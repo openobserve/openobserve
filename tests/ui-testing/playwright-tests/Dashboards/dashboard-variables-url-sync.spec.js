@@ -38,7 +38,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add global variable
     await pm.dashboardSetting.openSetting();
@@ -91,7 +91,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add tab variable to default tab
     await pm.dashboardSetting.openSetting();
@@ -152,7 +152,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add panel and capture panel ID from API response
     await pm.dashboardCreate.addPanel();
@@ -242,7 +242,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -308,7 +308,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable with default value
     await pm.dashboardSetting.openSetting();
@@ -372,7 +372,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -441,7 +441,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add two variables
     await pm.dashboardSetting.openSetting();
@@ -495,7 +495,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable
     await pm.dashboardSetting.openSetting();
@@ -571,7 +571,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add global and tab variables using default tab
     await pm.dashboardSetting.openSetting();

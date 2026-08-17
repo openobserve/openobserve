@@ -22,6 +22,8 @@ vi.mock("@/services/alerts", () => ({
     list_groups: vi.fn(),
     list_group_transitions: vi.fn(),
     getHistory: vi.fn(),
+    getCompositeReferences: vi.fn(),
+    getCompositeTimeline: vi.fn(),
   },
 }));
 
@@ -74,6 +76,58 @@ function makeMultiAlert() {
     query_condition: {
       aggregation: { group_by: ["host"], multi_alert: true },
     },
+  };
+}
+
+function makeCompositeAlert(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "alert-1",
+    alert_type: "composite",
+    name: "Checkout degraded",
+    enabled: true,
+    scheduler_job_present: true,
+    trigger_condition: { silence: 15 },
+    composite_condition: {
+      expression: "({id-a} && {id-b})",
+      warning_counts_as_firing: true,
+      stale_child_policy: "use_last_state",
+    },
+    evaluation: {
+      result: true,
+      level: "critical",
+      evaluated_at: 1_786_500_015_000_000,
+    },
+    referenced_by_composite_count: 1,
+    children: [
+      {
+        alert_id: "id-a",
+        name: "High error rate",
+        alert_type: "scheduled",
+        folder_id: "default",
+        enabled: true,
+        accessible: true,
+        level: "critical",
+        last_outcome: "firing",
+        level_at: 1_786_500_000_000_000,
+        stale_deadline: 1_786_500_180_000_000,
+        stale: false,
+        truth: true,
+      },
+      {
+        alert_id: "id-b",
+        name: "High latency",
+        alert_type: "scheduled",
+        folder_id: "payments",
+        enabled: false,
+        accessible: true,
+        level: null,
+        level_at: null,
+        stale_deadline: null,
+        stale: true,
+        truth: false,
+      },
+    ],
+    ...overrides,
   };
 }
 
@@ -133,6 +187,20 @@ async function mountView({
   } as any);
   vi.mocked(alertsService.getHistory).mockResolvedValue({
     data: { hits: evaluations, total: evaluations.length },
+  } as any);
+  vi.mocked(alertsService.getCompositeReferences).mockResolvedValue({
+    data: {
+      references: [{ alert_id: "parent-1", name: "Customer impact", folder_id: "default" }],
+      hidden_reference_count: 0,
+    },
+  } as any);
+  vi.mocked(alertsService.getCompositeTimeline).mockResolvedValue({
+    data: {
+      from: 0,
+      to: 1,
+      children: [],
+      result: { alert_id: "alert-1", accessible: true, transitions: [] },
+    },
   } as any);
 
   const wrapper = mount(AlertDetail, {
@@ -406,6 +474,52 @@ describe("AlertDetail — History tab", () => {
       await wrapper.find('[data-test="alerts-alertdetail-edit"]').trigger("click");
 
       expect(mockRouterPush.mock.calls[0][0].query.folder).toBe("default");
+    });
+  });
+
+  describe("composite detail integration", () => {
+    it("renders why-firing diagnostics instead of query and group surfaces", async () => {
+      wrapper = await mountView({ alert: makeCompositeAlert() });
+
+      expect(wrapper.findComponent({ name: "CompositeAlertDetail" }).exists()).toBe(true);
+      expect(wrapper.find('[data-test="alerts-composite-detail-result"]').text()).toMatch(
+        /critical/i,
+      );
+      expect(wrapper.find('[data-test="alerts-composite-detail-child-id-a"]').text()).toMatch(
+        /critical.*firing/i,
+      );
+      expect(wrapper.find('[data-test="alerts-composite-detail-child-id-b"]').text()).toMatch(
+        /disabled/i,
+      );
+      expect(wrapper.findComponent({ name: "AlertGroupChart" }).exists()).toBe(false);
+      expect(wrapper.find('[data-otab-name="groups"]').exists()).toBe(false);
+      expect(alertsService.list_groups).not.toHaveBeenCalled();
+    });
+
+    it("opens the reference drawer from the detail chip using the shared endpoint", async () => {
+      wrapper = await mountView({ alert: makeCompositeAlert() });
+      await wrapper.find('[data-test="alerts-composite-reference-chip"]').trigger("click");
+      await flushPromises();
+
+      expect(alertsService.getCompositeReferences).toHaveBeenCalledWith("default", "alert-1");
+      expect(
+        wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').text(),
+      ).toContain("Customer impact");
+    });
+
+    it("shows missing-job repair guidance only for an enabled composite", async () => {
+      wrapper = await mountView({
+        alert: makeCompositeAlert({ enabled: true, scheduler_job_present: false }),
+      });
+      expect(wrapper.find('[data-test="alerts-composite-detail-missing-job"]').exists()).toBe(true);
+      wrapper.unmount();
+
+      wrapper = await mountView({
+        alert: makeCompositeAlert({ enabled: false, scheduler_job_present: false }),
+      });
+      expect(wrapper.find('[data-test="alerts-composite-detail-missing-job"]').exists()).toBe(
+        false,
+      );
     });
   });
 });

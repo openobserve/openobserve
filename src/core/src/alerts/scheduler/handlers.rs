@@ -103,15 +103,47 @@ async fn persist_alert_run_state(
                 return false;
             }
         };
-        let plan = config::meta::alerts::grouping::plan_group_updates(
-            alert_id,
-            classification,
-            &prev,
-            now_micros(),
-        );
+        let at = now_micros();
+        let plan =
+            config::meta::alerts::grouping::plan_group_updates(alert_id, classification, &prev, at);
         if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
+        }
+
+        // A composite reads only this multi-alert's rollup row. Nudge its
+        // parents on a rollup transition or a stale-to-fresh return, exactly
+        // as the single-row path does — otherwise a grouped child is sweep-only.
+        let rollup = plan.updates.iter().find(|update| {
+            update
+                .state
+                .as_ref()
+                .is_some_and(|state| state.group_key.as_str() == ROLLUP_GROUP_KEY)
+        });
+        let transition_changed = rollup.is_some_and(|update| update.transition.is_some());
+        let stale_to_fresh = prev
+            .get(ROLLUP_GROUP_KEY)
+            .and_then(|state| state.level_at)
+            .is_some_and(|level_at| {
+                config::meta::alerts::composite::alert_stale_deadline_micros(
+                    level_at,
+                    &alert.trigger_condition,
+                    alert.tz_offset,
+                    composite_stale_k(),
+                )
+                .map(|deadline| at > deadline)
+                .unwrap_or(false)
+            });
+        if transition_changed || stale_to_fresh {
+            let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            nudge_composite_parents(
+                db,
+                &alert.org_id,
+                alert_id,
+                infra::table::alert_composites::ChildKind::Alert,
+                at,
+            )
+            .await;
         }
         return true;
     }
@@ -170,6 +202,36 @@ async fn persist_alert_run_state(
     if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
         log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
         return false;
+    }
+
+    // Composite parents observe this rollup row. Nudge them on a level/outcome
+    // transition or a stale-to-fresh return so a composite over an ordinary or
+    // SLO child is event-driven, not only sweep-driven (§11.2). Repeated fresh
+    // same-level evaluations deliberately do not nudge.
+    let transition_changed = update.transition.is_some();
+    let stale_to_fresh = prev
+        .as_ref()
+        .and_then(|previous| previous.level_at)
+        .is_some_and(|level_at| {
+            config::meta::alerts::composite::alert_stale_deadline_micros(
+                level_at,
+                &alert.trigger_condition,
+                alert.tz_offset,
+                composite_stale_k(),
+            )
+            .map(|deadline| now > deadline)
+            .unwrap_or(false)
+        });
+    if transition_changed || stale_to_fresh {
+        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        nudge_composite_parents(
+            db,
+            &alert.org_id,
+            alert_id,
+            infra::table::alert_composites::ChildKind::Alert,
+            now,
+        )
+        .await;
     }
     true
 }
@@ -525,7 +587,524 @@ pub async fn handle_triggers(
         }
         db::scheduler::TriggerModule::Slo => handle_slo_triggers(trigger).await,
         db::scheduler::TriggerModule::SloBackfill => handle_slo_backfill_triggers(trigger).await,
+        db::scheduler::TriggerModule::CompositeAlert => {
+            handle_composite_alert_trigger(trace_id, trigger).await
+        }
     }
+}
+
+fn composite_debounce_secs() -> i64 {
+    config::get_config().alert_composite.debounce_secs.max(1)
+}
+
+fn composite_sweep_secs() -> i64 {
+    config::get_config().alert_composite.sweep_secs.max(1)
+}
+
+fn composite_stale_k() -> i64 {
+    config::get_config().alert_composite.stale_k.max(1)
+}
+
+/// Advance composite parents after a committed rollup write that changes what
+/// they observe (a level/outcome transition, or a stale-to-fresh return at the
+/// same level). Idempotent and coalesced: `next_run_at` is only ever pulled
+/// earlier, never pushed out.
+async fn nudge_composite_parents(
+    db: &sea_orm::DatabaseConnection,
+    org: &str,
+    child_id: &str,
+    child_kind: infra::table::alert_composites::ChildKind,
+    now: i64,
+) {
+    let parents =
+        match infra::table::alert_composites::list_parents(db, org, child_kind, child_id).await {
+            Ok(parents) => parents,
+            Err(error) => {
+                log::error!("[COMPOSITE_ALERT] failed to look up parents for {child_id}: {error}");
+                return;
+            }
+        };
+    for parent in parents {
+        // Order matters: generation first, then the job advance. A completion
+        // that later re-reads the generation must observe the nudge.
+        if let Err(error) =
+            infra::table::alert_composites::increment_evaluation_generation(db, org, &parent.id)
+                .await
+        {
+            log::error!(
+                "[COMPOSITE_ALERT] failed to increment generation for parent {}: {error}",
+                parent.id
+            );
+            continue;
+        }
+        if let Ok(mut parent_job) = infra::scheduler::get(
+            org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &parent.id,
+        )
+        .await
+        {
+            let debounce_at = now + composite_debounce_secs() * 1_000_000;
+            parent_job.next_run_at = parent_job.next_run_at.min(debounce_at);
+            if let Err(error) = infra::scheduler::update_trigger(parent_job, false).await {
+                log::error!(
+                    "[COMPOSITE_ALERT] failed to advance parent {}: {error}",
+                    parent.id
+                );
+            }
+        }
+    }
+}
+
+/// Composite jobs are routed explicitly by their append-only scheduler
+/// module. The definition/evaluation service is intentionally separate from
+/// the query-alert handler so a composite can never execute child queries.
+async fn handle_composite_alert_trigger(
+    trace_id: &str,
+    mut trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        infra::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &trigger.module_key,
+        )
+        .await?;
+        return Ok(());
+    }
+    // Until a production database-backed evaluator can obtain the metadata
+    // transaction used for state fencing, a missing/stale definition is
+    // completed safely through the epoch-fenced scheduler seam. This path is
+    // also the required lifecycle behavior after deletion.
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let definition =
+        infra::table::alert_composites::get_by_id(db, &trigger.org, &trigger.module_key).await?;
+    let Some(definition) = definition else {
+        infra::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &trigger.module_key,
+        )
+        .await?;
+        return Ok(());
+    };
+    if !definition.definition.enabled {
+        infra::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &trigger.module_key,
+        )
+        .await?;
+        return Ok(());
+    }
+    let mut scheduled_data: config::meta::triggers::ScheduledTriggerData =
+        config::utils::json::from_str(&trigger.data).unwrap_or_default();
+
+    use config::meta::{
+        alerts::{
+            composite::StaleChildPolicy,
+            state::{ROLLUP_GROUP_KEY, apply_outcome},
+        },
+        self_reporting::usage::RunOutcome,
+    };
+    let now = now_micros();
+    let child_ids = definition
+        .children
+        .iter()
+        .map(|child| child.child_alert_id.clone())
+        .collect::<Vec<_>>();
+    let states = infra::table::alert_states::get_rollups(&child_ids).await?;
+    let states = states
+        .into_iter()
+        .map(|state| (state.alert_id.clone(), state))
+        .collect::<std::collections::HashMap<_, _>>();
+    let resolved =
+        infra::table::alert_composites::resolve_many(db, &trigger.org, &child_ids).await?;
+    let stale_k = composite_stale_k();
+    let composite_sweep_seconds = composite_sweep_secs();
+    let mut children = Vec::with_capacity(definition.children.len());
+    for child in &definition.children {
+        let state = states.get(&child.child_alert_id);
+        let (name, alert_type, enabled, cadence_seconds, stale_deadline) =
+            match resolved.get(&child.child_alert_id) {
+                Some(infra::table::alert_composites::Resolution::Alert(model)) => {
+                    let alert: config::meta::alerts::alert::Alert = (**model).clone().try_into()?;
+                    if alert.is_real_time {
+                        anyhow::bail!("composite child is no longer eligible");
+                    }
+                    let stale_deadline = state
+                        .and_then(|state| state.level_at)
+                        .map(|level_at| {
+                            config::meta::alerts::composite::alert_stale_deadline_micros(
+                                level_at,
+                                &alert.trigger_condition,
+                                alert.tz_offset,
+                                stale_k,
+                            )
+                        })
+                        .transpose()?;
+                    (
+                        alert.name,
+                        if alert.query_condition.slo_condition.is_some() {
+                            "slo"
+                        } else {
+                            "scheduled"
+                        },
+                        alert.enabled,
+                        alert.trigger_condition.frequency.max(1),
+                        stale_deadline,
+                    )
+                }
+                Some(infra::table::alert_composites::Resolution::Composite(model)) => (
+                    model.name.clone(),
+                    "composite",
+                    model.enabled,
+                    composite_sweep_seconds,
+                    state.and_then(|state| state.level_at).and_then(|level_at| {
+                        composite_sweep_seconds
+                            .checked_mul(stale_k)
+                            .and_then(|seconds| seconds.checked_mul(1_000_000))
+                            .and_then(|window| level_at.checked_add(window))
+                    }),
+                ),
+                _ => anyhow::bail!("composite child definition missing"),
+            };
+        children.push(crate::alerts::composite::CompositeStateInput {
+            alert_id: child.child_alert_id.clone(),
+            name,
+            alert_type: alert_type.to_string(),
+            enabled,
+            level: state.and_then(|state| state.level),
+            level_at: state.and_then(|state| state.level_at),
+            effective_cadence_seconds: cadence_seconds,
+            stale_deadline,
+        });
+    }
+    let stale_policy = match definition.definition.stale_child_policy {
+        1 => StaleChildPolicy::TreatAsFalse,
+        2 => StaleChildPolicy::TreatAsTrue,
+        _ => StaleChildPolicy::UseLastState,
+    };
+    let evaluated = crate::alerts::composite::CompositeEvaluator::evaluate(
+        &definition.definition.expression,
+        children,
+        definition.definition.warning_counts_as_firing,
+        stale_policy,
+        now,
+    )?;
+    let previous =
+        infra::table::alert_states::get(&definition.definition.id, ROLLUP_GROUP_KEY).await?;
+    let outcome = if evaluated.result {
+        RunOutcome::Firing
+    } else {
+        RunOutcome::Normal
+    };
+    let update = apply_outcome(
+        &definition.definition.id,
+        ROLLUP_GROUP_KEY,
+        previous.as_ref(),
+        outcome.clone(),
+        Some(evaluated.level),
+        now,
+    );
+
+    use sea_orm::{
+        ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
+    };
+    let transaction = db.begin().await?;
+    let lease_deadline = now + config::get_config().limit.alert_schedule_timeout * 1_000_000;
+    if !infra::scheduler::renew_claim_in_transaction(
+        &transaction,
+        trigger.id,
+        trigger.claim_epoch,
+        lease_deadline,
+    )
+    .await?
+    {
+        transaction.rollback().await?;
+        return Ok(());
+    }
+    let mut current_query =
+        infra::table::entity::alert_composites::Entity::find_by_id(&definition.definition.id)
+            .filter(infra::table::entity::alert_composites::Column::Org.eq(&trigger.org));
+    if transaction.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+        current_query = current_query.lock(sea_orm::sea_query::LockType::Update);
+    }
+    let current = current_query.one(&transaction).await?;
+    if current.is_none_or(|current| {
+        !current.enabled
+            || current.evaluation_generation != definition.definition.evaluation_generation
+    }) {
+        transaction.rollback().await?;
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        trigger.next_run_at = now + composite_debounce_secs() * 1_000_000;
+        let _ = infra::scheduler::complete_claim(trigger).await?;
+        return Ok(());
+    }
+    infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
+    transaction.commit().await?;
+
+    let mut delivery_retry_at = None;
+    if evaluated.result {
+        let delivery = config::meta::alerts::level::delivery_decision(
+            evaluated.level,
+            scheduled_data
+                .last_notified_level
+                .and_then(config::meta::alerts::level::AlertLevel::from_i32),
+            scheduled_data.delivery_silenced_until,
+            now,
+            Some(true),
+        );
+        if delivery.should_deliver()
+            && (!definition
+                .definition
+                .destinations
+                .as_array()
+                .is_none_or(Vec::is_empty)
+                || !definition
+                    .definition
+                    .workflows
+                    .as_array()
+                    .is_none_or(Vec::is_empty))
+        {
+            let notification_alert = composite_notification_alert(&definition.definition);
+            let notification_row = composite_notification_row(
+                &definition.definition.expression,
+                evaluated.result,
+                &evaluated.children,
+            );
+            let rows = [notification_row];
+
+            #[cfg(feature = "enterprise")]
+            let incident_handled = if notification_alert.creates_incident
+                && o2_enterprise::enterprise::common::config::get_config()
+                    .incidents
+                    .enabled
+            {
+                crate::alerts::incidents::correlate_alert_to_incident(
+                    &notification_alert,
+                    &rows[0],
+                    &rows,
+                    now,
+                    Some(evaluated.level),
+                )
+                .await
+                .map(|outcome| outcome.is_some())
+                .unwrap_or_else(|error| {
+                    log::error!(
+                        "[COMPOSITE_ALERT] incident correlation failed for {}: {error}",
+                        definition.definition.id
+                    );
+                    false
+                })
+            } else {
+                false
+            };
+            #[cfg(not(feature = "enterprise"))]
+            let incident_handled = false;
+
+            let delivery_result = if incident_handled {
+                Ok(crate::alerts::alert::NotificationOutcome::default())
+            } else {
+                notification_alert
+                    .send_notification(
+                        trace_id,
+                        &rows,
+                        now,
+                        None,
+                        now,
+                        Some(evaluated.level),
+                        Some(i32::from(evaluated.result) as f64),
+                        None,
+                        &scheduled_data.notified_destinations,
+                    )
+                    .await
+            };
+            match delivery_result {
+                Ok(outcome) if outcome.failed.is_empty() => {
+                    scheduled_data.notified_destinations.clear();
+                    scheduled_data.last_notified_level = Some(evaluated.level.to_i32());
+                    scheduled_data.delivery_silenced_until = definition
+                        .definition
+                        .silence_seconds
+                        .checked_mul(1_000_000)
+                        .and_then(|window| now.checked_add(window));
+                    trigger.retries = 0;
+                }
+                Ok(outcome) => {
+                    for destination in outcome.succeeded {
+                        if !scheduled_data.notified_destinations.contains(&destination) {
+                            scheduled_data.notified_destinations.push(destination);
+                        }
+                    }
+                    trigger.retries = trigger.retries.saturating_add(1);
+                    delivery_retry_at = Some(now.saturating_add(10_000_000));
+                }
+                Err(error) => {
+                    log::error!(
+                        "[COMPOSITE_ALERT] delivery failed for {}: {error}",
+                        definition.definition.id
+                    );
+                    trigger.retries = trigger.retries.saturating_add(1);
+                    delivery_retry_at = Some(now.saturating_add(10_000_000));
+                }
+            }
+        }
+    }
+
+    // Publish composite history through the existing trigger path with an
+    // `alert_type="composite"` discriminator (§12.4). `actual_value` is the
+    // boolean result (1/0); threshold fields are absent.
+    publish_triggers_usage(TriggerData {
+        _timestamp: now,
+        org: trigger.org.clone(),
+        module: TriggerDataType::CompositeAlert,
+        key: format!(
+            "{}/{}",
+            definition.definition.name, definition.definition.id
+        ),
+        status: outcome.clone(),
+        actual_value: Some(i32::from(evaluated.result) as f64),
+        level: Some(evaluated.level.to_i32()),
+        scheduler_trace_id: Some(trace_id.to_string()),
+        retries: trigger.retries,
+        is_realtime: trigger.is_realtime,
+        is_silenced: trigger.is_silenced,
+        start_time: now,
+        end_time: now,
+        next_run_at: trigger.next_run_at,
+        ..Default::default()
+    });
+
+    let significant = previous.as_ref().is_none_or(|previous| {
+        previous.level != Some(evaluated.level)
+            || previous.last_outcome.as_ref() != Some(&outcome)
+            || previous.level_at.is_some_and(|level_at| {
+                // Composite staleness is measured against
+                // `ZO_ALERT_COMPOSITE_STALE_K * ZO_ALERT_COMPOSITE_SWEEP_SECS`.
+                // If the composite was stale before this run and just wrote a
+                // fresh `level_at`, its parent must re-evaluate even at an
+                // unchanged level.
+                let window = composite_stale_k()
+                    .saturating_mul(composite_sweep_secs())
+                    .saturating_mul(1_000_000);
+                now.saturating_sub(level_at) > window
+            })
+    });
+    if significant {
+        nudge_composite_parents(
+            db,
+            &trigger.org,
+            &definition.definition.id,
+            infra::table::alert_composites::ChildKind::Composite,
+            now,
+        )
+        .await;
+    }
+
+    log::info!(
+        "[COMPOSITE_ALERT] trace_id={trace_id} composite_id={} generation_start={} generation_end={} child_count={} result={} stale_count={} nudge_reason=scheduler error_code=",
+        definition.definition.id,
+        definition.definition.evaluation_generation,
+        definition.definition.evaluation_generation,
+        evaluated.children.len(),
+        evaluated.result,
+        evaluated
+            .children
+            .iter()
+            .filter(|child| child.stale)
+            .count(),
+    );
+    let sweep_at = now + composite_sweep_secs() * 1_000_000;
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    trigger.next_run_at = evaluated
+        .next_stale_deadline
+        .map(|deadline| deadline.saturating_add(1).min(sweep_at))
+        .unwrap_or(sweep_at);
+    if let Some(retry_at) = delivery_retry_at {
+        trigger.next_run_at = trigger.next_run_at.min(retry_at);
+    }
+    // Lost-wakeup protection (§11.4): a child nudge, manual trigger, or
+    // mutation that lands after the state transaction commits advances
+    // `evaluation_generation`. If the generation has moved past the snapshot
+    // taken at the start of this run, completion must schedule another run no
+    // later than `now + debounce` rather than overwrite that event with the
+    // sweep deadline.
+    if let Ok(Some(current_generation)) =
+        infra::table::alert_composites::current_generation(db, &trigger.org, &trigger.module_key)
+            .await
+        && current_generation > definition.definition.evaluation_generation
+    {
+        trigger.next_run_at = trigger
+            .next_run_at
+            .min(now + composite_debounce_secs() * 1_000_000);
+    }
+    trigger.data = config::utils::json::to_string(&scheduled_data)?;
+    let _ = infra::scheduler::complete_claim(trigger).await?;
+    Ok(())
+}
+
+fn composite_notification_alert(
+    definition: &infra::table::entity::alert_composites::Model,
+) -> config::meta::alerts::alert::Alert {
+    let mut alert = config::meta::alerts::alert::Alert::default();
+    alert.id = svix_ksuid::Ksuid::from_str(&definition.id).ok();
+    alert.org_id = definition.org.clone();
+    alert.name = definition.name.clone();
+    alert.description = definition.description.clone().unwrap_or_default();
+    alert.destinations =
+        serde_json::from_value(definition.destinations.clone()).unwrap_or_default();
+    alert.template = definition.template.clone();
+    alert.context_attributes = definition
+        .context_attributes
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok());
+    alert.creates_incident = definition.creates_incident;
+    alert.workflows = serde_json::from_value(definition.workflows.clone()).unwrap_or_default();
+    alert.priority = definition
+        .priority
+        .and_then(config::meta::alerts::priority::AlertPriority::from_i32);
+    alert.tags = definition
+        .tags
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    alert.trigger_condition.silence = definition.silence_seconds;
+    alert
+}
+
+fn composite_notification_row(
+    expression: &str,
+    result: bool,
+    children: &[crate::alerts::composite::EvaluatedChild],
+) -> config::utils::json::Map<String, config::utils::json::Value> {
+    let mut resolved_expression = expression.to_string();
+    for child in children {
+        resolved_expression =
+            resolved_expression.replace(&format!("{{{}}}", child.alert_id), &child.name);
+    }
+    let value = config::utils::json::json!({
+        "composite_result": result,
+        "composite_expression": resolved_expression,
+        "composite_expression_ids": expression,
+        "firing_children": children.iter().filter(|child| child.truth).map(|child| child.name.clone()).collect::<Vec<_>>(),
+        "stale_children": children.iter().filter(|child| child.stale).map(|child| child.name.clone()).collect::<Vec<_>>(),
+        "child_states": children.iter().map(|child| config::utils::json::json!({
+            "alert_id": child.alert_id,
+            "name": child.name,
+            "alert_type": child.alert_type,
+            "enabled": child.enabled,
+            "level": child.level.map(|level| level.to_string()),
+            "level_at": child.level_at,
+            "stale": child.stale,
+            "truth": child.truth,
+        })).collect::<Vec<_>>(),
+    });
+    value.as_object().cloned().unwrap_or_default()
 }
 
 /// Handle an anomaly detection trigger.
