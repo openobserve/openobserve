@@ -24,7 +24,10 @@ import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 const stubs = {
   OScheduleTimeline: {
     name: "OScheduleTimeline",
-    props: ["tracks", "nowOffset"],
+    // Mirrors the primitive's real prop list: a stub that omits `axisTicks`
+    // silently returns undefined for it, and every assertion about the axis
+    // passes without an axis existing.
+    props: ["tracks", "nowOffset", "axisTicks", "dayColumns"],
     template: "<div><slot name='legend' /></div>",
   },
 };
@@ -94,6 +97,81 @@ describe("OnCallCoverageStrip", () => {
       expect(band.ariaLabel).toContain("from");
       expect(band.ariaLabel).toContain("to");
     }
+  });
+
+  /// I10: the strip was one unbroken bar with no dates under it, so a gap
+  /// tomorrow and a gap a fortnight out looked identical. The marks sit on real
+  /// local midnights — an even fraction of the window would put "Mon 18" at
+  /// half past two on the Monday.
+  describe("the time axis", () => {
+    function axisOf(wrapper: any) {
+      return wrapper.findComponent({ name: "OScheduleTimeline" }).props("axisTicks") ?? [];
+    }
+
+    it("labels the strip with dates a reader can count days along", () => {
+      const ticks = axisOf(render([rotation(["ana@o2.ai"])]));
+
+      expect(ticks.length).toBeGreaterThan(1);
+      // Thinned, never one per day: fourteen labels collide at this zoom.
+      expect(ticks.length).toBeLessThanOrEqual(8);
+      for (const tick of ticks) {
+        expect(tick.offset).toBeGreaterThanOrEqual(0);
+        expect(tick.offset).toBeLessThanOrEqual(1);
+        expect(String(tick.label)).toMatch(/\d/);
+      }
+    });
+
+    /// FROM is 14 Nov 2023 22:13 UTC, so the first boundary is under two hours
+    /// in — the axis must start where the day starts, not where the strip does.
+    it("puts the first mark on the next local midnight, not on the window edge", () => {
+      const [first] = axisOf(render([rotation(["ana@o2.ai"])]));
+      const dayShare = 1 / 14;
+
+      expect(first.offset).toBeGreaterThan(0);
+      expect(first.offset).toBeLessThan(dayShare);
+    });
+  });
+
+  /// E5: `Covered` is a binary that answers the wrong question. What somebody
+  /// acts on is WHEN cover next drops — read off the same runs the bands are
+  /// drawn from, so the sentence can never disagree with the picture above it.
+  describe("the summary sentence", () => {
+    const summaryOf = (wrapper: any) =>
+      wrapper.find('[data-test="oncall-coverage-summary"]').text();
+
+    it("says how long there is before cover drops, and for how long", () => {
+      // A weekday-only rotation: FROM is a Tuesday evening, so the first hole
+      // opens at Saturday midnight — three days out, and two days wide.
+      const rotations = [
+        rotation(["ana@o2.ai", "bob@o2.ai"], {
+          restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 0, end_minute: 1439 }],
+        }),
+      ];
+      const text = summaryOf(render(rotations));
+
+      expect(text).toContain("Cover drops in");
+      expect(text).toContain("3d");
+      expect(text).toContain("for 2d");
+    });
+
+    /// A hole that is already open is not a thing that will happen.
+    it("says nobody is on call when the gap has already started", () => {
+      expect(summaryOf(render([]))).toContain("Nobody is on call");
+    });
+
+    /// Cover "returning" at the edge of what we drew would be a shift we
+    /// invented — the window ending is not a rota starting.
+    it("does not promise cover returns at the edge of the window", () => {
+      const text = summaryOf(render([]));
+      expect(text).toContain("nobody is scheduled in the next 14 days");
+      expect(text).not.toContain("cover returns");
+    });
+
+    it("stays calm when the whole window is covered", () => {
+      expect(summaryOf(render([rotation(["ana@o2.ai", "bob@o2.ai"])]))).toContain(
+        "the whole of the next 14 days",
+      );
+    });
   });
 
   it("offers a legend for all three states", () => {

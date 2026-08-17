@@ -24,7 +24,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col gap-2" data-test="oncall-coverage-strip">
-    <OScheduleTimeline :tracks="tracks" :now-offset="0" :now-label="t('oncall.calendarToday')">
+    <!-- The sentence the picture cannot say on its own. A strip answers "is
+         there a hole" at a glance; the one thing a reader actually acts on is
+         WHEN, and a fortnight of green looks identical whether the hole is
+         tomorrow or never. -->
+    <p
+      class="text-xs"
+      :class="firstGap ? 'text-status-warning-text' : 'text-text-secondary'"
+      data-test="oncall-coverage-summary"
+    >
+      {{ summary }}
+    </p>
+
+    <OScheduleTimeline
+      :tracks="tracks"
+      :axis-ticks="axisTicks"
+      :day-columns="dayColumns"
+      :now-offset="0"
+      :now-label="t('oncall.calendarToday')"
+    >
       <template #legend>
         <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span
@@ -46,6 +64,7 @@ import { computed } from "vue";
 
 import OScheduleTimeline from "@/lib/data/ScheduleTimeline/OScheduleTimeline.vue";
 import type {
+  ScheduleAxisTick,
   ScheduleBand,
   ScheduleTrack,
 } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
@@ -53,7 +72,13 @@ import type { Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone, resolveHolder, resolveNextHolder } from "@/utils/oncall";
+import { formatMicrosDuration } from "@/utils/formatters";
+import {
+  formatInZone,
+  resolveHolder,
+  resolveNextHolder,
+  wallTimeInZone,
+} from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -105,43 +130,163 @@ const clock = (micros: number) =>
     minute: "2-digit",
   });
 
+/** One unbroken stretch of a single cover state. */
+interface Run {
+  from: number;
+  to: number;
+  cover: Cover;
+}
+
 /// Adjacent samples of the same state merge, so a covered fortnight is one band
 /// rather than 336 slivers the browser has to lay out.
-const tracks = computed<ScheduleTrack[]>(() => {
+const runs = computed<Run[]>(() => {
   if (span.value <= 0) return [];
 
-  const bands: ScheduleBand[] = [];
+  const out: Run[] = [];
   let runStart = start.value;
   let runCover = coverAt(start.value);
-
-  const push = (from: number, to: number, cover: Cover) => {
-    const label = t(COVER_LABEL[cover] as "oncall.coverNobody");
-    bands.push({
-      key: `${from}`,
-      offset: (from - start.value) / span.value,
-      width: (to - from) / span.value,
-      // Only the gap carries text: a fortnight of cover labelled fourteen times
-      // is noise, and the band a reader is hunting for is the empty one.
-      label: cover === "none" ? label : raw(""),
-      ariaLabel: t("oncall.coverageStripAria", {
-        who: label,
-        from: raw(clock(from)),
-        to: raw(clock(to)),
-      }),
-      tone: TONE[cover],
-    });
-  };
 
   for (let at = start.value + STEP_MICROS; at < end.value; at += STEP_MICROS) {
     const cover = coverAt(at);
     if (cover === runCover) continue;
-    push(runStart, at, runCover);
+    out.push({ from: runStart, to: at, cover: runCover });
     runStart = at;
     runCover = cover;
   }
-  push(runStart, end.value, runCover);
+  out.push({ from: runStart, to: end.value, cover: runCover });
+  return out;
+});
+
+const tracks = computed<ScheduleTrack[]>(() => {
+  if (!runs.value.length) return [];
+
+  const bands: ScheduleBand[] = runs.value.map((run) => {
+    const label = t(COVER_LABEL[run.cover] as "oncall.coverNobody");
+    return {
+      key: `${run.from}`,
+      offset: (run.from - start.value) / span.value,
+      width: (run.to - run.from) / span.value,
+      // Only the gap carries text: a fortnight of cover labelled fourteen times
+      // is noise, and the band a reader is hunting for is the empty one.
+      label: run.cover === "none" ? label : raw(""),
+      ariaLabel: t("oncall.coverageStripAria", {
+        who: label,
+        from: raw(clock(run.from)),
+        to: raw(clock(run.to)),
+      }),
+      tone: TONE[run.cover],
+    };
+  });
 
   return [{ key: "coverage", label: raw(""), bands }];
+});
+
+/// The first stretch with nobody on call. Read off the SAME runs the bands are
+/// drawn from, never resolved a second way: a sentence that disagreed with the
+/// picture above it would be worse than no sentence.
+const firstGap = computed<Run | null>(
+  () => runs.value.find((run) => run.cover === "none") ?? null,
+);
+
+/// Cover the moment the strip starts, which is now.
+const coveredNow = computed(() => runs.value[0]?.cover !== "none");
+
+/// "Cover drops in 5d 3h — Fri 22 Aug 18:00, for 12h", or the calm version.
+///
+/// The duration is what somebody acts on; the instant is what they put in a
+/// calendar; the length is how much of a hole it is. A gap already in progress
+/// says so instead, because "drops in 0m" is a sentence about the future for a
+/// thing that has already happened.
+const summary = computed<I18nText>(() => {
+  const gap = firstGap.value;
+  if (!gap) return t("oncall.coverageNoGap", { days: props.days });
+
+  const at = raw(
+    formatInZone(gap.from, props.timezone, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  );
+  const length = formatMicrosDuration(gap.to - gap.from);
+
+  if (!coveredNow.value) {
+    // A hole that runs to the end of the window has no known return: saying
+    // cover comes back at the edge of what we drew would invent a shift.
+    return gap.to >= end.value
+      ? t("oncall.coverageGapNowOpen", { days: props.days })
+      : t("oncall.coverageGapNow", {
+          when: raw(
+            formatInZone(gap.to, props.timezone, {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          ),
+        });
+  }
+
+  return t("oncall.coverageDropsIn", {
+    duration: formatMicrosDuration(gap.from - start.value),
+    when: at,
+    length,
+  });
+});
+
+/// Roughly this many labelled marks across the window — enough to place a band
+/// within a day, few enough that the labels do not collide.
+const TICK_TARGET = 7;
+
+/// The next local midnight at or after `at`.
+///
+/// Snapped by re-reading the wall clock rather than trusting the arithmetic: a
+/// DST change moves the boundary by an hour, and a tick labelled Tuesday that
+/// sits an hour inside Monday is the kind of error nobody catches by eye.
+function nextLocalMidnight(at: number): number {
+  const wall = wallTimeInZone(at, props.timezone);
+  if (!wall) return at + MICROS_PER_DAY;
+  const candidate = at + (1440 - wall.minuteOfDay) * 60 * 1_000_000;
+  const landed = wallTimeInZone(candidate, props.timezone);
+  if (!landed || landed.minuteOfDay === 0) return candidate;
+  return landed.minuteOfDay > 720
+    ? candidate + (1440 - landed.minuteOfDay) * 60 * 1_000_000
+    : candidate - landed.minuteOfDay * 60 * 1_000_000;
+}
+
+/// Every local midnight in the window — the guides a reader counts days along.
+const dayBoundaries = computed<number[]>(() => {
+  if (span.value <= 0) return [];
+  const out: number[] = [];
+  // Bounded by the day count, so a bad timezone cannot spin here.
+  for (
+    let at = nextLocalMidnight(start.value);
+    at < end.value && out.length <= props.days + 1;
+    at = nextLocalMidnight(at)
+  ) {
+    out.push(at);
+  }
+  return out;
+});
+
+const dayColumns = computed(() =>
+  dayBoundaries.value.map((at) => (at - start.value) / span.value),
+);
+
+/// Dates on the axis. Every day's label would collide at a fortnight's zoom, so
+/// they thin out — but always onto real midnights, never onto even fractions of
+/// the window, which would put "Mon 18" at half past two on the Monday.
+const axisTicks = computed<ScheduleAxisTick[]>(() => {
+  const step = Math.max(1, Math.ceil(props.days / TICK_TARGET));
+  return dayBoundaries.value
+    .filter((_, index) => index % step === 0)
+    .map((at) => ({
+      offset: (at - start.value) / span.value,
+      label: raw(formatInZone(at, props.timezone, { weekday: "short", day: "numeric" })),
+    }));
 });
 
 interface LegendEntry {
