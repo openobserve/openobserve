@@ -226,14 +226,42 @@ describe("traceColors", () => {
   });
 
   describe("getContrastTextColor", () => {
-    it("should return 'white'", () => {
+    // A value this cannot measure keeps the old always-white behaviour, so
+    // existing callers passing a CSS var reference are unaffected.
+    it("returns white for a value it cannot measure", () => {
       expect(getContrastTextColor("var(--color-span-1)")).toBe("white");
+      expect(getContrastTextColor("")).toBe("white");
+      expect(getContrastTextColor("not-a-colour")).toBe("white");
+      expect(getContrastTextColor("#12345")).toBe("white");
     });
 
-    it("should always return white regardless of background", () => {
+    it("picks the text colour from the background's luminance", () => {
       expect(getContrastTextColor("#000000")).toBe("white");
-      expect(getContrastTextColor("#ffffff")).toBe("white");
-      expect(getContrastTextColor("")).toBe("white");
+      expect(getContrastTextColor("#ffffff")).toBe("black");
+      expect(getContrastTextColor("#1f3a5f")).toBe("white"); // dark navy
+      expect(getContrastTextColor("#ffe0a3")).toBe("black"); // pale amber
+    });
+
+    it("accepts hex shorthand and an absent leading hash", () => {
+      expect(getContrastTextColor("#fff")).toBe("black");
+      expect(getContrastTextColor("#000")).toBe("white");
+      expect(getContrastTextColor("ffffff")).toBe("black");
+    });
+
+    // Luminance is not brightness: green weighs ~3.5x more than blue, so a
+    // saturated green needs dark text where an equally saturated blue does not.
+    it("weights channels by luminance, not by raw value", () => {
+      expect(getContrastTextColor("#00ff00")).toBe("black");
+      expect(getContrastTextColor("#0000ff")).toBe("white");
+    });
+
+    // The real palette these labels land on — every entry must resolve to a
+    // readable pairing rather than throwing or returning something unexpected.
+    it("resolves every span colour in the palette", () => {
+      for (const color of getAllSpanColors()) {
+        if (!color.startsWith("#")) continue;
+        expect(["white", "black"]).toContain(getContrastTextColor(color));
+      }
     });
   });
 

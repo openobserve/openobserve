@@ -154,14 +154,62 @@ export const generateServiceColorMap = (serviceNames: string[]): Map<string, str
 };
 
 /**
- * Get readable text color (white or black) based on background color
- * @param backgroundColor - Background color CSS variable
- * @returns 'white' or 'black'
+ * Threshold on WCAG relative luminance for flipping text from white to black.
+ *
+ * 0.179 is the point where a background contrasts equally against both, so it
+ * maximises the worse of the two ratios rather than favouring either.
  */
-export const getContrastTextColor = (_backgroundColor: string): string => {
-  // For now, return white for all span colors as they're designed with good contrast
-  // Can be enhanced with actual luminance calculation if needed
-  return "white";
+const CONTRAST_LUMINANCE_THRESHOLD = 0.179;
+
+/** Parses `#rgb` / `#rrggbb` into 0-255 channels, or null if it is not a hex. */
+const parseHexChannels = (color: string): [number, number, number] | null => {
+  const hex = color.trim().replace(/^#/, "");
+  const full =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : hex;
+
+  if (!/^[0-9a-f]{6}$/i.test(full)) return null;
+
+  return [
+    parseInt(full.slice(0, 2), 16),
+    parseInt(full.slice(2, 4), 16),
+    parseInt(full.slice(4, 6), 16),
+  ];
+};
+
+/**
+ * Get readable text color (white or black) based on background color
+ *
+ * Used where text has to sit on a span's own colour — the duration label inside
+ * a bar too wide to place it beside. Span colours come from an arbitrary
+ * palette, so the choice cannot be baked in per theme: a pale bar needs black
+ * text in dark mode just as much as in light.
+ *
+ * @param backgroundColor - a hex colour (`#rgb` or `#rrggbb`)
+ * @returns 'white' or 'black'
+ *
+ * A non-hex value (e.g. a `var(--color-span-N)` reference, which
+ * `generateServiceColorMap` produces) cannot be measured here and yields
+ * 'white', preserving this function's previous behaviour for those callers.
+ */
+export const getContrastTextColor = (backgroundColor: string): "white" | "black" => {
+  const channels = parseHexChannels(backgroundColor ?? "");
+  if (!channels) return "white";
+
+  // WCAG relative luminance: linearise each channel, then weight by the eye's
+  // sensitivity to it. Green dominates, which is why a mid-green bar needs dark
+  // text where a mid-blue one of the same hex distance does not.
+  const [r, g, b] = channels.map((channel) => {
+    const v = channel / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  return luminance > CONTRAST_LUMINANCE_THRESHOLD ? "black" : "white";
 };
 
 /**
