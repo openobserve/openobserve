@@ -166,7 +166,7 @@ test.describe("Online Evals LLM Provider Types & API Key Handling", () => {
         await pm.llmProvidersPage.clickSave();
 
         await expect(pm.llmProvidersPage.getToastErrorLocator().first())
-            .toContainText('endpoint is required', { timeout: 10000 });
+            .toContainText(/endpoint is required/i, { timeout: 10000 });
         await expect(pm.llmProvidersPage.getToastSuccessLocator()).toHaveCount(0);
         // The form stays open on validation failure.
         await expect(pm.llmProvidersPage.getFormTitleLocator()).toBeVisible();
