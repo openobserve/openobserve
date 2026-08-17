@@ -35,13 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EvidenceEventDetail from "./EvidenceEventDetail.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   evidenceGroupKind,
@@ -85,6 +86,14 @@ const rows = computed<EvidenceRow[]>(() =>
 );
 
 const isPanel = computed(() => props.mode === "panel");
+
+/**
+ * Multiple, not single: the question an expanded row answers is usually
+ * comparative — did the 503 that opened here carry the same step id as the
+ * page error below it — and single-expansion closes the first answer to show
+ * the second.
+ */
+const expandedIds = ref<string[]>([]);
 
 /**
  * Headers and sorting are PANEL-only.
@@ -245,6 +254,9 @@ function rowTitle(e: EvidenceEvent): string {
     :fill-height="false"
     :frame="false"
     :get-row-status-color="rowStatusColor"
+    :expansion="isPanel ? 'multiple' : 'none'"
+    :expanded-ids="expandedIds"
+    @update:expandedIds="(ids: string[]) => (expandedIds = ids)"
     data-test="synthetics-evidence-events"
   >
     <!-- First column, because it is the axis every other cell is read against:
@@ -318,6 +330,10 @@ function rowTitle(e: EvidenceEvent): string {
       <span class="text-text-secondary text-right font-mono text-xs">
         {{ row.durationMs != null ? `${row.durationMs}ms` : "" }}
       </span>
+    </template>
+
+    <template #expansion="{ row }">
+      <EvidenceEventDetail :event="row" />
     </template>
 
     <template #empty>

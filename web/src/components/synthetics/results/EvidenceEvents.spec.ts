@@ -18,6 +18,7 @@ import { mount } from "@vue/test-utils";
 
 import i18n from "@/locales";
 import EvidenceEvents from "./EvidenceEvents.vue";
+import EvidenceEventDetail from "./EvidenceEventDetail.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -192,5 +193,39 @@ describe("EvidenceEvents", () => {
     empty.vm.$emit("action", "clear-filters");
     await w.vm.$nextTick();
     expect(w.emitted("clear-filters")).toBeTruthy();
+  });
+
+  it("offers an expand control on every panel row", () => {
+    const w = mountEvents({ mode: "panel" });
+    expect(w.find('[data-test="o2-table-expand-0"]').exists()).toBe(true);
+    expect(w.find('[data-test="o2-table-expand-1"]').exists()).toBe(true);
+  });
+
+  it("leaves the inline step list unexpandable, where the cap is the point", () => {
+    const w = mountEvents({ mode: "inline" });
+    expect(w.find('[data-test="o2-table-expand-cell"]').exists()).toBe(false);
+    expect(w.find('[data-test="o2-table-expand-0"]').exists()).toBe(false);
+  });
+
+  it("renders the detail panel for an expanded row", async () => {
+    const w = mountEvents({ mode: "panel" });
+    await w.find('[data-test="o2-table-expand-0"]').trigger("click");
+    expect(w.findComponent(EvidenceEventDetail).exists()).toBe(true);
+  });
+
+  it("hands the detail panel the row it was expanded from", async () => {
+    const w = mountEvents({ mode: "panel" });
+    await w.find('[data-test="o2-table-expand-0"]').trigger("click");
+    expect(w.findComponent(EvidenceEventDetail).props("event")).toMatchObject({
+      kind: "pageerror",
+      message: "Uncaught TypeError: c.user is undefined",
+    });
+  });
+
+  it("keeps two rows open at once — comparing two events is the point", async () => {
+    const w = mountEvents({ mode: "panel" });
+    await w.find('[data-test="o2-table-expand-0"]').trigger("click");
+    await w.find('[data-test="o2-table-expand-1"]').trigger("click");
+    expect(w.findAllComponents(EvidenceEventDetail)).toHaveLength(2);
   });
 });
