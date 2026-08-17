@@ -106,7 +106,7 @@ pub async fn merge_parquet_files(
     // get all sorted data
     let sql = if stream_type == StreamType::Metadata && is_trace_time_index_stream(stream_name) {
         format!(
-            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
+            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id, MAX(session_id) AS session_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead sort by min ts of entries
@@ -317,7 +317,7 @@ pub fn append_metadata(
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int64Array, StringArray};
+    use arrow::array::{Array, Int64Array, StringArray};
     use arrow_schema::{DataType, Field, Schema};
     use bytes::Bytes;
     use datafusion::datasource::MemTable;
@@ -391,6 +391,7 @@ mod tests {
         let schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("trace_id", DataType::Utf8, false),
+            Field::new("session_id", DataType::Utf8, true),
             Field::new("min_ts", DataType::Int64, false),
             Field::new("max_ts", DataType::Int64, false),
         ]));
@@ -399,6 +400,7 @@ mod tests {
             vec![
                 Arc::new(Int64Array::from(vec![100, 110, 120, 130])),
                 Arc::new(StringArray::from(vec!["a", "a", "b", "a"])),
+                Arc::new(StringArray::from(vec![None, Some("session-a"), None, None])),
                 Arc::new(Int64Array::from(vec![100, 90, 120, 80])),
                 Arc::new(Int64Array::from(vec![101, 115, 125, 140])),
             ],
@@ -458,20 +460,28 @@ mod tests {
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap();
+        let session_ids = batch
+            .column_by_name("session_id")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
         let rows = (0..batch.num_rows())
             .map(|index| {
                 (
                     trace_ids.value(index).to_string(),
                     (
                         timestamps.value(index),
+                        (!session_ids.is_null(index)).then(|| session_ids.value(index).to_string()),
                         min_ts.value(index),
                         max_ts.value(index),
                     ),
                 )
             })
             .collect::<std::collections::HashMap<_, _>>();
-        assert_eq!(rows["a"], (100, 80, 140));
-        assert_eq!(rows["b"], (120, 120, 125));
+        // MAX(session_id) ignores NULLs: trace a keeps the one known session.
+        assert_eq!(rows["a"], (100, Some("session-a".to_string()), 80, 140));
+        assert_eq!(rows["b"], (120, None, 120, 125));
     }
 
     #[tokio::test]
