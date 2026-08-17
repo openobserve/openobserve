@@ -272,7 +272,10 @@ describe("GeneralSettings", () => {
     it("should update dashboard description when input changes", async () => {
       wrapper = await createWrapper();
 
-      const descInput = wrapper.find('[data-test="dashboard-general-setting-description"] input');
+      // Description is a textarea (multi-line) in the redesigned form.
+      const descInput = wrapper.find(
+        '[data-test="dashboard-general-setting-description"] textarea',
+      );
       await descInput.setValue("Updated description");
 
       // The form owns `description` now — assert via the form state.

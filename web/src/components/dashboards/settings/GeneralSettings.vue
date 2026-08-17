@@ -17,66 +17,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
-    <div>
-      <OForm
-        ref="formRef"
-        :schema="generalSettingsSchema"
-        :default-values="generalSettingsDefaults()"
-        @submit="onSubmit"
-        v-slot="{ isSubmitting }"
-      >
-        <div class="flex flex-col gap-3 px-3 py-3">
-          <OFormInput
-            name="name"
-            :label="t('dashboard.name')"
-            required
-            data-test="dashboard-general-setting-name"
+    <OForm
+      ref="formRef"
+      :schema="generalSettingsSchema"
+      :default-values="generalSettingsDefaults()"
+      @submit="onSubmit"
+      v-slot="{ isSubmitting }"
+      class="flex min-h-0 flex-1 flex-col"
+    >
+      <div class="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-3 py-3">
+        <OFormInput
+          name="name"
+          :label="t('dashboard.name')"
+          required
+          data-test="dashboard-general-setting-name"
+        />
+        <OFormTextarea
+          name="description"
+          :label="t('dashboard.typeDesc')"
+          :rows="3"
+          data-test="dashboard-general-setting-description"
+        />
+
+        <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
+          <label class="text-compact text-input-label-text leading-tight font-medium">{{
+            t("dashboard.defaultDuration")
+          }}</label>
+          <DateTimePickerDashboard
+            v-show="store.state.printMode === false"
+            ref="dateTimePicker"
+            class="my-2 h-7.5"
+            size="sm"
+            :initialTimezone="initialTimezone"
+            v-model="dateTimeValue"
+            :auto-apply-dashboard="true"
+            menu-align="start"
           />
-          <OFormInput
-            name="description"
-            :label="t('dashboard.typeDesc')"
-            data-test="dashboard-general-setting-description"
-          />
-          <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
-            <label>{{ t("dashboard.defaultDuration") }}</label>
-            <DateTimePickerDashboard
-              v-show="store.state.printMode === false"
-              ref="dateTimePicker"
-              class="my-2 h-7.5"
-              size="sm"
-              :initialTimezone="initialTimezone"
-              v-model="dateTimeValue"
-              :auto-apply-dashboard="true"
-              menu-align="start"
-            />
-          </div>
+        </div>
+
+        <div class="flex flex-col gap-1">
           <OFormSwitch
             name="showDynamicFilters"
             :label="t('dashboard.showDynamicFilters')"
             data-test="dashboard-general-setting-dynamic-filter"
             size="lg"
           />
-          <div class="flex justify-center gap-2">
-            <OButton
-              @click="$emit('close')"
-              variant="outline"
-              size="sm-action"
-              :disabled="isSubmitting"
-              data-test="dashboard-general-setting-cancel-btn"
-              >{{ t("dashboard.cancel") }}</OButton
-            >
-            <OButton
-              variant="primary"
-              size="sm-action"
-              type="submit"
-              :loading="isSubmitting"
-              data-test="dashboard-general-setting-save-btn"
-              >{{ t("dashboard.save") }}</OButton
-            >
-          </div>
+          <p class="text-text-secondary text-xs">
+            {{ t("dashboard.generalSettingsPage.dynamicFiltersHelp") }}
+          </p>
         </div>
-      </OForm>
-    </div>
+      </div>
+
+      <!-- Footer pinned to the drawer bottom: a plain-language reminder that
+           settings are shared, plus the primary/secondary actions. -->
+      <div
+        class="border-border-default flex shrink-0 items-center justify-between gap-2 border-t px-3 py-2.5"
+      >
+        <span class="text-text-secondary text-xs">
+          {{ t("dashboard.generalSettingsPage.appliesToEveryone") }}
+        </span>
+        <div class="flex gap-2">
+          <OButton
+            @click="$emit('close')"
+            variant="outline"
+            size="sm-action"
+            :disabled="isSubmitting"
+            data-test="dashboard-general-setting-cancel-btn"
+            >{{ t("dashboard.cancel") }}</OButton
+          >
+          <OButton
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            :loading="isSubmitting"
+            data-test="dashboard-general-setting-save-btn"
+            >{{ t("dashboard.generalSettingsPage.saveChanges") }}</OButton
+          >
+        </div>
+      </div>
+    </OForm>
   </div>
 </template>
 
@@ -92,6 +111,7 @@ import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import {
   makeGeneralSettingsSchema,
@@ -107,6 +127,7 @@ export default defineComponent({
     OButton,
     OForm,
     OFormInput,
+    OFormTextarea,
     OFormSwitch,
   },
   emits: ["save", "close"],
@@ -166,8 +187,8 @@ export default defineComponent({
           ),
         );
 
-        // update the values — all three come from the validated form submit
-        // payload (the form owns `name`, `description`, `showDynamicFilters`).
+        // update the values — all come from the validated form submit payload
+        // (the form owns `name`, `description`, `showDynamicFilters`).
         data.title = value.name;
         data.description = value.description;
 
