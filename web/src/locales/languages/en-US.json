@@ -2375,6 +2375,7 @@
     "runs": {
       "title": "Workflow Runs",
       "edit": "Edit Workflow",
+      "debugInEditor": "Debug In Editor",
       "staleGraphWarning": "This workflow has been edited since this run — {count} step it executed no longer exists, so its status isn't shown here. | This workflow has been edited since this run — {count} steps it executed no longer exist, so their status isn't shown here."
     },
     "history": {
@@ -2609,7 +2610,14 @@
       "viewJson": "JSON",
       "itemN": "Item {n}",
       "executeStep": "Run Step",
-      "sample": "Sample"
+      "sample": "Sample",
+      "editStep": "Edit This Step"
+    },
+    "runOverlay": {
+      "banner": "Showing step data from a past run ({run}). You can edit freely — this run is never changed.",
+      "clear": "Clear Run Data",
+      "ghostNodes": "{count} step from this run no longer exists in the workflow, so its status isn't shown. | {count} steps from this run no longer exist in the workflow, so their status isn't shown.",
+      "missingNode": "That step no longer exists in this workflow — it was removed after this run."
     },
     "unsaved": {
       "title": "Unsaved Changes",

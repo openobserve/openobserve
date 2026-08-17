@@ -60,6 +60,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton variant="outline" data-test="workflow-runs-edit" @click="onEditWorkflow">
           {{ t("workflow.runs.edit") }}
         </OButton>
+        <!-- Only meaningful once a run is selected — it is the run that gets
+             carried over. Without one there is nothing to debug, so it stays
+             hidden rather than rendering as a dead control. -->
+        <OButton
+          v-if="selectedRunId"
+          variant="primary"
+          data-test="workflow-runs-debug"
+          @click="onDebugInEditor"
+        >
+          {{ t("workflow.runs.debugInEditor") }}
+        </OButton>
       </template>
     </OPageHeader>
 
@@ -164,6 +175,8 @@ watch(
 );
 
 // Deliberate switch to the editor — the only bridge between inspect and build.
+// Deliberately WITHOUT the run: this is "go build", and arriving with a past
+// run's badges still painted would be surprising.
 const onEditWorkflow = () => {
   router.push({
     name: "workflowEditor",
@@ -171,6 +184,22 @@ const onEditWorkflow = () => {
       id: workflowId.value,
       name: workflowName.value,
       org_identifier: orgId.value,
+    },
+  });
+};
+
+// The other half of that pair: "go fix THIS run". Same destination, but the run
+// travels along, so the editor reloads it onto the canvas — identical badges and
+// per-node data, now editable. The run itself is only ever read; fixing edits the
+// definition, and re-testing produces a new test run.
+const onDebugInEditor = () => {
+  router.push({
+    name: "workflowEditor",
+    query: {
+      id: workflowId.value,
+      name: workflowName.value,
+      org_identifier: orgId.value,
+      run_id: selectedRunId.value,
     },
   });
 };

@@ -68,7 +68,7 @@ function createWrapper() {
     global: {
       plugins: [i18n, store],
       stubs: {
-        OIcon: { name: "OIcon", props: ["name", "size"], template: "<i />" },
+        OIcon: { name: "OIcon", props: ["name", "size"], template: '<i :data-name="name" />' },
       },
     },
   });
@@ -166,7 +166,9 @@ describe("WorkflowCondition", () => {
       // the two example snippets the note calls out
       expect(note.text()).toContain('severity != ""');
       expect(note.text()).toContain("severity != null");
-      expect(note.findAll("i").length).toBe(3); // one OIcon per bullet
+      // Count the BULLET icons specifically — the note also carries a dismiss
+      // button, so a blanket icon count breaks whenever its chrome changes.
+      expect(note.findAll('[data-name="info"]').length).toBe(3);
     });
   });
 

@@ -288,14 +288,9 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     // the disconnected node never ran → no ✓ badge
     expect(res.ranNodeIds).not.toContain("x");
     expect(res.blockedNodeIds).toEqual([]);
-    // ranSteps snapshots the executed-steps tree (structure + frozen data) so the
-    // dock can persist across later edits.
-    expect(res.ranSteps.map((s: any) => s.id)).toEqual(["t", "f", "d"]);
-    expect(res.ranSteps.find((s: any) => s.id === "t")).toMatchObject({
-      depth: 0,
-      childCount: 1,
-    });
-    expect(res.ranSteps.find((s: any) => s.id === "f").data.node_type).toBe("function");
+    // The frozen `ranSteps` tree went with the results dock — the NDV reads the
+    // live graph plus this result, so there is no snapshot to keep in sync.
+    expect(res.ranSteps).toBeUndefined();
   });
 
   it("sends the whole in-memory graph (test-without-saving), not just an id", async () => {
@@ -747,12 +742,14 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
     workflowObj.currentSelectedWorkflow.nodes = [triggerNode()];
     addNodeToEnd("condition");
     expect(mockToast).not.toHaveBeenCalled();
-    expect(workflowObj.dialog.show).toBe(true);
-    expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("condition");
-    // insert-immediately: the node is already on the canvas (trigger + condition)
+    // Insert-immediately, panel left SHUT — so the staged selection is cleared and
+    // the node must be inspected on the canvas, where it sits flagged incomplete.
+    expect(workflowObj.dialog.show).toBe(false);
+    const added = workflowObj.currentSelectedWorkflow.nodes.find(
+      (n: any) => n.data.node_type === "condition",
+    );
     expect(workflowObj.currentSelectedWorkflow.nodes).toHaveLength(2);
-    // and flagged as an unconfigured placeholder
-    expect(workflowObj.currentSelectedNodeData?.meta?.incomplete).toBe("true");
+    expect(added?.meta?.incomplete).toBe("true");
   });
 
   it("onDrop inserts a node on the canvas once a trigger is present", () => {
@@ -760,10 +757,12 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
     workflowObj.draggedNodeType = "function";
     onDrop({ clientX: 10, clientY: 10 } as any);
     expect(mockToast).not.toHaveBeenCalled();
-    expect(workflowObj.dialog.show).toBe(true);
-    expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("function");
+    expect(workflowObj.dialog.show).toBe(false);
+    const dropped = workflowObj.currentSelectedWorkflow.nodes.find(
+      (n: any) => n.data.node_type === "function",
+    );
     expect(workflowObj.currentSelectedWorkflow.nodes).toHaveLength(2);
-    expect(workflowObj.currentSelectedNodeData?.meta?.incomplete).toBe("true");
+    expect(dropped?.meta?.incomplete).toBe("true");
   });
 });
 
@@ -838,22 +837,20 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
     } as any;
 
     // Insert-immediately: addNodeOnEdge splices the node onto the canvas now (no
-    // separate commit step) and opens its panel.
+    // separate commit step) and leaves the panel shut.
     addNodeOnEdge("e1", "condition");
-    const staged = workflowObj.currentSelectedNodeData;
-    // placed a row below the source, aligned with the target column
-    expect(staged.position.y).toBe(160);
-    expect(staged.position.x).toBe(100);
-
     const wf = workflowObj.currentSelectedWorkflow;
-    const inserted = wf.nodes.find((n: any) => n.id === staged.id);
+    const inserted = wf.nodes.find((n: any) => n.data.node_type === "condition");
+    // placed a row below the source, aligned with the target column
+    expect(inserted.position.y).toBe(160);
+    expect(inserted.position.x).toBe(100);
     const target = wf.nodes.find((n: any) => n.id === "d");
     // new node stays a row below the source; target pushed down a full row below it
     expect(inserted.position.y).toBe(160);
     expect(target.position.y).toBe(320);
     // rewired A→new→B, old edge dropped
-    expect(wf.edges.some((e: any) => e.source === "t" && e.target === staged.id)).toBe(true);
-    expect(wf.edges.some((e: any) => e.source === staged.id && e.target === "d")).toBe(true);
+    expect(wf.edges.some((e: any) => e.source === "t" && e.target === inserted.id)).toBe(true);
+    expect(wf.edges.some((e: any) => e.source === inserted.id && e.target === "d")).toBe(true);
     expect(wf.edges.some((e: any) => e.id === "e1")).toBe(false);
   });
 
@@ -889,9 +886,9 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
 
     // insert on the trigger→condition edge; condition AND its downstream destination shift
     addNodeOnEdge("e1", "function");
-    const staged = workflowObj.currentSelectedNodeData;
     const wf = workflowObj.currentSelectedWorkflow;
-    expect(wf.nodes.find((n: any) => n.id === staged.id).position.y).toBe(160);
+    const inserted = wf.nodes.find((n: any) => n.data.node_type === "function");
+    expect(inserted.position.y).toBe(160);
     expect(wf.nodes.find((n: any) => n.id === "c").position.y).toBe(320);
     expect(wf.nodes.find((n: any) => n.id === "d").position.y).toBe(480);
   });

@@ -75,11 +75,6 @@ const { stub } = vi.hoisted(() => ({
 vi.mock("@/plugins/workflows/WorkflowCanvas.vue", () => stub("WorkflowCanvas"));
 vi.mock("./WorkflowNodeDrawer.vue", () => stub("WorkflowNodeDrawer"));
 vi.mock("./WorkflowTestDialog.vue", () => stub("WorkflowTestDialog"));
-vi.mock("./WorkflowResultsDock.vue", () =>
-  stub("WorkflowResultsDock", {
-    template: `<div data-test="WorkflowResultsDock"><slot /></div>`,
-  }),
-);
 vi.mock("./WorkflowLinkAlertsDialog.vue", () =>
   stub("WorkflowLinkAlertsDialog", {
     props: ["workflowId", "workflowName"],
@@ -502,10 +497,10 @@ describe("WorkflowEditor", () => {
       palette(wrapper).props("onItemClick")({ subtype: "condition" });
       await nextTick();
 
-      expect(workflowObj.dialog.name).toBe("condition");
-      expect(workflowObj.dialog.show).toBe(true);
-      // insert-immediately: the node is on the canvas now, wired after the trigger,
-      // and the pending edge has been consumed.
+      // Insert-immediately, and the panel stays SHUT: adding several steps in a row
+      // shouldn't mean dismissing a dialog each time. The node is on the canvas now,
+      // wired after the trigger, and the pending edge has been consumed.
+      expect(workflowObj.dialog.show).toBe(false);
       const added = workflowObj.currentSelectedWorkflow.nodes.find(
         (n: any) => n.data.node_type === "condition",
       );
@@ -581,9 +576,8 @@ describe("WorkflowEditor", () => {
       await nextTick();
 
       expect(workflowObj.stepPicker.show).toBe(false);
-      expect(workflowObj.dialog.name).toBe("function");
-      expect(workflowObj.dialog.show).toBe(true);
-      // insert-immediately: the node is on the canvas, wired after the trigger.
+      // Insert-immediately with the panel left shut — configure by clicking the node.
+      expect(workflowObj.dialog.show).toBe(false);
       const fn = workflowObj.currentSelectedWorkflow.nodes.find(
         (n: any) => n.data.node_type === "function",
       );
@@ -792,8 +786,10 @@ describe("WorkflowEditor", () => {
 
       await clickSave(wrapper);
 
+      // Pluralised + interpolated: the count must actually reach the message, so
+      // assert the resolved string rather than the raw key.
       expect(mockToast).toHaveBeenCalledWith({
-        message: t("workflow.finishStepsBeforePublish"),
+        message: i18n.global.t("workflow.finishStepsBeforePublish", { count: 1 }, 1),
         variant: "warning",
       });
       expect(createWorkflow).not.toHaveBeenCalled();
@@ -1536,12 +1532,18 @@ describe("WorkflowEditor", () => {
       );
     });
 
-    it("mounts the results dock (which hosts the step Input/Output) instead of an overlay drawer", async () => {
+    // The docked results panel is gone: a step's Input/Output is inspected in the
+    // node's own NDV, so inspecting and editing a step are one surface.
+    it("inspects step results in the NDV, not a docked results panel", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      // The editor docks results below the canvas via WorkflowResultsDock; a node
-      // badge selects a step inside the dock rather than opening an overlay drawer.
-      expect(wrapper.find('[data-test="WorkflowResultsDock"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="WorkflowResultsDock"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="WorkflowNodeDrawer"]').exists()).toBe(false);
+
+      // Opening a step (what a node/badge click does) mounts the NDV.
+      workflowObj.dialog.show = true;
+      await nextTick();
+      expect(wrapper.find('[data-test="WorkflowNodeDrawer"]').exists()).toBe(true);
     });
   });
 
@@ -1572,10 +1574,82 @@ describe("WorkflowEditor", () => {
       });
     });
 
-    it("does not load a run on mount even when deep-linked with ?run_id", async () => {
+    // ── Run overlay: arriving from Runs via "Fix This Step" ──────────────────
+    // Reverses the old contract ("the editor never loads a run"). A run is now
+    // copied onto the SAME testRun.result the canvas paints from, so the user
+    // lands on the identical canvas — but editable. The run is only ever READ.
+
+    it("loads the deep-linked run onto the canvas", async () => {
       await openSaved({ id: "wf-1", run_id: "run-7" });
-      // Run inspection lives entirely in the Runs view now.
+      expect(getWorkflowRun).toHaveBeenCalledWith(
+        expect.objectContaining({ run_id: "run-7", id: "wf-1" }),
+      );
+      expect(workflowObj.testRun.result?.mode).toBe("history");
+      expect(workflowObj.testRun.result?.runId).toBe("run-7");
+    });
+
+    it("does not load anything without ?run_id", async () => {
+      await openSaved({ id: "wf-1" });
       expect(getWorkflowRun).not.toHaveBeenCalled();
+      expect(workflowObj.testRun.result).toBeNull();
+    });
+
+    it("shows the provenance banner while a run overlay is active", async () => {
+      await openSaved({ id: "wf-1", run_id: "run-7" });
+      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(true);
+    });
+
+    it("has no banner on a normal edit session", async () => {
+      await openSaved({ id: "wf-1" });
+      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(false);
+    });
+
+    // The banner is the ONLY thing separating historical from live data, so it
+    // must disappear the moment a real Test writes the same key. A Test result
+    // carries no `mode`, which is what makes this automatic.
+    it("drops the banner when a test result replaces the overlay", async () => {
+      await openSaved({ id: "wf-1", run_id: "run-7" });
+      workflowObj.testRun.result = { errors: {}, inputs: {}, ranNodeIds: [], blockedNodeIds: [] };
+      await nextTick();
+      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(false);
+    });
+
+    it("clears the overlay from the banner", async () => {
+      await openSaved({ id: "wf-1", run_id: "run-7" });
+      await wrapper.find('[data-test="workflow-editor-run-overlay-clear"]').trigger("click");
+      await nextTick();
+      expect(workflowObj.testRun.result).toBeNull();
+      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(false);
+    });
+
+    it("opens the node named by ?node_id", async () => {
+      await openSaved({ id: "wf-1", run_id: "run-7", node_id: "d1" });
+      expect(workflowObj.dialog.show).toBe(true);
+      expect(workflowObj.currentSelectedNodeID).toBe("d1");
+    });
+
+    it("warns instead of opening when that node was removed after the run", async () => {
+      await openSaved({ id: "wf-1", run_id: "run-7", node_id: "gone" });
+      expect(workflowObj.dialog.show).toBe(false);
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+    });
+
+    // Steps the run executed that the workflow no longer has: their badges have
+    // nowhere to render, so the run would look cleaner here than it really was.
+    it("warns about ghost steps the workflow no longer has", async () => {
+      getWorkflowRun.mockResolvedValue({
+        data: { errors: { data: [{ node_id: "deleted-node", error: ["boom"] }] }, data: {} },
+      });
+      await openSaved({ id: "wf-1", run_id: "run-7" });
+      expect(workflowObj.testRun.result?.ghostNodeIds).toContain("deleted-node");
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+    });
+
+    it("surfaces a run that fails to load without leaving a stale overlay", async () => {
+      getWorkflowRun.mockRejectedValue({ response: { data: { message: "nope" } } });
+      await openSaved({ id: "wf-1", run_id: "run-7" });
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(false);
     });
   });
 

@@ -98,6 +98,14 @@ const mountNode = (id: string, data: any) =>
 
 const card = (wrapper: any) => wrapper.findComponent({ name: "FlowNodeCard" });
 
+// A badge click opens the node's NDV — the same panel a node click opens, now
+// carrying this run's Input/Output. There is no separate results dock any more,
+// so "inspect a step" and "edit a step" are one surface.
+const expectNdvOpenedOn = (id: string) => {
+  expect(workflowObj.dialog.show).toBe(true);
+  expect(workflowObj.currentSelectedNodeID).toBe(id);
+};
+
 describe("WorkflowNode", () => {
   let wrapper: any = null;
 
@@ -663,7 +671,7 @@ describe("WorkflowNode", () => {
       expect(wrapper.find(".wf-test-count").exists()).toBe(false);
     });
 
-    it("opens the per-node result drawer when the error badge is clicked", async () => {
+    it("opens the NDV when the error badge is clicked", async () => {
       setResult({
         errors: { c1: { error_count: 1, errors: [["boom"]] } },
         ranNodeIds: ["c1"],
@@ -671,13 +679,10 @@ describe("WorkflowNode", () => {
       });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-error"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({
-        show: true,
-        nodeId: "c1",
-      });
+      expectNdvOpenedOn("c1");
     });
 
-    it("opens the drawer when the ok badge is clicked (every ran node is inspectable)", async () => {
+    it("opens the NDV when the ok badge is clicked (every ran node is inspectable)", async () => {
       setResult({
         errors: {},
         inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
@@ -686,14 +691,14 @@ describe("WorkflowNode", () => {
       });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-ok"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({ show: true, nodeId: "c1" });
+      expectNdvOpenedOn("c1");
     });
 
-    it("opens the drawer when the grey (skipped) badge is clicked", async () => {
+    it("opens the NDV when the grey (skipped) badge is clicked", async () => {
       setResult({ errors: {}, inputs: {}, ranNodeIds: ["c1"], blockedNodeIds: [] });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-skipped"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({ show: true, nodeId: "c1" });
+      expectNdvOpenedOn("c1");
     });
 
     it("reacts to a test result arriving after mount", async () => {
@@ -744,10 +749,7 @@ describe("WorkflowNode", () => {
       const badge = wrapper.find('[data-test="workflow-node-undefined-test-error"]');
       expect(badge.exists()).toBe(true);
       await badge.trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({
-        show: true,
-        nodeId: "c1",
-      });
+      expectNdvOpenedOn("c1");
     });
 
     it("renders the delete button and the actions bar with an undefined type", async () => {

@@ -84,8 +84,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="chevron-right" size="xs" />
             </span>
           </OButton>
+          <!-- Read-only run view: the one verb that IS safe here — leave with the
+               run and the node in hand. Offered on PASSED steps too: a green step
+               can still be wrong, and a failure downstream is often caused by an
+               upstream step that passed while emitting the wrong records. -->
           <OButton
-            v-if="showIo"
+            v-if="canvasReadOnly && historyRunId"
+            variant="primary"
+            size="sm-action"
+            data-test="workflow-node-edit-step"
+            @click="editThisStep"
+          >
+            {{ t("workflow.ndv.editStep") }}
+          </OButton>
+          <!-- Hidden (not disabled) on a historical run: canvasReadOnly means it
+               could never be enabled there, and a permanently dead control just
+               advertises an action the surface refuses. -->
+          <OButton
+            v-if="showIo && !canvasReadOnly"
             variant="primary"
             size="sm-action"
             data-test="workflow-node-execute"
@@ -119,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Node Detail View body: Steps · Input · Config · Output. Collapses to Config
          only while the function's full-width inline editor is open (dialog.expand). -->
     <div
+      data-test="workflow-ndv-body"
       class="relative flex h-[calc(90vh-10rem)] min-h-0 gap-4"
       :class="workflowObj.dialog.expand || isIoNode ? '' : 'p-4'"
     >
@@ -329,6 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <component v-else-if="bodyComponent" :is="bodyComponent" :key="nodeId" ref="bodyRef" />
           <div
             v-else
+            data-test="workflow-ndv-config-placeholder"
             class="text-text-secondary flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center"
           >
             <OIcon :name="meta?.icon || 'help'" size="lg" />
@@ -458,6 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -492,6 +511,7 @@ import useWorkflowCanvas, {
 
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 const { applyNodeConfig, mergeNodeConfig, closeNodeDrawer, deleteNode, editNode } =
   useWorkflowCanvas(t);
 
@@ -561,6 +581,29 @@ const canvasReadOnly = computed(() => workflowObj.readOnly);
 // received. Reuses the shared derivation the results dock uses; the richer controls
 // (replay / fullscreen / use-as-test-input) stay in that dock for now.
 const nodeId = computed(() => workflowObj.currentSelectedNodeData?.id || "");
+
+// ── "Edit This Step" (Runs history → editor) ────────────────────────────────
+// The read-only run view can see exactly what broke but can do nothing about it,
+// so the user closes the panel, switches route, re-finds the node from memory and
+// hand-copies its input. This carries both of those for them: the editor re-loads
+// the same run onto its canvas and opens this node. The run itself is only ever
+// read — the fix lands on the definition, and re-testing makes a NEW test run.
+const historyRunId = computed<string>(() =>
+  workflowObj.testRun.result?.mode === "history" ? workflowObj.testRun.result.runId || "" : "",
+);
+const editThisStep = () => {
+  const workflowId = workflowObj.currentSelectedWorkflow?.id;
+  if (!workflowId || !nodeId.value) return;
+  router.push({
+    name: "workflowEditor",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+      id: workflowId,
+      run_id: historyRunId.value,
+      node_id: nodeId.value,
+    },
+  });
+};
 // A test run exists to inspect. Once it does, opening OR navigating to any node keeps
 // the NDV — even a node that didn't run shows empty Input/Output (not a config-only
 // drawer), so the prev/next walk stays in NDV format the whole way.

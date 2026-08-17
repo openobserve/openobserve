@@ -171,6 +171,8 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", async () => {
     onDrop: vi.fn(),
     onDragOver: vi.fn(),
     openTriggerPicker: vi.fn(),
+    openActionPicker: vi.fn(),
+    openStepPicker: vi.fn(),
     openInsertPicker: vi.fn(),
   };
   return {
@@ -181,6 +183,13 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", async () => {
     undoWorkflow: vi.fn(),
     redoWorkflow: vi.fn(),
     tidyWorkflowLayout: vi.fn(),
+    // The canvas asks for a node's io_type to decide which leaves can offer an
+    // "append step" point — a terminal (output) node cannot. Only ioType is read.
+    nodeMeta: (nodeType: string) => {
+      if (nodeType === "destination") return { ioType: "output" };
+      if (nodeType === "workflow_trigger") return { ioType: "input" };
+      return { ioType: "default" };
+    },
   };
 });
 
@@ -343,16 +352,22 @@ describe("WorkflowCanvas", () => {
     });
   });
 
-  // The empty canvas now offers a clickable start node (which opens the trigger
-  // picker) in place of the old hint text.
+  // Two DIFFERENT start surfaces, and which one shows is the contract:
+  //   • empty canvas          → the two-slot SCAFFOLD (Trigger + Action)
+  //   • trigger missing, but
+  //     steps already placed  → the single "Choose a Trigger" card
   describe("empty-canvas start node", () => {
     const startNode = (w: any) => w.find('[data-test="workflow-flow-start-node"]');
+    const scaffold = (w: any) => w.find('[data-test="workflow-flow-start-scaffold"]');
 
-    it("shows the start node when the canvas has no nodes", () => {
+    it("shows the two-slot scaffold when the canvas has no nodes", () => {
       wrapper = mountCanvas();
-      const node = startNode(wrapper);
-      expect(node.exists()).toBe(true);
-      expect(node.text()).toBe("Choose a Trigger");
+      expect(scaffold(wrapper).exists()).toBe(true);
+      // Both slots are offered up front, so the trigger isn't a dead end.
+      expect(wrapper.find('[data-test="workflow-flow-start-trigger"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-flow-start-action"]').exists()).toBe(true);
+      // The single "trigger missing" card belongs to the non-empty case only.
+      expect(startNode(wrapper).exists()).toBe(false);
     });
 
     it("hides the start node once a node exists", async () => {
@@ -360,15 +375,16 @@ describe("WorkflowCanvas", () => {
       wrapper = mountCanvas();
       await nextTick();
       expect(startNode(wrapper).exists()).toBe(false);
+      expect(scaffold(wrapper).exists()).toBe(false);
     });
 
-    it("re-shows the start node when the last node is removed", async () => {
+    it("re-shows the scaffold when the last node is removed", async () => {
       wfObj.currentSelectedWorkflow.nodes = [triggerNode()];
       wrapper = mountCanvas();
       await nextTick();
       wfObj.currentSelectedWorkflow.nodes = [];
       await nextTick();
-      expect(startNode(wrapper).exists()).toBe(true);
+      expect(scaffold(wrapper).exists()).toBe(true);
     });
 
     it("re-shows the start node when the trigger is deleted mid-graph (steps remain)", async () => {

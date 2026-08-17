@@ -148,6 +148,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
+    <!-- Provenance for the run overlay. Not decoration — it is the only thing
+         separating "this is a past run's data" from "this is my last test", and
+         it disappears by itself the moment a real Test replaces the result. -->
+    <OBanner
+      v-if="runOverlay"
+      variant="info"
+      icon="history"
+      dense
+      inline-actions
+      data-test="workflow-editor-run-overlay"
+      :content="t('workflow.runOverlay.banner', { run: runOverlay.runId })"
+    >
+      <template #actions>
+        <OButton
+          variant="ghost-muted"
+          size="sm-action"
+          data-test="workflow-editor-run-overlay-clear"
+          @click="clearRunOverlay"
+        >
+          {{ t("workflow.runOverlay.clear") }}
+        </OButton>
+      </template>
+    </OBanner>
+
     <!-- workspace: docked palette + canvas (+ drawer region for node forms). The
          history drawer portals in here (below the toolbar) so it can sit
          side-by-side with the canvas. -->
@@ -236,11 +260,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
@@ -266,6 +291,7 @@ import useWorkflowCanvas, {
   markWorkflowDirty,
   reachableFrom,
   isNodeIncomplete,
+  loadWorkflowRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
@@ -292,7 +318,21 @@ const {
   closeStepPicker,
   onDragStart,
   addNodeToEnd,
+  editNode,
 } = useWorkflowCanvas(t);
+
+// ── Run overlay (arriving from Runs history) ────────────────────────────────
+// A past run is loaded into the SAME `testRun.result` the canvas paints from, so
+// the editor shows the identical badges and per-node Input/Output — except the
+// workflow stays editable. `mode: "history"` is stamped only by loadWorkflowRun;
+// a real Test writes the same key WITHOUT it, so running a test drops the banner
+// on its own and the two data sources can never be confused.
+const runOverlay = computed(() =>
+  workflowObj.testRun.result?.mode === "history" ? workflowObj.testRun.result : null,
+);
+const clearRunOverlay = () => {
+  workflowObj.testRun.result = null;
+};
 
 // Docked palette items, grouped into sections (Transform / Destination) to
 // mirror the pipeline sidebar. The trigger is pre-placed and not addable, so
@@ -785,10 +825,47 @@ onMounted(async () => {
     // Edit-from-list already hydrated the shared state synchronously; only
     // re-fetch on a cold load (deep link / refresh) where it's missing.
     if (workflowObj.currentSelectedWorkflow?.id !== id) await loadWorkflow(id);
+    // Arrived from a run ("Fix This Step"). Must run AFTER the workflow is
+    // hydrated: loadWorkflowRun diffs the run against the current node list to
+    // find ghost steps, and resetWorkflowData nulls testRun.result.
+    await applyRunOverlay(
+      id,
+      query.run_id as string | undefined,
+      query.node_id as string | undefined,
+    );
   } else {
     startNewWorkflow();
   }
 });
+
+// Copy a past run onto the canvas, then open the step the user came to fix.
+// Read-only projection: nothing here writes back to the stored run.
+const applyRunOverlay = async (workflowId: string, runId?: string, nodeId?: string) => {
+  if (!runId) return;
+  const r = await loadWorkflowRun({ orgId: orgId(), workflowId, runId });
+  if (!r.ok) {
+    toast({
+      message: raw(r.error) || t("workflow.history.loadRunError"),
+      variant: "error",
+    });
+    return;
+  }
+  // Steps this run executed that the workflow no longer has: their badges have
+  // nowhere to render, so the run would look cleaner here than it actually was.
+  const ghosts = runOverlay.value?.ghostNodeIds?.length || 0;
+  if (ghosts) {
+    toast({
+      message: t("workflow.runOverlay.ghostNodes", { count: ghosts }, ghosts),
+      variant: "warning",
+    });
+  }
+  if (!nodeId) return;
+  const exists = (workflowObj.currentSelectedWorkflow.nodes || []).some(
+    (n: any) => n.id === nodeId,
+  );
+  if (exists) editNode(nodeId);
+  else toast({ message: t("workflow.runOverlay.missingNode"), variant: "warning" });
+};
 
 onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);

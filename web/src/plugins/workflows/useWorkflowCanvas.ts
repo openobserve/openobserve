@@ -1262,7 +1262,9 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     workflowObj.dialog.name = nodeType;
     workflowObj.dialog.expand = false;
     // Insert-immediately (no Save button): the node lands on the canvas + auto-wires
-    // now, then the panel opens on it in edit mode. Closing the panel commits config.
+    // now, and the panel does NOT open — adding several steps in a row shouldn't mean
+    // dismissing a dialog each time. It arrives flagged incomplete ("Set up later")
+    // and is configured by clicking it, which is what blocks Publish until it's done.
     commitStagedNode();
     closeNodeDrawer();
   }
