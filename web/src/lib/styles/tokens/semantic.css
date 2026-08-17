@@ -270,6 +270,9 @@
   --shadow-glow-sm-geom: 0 2px 8px;
   --shadow-glow-md-geom: 0 4px 12px;
   --shadow-glow-lg-geom: 0 6px 16px;
+  /* AI send button only — under-lit at the lg/sm steps. */
+  --shadow-glow-xl-geom: 0 6px 20px;
+  --shadow-glow-press-geom: 0 2px 10px;
   --shadow-glow-sm: var(--shadow-glow-sm-geom) color-mix(in srgb, rgb(0 0 0) 10%, transparent);
   --shadow-glow-md: var(--shadow-glow-md-geom) color-mix(in srgb, rgb(0 0 0) 20%, transparent);
   --shadow-glow-lg: var(--shadow-glow-lg-geom) color-mix(in srgb, rgb(0 0 0) 20%, transparent);

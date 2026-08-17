@@ -871,6 +871,21 @@
   --color-ingest-accent-purple: var(--color-purple-500);
   --color-ingest-accent-amber: var(--color-amber-600);
   --color-ingest-accent-orange: var(--color-orange-500);
+
+  /* Tokens, not scoped CSS: scoped is unlayered and would beat `group-hover:`. */
+  --color-ingest-tint-blue: color-mix(in srgb, var(--color-ingest-accent-blue) 12%, transparent);
+  --color-ingest-tint-teal: color-mix(in srgb, var(--color-ingest-accent-teal) 12%, transparent);
+  --color-ingest-tint-purple: color-mix(
+    in srgb,
+    var(--color-ingest-accent-purple) 12%,
+    transparent
+  );
+  --color-ingest-tint-amber: color-mix(in srgb, var(--color-ingest-accent-amber) 12%, transparent);
+  --color-ingest-tint-orange: color-mix(
+    in srgb,
+    var(--color-ingest-accent-orange) 12%,
+    transparent
+  );
 }
 
 /* Role names for palette colours templates were reading raw (`bg-[var(--color-
@@ -1251,6 +1266,11 @@
   --color-ingest-accent-purple: var(--color-ingest-accent-purple);
   --color-ingest-accent-amber: var(--color-ingest-accent-amber);
   --color-ingest-accent-orange: var(--color-ingest-accent-orange);
+  --color-ingest-tint-blue: var(--color-ingest-tint-blue);
+  --color-ingest-tint-teal: var(--color-ingest-tint-teal);
+  --color-ingest-tint-purple: var(--color-ingest-tint-purple);
+  --color-ingest-tint-amber: var(--color-ingest-tint-amber);
+  --color-ingest-tint-orange: var(--color-ingest-tint-orange);
 
   /* Separator */
   --spacing-separator: var(--spacing-separator);

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="emit('click')"
   >
     <span
-      class="es-ing-card__icon rounded-default bg-tabs-active-bg text-tabs-active-text group-hover:bg-accent inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150 group-hover:text-white"
+      class="es-ing-card__icon rounded-default group-hover:bg-button-primary inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150 group-hover:text-white"
       :class="iconClass"
     >
       <OIcon :name="icon" size="md" />
@@ -63,38 +63,19 @@ const props = withDefaults(
 
 const emit = defineEmits<{ click: [] }>();
 
-// The variant class stays as the hook for the color-mix() tint below (a utility
-// cannot be a mix input); the accent itself is a registered token utility.
+// Each variant carries BOTH its resting background and its resting colour. They
+// are not split between here and the base class on purpose: two plain utilities
+// setting the same property differ only by Tailwind's emit order, so
+// `text-tabs-active-text` in the base class silently won over every
+// `text-ingest-accent-*` and all five variants rendered one colour.
 const ICON_VARIANT_CLASS: Record<IconVariant, string> = {
-  default: "",
-  blue: "es-ing-card__icon--blue text-ingest-accent-blue",
-  teal: "es-ing-card__icon--teal text-ingest-accent-teal",
-  purple: "es-ing-card__icon--purple text-ingest-accent-purple",
-  amber: "es-ing-card__icon--amber text-ingest-accent-amber",
-  orange: "es-ing-card__icon--orange text-ingest-accent-orange",
+  default: "bg-tabs-active-bg text-tabs-active-text",
+  blue: "bg-ingest-tint-blue text-ingest-accent-blue",
+  teal: "bg-ingest-tint-teal text-ingest-accent-teal",
+  purple: "bg-ingest-tint-purple text-ingest-accent-purple",
+  amber: "bg-ingest-tint-amber text-ingest-accent-amber",
+  orange: "bg-ingest-tint-orange text-ingest-accent-orange",
 };
 
 const iconClass = computed(() => ICON_VARIANT_CLASS[props.iconVariant]);
 </script>
-
-<style scoped>
-/* keep(brand): the 12% accent WASH behind each variant icon. A utility cannot be
-   an input to color-mix(), so only these five remain — the accent colour itself
-   is `text-ingest-accent-*` and the parent-hover repaint is `group-hover:` on
-   the icon, both in the template. */
-.es-ing-card__icon--blue {
-  background: color-mix(in srgb, var(--color-ingest-accent-blue) 12%, transparent);
-}
-.es-ing-card__icon--teal {
-  background: color-mix(in srgb, var(--color-ingest-accent-teal) 12%, transparent);
-}
-.es-ing-card__icon--purple {
-  background: color-mix(in srgb, var(--color-ingest-accent-purple) 12%, transparent);
-}
-.es-ing-card__icon--amber {
-  background: color-mix(in srgb, var(--color-ingest-accent-amber) 12%, transparent);
-}
-.es-ing-card__icon--orange {
-  background: color-mix(in srgb, var(--color-ingest-accent-orange) 12%, transparent);
-}
-</style>
