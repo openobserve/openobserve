@@ -510,6 +510,48 @@ describe("routeGuard", () => {
 
       expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
     });
+
+    // I14: on-call is configured BEFORE any data flows — teams, schedules and
+    // routing are exactly what a fresh org sets up first. Bouncing those clicks
+    // to /ingestion made every on-call screen unreachable by navigation (a
+    // direct URL worked only because a cold load races zoConfig). The whole
+    // subtree is exempt, including the dynamic-segment routes the exact-match
+    // list cannot express.
+    it.each([
+      ["triage list", "onCallResponses", "/oncall/responses"],
+      ["team list", "onCallTeams", "/oncall/teams"],
+      ["team detail with params", "onCallTeamDetail", "/oncall/teams/team_1/schedule"],
+      ["org routing", "onCallRouting", "/oncall/routing"],
+      ["trailing slash", "onCallTeams", "/oncall/teams/"],
+    ])("calls next() directly for on-call %s", async (_label, name, path) => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 0 } },
+      });
+      mockStore = buildEmptyDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name, path }, {}, mockNext);
+
+      expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledTimes(1);
+      expect(mockNext).not.toHaveBeenCalledWith({ path: "/ingestion" });
+    });
+
+    // The prefix is a path SEGMENT, not a substring — a route that merely
+    // starts with the same letters must not inherit the exemption.
+    it("still redirects a near-miss path that only shares the prefix's letters", async () => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 0 } },
+      });
+      mockStore = buildEmptyDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name: "oncallish", path: "/oncallish" }, {}, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
+    });
   });
 });
 
