@@ -292,7 +292,8 @@ async function fetchAll() {
 function openTeam(row: PolicyRow) {
   router.push({
     name: "onCallTeamDetail",
-    params: { teamId: row.teamId, tab: "policy" },
+    // The word the tab uses. `policy` still resolves, for links already saved.
+    params: { teamId: row.teamId, tab: "escalation" },
     query: { org_identifier: orgId.value },
   });
 }

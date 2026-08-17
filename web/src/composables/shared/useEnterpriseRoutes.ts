@@ -236,7 +236,14 @@ const useEnterpriseRoutes = () => {
       {
         // The tab is part of the URL, so a schedule somebody sends is the
         // schedule the recipient lands on. Defaults to `schedule`.
-        path: "oncall/teams/:teamId/:tab(overview|schedule|members|policy|ownership)?",
+        //
+        // `escalation` and `routing` are what the tabs are CALLED; `policy` and
+        // `ownership` are what they were called when the routes were written,
+        // and links to them are already in Slack threads and setup checklists.
+        // Both are accepted, the view canonicalises to the visible word — a
+        // shared link and the tab it lands on should not use two vocabularies
+        // for one thing.
+        path: "oncall/teams/:teamId/:tab(overview|schedule|members|policy|escalation|ownership|routing)?",
         name: "onCallTeamDetail",
         component: OnCallTeamDetail,
         meta: { titleKey: "oncall.teamDetail" },

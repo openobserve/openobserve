@@ -736,6 +736,12 @@ describe("OnCallResponses", () => {
       );
     });
 
+    /// H6: this is the one test in the suite that mounts the table with 600
+    /// rows, because a "full page" is only full at the component's own limit of
+    /// 200 and the cap is three of them — shrinking the fixture would stop
+    /// pinning the claim. It passes in about a second alone and times out at
+    /// the 5s default under a 39-file parallel run, so it gets its own budget
+    /// rather than a re-run every time somebody sees it red.
     it("walks on while pages come back full, and says so when it stops early", async () => {
       const full = Array.from({ length: 200 }, (_, i) => page({ id: `r${i}` }, `al_${i}`));
       service.listTeams.mockResolvedValue({ data: [team] } as any);
@@ -749,7 +755,7 @@ describe("OnCallResponses", () => {
       expect(pagingCalls()).toHaveLength(3);
       expect(pagingCalls().at(-1)?.[0]).toEqual(expect.objectContaining({ offset: 400 }));
       expect(wrapper.find('[data-test="oncall-responses-truncated"]').exists()).toBe(true);
-    });
+    }, 20_000);
 
     /// A server without the counter must not break the screen.
     it("survives the total being unavailable", async () => {

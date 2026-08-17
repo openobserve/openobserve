@@ -521,13 +521,35 @@ const teamId = computed(() => String(route.params.teamId ?? ""));
 /// outside this set is ignored rather than left on a panel that does not exist.
 const TEAM_TABS = ["overview", "members", "schedule", "policy", "ownership"] as const;
 
+/// What each tab is CALLED, which is what its URL should say.
+///
+/// `policy` and `ownership` are the names the panels were given before the tabs
+/// were renamed to Escalation and Routing, and they are still the internal ids
+/// — the attention banner, the setup checklist and the policies list all emit
+/// them. So the internal name stays and the URL carries the visible word: a
+/// link somebody pastes into a thread should say the same thing as the tab it
+/// opens.
+const TAB_URL_NAME: Record<string, string> = {
+  policy: "escalation",
+  ownership: "routing",
+};
+
+/// The reverse, plus every name that is its own URL. Old links are still
+/// accepted — they are in checklists and Slack threads already, and breaking
+/// them to tidy a vocabulary would be a worse trade than carrying two spellings.
+const URL_TAB_NAME: Record<string, string> = {
+  escalation: "policy",
+  routing: "ownership",
+};
+
 /// Which tab the URL asked for.
 ///
 /// The setup checklist and the policies list both deep-link here with a `tab`
 /// param, and the view was never reading it — the links only appeared to work
 /// because the default landing tab happened to be the one they asked for.
 const routeTab = computed(() => {
-  const tab = String(route.params.tab ?? "");
+  const asked = String(route.params.tab ?? "");
+  const tab = URL_TAB_NAME[asked] ?? asked;
   return (TEAM_TABS as readonly string[]).includes(tab) ? tab : null;
 });
 
@@ -904,6 +926,28 @@ function onTeamSaved() {
 }
 
 // The timeline owns its window; refetch whenever it moves.
+/// The URL follows the tab.
+///
+/// The route has always carried `:tab`, and the view has always read it — but
+/// nothing ever WROTE it, so clicking Escalation and copying the address bar
+/// sent somebody to whichever tab this team happens to land on. Half a deep
+/// link is worse than none: it looks like it worked.
+///
+/// `replace`, not `push`: Back should leave the team, not walk the five tabs
+/// somebody clicked through on the way.
+watch(activeTab, (tab) => {
+  // Not while the first fetch is still deciding where to land — that would
+  // rewrite the URL somebody just typed.
+  if (!loaded.value) return;
+  const name = TAB_URL_NAME[tab] ?? tab;
+  if (String(route.params.tab ?? "") === name) return;
+  router.replace({
+    name: "onCallTeamDetail",
+    params: { teamId: teamId.value, tab: name },
+    query: { org_identifier: orgId.value },
+  });
+});
+
 watch(scheduleWindow, fetchSegments, { deep: true });
 watch(selectedPriority, fetchPreview);
 

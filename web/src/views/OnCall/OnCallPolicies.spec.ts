@@ -143,7 +143,10 @@ describe("OnCallPolicies", () => {
     expect(rowsOf(wrapper)[0].onCall).toBe("");
   });
 
-  it("opens the team on its policy tab", async () => {
+  /// I13: the tab is called Escalation, so that is what the link says. The old
+  /// `policy` spelling still resolves for links already saved, but nothing we
+  /// generate should keep minting the word the screen does not use.
+  it("opens the team on its escalation tab, in the word the tab uses", async () => {
     const wrapper = render();
     await flushPromises();
 
@@ -152,7 +155,7 @@ describe("OnCallPolicies", () => {
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "onCallTeamDetail",
-        params: { teamId: "t1", tab: "policy" },
+        params: { teamId: "t1", tab: "escalation" },
       }),
     );
   });

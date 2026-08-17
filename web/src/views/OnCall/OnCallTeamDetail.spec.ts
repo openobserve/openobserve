@@ -42,9 +42,13 @@ vi.mock("@/services/oncall", () => ({
 }));
 
 const routeParams: Record<string, string> = { teamId: "team_1" };
+// One router object, not a fresh mock per call: the view writes the tab back
+// into the URL, and a `useRouter()` that handed out a new spy each time would
+// make that unobservable.
+const router = { push: vi.fn(), replace: vi.fn() };
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: routeParams }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => router,
 }));
 
 const service = vi.mocked(oncallService);
@@ -202,6 +206,84 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
 
       expect(chip(wrapper)).toContain("Nobody on call");
+    });
+  });
+
+  /// I13: the route said `policy` and `ownership`; the tabs said Escalation and
+  /// Routing. A link somebody pastes into a thread and the tab it opens were
+  /// using two vocabularies for one thing.
+  describe("the tab vocabulary", () => {
+    it("opens Escalation for the word the tab actually uses", async () => {
+      routeParams.tab = "escalation";
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OTabPanels" }).props("modelValue")).toBe("policy");
+    });
+
+    it("opens Routing for the word the tab actually uses", async () => {
+      routeParams.tab = "routing";
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OTabPanels" }).props("modelValue")).toBe("ownership");
+    });
+
+    /// The old spellings are in setup checklists and Slack threads already;
+    /// tidying a vocabulary is not worth breaking a link somebody saved.
+    it("still honours the spelling the old links use", async () => {
+      routeParams.tab = "ownership";
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OTabPanels" }).props("modelValue")).toBe("ownership");
+    });
+
+    /// The route always carried `:tab` and the view always read it — but
+    /// nothing wrote it, so clicking a tab and copying the address bar sent
+    /// somebody to the landing tab. Half a deep link is worse than none.
+    it("writes the tab back into the URL, in the visible word", async () => {
+      const wrapper = render();
+      await flushPromises();
+      router.replace.mockClear();
+
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "policy");
+      await flushPromises();
+
+      expect(router.replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "onCallTeamDetail",
+          params: expect.objectContaining({ tab: "escalation" }),
+        }),
+      );
+    });
+
+    /// Back should leave the team, not walk the five tabs somebody clicked
+    /// through on the way to this one.
+    it("replaces rather than pushes, so Back leaves the page", async () => {
+      const wrapper = render();
+      await flushPromises();
+      router.push.mockClear();
+
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    /// Rewriting the URL while the first fetch is still deciding where to land
+    /// would overwrite the address somebody just typed.
+    it("does not rewrite the URL before the team has loaded", async () => {
+      service.getTeam.mockReturnValue(new Promise(() => {}) as any);
+      const wrapper = render();
+      await flushPromises();
+
+      // Even a tab change mid-load must not overwrite the address somebody
+      // just typed — the landing tab has not been decided yet.
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "policy");
+      await flushPromises();
+
+      expect(router.replace).not.toHaveBeenCalled();
     });
   });
 
