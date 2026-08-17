@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Cloud: storage not enabled -->
       <div v-else-if="isCloud && !orgStorageEnabled" class="text-text-secondary py-3 text-sm">
-        {{ t("storage_settings.notEnabled") }}
+        {{ t("storage_settings.notEnabled", { product: raw("BYOB") }) }}
       </div>
 
       <!-- ========== NOT CONFIGURED: cloud hero ========== -->
@@ -316,7 +316,7 @@ import { ref, computed, onMounted } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";

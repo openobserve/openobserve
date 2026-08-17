@@ -21,7 +21,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
+import { defaultDestinationNodeWarningKey } from "@/utils/pipelines/constants";
 import { getTruncatedConditions as getTruncatedConditionsUtil } from "@/utils/conditionPreview";
 import { formatNodeErrorText } from "@/utils/pipelines/nodeErrors";
 
@@ -304,26 +304,28 @@ const getTruncatedConditions = (conditionData: unknown) =>
 
 const confirmDialogMeta = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   data: null,
-  warningMessage: "",
+  warningMessage: raw(""),
   onConfirm: () => {},
 });
 
 const openCancelDialog = (id: string) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("common.delete");
-  confirmDialogMeta.value.message = "Are you sure you want to delete node?";
+  confirmDialogMeta.value.message = t("pipeline.confirmDeleteNode");
   //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if (
     Object.prototype.hasOwnProperty.call(props.data ?? {}, "node_type") &&
     props.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(id)
   ) {
-    confirmDialogMeta.value.warningMessage = defaultDestinationNodeWarningMessage;
+    confirmDialogMeta.value.warningMessage = t(defaultDestinationNodeWarningKey);
   } else {
-    confirmDialogMeta.value.warningMessage = "";
+    // raw("") clears the field back to the empty placeholder.
+    confirmDialogMeta.value.warningMessage = raw("");
   }
   confirmDialogMeta.value.onConfirm = () => {
     deletePipelineNode(id);
@@ -332,8 +334,9 @@ const openCancelDialog = (id: string) => {
 
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
-  confirmDialogMeta.value.title = "";
-  confirmDialogMeta.value.message = "";
+  // raw("") clears the fields back to the empty placeholder.
+  confirmDialogMeta.value.title = raw("");
+  confirmDialogMeta.value.message = raw("");
   confirmDialogMeta.value.onConfirm = () => {};
 };
 

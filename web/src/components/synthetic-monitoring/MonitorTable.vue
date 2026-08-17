@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dot="true"
         size="sm"
       >
-        {{ resolveBadge("serviceStatus", (row as any).status).label }}
+        {{ resolveBadgeLabel("serviceStatus", (row as any).status) }}
       </OBadge>
     </template>
 
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Steps count (Browser mode) -->
     <template #cell-steps="{ row }">
       <span class="truncate">{{
-        (row as any).steps ? `${(row as any).steps} ${t("synthetics.table.stepsSuffix")}` : "—"
+        (row as any).steps ? t("synthetics.table.stepsCount", { count: (row as any).steps }) : "—"
       }}</span>
     </template>
 
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #cell-assertions="{ row }">
       <span class="truncate">{{
         (row as any).assertions
-          ? `${(row as any).assertions} ${t("synthetics.table.checksSuffix")}`
+          ? t("synthetics.table.checksCount", { count: (row as any).assertions })
           : "—"
       }}</span>
     </template>
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Type badge (monitors mode) -->
     <template #cell-type="{ row }">
       <OBadge :variant="resolveBadge('syntheticType', (row as any).type).variant" size="sm">
-        {{ resolveBadge("syntheticType", (row as any).type).label }}
+        {{ resolveBadgeLabel("syntheticType", (row as any).type) }}
       </OBadge>
     </template>
 
@@ -492,7 +492,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 
 type Mode = "all" | "browser";

@@ -64,8 +64,10 @@ vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
+    // Delegate to the real message catalogue instead of echoing the key, so
+    // assertions on rendered copy (e.g. formatTime -> "1500.00 sec") stay real.
     useI18n: () => ({
-      t: (key) => key,
+      t: (...args) => i18n.global.t(...args),
     }),
   };
 });

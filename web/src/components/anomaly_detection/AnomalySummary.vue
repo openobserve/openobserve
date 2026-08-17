@@ -66,7 +66,7 @@ const summaryContainer = ref<HTMLElement | null>(null);
 const showScrollToBottom = ref(false);
 
 const summaryText = computed(() =>
-  generateAnomalySummary(props.config, props.destinations, undefined, props.wizardStep),
+  generateAnomalySummary(props.config, props.destinations, t, props.wizardStep),
 );
 
 const checkScrollState = () => {

@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="check-circle" style="width: 80px; height: 80px" />
         <h4 class="mt-3">{{ t("awsMarketplace.subscriptionActivated") }}</h4>
         <p class="text-text-secondary">
-          {{ t("awsMarketplace.activatedDescription") }}
+          {{ t("awsMarketplace.activatedDescription", { product: raw("AWS Marketplace") }) }}
         </p>
         <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard">{{
           t("awsMarketplace.goToDashboard")
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" style="width: 80px; height: 80px" />
         <h5 class="mt-3">{{ t("awsMarketplace.paymentFailed") }}</h5>
         <p class="text-text-secondary">
-          {{ t("awsMarketplace.paymentFailedDescription") }}
+          {{ t("awsMarketplace.paymentFailedDescription", { product: raw("AWS Marketplace") }) }}
         </p>
         <OButton
           as="a"
@@ -194,7 +194,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
 import organizationsService from "@/services/organizations";
@@ -306,7 +306,8 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to create organization:", error);
         state.value = "error";
-        errorMessage.value = error.response?.data?.message || "Failed to create organization";
+        errorMessage.value =
+          error.response?.data?.message || t("billing.failedToCreateOrganization");
       }
     };
 
@@ -339,7 +340,8 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to link subscription:", error);
         state.value = "error";
-        errorMessage.value = error.response?.data?.message || "Failed to link AWS subscription";
+        errorMessage.value =
+          error.response?.data?.message || t("billing.failedToLinkAwsSubscription");
       }
     };
 
@@ -373,8 +375,7 @@ export default defineComponent({
           } else if (attempts >= maxAttempts) {
             if (pollInterval) clearInterval(pollInterval);
             state.value = "error";
-            errorMessage.value =
-              "Activation timeout. Please contact support if the issue persists.";
+            errorMessage.value = t("billing.activationTimeoutContactSupport");
           }
         } catch (error) {
           console.error("Poll error:", error);
@@ -396,6 +397,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       isDark,
       state,

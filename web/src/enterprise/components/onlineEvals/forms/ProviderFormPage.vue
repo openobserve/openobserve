@@ -44,7 +44,7 @@
               </div>
               <OFormInput
                 name="name"
-                :placeholder="t('onlineEvals.provider.namePlaceholder')"
+                :placeholder="raw('Production OpenAI')"
                 size="sm"
                 :disabled="mode === 'edit'"
                 data-test="provider-form-name-input"
@@ -95,7 +95,7 @@
               </div>
               <OFormInput
                 name="defaultModel"
-                :placeholder="t('onlineEvals.provider.defaultModelPlaceholder')"
+                :placeholder="raw('gpt-4o-mini')"
                 size="sm"
                 data-test="provider-form-default-model-input"
               />
@@ -107,7 +107,7 @@
               </div>
               <OFormInput
                 name="availableModels"
-                :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
+                :placeholder="raw('gpt-4o-mini, gpt-4.1')"
                 size="sm"
                 data-test="provider-form-available-models-input"
               />

@@ -854,7 +854,7 @@ export default defineComponent({
         variablesData.values.push({
           name: "Dynamic filters",
           type: "dynamic_filters",
-          label: "Dynamic filters",
+          label: t("dashboard.dashboards.dynamicFilters"),
           value: initialValue,
           isLoading: false,
           isVariableLoadingPending: false,

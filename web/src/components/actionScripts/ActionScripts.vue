@@ -468,10 +468,12 @@ export default defineComponent({
             };
           });
           actionsScriptRows.value = alerts.value.map((data: any) => {
-            if (data.execution_details_type === "repeat") data.execution_details_type = "Cron Job";
+            if (data.execution_details_type === "repeat")
+              data.execution_details_type = t("actions.cronJob");
             if (data.execution_details_type === "service")
-              data.execution_details_type = "Real Time";
-            if (data.execution_details_type === "once") data.execution_details_type = "Once";
+              data.execution_details_type = t("actions.realTime");
+            if (data.execution_details_type === "once")
+              data.execution_details_type = t("actions.once");
             return {
               id: data.id,
               name: data.name,
@@ -613,7 +615,7 @@ export default defineComponent({
           }
           toast({
             variant: "error",
-            message: err?.data?.message || "Error while deleting alert.",
+            message: err?.data?.message || t("actionScripts.deleteActionError"),
           });
         });
       if (config.enableAnalytics == "true") {
@@ -692,7 +694,7 @@ export default defineComponent({
             message:
               error.response?.data?.message ||
               error?.message ||
-              "Error while deleting action scripts",
+              t("actionScripts.deleteActionScriptsError"),
           });
         }
         confirmBulkDelete.value = false;

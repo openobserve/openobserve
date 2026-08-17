@@ -650,7 +650,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "p50_latency_ns",
     hideable: true,
-    header: t("traces.servicesCatalog.columns.p50Latency"),
+    header: raw("P50"),
     accessorKey: "p50_latency_ns",
     sortable: true,
     resizable: true,
@@ -660,7 +660,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "p95_latency_ns",
     hideable: true,
-    header: t("traces.servicesCatalog.columns.p95Latency"),
+    header: raw("P95"),
     accessorKey: "p95_latency_ns",
     sortable: true,
     resizable: true,
@@ -670,7 +670,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "p99_latency_ns",
     hideable: true,
-    header: t("traces.servicesCatalog.columns.p99Latency"),
+    header: raw("P99"),
     accessorKey: "p99_latency_ns",
     sortable: true,
     resizable: true,

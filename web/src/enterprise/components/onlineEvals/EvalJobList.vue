@@ -461,8 +461,7 @@ function statusLabel(status: EvalJobStatus) {
 
 function scorerCountText(row: EvalJob) {
   const count = (row.scorers || []).length;
-  if (count === 1) return t("onlineEvals.job.scorerCount", { count });
-  return t("onlineEvals.job.scorersCount", { count });
+  return t("onlineEvals.job.scorerCount", { count });
 }
 
 function targetScopeLabel(row: EvalJob) {

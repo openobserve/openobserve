@@ -96,7 +96,11 @@
                       <br />
                       {{ t("dashboard.stepValueTooltipInfo") }}
                       <br />
-                      {{ t("dashboard.stepValueExample") }}
+                      {{
+                        t("dashboard.stepValueExample", {
+                          example: raw("10s, 1h"),
+                        })
+                      }}
                     </template>
                   </OTooltip>
                 </OIcon>
@@ -150,7 +154,7 @@
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -245,6 +249,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       dashboardPanelDataModel,
       queryTypeOptions,

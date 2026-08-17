@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="geoLatLabel"
         :label="t('dashboard.geoLatLabel')"
-        :placeholder="t('dashboard.promQLChartConfig.geoLatPlaceholder')"
+        :placeholder="raw('latitude or lat')"
         data-test="dashboard-config-geo-lat-label"
       >
         <template #tooltip>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="geoLonLabel"
         :label="t('dashboard.geoLonLabel')"
-        :placeholder="t('dashboard.promQLChartConfig.geoLonPlaceholder')"
+        :placeholder="raw('longitude or lon')"
         data-test="dashboard-config-geo-lon-label"
       >
         <template #tooltip>
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="geoWeightLabel"
         :label="t('dashboard.geoWeightLabel')"
-        :placeholder="t('dashboard.promQLChartConfig.geoWeightPlaceholder')"
+        :placeholder="raw('weight')"
         data-test="dashboard-config-geo-weight-label"
       >
         <template #tooltip>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="mapsNameLabel"
         :label="t('dashboard.mapsNameLabel')"
-        :placeholder="t('dashboard.promQLChartConfig.mapsNamePlaceholder')"
+        :placeholder="raw('country or location')"
         data-test="dashboard-config-maps-name-label"
       >
         <template #tooltip>
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, ref, inject } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -674,6 +674,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       aggregationOptions,
       showAggregationConfig,
       aggregationValue,

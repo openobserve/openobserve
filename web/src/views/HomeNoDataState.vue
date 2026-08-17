@@ -32,7 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <EmptyStateIngestionCard
         icon="search"
         :label="t('home.noDataState.logs')"
-        :sublabel="t('home.noDataState.logsDesc')"
+        :sublabel="
+          t('home.noDataState.logsDesc', {
+            product1: raw('Curl'),
+            product2: raw('Filebeat'),
+            product3: raw('Fluentbit'),
+            product4: raw('Vector'),
+          })
+        "
         icon-variant="blue"
         data-test="home-no-data-logs-card"
         @click="go('curl')"
@@ -42,7 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <EmptyStateIngestionCard
         icon="account-tree"
         :label="t('home.noDataState.traces')"
-        :sublabel="t('home.noDataState.tracesDesc')"
+        :sublabel="
+          t('home.noDataState.tracesDesc', {
+            product1: raw('OTLP'),
+            product2: raw('Jaeger'),
+            product3: raw('Zipkin'),
+          })
+        "
         icon-variant="purple"
         data-test="home-no-data-traces-card"
         @click="go('tracesOTLP')"
@@ -52,7 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <EmptyStateIngestionCard
         icon="bar-chart"
         :label="t('home.noDataState.metrics')"
-        :sublabel="t('home.noDataState.metricsDesc')"
+        :sublabel="
+          t('home.noDataState.metricsDesc', {
+            product1: raw('Prometheus'),
+            product2: raw('OTel Collector'),
+            product3: raw('Telegraf'),
+          })
+        "
         icon-variant="teal"
         data-test="home-no-data-metrics-card"
         @click="go('prometheus')"
@@ -68,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="hub"
           data-test="home-no-data-otel-btn"
           @click="go('ingestLogsFromOtel')"
-          >{{ t("home.noDataState.otel") }}</EmptyStateIngestionChip
+          >{{ raw("OpenTelemetry") }}</EmptyStateIngestionChip
         >
         <EmptyStateIngestionChip
           data-test="home-no-data-kubernetes-btn"
@@ -79,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("home.noDataState.kubernetes") }}
+          {{ raw("Kubernetes") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip data-test="home-no-data-aws-btn" @click="go('AWSConfig')">
           <img
@@ -108,13 +127,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import { getImageURL } from "@/utils/zincutils";
+import DOMPurify from "dompurify";
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -125,7 +145,7 @@ const orgQuery = computed(() => ({
 }));
 
 // Uses v-html — fully i18n-controlled, no user input.
-const description = computed(() => t("home.noDataState.description"));
+const description = computed(() => DOMPurify.sanitize(t("home.noDataState.description")));
 
 const go = (routeName: string) => {
   router.push({ name: routeName, query: orgQuery.value });

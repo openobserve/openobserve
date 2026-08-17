@@ -32,7 +32,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
 import { computed, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { useRouter, useRoute, RouterView } from "vue-router";
@@ -116,7 +116,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
         {
           key: "mcpServer",
           label: t("iam.mcpServerLabel"),
-          description: t("iam.mcpServerDesc"),
+          description: t("iam.mcpServerDesc", { product: raw("Model Context Protocol") }),
           icon: "mcp",
           to: { name: "mcpServer", query: orgQuery.value },
           visible: aiEnabled,

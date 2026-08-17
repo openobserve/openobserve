@@ -84,7 +84,7 @@ const useRoutes = () => {
       path: "/login",
       component: Login,
       meta: {
-        title: "Login",
+        titleKey: "login.login",
       },
     },
     {
@@ -103,7 +103,7 @@ const useRoutes = () => {
       name: "callback",
       component: Login,
       meta: {
-        title: "Login Callback",
+        titleKey: "routeTitles.loginCallback",
       },
     },
   ];
@@ -115,7 +115,7 @@ const useRoutes = () => {
       component: Home,
       meta: {
         keepAlive: true,
-        title: "Home",
+        titleKey: "menu.home",
       },
     },
     // TEMPORARY: preview route for the OEmptyState design sample. Remove once
@@ -126,7 +126,7 @@ const useRoutes = () => {
       component: () => import("@/views/EmptyStateDemo.vue"),
       meta: {
         keepAlive: false,
-        title: "Empty State Demo",
+        titleKey: "routeTitles.emptyStateDemo",
       },
     },
     {
@@ -135,7 +135,7 @@ const useRoutes = () => {
       component: Search,
       meta: {
         keepAlive: true,
-        title: "Logs",
+        titleKey: "menu.search",
       },
       beforeEnter(to: any, from: any, next: any) {
         // Back-compat: Search History / Scheduler used to be `?action=…` overlays
@@ -158,7 +158,7 @@ const useRoutes = () => {
       component: SearchJobInspector,
       meta: {
         keepAlive: false,
-        title: "Search Job Inspector",
+        titleKey: "logs.searchJobInspector.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -173,7 +173,7 @@ const useRoutes = () => {
       component: SearchHistory,
       meta: {
         keepAlive: false,
-        title: "Search History",
+        titleKey: "search_history.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -188,7 +188,7 @@ const useRoutes = () => {
       component: SearchSchedulersList,
       meta: {
         keepAlive: false,
-        title: "Search Scheduler",
+        titleKey: "routeTitles.searchScheduler",
       },
       beforeEnter(to: any, from: any, next: any) {
         if (config.isEnterprise !== "true") {
@@ -211,7 +211,7 @@ const useRoutes = () => {
       component: AppMetricsExplorer,
       meta: {
         keepAlive: false,
-        title: "Metrics",
+        titleKey: "menu.metrics",
       },
       beforeEnter(to: any, from: any, next: any) {
         if (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize") {
@@ -236,7 +236,7 @@ const useRoutes = () => {
       component: AppMetrics,
       meta: {
         keepAlive: true,
-        title: "Metrics",
+        titleKey: "menu.metrics",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -248,7 +248,7 @@ const useRoutes = () => {
       component: PromQLQueryBuilder,
       meta: {
         keepAlive: false,
-        title: "PromQL Query Builder",
+        titleKey: "metrics.queryBuilder.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -260,7 +260,7 @@ const useRoutes = () => {
       component: AppTraces,
       meta: {
         keepAlive: true,
-        title: "Traces",
+        titleKey: "menu.traces",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -271,7 +271,7 @@ const useRoutes = () => {
       name: "traceDetails",
       component: TraceDetails,
       meta: {
-        title: "Trace Details",
+        titleKey: "routeTitles.traceDetails",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -282,7 +282,7 @@ const useRoutes = () => {
       name: "sessionDetails",
       component: SessionDetails,
       meta: {
-        title: "Session Details",
+        titleKey: "routeTitles.sessionDetails",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -299,7 +299,7 @@ const useRoutes = () => {
       component: StreamExplorer,
       props: true,
       meta: {
-        title: "Stream Explorer",
+        titleKey: "routeTitles.streamExplorer",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -310,7 +310,7 @@ const useRoutes = () => {
       name: "logstreams",
       component: LogStream,
       meta: {
-        title: "Streams",
+        titleKey: "menu.index",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -322,7 +322,7 @@ const useRoutes = () => {
       component: About,
       meta: {
         keepAlive: true,
-        title: "About",
+        titleKey: "menu.about",
       },
     },
     {
@@ -331,7 +331,7 @@ const useRoutes = () => {
       component: Dashboards,
       meta: {
         keepAlive: false,
-        title: "Dashboards",
+        titleKey: "menu.dashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -343,7 +343,7 @@ const useRoutes = () => {
       component: ViewDashboard,
       props: true,
       meta: {
-        title: "View Dashboard",
+        titleKey: "routeTitles.viewDashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -355,7 +355,7 @@ const useRoutes = () => {
       component: ImportDashboard,
       props: true,
       meta: {
-        title: "Import Dashboard",
+        titleKey: "dashboard.importDashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -367,7 +367,7 @@ const useRoutes = () => {
       component: AddPanel,
       props: true,
       meta: {
-        title: "Add Panel",
+        titleKey: "panel.addPanel",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -379,7 +379,7 @@ const useRoutes = () => {
       component: MemberSubscription,
       meta: {
         keepAlive: true,
-        title: "Member Subscription",
+        titleKey: "billing.memberSubscription.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -391,7 +391,7 @@ const useRoutes = () => {
       name: "pipeline",
       component: Functions,
       meta: {
-        title: "Pipeline",
+        titleKey: "pipeline.pipelineLabel",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -450,7 +450,7 @@ const useRoutes = () => {
               name: "pipelineHistory",
               component: () => import("@/components/pipelines/PipelineHistory.vue"),
               meta: {
-                title: "Pipeline History",
+                titleKey: "pipeline.history",
               },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
@@ -461,7 +461,7 @@ const useRoutes = () => {
               name: "pipelineBackfill",
               component: () => import("@/components/pipelines/BackfillJobsList.vue"),
               meta: {
-                title: "Pipeline Backfill Jobs",
+                titleKey: "routeTitles.pipelineBackfillJobs",
               },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
@@ -476,7 +476,7 @@ const useRoutes = () => {
       name: "sloList",
       component: () => import("@/views/slos/SloList.vue"),
       meta: {
-        title: "SLOs",
+        titleKey: "menu.slos",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -489,7 +489,7 @@ const useRoutes = () => {
       name: "addSlo",
       component: () => import("@/views/slos/AddSlo.vue"),
       meta: {
-        title: "New SLO",
+        titleKey: "slos.newTitle",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -500,7 +500,7 @@ const useRoutes = () => {
       name: "editSlo",
       component: () => import("@/views/slos/AddSlo.vue"),
       meta: {
-        title: "Edit SLO",
+        titleKey: "slos.editTitle",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -511,7 +511,7 @@ const useRoutes = () => {
       name: "sloDetail",
       component: () => import("@/views/slos/SloDetail.vue"),
       meta: {
-        title: "SLO",
+        titleKey: "routeTitles.sloDetail",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -522,7 +522,7 @@ const useRoutes = () => {
       name: "alertList",
       component: AlertList,
       meta: {
-        title: "Alerts",
+        titleKey: "menu.alerts",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -545,7 +545,7 @@ const useRoutes = () => {
       name: "alertDestinations",
       component: AlertsDestinationList,
       meta: {
-        title: "Notification Destinations",
+        titleKey: "alert_destinations.header",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -556,7 +556,7 @@ const useRoutes = () => {
       name: "alertTemplates",
       component: TemplateList,
       meta: {
-        title: "Templates",
+        titleKey: "alert_templates.header",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -575,7 +575,7 @@ const useRoutes = () => {
       name: "alertSources",
       component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
       meta: {
-        title: "External Alert Sources",
+        titleKey: "alert_sources.header",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -594,7 +594,7 @@ const useRoutes = () => {
       name: "alertDetail",
       component: () => import("@/views/alerts/AlertDetail.vue"),
       meta: {
-        title: "Alert Detail",
+        titleKey: "routeTitles.alertDetail",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -605,7 +605,7 @@ const useRoutes = () => {
       name: "addAlert",
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
-        title: "Add Alert",
+        titleKey: "alerts.addAlertMode",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -616,7 +616,7 @@ const useRoutes = () => {
       name: "addAnomalyDetection",
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
-        title: "Add Anomaly Detection",
+        titleKey: "alerts.addAnomalyMode",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -633,7 +633,7 @@ const useRoutes = () => {
       name: "editAnomalyDetection",
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
-        title: "Edit Anomaly Detection",
+        titleKey: "alerts.editAnomalyMode",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -650,7 +650,7 @@ const useRoutes = () => {
       name: "alertHistory",
       component: () => import("@/components/alerts/AlertHistory.vue"),
       meta: {
-        title: "Alert History",
+        titleKey: "alerts.history",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -661,7 +661,7 @@ const useRoutes = () => {
       name: "alertInsights",
       component: () => import("@/components/alerts/AlertInsights.vue"),
       meta: {
-        title: "Alert Insights",
+        titleKey: "alerts.insights.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -672,7 +672,7 @@ const useRoutes = () => {
       name: "importSemanticGroups",
       component: () => import("@/components/alerts/ImportSemanticGroups.vue"),
       meta: {
-        title: "Import Semantic Groups",
+        titleKey: "correlation.importSemanticGroups.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -692,7 +692,7 @@ const useRoutes = () => {
       name: "RUM",
       component: RealUserMonitoring,
       meta: {
-        title: "Real User Monitoring",
+        titleKey: "rum.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -821,7 +821,7 @@ const useRoutes = () => {
       component: Error404,
       meta: {
         keepAlive: true,
-        title: "404 - Not Found",
+        titleKey: "routeTitles.notFound",
       },
     },
   ];
@@ -836,7 +836,7 @@ const useRoutes = () => {
         component: ReportList,
         props: true,
         meta: {
-          title: "Reports",
+          titleKey: "menu.report",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -848,7 +848,7 @@ const useRoutes = () => {
         component: CreateReport,
         props: true,
         meta: {
-          title: "Create Report",
+          titleKey: "routeTitles.createReport",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);

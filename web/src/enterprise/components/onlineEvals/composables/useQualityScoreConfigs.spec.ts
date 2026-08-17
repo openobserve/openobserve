@@ -12,6 +12,8 @@ vi.mock("@/plugins/traces/composables/useLLMStreamQuery", () => ({
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import type { ScoreConfig } from "@/services/online-evals.service";
+import { gt } from "@/types/i18n";
+
 import {
   buildTrendSeries,
   buildQualityConfigAggSql,
@@ -142,6 +144,7 @@ describe("useQualityScoreConfigs volume trend", () => {
         startUs: startMs * 1000,
         endUs: (startMs + 15 * 60_000) * 1000,
       }),
+      gt,
     );
 
     await refresh();

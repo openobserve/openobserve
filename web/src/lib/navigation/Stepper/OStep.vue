@@ -275,12 +275,7 @@ const triggerClasses = computed<string>(() => {
   -->
   <template v-else>
     <!-- Expanded (checklist) mode: always rendered, no transition. -->
-    <div
-      v-if="expanded"
-      class="o-step-content w-full min-w-0"
-      role="region"
-      :aria-label="`${title}`"
-    >
+    <div v-if="expanded" class="o-step-content w-full min-w-0" role="region" :aria-label="title">
       <slot />
     </div>
     <template v-else>
@@ -297,7 +292,7 @@ const triggerClasses = computed<string>(() => {
           :key="name"
           class="o-step-content w-full min-w-0"
           role="region"
-          :aria-label="`${title}`"
+          :aria-label="title"
         >
           <slot />
         </div>
@@ -306,7 +301,7 @@ const triggerClasses = computed<string>(() => {
         v-else-if="!animated && isActive"
         class="o-step-content w-full min-w-0"
         role="region"
-        :aria-label="`${title}`"
+        :aria-label="title"
       >
         <slot />
       </div>

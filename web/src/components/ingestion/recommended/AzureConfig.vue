@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("ingestion.azureSetup.activityLogsTitle") }}
         </div>
         <div class="text-text-secondary m-0 text-sm">
-          {{ t("ingestion.azureSetup.activityLogsDescription") }}
+          {{ t("ingestion.azureSetup.activityLogsDescription", { product: raw("Event Hub") }) }}
         </div>
       </div>
     </div>
@@ -227,14 +227,14 @@ const SCRIPT_URL =
   "https://raw.githubusercontent.com/openobserve/o2-datasource/main/azure/azure_activity_logs/configure-diagnostic-settings.sh";
 
 const LOG_CATEGORIES = [
-  { value: "Administrative", label: "Administrative" },
-  { value: "Security", label: "Security" },
-  { value: "ServiceHealth", label: "Service Health" },
-  { value: "Alert", label: "Alert" },
-  { value: "Recommendation", label: "Recommendation" },
-  { value: "Policy", label: "Policy" },
-  { value: "Autoscale", label: "Autoscale" },
-  { value: "ResourceHealth", label: "Resource Health" },
+  { value: "Administrative", label: raw("Administrative") },
+  { value: "Security", label: raw("Security") },
+  { value: "ServiceHealth", label: raw("Service Health") },
+  { value: "Alert", label: raw("Alert") },
+  { value: "Recommendation", label: raw("Recommendation") },
+  { value: "Policy", label: raw("Policy") },
+  { value: "Autoscale", label: raw("Autoscale") },
+  { value: "ResourceHealth", label: raw("Resource Health") },
 ];
 
 const activityLogsIntegration = azureIntegrations.find((i) => i.id === "activity-logs")!;
@@ -276,6 +276,8 @@ export default defineComponent({
   --categories "${cats}"`;
     });
 
+    // Copy block, not prose: the two labels name the fields exactly as the Azure
+    // portal spells them, so they stay English in every locale (raw() at render).
     const manualContent = computed(() => {
       const orgId = store.state?.selectedOrganization?.identifier || "";
       const url = endpoint?.url || "";

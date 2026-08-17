@@ -48,6 +48,7 @@ import {
   checkIfVariablesAreLoaded,
   getDashboard,
 } from "./commons";
+import { gt } from "@/types/i18n";
 
 // Mock dependencies
 vi.mock("../services/dashboards", () => ({
@@ -949,7 +950,7 @@ describe("Commons Utility Functions", () => {
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await addVariable(mockStore, dashboardId, variableData, folderId);
+      await addVariable(gt, mockStore, dashboardId, variableData, folderId);
 
       expect(mockDashboard.variables).toEqual({
         showDynamicFilters: false,
@@ -975,7 +976,7 @@ describe("Commons Utility Functions", () => {
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await addVariable(mockStore, dashboardId, variableData, folderId);
+      await addVariable(gt, mockStore, dashboardId, variableData, folderId);
 
       expect(mockDashboard.variables.list).toHaveLength(2);
       expect(mockDashboard.variables.list[1]).toBe(variableData);
@@ -995,7 +996,7 @@ describe("Commons Utility Functions", () => {
 
       mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
 
-      await expect(addVariable(mockStore, dashboardId, variableData, folderId)).rejects.toThrow(
+      await expect(addVariable(gt, mockStore, dashboardId, variableData, folderId)).rejects.toThrow(
         "Variable with same name already exists",
       );
     });
@@ -1048,7 +1049,7 @@ describe("Commons Utility Functions", () => {
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await updateVariable(mockStore, dashboardId, variableName, variableData, folderId);
+      await updateVariable(gt, mockStore, dashboardId, variableName, variableData, folderId);
 
       expect(mockDashboard.variables.list[0]).toBe(variableData);
     });
@@ -1071,7 +1072,7 @@ describe("Commons Utility Functions", () => {
       mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
 
       await expect(
-        updateVariable(mockStore, dashboardId, variableName, variableData, folderId),
+        updateVariable(gt, mockStore, dashboardId, variableName, variableData, folderId),
       ).rejects.toThrow("Variable with same name already exists");
     });
   });

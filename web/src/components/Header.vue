@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'images/common/openobserve_latest_light_2.svg',
                 )
               "
-              :alt="t('about.name')"
+              :alt="raw('OpenObserve')"
             />
           </a>
         </div>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'images/common/openobserve_latest_light_2.svg',
               )
             "
-            :alt="t('about.name')"
+            :alt="raw('OpenObserve')"
           />
         </a>
       </div>
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openSlack"
           >
             <component :is="slackIcon" class="size-5 shrink-0" />
-            <OTooltip side="top" align="center" :content="t('menu.slack')" />
+            <OTooltip side="top" align="center" :content="raw('Slack')" />
           </OButton>
 
           <!-- HELP MENU: Contains links to docs, API, and about page -->
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="menu-link-openapi-item"
                   @select="navigateToOpenAPI(zoBackendUrl)"
                 >
-                  {{ t(`menu.openapi`) }}
+                  {{ raw("OpenAPI") }}
                 </ODropdownItem>
                 <ODropdownSeparator />
               </template>
@@ -432,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, PropType, computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
@@ -571,7 +571,7 @@ export default defineComponent({
       const isCloud = props.config.isCloud === "true";
 
       if (isCloud) {
-        return t("about.header_button.cloud_features");
+        return t("about.header_button.cloud_features", { product: raw("OpenObserve") });
       } else if (isEnterprise) {
         return t("about.header_button.enterprise_edition");
       } else {
@@ -659,6 +659,7 @@ export default defineComponent({
     return {
       isDark,
       t,
+      raw,
       getImageURL,
       enterpriseButtonText,
       ingestionQuotaPercentage,

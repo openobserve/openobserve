@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { gt } from "@/types/i18n";
 import useSyntheticsRecorder from "./useSyntheticsRecorder";
 import type { WireStep } from "@/types/synthetics";
 
@@ -96,7 +97,7 @@ describe("useSyntheticsRecorder", () => {
 
   describe("detectExtension", () => {
     it("should return true when the extension replies (no installed field)", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.detectExtension();
 
       await settleProbeDelay();
@@ -107,7 +108,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should reflect an in-progress recording reported by getStatus", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.detectExtension();
 
       await settleProbeDelay();
@@ -119,7 +120,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should return false when the command times out (no extension reachable)", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.detectExtension();
 
       // Let the probe delay pass, then let the command timeout fire.
@@ -135,7 +136,7 @@ describe("useSyntheticsRecorder", () => {
 
   describe("startRecording", () => {
     it("should send a startRecording command via the bridge and map setActions pushes", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.startRecording("https://app.test/login");
 
       await settleProbeDelay();
@@ -163,7 +164,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should ignore command-ack messages on the bridge", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.startRecording("https://app.test");
 
       await settleProbeDelay();
@@ -189,7 +190,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should surface an error and tear down when start fails", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.startRecording("https://app.test");
 
       await settleProbeDelay();
@@ -201,7 +202,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should set a fallback error when the start response has no error text", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.startRecording("https://app.test");
 
       await settleProbeDelay();
@@ -214,7 +215,7 @@ describe("useSyntheticsRecorder", () => {
   });
 
   it("sends the configured test-id attribute when one is given", async () => {
-    const r = useSyntheticsRecorder();
+    const r = useSyntheticsRecorder(gt);
     const promise = r.startRecording("https://app.test", "data-qa");
 
     await settleProbeDelay();
@@ -229,7 +230,7 @@ describe("useSyntheticsRecorder", () => {
   });
 
   it("falls back to the O2 default when no attribute is given", async () => {
-    const r = useSyntheticsRecorder();
+    const r = useSyntheticsRecorder(gt);
     const promise = r.startRecording("https://app.test", "");
 
     await settleProbeDelay();
@@ -243,7 +244,7 @@ describe("useSyntheticsRecorder", () => {
 
   describe("stopRecording", () => {
     it("should return the live-accumulated steps via the bridge", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const startPromise = r.startRecording("https://x.test");
 
       await settleProbeDelay();
@@ -271,7 +272,7 @@ describe("useSyntheticsRecorder", () => {
 
   describe("cancelRecording", () => {
     it("should clear state without returning steps", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.startRecording("https://x.test");
 
       await settleProbeDelay();
@@ -290,7 +291,7 @@ describe("useSyntheticsRecorder", () => {
     const steps: WireStep[] = [{ id: "s1", action: "navigate", url: "https://x.test" }];
 
     it("should send a replay command, toggle isReplaying, and store the result", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.replay(steps, "https://x.test");
 
       await settleProbeDelay();
@@ -313,7 +314,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should accept auth, headers, cookies, and variables without throwing", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const vars = [{ name: "BASE_URL", value: "https://example.com" }];
       const auth = { type: "basic" as const, username: "admin", password: "secret" };
       const headers = [{ key: "X-Custom", value: "val" }];
@@ -338,7 +339,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should substitute variables in wire steps before sending", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const stepsWithVars: WireStep[] = [
         { id: "s1", action: "navigate", url: "https://{{ BASE_URL }}/login" },
         { id: "s2", action: "type", selector: "#email", value: "{{ EMAIL }}" },
@@ -360,7 +361,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should store a failed replay result with the step error", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.replay(steps);
 
       await settleProbeDelay();
@@ -371,7 +372,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should not send a command when there are no steps", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const res = await r.replay([]);
       expect(res).toBeNull();
       expect(r.error.value).toContain("No replayable steps");
@@ -395,7 +396,7 @@ describe("useSyntheticsRecorder", () => {
     }
 
     it("stopReplay should send a stopReplay command", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       await startRunningReplay(r);
 
       const promise = r.stopReplay();
@@ -406,7 +407,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should hold the stopping phase until the extension confirms", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       await startRunningReplay(r);
       emitStreamEvent({ method: "stepReplayStarted", stepId: "s1" });
 
@@ -424,7 +425,7 @@ describe("useSyntheticsRecorder", () => {
     it("should clear the active step so no step is left in progress after a stop", async () => {
       // Regression: the step the replay was interrupted on never reports a result,
       // so a non-null activeStepId rendered as a permanently spinning status dot.
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       await startRunningReplay(r);
       emitStreamEvent({ method: "stepReplayStarted", stepId: "s1" });
       expect(r.activeStepId.value).toBe("s1");
@@ -437,7 +438,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should reach stopped even when the extension never acknowledges the stop", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       await startRunningReplay(r);
 
       const promise = r.stopReplay();
@@ -452,7 +453,7 @@ describe("useSyntheticsRecorder", () => {
     it("should ignore a stepReplayStarted that arrives after the stop", async () => {
       // The player can announce a step in the instant before the abort lands.
       // Honouring it would re-arm the spinner on a step that never ran.
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       await startRunningReplay(r);
 
       const promise = r.stopReplay();
@@ -465,7 +466,7 @@ describe("useSyntheticsRecorder", () => {
 
     it("should still record a step result that was already in flight when stopping", async () => {
       // That step genuinely ran, so it must keep counting toward "completed X of N".
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       await startRunningReplay(r);
 
       const promise = r.stopReplay();
@@ -482,7 +483,7 @@ describe("useSyntheticsRecorder", () => {
       // Regression: Stop returns as soon as the extension acknowledges, but the
       // original `replay` promise resolves later. Without a generation guard it
       // landed on the run started in between and knocked "running" back to "stopped".
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const firstReplay = r.replay(steps);
       await settleProbeDelay();
       const firstNonce = getLastCommandNonce()!;
@@ -524,7 +525,7 @@ describe("useSyntheticsRecorder", () => {
       // Regression: the abandoned replay answers long after Stop. If it is still
       // allowed to report, dismissing the stopped banner only hides it until that
       // response lands and puts the journey back into "stopped".
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       await startRunningReplay(r);
       const replayNonce = getLastCommandNonce()!;
 
@@ -552,7 +553,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should be a no-op when no replay is running", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       await r.stopReplay();
 
       expect(r.replayPhase.value).toBe("idle");
@@ -569,7 +570,7 @@ describe("useSyntheticsRecorder", () => {
         { id: "s2", action: "click", selector: "#login" },
         { id: "s3", action: "click", selector: "#logout" },
       ];
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.replay(journey);
 
       await settleProbeDelay();
@@ -597,7 +598,7 @@ describe("useSyntheticsRecorder", () => {
     });
 
     it("should give up when the extension never answers the replay command", async () => {
-      const r = useSyntheticsRecorder();
+      const r = useSyntheticsRecorder(gt);
       const promise = r.replay(steps);
 
       await settleProbeDelay();

@@ -326,7 +326,7 @@ describe("AddCipherKey.vue", () => {
       await nextTick();
       await wrapper.find('[data-test="add-cipher-key-cancel-btn"]').trigger("click");
       expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+      expect(wrapper.vm.dialog.title).toBe("Discard changes");
     });
   });
 });

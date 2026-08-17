@@ -2,6 +2,7 @@ import { toZonedTime } from "date-fns-tz";
 import { computeTreeLayout } from "./computeTreeLayout";
 import { resolveModelVendorLogo } from "./modelVendorLogo";
 import { cssToken } from "@/utils/theme";
+import { gt } from "@/types/i18n";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -465,8 +466,12 @@ export const convertServiceGraphToTree = (
         formatter: (params: any) => {
           // Drop the "N req" line at extreme density (see showReqLine) so the
           // name line alone stays readable rather than the two lines colliding.
+          // `{name|…}`/`{requests|…}` are ECharts rich-text tags, not i18n
+          // placeholders, so they stay in code and only the label is translated.
           return showReqLine
-            ? `{name|${params.name}}\n{requests|${formatNumber(totalRequests)} req}`
+            ? `{name|${params.name}}\n{requests|${gt("traces.graphTooltip.requestCount", {
+                count: formatNumber(totalRequests),
+              })}}`
             : `{name|${params.name}}`;
         },
         rich: {
@@ -1456,9 +1461,9 @@ export const convertServiceGraphToNetwork = (
       tooltip: {
         formatter: `
           <strong>${node.label || node.id}</strong><br/>
-          Requests: ${formatNumber(metrics.requests)}<br/>
-          Errors: ${formatNumber(metrics.errors)}<br/>
-          Error Rate: ${errorRate.toFixed(2)}%
+          ${gt("traces.graphTooltip.requests", { value: formatNumber(metrics.requests) })}<br/>
+          ${gt("traces.graphTooltip.errors", { value: formatNumber(metrics.errors) })}<br/>
+          ${gt("traces.graphTooltip.errorRate", { value: errorRate.toFixed(2) })}
         `,
       },
     };

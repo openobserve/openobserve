@@ -347,7 +347,7 @@ const fetchQuerySchema = async () => {
           alias: "zo_sql_key",
           column: "zo_sql_key",
           color: null,
-          label: "Time",
+          label: t("alerts.timeLabel"),
         },
       ];
       const aggFunction = props.formData.query_condition?.aggregation?.function || "";
@@ -767,7 +767,7 @@ const evaluateAndSetStatus = (resultCount: number) => {
     // Always show as "would trigger" with informational message for real-time alerts
     evaluationStatus.value = {
       wouldTrigger: true,
-      reason: "When conditions match",
+      reason: t("alerts.previewEvaluation.realTimeReason"),
     };
     return;
   }
@@ -807,22 +807,37 @@ const evaluateAndSetStatus = (resultCount: number) => {
     dashboardPanelData.data.queries[0]?.fields?.breakdown?.length > 0 ||
     dashboardPanelData.data.queries[0]?.fields?.x?.length > 0;
 
-  let resultLabel = "result";
+  const plural = resultCount !== 1;
+  let resultLabel: I18nText;
   if (props.isAggregationEnabled && hasGroupBy) {
-    resultLabel = resultCount !== 1 ? "matching groups" : "matching group";
+    resultLabel = plural
+      ? t("alerts.previewEvaluation.matchingGroups")
+      : t("alerts.previewEvaluation.matchingGroup");
   } else if (chartType === "line") {
-    resultLabel = resultCount !== 1 ? "data points" : "data point";
+    resultLabel = plural
+      ? t("alerts.previewEvaluation.dataPoints")
+      : t("alerts.previewEvaluation.dataPoint");
   } else if (chartType === "table") {
-    resultLabel = resultCount !== 1 ? "rows" : "row";
+    resultLabel = plural ? t("alerts.previewEvaluation.rows") : t("alerts.previewEvaluation.row");
   } else {
-    resultLabel = resultCount !== 1 ? "results" : "result";
+    resultLabel = plural
+      ? t("alerts.previewEvaluation.results")
+      : t("alerts.previewEvaluation.result");
   }
 
   evaluationStatus.value = {
     wouldTrigger,
     reason: wouldTrigger
-      ? `${resultCount} ${resultLabel} match (${comparisonText})`
-      : `${resultCount} ${resultLabel} found - does not meet ${comparisonText}`,
+      ? t("alerts.previewEvaluation.reasonMatch", {
+          count: resultCount,
+          label: resultLabel,
+          comparison: comparisonText,
+        })
+      : t("alerts.previewEvaluation.reasonNoMatch", {
+          count: resultCount,
+          label: resultLabel,
+          comparison: comparisonText,
+        }),
   };
 };
 
@@ -869,7 +884,7 @@ const refreshData = () => {
       alias: "zo_sql_key",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
-      label: "Timestamp",
+      label: t("alerts.timestamp"),
     },
   ];
 
@@ -930,7 +945,7 @@ const refreshData = () => {
     // Configure x-axis for zo_sql_key (timestamp buckets)
     xAxis = [
       {
-        label: "Time",
+        label: t("alerts.timeLabel"),
         alias: "zo_sql_key",
         column: "zo_sql_key",
         color: null,

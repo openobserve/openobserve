@@ -365,7 +365,7 @@ export default defineComponent({
     // -----------------------------------------------------------------------
 
     const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
-      useFieldValuesStream();
+      useFieldValuesStream(t);
 
     const {
       percentiles: durationPercentiles,
@@ -373,15 +373,15 @@ export default defineComponent({
       fetchPercentiles,
       cancelFetch: cancelPercentileFetch,
       errMsg: durationPercentileErrMsg,
-    } = useDurationPercentiles();
+    } = useDurationPercentiles(t);
 
     const PERCENTILE_LABELS = [
-      { key: "p25", label: "P25" },
-      { key: "p50", label: "P50" },
-      { key: "p75", label: "P75" },
-      { key: "p95", label: "P95" },
-      { key: "p99", label: "P99" },
-      { key: "max", label: "Max" },
+      { key: "p25", label: raw("P25") },
+      { key: "p50", label: raw("P50") },
+      { key: "p75", label: raw("P75") },
+      { key: "p95", label: raw("P95") },
+      { key: "p99", label: raw("P99") },
+      { key: "max", label: t("traces.max") },
     ] as const;
 
     const hasDurationPercentiles = computed(() =>

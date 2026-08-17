@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import http from "./http";
 
 /**
@@ -34,7 +36,7 @@ import http from "./http";
 function rejectBodyErrors(res: any) {
   const code = res?.data?.code;
   if (typeof code === "number" && code >= 400) {
-    const err: any = new Error(res.data?.message || `Request failed (${code})`);
+    const err: any = new Error(res.data?.message || gt("slos.requestFailed", { code }));
     // Shaped like an axios error so callers reading `e.response.data.message`
     // — which is every one of them — keep working unchanged.
     err.response = { status: code, data: res.data };

@@ -300,7 +300,7 @@ import {
 import { subtractRelativeTime } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
@@ -1095,7 +1095,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             if (customMessage) errorMsg = t(customMessage);
           }
           if (trace_id) {
-            errorMsg += ` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`;
+            // Markup + an English "TraceID:" label on purpose: useQueryError reads
+            // the id back out of this string with /TraceID:\s*([a-f0-9A-F-]+)/i, so a
+            // translated label would stop QueryErrorState from finding the trace id.
+            errorMsg += raw(` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`);
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
@@ -1350,7 +1353,7 @@ function updateGridColumns() {
           store.state.timezone,
           "yyyy-MM-dd HH:mm:ss.SSS",
         ),
-      label: "Start Time",
+      label: t("traces.startTime"),
       align: "left",
       sortable: true,
     });
@@ -1359,7 +1362,7 @@ function updateGridColumns() {
       name: "operation_name",
       field: (row: any) => row.operation_name,
       prop: (row: any) => row.operation_name,
-      label: "Operation",
+      label: t("traces.operation"),
       align: "left",
       sortable: true,
     });
@@ -1368,7 +1371,7 @@ function updateGridColumns() {
       name: "service_name",
       field: (row: any) => row.service_name,
       prop: (row: any) => row.service_name,
-      label: "Service",
+      label: t("traces.tableColumns.service"),
       align: "left",
       sortable: true,
     });
@@ -1377,7 +1380,7 @@ function updateGridColumns() {
       name: "duration",
       field: (row: any) => row.duration,
       prop: (row: any) => row.duration,
-      label: "Duration",
+      label: t("traces.tableColumns.duration"),
       align: "left",
       sortable: true,
       format: (val) => formatTimeWithSuffix(val),
@@ -1398,7 +1401,7 @@ function generateHistogramData() {
   var trace1 = {
     x: xData,
     y: yData,
-    name: "Trace",
+    name: t("traces.trace"),
     type: "scatter",
     mode: "markers",
     hovertemplate: "%{x} <br> %{y}", // hovertemplate for custom tooltip
@@ -1787,9 +1790,11 @@ const onAskAiTracing = () => {
   const errorText = (el.textContent ?? "").trim();
   const errorContext = errorText ? ` Error: ${errorText}.` : "";
 
+  // Model input, not screen copy — kept English so the assistant reads the same
+  // wording regardless of the user's locale.
   const outcome = errorContext
-    ? `The traces query produced an error.${errorContext}`
-    : `The traces query ran successfully but returned no results.`;
+    ? raw(`The traces query produced an error.${errorContext}`)
+    : raw(`The traces query ran successfully but returned no results.`);
 
   const mode = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
   const stream = searchObj.data.stream.selectedStream?.value || "unknown";
@@ -1797,7 +1802,9 @@ const onAskAiTracing = () => {
 
   emit(
     "sendToAiChat",
-    `${outcome} I am searching ${mode}. The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query. Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust the filter to get results?`,
+    raw(
+      `${outcome} I am searching ${mode}. The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query. Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust the filter to get results?`,
+    ),
     false,
   );
 };
@@ -1807,7 +1814,9 @@ const onAskAiTracing = () => {
 const onAskAiSetupTracing = () => {
   emit(
     "sendToAiChat",
-    `I don't have any trace streams in OpenObserve yet and want to start sending traces. How do I instrument my services to send traces (e.g. via OpenTelemetry / OTLP)?`,
+    raw(
+      `I don't have any trace streams in OpenObserve yet and want to start sending traces. How do I instrument my services to send traces (e.g. via OpenTelemetry / OTLP)?`,
+    ),
     false,
   );
 };

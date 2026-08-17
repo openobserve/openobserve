@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OEmptyState illustration="connect" size="hero" :hide-action="true">
-    <template #title>{{ t("logs.noData.title") }}</template>
+    <template #title>{{ t("logs.noData.title", { product: raw("OpenObserve") }) }}</template>
 
     <template #description>
       <span v-html="description" />
@@ -40,7 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <EmptyStateIngestionCard
         icon="alt-route"
         :label="t('logs.noData.shippers')"
-        :sublabel="t('logs.noData.shippersDesc')"
+        :sublabel="
+          t('logs.noData.shippersDesc', {
+            product1: raw('Filebeat'),
+            product2: raw('Fluentbit'),
+            product3: raw('Fluentd'),
+            product4: raw('Vector'),
+            product5: raw('SyslogNg'),
+          })
+        "
         icon-variant="teal"
         data-test="logs-no-data-shippers-card"
         @click="go('ingestLogs')"
@@ -49,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OpenTelemetry -->
       <EmptyStateIngestionCard
         icon="hub"
-        :label="t('logs.noData.otel')"
+        :label="raw('OpenTelemetry')"
         :sublabel="t('logs.noData.otelDesc')"
         icon-variant="amber"
         data-test="logs-no-data-otel-card"
@@ -71,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("logs.noData.kubernetes") }}
+          {{ raw("Kubernetes") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip data-test="logs-no-data-aws-btn" @click="go('AWSConfig')">
           <img
@@ -87,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("logs.noData.linux") }}
+          {{ raw("Linux") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           data-test="logs-no-data-windows-btn"
@@ -98,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("logs.noData.windows") }}
+          {{ raw("Windows") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           v-if="aiEnabled"
@@ -116,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

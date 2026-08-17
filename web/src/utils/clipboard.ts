@@ -4,7 +4,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface CopyToClipboardOptions {
-  successMessage?: string;
+  successMessage?: I18nText;
   errorMessage?: I18nText;
   timeout?: number;
   silent?: boolean;

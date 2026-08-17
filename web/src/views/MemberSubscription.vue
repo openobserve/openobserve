@@ -61,7 +61,7 @@ export default defineComponent({
   data() {
     return {
       status: "processing",
-      message: "Please wait while we process your request...",
+      message: this.t("billing.pleaseWaitProcessingRequest"),
       error: "",
       queryString: this.$route.hash.split("=")[1],
     };

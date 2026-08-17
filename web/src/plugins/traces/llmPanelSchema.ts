@@ -29,7 +29,7 @@
  * Only panel types present in `TYPE_MAP` are convertible.
  */
 
-import { raw, type I18nText } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 import type { LLMPanelDef } from "./config/llmInsightsPanels";
 
@@ -52,7 +52,10 @@ interface AxisField {
   label: I18nText;
 }
 
-// Axis labels are column aliases and series names (`p50`, `errors`) — identifiers, not prose.
+// Most axis labels are column aliases / percentile tokens (`p50`, `p95`) — identifiers,
+// not prose, hence `raw()`. Callers that pass real UI text (the "Time" axis name, the
+// `seriesLabelKey` legend name) translate it first and hand the result in already
+// resolved; `raw()` is a no-op brand at runtime, so it is safe for both.
 function axisField(name: string, label: string): AxisField {
   return { alias: name, column: name, color: null, label: raw(label) };
 }
@@ -63,9 +66,16 @@ export function buildLLMPanelSchema(opts: {
   sql: string;
   stream: string;
   streamType?: string;
+  /**
+   * Translator, threaded in from the calling component. The axis/series labels
+   * below are user-facing, and the panel defs are module-scope config, so the
+   * text has to be resolved here (at build time) to follow the locale.
+   */
+  t: TranslateFn;
 }): any {
-  const { panel, sql, stream, streamType = "traces" } = opts;
-  const { timeField, seriesField, valueField, valueFormat, seriesLabel } = panel.query;
+  const { panel, sql, stream, streamType = "traces", t } = opts;
+  const { timeField, seriesField, valueField, valueFormat, seriesLabelKey } = panel.query;
+  const seriesLabel = seriesLabelKey ? t(seriesLabelKey) : undefined;
 
   // Single-series panels (no breakdown) use the non-stacked "area" variant.
   // An "area-stacked" panel with no breakdown renders its legend as "(empty)"
@@ -164,12 +174,21 @@ export function buildLLMPanelSchema(opts: {
           // it, a grouped bar's legend overlaps the value-axis ticks — exactly
           // the difference vs. the dashboards page, which always has a name.
           x: xFieldName
-            ? [axisField(xFieldName, isHBar ? (panel.series?.length ? xFieldName : "") : "Time")]
+            ? [
+                axisField(
+                  xFieldName,
+                  isHBar
+                    ? panel.series?.length
+                      ? xFieldName
+                      : ""
+                    : t("traces.lLMInsightsDashboard.timeAxis"),
+                ),
+              ]
             : [],
           // Grouped-bar panels declare multiple value series (p50/p90/p95/p99)
           // → one Y field each. Otherwise a single Y field; with no breakdown
           // its label becomes the legend/series name, so honour the panel's
-          // seriesLabel (e.g. "errors") when set.
+          // translated seriesLabelKey (e.g. "errors") when set.
           y: panel.series?.length
             ? panel.series.map((s) => axisField(s.field, s.label))
             : valueField

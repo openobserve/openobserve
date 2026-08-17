@@ -201,10 +201,10 @@ export default defineComponent({
 
     const selectedSearchType = ref("dashboards");
     const searchTypes = ["dashboards", "ui", "Others"]; // UI, Dashboards, Reports, Alerts, Values, Other, RUM, DerivedStream,
-    const searchTypeLabels: Record<string, string> = {
-      dashboards: "Dashboards",
-      ui: "UI",
-      Others: "Others",
+    const searchTypeLabels: Record<string, I18nText> = {
+      dashboards: t("queries.searchTypeDashboards"),
+      ui: t("queries.searchTypeUi"),
+      Others: t("queries.searchTypeOthers"),
     };
 
     const runningQueryTypes = [
@@ -306,8 +306,8 @@ export default defineComponent({
 
     const deleteDialog = ref({
       show: false,
-      title: "Delete Running Query",
-      message: "Are you sure you want to delete this running query?",
+      title: t("queries.deleteRunningQueryTitle"),
+      message: t("queries.deleteRunningQueryMessage"),
       data: null as any,
     });
 
@@ -605,7 +605,7 @@ export default defineComponent({
         })
         .catch((error: any) => {
           toast({
-            message: error.response?.data?.message || "Failed to fetch running queries",
+            message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
             variant: "error",
           });
         })
@@ -628,7 +628,7 @@ export default defineComponent({
         })
         .catch((error: any) => {
           toast({
-            message: error.response?.data?.message || "Failed to cancel query",
+            message: error.response?.data?.message || t("queries.cancelQueryFailed"),
             variant: "error",
           });
         })

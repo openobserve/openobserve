@@ -408,9 +408,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="errorDialog.data?.name"
     :sub-title="
       errorDialog.data
-        ? raw(
-            `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}`,
-          )
+        ? t('pipeline_list.lastErrorAt', {
+            time: new Date(
+              errorDialog.data.last_error.last_error_timestamp / 1000,
+            ).toLocaleString(),
+          })
         : undefined
     "
     :primary-button-label="t('pipeline_list.close')"
@@ -488,7 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, onMounted } from "vue";
 import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
@@ -774,10 +776,10 @@ const togglePipelineState = (row: any, from_now: boolean) => {
     .then(async () => {
       row.enabled = newState;
       const message = row.enabled
-        ? `${row.name} state resumed successfully`
-        : `${row.name} state paused successfully`;
+        ? t("toastMessages.pipeline.stateResumed", { name: row.name })
+        : t("toastMessages.pipeline.statePaused", { name: row.name });
       toast({
-        message: raw(message),
+        message,
         variant: "success",
       });
       await getPipelines();
@@ -785,7 +787,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
     .catch((error) => {
       if (error.response.status != 403) {
         toast({
-          message: error.response?.data?.message || "Error while updating pipeline state",
+          message: error.response?.data?.message || t("pipeline.updatePipelineStateError"),
           variant: "error",
         });
       }
@@ -980,13 +982,22 @@ const getPipelines = async () => {
         pipeline.sql_query = "--";
       } else {
         pipeline.stream_type = pipeline.source.stream_type;
+        // These three feed accessor-only table columns (no #cell-* slot), so whatever
+        // is written here renders verbatim — hence t() rather than bare literals.
+        // Keys deliberately preserve the existing English ("15 Mins", "True"/"False")
+        // so this change is i18n-only with no visible diff. Switching the Cron column
+        // to Yes/No would read better, but that is a copy decision, not a migration one.
         pipeline.frequency =
           pipeline.source.trigger_condition.frequency_type == "minutes"
-            ? pipeline.source.trigger_condition.frequency + " Mins"
+            ? t("pipeline.frequencyMins", { count: pipeline.source.trigger_condition.frequency })
             : pipeline.source.trigger_condition.cron;
-        pipeline.period = pipeline.source.trigger_condition.period + " Mins";
+        pipeline.period = t("pipeline.frequencyMins", {
+          count: pipeline.source.trigger_condition.period,
+        });
         pipeline.cron =
-          pipeline.source.trigger_condition.frequency_type == "minutes" ? "False" : "True";
+          pipeline.source.trigger_condition.frequency_type == "minutes"
+            ? t("common.boolFalse")
+            : t("common.boolTrue");
         pipeline.sql_query = pipeline.source.query_condition.sql;
       }
 
@@ -1021,7 +1032,7 @@ const editPipeline = (pipeline: any) => {
 const openDeleteDialog = (pipeline: any) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
-  confirmDialogMeta.value.message = "Are you sure you want to delete this pipeline?";
+  confirmDialogMeta.value.message = t("pipeline.deletePipelineConfirm");
   confirmDialogMeta.value.onConfirm = deletePipeline;
   confirmDialogMeta.value.data = pipeline;
 };
@@ -1051,7 +1062,7 @@ const savePipeline = (data: any) => {
       dismiss();
       if (error.response.status != 403) {
         toast({
-          message: error.response?.data?.message || "Error while saving pipeline",
+          message: error.response?.data?.message || t("pipeline.errorSavingPipeline"),
           variant: "error",
         });
       }
@@ -1080,7 +1091,7 @@ const deletePipeline = async () => {
     .catch((error) => {
       if (error.response.status != 403) {
         toast({
-          message: error.response?.data?.message || "Error while deleting pipeline",
+          message: error.response?.data?.message || t("pipeline.deletePipelineError"),
           variant: "error",
         });
       }
@@ -1252,7 +1263,9 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
 const openBulkDeleteDialog = () => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
-  confirmDialogMeta.value.message = `Are you sure you want to delete ${selectedPipelines.value.length} pipeline(s)?`;
+  confirmDialogMeta.value.message = t("pipeline.confirmBulkDeleteMsg", {
+    count: selectedPipelines.value.length,
+  });
   confirmDialogMeta.value.onConfirm = bulkDeletePipelines;
   confirmDialogMeta.value.data = null;
 };
@@ -1335,9 +1348,7 @@ const bulkDeletePipelines = async () => {
     dismiss();
     // Show error message from response if available
     const errorMessage =
-      error.response?.data?.message ||
-      error?.message ||
-      "Error deleting pipelines. Please try again.";
+      error.response?.data?.message || error?.message || t("pipeline.bulkDeletePipelinesError");
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
         variant: "error",

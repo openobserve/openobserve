@@ -16,7 +16,7 @@
 // MongoDB data-source setup card. Follows the OpenObserve guide:
 // https://openobserve.ai/blog/monitor-mongodb-metrics-otel (requires MongoDB 4.0+).
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -59,15 +59,15 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
+export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
   return {
     provider: {
-      name: "MongoDB",
-      tagline: gt("ingestion.setupCard.mongodbTagline"),
+      name: raw("MongoDB"),
+      tagline: t("ingestion.setupCard.mongodbTagline"),
       logo: getImageURL("images/ingestion/mongodb.svg"),
       tone: "#00ED64",
-      metaBadges: [gt("common.metrics")],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
       {
@@ -103,7 +103,7 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
           },
         ],
       },
-      collectorInstallStep(),
+      collectorInstallStep(t),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -145,14 +145,15 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // mongodb receiver metric names (mongodb.connection.count, mongodb.cursor.count,
-        // …) — untranslated so the pills match the ingested metrics.
+        // What the verify step will show, in prose. These are NOT the receiver metric
+        // names (those are mongodb.connection.count, mongodb.cursor.count, …) — they are
+        // a plain-English summary of them, so they are translated.
         pills: [
-          raw("Connections"),
-          raw("Operations"),
-          raw("Cache Hits"),
-          raw("Cursors"),
-          raw("Documents"),
+          t("ingestion.setupCard.pillConnections"),
+          t("ingestion.setupCard.pillOperations"),
+          t("ingestion.setupCard.pillCacheHits"),
+          t("ingestion.setupCard.pillCursors"),
+          t("ingestion.setupCard.pillDocuments"),
         ],
       },
     ],

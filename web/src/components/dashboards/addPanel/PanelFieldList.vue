@@ -404,7 +404,7 @@ import useStreams from "@/composables/useStreams";
 import { applyPromqlSeed, metricsStreamsOf } from "@/utils/dashboard/promqlSeed";
 import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
 import { buildTypeFilterBuckets } from "@/utils/metrics/metricFamily";
-import { BADGE_LABELS, getBadgeStyle } from "@/utils/metrics/metricPalette";
+import { BADGE_LABEL_KEYS, getBadgeStyle } from "@/utils/metrics/metricPalette";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -614,7 +614,7 @@ const streamOptions = computed(() =>
     // The bucket id drives BOTH the label and the colour, so neither is
     // reconstructed from the other.
     const bucket = metricTypeBuckets.value[s.name];
-    const type = bucket ? (BADGE_LABELS[bucket] ?? "Other") : undefined;
+    const type = bucket ? t(BADGE_LABEL_KEYS[bucket] ?? "metrics.badge.other") : undefined;
     return {
       ...s,
       // The chip is the initial; hovering it (the title) spells the type out.
@@ -761,7 +761,9 @@ watch(
           );
         }
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Failed to get stream fields");
+        showErrorNotification(
+          error?.message ?? t("dashboard.addSettingVariable.failedToGetStreamFields"),
+        );
       }
     }
   },
@@ -812,7 +814,7 @@ const flattenGroupedFields = computed(() => {
   if (customQueryFields.length > 0) {
     flattenedFields.push({
       isGroup: true,
-      groupName: "Query Fields",
+      groupName: t("dashboard.dashboards.queryFields"),
     });
     customQueryFields.forEach((field: any) => {
       flattenedFields.push({
@@ -827,7 +829,7 @@ const flattenGroupedFields = computed(() => {
   if (vrlFunctionFields.length > 0) {
     flattenedFields.push({
       isGroup: true,
-      groupName: "Function Fields",
+      groupName: t("dashboard.dashboards.functionFields"),
     });
     vrlFunctionFields.forEach((field: any) => {
       flattenedFields.push({

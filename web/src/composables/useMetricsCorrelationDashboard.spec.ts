@@ -5,12 +5,15 @@ import {
   type MetricsCorrelationConfig,
 } from "./useMetricsCorrelationDashboard";
 import type { StreamInfo } from "@/services/service_streams";
+import i18nInstance from "@/locales";
+
+const t = (i18nInstance.global as any).t;
 
 describe("useMetricsCorrelationDashboard", () => {
   let composable: ReturnType<typeof useMetricsCorrelationDashboard>;
 
   beforeEach(() => {
-    composable = useMetricsCorrelationDashboard();
+    composable = useMetricsCorrelationDashboard(t);
   });
 
   describe("generateDashboard", () => {

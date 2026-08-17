@@ -90,7 +90,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import { addAnnotationSchema } from "./AddAnnotation.schema";
+import { makeAddAnnotationSchema } from "./AddAnnotation.schema";
 import type { AddAnnotationForm } from "./AddAnnotation.schema";
 
 interface AnnotationData {
@@ -130,6 +130,8 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18nTyped();
+
+const addAnnotationSchema = makeAddAnnotationSchema(t);
 const isOpen = ref(true);
 const showDeleteConfirm = ref(false);
 

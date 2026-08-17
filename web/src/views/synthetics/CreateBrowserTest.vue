@@ -78,8 +78,8 @@ const variablesHintParams = computed(() => ({
 // Chrome UI element names — must stay in English across all locales
 // because they reference the actual Chrome browser interface.
 const CHROME_UI_LABELS = {
-  details: "Details",
-  allowIncognito: "Allow in Incognito",
+  details: raw("Details"),
+  allowIncognito: raw("Allow in Incognito"),
 } as const;
 
 // Three top-level phases:
@@ -138,7 +138,7 @@ const saveSchema = computed(() => makeBrowserCheckSaveSchema(t));
 
 // Extension setup state — persists across phases in this session.
 // `extensionInstalled` is now driven by a real runtime probe (not a manual click).
-const recorder = useSyntheticsRecorder();
+const recorder = useSyntheticsRecorder(t);
 const extensionInstalled = ref(false);
 const incognitoAllowed = ref(false);
 const extensionReady = ref(false);

@@ -133,6 +133,20 @@ interface Props {
 
 const { t } = useI18nTyped();
 
+/** Keep in sync with `aiAssistant.aiChat.entity.*`; anything absent renders raw English. */
+const DELETABLE_ENTITIES = new Set([
+  "alert",
+  "dashboard",
+  "pipeline",
+  "report",
+  "function",
+  "stream",
+  "folder",
+  "panel",
+  "user",
+  "action",
+]);
+
 const props = withDefaults(defineProps<Props>(), {
   confirmation: null,
 });
@@ -159,23 +173,29 @@ const formattedMessage = computed(() => {
     // Use the label/message from the navigation action
     const message = props.confirmation.message;
     if (message) {
-      return `Allow O2 Assistant to ${message}?`;
+      return t("aiAssistant.aiChat.allowAssistantTo", { action: message });
     }
 
     // Fallback: format based on target
     const target = props.confirmation.args;
     if (target?.name) {
-      return `Allow O2 Assistant to navigate to ${target.name}?`;
+      return t("aiAssistant.aiChat.allowAssistantNavigateTo", { name: target.name });
     }
 
-    return "Allow O2 Assistant to navigate?";
+    return t("aiAssistant.aiChat.navigateConfirmQuestion");
   }
 
   // Handle Delete* operations generically (DeleteAlert, DeleteDashboard, DeletePipeline, etc.)
   if (props.confirmation.tool && props.confirmation.tool.startsWith("Delete")) {
     // Extract entity type (e.g., "Alert" from "DeleteAlert")
     const entityType = props.confirmation.tool.replace("Delete", "");
-    const entityTypeLower = entityType.toLowerCase();
+    // The noun is server-supplied English, so it needs translating before it goes into
+    // a translated sentence. Gated on a list, not te(): te() ignores the fallback locale,
+    // so it returns false for every non-English user until the entity keys are translated.
+    const lowerEntity = entityType.toLowerCase();
+    const entityTypeLower = DELETABLE_ENTITIES.has(lowerEntity)
+      ? t(`aiAssistant.aiChat.entity.${lowerEntity}`)
+      : lowerEntity;
     const args = props.confirmation.args || {};
 
     // Try to find a name or title for the entity
@@ -183,11 +203,14 @@ const formattedMessage = computed(() => {
       args.name || args.title || args.alert_id || args.dashboard_id || args.pipeline_id || args.id;
 
     if (name) {
-      return `Do you really want to delete the "${name}" ${entityTypeLower}?`;
+      return t("aiAssistant.aiChat.confirmDeleteNamedEntity", {
+        name,
+        entity: entityTypeLower,
+      });
     }
 
     // Fallback if no identifier found
-    return `Do you really want to delete this ${entityTypeLower}?`;
+    return t("aiAssistant.aiChat.confirmDeleteEntity", { entity: entityTypeLower });
   }
 
   // Fallback to message property

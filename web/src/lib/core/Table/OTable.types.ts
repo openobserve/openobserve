@@ -235,7 +235,7 @@ export interface OTableProps<TData = any> {
   /** Global search/filter text */
   globalFilter?: string;
   /** Placeholder for global filter input */
-  globalFilterPlaceholder?: string;
+  globalFilterPlaceholder?: I18nText;
   /** Show built-in global filter search bar (default: true) */
   showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;

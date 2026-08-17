@@ -496,7 +496,7 @@ export default defineComponent({
           if (e.response.status != 403) {
             toast({
               variant: "error",
-              message: e.response?.data?.message || "Error while generating RUM Token.",
+              message: e.response?.data?.message || t("ingestion.errorWhileGeneratingRumToken"),
               timeout: 5000,
             });
           }
@@ -528,7 +528,7 @@ export default defineComponent({
           if (e.response.status != 403) {
             toast({
               variant: "error",
-              message: e.response?.data?.message || "Error while refreshing RUM Token.",
+              message: e.response?.data?.message || t("ingestion.errorWhileRefreshingRumToken"),
               timeout: 5000,
             });
           }

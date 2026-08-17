@@ -16,6 +16,8 @@
 import { format as dfFormat, sub } from "date-fns";
 import { DateTime as _DateTime } from "luxon";
 
+import { gt } from "@/types/i18n";
+
 // ---------------------------------------------------------------------------
 // Duration helpers
 // ---------------------------------------------------------------------------
@@ -81,7 +83,7 @@ export const generateDurationLabel = (seconds: number) => {
   }
 
   if (label === "") {
-    label = `Off`;
+    label = gt("common.off");
   }
 
   return label;

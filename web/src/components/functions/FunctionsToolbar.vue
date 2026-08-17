@@ -60,7 +60,7 @@
                      side-by-side. A single flex-col child keeps title over body. -->
                 <div class="flex flex-col">
                   <div class="mb-1 font-semibold">
-                    {{ transTypeValue === "1" ? t("function.javascript") : t("function.vrl") }}
+                    {{ transTypeValue === "1" ? raw("JavaScript") : t("function.vrl") }}
                     {{ t("function.tipLabel") }}
                   </div>
                   <div>
@@ -144,7 +144,7 @@
 <script setup lang="ts">
 import { ref, computed, type PropType } from "vue";
 import { inject } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";

@@ -43,7 +43,7 @@ const useEnvRoutes = () => {
       name: "awsMarketplaceSetup",
       component: AwsMarketplaceSetup,
       meta: {
-        title: "AWS Marketplace Setup",
+        titleKey: "routeTitles.awsMarketplaceSetup",
         requiresAuth: true,
       },
     },
@@ -71,7 +71,7 @@ const useEnvRoutes = () => {
         routeGuard(to, from, next);
       },
       meta: {
-        title: "AI Monitoring",
+        titleKey: "routeTitles.aiMonitoring",
         keepAlive: false,
       },
       children: [
@@ -84,32 +84,32 @@ const useEnvRoutes = () => {
           path: "llm-insights",
           name: "aiLLMInsights",
           component: AILLMInsightsPage,
-          meta: { title: "Insights", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.llmInsights", keepAlive: false },
         },
         {
           path: "sessions",
           name: "aiSessions",
           component: AISessionsPage,
-          meta: { title: "Sessions", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.sessions", keepAlive: false },
         },
         {
           path: "agent-graph",
           name: "aiAgentGraph",
           component: AIAgentGraphPage,
-          meta: { title: "Agent Graph", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.agentGraph", keepAlive: false },
         },
         {
           path: "agent-behavior",
           name: "aiAgentBehavior",
           component: AIAgentBehaviorPage,
-          meta: { title: "Agent Behavior", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.agentBehavior", keepAlive: false },
         },
         {
           path: "evaluations",
           name: "aiEvaluations",
           component: OnlineEvals,
           props: { hideTabBar: true },
-          meta: { title: "Evaluations", keepAlive: false },
+          meta: { titleKey: "onlineEvals.title", keepAlive: false },
         },
       ],
     },
@@ -119,7 +119,7 @@ const useEnvRoutes = () => {
       path: "ai/session-details",
       name: "aiSessionDetails",
       component: SessionDetails,
-      meta: { title: "Session Details", keepAlive: false },
+      meta: { titleKey: "routeTitles.sessionDetails", keepAlive: false },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },

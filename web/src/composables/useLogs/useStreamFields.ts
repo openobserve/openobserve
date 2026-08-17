@@ -298,10 +298,12 @@ export const useStreamFields = () => {
               searchObj.data.datetime.queryRangeRestrictionMsg = t(
                 "search.queryRangeRestrictionMsg",
                 {
-                  range:
-                    searchObj.data.datetime.queryRangeRestrictionInHour > 1
-                      ? searchObj.data.datetime.queryRangeRestrictionInHour + " hours"
-                      : searchObj.data.datetime.queryRangeRestrictionInHour + " hour",
+                  // `{range}` lands inside a translated sentence, so the unit has to be
+                  // translated too. Dedicated pipe-plural key rather than common.hrShort
+                  // ("{count} hr"), which would change the copy from "hours" to "hr".
+                  range: t("search.queryRangeHours", {
+                    count: searchObj.data.datetime.queryRangeRestrictionInHour,
+                  }),
                 },
               );
             }
@@ -665,7 +667,7 @@ export const useStreamFields = () => {
 
             if (searchObj.data.stream.selectedStream.length > 1 && commonSchemaFields.length == 0) {
               commonSchemaMaps.unshift({
-                name: "Common Group Fields",
+                name: t("search.commonGroupFields"),
                 label: true,
                 ftsKey: false,
                 isSchemaField: false,
@@ -856,7 +858,7 @@ export const useStreamFields = () => {
     } catch (e: any) {
       searchObj.loadingStream = false;
       console.log("Error while extracting fields.", e);
-      notificationMsg.value = "Error while extracting stream fields.";
+      notificationMsg.value = t("search.errorWhileExtractingStreamFields");
     }
   };
 
@@ -865,7 +867,7 @@ export const useStreamFields = () => {
       if (streamName != "") {
         return await getStream(streamName, searchObj.data.stream.streamType || "logs", true);
       } else {
-        searchObj.data.errorMsg = "No stream found in selected organization!";
+        searchObj.data.errorMsg = t("search.noStreamFoundInOrganization");
       }
       return;
     } catch (e: any) {
@@ -950,7 +952,7 @@ export const useStreamFields = () => {
           searchObj.data.stream.selectedStream = selectedStream;
         }
       } else {
-        searchObj.data.errorMsg = "No stream found in selected organization!";
+        searchObj.data.errorMsg = t("search.noStreamFoundInOrganization");
       }
       return;
     } catch (e: any) {
@@ -1073,8 +1075,8 @@ export const useStreamFields = () => {
                 store.state.timezone,
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
-            label: t("search.timestamp") + ` (${store.state.timezone})`,
-            header: t("search.timestamp") + ` (${store.state.timezone})`,
+            label: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
+            header: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
             align: "left",
             sortable: true,
             enableResizing: false,
@@ -1097,6 +1099,8 @@ export const useStreamFields = () => {
             id: "source",
             accessorFn: (row: any) => JSON.stringify(row),
             cell: (info: any) => info.getValue(),
+            // "source" here, "_source" in the CorrelatedLogsTable variant — the two
+            // columns are named differently on purpose; do not unify them.
             header: raw("source"),
             sortable: true,
             // Elastic: the source column fills the width left beside the
@@ -1133,8 +1137,8 @@ export const useStreamFields = () => {
                 store.state.timezone,
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
-            label: t("search.timestamp") + ` (${store.state.timezone})`,
-            header: t("search.timestamp") + ` (${store.state.timezone})`,
+            label: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
+            header: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
             align: "left",
             sortable: true,
             enableResizing: false,
@@ -1222,7 +1226,7 @@ export const useStreamFields = () => {
       extractFTSFields();
     } catch (e: any) {
       searchObj.loadingStream = false;
-      notificationMsg.value = "Error while updating table columns.";
+      notificationMsg.value = t("search.errorWhileUpdatingTableColumns");
     }
   };
 

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, computed } from "vue";
+import { gt } from "@/types/i18n";
 import { useStore } from "vuex";
 import serviceStreamsApi from "@/services/service_streams";
 import settingsApi from "@/services/settings";
@@ -135,7 +136,7 @@ export function useServiceCorrelation() {
         semanticGroupsGlobalCache.set(org, cacheEntry);
         return response.data;
       } catch (err: any) {
-        error.value = `Failed to load semantic groups: ${err.message || err}`;
+        error.value = gt("traces.semanticGroupsLoadFailed", { error: err.message || err });
         console.error("Error loading semantic groups:", err);
         return [];
       } finally {
@@ -172,7 +173,7 @@ export function useServiceCorrelation() {
     try {
       // Validate inputs
       if (!currentStream) {
-        error.value = "Stream name is required for correlation";
+        error.value = gt("traces.streamNameRequiredForCorrelation");
         return null;
       }
 
@@ -183,7 +184,7 @@ export function useServiceCorrelation() {
       ]);
 
       if (semanticGroups.length === 0) {
-        error.value = "No semantic groups available";
+        error.value = gt("traces.noSemanticGroupsAvailable");
         return null;
       }
 
@@ -193,7 +194,7 @@ export function useServiceCorrelation() {
       const allDimensions = extractSemanticDimensions(context, semanticGroups, false);
 
       if (Object.keys(allDimensions).length === 0) {
-        error.value = "No recognizable dimensions found in context for correlation";
+        error.value = gt("traces.noRecognizableDimensionsForCorrelation");
         console.error(
           "[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.",
         );
@@ -217,7 +218,7 @@ export function useServiceCorrelation() {
 
       // Check if API returned null (no matching service found)
       if (!correlationData) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
+        error.value = gt("traces.noMatchingServiceForStream");
         console.warn(
           "[useServiceCorrelation] Correlation API returned null - no matching service found",
         );
@@ -260,13 +261,13 @@ export function useServiceCorrelation() {
     } catch (err: any) {
       // Provide user-friendly error messages
       if (err.response?.status === 403) {
-        error.value = "Service Discovery is not enabled. This is an enterprise feature.";
+        error.value = gt("traces.serviceDiscoveryNotEnabled");
       } else if (err.response?.status === 404) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
+        error.value = gt("traces.noMatchingServiceForStream");
       } else if (err.message?.includes("host") || err.code === "ERR_NETWORK") {
-        error.value = "Unable to connect to server. Please check if the application is running.";
+        error.value = gt("traces.unableToConnectToServer");
       } else if (!error.value) {
-        error.value = `Correlation failed: ${err.message || err}`;
+        error.value = gt("traces.correlationFailed", { error: err.message || err });
       }
       console.error("Error finding related telemetry:", err);
       return null;

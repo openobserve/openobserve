@@ -811,19 +811,19 @@ export default defineComponent({
 
       const currentXLabel =
         panelSchema?.value?.type == "table"
-          ? "First Column"
+          ? t("panel.firstColumn")
           : panelSchema?.value?.type == "h-bar"
-            ? "Y-Axis"
-            : "X-Axis";
+            ? t("panel.yAxisShort")
+            : t("panel.xAxisShort");
 
       const currentYLabel =
         panelSchema?.value?.type == "table"
-          ? "Other Columns"
+          ? t("panel.otherColumn")
           : panelSchema?.value?.type == "h-bar"
-            ? "X-Axis"
-            : "Y-Axis";
+            ? t("panel.xAxisShort")
+            : t("panel.yAxisShort");
 
-      validateSQLPanelFields(panelSchema.value, 0, currentXLabel, currentYLabel, errors, true);
+      validateSQLPanelFields(t, panelSchema.value, 0, currentXLabel, currentYLabel, errors, true);
 
       return errors;
     });
@@ -1476,6 +1476,7 @@ export default defineComponent({
         selectedAnnotationData,
         isCursorOverPanel,
         showErrorNotification,
+        t,
       });
 
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
@@ -1485,6 +1486,7 @@ export default defineComponent({
       tableRendererRef,
       showErrorNotification,
       showPositiveNotification,
+      t,
     });
 
     // Trellis only applies when EVERY query has a breakdown field (each

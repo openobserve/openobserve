@@ -183,7 +183,7 @@
         <OContent v-if="slo">
           <dl class="text-compact grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2">
             <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
-            <dd>{{ sliTypeLabel(slo.sli_type) }}</dd>
+            <dd>{{ sliTypeLabel(slo.sli_type, t) }}</dd>
 
             <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
             <dd>
@@ -291,7 +291,7 @@ const backTarget = computed(() => ({
 const subtitle = computed(() => {
   if (!slo.value) return raw("");
   const parts = [
-    sliTypeLabel(slo.value.sli_type),
+    sliTypeLabel(slo.value.sli_type, t),
     t("slos.overRolling", { window: formatWindow(slo.value.window_secs) }),
     formatSlice(slo.value.slice_interval_secs),
   ];

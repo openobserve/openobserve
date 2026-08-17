@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
             />
             <OIcon name="bar-chart" size="sm" class="shrink-0" />
-            <OTooltip :content="t('traces.RedMetrics')" />
+            <OTooltip :content="raw('RED Metrics')" />
           </div>
         </template>
 
@@ -368,7 +368,7 @@ import {
   toRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -866,6 +866,7 @@ export default defineComponent({
       _traceFieldValues,
       _traceSqlMode,
       _traceNoStream,
+      t,
       { excludeMatchAll: true },
     );
 
@@ -880,6 +881,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       router,
       store,
       searchObj,

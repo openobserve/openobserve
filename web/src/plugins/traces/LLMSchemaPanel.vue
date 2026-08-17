@@ -126,6 +126,7 @@ const chartData = computed(() =>
         panel: props.panel,
         sql: sql.value,
         stream: props.streamName,
+        t,
       })
     : null,
 );

@@ -68,7 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <OFormInput
                   name="name"
-                  :placeholder="t('modelPricing.modelNamePlaceholder')"
+                  :placeholder="
+                    t('modelPricing.modelNamePlaceholder', {
+                      example: raw('GPT-4o'),
+                    })
+                  "
                   data-test="model-pricing-name-input"
                 />
               </div>
@@ -94,7 +98,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OFormInput
                     name="match_pattern"
-                    :placeholder="t('modelPricing.matchPatternPlaceholder')"
+                    :placeholder="
+                      t('modelPricing.matchPatternPlaceholder', {
+                        example: raw('gpt-4.*'),
+                      })
+                    "
                     data-test="model-pricing-pattern-input"
                   />
                 </div>
@@ -234,7 +242,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormInput
                           :name="`tiers[${idx}].condition.usage_key`"
                           :label="t('modelPricing.usageKeyCol')"
-                          :placeholder="t('modelPricing.usageKeyPlaceholder')"
+                          :placeholder="
+                            t('modelPricing.usageKeyPlaceholder', {
+                              example: raw('input'),
+                            })
+                          "
                           :data-test="`model-pricing-tier-condition-key-input-${idx}`"
                         />
                       </div>
@@ -325,7 +337,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormInput
                           :name="`tiers[${idx}].prices[${entryIdx}].key`"
-                          :placeholder="t('modelPricing.usageKeyPlaceholder')"
+                          :placeholder="
+                            t('modelPricing.usageKeyPlaceholder', {
+                              example: raw('input'),
+                            })
+                          "
                           :data-test="`model-pricing-price-key-input-${idx}-${entryIdx}`"
                         />
                         <OFormInput
@@ -333,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           type="number"
                           :min="0"
                           step="0.01"
-                          :placeholder="t('modelPricing.pricePlaceholder')"
+                          :placeholder="raw('0.00')"
                           :data-test="`model-pricing-price-value-input-${idx}-${entryIdx}`"
                         >
                           <template #icon-left>
@@ -379,7 +395,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormInput
                           :name="`tiers[${idx}].draftKey`"
-                          :placeholder="t('modelPricing.addUsageKeyPlaceholder')"
+                          :placeholder="
+                            t('modelPricing.addUsageKeyPlaceholder', {
+                              example: raw('input'),
+                            })
+                          "
                           :data-test="`model-pricing-add-price-key-input-${idx}`"
                         />
                         <OFormInput
@@ -387,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           type="number"
                           :min="0"
                           step="0.01"
-                          :placeholder="t('modelPricing.pricePlaceholder')"
+                          :placeholder="raw('0.00')"
                           :data-test="`model-pricing-add-price-value-input-${idx}`"
                         >
                           <template #icon-left>
@@ -546,11 +566,11 @@ function copyPattern(pattern: string) {
 }
 
 const patternExamples = [
-  { name: "GPT-4o", match_pattern: "gpt-4o" },
+  { name: raw("GPT-4o"), match_pattern: "gpt-4o" },
   { name: "o3", match_pattern: "o3" },
-  { name: "Claude Sonnet 4.6", match_pattern: "claude-sonnet-4-6" },
-  { name: "Gemini 2.5 Pro", match_pattern: "gemini-2.5-pro" },
-  { name: "GPT-4o Mini", match_pattern: "gpt-4o-mini" },
+  { name: raw("Claude Sonnet 4.6"), match_pattern: "claude-sonnet-4-6" },
+  { name: raw("Gemini 2.5 Pro"), match_pattern: "gemini-2.5-pro" },
+  { name: raw("GPT-4o Mini"), match_pattern: "gpt-4o-mini" },
 ];
 
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
@@ -591,7 +611,9 @@ function createEmptyModel() {
     name: "",
     match_pattern: "",
     enabled: true,
-    tiers: [newTier(t("modelPricing.tierDefaultName"))],
+    // English on purpose: this is persisted verbatim as `tier.name` in the saved
+    // model, so a translated default would store different data per locale.
+    tiers: [newTier(raw("Default"))],
   };
 }
 
@@ -697,7 +719,7 @@ const operators = [
 function addTier() {
   setTiers([
     ...formTiers.value,
-    newFormTier(t("modelPricing.tierConditionalName"), {
+    newFormTier(raw("Conditional Tier"), {
       usage_key: "input",
       operator: "gt",
       value: 200000,

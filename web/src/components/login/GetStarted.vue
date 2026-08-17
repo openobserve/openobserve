@@ -111,13 +111,15 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
-import { getStartedSchema, getStartedDefaults, type GetStartedForm } from "./GetStarted.schema";
+import { makeGetStartedSchema, getStartedDefaults, type GetStartedForm } from "./GetStarted.schema";
 import { useStore } from "vuex";
 import billings from "@/services/billings";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 const store = useStore();
 const { t } = useI18nTyped();
+
+const getStartedSchema = makeGetStartedSchema(t);
 const emit = defineEmits(["removeFirstTimeLogin"]);
 const formRef = ref(null);
 

@@ -117,7 +117,8 @@ const deleteConfirm = ref<{ show: boolean; step: BrowserStep | null }>({
 
 const deleteConfirmMessage = computed(() => {
   const step = deleteConfirm.value.step;
-  if (!step) return "";
+  // raw("") is only the empty placeholder for "no step selected".
+  if (!step) return raw("");
   const label = step.name || `#${props.modelValue.indexOf(step) + 1}`;
   return t("synthetics.journey.confirmDeleteMessage", { label });
 });
@@ -276,11 +277,11 @@ const { t } = useI18nTyped();
 // because they reference the actual Chrome browser interface.
 const CHROME_UI = {
   details: "Details",
-  allowIncognito: "Allow in Incognito",
-  recorderName: "OpenObserve Recorder",
+  allowIncognito: raw("Allow in Incognito"),
+  recorderName: raw("OpenObserve Recorder"),
 } as const;
 
-const recorder = useSyntheticsRecorder();
+const recorder = useSyntheticsRecorder(t);
 const isRecording = recorder.isRecording;
 const capturedSteps = recorder.liveSteps;
 const currentUrl = recorder.currentUrl;
@@ -898,7 +899,7 @@ function openChromeExtensions() {
         }}</span>
       </div>
       <p class="text-text-secondary m-0 text-xs">
-        {{ t("synthetics.journey.incognitoDescription") }}
+        {{ t("synthetics.journey.incognitoDescription", { product: CHROME_UI.recorderName }) }}
       </p>
       <ol class="text-text-body m-0 flex list-decimal flex-col gap-1 pl-4 text-xs">
         <li>{{ t("synthetics.journey.incognitoStep1Full") }}</li>
@@ -1161,9 +1162,9 @@ function openChromeExtensions() {
         <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
           <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="text-text-muted text-xs"
-          >{{ capturedSteps.length }} {{ t("synthetics.table.stepsSuffix") }}</span
-        >
+        <span class="text-text-muted text-xs">{{
+          t("synthetics.table.stepsCount", { count: capturedSteps.length })
+        }}</span>
       </div>
 
       <JourneySteps

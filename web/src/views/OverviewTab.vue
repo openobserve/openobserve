@@ -766,8 +766,13 @@ const loadAnomalies = async () => {
         if ((h.anomaly_count ?? 0) > 0) {
           found.push({
             id: h.id ?? `anm-${cfg?.id}-${tsMs}`,
-            title: `Anomaly detected — ${cfg?.name ?? cfg?.alert_name ?? h.alert_name ?? "unknown"}`,
-            description: `Stream: ${cfg?.stream_name ?? h.stream_name ?? "unknown"} · ${h.anomaly_count} anomalous point(s)`,
+            title: t("overview.anomalyDetectedTitle", {
+              name: cfg?.name ?? cfg?.alert_name ?? h.alert_name ?? "unknown",
+            }),
+            description: t("overview.anomalyDetectedDescription", {
+              stream: cfg?.stream_name ?? h.stream_name ?? "unknown",
+              count: h.anomaly_count,
+            }),
             severity: "warning",
             alertName: cfg?.name ?? cfg?.alert_name ?? h.alert_name,
             streamName: cfg?.stream_name ?? h.stream_name,
@@ -839,7 +844,9 @@ const loadHistoryAndSplit = async () => {
         if (!existing || h.timestamp > existing.rawTs) {
           failedMap.set(key, {
             id: `fail-${key}`,
-            typeLabel: "Failed",
+            // English for the same reason as formatStatus() — this is the OTag
+            // `eventStatus` lookup value, not free display copy.
+            typeLabel: raw("Failed"),
             service: h.stream_name ?? "—",
             description: h.alert_name ?? "",
             timeAgo: relativeTime_(h.timestamp),
@@ -931,24 +938,28 @@ const loadServiceGraph = async () => {
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+// Deliberately English: the result feeds <OTag type="eventStatus" :value>, and
+// OTag normalises that value (lower-cased, separators stripped) to pick the
+// badge variant from the `eventStatus` group in badgeGroups.ts. A translated
+// value would miss `failed`/`firing`/`error` and lose the red/amber colouring.
 const formatStatus = (status: string) => {
-  if (!status) return "Event";
+  if (!status) return raw("Event");
   const map: Record<string, string> = {
     firing: "Firing",
     error: "Error",
     failed: "Failed",
     anomaly: "Anomaly",
   };
-  return map[status.toLowerCase()] ?? status.charAt(0).toUpperCase() + status.slice(1);
+  return raw(map[status.toLowerCase()] ?? status.charAt(0).toUpperCase() + status.slice(1));
 };
 
 const relativeTime_ = (tsMicros: number): string => {
   if (!tsMicros) return "—";
   const diffMs = Date.now() - Math.floor(tsMicros / 1000);
-  if (diffMs < 60_000) return `${Math.round(diffMs / 1000)}s ago`;
-  if (diffMs < 3_600_000) return `${Math.round(diffMs / 60_000)}m ago`;
-  if (diffMs < 86_400_000) return `${Math.round(diffMs / 3_600_000)}h ago`;
-  return `${Math.round(diffMs / 86_400_000)}d ago`;
+  if (diffMs < 60_000) return t("overview.secondsAgo", { count: Math.round(diffMs / 1000) });
+  if (diffMs < 3_600_000) return t("overview.minutesAgo", { count: Math.round(diffMs / 60_000) });
+  if (diffMs < 86_400_000) return t("overview.hoursAgo", { count: Math.round(diffMs / 3_600_000) });
+  return t("overview.daysAgo", { count: Math.round(diffMs / 86_400_000) });
 };
 
 const formatReqRate = (reqs: number) => {

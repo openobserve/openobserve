@@ -2234,7 +2234,7 @@ export default defineComponent({
     const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, cancelQuery } =
       useSearchBar(t);
     const { loadStreamLists, extractFields } = useStreamFields();
-    const { cancelPatterns } = usePatterns();
+    const { cancelPatterns } = usePatterns(t);
 
     const {
       refreshData,
@@ -3947,7 +3947,7 @@ export default defineComponent({
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
             toast({
-              message: err.message || `Error while applying saved view.`,
+              message: err.message || t("search.errorWhileApplyingSavedView"),
               variant: "error",
             });
           }
@@ -4004,7 +4004,9 @@ export default defineComponent({
               getSavedViews();
             } else {
               toast({
-                message: `${t("search.errorDeletingSavedView")} ${res.data.error_detail}`,
+                message: t("search.errorDeletingSavedViewDetail", {
+                  detail: res.data.error_detail,
+                }),
                 variant: "error",
               });
             }
@@ -4104,7 +4106,9 @@ export default defineComponent({
               isSavedViewAction.value = "create";
             } else {
               toast({
-                message: `${t("search.errorCreatingSavedView")} ${res.data.error_detail}`,
+                message: t("search.errorCreatingSavedViewDetail", {
+                  detail: res.data.error_detail,
+                }),
                 variant: "error",
               });
             }
@@ -4163,7 +4167,9 @@ export default defineComponent({
               confirmSavedViewDialogVisible.value = false;
             } else {
               toast({
-                message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
+                message: t("search.errorUpdatingSavedViewDetail", {
+                  detail: res.data.error_detail,
+                }),
                 variant: "error",
               });
             }
@@ -4573,7 +4579,9 @@ export default defineComponent({
         // validate that timestamp column is not used as an alias
         if (!checkTimestampAlias(logsPageQuery)) {
           showErrorNotification(
-            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+            t("search.aliasNotAllowed", {
+              alias: store.state.zoConfig.timestamp_column || "_timestamp",
+            }),
           );
           return;
         }
@@ -4899,6 +4907,7 @@ export default defineComponent({
       _fieldValues,
       _sqlMode,
       _noStream,
+      t,
     );
     // [END] query editor placeholder overlay
 

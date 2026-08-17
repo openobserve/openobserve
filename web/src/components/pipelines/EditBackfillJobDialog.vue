@@ -258,7 +258,7 @@ const onSubmit = async (value: BackfillForm) => {
   errorMessage.value = "";
 
   if (!props.job) {
-    errorMessage.value = "No job selected";
+    errorMessage.value = t("pipeline.noJobSelected");
     return;
   }
 
@@ -311,7 +311,7 @@ const updateBackfillJobRequest = async (value: BackfillForm) => {
   } catch (error: any) {
     console.error("Error updating backfill job:", error);
     errorMessage.value =
-      error?.response?.data?.error || error?.message || "Failed to update backfill job";
+      error?.response?.data?.error || error?.message || t("pipeline.updateBackfillJobFailed");
   }
 };
 </script>

@@ -21,7 +21,7 @@
 // The install + init steps share the "pkg" variant group: picking NPM or CDN
 // on either step switches both, so the two read as one coherent path.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
@@ -181,7 +181,7 @@ ${indent(LOGS_INIT_FIELDS, 4)},
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
-export default function rumCard(subs: RumCardSubs): RichCardContent {
+export default function rumCard(subs: RumCardSubs, t: TranslateFn): RichCardContent {
   const nodeIcon = getImageURL("images/ingestion/nodejs.svg");
 
   const installVariants: RichCardStepVariant[] = [
@@ -190,7 +190,7 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
       label: raw("NPM"),
       icon: nodeIcon,
       code: { lang: "bash", raw: NPM_INSTALL },
-      note: "Prefer NPM when you own the build — the SDK ships inside your bundle, versions move with your lockfile, and your CSP stays first-party.",
+      note: t("ingestion.setupCard.rumNpmInstallNote"),
     },
     {
       id: "cdn",
@@ -200,7 +200,7 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
         filename: "index.html",
         raw: cdnInstall(subs),
       },
-      note: `Paste at the top of <head>. Pinned to v${RUM_SDK_VERSION} for immutable caching; async + preconnect keep it off the critical rendering path. For strict CSP, self-host the two bundles instead.`,
+      note: t("ingestion.setupCard.rumCdnInstallNote", { version: RUM_SDK_VERSION }),
     },
   ];
 
@@ -215,7 +215,7 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
         raw: npmInit(subs, subs.rumToken),
         masked: npmInit(subs, subs.rumTokenMasked),
       },
-      note: "Run this in your app entry (main.js / index.js) before the app mounts, so early errors and first-paint timings are captured.",
+      note: t("ingestion.setupCard.rumNpmInitNote"),
     },
     {
       id: "cdn",
@@ -226,24 +226,19 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
         raw: cdnInit(subs, subs.rumToken),
         masked: cdnInit(subs, subs.rumTokenMasked),
       },
-      note: "Keep this right after the loader in <head>. onReady() queues init until each bundle arrives — nothing blocks rendering.",
+      note: t("ingestion.setupCard.rumCdnInitNote"),
     },
   ];
 
   return {
     provider: {
-      name: "Real User Monitoring",
-      tagline: gt("ingestion.setupCard.rumTagline"),
+      name: t("ingestion.setupCard.providerNameRum"),
+      tagline: t("ingestion.setupCard.rumTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
-      runtime: "Browser",
-      setupTime: "~2 min",
-      metaBadges: [
-        gt("rum.sessions"),
-        gt("rum.errors"),
-        gt("rum.webVitals"),
-        gt("rum.sessionReplay"),
-      ],
+      runtime: t("ingestion.setupCard.runtimeBrowser"),
+      setupTime: t("ingestion.setupCard.setupTime2Min"),
+      metaBadges: [t("rum.sessions"), t("rum.errors"), t("rum.webVitals"), t("rum.sessionReplay")],
     },
     steps: [
       {
@@ -274,12 +269,12 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
         completeOn: "detect",
         detectionAnchor: true,
         pills: [
-          gt("rum.sessions"),
-          gt("ingestion.setupCard.pillPageViews"),
-          gt("ingestion.setupCard.pillUserActions"),
-          gt("rum.errors"),
-          gt("rum.webVitals"),
-          gt("rum.sessionReplay"),
+          t("rum.sessions"),
+          t("ingestion.setupCard.pillPageViews"),
+          t("ingestion.setupCard.pillUserActions"),
+          t("rum.errors"),
+          t("rum.webVitals"),
+          t("rum.sessionReplay"),
         ],
       },
     ],
@@ -291,9 +286,8 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
       filter: "type = 'view'",
     },
     extras: {
-      fixTitle: "Allow The SDK In Your Content Security Policy",
-      fixBody:
-        "If your app runs but nothing arrives, the browser most likely blocked the SDK or its requests — usually a Content-Security-Policy or an ad-blocker. Allow the CDN and your OpenObserve endpoint, then reload:",
+      fixTitle: t("ingestion.setupCard.rumFixTitle"),
+      fixBody: t("ingestion.setupCard.rumFixBody"),
       fixLang: "yaml",
       fixSnippet: `Content-Security-Policy:
   script-src 'self' ${CDN_HOST};
@@ -301,32 +295,37 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
   worker-src 'self' blob:;`,
       troubleshooting: [
         {
-          q: "The scripts load but no data arrives",
-          a: `Check the browser console and network tab. A Content-Security-Policy must allow \`script-src ${CDN_HOST}\` (CDN setup), \`connect-src ${subs.endpoint}\` and \`worker-src blob:\` — session replay records in a web worker.`,
+          q: t("ingestion.setupCard.rumTroubleNoDataQ"),
+          a: t("ingestion.setupCard.rumTroubleNoDataA", {
+            cdnHost: CDN_HOST,
+            endpoint: subs.endpoint,
+          }),
         },
         {
-          q: "Requests are blocked by ad-blockers or privacy extensions",
-          a: "Some blockers filter third-party analytics scripts. Self-hosting the two bundles on your own origin (copy them from the CDN at deploy time) keeps everything first-party and avoids this entirely — it also lets you add Subresource Integrity hashes.",
+          q: t("ingestion.setupCard.rumTroubleBlockersQ"),
+          a: t("ingestion.setupCard.rumTroubleBlockersA"),
         },
         {
-          q: "Is it safe that the token is visible in my page source?",
-          a: "Yes — the `clientToken` is a client-side token by design, like every browser RUM product's. NPM setups expose it inside the JS bundle and CDN setups inline it in the HTML; DevTools reveals it either way. It can only **write** RUM events — it grants no read access and is separate from the ingestion passcode. If someone abuses it to send fake events, regenerate it from this page's header and redeploy your app.",
+          q: t("ingestion.setupCard.rumTroubleTokenVisibleQ"),
+          a: t("ingestion.setupCard.rumTroubleTokenVisibleA"),
         },
         {
-          q: "RUM requests return 401 or 403",
-          a: "The `clientToken` is this org's **RUM token** — not the ingestion passcode. If it was rotated, regenerate it from this page's header and update your app.",
+          q: t("ingestion.setupCard.rumTrouble401Q"),
+          a: t("ingestion.setupCard.rumTrouble401A"),
         },
         {
-          q: "My OpenObserve endpoint is plain HTTP",
-          a: `Browsers refuse mixed content and the SDK defaults to HTTPS — keep \`insecureHTTP: ${subs.insecureHTTP}\` (already set from this org's endpoint) so uploads use the right scheme.`,
+          q: t("ingestion.setupCard.rumTroublePlainHttpQ"),
+          a: t("ingestion.setupCard.rumTroublePlainHttpA", {
+            insecureHTTP: subs.insecureHTTP,
+          }),
         },
         {
-          q: "Session replays look blank or over-masked",
-          a: "`defaultPrivacyLevel` controls what replay captures: `'allow'` records everything, `'mask-user-input'` hides form input, `'mask'` hides all text. Pick the strictest level your privacy policy requires.",
+          q: t("ingestion.setupCard.rumTroubleMaskedQ"),
+          a: t("ingestion.setupCard.rumTroubleMaskedA"),
         },
         {
-          q: "Will the SDK slow my site down?",
-          a: "No — the bundles load with `async` off the critical rendering path, `preconnect` warms DNS/TLS before the first upload, and events are batched before sending. Lower `sessionReplaySampleRate` if you want to bound replay overhead further.",
+          q: t("ingestion.setupCard.rumTroublePerfQ"),
+          a: t("ingestion.setupCard.rumTroublePerfA"),
         },
       ],
     },

@@ -139,7 +139,15 @@ function tooltipText(metric: MetricResult): string {
   // (humanize), cost bounds are dollars, everything else is a plain number.
   const fmtBound = (v: number): string => {
     if (MS_KEYS.includes(metric.key))
-      return formatMicros(Math.abs(v)) + (v < 0 ? " faster" : " slower");
+      // The result is spliced into the translated ciRange sentence, so the direction
+      // word has to come from the catalogue rather than being appended in English.
+      return v < 0
+        ? t("aiObservability.deltaStrip.tooltip.boundFaster", {
+            value: formatMicros(Math.abs(v)),
+          })
+        : t("aiObservability.deltaStrip.tooltip.boundSlower", {
+            value: formatMicros(Math.abs(v)),
+          });
     if (COST_KEYS.includes(metric.key)) return `$${v.toFixed(4)}`;
     return v.toFixed(4);
   };

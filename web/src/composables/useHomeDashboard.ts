@@ -16,7 +16,7 @@
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw, type I18nText } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 export interface HomeDashboard {
   dashboardId: string;
@@ -31,7 +31,7 @@ const SETTING_CATEGORY = "ui";
 const homeDashboard: Ref<HomeDashboard | null> = ref(null);
 const isLoading = ref(false);
 
-export function useHomeDashboard() {
+export function useHomeDashboard(t: TranslateFn) {
   const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
 
   const load = async (org: string) => {
@@ -49,10 +49,10 @@ export function useHomeDashboard() {
     }
   };
 
-  const errMessage = (e: any, action: string) =>
-    e?.response?.status === 403
-      ? "You don't have permission to change the home dashboard"
-      : `Couldn't ${action} the home dashboard`;
+  // `fallback` is the already-translated "couldn't do X" line for the caller's
+  // action — passed in rather than composed here, so each action keeps its own key.
+  const errMessage = (e: any, fallback: I18nText) =>
+    e?.response?.status === 403 ? t("dashboard.noPermissionHomeDashboard") : fallback;
 
   const setHomeDashboard = async (org: string, d: HomeDashboard) => {
     if (!org) return; // no org → don't hit the API with an undefined segment
@@ -62,7 +62,10 @@ export function useHomeDashboard() {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: raw(errMessage(e, "set")) });
+      toast({
+        variant: "error",
+        message: errMessage(e, t("dashboard.homeDashboardSetFailed")),
+      });
     }
   };
 
@@ -80,7 +83,10 @@ export function useHomeDashboard() {
       // null, don't revert, don't toast. Only real errors revert.
       if (e?.response?.status === 404) return;
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: raw(errMessage(e, "remove")) });
+      toast({
+        variant: "error",
+        message: errMessage(e, t("dashboard.homeDashboardRemoveFailed")),
+      });
     }
   };
 

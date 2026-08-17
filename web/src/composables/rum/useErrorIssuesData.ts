@@ -350,7 +350,8 @@ const useErrorIssuesData = (t: TranslateFn) => {
       lastQueryError.value = (issuesR.reason as any)?.response?.data ?? null;
       toast({
         message:
-          (issuesR.reason as any)?.response?.data?.message || "Error while fetching error events",
+          (issuesR.reason as any)?.response?.data?.message ||
+          t("rum.errorWhileFetchingErrorEvents"),
         variant: "error",
       });
     }

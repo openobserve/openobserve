@@ -147,6 +147,18 @@ const BARE_STRING_DEFAULT_ALLOWLIST = [
 // otherwise the check is dodged by adding two braces. Bound PROPS are not checked
 // here; `I18nText` covers them, and rejects even a plain string variable.
 // Non-<template> files are a no-op.
+// Native attributes whose content is always text a user reads.
+const NATIVE_TEXT_ATTRS = new Set([
+  "placeholder",
+  "title",
+  "alt",
+  "aria-label",
+  "aria-placeholder",
+  "aria-description",
+  "aria-valuetext",
+  "aria-roledescription",
+]);
+
 noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
   meta: {
     type: "problem",
@@ -205,8 +217,19 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
         const text = bareText(node.value && node.value.expression);
         if (text == null) return;
         if (dir === "bind") {
-          // Component props → guarded by I18nText. Native `:title` / `:alt` are the
-          // residual gap: the built-in rule covers only their static form.
+          // Native only: component props are covered by the I18nText type, and the
+          // built-in rule sees only the STATIC form of these attributes.
+          const el = node.parent && node.parent.parent;
+          const tag = el && el.rawName;
+          // A dash or an uppercase letter means a component (OButton, q-btn).
+          const isNative = typeof tag === "string" && /^[a-z][a-z0-9]*$/.test(tag);
+          const attr = node.key.argument && node.key.argument.name;
+          if (isNative && NATIVE_TEXT_ATTRS.has(attr)) {
+            context.report({
+              node,
+              message: `Hardcoded text "${text}" in :${attr} — use t('...') with a key in en-US.json.`,
+            });
+          }
           return;
         } else if (dir === "text" || dir === "html") {
           context.report({
@@ -468,19 +491,6 @@ export default [
     files: ["src/composables/useTheme.ts", "src/utils/chartTheme.ts"],
     rules: {
       "no-restricted-syntax": "off",
-    },
-  },
-  {
-    // Query-syntax cheat-sheets — the "text" is SQL/PromQL, not prose. Add a file
-    // here only when it is genuinely code, with a one-line reason.
-    files: [
-      "src/plugins/logs/SyntaxGuide.vue",
-      "src/plugins/traces/SyntaxGuide.vue",
-      "src/plugins/metrics/SyntaxGuideMetrics.vue",
-    ],
-    rules: {
-      "vue/no-bare-strings-in-template": "off",
-      "local/no-bare-bound-text-props": "off",
     },
   },
   {

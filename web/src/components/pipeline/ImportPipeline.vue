@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OSelect
                         data-test="pipeline-import-destination-stream-type-input"
                         :model-value="userSelectedTimezone[index] || ''"
-                        :options="timezoneOptions"
+                        :options="timezoneSelectOptions"
                         :label="t('common.timezone')"
                         searchable
                         class="showLabelOnTop no-case py-2"
@@ -468,7 +468,7 @@ export default defineComponent({
     const router = useRouter();
 
     const { getStreams } = useStreams(t);
-    const { getPipelineDestinations } = usePipelines();
+    const { getPipelineDestinations } = usePipelines(t);
 
     const baseImportRef = ref<any>(null);
     const pipelineErrorsToDisplay = ref<PipelineErrors>([]);
@@ -528,11 +528,24 @@ export default defineComponent({
       return tz;
     });
 
-    const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+    // The VALUE stays English: resolveBrowserTimezone() parses this exact shape and
+    // stored records hold it verbatim. The LABEL is translated below.
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const browserTime = raw("Browser Time (" + browserTz + ")");
 
     // Add the UTC option
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
+
+    // Only the browser entry has copy to translate; every other option is an IANA
+    // zone name. Mapped for display so the persisted value stays the English shape.
+    const timezoneSelectOptions = computed(() =>
+      (timezoneOptions as string[]).map((tz: string) =>
+        tz === browserTime
+          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
+          : { label: raw(tz), value: tz },
+      ),
+    );
 
     const updateSqlQuery = (sqlQuery: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
@@ -655,7 +668,7 @@ export default defineComponent({
       try {
         // Check if jsonStr is empty or null
         if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
+          throw new Error(t("common.jsonStringEmpty"));
         }
 
         const parsedJson = JSON.parse(jsonString);
@@ -663,7 +676,7 @@ export default defineComponent({
         jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
       } catch (e: any) {
         toast({
-          message: e.message || "Invalid JSON format",
+          message: e.message || t("common.invalidJsonFormat"),
           variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
@@ -887,9 +900,13 @@ export default defineComponent({
           input.sql_query != input.source.query_condition.sql) ||
         !isValidQuery
       ) {
-        pipelineErrors.push(`Pipeline - ${index}: SQL query should be same across all nodes as well try to match the query in the nodes \n
-          input.sql_query: ${input.sql_query} \n
-          input.source.query_condition.sql: ${input.source.query_condition.sql} \n`);
+        pipelineErrors.push(
+          t("pipeline.importErrors.sqlQueryMismatch", {
+            index,
+            sqlQuery: input.sql_query,
+            sourceSql: input.source.query_condition.sql,
+          }),
+        );
       }
 
       //validate timezone in scheduled pipeline if the frequency type is cron
@@ -909,14 +926,14 @@ export default defineComponent({
         input.source.trigger_condition.frequency_type == "minutes" &&
         input.source.trigger_condition.frequency < 1
       ) {
-        pipelineErrors.push(`Pipeline - ${index}: Frequency should be greater than 0`);
+        pipelineErrors.push(t("pipeline.importErrors.frequencyPositive", { index }));
       }
       if (
         input.source.source_type == "scheduled" &&
         input.source.trigger_condition.frequency_type == "cron" &&
         input.source.trigger_condition.period < 1
       ) {
-        pipelineErrors.push(`Pipeline - ${index}: Period should be greater than 0`);
+        pipelineErrors.push(t("pipeline.importErrors.periodPositive", { index }));
       }
       //should match in source as well as in nodes as well
 
@@ -927,24 +944,16 @@ export default defineComponent({
         input.nodes.forEach((node: any) => {
           if (node.io_type == "input" && node.data.node_type == "query") {
             if (node.data.trigger_condition.frequency_type != "cron") {
-              pipelineErrors.push(
-                `Pipeline - ${index}: Frequency type should be cron and should match in source as well as in nodes so kindly check the frequency type in all nodes`,
-              );
+              pipelineErrors.push(t("pipeline.importErrors.cronFrequencyTypeMismatch", { index }));
             }
             if (node.data.trigger_condition.cron != input.source.trigger_condition.cron) {
-              pipelineErrors.push(
-                `Pipeline - ${index}: Cron should be same as in source and should match in all nodes so kindly check the cron in all nodes`,
-              );
+              pipelineErrors.push(t("pipeline.importErrors.cronMismatch", { index }));
             }
             if (node.data.trigger_condition.period != input.source.trigger_condition.period) {
-              pipelineErrors.push(
-                `Pipeline - ${index}: Period should be same as in source and should match in all nodes so kindly check the period in all nodes`,
-              );
+              pipelineErrors.push(t("pipeline.importErrors.periodMismatch", { index }));
             }
             if (node.data.trigger_condition.timezone != input.source.trigger_condition.timezone) {
-              pipelineErrors.push(
-                `Pipeline - ${index}: Timezone should be same as in source and should match in all nodes so kindly check the timezone in all nodes`,
-              );
+              pipelineErrors.push(t("pipeline.importErrors.timezoneMismatch", { index }));
             }
           }
         });
@@ -957,13 +966,11 @@ export default defineComponent({
           if (node.io_type == "input" && node.data.node_type == "query") {
             if (node.data.trigger_condition.frequency_type != "minutes") {
               pipelineErrors.push(
-                `Pipeline - ${index}: Frequency type should be minutes and should match in source as well as in nodes so kindly check the frequency type in all nodes`,
+                t("pipeline.importErrors.minutesFrequencyTypeMismatch", { index }),
               );
             }
             if (node.data.trigger_condition.frequency != input.source.trigger_condition.frequency) {
-              pipelineErrors.push(
-                `Pipeline - ${index}: Frequency should be same as in source and should match in all nodes so kindly check the frequency in all nodes`,
-              );
+              pipelineErrors.push(t("pipeline.importErrors.frequencyMismatch", { index }));
             }
           }
         });
@@ -1374,6 +1381,7 @@ export default defineComponent({
       updateRemoteDestination,
       destinationStreamTypes,
       timezoneOptions,
+      timezoneSelectOptions,
       handleDynamicStreamName,
       scheduledPipelines,
       userSelectedOrgId,

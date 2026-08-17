@@ -165,7 +165,7 @@ export function useVersionCompare() {
                 response?.message ||
                 response?.error ||
                 response?.error_detail ||
-                "Failed to fetch raw sample";
+                t("traces.failedToFetchRawSample");
               reject(new Error(message));
             },
             complete: () => resolve(hits),
@@ -251,10 +251,10 @@ export function useVersionCompare() {
     const runner = makeRunner();
 
     const fetchAPromise = armA.fetchAll(stream, queryA.start, queryA.end, va).catch((e: any) => {
-      armA.error.value = e?.message || "Failed to fetch version A";
+      armA.error.value = e?.message || t("traces.failedToFetchVersionA");
     });
     const fetchBPromise = armB.fetchAll(stream, queryB.start, queryB.end, vb).catch((e: any) => {
-      armB.error.value = e?.message || "Failed to fetch version B";
+      armB.error.value = e?.message || t("traces.failedToFetchVersionB");
     });
 
     // Default path: the sketch-merge compare endpoint for latency (p50/p95/
@@ -311,13 +311,13 @@ export function useVersionCompare() {
 
     const sampleAPromise = fetchRawSample(stream, filterA, queryA.start, queryA.end, runner).catch(
       (e: any) => {
-        armA.error.value = armA.error.value || e?.message || "Failed to fetch sample A";
+        armA.error.value = armA.error.value || e?.message || t("traces.failedToFetchSampleA");
         return { durations: [], costs: [] };
       },
     );
     const sampleBPromise = fetchRawSample(stream, filterB, queryB.start, queryB.end, runner).catch(
       (e: any) => {
-        armB.error.value = armB.error.value || e?.message || "Failed to fetch sample B";
+        armB.error.value = armB.error.value || e?.message || t("traces.failedToFetchSampleB");
         return { durations: [], costs: [] };
       },
     );

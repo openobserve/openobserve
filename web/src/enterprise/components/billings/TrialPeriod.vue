@@ -76,13 +76,9 @@ export default defineComponent({
           this.store.state.organizationData.organizationSettings.free_trial_expiry,
         );
         if (dueDays >= 0) {
-          if (dueDays > 1) {
-            return `${dueDays} Days remaining in your trial account`;
-          } else {
-            return `${dueDays} Day remaining in your trial account`;
-          }
+          return this.t("billing.trialDaysRemaining", { count: dueDays }, dueDays);
         } else {
-          return "Your trial period has expired.";
+          return this.t("billing.trialPeriodHasExpired");
         }
       }
       return undefined;

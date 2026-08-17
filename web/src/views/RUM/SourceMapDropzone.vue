@@ -149,9 +149,11 @@ const removeFile = (field: any) => {
 };
 
 const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return "0 Bytes";
   const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
+  // "KB"/"MB"/"GB" are unit SYMBOLS and read the same everywhere; only the
+  // spelled-out "Bytes" is a word, so only that one is translated.
+  const sizes = [t("dashboard.bytes"), "KB", "MB", "GB"];
+  if (bytes === 0) return `0 ${sizes[0]}`;
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 };

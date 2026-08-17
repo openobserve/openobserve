@@ -21,7 +21,7 @@
 // Per-DB content (the prepare/grant SQL, the receiver config, run, verify) stays
 // in each card's own file (e.g. sqlServer.ts, postgres.ts).
 
-import { raw } from "@/types/i18n";
+import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardStep, RichCardStepVariant } from "../types";
@@ -54,8 +54,7 @@ const winInstall = (version: string) =>
   `Invoke-WebRequest -Uri ${relUrl(version)}/otelcol-contrib_${version}_windows_amd64.tar.gz -OutFile otelcol-contrib.tar.gz
 tar -xvf otelcol-contrib.tar.gz
 .\\otelcol-contrib.exe --version`;
-const MAC_QUARANTINE_NOTE =
-  "If macOS blocks the unsigned binary, clear the quarantine flag: xattr -d com.apple.quarantine ./otelcol-contrib";
+const MAC_QUARANTINE_NOTE_KEY: I18nKey = "ingestion.setupCard.macQuarantineNote";
 
 /**
  * The "Install OpenTelemetry Collector Contrib" step — identical across DBs: a
@@ -63,7 +62,10 @@ const MAC_QUARANTINE_NOTE =
  * with the matching download command. The sqlserver/postgresql/etc. receivers
  * all ship only in the Contrib build.
  */
-export function collectorInstallStep(version: string = COLLECTOR_VERSION): RichCardStep {
+export function collectorInstallStep(
+  t: TranslateFn,
+  version: string = COLLECTOR_VERSION,
+): RichCardStep {
   const icon = osIcons();
   return {
     id: "install",
@@ -92,7 +94,7 @@ export function collectorInstallStep(version: string = COLLECTOR_VERSION): RichC
         icon: icon.mac,
         iconInvertDark: true,
         code: { lang: "bash", raw: unixInstall("darwin_arm64", version) },
-        note: MAC_QUARANTINE_NOTE,
+        note: t(MAC_QUARANTINE_NOTE_KEY),
       },
       {
         id: "darwin-amd64",
@@ -100,7 +102,7 @@ export function collectorInstallStep(version: string = COLLECTOR_VERSION): RichC
         icon: icon.mac,
         iconInvertDark: true,
         code: { lang: "bash", raw: unixInstall("darwin_amd64", version) },
-        note: MAC_QUARANTINE_NOTE,
+        note: t(MAC_QUARANTINE_NOTE_KEY),
       },
       {
         id: "windows-amd64",

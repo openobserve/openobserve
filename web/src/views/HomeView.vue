@@ -143,7 +143,7 @@ export default defineComponent({
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
-    const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard();
+    const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard(t);
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
@@ -263,7 +263,7 @@ export default defineComponent({
     watch(activeHomeTab, (val) => {
       if (val.startsWith("dash:")) {
         const org = store.state.selectedOrganization?.identifier;
-        if (org) useHomeDashboard().load(org);
+        if (org) useHomeDashboard(t).load(org);
       }
     });
 

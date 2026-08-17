@@ -79,7 +79,7 @@ watch(
       }
       expandedSteps.value = new Set(expandedSteps.value);
     } catch (e: any) {
-      queryError.value = e?.message ?? "Query failed";
+      queryError.value = e?.message ?? t("synthetics.queryFailed");
     } finally {
       loading.value = false;
     }

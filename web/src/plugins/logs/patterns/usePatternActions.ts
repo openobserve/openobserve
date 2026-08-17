@@ -31,7 +31,7 @@ export const usePatternActions = () => {
   const router = useRouter();
   const { t } = useI18nTyped();
   const { searchObj } = searchState();
-  const { patternsState } = usePatterns();
+  const { patternsState } = usePatterns(t);
 
   const selectedPattern = ref<any>(null);
   const showPatternDetails = ref(false);
