@@ -31,8 +31,9 @@ import type {
   OnCallResponseGroup,
   OnCallSlot,
   PriorityRung,
+  PromoteSeverity,
 } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, PROMOTE_SEVERITIES, sameSlot } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
@@ -912,6 +913,35 @@ export function identityDimensions(dimensions: Record<string, string>): Record<s
   return Object.fromEntries(
     Object.entries(dimensions).filter(([name]) => IDENTITY_DIMENSION_IDS.has(name)),
   );
+}
+
+/**
+ * The severity a promotion derives when the caller sends none — the record's
+ * own priority, with P5 folded into P4 because the incident scale has no P5.
+ */
+export function promoteSeverityFloor(priority: number): PromoteSeverity {
+  switch (priority) {
+    case 1:
+      return "P1";
+    case 2:
+      return "P2";
+    case 3:
+      return "P3";
+    default:
+      return "P4";
+  }
+}
+
+/**
+ * The severities a promotion may be *offered*. "A promotion may raise the
+ * severity but must never lower what already woke somebody" is stated as an
+ * invariant and enforced nowhere — the handler takes whatever string it is
+ * sent — so the picker is where it holds: a P2 page offers P1 and P2, never
+ * P3. Ranked most severe first, which is also how the incident screens order.
+ */
+export function promoteSeverityOptions(priority: number): PromoteSeverity[] {
+  const floor = promoteSeverityFloor(priority);
+  return PROMOTE_SEVERITIES.slice(0, PROMOTE_SEVERITIES.indexOf(floor) + 1);
 }
 
 /**

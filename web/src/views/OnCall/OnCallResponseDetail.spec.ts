@@ -37,6 +37,8 @@ vi.mock("@/services/oncall", () => ({
     addNote: vi.fn(),
     handoffResponse: vi.fn(),
     resolveResponse: vi.fn(),
+    promoteResponse: vi.fn(),
+    escalationProgress: vi.fn(),
   },
 }));
 
@@ -54,7 +56,11 @@ const service = vi.mocked(oncallService);
 const alerts = vi.mocked(alertsService);
 
 const stubs = {
-  OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
+  OPageLayout: {
+    name: "OPageLayout",
+    // `title-trail` carries the state tags, which are assertions of their own.
+    template: "<div><slot name='title-trail' /><slot name='actions' /><slot /></div>",
+  },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
@@ -71,7 +77,11 @@ const stubs = {
     props: ["groups"],
     template: "<div />",
   },
-  OnCallEscalation: { name: "OnCallEscalation", props: ["progress"], template: "<div />" },
+  OnCallEscalation: {
+    name: "OnCallEscalation",
+    props: ["progress", "events", "responderRole"],
+    template: "<div />",
+  },
   OContent: { name: "OContent", template: "<div><slot /></div>" },
   OStatStrip: { name: "OStatStrip", props: ["items"], template: "<div />" },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
@@ -594,4 +604,118 @@ describe("OnCallResponseDetail", () => {
     });
   });
 
+  /// D8/D-21. `ResponderRole` was typed and rendered nowhere, so a team paged
+  /// to contain somebody else's blast radius saw a page indistinguishable from
+  /// one it owned — and a two-rung ladder that stopped read as broken.
+  describe("liaison seat", () => {
+    it("says why this team was paged and links the owning team's record", async () => {
+      const wrapper = await renderWith({
+        responder_role: "impacted",
+        origin_response_id: "resp_owner",
+      });
+
+      expect(wrapper.find('[data-test="oncall-response-liaison-tag"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-liaison-banner"]').text()).toContain(
+        "another team's failure reaches your service",
+      );
+      expect(wrapper.find('[data-test="oncall-response-origin-link"]').exists()).toBe(true);
+    });
+
+    /// The role is what the ladder is truncated by, so it is what the ladder
+    /// panel is told — not a guess made from the ladder's own shape.
+    it("tells the ladder panel which seat this is", async () => {
+      service.escalationProgress.mockResolvedValue({
+        data: { fired: [], next_targets: [], next_at: null, exhausted: true, stopped_because: null },
+      } as any);
+      const wrapper = await renderWith({ responder_role: "impacted" });
+
+      expect(wrapper.findComponent({ name: "OnCallEscalation" }).props("responderRole")).toBe(
+        "impacted",
+      );
+    });
+
+    it("leaves an owner record with no liaison language at all", async () => {
+      service.escalationProgress.mockResolvedValue({
+        data: { fired: [], next_targets: [], next_at: null, exhausted: false, stopped_because: null },
+      } as any);
+      const wrapper = await renderWith({ responder_role: "owner" });
+
+      expect(wrapper.find('[data-test="oncall-response-liaison-banner"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-liaison-tag"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallEscalation" }).props("responderRole")).toBe(
+        "owner",
+      );
+    });
+  });
+
+  /// D5. `incident_id` could only ever be set by the path that opened the
+  /// record, so a responder who worked a page for ten minutes and realised it
+  /// was bigger than an alert had no way to say so.
+  describe("promote", () => {
+    it("promotes with the record's own title and severity by default", async () => {
+      service.promoteResponse.mockResolvedValue({
+        data: { incident_id: "inc_9", severity: "P1", response: record() },
+      } as any);
+      const wrapper = await renderWith({ priority: 1, title: "checkout down" });
+
+      await wrapper.find('[data-test="oncall-response-promote-btn"]').trigger("click");
+      const before = service.getResponse.mock.calls.length;
+      await wrapper.find('[data-test="oncall-promote-confirm"]').trigger("click");
+      await flushPromises();
+
+      expect(service.promoteResponse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          response_id: "resp_1",
+          data: { title: "checkout down", severity: "P1" },
+        }),
+      );
+      expect(service.getResponse.mock.calls.length).toBeGreaterThan(before);
+    });
+
+    /// The handler states the raise-never-lower invariant and enforces none of
+    /// it — it takes whatever severity string it is sent — so offering P3 on a
+    /// P2 page would quietly downgrade what already woke somebody.
+    it("offers no severity below the one that already woke somebody", async () => {
+      const wrapper = await renderWith({ priority: 2 });
+      await wrapper.find('[data-test="oncall-response-promote-btn"]').trigger("click");
+
+      const select = wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c) => c.attributes("data-test") === "oncall-promote-severity");
+      expect(
+        (select?.props("options") as { value: string }[]).map((o) => o.value),
+      ).toEqual(["P1", "P2"]);
+    });
+
+    /// Two responders clicking at once must not end up looking at two
+    /// incidents for one firing: the server refuses the second with a 409, and
+    /// the refetch is what puts the winning incident in front of the loser.
+    it("refetches on a conflict so the incident that won is the one shown", async () => {
+      service.promoteResponse.mockRejectedValue({
+        response: { status: 409, data: { message: "this record is already part of incident inc_9" } },
+      });
+      const wrapper = await renderWith();
+
+      await wrapper.find('[data-test="oncall-response-promote-btn"]').trigger("click");
+      const before = service.getResponse.mock.calls.length;
+      await wrapper.find('[data-test="oncall-promote-confirm"]').trigger("click");
+      await flushPromises();
+
+      expect(service.getResponse.mock.calls.length).toBeGreaterThan(before);
+    });
+
+    it("stops offering the promotion once the record has an incident", async () => {
+      const wrapper = await renderWith({ incident_id: "inc_9" });
+      expect(wrapper.find('[data-test="oncall-response-promote-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-incident-link"]').exists()).toBe(true);
+    });
+
+    /// A firing is routinely recognised as part of something larger after it
+    /// was closed, and the server does not gate the verb by state.
+    it("still offers the promotion on a closed record", async () => {
+      const wrapper = await renderWith({ state: "resolved", closed_at: 1_700_000_100_000_000 });
+      expect(wrapper.find('[data-test="oncall-response-promote-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-resolve-btn"]').exists()).toBe(false);
+    });
+  });
 });

@@ -46,6 +46,8 @@ import type {
   EscalationProgress,
   MyOnCall,
   Override,
+  PromoteResult,
+  PromoteSeverity,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 
@@ -590,6 +592,26 @@ const oncall = {
   }) =>
     http().post<OnCallResponse>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/confirm-recovery`,
+      data ?? {},
+    ),
+
+  /// Makes an incident out of a page that turned out to be one. Both body
+  /// fields are optional: an absent title reuses the record's, and an absent
+  /// severity is DERIVED from the record's priority server-side (1→P1, 2→P2,
+  /// 3→P3, 4 and 5→P4). Refuses with 409 when the record already has an
+  /// incident, naming it — two responders clicking at once must not end up
+  /// looking at two incidents for one firing.
+  promoteResponse: ({
+    org_identifier,
+    response_id,
+    data,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    data?: { title?: string; severity?: PromoteSeverity };
+  }) =>
+    http().post<PromoteResult>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/promote`,
       data ?? {},
     ),
 

@@ -16,6 +16,16 @@
         <OTag v-if="snoozedUntilLabel" variant="warning-soft" size="sm">
           {{ t("oncall.snoozed") }}
         </OTag>
+        <!-- Why this team is looking at somebody else's outage, said where the
+             state is said rather than halfway down the page. -->
+        <OTag
+          v-if="isImpacted"
+          variant="info-outline"
+          size="sm"
+          data-test="oncall-response-liaison-tag"
+        >
+          {{ t("oncall.liaisonTag") }}
+        </OTag>
       </template>
     </template>
 
@@ -64,6 +74,25 @@
         >
           {{ t("oncall.handoff") }}
         </OButton>
+      </template>
+
+      <!-- Ten minutes into a page, "this is bigger than an alert" had no way of
+           being said: `incident_id` could only ever be set by the path that
+           opened the record. Offered on a closed record too — the server does
+           not gate it by state, and the realisation that a firing belonged to
+           something larger routinely arrives after it was closed. Hidden once
+           an incident exists, because the rail links to it from then on. -->
+      <OButton
+        v-if="response && !response.incident_id"
+        variant="outline"
+        size="sm-action"
+        data-test="oncall-response-promote-btn"
+        @click="promoteOpen = true"
+      >
+        {{ t("oncall.promote") }}
+      </OButton>
+
+      <template v-if="response && isOpenState">
         <!-- An impacted record closes through ITS verb. A plain resolve would
              close this record but skip the sibling check that closes the
              owner's — the owner would wait forever on a confirmation that can
@@ -104,6 +133,31 @@
           {{ t("oncall.snoozedUntil", { time: snoozedUntilLabel }) }}
         </OBanner>
 
+        <!-- D-21. This record exists because somebody else's failure reaches
+             this team's service. Without saying so, a two-rung ladder that
+             stops reads as a broken one, and the team reads its own page as
+             an outage it is supposed to fix. -->
+        <OBanner
+          v-if="isImpacted"
+          variant="info"
+          class="mb-3"
+          data-test="oncall-response-liaison-banner"
+        >
+          {{ t("oncall.liaisonBanner") }}
+          <router-link
+            v-if="response.origin_response_id"
+            class="text-accent"
+            :to="{
+              name: 'onCallResponseDetail',
+              params: { responseId: response.origin_response_id },
+              query: { org_identifier: orgId },
+            }"
+            data-test="oncall-response-origin-link"
+          >
+            {{ t("oncall.liaisonOpenOrigin") }}
+          </router-link>
+        </OBanner>
+
         <OStatStrip :items="summaryStats" data-test="oncall-response-stats" />
       </OContent>
 
@@ -122,7 +176,12 @@
                      default deployment has no agent and must not show an
                      analysis panel that sits empty forever. -->
                 <OnCallVerdictCard :events="events" />
-                <OnCallEscalation v-if="escalation" :progress="escalation" :events="events" />
+                <OnCallEscalation
+                  v-if="escalation"
+                  :progress="escalation"
+                  :events="events"
+                  :responder-role="isImpacted ? 'impacted' : 'owner'"
+                />
                 <OnCallDeliveryLedger
                   :records="deliveries"
                   :total="deliveriesTotal"
@@ -358,6 +417,55 @@
     </ODialog>
 
     <ODialog
+      v-model="promoteOpen"
+      :title="t('oncall.promoteTitle')"
+      data-test="oncall-promote-dialog"
+    >
+      <div class="flex flex-col gap-3">
+        <p class="text-text-muted text-sm">{{ t("oncall.promoteMessage") }}</p>
+
+        <OInput
+          v-model="promoteTitle"
+          :label="t('oncall.promoteIncidentTitle')"
+          :placeholder="t('oncall.promoteIncidentTitlePlaceholder')"
+          data-test="oncall-promote-title"
+        />
+
+        <!-- Only P1 up to this record's own severity is offered. "A promotion
+             may raise the severity but must never lower what already woke
+             somebody" is an invariant the handler states and does not enforce
+             — it takes whatever string it is sent — so the picker is where it
+             holds. -->
+        <div class="flex flex-col gap-1">
+          <span class="text-text-label text-xs">{{ t("oncall.promoteSeverity") }}</span>
+          <span class="text-text-muted text-xs">{{ t("oncall.promoteSeverityHint") }}</span>
+          <OSelect
+            v-model="promoteSeverity"
+            :options="severityOptions"
+            data-test="oncall-promote-severity"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <OButton variant="outline" size="sm-action" @click="promoteOpen = false">
+            {{ t("oncall.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="promoting"
+            data-test="oncall-promote-confirm"
+            @click="promoteRecord"
+          >
+            {{ t("oncall.promote") }}
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
+
+    <ODialog
       v-model="confirmResolve"
       :title="t('oncall.resolveTitle')"
       data-test="oncall-resolve-dialog"
@@ -410,7 +518,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -452,13 +560,21 @@ import type {
   EscalationProgress,
   OnCallResponse,
   OnCallResponseEvent,
+  PromoteSeverity,
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
-import { isEscalating, isSnoozed, isUnresolved, routingReasonOf } from "@/utils/oncall";
+import {
+  isEscalating,
+  isSnoozed,
+  isUnresolved,
+  promoteSeverityFloor,
+  promoteSeverityOptions,
+  routingReasonOf,
+} from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
@@ -477,8 +593,13 @@ const confirmingRecovery = ref(false);
 const recoveryNote = ref("");
 
 /// An impacted record was opened alongside another team's page to contain the
-/// blast radius on THIS team's service. Its origin id is the owner's record.
-const isImpacted = computed(() => !!response.value?.origin_response_id);
+/// blast radius on THIS team's service. The role is always on the wire and the
+/// origin id says the same thing (§ "UI rule"); either one is enough, and an
+/// older record written before the role column is still readable.
+const isImpacted = computed(
+  () =>
+    response.value?.responder_role === "impacted" || !!response.value?.origin_response_id,
+);
 
 /// The dependent's close. The owner's record closes on its own once the last
 /// dependent has confirmed — which may be this call.
@@ -503,6 +624,66 @@ async function confirmRecovery() {
     confirmingRecovery.value = false;
   }
 }
+const promoteOpen = ref(false);
+const promoting = ref(false);
+const promoteTitle = ref("");
+const promoteSeverity = ref<PromoteSeverity>("P4");
+
+/// What a promotion may be set to on THIS record, most severe first, floored
+/// at its own priority.
+const severityOptions = computed(() =>
+  promoteSeverityOptions(response.value?.priority ?? 5).map((severity) => ({
+    label: raw(severity),
+    value: severity,
+  })),
+);
+
+/// The record's own severity is the default: the wire derives exactly this
+/// when no severity is sent, so the picker opens on the answer rather than on
+/// an empty box somebody has to fill in mid-incident.
+watch(
+  [response, promoteOpen],
+  () => {
+    if (!promoteOpen.value || !response.value) return;
+    promoteTitle.value = response.value.title || "";
+    promoteSeverity.value = promoteSeverityFloor(response.value.priority);
+  },
+  { immediate: true },
+);
+
+/// Makes an incident out of a page that turned out to be one. The refusal path
+/// matters as much as the success one: a 409 means somebody else promoted this
+/// record while this dialog was open, so the record is refetched and the rail's
+/// incident link is what the responder sees next.
+async function promoteRecord() {
+  promoting.value = true;
+  try {
+    const res = await oncallService.promoteResponse({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+      data: {
+        ...(promoteTitle.value.trim() ? { title: promoteTitle.value.trim() } : {}),
+        severity: promoteSeverity.value,
+      },
+    });
+    promoteOpen.value = false;
+    toast({
+      variant: "success",
+      message: t("oncall.promoted", { incident: res.data.incident_id }),
+    });
+    await fetchResponse();
+  } catch (err: any) {
+    promoteOpen.value = false;
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.promoteFailed"),
+    });
+    if (err?.response?.status === 409) await fetchResponse();
+  } finally {
+    promoting.value = false;
+  }
+}
+
 const acking = ref(false);
 const snoozing = ref(false);
 const addingNote = ref(false);

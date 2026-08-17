@@ -44,6 +44,8 @@ import {
   priorityLabel,
   priorityTagVariant,
   priorityTone,
+  promoteSeverityFloor,
+  promoteSeverityOptions,
   resolveHolder,
   resolveLadder,
   resolveNextHolder,
@@ -1051,6 +1053,30 @@ describe("compareRulePrecedence", () => {
       "service=alpha",
       "service=beta",
     ]);
+  });
+});
+
+/// D5. The promote handler states "a promotion may raise the severity but must
+/// never lower what already woke somebody" and then takes whatever severity it
+/// is sent — so the picker is the only place the invariant can hold.
+describe("promoteSeverityFloor / promoteSeverityOptions", () => {
+  it("derives the same severity the server would from the priority", () => {
+    expect(promoteSeverityFloor(1)).toBe("P1");
+    expect(promoteSeverityFloor(2)).toBe("P2");
+    expect(promoteSeverityFloor(3)).toBe("P3");
+    expect(promoteSeverityFloor(4)).toBe("P4");
+  });
+
+  /// The incident scale has no P5, which is why the server folds 4 and 5 into
+  /// the same severity rather than rejecting a P5 record.
+  it("folds a P5 page into P4, the lowest severity an incident has", () => {
+    expect(promoteSeverityFloor(5)).toBe("P4");
+  });
+
+  it("offers nothing below the record's own severity", () => {
+    expect(promoteSeverityOptions(2)).toEqual(["P1", "P2"]);
+    expect(promoteSeverityOptions(1)).toEqual(["P1"]);
+    expect(promoteSeverityOptions(5)).toEqual(["P1", "P2", "P3", "P4"]);
   });
 });
 

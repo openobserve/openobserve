@@ -448,6 +448,22 @@ export interface OnCallResponse {
   origin_response_id?: string | null;
 }
 
+/**
+ * What `POST /responses/{id}/promote` accepts as a severity. An incident's
+ * severity is NOT the record's priority: the incident scale stops at P4, so a
+ * P5 page promotes to P4 rather than to a severity that does not exist.
+ */
+export const PROMOTE_SEVERITIES = ["P1", "P2", "P3", "P4"] as const;
+
+export type PromoteSeverity = (typeof PROMOTE_SEVERITIES)[number];
+
+/** What the promote call answers with — the record comes back updated. */
+export interface PromoteResult {
+  incident_id: string;
+  severity: string;
+  response: OnCallResponse;
+}
+
 /// Fixed list, matching the backend enum. Free text would fragment into
 /// near-duplicates and never group, which is the same as recording nothing.
 export const RESOLUTION_CAUSES = [

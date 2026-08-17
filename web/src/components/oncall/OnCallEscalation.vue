@@ -19,6 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection>
       <h2 class="text-text-heading text-lg">{{ t("oncall.escalation") }}</h2>
 
+      <!-- D-21: an impacted record is a liaison seat, and its ladder is
+           deliberately two rungs — the opening page and one chase — with no
+           repeat and no handoff. Unexplained, that reads as a ladder somebody
+           misconfigured, and its end reads as a failure. -->
+      <p
+        v-if="isLiaison"
+        class="text-text-secondary mb-3 text-sm"
+        data-test="oncall-escalation-liaison-note"
+      >
+        {{ t("oncall.ladderLiaisonNote") }}
+      </p>
+
       <!-- The headline. Mid-incident the question is not "who has been paged"
            but "when does this wake somebody else", and it was answerable
            nowhere in the product. -->
@@ -28,6 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-escalation-stopped"
       >
         {{ t(`oncall.ladderStopped_${progress.stopped_because}`) }}
+      </p>
+      <!-- A liaison ladder that has run out has done its whole job. "Nobody
+           left to escalate to" is the owner team's emergency, not this one's,
+           and printing it here asks a team to chase an outage it cannot fix. -->
+      <p
+        v-else-if="progress.exhausted && isLiaison"
+        class="text-text-secondary mb-3 text-sm"
+        data-test="oncall-escalation-liaison-done"
+      >
+        {{ t("oncall.ladderLiaisonDone") }}
       </p>
       <p
         v-else-if="progress.exhausted"
@@ -96,7 +118,11 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import type { EscalationProgress, OnCallResponseEvent } from "@/ts/interfaces/oncall";
+import type {
+  EscalationProgress,
+  OnCallResponseEvent,
+  ResponderRole,
+} from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -106,11 +132,22 @@ const props = withDefaults(
     progress: EscalationProgress;
     /** The record's timeline, for the whole-rung-lost cross-reference. */
     events?: OnCallResponseEvent[];
+    /**
+     * Why this team holds the record. The server always sends it; the default
+     * keeps a caller that has only the progress payload rendering the owner
+     * reading, which is the one that was correct before this prop existed.
+     */
+    responderRole?: ResponderRole;
   }>(),
-  { events: () => [] },
+  { events: () => [], responderRole: "owner" },
 );
 
 const { t } = useI18nTyped();
+
+/// An impacted team is paged to contain the blast radius, never to fix the
+/// cause: `impacted_ladder` truncates its policy to two rungs, `tick` refuses
+/// to repeat it, and no final action hands it anywhere.
+const isLiaison = computed(() => props.responderRole === "impacted");
 
 /// Rungs of the CURRENT run whose page entry says the transport lost them.
 /// `/escalation` is scoped to the current run, so the events are too: an

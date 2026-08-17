@@ -27,7 +27,11 @@ const stubs = {
   OTimeCell: { name: "OTimeCell", template: "<span />" },
 };
 
-function render(progress: Partial<EscalationProgress>, events: unknown[] = []) {
+function render(
+  progress: Partial<EscalationProgress>,
+  events: unknown[] = [],
+  responderRole: "owner" | "impacted" = "owner",
+) {
   return mount(OnCallEscalation, {
     props: {
       progress: {
@@ -39,6 +43,7 @@ function render(progress: Partial<EscalationProgress>, events: unknown[] = []) {
         ...progress,
       },
       events: events as never,
+      responderRole,
     },
     global: { plugins: [i18n], stubs },
   });
@@ -173,6 +178,31 @@ describe("OnCallEscalation", () => {
   });
 
   /// A rung that reached people writes delivery rows, so it earns neither tag.
+  /// D8/D-21: an impacted record is a liaison seat. Its ladder is truncated to
+  /// two rungs by `impacted_ladder`, never repeats, and never hands off — so a
+  /// short ladder that stops is the design working, and the owner ladder's
+  /// warning ("nobody left to escalate to") would ask a team to chase an
+  /// outage it cannot fix.
+  it("says a liaison ladder is short on purpose", () => {
+    const wrapper = render({ fired: [{ after_micros: 0, at: 1, targets: ["ana@o2.ai"] }] }, [], "impacted");
+    expect(wrapper.find('[data-test="oncall-escalation-liaison-note"]').text()).toContain(
+      "one chase",
+    );
+  });
+
+  it("reads a spent liaison ladder as finished, not as exhausted", () => {
+    const wrapper = render({ exhausted: true }, [], "impacted");
+    expect(wrapper.find('[data-test="oncall-escalation-liaison-done"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-escalation-exhausted"]').exists()).toBe(false);
+  });
+
+  /// The owner's ladder running out is still the loud failure it was.
+  it("keeps the exhausted warning on an owner record", () => {
+    const wrapper = render({ exhausted: true });
+    expect(wrapper.find('[data-test="oncall-escalation-exhausted"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-escalation-liaison-note"]').exists()).toBe(false);
+  });
+
   it("puts no nobody-tag on a rung that landed", () => {
     const wrapper = render(
       { fired: [{ after_micros: 0, at: 1, targets: ["ana@o2.ai"] }] },
