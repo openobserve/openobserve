@@ -1020,11 +1020,33 @@ pub fn resolve_on_call(
                     slot,
                 });
             }
-            let r = winner?;
-            let holder = r.available_member_at(at, tz, unavailability)?;
+            // A slot nothing staffs directly may still be a *declared derived*
+            // position, and this is the read `/on-call` is built from.
+            //
+            // It was missed when derived slots landed: `slots()` reported the
+            // name and `on_call_in_slot` resolved it, but this function asked
+            // `winning_rotation_in_slot` — which only matches a rotation's own
+            // slot — and `let r = winner?` dropped the entry on the floor. So
+            // the slot existed everywhere except the one place a person looks,
+            // and a team was told "nobody backs this rotation up" while a cover
+            // written into that same slot appeared correctly, because the
+            // override arm above matches by name and returns before this point.
+            let (rotation_name, holder) = match winner {
+                Some(r) => (
+                    r.name.clone(),
+                    r.available_member_at(at, tz, unavailability)?.to_string(),
+                ),
+                None => {
+                    let owner = deriving_rotation(rotations, &slot, at, tz)?;
+                    (
+                        owner.name.clone(),
+                        derived_holder(rotations, overrides, unavailability, &slot, at, tz)?,
+                    )
+                }
+            };
             Some(OnCallSlot {
-                rotation: r.name.clone(),
-                user_email: holder.to_string(),
+                rotation: rotation_name,
+                user_email: holder,
                 next_user_email: next,
                 next_offset,
                 override_id: None,
@@ -1097,14 +1119,28 @@ fn derived_holder(
     at: i64,
     tz: chrono_tz::Tz,
 ) -> Option<String> {
-    let owner = rotations.iter().find(|r| {
+    let owner = deriving_rotation(rotations, slot, at, tz)?;
+    next_on_call_in_slot(rotations, overrides, unavailability, &owner.slot, at, tz)
+}
+
+/// The rotation that declares `slot` as its derived second position, if any.
+///
+/// Split out because two callers need it and they must not disagree: whether a
+/// derived slot resolves at all, and what `resolve_on_call` calls the rotation
+/// behind it. They did disagree once — see the note on [`resolve_on_call`].
+fn deriving_rotation<'a>(
+    rotations: &'a [Rotation],
+    slot: &str,
+    at: i64,
+    tz: chrono_tz::Tz,
+) -> Option<&'a Rotation> {
+    rotations.iter().find(|r| {
         r.secondary_slot
             .as_deref()
             .is_some_and(|d| same_slot(d, slot))
             && r.validate().is_ok()
             && r.applies_at(at, tz)
-    })?;
-    next_on_call_in_slot(rotations, overrides, unavailability, &owner.slot, at, tz)
+    })
 }
 
 /// The person the rotation in force hands over to next.
@@ -1505,7 +1541,19 @@ fn holder_at(
             .map(|m| (r.name.clone(), m.to_string()))
     }) {
         Some((rotation, member)) => (Some(member), Some(rotation), None),
-        None => (None, None, None),
+        // Same omission as `resolve_on_call` had, in the read the *calendar* is
+        // built from: a declared derived slot has no rotation of its own, so
+        // asking only `winning_rotation_in_slot` drew every segment of it as a
+        // gap. A row of empty cells is a strong claim — "nobody has this" — and
+        // it was false.
+        None => match deriving_rotation(rotations, slot, at, tz) {
+            Some(owner) => (
+                derived_holder(rotations, overrides, unavailability, slot, at, tz),
+                Some(owner.name.clone()),
+                None,
+            ),
+            None => (None, None, None),
+        },
     }
 }
 
@@ -3529,6 +3577,122 @@ mod tests {
             vec!["eve@o2.ai".to_string(), "bob@o2.ai".to_string()],
             "and one slot can still be named on its own"
         );
+    }
+
+    /// **The read `/on-call` is built from**, which is the one that was wrong.
+    ///
+    /// `slots()` reported the derived name and `on_call_in_slot` resolved it,
+    /// so every test passed — but `resolve_on_call` asked
+    /// `winning_rotation_in_slot`, which only matches a rotation's own slot,
+    /// and dropped the entry. The slot existed everywhere except the place a
+    /// person looks, and the team screen said "nobody backs this rotation up".
+    ///
+    /// Found by someone driving the product as a user rather than reading it.
+    /// Pinned here, at the level the endpoint uses, because the level below was
+    /// already green and stayed green throughout.
+    #[test]
+    fn test_the_derived_slot_appears_in_the_read_the_endpoint_uses() {
+        let rotations = vec![
+            Rotation::weekly(
+                "Platform",
+                vec![
+                    "ana@o2.ai".into(),
+                    "bob@o2.ai".into(),
+                    "cy@o2.ai".into(),
+                    "dee@o2.ai".into(),
+                ],
+                ANCHOR,
+            )
+            .deriving("secondary"),
+        ];
+        let on_call = resolve_on_call(&rotations, &[], &[], ANCHOR, TZ);
+        assert_eq!(
+            on_call.len(),
+            2,
+            "one roster, two staffed positions — got {on_call:?}"
+        );
+        assert_eq!(on_call[0].slot, "primary");
+        assert_eq!(on_call[0].user_email, "ana@o2.ai");
+        assert_eq!(on_call[1].slot, "secondary");
+        assert_eq!(on_call[1].user_email, "cy@o2.ai");
+        assert_eq!(
+            on_call[1].rotation, "Platform",
+            "the derived slot names the rotation it is derived from, not a placeholder"
+        );
+        assert_ne!(on_call[0].user_email, on_call[1].user_email);
+    }
+
+    /// And the read the **calendar** is built from, which had the same hole.
+    /// A row of empty cells says "nobody has this", which is a strong claim to
+    /// make wrongly.
+    #[test]
+    fn test_the_derived_slot_is_drawn_on_the_grid_too() {
+        let rotations = vec![
+            Rotation::weekly(
+                "Platform",
+                vec![
+                    "ana@o2.ai".into(),
+                    "bob@o2.ai".into(),
+                    "cy@o2.ai".into(),
+                    "dee@o2.ai".into(),
+                ],
+                ANCHOR,
+            )
+            .deriving("secondary"),
+        ];
+        let segments = resolve_window_in_slot(
+            &rotations,
+            &[],
+            &[],
+            "secondary",
+            ANCHOR,
+            ANCHOR + MICROS_PER_WEEK,
+            TZ,
+        )
+        .expect("a week of the secondary slot");
+        assert!(!segments.is_empty());
+        assert!(
+            segments.iter().all(|s| s.user_email.is_some()),
+            "every segment of a staffed derived slot has a holder — got {segments:?}"
+        );
+        assert_eq!(segments[0].user_email.as_deref(), Some("cy@o2.ai"));
+        assert_eq!(segments[0].rotation.as_deref(), Some("Platform"));
+    }
+
+    /// A cover written into the derived slot already worked — the override arm
+    /// returns before the branch that was broken — which is exactly why the
+    /// bug was survivable: writing a cover made the slot appear, so the slot
+    /// looked real from the outside.
+    #[test]
+    fn test_a_cover_on_the_derived_slot_still_reads_as_that_slot() {
+        let rotations = vec![
+            Rotation::weekly(
+                "Platform",
+                vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cy@o2.ai".into()],
+                ANCHOR,
+            )
+            .deriving("secondary"),
+        ];
+        let overrides = vec![ScheduleOverride {
+            id: "ov1".into(),
+            org_id: "default".into(),
+            team_id: "t1".into(),
+            slot: Some("secondary".into()),
+            user_email: "zoe@o2.ai".into(),
+            covering_for: None,
+            start_at: ANCHOR - MICROS_PER_HOUR,
+            end_at: ANCHOR + MICROS_PER_HOUR,
+            reason: None,
+            created_by: "root@o2.ai".into(),
+            created_at: ANCHOR,
+        }];
+        let on_call = resolve_on_call(&rotations, &overrides, &[], ANCHOR, TZ);
+        let secondary = on_call
+            .iter()
+            .find(|s| s.slot == "secondary")
+            .expect("the covered slot");
+        assert_eq!(secondary.user_email, "zoe@o2.ai");
+        assert_eq!(secondary.override_id.as_deref(), Some("ov1"));
     }
 
     /// The whole point of the field: an ordinary team — one pool, anybody can
