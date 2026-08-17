@@ -27,11 +27,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :marker-end="markerEnd"
     type="smoothstep"
   />
+
+  <!-- Mid-edge "insert step here" `+` — opt-in (Workflows pass `insertable`), so
+       the shared pipeline canvas is unchanged. Rendered into the EdgeLabelRenderer
+       layer so it lives inside the viewport transform: `path[1]`/`path[2]` are the
+       edge's midpoint in flow coords, and translate(-50%,-50%) centres the chip on
+       it. Positioned via a CSS var (dynamic px, the sanctioned pattern here) so no
+       literal px lands in a class. -->
+  <EdgeLabelRenderer v-if="insertable">
+    <div
+      class="pointer-events-auto absolute top-0 left-0 [transform:var(--wf-edge-mid)]"
+      :style="{ '--wf-edge-mid': `translate(-50%, -50%) translate(${path[1]}px, ${path[2]}px)` }"
+    >
+      <FlowAddButton data-test="workflow-edge-add" @click.stop="emit('insert', $event)" />
+    </div>
+  </EdgeLabelRenderer>
 </template>
 
 <script setup lang="ts">
-import { BaseEdge, getBezierPath, Position } from "@vue-flow/core";
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, Position } from "@vue-flow/core";
 import { computed, type PropType } from "vue";
+import FlowAddButton from "./FlowAddButton.vue";
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -46,7 +62,12 @@ const props = defineProps({
   style: { type: Object, required: false },
   // Accepted for pipeline call-site compatibility; not used for rendering.
   isInView: { type: Boolean, required: false, default: false },
+  // Workflows opt in to the mid-edge insert `+`; pipelines leave it off.
+  insertable: { type: Boolean, required: false, default: false },
 });
+
+// Clicking the mid-edge `+` asks the canvas to splice a step onto THIS edge.
+const emit = defineEmits<{ (e: "insert", event: MouseEvent): void }>();
 
 const path = computed(() => getBezierPath(props));
 </script>

@@ -168,15 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            on the lighter `surface-subtle` slab, which is what made the two
            editors read as different shades. -->
       <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
-        <!-- The results dock (T4) is a LAYOUT WRAPPER around the canvas: with no
-             Test result it renders the canvas full-size; once a run produces a
-             result it splits the space (canvas on top, results panel docked below,
-             draggable divider) so the graph stays visible — instead of the old
-             overlay drawer. The canvas is the dock's slot so the dock can place it
-             in the splitter's top pane. -->
-        <WorkflowResultsDock>
-          <WorkflowCanvas />
-        </WorkflowResultsDock>
+        <!-- Test results are inspected in the node's NDV (click a node's ✓/✗ badge),
+             so the canvas fills the space — no docked results panel. -->
+        <WorkflowCanvas />
       </div>
     </div>
 
@@ -255,7 +249,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
-import WorkflowResultsDock from "./WorkflowResultsDock.vue";
 import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
@@ -295,6 +288,7 @@ const {
   addNodeAfter,
   addNodeOnEdge,
   addTriggerNode,
+  addActionFromStart,
   closeStepPicker,
   onDragStart,
   addNodeToEnd,
@@ -382,6 +376,9 @@ const onStepPick = (item: any) => {
   // The trigger has nothing before it, so it is placed rather than appended.
   if (mode === "trigger")
     addTriggerNode(item.nodeType || "workflow_trigger", item.trigger_kind, position);
+  // Empty-canvas scaffold's Action slot — the workflow's first step (appends after
+  // the trigger when one exists, else placed unconnected at the slot).
+  else if (mode === "action") addActionFromStart(item.key, position);
   // Insert-between (T7): splice the picked type onto the selected edge.
   else if (mode === "insert") addNodeOnEdge(edgeId, item.key);
   else addNodeAfter(source, handle, item.key);
@@ -539,9 +536,19 @@ const validate = ({
   // Publish-only (strict path — Test/allowOrphans and Draft/!requireGraph both
   // return before here): a still-unfinished placeholder node (e.g. a Destination
   // saved with no destination) can't be published. Draft + Test allow it.
-  const incomplete = nodes.find((n: any) => isNodeIncomplete(n));
-  if (incomplete) {
-    toast({ message: t("workflow.finishStepsBeforePublish"), variant: "warning" });
+  const incompleteNodes = nodes.filter((n: any) => isNodeIncomplete(n));
+  if (incompleteNodes.length) {
+    // Show the user EXACTLY which steps block publishing: flash a warning ring on each
+    // (the canvas frames them — see WorkflowCanvas) instead of a vague "fill all steps".
+    workflowObj.incompleteHighlight = incompleteNodes.map((n: any) => n.id);
+    toast({
+      message: t(
+        "workflow.finishStepsBeforePublish",
+        { count: incompleteNodes.length },
+        incompleteNodes.length,
+      ),
+      variant: "warning",
+    });
     return false;
   }
   return true;

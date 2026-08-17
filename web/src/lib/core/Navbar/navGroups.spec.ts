@@ -125,6 +125,33 @@ describe("groupNavLinks", () => {
     ]);
   });
 
+  // Workflows moved off the rail and under Data, next to Pipelines. Its visibility
+  // still rides on the top-level entry MainLayout adds/removes from the
+  // `workflows_enabled` flag, so the two tests below are the whole contract.
+  it("absorbs workflows into Data, next to Pipelines", () => {
+    const entries = groupNavLinks([
+      link("home"),
+      link("streams"),
+      link("pipeline"),
+      link("workflows"),
+      link("ingestion"),
+    ]);
+    expect(keysOf(entries)).not.toContain("link:workflows");
+    expect(dataGroup(entries)?.children.map((c) => c.name)).toEqual([
+      "logstreams",
+      "pipelines",
+      "workflows",
+      "functionList",
+      "enrichmentTables",
+      "ingestion",
+    ]);
+  });
+
+  it("omits Workflows from Data when the feature flag left it off the rail", () => {
+    const entries = groupNavLinks([link("home"), link("streams"), link("pipeline")]);
+    expect(dataGroup(entries)?.children.map((c) => c.name)).not.toContain("workflows");
+  });
+
   it("collapses Alerts into Reliability; Reports stays a link when Dashboards is absent", () => {
     const entries = groupNavLinks([link("home"), link("alertList"), link("reports")]);
     // Destinations/Templates ride on alertList, so Alerts alone is already a

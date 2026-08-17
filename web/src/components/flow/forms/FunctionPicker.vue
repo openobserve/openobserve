@@ -42,6 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     showFlatten          — show the After-Flattening toggle + guidelines (default true)
     isUpdating           — lock the select (edit-an-existing-function mode)
     duplicateNames       — names that are already used → shows "already associated"
+    optional             — allow saving with NO function selected (Workflows dummy
+                           nodes): submit() returns an empty `name` instead of null,
+                           and the required schema check is skipped. Default false so
+                           Pipelines are unaffected.
+    createButton         — single-screen mode (Workflows): show the select AND the
+                           inline create editor together on ONE page (no mode switch, no
+                           view swap) — pick existing above, or create new below (its
+                           own Save auto-selects it). Default false → Pipelines keep the
+                           mode switch + full-height editor.
 
   Emits:
     expand(boolean)  — inline-create mode toggled (host can widen the drawer)
@@ -53,14 +62,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="function-picker"
-    class="flex w-full flex-col gap-4"
-    :class="createNewFunction ? 'h-full min-h-0 gap-0' : ''"
+    class="flex w-full flex-col"
+    :class="
+      createNewFunction ? 'h-full min-h-0 gap-0' : createButton ? 'h-full min-h-0 gap-2' : 'gap-4'
+    "
   >
     <OSpinner v-if="loading" size="md" class="mx-auto my-8" />
 
     <template v-else>
-      <!-- create / pick toggle -->
-      <div class="flex items-center gap-3" :class="createNewFunction ? 'shrink-0 px-4 pt-4' : ''">
+      <!-- create / pick MODE SWITCH (pipelines). Single-screen hosts (workflows) use a
+           subtle "+ Create New" button by the select instead — see createButton below. -->
+      <div
+        v-if="!createButton"
+        class="flex items-center gap-3"
+        :class="createNewFunction ? 'shrink-0 px-4 pt-4' : ''"
+      >
         <OSwitch
           v-model="createNewFunction"
           :label="t('flow.function.createNew')"
@@ -84,42 +100,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- inline function editor (full-width; its own toolbar owns save/cancel) -->
-      <div v-if="createNewFunction" class="flow-add-function min-h-0 w-full flex-1">
-        <!-- ALWAYS a fresh function. AddFunction's `is-updated` means "editing an
-             EXISTING function" and disables its name input (`:disable-name`), so
-             it must never be fed our `isUpdating` — that flag means "editing the
-             NODE", which is a different thing. Conflating them left the user
-             unable to name the function they were creating. -->
-        <AddFunction
-          ref="addFunctionRef"
-          :is-updated="false"
-          :height-offset="75"
-          :sample-events="sampleEvents"
-          :forced-language="language"
-          :default-code="defaultCode"
-          @update:list="onFunctionCreation"
-          @cancel:hideform="cancelFunctionCreation"
-        />
-      </div>
-
-      <OForm v-if="!createNewFunction" :form="form" class="flex flex-col gap-4">
+      <!-- SELECT an existing function (+ preview + After-Flattening). Single-screen
+           hosts (workflows) show this ALWAYS, with the create editor below it; pipelines
+           show it only when not in create mode. -->
+      <OForm v-if="createButton || !createNewFunction" :form="form" class="flex flex-col gap-4">
         <!-- required + "already associated" are both enforced by the shared
-             AssociateFunction schema, rendered inline on the field. -->
-        <OFormSelect
-          name="selectedFunction"
-          :options="functionOptions"
-          :label="t('flow.function.select')"
-          required
-          searchable
-          :readonly="isUpdating"
-          :disabled="isUpdating"
-          data-test="associate-function-select-function-input"
-        />
+             AssociateFunction schema, rendered inline on the field. Single-screen
+             (workflow): a save ICON sits on the same line, right of the dropdown —
+             mirroring the Logs editor — so saving reads as "save this FUNCTION", not
+             "save the node" (the node commits on close). -->
+        <div class="flex items-end gap-2">
+          <OFormSelect
+            name="selectedFunction"
+            class="min-w-0 flex-1"
+            :options="functionOptions"
+            :label="t('flow.function.select')"
+            :required="!optional"
+            searchable
+            :readonly="isUpdating"
+            :disabled="isUpdating"
+            data-test="associate-function-select-function-input"
+          />
+          <OButton
+            v-if="createButton"
+            variant="outline"
+            type="button"
+            size="sm"
+            class="shrink-0"
+            :loading="savingFn"
+            :title="t('function.save')"
+            data-test="wf-function-save-btn"
+            @click="onBottomSave"
+          >
+            <OIcon name="save" size="sm" />
+          </OButton>
+        </div>
 
-        <!-- read-only definition preview -->
+        <!-- read-only definition preview (pipelines only — the single-screen editor
+             below is where workflows view/edit the function). -->
         <div
-          v-if="selectedFunction && selectedDefinition"
+          v-if="!createButton && selectedFunction && selectedDefinition"
           data-test="associate-function-definition-section"
           class="mt-4 mb-4"
         >
@@ -151,22 +171,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCard>
         </div>
 
-        <!-- After-Flattening (RAF/RBF) toggle + guidelines -->
-        <div v-if="showFlatten" class="flex w-full flex-col gap-3">
+        <!-- After-Flattening (RAF/RBF) toggle + guidelines. Single-screen (workflow)
+             moves this toggle to the bottom bar (next to Save), so it's hidden here. -->
+        <div v-if="showFlatten && !createButton" class="flex w-full flex-col gap-3">
           <OFormSwitch
             name="afterFlattening"
             :label="t('flow.function.flatten')"
             data-test="associate-function-after-flattening-toggle"
           />
-          <!-- Same theme-aware banner tokens the pipeline + workflow Condition
-               notes use, so all three match and work in dark mode (the old
-               #f9f290/#2d3748 were light-only). These were --color-note-* until
-               #13173 removed that set; banner-warning-* is its replacement.
-               The `border-banner-warning-border` matters in LIGHT mode: the bg
-               (warning-50, ~#fefce8) is near-white, so without the border the
-               callout blends into the page and reads as unstyled — the canonical
-               warning banners (logstream/schema, settings/*) all carry it. -->
+          <!-- RBF/RAF guidelines banner. Hidden in the single-screen (workflow) editor
+               to keep it uncluttered; the toggle above is self-explanatory there.
+               Same theme-aware banner tokens the pipeline + workflow Condition notes use
+               (banner-warning-* replaced the retired --color-note-* set); the
+               border matters in LIGHT mode so the near-white fill doesn't read unstyled. -->
           <div
+            v-if="!createButton"
             class="bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default flex w-full flex-col gap-2 border p-3"
           >
             <div class="text-sm">
@@ -191,28 +210,150 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </OForm>
+
+      <!-- CREATE a new function — inline on the SAME page. Single-screen (workflows):
+           always shown below the select, set apart by a divider; its own toolbar saves
+           the function, which then auto-selects in the dropdown above. Pipelines: shown
+           only when the mode switch is on (keeps their full-height editor). -->
+      <!-- ALWAYS a fresh function. AddFunction's `is-updated` means "editing an
+           EXISTING function" (disables its name input), which is a different thing
+           from editing the NODE — never feed it our `isUpdating`. Single-screen
+           (workflows) shows it always, full-height, as the main surface. -->
+      <!-- Editor fills the available height (comment stays pinned below via the host
+           panel), so no vertical space is wasted. -->
+      <div v-if="createButton || createNewFunction" class="flow-add-function min-h-0 w-full flex-1">
+        <!-- Single-screen: picking a saved function loads ITS definition into the
+             editor (re-keyed so the code swaps on each selection); with none picked it
+             seeds the fresh-function default. -->
+        <AddFunction
+          ref="addFunctionRef"
+          :key="createButton ? selectedFunction : undefined"
+          :is-updated="false"
+          :height-offset="75"
+          :sample-events="sampleEvents"
+          :forced-language="language"
+          :hide-test-panel="createButton"
+          :hide-ai-assist="createButton"
+          :default-code="createButton && selectedFunction ? selectedDefinition : defaultCode"
+          @update:list="onFunctionCreation"
+          @cancel:hideform="cancelFunctionCreation"
+        />
+      </div>
+
+      <!-- Single-screen (workflow) bottom bar: After Flattening pinned to the RIGHT.
+           Save moved up beside the dropdown so it clearly saves the FUNCTION. The
+           toggle carries a hover tooltip explaining before- vs after-flattening. -->
+      <div v-if="createButton && showFlatten" class="flex shrink-0 items-center justify-end pt-1">
+        <div class="inline-flex items-center">
+          <OSwitch
+            :model-value="afterFlatteningValue"
+            :label="t('flow.function.flatten')"
+            data-test="wf-after-flatten"
+            @update:model-value="onAfterFlatteningChange"
+          />
+          <OTooltip side="top">
+            <template #content>
+              <div class="flex max-w-64 flex-col gap-1">
+                <div>
+                  <span class="font-semibold">{{ t("flow.function.rbf") }}</span>
+                  {{ t("flow.function.rbfDesc") }}
+                </div>
+                <div>
+                  <span class="font-semibold">{{ t("flow.function.raf") }}</span>
+                  {{ t("flow.function.rafDesc") }}
+                </div>
+              </div>
+            </template>
+          </OTooltip>
+        </div>
+      </div>
     </template>
+
+    <!-- Saved Functions dialog (single-screen / workflow only) — mirrors the Logs
+         editor: Save from the editor opens Update|Create. Update overwrites an existing
+         reusable function (with a confirm, since it may be used elsewhere); Create makes
+         a new one. Either way we then select it, so the node references it by name. -->
+    <ODialog
+      v-if="createButton"
+      v-model:open="savedDialog"
+      size="md"
+      form-id="wf-saved-function-form"
+      :title="t('search.functionPlaceholder')"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      :primary-button-loading="savingFn"
+      @click:secondary="savedDialog = false"
+    >
+      <OForm id="wf-saved-function-form" :form="savedForm">
+        <OFormToggleGroup
+          name="isSavedFunctionAction"
+          data-test="wf-saved-function-action-toggle"
+          :disabled="functionOptions.length === 0"
+          class="mb-3"
+        >
+          <OToggleGroupItem value="update" size="sm">{{ t("common.update") }}</OToggleGroupItem>
+          <OToggleGroupItem value="create" size="sm">{{ t("common.create") }}</OToggleGroupItem>
+        </OFormToggleGroup>
+        <OFormInput
+          v-if="savedMode === 'create'"
+          name="savedFunctionName"
+          data-test="wf-saved-function-name-input"
+          :label="t('search.saveFunctionName')"
+          required
+        />
+        <OFormSelect
+          v-else
+          name="savedFunctionSelectedName"
+          data-test="wf-saved-function-name-select"
+          :options="functionOptions"
+          :label="t('search.saveFunctionName')"
+          :placeholder="t('search.selectFunctionNamePlaceholder')"
+          searchable
+          required
+        />
+      </OForm>
+    </ODialog>
+    <ConfirmDialog
+      v-if="createButton"
+      data-test="wf-function-update-confirm"
+      :title="t('search.confirmFunctionUpdateTitle')"
+      :message="t('search.confirmFunctionUpdateMsg', { name: fnToUpdateName })"
+      v-model="fnUpdateConfirm"
+      @update:ok="executeUpdate"
+      @update:cancel="fnUpdateConfirm = false"
+    />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
   makeAssociateFunctionSchema,
   type AssociateFunctionForm,
 } from "@/components/pipeline/NodeForm/AssociateFunction.schema";
+import {
+  makeSavedFunctionSchema,
+  type SavedFunctionForm,
+} from "@/plugins/logs/SearchBar.SavedFunction.schema";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import functionsService from "@/services/jstransform";
 import { isJsFunction } from "@/utils/functionLanguage";
@@ -225,6 +366,11 @@ const props = withDefaults(
     initialAfterFlatten?: boolean;
     showFlatten?: boolean;
     isUpdating?: boolean;
+    optional?: boolean;
+    // Single-screen mode (Workflows): the select + the inline create editor on ONE
+    // full-height page (no mode switch, no definition preview, no RBF/RAF guidelines) —
+    // an editor-first surface. Pipelines keep the switch + preview + guidelines (default).
+    createButton?: boolean;
     duplicateNames?: string[];
     // Sample events to seed the inline function editor's "Events" panel (e.g. the
     // workflow alert payload). Omitted → the generic log sample.
@@ -242,6 +388,8 @@ const props = withDefaults(
     initialAfterFlatten: true,
     showFlatten: true,
     isUpdating: false,
+    optional: false,
+    createButton: false,
     duplicateNames: () => [],
     sampleEvents: undefined,
     language: "",
@@ -292,6 +440,17 @@ const form = useOForm<AssociateFunctionForm>({
 const selectedFunction = form.useStore((s: any) => s.values?.selectedFunction ?? "");
 
 const selectedDefinition = computed(() => functionDefs.value[selectedFunction.value] || "");
+
+// After Flattening lives in the bottom bar (single-screen). Plain switch bound to the
+// same form field submit() reads, so no second OForm context is needed at the bottom.
+const afterFlatteningValue = form.useStore((s: any) => !!s.values?.afterFlattening);
+const onAfterFlatteningChange = (v: unknown) => form.setFieldValue("afterFlattening", !!v);
+
+// Bottom Save → pull the live editor code from AddFunction and open Update|Create.
+const onBottomSave = () => {
+  const code = (addFunctionRef.value?.getCode?.() as string) ?? "";
+  onSaveRequest(code);
+};
 
 // Only functions written in the host's language are selectable: a pipeline runs
 // VRL, a workflow node runs JS. Offering the other kind would let a user attach a
@@ -345,10 +504,122 @@ const cancelFunctionCreation = () => {
   createNewFunction.value = false;
 };
 
+// ── Saved Functions dialog (single-screen / workflow) ────────────────────────
+// Mirrors the Logs editor: the editor's Save hands us its code (save-request), we
+// ask Update-or-Create, then persist + select. Reuses the Logs schema so the
+// create/update validation is identical.
+const savedDialog = ref(false);
+const savingFn = ref(false);
+const pendingCode = ref("");
+const fnUpdateConfirm = ref(false);
+const fnToUpdateName = ref("");
+
+const savedForm = useOForm<SavedFunctionForm>({
+  defaultValues: {
+    isSavedFunctionAction: "create",
+    savedFunctionName: "",
+    savedFunctionSelectedName: "",
+  },
+  schema: makeSavedFunctionSchema(t),
+  onSubmit: (v) => onSavedSubmit(v),
+});
+const savedMode = savedForm.useStore(
+  (s: any) => (s.values.isSavedFunctionAction as string) ?? "create",
+);
+
+// Editor Save → open Update|Create. Default to Update (preselecting the loaded
+// function) when one is selected; otherwise Create. Empty code has nothing to save.
+const onSaveRequest = (code: string) => {
+  if (!code || !code.trim()) {
+    toast({ variant: "warning", message: t("logs.searchBar.functionFieldRequired") });
+    return;
+  }
+  pendingCode.value = code;
+  const current = selectedFunction.value as string;
+  savedForm.reset({
+    isSavedFunctionAction: current && functionOptions.value.length ? "update" : "create",
+    savedFunctionName: "",
+    savedFunctionSelectedName: current || "",
+  });
+  savedDialog.value = true;
+};
+
+// jstransform payload for the current editor code. Workflow functions are JS
+// (transType 1); params is the fixed `row` binding.
+const fnPayload = (name: string) => ({
+  name,
+  function: pendingCode.value,
+  params: "row",
+  transType: wantsJs.value ? 1 : 0,
+});
+
+const afterSaved = async (name: string) => {
+  await getFunctions();
+  await nextTick();
+  form.setFieldValue("selectedFunction", name);
+  emit("created", { name });
+};
+
+const onSavedSubmit = async (v: SavedFunctionForm) => {
+  if (v.isSavedFunctionAction === "create") {
+    savingFn.value = true;
+    try {
+      const res: any = await functionsService.create(
+        store.state.selectedOrganization.identifier,
+        fnPayload(v.savedFunctionName),
+      );
+      toast({ variant: "success", message: raw(res?.data?.message || t("flow.function.saved")) });
+      savedDialog.value = false;
+      await afterSaved(v.savedFunctionName);
+    } catch (e: any) {
+      toast({
+        variant: "error",
+        message: raw(e?.response?.data?.message || t("flow.function.saveError")),
+      });
+    } finally {
+      savingFn.value = false;
+    }
+  } else {
+    // Update overwrites a reusable function that may be used elsewhere → confirm first.
+    fnToUpdateName.value = v.savedFunctionSelectedName;
+    fnUpdateConfirm.value = true;
+  }
+};
+
+const executeUpdate = async () => {
+  savingFn.value = true;
+  try {
+    const res: any = await functionsService.update(
+      store.state.selectedOrganization.identifier,
+      fnPayload(fnToUpdateName.value),
+    );
+    toast({ variant: "success", message: raw(res?.data?.message || t("flow.function.updated")) });
+    fnUpdateConfirm.value = false;
+    savedDialog.value = false;
+    await afterSaved(fnToUpdateName.value);
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: raw(e?.response?.data?.message || t("flow.function.saveError")),
+    });
+  } finally {
+    savingFn.value = false;
+  }
+};
+
 // Host bridge: validate through the schema and return the node payload, or null
 // when invalid (OForm renders required / already-associated inline on the field).
 const submit = async () => {
   if (createNewFunction.value) return null; // still in the inline editor
+  // Optional (Workflows dummy node): empty is allowed. Read the current value
+  // WITHOUT running the required schema, so no inline error and empty resolves to
+  // an empty name rather than null (mirrors DestinationPicker's optional branch).
+  if (props.optional) {
+    const name = (form.state.values.selectedFunction as string) || "";
+    return props.showFlatten
+      ? { name, after_flatten: !!form.state.values.afterFlattening }
+      : { name };
+  }
   validated.value = null;
   await form.handleSubmit();
   const values = validated.value as AssociateFunctionForm | null;
@@ -360,21 +631,3 @@ const submit = async () => {
 
 defineExpose({ submit, createNewFunction, form });
 </script>
-
-<style scoped>
-/* keep(lib-override:AddFunction): only AddFunction's own chrome is suppressed here — :deep() reaches a child
-   component's internals, which utilities cannot.
-   The `.function-code` font-family became the `font-mono` utility, and the
-   ::-webkit-scrollbar rules were DELETED: component.css already styles
-   scrollbars globally from tokens WITH `.dark` variants, so these light-only
-   hex rules were duplicating it and overriding the themed version in dark. */
-.flow-add-function :deep(.add-function-back-btn),
-.flow-add-function :deep(.add-function-fullscreen-btn),
-.flow-add-function :deep(.add-function-title) {
-  display: none;
-}
-.flow-add-function :deep(.add-function-name-input) {
-  width: 100%;
-  margin-left: 0 !important;
-}
-</style>

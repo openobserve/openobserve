@@ -38,7 +38,7 @@ vi.mock("@vue-flow/core", () => ({
     onNodesInitialized: vi.fn(),
     updateNode: vi.fn(),
   }),
-  // makeEdge (via commitNode) reads MarkerType.ArrowClosed for the edge marker.
+  // makeEdge (via commitStagedNode) reads MarkerType.ArrowClosed for the edge marker.
   MarkerType: { ArrowClosed: "arrowclosed" },
 }));
 
@@ -743,21 +743,27 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
     expect(workflowObj.currentSelectedNodeData).toBeNull();
   });
 
-  it("addNodeToEnd stages a node once a trigger is present", () => {
+  it("addNodeToEnd inserts a node on the canvas once a trigger is present", () => {
     workflowObj.currentSelectedWorkflow.nodes = [triggerNode()];
     addNodeToEnd("condition");
     expect(mockToast).not.toHaveBeenCalled();
     expect(workflowObj.dialog.show).toBe(true);
     expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("condition");
+    // insert-immediately: the node is already on the canvas (trigger + condition)
+    expect(workflowObj.currentSelectedWorkflow.nodes).toHaveLength(2);
+    // and flagged as an unconfigured placeholder
+    expect(workflowObj.currentSelectedNodeData?.meta?.incomplete).toBe("true");
   });
 
-  it("onDrop stages a node once a trigger is present", () => {
+  it("onDrop inserts a node on the canvas once a trigger is present", () => {
     workflowObj.currentSelectedWorkflow.nodes = [triggerNode()];
     workflowObj.draggedNodeType = "function";
     onDrop({ clientX: 10, clientY: 10 } as any);
     expect(mockToast).not.toHaveBeenCalled();
     expect(workflowObj.dialog.show).toBe(true);
     expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("function");
+    expect(workflowObj.currentSelectedWorkflow.nodes).toHaveLength(2);
+    expect(workflowObj.currentSelectedNodeData?.meta?.incomplete).toBe("true");
   });
 });
 
@@ -811,7 +817,7 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
   };
 
   it("places the spliced node a row below the source and nudges the target down", () => {
-    const { addNodeOnEdge, commitNode } = useWorkflowCanvas(t);
+    const { addNodeOnEdge } = useWorkflowCanvas(t);
     resetStaged();
     workflowObj.currentSelectedWorkflow = {
       nodes: [
@@ -831,13 +837,14 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
       edges: [{ id: "e1", source: "t", target: "d" }],
     } as any;
 
+    // Insert-immediately: addNodeOnEdge splices the node onto the canvas now (no
+    // separate commit step) and opens its panel.
     addNodeOnEdge("e1", "condition");
     const staged = workflowObj.currentSelectedNodeData;
-    // staged a row below the source, aligned with the target column
+    // placed a row below the source, aligned with the target column
     expect(staged.position.y).toBe(160);
     expect(staged.position.x).toBe(100);
 
-    commitNode({});
     const wf = workflowObj.currentSelectedWorkflow;
     const inserted = wf.nodes.find((n: any) => n.id === staged.id);
     const target = wf.nodes.find((n: any) => n.id === "d");
@@ -851,7 +858,7 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
   });
 
   it("also shifts nodes downstream of the target", () => {
-    const { addNodeOnEdge, commitNode } = useWorkflowCanvas(t);
+    const { addNodeOnEdge } = useWorkflowCanvas(t);
     resetStaged();
     workflowObj.currentSelectedWorkflow = {
       nodes: [
@@ -883,7 +890,6 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
     // insert on the trigger→condition edge; condition AND its downstream destination shift
     addNodeOnEdge("e1", "function");
     const staged = workflowObj.currentSelectedNodeData;
-    commitNode({});
     const wf = workflowObj.currentSelectedWorkflow;
     expect(wf.nodes.find((n: any) => n.id === staged.id).position.y).toBe(160);
     expect(wf.nodes.find((n: any) => n.id === "c").position.y).toBe(320);
@@ -891,7 +897,7 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
   });
 
   it("does not shift a target that already has enough room", () => {
-    const { addNodeOnEdge, commitNode } = useWorkflowCanvas(t);
+    const { addNodeOnEdge } = useWorkflowCanvas(t);
     resetStaged();
     workflowObj.currentSelectedWorkflow = {
       nodes: [
@@ -907,7 +913,6 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
     } as any;
 
     addNodeOnEdge("e1", "condition");
-    commitNode({});
     const wf = workflowObj.currentSelectedWorkflow;
     // target already 400 below (> new node at 160 + 160 gap), so it stays put
     expect(wf.nodes.find((n: any) => n.id === "d").position.y).toBe(400);

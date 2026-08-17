@@ -504,10 +504,18 @@ describe("WorkflowEditor", () => {
 
       expect(workflowObj.dialog.name).toBe("condition");
       expect(workflowObj.dialog.show).toBe(true);
-      expect(workflowObj.pendingEdge).toEqual({
-        source: triggerId,
-        sourceHandle: undefined,
-      });
+      // insert-immediately: the node is on the canvas now, wired after the trigger,
+      // and the pending edge has been consumed.
+      const added = workflowObj.currentSelectedWorkflow.nodes.find(
+        (n: any) => n.data.node_type === "condition",
+      );
+      expect(added).toBeTruthy();
+      expect(
+        workflowObj.currentSelectedWorkflow.edges.some(
+          (e: any) => e.source === triggerId && e.target === added.id,
+        ),
+      ).toBe(true);
+      expect(workflowObj.pendingEdge).toBeNull();
     });
 
     it("records the dragged node type on palette drag start", async () => {
@@ -555,7 +563,7 @@ describe("WorkflowEditor", () => {
       expect(items[0].iconTint).toContain("badge-warning-soft");
     });
 
-    it("stages the picked step after the source node and closes the picker", async () => {
+    it("inserts the picked step after the source node and closes the picker", async () => {
       wrapper = mountEditor();
       await flushPromises();
       const triggerId = placeTrigger();
@@ -574,10 +582,18 @@ describe("WorkflowEditor", () => {
 
       expect(workflowObj.stepPicker.show).toBe(false);
       expect(workflowObj.dialog.name).toBe("function");
-      expect(workflowObj.pendingEdge).toEqual({
-        source: triggerId,
-        sourceHandle: undefined,
-      });
+      expect(workflowObj.dialog.show).toBe(true);
+      // insert-immediately: the node is on the canvas, wired after the trigger.
+      const fn = workflowObj.currentSelectedWorkflow.nodes.find(
+        (n: any) => n.data.node_type === "function",
+      );
+      expect(fn).toBeTruthy();
+      expect(
+        workflowObj.currentSelectedWorkflow.edges.some(
+          (e: any) => e.source === triggerId && e.target === fn.id,
+        ),
+      ).toBe(true);
+      expect(workflowObj.pendingEdge).toBeNull();
     });
 
     it("closes the picker on close", async () => {

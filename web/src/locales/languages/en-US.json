@@ -767,13 +767,17 @@
     "destination": {
       "createNew": "Create New Destination",
       "select": "Destination",
-      "loadError": "Error while pulling destinations."
+      "loadError": "Error while pulling destinations.",
+      "unsupportedType": "Unsupported Type — Workflows Support Custom Destinations Only"
     },
     "function": {
       "createNew": "Create New Function",
       "createNewNoteWorkflow": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the workflow.",
       "select": "Select Function",
       "loadError": "Failed to load functions",
+      "saved": "Function Saved Successfully",
+      "updated": "Function Updated Successfully",
+      "saveError": "Failed To Save Function",
       "flatten": "After Flattening",
       "guidelinesTitle": "Function Execution Guidelines:",
       "rbf": "RBF (Run Before Flattening):",
@@ -2406,7 +2410,7 @@
     "triggerRequired": "A Trigger Is Required",
     "addStepRequired": "Add At Least One Step After The Trigger",
     "connectAllNodes": "Connect All Nodes Before Saving",
-    "finishStepsBeforePublish": "Finish configuring all steps before publishing",
+    "finishStepsBeforePublish": "{count} step needs setup before publishing — highlighted on the canvas. | {count} steps need setup before publishing — highlighted on the canvas.",
     "draft": "Draft",
     "saveDraft": "Save as Draft",
     "publish": "Publish",
@@ -2521,6 +2525,11 @@
       "linkError": "Unable To Link Alerts."
     },
     "chooseTrigger": "Choose a Trigger",
+    "start": {
+      "triggerHint": "Select the event that starts your workflow",
+      "chooseAction": "Choose an Action",
+      "actionHint": "Select what happens after the trigger"
+    },
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",
@@ -2543,6 +2552,7 @@
       "incidentSpecificTitle": "Event-Specific Fields",
       "incidentNoExtraFields": "This event adds no fields beyond the common ones.",
       "conditionNoteTitle": "Condition Guidelines",
+      "functionFlattenTitle": "Before vs After Flattening",
       "conditionNoteEmpty": "To Check For An Empty Value, Use \"\". Example:",
       "conditionNoteNull": "To Check For A Null Value, Use null. Example:",
       "conditionNoteCustom": "To Add A Custom Column, Type Its Name And Press Enter.",
@@ -2567,19 +2577,39 @@
       "disable": "Disable Step",
       "enable": "Enable Step",
       "disabledBadge": "Disabled",
-      "incompleteBadge": "Set up later",
-      "destinationSetUpLater": "Set up later",
-      "destinationSetUpLaterPrompt": "Don't have a destination yet? Turn this on to set it up later — you can save a draft and test now.",
-      "destinationSetUpLaterActive": "The destination is skipped for now — the name and comment still save. You'll need a destination before publishing.",
-      "functionSetUpLater": "Set up later",
-      "functionSetUpLaterPrompt": "Don't have a function yet? Turn this on to set it up later — you can save a draft and test now.",
-      "functionSetUpLaterActive": "The function is skipped for now — the name and comment still save. You'll need a function before publishing."
+      "incompleteBadge": "Set up later"
     },
     "canvas": {
       "undo": "Undo",
       "tidyUp": "Tidy Up",
-      "insertStep": "Insert Step",
-      "deleteEdge": "Delete Connection"
+      "edgeDeleteHint": "Press Backspace/Delete to remove the edge"
+    },
+    "ndv": {
+      "input": "Input",
+      "output": "Output",
+      "config": "Configuration",
+      "noInput": "No input records.",
+      "noOutput": "No records forwarded.",
+      "prevStep": "Previous Step · {name}",
+      "nextStep": "Next Step · {name}",
+      "prevStepBtn": "Previous Step",
+      "nextStepBtn": "Next Step",
+      "collapseSteps": "Collapse Steps",
+      "expandSteps": "Expand Steps",
+      "inputTag": "Input",
+      "openStep": "Open {name}",
+      "runToView": "Run A Test To View This Data.",
+      "noBranchItems": "No Items On This Branch.",
+      "noUpstream": "No Upstream Steps.",
+      "noRunYet": "No Run Yet.",
+      "runTest": "Run Test",
+      "noItems": "No Items",
+      "itemsCount": "{count} Item | {count} Items",
+      "viewTable": "Table",
+      "viewJson": "JSON",
+      "itemN": "Item {n}",
+      "executeStep": "Run Step",
+      "sample": "Sample"
     },
     "unsaved": {
       "title": "Unsaved Changes",
@@ -2593,7 +2623,20 @@
       "expand": "Expand",
       "close": "Clear & Close Results",
       "nodesTitle": "Steps",
-      "empty": "Run A Test To See Step Results Here."
+      "empty": "Run A Test To See Step Results Here.",
+      "openNode": "Open Node",
+      "viewConfig": "View Configuration",
+      "hideConfig": "Hide Configuration",
+      "noConfig": "No Configuration",
+      "functionLabel": "Function",
+      "destinationLabel": "Destination",
+      "destinationUnsupported": "Unsupported Type",
+      "destinationMissing": "This Destination No Longer Exists Or Cannot Be Read.",
+      "headersLabel": "Headers",
+      "templateLabel": "Template",
+      "outputFormatLabel": "Output Format",
+      "tlsVerifyLabel": "TLS Verification",
+      "tlsDisabled": "Disabled"
     }
   },
   "pipeline": {

@@ -49,6 +49,12 @@ function createWrapper(props: Record<string, any> = {}) {
       stubs: {
         OSelect: OSelectStub,
         OSwitch: OSwitchStub,
+        OButton: {
+          name: "OButton",
+          props: ["iconLeft", "variant", "size"],
+          emits: ["click"],
+          template: '<button class="o-btn" @click="$emit(\'click\')"><slot /></button>',
+        },
         OSpinner: true,
         OCard: { template: "<div><slot /></div>" },
         OCardSection: { template: "<div><slot /></div>" },
@@ -56,8 +62,8 @@ function createWrapper(props: Record<string, any> = {}) {
         OIcon: true,
         AddFunction: {
           name: "AddFunction",
-          template: '<div class="add-function-stub"></div>',
-          props: ["isUpdated", "heightOffset"],
+          template: '<div class="add-function-stub">{{ defaultCode }}</div>',
+          props: ["isUpdated", "heightOffset", "defaultCode", "forcedLanguage", "sampleEvents"],
           emits: ["update:list", "cancel:hideform"],
         },
       },
@@ -132,6 +138,30 @@ describe("FunctionPicker", () => {
     await expect((wrapper.vm as any).submit()).resolves.toBeNull();
   });
 
+  // Optional mode (Workflows dummy node): an empty selection is allowed — submit
+  // resolves an empty name (placeholder) instead of null, and no required error.
+  it("optional: submit resolves an empty name when nothing is selected", async () => {
+    const wrapper = createWrapper({ optional: true });
+    await flushPromises();
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "",
+      after_flatten: true,
+    });
+  });
+
+  it("optional: still resolves the chosen function when one is selected", async () => {
+    const wrapper = createWrapper({
+      optional: true,
+      initialName: "alpha",
+      initialAfterFlatten: false,
+    });
+    await flushPromises();
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "alpha",
+      after_flatten: false,
+    });
+  });
+
   it("submit resolves { name, after_flatten } with the flatten value", async () => {
     const wrapper = createWrapper({ initialName: "alpha", initialAfterFlatten: false });
     await flushPromises();
@@ -182,5 +212,37 @@ describe("FunctionPicker", () => {
     expect(wrapper.find('[data-test="associate-function-after-flattening-toggle"]').exists()).toBe(
       false,
     );
+  });
+
+  // Single-screen mode (workflows): the select AND the create editor are BOTH on one
+  // page — no mode switch, no view swap. Pipelines keep the switch.
+  it("createButton: shows the select and the create editor together (no mode switch)", async () => {
+    const wrapper = createWrapper({ createButton: true });
+    await flushPromises();
+    expect(wrapper.find(".o-select").exists()).toBe(true); // pick existing
+    expect(wrapper.find(".add-function-stub").exists()).toBe(true); // create new — same page
+    expect(wrapper.find('[data-test="create-function-toggle"]').exists()).toBe(false);
+  });
+
+  it("createButton: does not emit expand (inline on one page, no drawer widen swap)", async () => {
+    const wrapper = createWrapper({ createButton: true });
+    await flushPromises();
+    expect(wrapper.emitted("expand")).toBeFalsy();
+  });
+
+  it("createButton: selecting a function fills its definition into the editor", async () => {
+    // 'alpha' is a VRL function in the fixture — preselect it, then the editor's
+    // default-code should be that function's definition.
+    const wrapper = createWrapper({ createButton: true, language: "vrl", initialName: "alpha" });
+    await flushPromises();
+    const addFn = wrapper.findComponent({ name: "AddFunction" });
+    expect(addFn.props("defaultCode")).toBe("def alpha(r): r");
+  });
+
+  it("keeps the mode switch by default (pipelines)", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.find('[data-test="create-function-toggle"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="create-function-open"]').exists()).toBe(false);
   });
 });

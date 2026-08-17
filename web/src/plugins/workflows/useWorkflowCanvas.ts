@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // the editor, canvas, nodes and node-forms all share one object.
 
 import { reactive } from "vue";
+import { isEqual } from "lodash-es";
 import { useVueFlow } from "@vue-flow/core";
 import { getUUID, getImageURL } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -203,7 +204,7 @@ const defaultObject = {
     show: false,
     source: "",
     handle: "out",
-    mode: "next" as "next" | "trigger" | "insert",
+    mode: "next" as "next" | "trigger" | "action" | "insert",
     // "insert" mode splices onto this edge (A→B becomes A→new→B on commit).
     edgeId: "",
     position: null as { x: number; y: number } | null,
@@ -232,13 +233,15 @@ const defaultObject = {
     // sentinel never lands here or on the API payload.
     fromNode: "",
     result: <any>null,
-    // Per-node Input/Output result drawer (opened by clicking a node's badge).
-    resultDrawer: { show: false, nodeId: "" },
   },
   currentSelectedWorkflow: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   workflowWithoutChange: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   nameError: false,
   nameErrorMessage: "",
+  // Node ids to FLASH a "needs setup" warning ring on — set by Publish validation
+  // when incomplete (dummy) nodes block publishing, so the user sees exactly which
+  // steps. Transient: the canvas frames them and clears this after a few seconds.
+  incompleteHighlight: <string[]>[],
 };
 
 const workflowObj = reactive(Object.assign({}, defaultObject));
@@ -323,9 +326,19 @@ export const isNodeDisabled = (node: any): boolean =>
 
 // Write meta on a node reference (staged or already on the canvas). Empty values
 // drop the key so an unnamed/uncommented node serializes clean.
+//
+// IDEMPOTENT: if the resolved value is unchanged, do nothing — no reassignment,
+// no dirty flag. This matters now that the node panel commits its config on CLOSE
+// (no Save button): opening a node and closing it re-runs the body's submit(),
+// which re-asserts the same `incomplete` value; without this guard that alone
+// would mark an untouched workflow dirty and trip the unsaved-changes guard.
 const setNodeMeta = (node: any, key: string, value: string) => {
   if (!node) return;
-  const meta = { ...(node.meta || {}) };
+  const current = node.meta || {};
+  const nextVal = value || undefined;
+  const curVal = current[key] || undefined;
+  if (curVal === nextVal) return;
+  const meta = { ...current };
   if (value) meta[key] = value;
   else delete meta[key];
   node.meta = meta;
@@ -486,9 +499,9 @@ export const flowOrderedNodeIds = (nodes: any[], edges: any[], startId?: string)
   return order;
 };
 
-// A step in the executed-steps TREE (results dock). Carries the render structure —
-// depth, direct-child count, and per-column "does this rail continue" flags — so
-// the panel draws the traces-waterfall connector lines without re-deriving them.
+// A step in the workflow TREE (the NDV's Steps rail). Carries the render structure —
+// depth, direct-child count, and per-column "does this rail continue" flags — so the
+// rail draws the traces-waterfall connector lines without re-deriving them.
 export interface StepTreeNode {
   id: string;
   depth: number;
@@ -662,27 +675,10 @@ export const executeTestRun = async (opts: {
     )?.id;
     const startId = opts.fromNode || triggerId;
     const ranNodeIds = startId ? [...reachableFrom(wf.edges || [], [startId])] : [];
-    // Snapshot the executed-steps TREE at run time. The results dock now persists
-    // across graph edits, so a step later deleted or disabled must still
-    // render — with its frozen label/icon, struck-through. We freeze the tree shape
-    // (depth + connector guides) plus each step's display data/meta here; the panel
-    // resolves live label/status on top (reflecting a later rename) and falls back
-    // to this frozen data for a removed node. History runs don't set this — the
-    // panel rebuilds the tree from the live graph there. See WorkflowResultsPanel.
-    const stepById = new Map<string, any>((wf.nodes || []).map((n: any) => [n.id, n]));
-    const ranSteps = buildStepTree(wf.nodes || [], wf.edges || [], ranNodeIds).map((s) => {
-      const n = stepById.get(s.id);
-      return {
-        ...s,
-        data: n?.data ? { ...n.data } : undefined,
-        meta: n?.meta ? { ...n.meta } : undefined,
-      };
-    });
     workflowObj.testRun.result = {
       errors,
       inputs,
       ranNodeIds,
-      ranSteps,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
     };
     return { ok: true };
@@ -950,9 +946,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     pushWorkflowHistory();
     wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
     wf.edges = wf.edges.filter((e: any) => e.source !== nodeId && e.target !== nodeId);
-    // The Test log PERSISTS: the deleted step stays listed in the dock,
-    // struck-through, from the run-time snapshot (result.ranSteps). Its canvas badge
-    // is gone with the node. Cleared only by a new run or the explicit Clear button.
+    // If the deleted node's NDV is open, close it.
     if (workflowObj.currentSelectedNodeData?.id === nodeId) {
       workflowObj.currentSelectedNodeData = null;
       workflowObj.dialog.show = false;
@@ -999,6 +993,23 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       source: "",
       handle: "out",
       mode: "trigger",
+      edgeId: "",
+      position: screenToFlowCoordinate({ x: event.clientX, y: event.clientY }),
+      anchor: { x: event.clientX, y: event.clientY },
+    };
+  }
+
+  // The empty-canvas start scaffold's second slot: the same picker restricted to
+  // the addable (non-trigger) node types. Mirrors openTriggerPicker — the click
+  // point becomes the placed node's position (see addActionFromStart). `mode`
+  // "action" means "the workflow's FIRST step" (no parent yet), as distinct from
+  // "next" (extend a specific node).
+  function openActionPicker(event: MouseEvent) {
+    workflowObj.stepPicker = {
+      show: true,
+      source: "",
+      handle: "out",
+      mode: "action",
       edgeId: "",
       position: screenToFlowCoordinate({ x: event.clientX, y: event.clientY }),
       anchor: { x: event.clientX, y: event.clientY },
@@ -1115,30 +1126,23 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       type: meta.ioType,
       position,
       data: { label: id, node_type: nodeType },
+      meta: { incomplete: "true" },
     };
     // No auto-wire on drag-drop — the node is placed where dropped and stays
     // unconnected until the user draws an edge.
     workflowObj.pendingEdge = null;
+    workflowObj.pendingInsert = null;
     workflowObj.currentSelectedNodeID = id;
-    workflowObj.isEditNode = false;
     workflowObj.dialog.name = nodeType;
     workflowObj.dialog.expand = false;
-    workflowObj.dialog.show = true;
+    commitStagedNode();
+    closeNodeDrawer();
   }
 
-  // Hover-`+` add: STAGE a node below `sourceId` and open its config drawer. The
-  // node is NOT added to the canvas here — it's committed (added + auto-wired)
-  // only when the drawer is saved (commitNode), or discarded on cancel
-  // (cancelNodeDrawer). Pipeline pattern. `handle` is always "out" (the single
-  // output; the Condition is a filter, not a true/false branch).
   // Start node picked: ADD the workflow's first (trigger) node to the canvas and
-  // open its panel.
-  //
-  // Committed immediately rather than staged (the addNodeAfter / onDrop
-  // pattern): a staged node only lands via commitNode, which runs from the
-  // drawer's Save — and the trigger panel is a READ-ONLY payload reference with
-  // no footer and no Save (WorkflowNodeDrawer's `readonlyBody`). Staged, it
-  // could never be committed, so the node never appeared on the canvas.
+  // open its panel. Like every other add now, it lands on the canvas immediately
+  // (commitStagedNode is the shared path for the config nodes); the trigger is the
+  // one node with a READ-ONLY panel, so there's simply nothing to commit on close.
   //
   // `triggerKind` maps to the backend WorkflowTriggerKind; the node type stays
   // "workflow_trigger" for all kinds.
@@ -1153,9 +1157,10 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     // Placing the trigger is a real add — snapshot before, mark dirty after, so
     // it's undoable and the unsaved guard catches a just-started workflow.
     pushWorkflowHistory();
+    const wf = workflowObj.currentSelectedWorkflow;
     const id = getUUID();
-    workflowObj.currentSelectedWorkflow.nodes = [
-      ...workflowObj.currentSelectedWorkflow.nodes,
+    wf.nodes = [
+      ...wf.nodes,
       {
         id,
         type: meta.ioType,
@@ -1168,9 +1173,56 @@ export default function useWorkflowCanvas(t: TranslateFn) {
         },
       },
     ];
+    // Empty-canvas scaffold "Action first" path: if the user placed the action
+    // step BEFORE the trigger, the canvas holds exactly that one orphan step —
+    // auto-wire the new trigger into it so the two-node chain the scaffold implied
+    // is connected, instead of stranding an unlinked step. Guarded to the single
+    // orphan case so re-adding a trigger to a larger graph never wires blindly.
+    const others = wf.nodes.filter((n: any) => n.id !== id);
+    if (others.length === 1) {
+      const only = others[0];
+      const hasIncoming = (wf.edges || []).some((e: any) => e.target === only.id);
+      if (!hasIncoming && only.data?.node_type !== "workflow_trigger") {
+        wf.edges = [...(wf.edges || []), newEdge(id, only.id)];
+      }
+    }
     markWorkflowDirty();
     // Don't auto-open the trigger's (read-only) detail panel — placing the trigger
     // shouldn't interrupt the build flow. The user can click the node to open it.
+  }
+
+  // Empty-canvas scaffold "Action" slot picked: place the workflow's FIRST step.
+  // When a trigger already exists (the common flow — trigger picked first), append
+  // + auto-wire after the chain end, exactly like the palette add. When there's no
+  // trigger yet (the user clicked Action before Trigger), drop the step UNCONNECTED
+  // at the scaffold's action-slot position; adding the trigger afterwards auto-wires
+  // into it (see addTriggerNode). `position` is the click point the scaffold card
+  // sat at. Like every add, the node lands as an unconfigured DUMMY — its config
+  // panel opens only when the user clicks it, not on add.
+  function addActionFromStart(nodeType: string, position: { x: number; y: number } | null) {
+    if (hasTrigger()) {
+      const src = endNodeId();
+      if (src) addNodeAfter(src, "out", nodeType);
+      return;
+    }
+    const meta = nodeMeta(nodeType);
+    if (!meta) return;
+    const id = getUUID();
+    workflowObj.currentSelectedNodeData = {
+      id,
+      type: meta.ioType,
+      position: position ?? { x: 320, y: 240 },
+      data: { label: id, node_type: nodeType },
+      meta: { incomplete: "true" },
+    };
+    // Unconnected — no trigger to wire from yet; the trigger add links it later.
+    workflowObj.pendingEdge = null;
+    workflowObj.pendingInsert = null;
+    workflowObj.currentSelectedNodeID = id;
+    workflowObj.dialog.name = nodeType;
+    workflowObj.dialog.expand = false;
+    commitStagedNode();
+    closeNodeDrawer();
   }
 
   const NODE_W = 240;
@@ -1199,19 +1251,26 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       type: meta.ioType,
       position,
       data: { label: id, node_type: nodeType },
+      // A freshly-added config node is an unconfigured placeholder until the panel
+      // is closed with its payload; flag it so it shows the "Set up later" badge and
+      // Publish stays blocked.
+      meta: { incomplete: "true" },
     };
     workflowObj.pendingEdge = { source: sourceId, sourceHandle };
     workflowObj.pendingInsert = null;
     workflowObj.currentSelectedNodeID = id;
-    workflowObj.isEditNode = false;
     workflowObj.dialog.name = nodeType;
     workflowObj.dialog.expand = false;
-    workflowObj.dialog.show = true;
+    // Insert-immediately (no Save button): the node lands on the canvas + auto-wires
+    // now, then the panel opens on it in edit mode. Closing the panel commits config.
+    commitStagedNode();
+    closeNodeDrawer();
   }
 
-  // Insert-on-edge (T7): STAGE a node to be spliced onto edge A→B. On commit the
-  // old edge is removed and A→new + new→B are created (see commitNode). The node is
-  // positioned at the midpoint of A and B; B is nudged down so it doesn't overlap.
+  // Insert-on-edge (T7): splice a node onto edge A→B. commitStagedNode removes the
+  // old edge and creates A→new + new→B immediately. The node is positioned a row
+  // below A, aligned with B's column; B (and its subtree) is nudged down so it
+  // doesn't overlap.
   function addNodeOnEdge(edgeId: string, nodeType: string) {
     const wf = workflowObj.currentSelectedWorkflow;
     const edge = (wf.edges || []).find((e: any) => e.id === edgeId);
@@ -1223,8 +1282,8 @@ export default function useWorkflowCanvas(t: TranslateFn) {
 
     const id = getUUID();
     // Place the spliced node a full row below the source and aligned with the
-    // target's column (so new→target reads as a straight edge). commitNode then
-    // nudges the target + downstream down to keep a full row of breathing room
+    // target's column (so new→target reads as a straight edge). commitStagedNode
+    // then nudges the target + downstream down to keep a full row of breathing room
     // below the new node.
     const position = {
       x: tgt.position?.x ?? src.position?.x ?? 0,
@@ -1235,6 +1294,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       type: meta.ioType,
       position,
       data: { label: id, node_type: nodeType },
+      meta: { incomplete: "true" },
     };
     workflowObj.pendingEdge = null;
     workflowObj.pendingInsert = {
@@ -1244,26 +1304,24 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       sourceHandle: edge.sourceHandle,
     };
     workflowObj.currentSelectedNodeID = id;
-    workflowObj.isEditNode = false;
     workflowObj.dialog.name = nodeType;
     workflowObj.dialog.expand = false;
-    workflowObj.dialog.show = true;
+    commitStagedNode();
+    closeNodeDrawer();
   }
 
-  // Drawer Save: merge the form payload, then either update the existing node
-  // (edit) or commit the staged node + its auto-wired edge (add / insert).
-  function commitNode(payload: any = {}) {
+  // Insert the staged node (currentSelectedNodeData) onto the canvas immediately —
+  // the "insert-immediately" half of the Save-less node panel. Adds the node and
+  // its auto-wired edge (append via pendingEdge, or splice A→new→B via
+  // pendingInsert), leaves it in EDIT mode, and does NOT touch the dialog. The panel
+  // then opens on this now-real node; closing it commits the node's config
+  // (applyNodeConfig). One undo reverts the whole insert (edges included).
+  function commitStagedNode() {
     const wf = workflowObj.currentSelectedWorkflow;
     const node = workflowObj.currentSelectedNodeData;
     if (!node) return;
-    // Snapshot BEFORE the add/edit so one undo reverts the whole commit.
     pushWorkflowHistory();
-    node.data = { ...node.data, ...payload };
-
-    if (workflowObj.isEditNode) {
-      const idx = wf.nodes.findIndex((n: any) => n.id === node.id);
-      if (idx !== -1) wf.nodes[idx] = node;
-    } else if (workflowObj.pendingInsert) {
+    if (workflowObj.pendingInsert) {
       // Splice onto the edge: drop A→B, add A→new and new→B (T7).
       const ins = workflowObj.pendingInsert;
       wf.nodes = [...wf.nodes, node];
@@ -1297,20 +1355,39 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     }
     workflowObj.pendingEdge = null;
     workflowObj.pendingInsert = null;
-    workflowObj.isEditNode = false;
-    workflowObj.dialog.expand = false;
-    workflowObj.dialog.show = false;
-    // The Test log PERSISTS across edits — adding / inserting / editing
-    // a node keeps the dock and existing badges in place instead of a jarring
-    // close+reopen. A newly-added node simply has no badge (it wasn't in the run);
-    // an edited node keeps its last-run badge until re-tested. Cleared only by a new
-    // run or the explicit "Clear" button. See executeTestRun for the run snapshot.
+    // The node is now a real, committed node on the canvas — edit mode from here.
+    workflowObj.isEditNode = true;
     markWorkflowDirty();
   }
 
-  // Drawer Cancel: discard a staged (not-yet-added) node; leave existing nodes
-  // untouched.
-  function cancelNodeDrawer() {
+  // Merge the body's config payload into the already-committed node, in place,
+  // WITHOUT closing the panel. Change-gated — identical data writes nothing and does
+  // NOT mark dirty (e.g. open + close with no edit). Used both by the panel-close
+  // commit and by the NDV Replay (which commits, then re-runs, staying open).
+  function mergeNodeConfig(payload: any = {}) {
+    const wf = workflowObj.currentSelectedWorkflow;
+    const node = workflowObj.currentSelectedNodeData;
+    if (!node) return;
+    const merged = { ...node.data, ...payload };
+    if (isEqual(merged, node.data)) return;
+    pushWorkflowHistory();
+    node.data = merged;
+    const idx = wf.nodes.findIndex((n: any) => n.id === node.id);
+    if (idx !== -1) wf.nodes[idx] = node;
+    // The Test log PERSISTS across edits — editing a node keeps the dock and existing
+    // badges in place; the node keeps its last-run badge until re-tested.
+    markWorkflowDirty();
+  }
+
+  // Node panel CLOSE (there is no Save button): commit the config, then close.
+  function applyNodeConfig(payload: any = {}) {
+    mergeNodeConfig(payload);
+    closeNodeDrawer();
+  }
+
+  // Close the node panel without deleting anything (the node is already on the
+  // canvas — insert-immediately). Just clears the selection + dialog state.
+  function closeNodeDrawer() {
     workflowObj.pendingEdge = null;
     workflowObj.pendingInsert = null;
     workflowObj.currentSelectedNodeData = null;
@@ -1365,12 +1442,12 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     workflowObj.nameError = false;
     workflowObj.nameErrorMessage = "";
     workflowObj.deleteConfirm = { show: false, nodeId: "" };
+    workflowObj.incompleteHighlight = [];
     workflowObj.testRun = {
       show: false,
       input: "",
       fromNode: "",
       result: null,
-      resultDrawer: { show: false, nodeId: "" },
     };
   }
 
@@ -1387,9 +1464,11 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     // node ops
     openStepPicker,
     openTriggerPicker,
+    openActionPicker,
     openInsertPicker,
     closeStepPicker,
     addTriggerNode,
+    addActionFromStart,
     addNodeAfter,
     addNodeOnEdge,
     addNodeToEnd,
@@ -1397,8 +1476,9 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     onDragStart,
     onDragOver,
     onDrop,
-    commitNode,
-    cancelNodeDrawer,
+    applyNodeConfig,
+    mergeNodeConfig,
+    closeNodeDrawer,
     editNode,
     requestDeleteNode,
     cancelDeleteNode,

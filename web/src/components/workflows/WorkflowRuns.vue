@@ -64,13 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OPageHeader>
 
     <div class="flex min-h-0 flex-1 gap-2 px-2 pt-3">
-      <!-- Read-only canvas (per-node run status overlay). The SAME results dock as
-           the editor docks the step Input/Output below the canvas once a run is
-           loaded (read-only here) — instead of the old overlay drawer. -->
-      <div class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden">
-        <WorkflowResultsDock>
-          <WorkflowCanvas />
-        </WorkflowResultsDock>
+      <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
+           opens its NDV (read-only here) with the step's Input · Config · Output — the
+           SAME panel the editor uses, so results read identically in both places. -->
+      <div
+        class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden dark:bg-transparent"
+      >
+        <WorkflowCanvas />
       </div>
 
       <!-- Persistent runs list (master-detail). -->
@@ -87,9 +87,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- Node NDV (read-only here) — opened by a node's ✓/✗ badge to inspect that
+         step's Input · Config · Output for the loaded run. -->
+    <WorkflowNodeDrawer v-if="workflowObj.dialog.show" />
+
     <!-- Test input popup — a fresh dry-run of the current graph, launched from the
          header. Results paint on the read-only canvas (switching it out of the
-         selected historical run) and open in the results dock above. -->
+         selected historical run) and the node NDV shows each step's I/O. -->
     <WorkflowTestDialog v-if="workflowObj.testRun.show" />
   </div>
 </template>
@@ -106,7 +110,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
-import WorkflowResultsDock from "./WorkflowResultsDock.vue";
+import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowRunsPanel from "./WorkflowRunsPanel.vue";
 import useWorkflowCanvas, {
