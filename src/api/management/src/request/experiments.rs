@@ -13,7 +13,10 @@ use db::authz::set_ownership;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
-    llm_evaluations::experiments::{self, ExperimentError},
+    llm_evaluations::{
+        experiment_results,
+        experiments::{self, ExperimentError},
+    },
 };
 
 use crate::{
@@ -29,9 +32,7 @@ use crate::{
             ExperimentPreviewResponseBody, ExperimentResponseBody, ExperimentResultPaginationBody,
             ExperimentResultsResponseBody, ExperimentRowDetailResponseBody,
             ExperimentRowNavigationBody, ExperimentRowSnapshotBody, ListExperimentsResponseBody,
-            PinnedExperimentScorerBody, RetryExperimentSlotRequestBody,
-            experiment_aggregate_summary, experiment_result_slots, experiment_result_summary,
-            experiment_row_result_summary,
+            RetryExperimentSlotRequestBody,
         },
     },
 };
@@ -273,25 +274,20 @@ pub async fn get_experiment(
             let scores = results.scores;
             let summary_executions = results.summary_executions;
             let summary_scores = results.summary_scores;
-            let scorers = experiment
-                .scorers
-                .iter()
-                .cloned()
-                .map(PinnedExperimentScorerBody::from)
-                .collect::<Vec<_>>();
-            let (task_progress, scoring_progress, skip_summary, score_summaries) =
-                experiment_result_summary(
-                    &preview.applicability.clone().into(),
-                    &scorers,
-                    &summary_executions,
-                    &summary_scores,
-                );
-            let aggregate_summary = experiment_aggregate_summary(
+            let scorers = experiment.scorers.clone();
+            let summary = experiment_results::result_summary(
+                &preview.applicability,
+                &scorers,
                 &summary_executions,
-                &task_progress,
-                &scoring_progress,
+                &summary_scores,
             );
-            let slots = experiment_result_slots(results.slots, &executions, &scores, &scorers);
+            let aggregate_summary = experiment_results::aggregate_summary(
+                &summary_executions,
+                &summary.task_progress,
+                &summary.scoring_progress,
+            );
+            let slots =
+                experiment_results::result_slots(results.slots, &executions, &scores, &scorers);
             ExperimentResultsResponseBody {
                 executions: executions
                     .into_iter()
@@ -301,18 +297,22 @@ pub async fn get_experiment(
                     .into_iter()
                     .filter_map(|record| serde_json::to_value(record).ok())
                     .collect(),
-                slots,
+                slots: slots.into_iter().map(Into::into).collect(),
                 pagination: ExperimentResultPaginationBody {
                     page: results.page,
                     page_size: results.page_size,
                     total_slots: results.total_slots,
                     has_more: results.has_more,
                 },
-                task_progress,
-                scoring_progress,
-                skip_summary,
-                score_summaries,
-                aggregate_summary,
+                task_progress: summary.task_progress.into(),
+                scoring_progress: summary.scoring_progress.into(),
+                skip_summary: summary.skip_summary.into(),
+                score_summaries: summary
+                    .score_summaries
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
+                aggregate_summary: aggregate_summary.into(),
             }
         }
         Err(error) => {
@@ -488,14 +488,10 @@ pub async fn get_experiment_row(
         }
     };
     let executions = row.executions;
-    let scorers = experiment
-        .scorers
-        .iter()
-        .cloned()
-        .map(PinnedExperimentScorerBody::from)
-        .collect::<Vec<_>>();
-    let (_, _, _, score_summaries) =
-        experiment_row_result_summary(row.slots.len(), &scorers, &executions, &row.scores);
+    let scorers = experiment.scorers.clone();
+    let score_summaries =
+        experiment_results::row_result_summary(row.slots.len(), &scorers, &executions, &row.scores)
+            .score_summaries;
     let first_slot = row
         .slots
         .first()
@@ -516,8 +512,11 @@ pub async fn get_experiment_row(
         logical_id: first_slot.logical_id.clone(),
         input: first_slot.input.clone(),
         expected_output: first_slot.expected_output.clone(),
-        trials: experiment_result_slots(row.slots, &executions, &row.scores, &scorers),
-        score_summaries,
+        trials: experiment_results::result_slots(row.slots, &executions, &row.scores, &scorers)
+            .into_iter()
+            .map(Into::into)
+            .collect(),
+        score_summaries: score_summaries.into_iter().map(Into::into).collect(),
     };
     MetaHttpResponse::json(response)
 }
