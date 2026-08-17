@@ -79,11 +79,14 @@ const stubs = {
   },
   // Mirrors the real OButton: emits declared (otherwise the listener also
   // falls through and handlers run twice) and the event passed on.
+  // `aria-label` is NOT declared: OButton has no such prop, it reaches the
+  // element by attribute fall-through. Declaring it here would assert a
+  // contract the real component does not have — the same mistake that hid
+  // three buttonless dialogs — and fall-through puts it on this root anyway.
   OButton: {
     name: "OButton",
-    props: ["ariaLabel"],
     emits: ["click"],
-    template: `<button :aria-label="ariaLabel" @click="(e) => $emit('click', e)"><slot /></button>`,
+    template: `<button @click="(e) => $emit('click', e)"><slot /></button>`,
   },
 };
 

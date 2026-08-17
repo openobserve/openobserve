@@ -385,7 +385,8 @@
     </ODrawer>
 
     <ODialog
-      v-model="confirmRecoveryOpen"
+      :open="confirmRecoveryOpen"
+      @update:open="(v: boolean) => (confirmRecoveryOpen = v)"
       :title="t('oncall.confirmRecoveryTitle')"
       data-test="oncall-confirm-recovery-dialog"
     >
@@ -417,7 +418,8 @@
     </ODialog>
 
     <ODialog
-      v-model="promoteOpen"
+      :open="promoteOpen"
+      @update:open="(v: boolean) => (promoteOpen = v)"
       :title="t('oncall.promoteTitle')"
       data-test="oncall-promote-dialog"
     >
@@ -466,7 +468,8 @@
     </ODialog>
 
     <ODialog
-      v-model="confirmResolve"
+      :open="confirmResolve"
+      @update:open="(v: boolean) => (confirmResolve = v)"
       :title="t('oncall.resolveTitle')"
       data-test="oncall-resolve-dialog"
     >

@@ -67,10 +67,14 @@ const stubs = {
   OBanner: { name: "OBanner", template: "<div><slot /></div>" },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
   OnCallTimeline: { name: "OnCallTimeline", template: "<div />" },
+  // `open`, not `modelValue`: ODialog has no `modelValue`, so a stub that
+  // declares one turns every assertion about this dialog into a claim about a
+  // prop the real component ignores — which is exactly how three dialogs
+  // shipped with no visible buttons.
   ODialog: {
     name: "ODialog",
-    props: ["modelValue"],
-    template: "<div v-if='modelValue'><slot /><slot name='footer' /></div>",
+    props: ["open"],
+    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
   },
   OnCallPriorCauses: {
     name: "OnCallPriorCauses",

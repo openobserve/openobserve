@@ -58,10 +58,12 @@ const stubs = {
     </div>`,
   },
   OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
+  // `open`, not `modelValue` — ODialog has no `modelValue`, and a stub that
+  // invents one lets a dialog that can never open test green.
   ODialog: {
     name: "ODialog",
-    props: ["modelValue"],
-    template: "<div v-if='modelValue'><slot /><slot name='footer' /></div>",
+    props: ["open"],
+    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
   },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },

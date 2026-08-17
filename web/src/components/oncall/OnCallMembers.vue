@@ -121,7 +121,8 @@
     <!-- The obvious next question after adding people is "so who is primary?",
          and the answer lives one tab over. -->
     <ODialog
-      v-model="awayOpen"
+      :open="awayOpen"
+      @update:open="(v: boolean) => (awayOpen = v)"
       :title="t('oncall.awayTitle')"
       data-test="oncall-members-away-dialog"
     >
