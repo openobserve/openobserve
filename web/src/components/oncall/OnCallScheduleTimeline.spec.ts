@@ -137,6 +137,16 @@ describe("OnCallScheduleTimeline", () => {
     expect(withGap.find('[data-test="oncall-timeline-gap"]').exists()).toBe(true);
   });
 
+  /// I9. The key was a single swatch labelled "On shift", which claimed the
+  /// chart had one colour and that the colour meant something. It paints six,
+  /// hashed per person, meaning only "not the one beside you" — and the
+  /// coverage bar on the same screen DOES use colour for status.
+  it("says the band colours separate people rather than grade them", () => {
+    const text = render().text();
+    expect(text).toContain("A colour per person");
+    expect(text).not.toContain("On shift");
+  });
+
   it("hands the caller the gap it offered to fill", async () => {
     const wrapper = render({ segments: [seg({ user_email: null })] });
     await wrapper.find('[data-test="oncall-timeline-fill-gap"]').trigger("click");

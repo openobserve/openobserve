@@ -85,9 +85,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #legend>
         <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <!-- One swatch labelled "On shift" said the chart had one colour and
+               that the colour meant something. It paints six, hashed per
+               person, and they mean only "not the one beside you" — so the key
+               shows the ramp and says what it is. The coverage bar on the same
+               screen uses colour for status; a reader who assumes that
+               vocabulary here reads a hue change as a change in cover. -->
           <span class="text-text-secondary flex items-center gap-1.5 text-xs">
-            <span class="bg-schedule-band-1-bg size-2 rounded-full" aria-hidden="true" />
-            {{ t("oncall.timelineOnShift") }}
+            <span class="flex items-center gap-0.5" aria-hidden="true">
+              <span
+                v-for="tone in BAND_TONES"
+                :key="tone"
+                class="size-2 rounded-full"
+                :class="tone"
+              />
+            </span>
+            {{ t("oncall.legendPersonRamp") }}
           </span>
           <!-- The gap is the only thing on this chart worth acting on, so it is
                the only legend entry that carries its own sentence and a way to
@@ -160,6 +173,18 @@ const { t } = useI18nTyped();
 const gapsOnly = ref(false);
 const showOverrides = ref(true);
 const nowMicros = useOnCallClock();
+
+/// The decorative ramp, spelled out rather than built from the tone number:
+/// Tailwind reads class names as literal text, so a template-built
+/// `bg-schedule-band-${n}-bg` produces no CSS and a legend of blank dots.
+const BAND_TONES = [
+  "bg-schedule-band-1-bg",
+  "bg-schedule-band-2-bg",
+  "bg-schedule-band-3-bg",
+  "bg-schedule-band-4-bg",
+  "bg-schedule-band-5-bg",
+  "bg-schedule-band-6-bg",
+];
 
 const RANGES = [
   { key: "day", days: 1, labelKey: "oncall.calendarDay" },

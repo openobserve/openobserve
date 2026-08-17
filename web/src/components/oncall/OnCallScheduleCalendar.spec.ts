@@ -211,4 +211,51 @@ describe("OnCallScheduleCalendar", () => {
     const wrapper = render([]);
     expect(wrapper.text()).toContain("Add a rotation");
   });
+
+  /// I9. This grid paints person bands, a dashed gap, a now line and weekend
+  /// shading, and explained none of them — while the coverage bar on the same
+  /// screen uses colour to mean covered/partial/nobody. A reader who carries
+  /// that vocabulary across reads a change of hue as a change in cover.
+  describe("legend", () => {
+    it("says the band colours are people, not status", () => {
+      const legend = render([rotation()]).find('[data-test="oncall-calendar-legend"]');
+      expect(legend.exists()).toBe(true);
+      expect(legend.text()).toContain("A colour per person");
+      expect(legend.text()).toContain("mean nothing on their own");
+    });
+
+    /// The one colour here that IS a status has to stay distinguishable from
+    /// the decorative ones, so it keeps its own key.
+    it("keys the gap separately from the person ramp", () => {
+      const wrapper = render([rotation()]);
+      expect(wrapper.find('[data-test="oncall-calendar-legend-gap"]').text()).toContain(
+        "No one on call",
+      );
+      expect(wrapper.find('[data-test="oncall-calendar-legend-now"]').exists()).toBe(true);
+    });
+
+    /// A key for shading the window does not contain is noise, and the day
+    /// view routinely contains no weekend.
+    it("keys the weekend shading only when a weekend is drawn", async () => {
+      const wrapper = render([rotation()]);
+      // The default week window always contains one.
+      expect(wrapper.find('[data-test="oncall-calendar-legend-weekend"]').exists()).toBe(true);
+
+      // A single midweek day: pick the range explicitly and step to a Tuesday.
+      wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "day");
+      await wrapper.vm.$nextTick();
+      const weekendKey = () =>
+        wrapper.find('[data-test="oncall-calendar-legend-weekend"]').exists();
+      const shown = [];
+      for (let i = 0; i < 7; i++) {
+        shown.push(weekendKey());
+        await wrapper.find('[data-test="oncall-calendar-next"]').trigger("click");
+        await wrapper.vm.$nextTick();
+      }
+      // Across a week of single days, the key appears on some and not others —
+      // which is the whole claim: it tracks what is drawn.
+      expect(shown).toContain(true);
+      expect(shown).toContain(false);
+    });
+  });
 });

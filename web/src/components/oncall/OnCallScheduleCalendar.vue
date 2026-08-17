@@ -169,6 +169,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
+
+          <!-- This grid paints four things and used to explain none of them.
+               The important one is the first: the band colours are DECORATIVE
+               — they separate one person from the next and carry no status —
+               while the Overview's coverage bar uses colour to mean covered,
+               partial or nobody. Two vocabularies on one screen, so each chart
+               has to say which it speaks or the reader assumes the louder one.
+               Deliberately not unified: making the ramp mean status would need
+               a status per person, which does not exist. -->
+          <div
+            class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1"
+            data-test="oncall-calendar-legend"
+          >
+            <span class="text-text-secondary flex items-center gap-1.5 text-xs">
+              <span class="flex items-center gap-0.5" aria-hidden="true">
+                <span
+                  v-for="tone in PERSON_TONES"
+                  :key="tone"
+                  class="size-2 rounded-full"
+                  :class="tone"
+                />
+              </span>
+              {{ t("oncall.legendPersonRamp") }}
+            </span>
+            <!-- The one colour here that IS a status, and the only thing on the
+                 chart worth acting on. -->
+            <span
+              class="text-status-error-text flex items-center gap-1.5 text-xs"
+              data-test="oncall-calendar-legend-gap"
+            >
+              <span
+                class="border-status-error-text size-2 rounded-full border border-dashed"
+                aria-hidden="true"
+              />
+              {{ t("oncall.calendarNobody") }}
+            </span>
+            <span
+              v-if="nowOffset !== null"
+              class="text-text-secondary flex items-center gap-1.5 text-xs"
+              data-test="oncall-calendar-legend-now"
+            >
+              <span class="bg-status-error-text h-3 w-px" aria-hidden="true" />
+              {{ t("oncall.legendNow") }}
+            </span>
+            <!-- Only when the window actually contains one; a day view showing
+                 a key for shading it does not draw is noise. -->
+            <span
+              v-if="hasWeekend"
+              class="text-text-secondary flex items-center gap-1.5 text-xs"
+              data-test="oncall-calendar-legend-weekend"
+            >
+              <span class="bg-surface-panel border-border-subtle size-2 rounded-default border" aria-hidden="true" />
+              {{ t("oncall.legendWeekend") }}
+            </span>
+          </div>
         </div>
       </div>
     </OCardSection>
@@ -373,6 +428,10 @@ function shift(direction: number) {
 function goToday() {
   offsetDays.value = 0;
 }
+
+/// Whether the drawn window contains a shaded weekend, so the key for it is
+/// offered only when there is something to key.
+const hasWeekend = computed(() => dayColumns.value.some((col) => col.weekend));
 
 function bandStyle(band: CalendarBand) {
   return { left: `${band.offset * 100}%`, width: `${band.width * 100}%` };
