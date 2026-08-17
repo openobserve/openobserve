@@ -69,6 +69,36 @@ describe("isSaveableJourney", () => {
   });
 });
 
+describe("hover and click fidelity", () => {
+  it("stores hover now that Playwright records it", () => {
+    // 1.56 added hover to the recorder model and the probe executes it, so an
+    // authored hover no longer vanishes at save.
+    expect(buildV2Step(step({ id: "s3", action: "hover" })).action).toBe("hover");
+    expect(isSaveableJourney([nav(), step({ id: "s3", action: "hover" })])).toBe(true);
+  });
+
+  it("carries the click button and count onto the storage wire, in snake_case", () => {
+    const wire = buildV2Step(step({ action: "click", button: "right", clickCount: 2 }));
+    expect(wire.button).toBe("right");
+    expect(wire.click_count).toBe(2);
+  });
+
+  it("omits button and count at their defaults, so old payloads are byte-identical", () => {
+    // The guarantee behind shipping these without a schema version bump: a step
+    // with no click metadata must serialise exactly as it did before they existed.
+    const wire = buildV2Step(step({ action: "click" }));
+    expect(wire).not.toHaveProperty("button");
+    expect(wire).not.toHaveProperty("click_count");
+    expect(Object.keys(wire).sort()).toEqual(["action", "id", "locator", "name"]);
+  });
+
+  it("omits a left button and a single click, which carry no information", () => {
+    const wire = buildV2Step(step({ action: "click", button: "left", clickCount: 1 }));
+    expect(wire).not.toHaveProperty("button");
+    expect(wire).not.toHaveProperty("click_count");
+  });
+});
+
 describe("buildV2Step", () => {
   // The server validates steps with deny_unknown_fields, so a stray `code` or
   // `selectorType` would be a 400 rather than a harmless extra.
@@ -187,7 +217,9 @@ describe("buildV2Step", () => {
   });
 
   it("refuses to build a step that cannot be stored", () => {
-    expect(() => buildV2Step(step({ action: "hover" }))).toThrow(/cannot be stored/);
+    // `wait` rather than `hover`: hover became storable in 1.56, but scroll,
+    // wait and screenshot still have no counterpart in the recorder model.
+    expect(() => buildV2Step(step({ action: "wait" }))).toThrow(/cannot be stored/);
   });
 
   it("maps a whole journey in order", () => {

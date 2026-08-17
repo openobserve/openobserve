@@ -29,7 +29,7 @@ use axum::{
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    DISTINCT_FIELDS, O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
+    O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
         gen_ai::GenAiAgentMappingConfig,
@@ -38,7 +38,7 @@ use config::{
         stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
+    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
 use ingestion_common::IngestUser;
@@ -76,7 +76,6 @@ use crate::{
         write_file,
     },
     logs::O2IngestJsonData,
-    metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
     traces::otel::{OtelIngestionProcessor, is_llm_trace},
 };
 
@@ -1419,10 +1418,6 @@ async fn write_traces(
     )
     .await;
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
-        .await
-        .unwrap_or_default();
-
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let partition_time_level = get_partition_time_level(StreamType::Traces);
     if stream_schema.has_partition_keys {
@@ -1484,32 +1479,9 @@ async fn write_traces(
     }
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-    let mut distinct_values = Vec::with_capacity(16);
 
     // Start write data
     for (timestamp, record_val) in json_data {
-        // get distinct_value item
-        if stream_settings.enable_distinct_fields {
-            let mut map = Map::new();
-            for field in DISTINCT_FIELDS.iter().chain(
-                stream_settings
-                    .distinct_value_fields
-                    .iter()
-                    .map(|f| &f.name),
-            ) {
-                if let Some(val) = record_val.get(field) {
-                    map.insert(field.clone(), val.clone());
-                }
-            }
-            if !map.is_empty() {
-                distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Traces,
-                    stream_name: stream_name.to_string(),
-                    value: map,
-                }));
-            }
-        }
-
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
             && triggers.len() < alerts.len()
@@ -1581,15 +1553,6 @@ async fn write_traces(
         log::error!("Error while writing traces: {e}");
         std::io::Error::other(e.to_string())
     })?;
-
-    // send distinct_values
-    if !distinct_values.is_empty()
-        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-        && stream_settings.enable_distinct_fields
-        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
-    {
-        log::error!("Error while writing distinct values: {e}");
-    }
 
     // only one trigger per request
     evaluate_trigger(triggers).await;

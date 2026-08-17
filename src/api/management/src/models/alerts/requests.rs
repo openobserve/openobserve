@@ -119,16 +119,6 @@ impl CreateAlertRequestBody {
     }
 }
 
-/// Documentation union for the unified create endpoint. Runtime dispatch is
-/// still driven by `alert_type`; this wrapper makes the OpenAPI contract
-/// explicit for clients that generate discriminated request types.
-#[derive(Clone, Debug, Deserialize, ToSchema)]
-#[serde(untagged)]
-pub enum CreateAlertRequestSchema {
-    Query(CreateAlertRequestBody),
-    Composite(CreateAlertRequestBody),
-}
-
 /// Anomaly-detection-specific fields for `CreateAlertRequestBody`.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct AnomalyAlertFields {

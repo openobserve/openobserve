@@ -700,7 +700,7 @@ def test_child_rename_and_move_do_not_rewrite_stored_id_expression(
         client.delete(f"folders/alerts/{destination_folder}", prefix="api/v2/")
 
 
-def test_openapi_exposes_composite_union_validate_preview_and_references(
+def test_openapi_exposes_composite_create_validate_preview_and_references(
     client: OpenObserveClient,
 ):
     response = client.get("api-doc/openapi.json", prefix="")
@@ -712,7 +712,11 @@ def test_openapi_exposes_composite_union_validate_preview_and_references(
     create_schema = paths["/api/v2/{org_id}/alerts"]["post"]["requestBody"][
         "content"
     ]["application/json"]["schema"]
-    assert "oneOf" in create_schema or "anyOf" in create_schema
+    # the create request body documents the composite contract directly
+    # (alert_type discriminator + composite_condition), not a oneOf union
+    serialized_create = str(create_schema)
+    assert "alert_type" in serialized_create
+    assert "composite_condition" in serialized_create
     serialized = str(document["components"]["schemas"])
     for token in (
         "composite_condition",
