@@ -97,6 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             zIndex: 1,
           }"
           class="absolute flex items-center text-xs transition-all duration-500 ease-[ease]"
+          :class="durationLabelClass"
+          :data-label-inside-bar="labelInsideBar"
           data-test="span-block-duration"
         >
           <div>
@@ -112,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
+import { getContrastTextColor } from "@/utils/traces/traceColors";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import {
@@ -222,6 +225,26 @@ export default defineComponent({
     });
 
     const durationStyle = ref({});
+
+    /**
+     * True when the duration label had to be placed inside the bar, because the
+     * span is wide enough that neither side of it has room.
+     */
+    const labelInsideBar = ref(false);
+
+    /**
+     * Text colour for the duration label.
+     *
+     * Outside the bar the label sits on the row and inherits the normal colour.
+     * Inside it, the label is on the span's own colour — drawn from an arbitrary
+     * per-service palette — so the choice has to follow that colour's luminance
+     * rather than the theme: a pale bar needs black text in dark mode too.
+     */
+    const durationLabelClass = computed(() => {
+      if (!labelInsideBar.value) return "";
+      const barColor = props.span?.style?.color || DEFAULT_SPAN_COLOR;
+      return getContrastTextColor(barColor) === "black" ? "text-black" : "text-white";
+    });
     const { t } = useI18nTyped();
 
     const leftPosition = ref(0);
@@ -362,39 +385,67 @@ export default defineComponent({
       },
     );
 
+    /**
+     * Places the duration label, in priority order: after the bar, else before
+     * it, else inside its right end.
+     *
+     * The rule is "is there room", not "where does the bar start". The previous
+     * version pinned the label to `right: 0` whenever it would not fit after the
+     * bar — but a bar that does not leave room after itself is a bar that
+     * reaches the container's right edge, so `right: 0` printed the label *on
+     * top of the bar*, in row-background text colour over an arbitrary service
+     * colour. Every long span rendered an unreadable duration.
+     *
+     * Falling back to the bar's left side first keeps the label off the bar in
+     * every case except a span that spans essentially the whole trace, where
+     * neither side has room and the label has to go inside.
+     */
     const getDurationStyle = () => {
       const style: any = {
         top: BAR_LABEL_TOP_REM,
       };
 
+      // Reset first: this is recomputed on resize and on window changes, and a
+      // latched flag would keep the contrast treatment after the bar shrank
+      // enough for the label to move back off it.
+      labelInsideBar.value = false;
+
       const onePercent = Number((spanBlockWidth.value / 100).toFixed(2));
       const labelWidth = 60;
-      // The label is placed `BAR_LABEL_GUTTER_PX` past the bar's right edge, so
-      // its own right edge sits at boxRight + gutter + labelWidth. The gutter
-      // has to be in this comparison too, or the last 6px of the label is
-      // clipped by this container's `overflow-hidden`.
-      if (
-        (leftPosition.value + spanWidth.value) * onePercent + labelWidth + BAR_LABEL_GUTTER_PX >
-        spanBlockWidth.value
-      ) {
-        style.right = 0;
-        style.top = "-0.3125rem";
-      } else if (leftPosition.value > 50) {
-        style.left = leftPosition.value * onePercent - labelWidth + "px";
-      } else {
-        const left = leftPosition.value + (Math.floor(spanWidth.value) ? spanWidth.value : 1);
+      const barStartPx = leftPosition.value * onePercent;
+      const barEndPx = (leftPosition.value + spanWidth.value) * onePercent;
 
-        // Below 19px of bar the label is pinned to a fixed offset from the bar's
-        // start rather than tracking its end. That offset used to clear the fill
-        // by `19 + 6 - barWidth` px, because the fill was drawn 6px shorter than
-        // its geometry box; now that the bar is truthful, the gutter has to be
-        // added back here or the label touches a ~19px bar.
-        style.left =
-          (left * onePercent - leftPosition.value * onePercent < 19
-            ? leftPosition.value * onePercent + 19 + BAR_LABEL_GUTTER_PX
-            : left * onePercent + BAR_LABEL_GUTTER_PX) + "px";
+      // A hairline bar still needs the label clear of it, so the label tracks a
+      // fixed offset from the bar's start rather than its (barely different)
+      // end. The gutter is added because the fill is now the bar's true width —
+      // it used to be drawn 6px short, which supplied this clearance for free.
+      const afterBarPx =
+        barEndPx - barStartPx < 19
+          ? barStartPx + 19 + BAR_LABEL_GUTTER_PX
+          : barEndPx + BAR_LABEL_GUTTER_PX;
+
+      // Both fallbacks below are room comparisons, and there is no room to
+      // compare against until the container has been measured. Unmeasured, they
+      // all fail and would drive every label inside the bar at a negative
+      // offset — off-screen — so take the ordinary after-the-bar position and
+      // let the resize observer place it properly once a width exists.
+      if (!(spanBlockWidth.value > 0) || afterBarPx + labelWidth <= spanBlockWidth.value) {
+        style.left = afterBarPx + "px";
+        return style;
       }
 
+      const beforeBarPx = barStartPx - BAR_LABEL_GUTTER_PX - labelWidth;
+      if (beforeBarPx >= 0) {
+        style.left = beforeBarPx + "px";
+        return style;
+      }
+
+      // Nowhere outside the bar to put it: inset from the container's right edge
+      // so the label sits inside the bar's own right end. `labelInsideBar` drives
+      // the contrast treatment, because at this point the text is on the span's
+      // colour rather than on the row.
+      style.left = spanBlockWidth.value - labelWidth - BAR_LABEL_GUTTER_PX + "px";
+      labelInsideBar.value = true;
       return style;
     };
 
@@ -428,6 +479,8 @@ export default defineComponent({
       store,
       onSpanHover,
       durationStyle,
+      durationLabelClass,
+      labelInsideBar,
       searchObj,
       DEFAULT_SPAN_COLOR,
       eventClusters,

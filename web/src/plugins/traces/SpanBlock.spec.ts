@@ -412,8 +412,13 @@ describe("SpanBlock", () => {
       expect(style).toHaveProperty("top");
     });
 
-    it("should set right:0 when span overflows block width", async () => {
-      // Simulate a wide span that would overflow past the container
+    // Regression: this branch used to set `right: 0`, which pins the label to the
+    // container's right edge. A bar that leaves no room after itself is a bar
+    // that reaches that edge, so the label was printed on top of the bar in
+    // row-background text colour over an arbitrary service colour — every long
+    // span rendered an unreadable duration. It is now inset from the right edge
+    // and flagged so the contrast treatment applies.
+    it("insets the label inside the bar when neither side has room", async () => {
       const el = wrapper.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", {
         configurable: true,
@@ -421,10 +426,13 @@ describe("SpanBlock", () => {
       });
       await wrapper.vm.onResize();
 
-      // leftPosition=0, spanWidth≈91.72%, 100px container → overflow
+      // leftPosition = 0, spanWidth ≈ 91.72% of 100px → no room after the bar,
+      // and none before it either since the bar starts at 0.
       const style = wrapper.vm.getDurationStyle();
-      // Under overflow condition the function sets style.right = 0
-      expect(style).toHaveProperty("right", 0);
+
+      expect(style).not.toHaveProperty("right");
+      expect(style.left).toBe(`${100 - 60 - 6}px`);
+      expect(wrapper.vm.labelInsideBar).toBe(true);
     });
   });
 
@@ -463,9 +471,10 @@ describe("SpanBlock", () => {
     // placed flush against the bar. With the gutter the label's right edge is
     // `barEnd + 6 + 60`, so a band of 6px worth of bar widths fell through to
     // the left-aligned branch and got clipped by `overflow-hidden`.
-    it("right-aligns the label before the gutter pushes it out of the container", async () => {
+    it("moves the label off a bar the gutter would push out of the container", async () => {
       // 329350 / 350372 → spanWidth 94.00%, so the bar ends at 940px of 1000px.
-      // Label at 946px + 60px wide = 1006px, past the container's edge.
+      // Label at 946px + 60px wide = 1006px, past the container's edge. The bar
+      // starts at 0, so there is no room on its left either — it goes inside.
       await wrapper.setProps({ span: { ...mockSpan, durationUs: 329350 } });
       const el = wrapper.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", { configurable: true, value: 1000 });
@@ -473,7 +482,114 @@ describe("SpanBlock", () => {
       await flushPromises();
 
       expect(wrapper.vm.spanWidth).toBe(94);
-      expect(wrapper.vm.getDurationStyle()).toHaveProperty("right", 0);
+      expect(wrapper.vm.getDurationStyle().left).toBe(`${1000 - 60 - 6}px`);
+      expect(wrapper.vm.labelInsideBar).toBe(true);
+    });
+
+    // The case the screenshot showed: a long bar that starts partway in. There is
+    // no room after its right edge, but plenty before its left, so the label goes
+    // there rather than on top of the bar. This is the branch that keeps the
+    // label off the bar for every span except one covering the whole trace.
+    it("places the label before a long bar that starts partway in", async () => {
+      // Start 30% in and run to the container's right edge.
+      await wrapper.setProps({
+        span: {
+          ...mockSpan,
+          startTimeUs: mockBaseTracePosition.startTimeUs + 105112,
+          durationUs: 245260,
+        },
+      });
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 1000 });
+      await wrapper.vm.onResize();
+      await flushPromises();
+
+      const barStartPx = wrapper.vm.leftPosition * 10;
+      const labelLeft = parseFloat(wrapper.vm.getDurationStyle().left);
+
+      // Entirely to the left of the bar, and still on screen.
+      expect(labelLeft).toBeGreaterThanOrEqual(0);
+      expect(labelLeft + 60).toBeLessThanOrEqual(barStartPx);
+      expect(wrapper.vm.labelInsideBar).toBe(false);
+    });
+  });
+
+  describe("duration label contrast when it sits inside the bar", () => {
+    /** Drives the label into the bar by making the container too narrow. */
+    const forceLabelInsideBar = async (w: any) => {
+      const el = w.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 100 });
+      await w.vm.onResize();
+      await flushPromises();
+    };
+
+    // Inside the bar the label is on the span's own colour, drawn from an
+    // arbitrary per-service palette — so the text colour has to follow that
+    // colour's luminance, not the theme. A pale bar needs black text in dark mode
+    // just as much as in light.
+    it("uses dark text on a pale bar", async () => {
+      const localWrapper = mount(SpanBlock, {
+        props: {
+          span: { ...mockSpan, style: { ...mockSpan.style, color: "#ffe0a3" } },
+          baseTracePosition: mockBaseTracePosition,
+          spanDimensions: mockSpanDimensions,
+          spanData: mockSpanData,
+        },
+        global: { plugins: [i18n, router, mockStore] },
+      });
+      await forceLabelInsideBar(localWrapper);
+
+      const label = localWrapper.find('[data-test="span-block-duration"]');
+      expect(label.attributes("data-label-inside-bar")).toBe("true");
+      expect(label.classes()).toContain("text-black");
+
+      localWrapper.unmount();
+    });
+
+    it("uses light text on a dark bar", async () => {
+      const localWrapper = mount(SpanBlock, {
+        props: {
+          span: { ...mockSpan, style: { ...mockSpan.style, color: "#1f3a5f" } },
+          baseTracePosition: mockBaseTracePosition,
+          spanDimensions: mockSpanDimensions,
+          spanData: mockSpanData,
+        },
+        global: { plugins: [i18n, router, mockStore] },
+      });
+      await forceLabelInsideBar(localWrapper);
+
+      expect(localWrapper.find('[data-test="span-block-duration"]').classes()).toContain(
+        "text-white",
+      );
+
+      localWrapper.unmount();
+    });
+
+    // Outside the bar the label is on the row, where the inherited colour is
+    // already correct — forcing white or black there would break one theme.
+    it("adds no contrast class while the label is outside the bar", async () => {
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 2000 });
+      await wrapper.vm.onResize();
+      await flushPromises();
+
+      const label = wrapper.find('[data-test="span-block-duration"]');
+
+      expect(label.attributes("data-label-inside-bar")).toBe("false");
+      expect(label.classes()).not.toContain("text-black");
+      expect(label.classes()).not.toContain("text-white");
+    });
+
+    // Regression: every room comparison fails against an unmeasured container,
+    // which drove the label inside the bar at a negative offset — off-screen —
+    // on every row before its first resize. Rows are virtualized and remount on
+    // scroll, so this was the state each one rendered in first.
+    it("falls back to the after-the-bar position before the row is measured", () => {
+      // jsdom reports clientWidth 0, so this wrapper has never been measured.
+      const style = wrapper.vm.getDurationStyle();
+
+      expect(parseFloat(style.left)).toBeGreaterThanOrEqual(0);
+      expect(wrapper.vm.labelInsideBar).toBe(false);
     });
   });
 
