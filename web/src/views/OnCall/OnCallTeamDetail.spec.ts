@@ -34,6 +34,9 @@ vi.mock("@/services/oncall", () => ({
     resolvedSchedule: vi.fn(),
     escalationPreview: vi.fn(),
     createOverride: vi.fn(),
+    // The undo half of a swap: without it here, a spec asserting the rollback
+    // fails on the mock rather than on the behaviour.
+    deleteOverride: vi.fn(),
     teamOverview: vi.fn(),
     teamReachability: vi.fn(),
     teamConfigRisks: vi.fn(),
@@ -284,6 +287,99 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
 
       expect(router.replace).not.toHaveBeenCalled();
+    });
+  });
+
+  /// F6: a swap is two writes behind one button, which is exactly where a UI
+  /// lies. The second can be refused — the server 409s when somebody already
+  /// covers that window — and by then the first has landed.
+  describe("swapping two shifts", () => {
+    const SWAP = {
+      first: { user_email: "bo@corp.com", start_at: 1_000, end_at: 2_000 },
+      second: { user_email: "ana@corp.com", start_at: 2_000, end_at: 3_000 },
+    };
+
+    async function swap(wrapper: ReturnType<typeof render>) {
+      wrapper.findComponent({ name: "OnCallCoverForm" }).vm.$emit("swap", SWAP);
+      await flushPromises();
+    }
+
+    it("writes one cover each way", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+      await swap(wrapper);
+
+      expect(service.createOverride).toHaveBeenCalledTimes(2);
+      expect(service.createOverride).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ data: SWAP.first }),
+      );
+      expect(service.createOverride).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ data: SWAP.second }),
+      );
+    });
+
+    /// Half a swap is worse than none: one person has been given a week they
+    /// did not agree to cover, and nobody has taken theirs.
+    it("undoes the first cover when the second is refused", async () => {
+      service.createOverride
+        .mockResolvedValueOnce({ data: { id: "ov_1" } } as any)
+        .mockRejectedValueOnce({ response: { data: { message: "already covered" } } });
+      service.deleteOverride.mockResolvedValue({} as any);
+
+      const wrapper = render();
+      await flushPromises();
+      await swap(wrapper);
+
+      expect(service.deleteOverride).toHaveBeenCalledWith(
+        expect.objectContaining({ override_id: "ov_1" }),
+      );
+    });
+
+    /// Nothing was written, so there is nothing to undo — a delete here would
+    /// be a request against an id that does not exist.
+    it("undoes nothing when the first cover was the one refused", async () => {
+      service.createOverride.mockRejectedValue({
+        response: { data: { message: "already covered" } },
+      });
+
+      const wrapper = render();
+      await flushPromises();
+      await swap(wrapper);
+
+      expect(service.deleteOverride).not.toHaveBeenCalled();
+    });
+
+    /// A refused swap leaves the dialog open on the two shifts somebody chose:
+    /// closing it would report the errand as done and make them rebuild the
+    /// same pair from scratch to try again.
+    it("keeps the dialog open when the swap did not happen", async () => {
+      service.createOverride
+        .mockResolvedValueOnce({ data: { id: "ov_1" } } as any)
+        .mockRejectedValueOnce({ response: { data: { message: "already covered" } } });
+      service.deleteOverride.mockResolvedValue({} as any);
+
+      const wrapper = render();
+      await flushPromises();
+      // The dialog is open, the way it is when somebody has just picked two
+      // shifts in it.
+      wrapper.findComponent({ name: "OnCallCoverForm" }).vm.$emit("update:open", true);
+      await flushPromises();
+      await swap(wrapper);
+
+      expect(wrapper.findComponent({ name: "OnCallCoverForm" }).props("open")).toBe(true);
+    });
+
+    it("closes the dialog once both covers are written", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+
+      const wrapper = render();
+      await flushPromises();
+      await swap(wrapper);
+
+      expect(wrapper.findComponent({ name: "OnCallCoverForm" }).props("open")).toBe(false);
     });
   });
 

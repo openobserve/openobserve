@@ -80,7 +80,7 @@ const stubs = {
   },
   ODialog: {
     name: "ODialog",
-    props: ["open", "primaryDisabled", "title"],
+    props: ["open", "primaryButtonDisabled", "title"],
     template: "<div><slot /></div>",
   },
   ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
@@ -166,12 +166,12 @@ describe("OnCallRouting", () => {
     await flushPromises();
     expect(dialog(wrapper).props("open")).toBe(true);
     // No team chosen yet — the rule cannot be written.
-    expect(dialog(wrapper).props("primaryDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
 
     await wrapper
       .findComponent('[data-test="oncall-routing-rule-team"]')
       .vm.$emit("update:modelValue", "team_2");
-    expect(dialog(wrapper).props("primaryDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
 
     dialog(wrapper).vm.$emit("click:primary");
     await flushPromises();

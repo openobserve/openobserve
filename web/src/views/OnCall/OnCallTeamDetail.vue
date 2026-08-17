@@ -389,7 +389,9 @@
       :saving="coverSaving"
       :current-holder="onCallNow[0]?.user_email ?? null"
       :gap="coverGap"
+      :shifts="swappableShifts"
       @save="saveCover"
+      @swap="saveSwap"
     />
   </OPageLayout>
 </template>
@@ -453,7 +455,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { isOnCallUnavailable } from "@/utils/oncall";
+import { isOnCallUnavailable, upcomingShifts, winningRotation } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
@@ -857,6 +859,76 @@ async function fetchSegments() {
 function onFillGap(gap: ResolvedSegment) {
   coverGap.value = { from: gap.from, to: gap.to };
   coverOpen.value = true;
+}
+
+/// The weeks a swap can trade: the next few shifts of the rotation actually in
+/// force, resolved the way the engine resolves it. Empty when there is no
+/// rotation to trade shifts of, which hides the swap mode rather than offering
+/// an empty picker.
+const SWAPPABLE_SHIFTS = 8;
+
+const swappableShifts = computed(() => {
+  const rotations = schedule.value?.rotations ?? [];
+  if (!rotations.length) return [];
+  const now = Date.now() * 1000;
+  const zone = schedule.value?.timezone || team.value?.timezone || "UTC";
+  const current = winningRotation(rotations, now, zone);
+  return current ? upcomingShifts(current, now, SWAPPABLE_SHIFTS) : [];
+});
+
+/// Two covers, one each way.
+///
+/// Written in sequence rather than in parallel: if the second is refused — the
+/// server 409s when somebody already covers that window — the first has already
+/// landed, and a half-done swap is worse than none. It is undone, and the
+/// reader is told which of the three things happened rather than being left to
+/// re-read the calendar and guess.
+async function saveSwap(value: {
+  first: { user_email: string; start_at: number; end_at: number };
+  second: { user_email: string; start_at: number; end_at: number };
+}) {
+  coverSaving.value = true;
+  let firstId: string | null = null;
+  try {
+    const created = await oncallService.createOverride({
+      org_identifier: orgId.value,
+      team_id: teamId.value,
+      data: value.first,
+    });
+    firstId = created.data?.id ?? null;
+
+    await oncallService.createOverride({
+      org_identifier: orgId.value,
+      team_id: teamId.value,
+      data: value.second,
+    });
+
+    coverOpen.value = false;
+    toast({ variant: "success", message: t("oncall.swapSaved") });
+    await fetchSegments();
+  } catch (err: any) {
+    const reason = raw(err?.response?.data?.message) || t("oncall.coverSaveFailed");
+    // Nothing was written, so the server's own sentence is the whole story.
+    if (!firstId) {
+      toast({ variant: "error", message: reason });
+      return;
+    }
+    try {
+      await oncallService.deleteOverride({
+        org_identifier: orgId.value,
+        team_id: teamId.value,
+        override_id: firstId,
+      });
+      toast({ variant: "error", message: t("oncall.swapRolledBack", { reason }) });
+    } catch {
+      // The undo failed too: one cover is live and the other is not. Saying
+      // "swap failed" here would describe a schedule that no longer exists.
+      toast({ variant: "warning", message: t("oncall.swapHalfDone", { reason }) });
+      await fetchSegments();
+    }
+  } finally {
+    coverSaving.value = false;
+  }
 }
 
 /// A cover takes a slot for a window; outside it the rotation resolves exactly

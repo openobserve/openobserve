@@ -59,7 +59,7 @@ const stubs = {
     props: ["signals", "teamName", "loading", "claiming"],
     template: "<div />",
   },
-  ODialog: { name: "ODialog", props: ["open", "primaryDisabled"], template: "<div><slot /></div>" },
+  ODialog: { name: "ODialog", props: ["open", "primaryButtonDisabled"], template: "<div><slot /></div>" },
   ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
   OButton: {
     name: "OButton",
@@ -187,10 +187,10 @@ describe("OnCallOwnership", () => {
   it("cannot save a rule with no dimensions", async () => {
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.findComponent({ name: "ODialog" }).props("primaryDisabled")).toBe(true);
+    expect(wrapper.findComponent({ name: "ODialog" }).props("primaryButtonDisabled")).toBe(true);
 
     await typePair(wrapper, "k8s-cluster", "prod");
-    expect(wrapper.findComponent({ name: "ODialog" }).props("primaryDisabled")).toBe(false);
+    expect(wrapper.findComponent({ name: "ODialog" }).props("primaryButtonDisabled")).toBe(false);
   });
 
   it("passes the routing preview back down to the simulator", async () => {
