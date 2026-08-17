@@ -1,0 +1,1866 @@
+===== COMPLETE LIST OF CHANGED FILES (32 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+tests/ui-testing/pages/dashboardPages/scheduledReportsDrawer.js
+tests/ui-testing/pages/reportsPages/reportsPage.js
+web/src/components/dashboards/PanelContainer.vue
+web/src/components/dashboards/VariablesValueSelector.vue
+web/src/components/dashboards/settings/GeneralSettings.spec.ts
+web/src/components/dashboards/settings/GeneralSettings.vue
+web/src/components/dashboards/settings/VariableSettings.spec.ts
+web/src/components/dashboards/settings/VariableSettings.vue
+web/src/components/dashboards/tabs/TabList.spec.ts
+web/src/components/dashboards/tabs/TabList.vue
+web/src/lib/core/EmptyState/presets.ts
+web/src/lib/styles/tokens/component.css
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/utils/query/sqlDiagnostics.spec.ts
+web/src/views/Dashboards/RenderDashboardCharts.vue
+web/src/views/Dashboards/ScheduledDashboards.spec.ts
+web/src/views/Dashboards/ScheduledDashboards.vue
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index f887eba040d..2b62c955db7 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -4140,6 +4140,9 @@
+     "gaugeMinValue": "a412a2fa60221199",
+     "generalSettings": "c910d474dcd724bf",
+     "generalSettingsPage": {
++      "appliesToEveryone": "124fcbb7dbdc79e5",
++      "dynamicFiltersHelp": "91c37cc4fdff5b4b",
++      "saveChanges": "dd0ae7a5cbcf2339",
+       "updatedSuccessfully": "042a0687fa1547fb",
+       "updationFailed": "5a2ca189da8984e1"
+     },
+@@ -4673,6 +4676,7 @@
+     "subtitle": "f55401b437f83559",
+     "sum": "a21d7df04c33f507",
+     "symbolsize": "7eb7b23774725d6a",
++    "tabPanelCount": "31bbca679806b213",
+     "tabRequired": "32ef8e40de851563",
+     "tabSettings": "8e5ea509893e6dfd",
+     "tabSettingsTitle": "d5feda8c8d79f555",
+@@ -4770,6 +4774,7 @@
+       "dashboardUpdatedSuccessfully": "042a0687fa1547fb",
+       "deletedPanel": "3f856e7a890f1203",
+       "deletedTab": "3c6b250c6585192e",
++      "dependsOn": "65c721346658538c",
+       "panelsCount": "2f5c09590f8069a9",
+       "scope": "b073f6c68ef87211",
+       "tabsCount": "d5af8ab49807842a",
+@@ -5215,6 +5220,12 @@
+       "description": "88f642638f976bb9",
+       "title": "eadb8912580ee6a3"
+     },
++    "noVariables": {
++      "action": "e10f539e38e1a105",
++      "actionDesc": "a061f3bb6335b334",
++      "description": "b35d724ad4511b65",
++      "title": "5699e3a83585bdc8"
++    },
+     "noWorkflows": {
+       "action": "ce94908ac04cbd99",
+       "actionDesc": "57f9a3e88bbc629a",
+@@ -5265,6 +5276,7 @@
+       "streams": "d5a08b6893ecd1aa",
+       "traces": "b5ac69fc467c01f3",
+       "users": "7dfb4cf67742cb06",
++      "variables": "7af0b3e47c35820f",
+       "workflows": "45b34f16db605a06"
+     }
+   },
+diff --git a/tests/ui-testing/pages/dashboardPages/scheduledReportsDrawer.js b/tests/ui-testing/pages/dashboardPages/scheduledReportsDrawer.js
+index cab9fb3b1ff..a36099b92be 100644
+--- a/tests/ui-testing/pages/dashboardPages/scheduledReportsDrawer.js
++++ b/tests/ui-testing/pages/dashboardPages/scheduledReportsDrawer.js
+@@ -30,7 +30,12 @@ export class ScheduledReportsDrawerPage {
+     // `tr` qualifier keeps the drag-handle button (`o2-table-row-drag-handle`,
+     // OTableBodyRow.vue:247) out of the prefix match.
+     this.rows = this.container.locator('tr[data-test^="o2-table-row-"]');
+-    this.emptyState = this.container.locator('[data-test="no-data-message"]');
++    // ScheduledDashboards now renders the shared OEmptyState through OTable's
++    // empty slot. Scope through the table wrapper so this cannot match another
++    // empty state elsewhere in the drawer/page.
++    this.emptyState = this.table
++      .locator('[data-test="o2-table-empty"]')
++      .locator('[data-test="o2-empty-state"]');
+     this.loadingBanner = this.container.locator('[data-test="o2-table-loading-banner"]');
+ 
+     // AppTabs renders `tab-<value>`; values are "cached" / "shared"
+diff --git a/tests/ui-testing/pages/reportsPages/reportsPage.js b/tests/ui-testing/pages/reportsPages/reportsPage.js
+index 02911a97fcb..44a548efc1d 100644
+--- a/tests/ui-testing/pages/reportsPages/reportsPage.js
++++ b/tests/ui-testing/pages/reportsPages/reportsPage.js
+@@ -359,25 +359,40 @@ export class ReportsPage {
+   }
+ 
+   async createReportSaveButton() {
+-    await this.saveButton.click({ force: true });
++    const [response] = await Promise.all([
++      this.page.waitForResponse(
++        (resp) => {
++          const pathname = new URL(resp.url()).pathname;
++          return /^\/api\/(?:v2\/)?[^/]+\/reports\/?$/.test(pathname) &&
++            resp.request().method() === 'POST';
++        },
++        { timeout: 30000 }
++      ),
++      this.saveButton.click({ force: true }),
++    ]);
++
++    if (!response.ok()) {
++      const responseBody = await response.text().catch(() => '<response body unavailable>');
++      throw new Error(
++        `Report creation failed with HTTP ${response.status()}: ${responseBody}`
++      );
++    }
+   }
+ 
+   async verifyReportCreated(reportName) {
+-    // Wait for save success toast
+-    await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 30000 });
+-    await expect(this.toastSuccess.first()).toBeVisible({ timeout: 5000 });
++    await expect(this.page).toHaveURL(/\/web\/reports(?:\?|$)/, { timeout: 30000 });
+ 
+-    // Navigate to reports list. waitForLoadState('networkidle') is insufficient
+-    // here because Vue's onBeforeMount API call starts AFTER the browser idles —
+-    // wait for the reports GET response explicitly so data is in the table before
+-    // we attempt to search.
++    // Reload the reports list and wait for its collection request. Both v1 and
++    // v2 are accepted so this helper works across mixed-version deployments.
+     const reportsApiPromise = this.page.waitForResponse(
+-      (resp) =>
+-        /\/api\/[^/]+\/reports(\?|$)/.test(resp.url()) &&
+-        resp.request().method() === 'GET' &&
+-        resp.status() === 200,
++      (resp) => {
++        const pathname = new URL(resp.url()).pathname;
++        return /^\/api\/(?:v2\/)?[^/]+\/reports\/?$/.test(pathname) &&
++          resp.request().method() === 'GET' &&
++          resp.ok();
++      },
+       { timeout: 30000 }
+-    ).catch(() => null);
++    );
+     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
+     await reportsApiPromise;
+ 
+diff --git a/web/src/components/dashboards/PanelContainer.vue b/web/src/components/dashboards/PanelContainer.vue
+index 0f3f138f813..d2d701b6beb 100644
+--- a/web/src/components/dashboards/PanelContainer.vue
++++ b/web/src/components/dashboards/PanelContainer.vue
+@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ <template>
+   <div
+-    class="rounded-default flex h-full flex-col overflow-hidden"
++    class="flex h-full flex-col overflow-hidden"
+     @mouseover="() => (isCurrentlyHoveredPanel = true)"
+     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
+     :data-test="`dashboard-panel-container`"
+@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       }"
+     >
+       <PanelBar
+-        class="rounded-t-default w-full flex-nowrap"
++        class="w-full flex-nowrap"
+         :class="{ 'border-b-transparent': isPanelLoading }"
+         data-test="dashboard-panel-bar"
+       >
+diff --git a/web/src/components/dashboards/VariablesValueSelector.vue b/web/src/components/dashboards/VariablesValueSelector.vue
+index eaa7a4bc45c..ec52694f1fd 100644
+--- a/web/src/components/dashboards/VariablesValueSelector.vue
++++ b/web/src/components/dashboards/VariablesValueSelector.vue
+@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ <template>
+-  <div v-if="variablesData.values?.length > 0" class="mt-1 flex flex-wrap">
++  <div v-if="variablesData.values?.length > 0" class="mt-1 flex flex-wrap gap-y-1">
+     <div
+       v-for="(item, index) in variablesData.values"
+       :key="item.name + index"
+diff --git a/web/src/components/dashboards/settings/GeneralSettings.spec.ts b/web/src/components/dashboards/settings/GeneralSettings.spec.ts
+index d8c375a7758..342c4e679b1 100644
+--- a/web/src/components/dashboards/settings/GeneralSettings.spec.ts
++++ b/web/src/components/dashboards/settings/GeneralSettings.spec.ts
+@@ -272,7 +272,10 @@ describe("GeneralSettings", () => {
+     it("should update dashboard description when input changes", async () => {
+       wrapper = await createWrapper();
+ 
+-      const descInput = wrapper.find('[data-test="dashboard-general-setting-description"] input');
++      // Description is a textarea (multi-line) in the redesigned form.
++      const descInput = wrapper.find(
++        '[data-test="dashboard-general-setting-description"] textarea',
++      );
+       await descInput.setValue("Updated description");
+ 
+       // The form owns `description` now — assert via the form state.
+diff --git a/web/src/components/dashboards/settings/GeneralSettings.vue b/web/src/components/dashboards/settings/GeneralSettings.vue
+index 237e0f2dacb..62a10048b66 100644
+--- a/web/src/components/dashboards/settings/GeneralSettings.vue
++++ b/web/src/components/dashboards/settings/GeneralSettings.vue
+@@ -17,66 +17,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ <template>
+   <div class="flex h-full flex-col">
+     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
+-    <div>
+-      <OForm
+-        ref="formRef"
+-        :schema="generalSettingsSchema"
+-        :default-values="generalSettingsDefaults()"
+-        @submit="onSubmit"
+-        v-slot="{ isSubmitting }"
+-      >
+-        <div class="flex flex-col gap-3 px-3 py-3">
+-          <OFormInput
+-            name="name"
+-            :label="t('dashboard.name')"
+-            required
+-            data-test="dashboard-general-setting-name"
+-          />
+-          <OFormInput
+-            name="description"
+-            :label="t('dashboard.typeDesc')"
+-            data-test="dashboard-general-setting-description"
++    <OForm
++      ref="formRef"
++      :schema="generalSettingsSchema"
++      :default-values="generalSettingsDefaults()"
++      @submit="onSubmit"
++      v-slot="{ isSubmitting }"
++      class="flex min-h-0 flex-1 flex-col"
++    >
++      <div class="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-3 py-3">
++        <OFormInput
++          name="name"
++          :label="t('dashboard.name')"
++          required
++          data-test="dashboard-general-setting-name"
++        />
++        <OFormTextarea
++          name="description"
++          :label="t('dashboard.typeDesc')"
++          :rows="3"
++          data-test="dashboard-general-setting-description"
++        />
++
++        <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
++          <label class="text-compact text-input-label-text leading-tight font-medium">{{
++            t("dashboard.defaultDuration")
++          }}</label>
++          <DateTimePickerDashboard
++            v-show="store.state.printMode === false"
++            ref="dateTimePicker"
++            class="my-2 h-7.5"
++            size="sm"
++            :initialTimezone="initialTimezone"
++            v-model="dateTimeValue"
++            :auto-apply-dashboard="true"
++            menu-align="start"
+           />
+-          <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
+-            <label>{{ t("dashboard.defaultDuration") }}</label>
+-            <DateTimePickerDashboard
+-              v-show="store.state.printMode === false"
+-              ref="dateTimePicker"
+-              class="my-2 h-7.5"
+-              size="sm"
+-              :initialTimezone="initialTimezone"
+-              v-model="dateTimeValue"
+-              :auto-apply-dashboard="true"
+-              menu-align="start"
+-            />
+-          </div>
++        </div>
++
++        <div class="flex flex-col gap-1">
+           <OFormSwitch
+             name="showDynamicFilters"
+             :label="t('dashboard.showDynamicFilters')"
+             data-test="dashboard-general-setting-dynamic-filter"
+             size="lg"
+           />
+-          <div class="flex justify-center gap-2">
+-            <OButton
+-              @click="$emit('close')"
+-              variant="outline"
+-              size="sm-action"
+-              :disabled="isSubmitting"
+-              data-test="dashboard-general-setting-cancel-btn"
+-              >{{ t("dashboard.cancel") }}</OButton
+-            >
+-            <OButton
+-              variant="primary"
+-              size="sm-action"
+-              type="submit"
+-              :loading="isSubmitting"
+-              data-test="dashboard-general-setting-save-btn"
+-              >{{ t("dashboard.save") }}</OButton
+-            >
+-          </div>
++          <p class="text-text-secondary text-xs">
++            {{ t("dashboard.generalSettingsPage.dynamicFiltersHelp") }}
++          </p>
++        </div>
++      </div>
++
++      <!-- Footer pinned to the drawer bottom: a plain-language reminder that
++           settings are shared, plus the primary/secondary actions. -->
++      <div
++        class="border-border-default flex shrink-0 items-center justify-between gap-2 border-t px-3 py-2.5"
++      >
++        <span class="text-text-secondary text-xs">
++          {{ t("dashboard.generalSettingsPage.appliesToEveryone") }}
++        </span>
++        <div class="flex gap-2">
++          <OButton
++            @click="$emit('close')"
++            variant="outline"
++            size="sm-action"
++            :disabled="isSubmitting"
++            data-test="dashboard-general-setting-cancel-btn"
++            >{{ t("dashboard.cancel") }}</OButton
++          >
++          <OButton
++            variant="primary"
++            size="sm-action"
++            type="submit"
++            :loading="isSubmitting"
++            data-test="dashboard-general-setting-save-btn"
++            >{{ t("dashboard.generalSettingsPage.saveChanges") }}</OButton
++          >
+         </div>
+-      </OForm>
+-    </div>
++      </div>
++    </OForm>
+   </div>
+ </template>
+ 
+@@ -92,6 +111,7 @@ import useNotifications from "@/composables/useNotifications";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OForm from "@/lib/forms/Form/OForm.vue";
+ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
++import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+ import {
+   makeGeneralSettingsSchema,
+@@ -107,6 +127,7 @@ export default defineComponent({
+     OButton,
+     OForm,
+     OFormInput,
++    OFormTextarea,
+     OFormSwitch,
+   },
+   emits: ["save", "close"],
+@@ -166,8 +187,8 @@ export default defineComponent({
+           ),
+         );
+ 
+-        // update the values — all three come from the validated form submit
+-        // payload (the form owns `name`, `description`, `showDynamicFilters`).
++        // update the values — all come from the validated form submit payload
++        // (the form owns `name`, `description`, `showDynamicFilters`).
+         data.title = value.name;
+         data.description = value.description;
+ 
+diff --git a/web/src/components/dashboards/settings/VariableSettings.spec.ts b/web/src/components/dashboards/settings/VariableSettings.spec.ts
+index a39d5ccb28b..cf973b97aba 100644
+--- a/web/src/components/dashboards/settings/VariableSettings.spec.ts
++++ b/web/src/components/dashboards/settings/VariableSettings.spec.ts
+@@ -272,6 +272,23 @@ describe("VariableSettings", () => {
+       expect(vm.getVariableTypeLabel("custom")).toBe("Custom");
+       expect(vm.getVariableTypeLabel("unknown_type")).toBe("unknown_type");
+     });
++
++    it("reports which variables a variable depends on", async () => {
++      const vm = wrapper.vm as any;
++      // `pod` references `$namespace` in a filter → depends on namespace.
++      vm.dashboardVariablesList = [
++        { name: "namespace", type: "query_values", query_data: { stream: "logs", filter: [] } },
++        {
++          name: "pod",
++          type: "query_values",
++          query_data: { stream: "logs", filter: [{ value: "$namespace" }] },
++        },
++      ];
++      await nextTick();
++
++      expect(vm.getDependencies({ name: "pod" })).toEqual(["namespace"]);
++      expect(vm.getDependencies({ name: "namespace" })).toEqual([]);
++    });
+   });
+ 
+   describe("Add Variable Functionality", () => {
+diff --git a/web/src/components/dashboards/settings/VariableSettings.vue b/web/src/components/dashboards/settings/VariableSettings.vue
+index 4a71421f7a2..253df45a33d 100644
+--- a/web/src/components/dashboards/settings/VariableSettings.vue
++++ b/web/src/components/dashboards/settings/VariableSettings.vue
+@@ -47,7 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           </div>
+         </template>
+       </DashboardHeader>
+-      <div ref="tableWrapper" data-test="dashboard-variable-settings-drag">
++      <div
++        ref="tableWrapper"
++        class="min-h-0 flex-1 overflow-y-auto"
++        data-test="dashboard-variable-settings-drag"
++      >
+         <OTable
+           data-test="dashboard-variables-table"
+           :data="dashboardVariablesList"
+@@ -61,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :show-global-filter="false"
+         >
+           <template #empty>
+-            <NoData />
++            <OEmptyState size="hero" preset="no-variables" @action="() => addVariables()" />
+           </template>
+ 
+           <template #cell-drag>
+@@ -78,11 +82,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           </template>
+ 
+           <template #cell-name="{ row }">
+-            <div class="item-name">
++            <div class="item-name flex items-center gap-1.5">
+               <span class="block overflow-hidden text-ellipsis whitespace-nowrap">
+                 {{ row.name }}
+               </span>
+               <OTooltip v-if="row.name.length > 30" :content="row.name" />
++              <!-- Dependency indicator: icon + count of variables this one depends
++                   on. OTooltip WRAPS the chip (default-slot mode) so the whole chip
++                   is the hover target — child mode would anchor only to the count. -->
++              <OTooltip
++                v-if="getDependencies(row).length"
++                :content="
++                  t('dashboard.variableSettingsPage.dependsOn', {
++                    names: getDependencies(row).join(', '),
++                  })
++                "
++              >
++                <span
++                  class="text-text-secondary bg-surface-subtle inline-flex shrink-0 cursor-help items-center gap-0.5 rounded-full px-1.5 py-0.5"
++                  :data-test="`dashboard-variable-${row.name}-dependencies`"
++                >
++                  <OIcon name="account-tree" size="xs" />
++                  <span class="text-2xs leading-none">{{ getDependencies(row).length }}</span>
++                </span>
++              </OTooltip>
+             </div>
+           </template>
+ 
+@@ -193,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ import {
+   defineComponent,
+   ref,
++  computed,
+   onMounted,
+   onActivated,
+   onBeforeUnmount,
+@@ -200,6 +224,7 @@ import {
+   nextTick,
+ } from "vue";
+ import { raw, useI18nTyped } from "@/types/i18n";
++import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
+ import { useStore } from "vuex";
+ import { useRoute } from "vue-router";
+ import { getDashboard, deleteVariable, updateDashboard } from "../../../utils/commons";
+@@ -207,7 +232,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import AddSettingVariable from "./AddSettingVariable.vue";
+ import DashboardHeader from "./common/DashboardHeader.vue";
+-import NoData from "../../shared/grid/NoData.vue";
++import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+ import ConfirmDialog from "../../ConfirmDialog.vue";
+ import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
+ import useNotifications from "@/composables/useNotifications";
+@@ -223,7 +248,7 @@ export default defineComponent({
+   name: "VariableSettings",
+   components: {
+     AddSettingVariable,
+-    NoData,
++    OEmptyState,
+     ConfirmDialog,
+     DashboardHeader,
+     VariablesDependenciesGraph,
+@@ -313,6 +338,15 @@ export default defineComponent({
+     } = useNotifications();
+     // list of all variables, which will be same as the dashboard variables list
+     const dashboardVariablesList: any = ref([]);
++
++    // Per-variable dependency graph — each entry's `parentVariables` are the
++    // variables that one depends on (referenced in its stream/field/filters).
++    const dependencyGraph = computed(() =>
++      buildVariablesDependencyGraph(dashboardVariablesList.value ?? []),
++    );
++    const getDependencies = (row: any): string[] =>
++      dependencyGraph.value?.[row?.name]?.parentVariables ?? [];
++
+     const selectedVariable = ref(null);
+     const confirmDeleteDialog = ref<boolean>(false);
+     const selectedDelete: any = ref(null);
+@@ -548,6 +582,7 @@ export default defineComponent({
+       getDashboardData,
+       addVariables,
+       dashboardVariablesList,
++      getDependencies,
+       isAddVariable,
+       showDeleteDialogFn,
+       confirmDeleteDialog,
+diff --git a/web/src/components/dashboards/tabs/TabList.spec.ts b/web/src/components/dashboards/tabs/TabList.spec.ts
+index 61fbd025cbb..6aa8db1fe95 100644
+--- a/web/src/components/dashboards/tabs/TabList.spec.ts
++++ b/web/src/components/dashboards/tabs/TabList.spec.ts
+@@ -177,6 +177,32 @@ describe("TabList", () => {
+       );
+     });
+ 
++    it("shows a panel-count badge per tab, excluding section headers", () => {
++      const dashboard = {
++        ...mockDashboardData,
++        tabs: [
++          {
++            tabId: "tab1",
++            name: "First Tab",
++            // Two real panels + one section header → count should be 2.
++            panels: [{ id: "p1" }, { o2SectionHeader: true, id: "h1" }, { id: "p2" }],
++          },
++        ],
++      };
++      wrapper = createWrapper({ dashboardData: dashboard });
++
++      const badge = wrapper.find('[data-test="dashboard-tab-tab1-panel-count"]');
++      expect(badge.exists()).toBe(true);
++      expect(badge.text()).toBe("2");
++    });
++
++    it("shows 0 on a tab with no panels", () => {
++      wrapper = createWrapper();
++      const badge = wrapper.find('[data-test="dashboard-tab-tab1-panel-count"]');
++      expect(badge.exists()).toBe(true);
++      expect(badge.text()).toBe("0");
++    });
++
+     it("should display tab names correctly", () => {
+       wrapper = createWrapper();
+ 
+@@ -247,7 +273,8 @@ describe("TabList", () => {
+         expect(classes).toContain("whitespace-nowrap");
+         expect(classes).toContain("overflow-hidden");
+         expect(classes).toContain("text-ellipsis");
+-        expect(classes).toContain("w-full");
++        // flex-1 (was w-full) so the name shares the row with the panel-count badge.
++        expect(classes).toContain("flex-1");
+       });
+     });
+   });
+diff --git a/web/src/components/dashboards/tabs/TabList.vue b/web/src/components/dashboards/tabs/TabList.vue
+index 5a73b575201..5f96159ce16 100644
+--- a/web/src/components/dashboards/tabs/TabList.vue
++++ b/web/src/components/dashboards/tabs/TabList.vue
+@@ -75,13 +75,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           </span>
+           <span
+             v-else
+-            class="w-full min-w-0 overflow-hidden px-0.5 text-ellipsis whitespace-nowrap"
++            class="min-w-0 flex-1 overflow-hidden px-0.5 text-ellipsis whitespace-nowrap"
+             :title="tab?.name"
+             :data-test="`dashboard-tab-${tab.tabId}-name`"
+             :data-test-tab-name="tab?.name"
+             @dblclick="canManage ? startRename(tab) : undefined"
+             >{{ tab?.name }}</span
+           >
++          <!-- Panel-count badge: conveys how dense each tab is without opening it.
++               Section headers are layout labels, not panels, so they're excluded. -->
++          <OBadge
++            variant="default"
++            size="xs"
++            shape="rounded"
++            class="ms-1 shrink-0"
++            :aria-label="t('dashboard.tabPanelCount', { count: panelCount(tab) }, panelCount(tab))"
++            :data-test="`dashboard-tab-${tab.tabId}-panel-count`"
++            >{{ panelCount(tab) }}</OBadge
++          >
+           <!-- Editable affordance: a pencil in the tab's right gutter that
+                fades in when the tab is hovered (group/otab comes from OTab) and
+                renames on click. While editing, the same slot shows a tick that
+@@ -143,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+ import OTab from "@/lib/navigation/Tabs/OTab.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
++import OBadge from "@/lib/core/Badge/OBadge.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import { computed, inject, nextTick, ref } from "vue";
+@@ -161,6 +173,7 @@ export default defineComponent({
+     OTabs,
+     OTab,
+     OButton,
++    OBadge,
+     OIcon,
+     OTooltip,
+   },
+@@ -198,6 +211,10 @@ export default defineComponent({
+     // no grip and its names aren't editable.
+     const canManage = computed(() => !props.viewOnly);
+ 
++    // Real panels only — section headers (o2SectionHeader) are layout labels.
++    const panelCount = (tab: any): number =>
++      (tab?.panels ?? []).filter((panel: any) => panel?.o2SectionHeader !== true).length;
++
+     const folderId = computed(() => (route.query.folder as string) ?? "default");
+ 
+     const refreshDashboard = () => {
+@@ -318,6 +335,7 @@ export default defineComponent({
+       route,
+       selectedTabId,
+       canManage,
++      panelCount,
+       onReorder,
+       editingTabId,
+       editingName,
+diff --git a/web/src/lib/core/EmptyState/presets.ts b/web/src/lib/core/EmptyState/presets.ts
+index 6f65423f7a2..766f9174367 100644
+--- a/web/src/lib/core/EmptyState/presets.ts
++++ b/web/src/lib/core/EmptyState/presets.ts
+@@ -391,6 +391,20 @@ export const emptyStatePresets = {
+       },
+     ],
+   },
++  "no-variables": {
++    illustration: "box",
++    variant: "create",
++    titleKey: "emptyState.noVariables.title",
++    descriptionKey: "emptyState.noVariables.description",
++    actions: [
++      {
++        id: "create",
++        icon: "add",
++        titleKey: "emptyState.noVariables.action",
++        descriptionKey: "emptyState.noVariables.actionDesc",
++      },
++    ],
++  },
+   "no-queries": {
+     illustration: "query",
+     variant: "neutral",
+@@ -842,6 +856,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
+   "no-search-jobs": "emptyState.nouns.searchJobs",
+   "no-users": "emptyState.nouns.users",
+   "no-reports": "emptyState.nouns.reports",
++  "no-variables": "emptyState.nouns.variables",
+   "no-queries": "emptyState.nouns.queries",
+   "no-service-accounts": "emptyState.nouns.serviceAccounts",
+   "no-invitations": "emptyState.nouns.invitations",
+diff --git a/web/src/lib/styles/tokens/component.css b/web/src/lib/styles/tokens/component.css
+index f21789a8774..3d7969ca356 100644
+--- a/web/src/lib/styles/tokens/component.css
++++ b/web/src/lib/styles/tokens/component.css
+@@ -761,19 +761,17 @@
+      The title strip at the top of every chart panel (dashboard panels via
+      PanelContainer's `dashboard-panel-bar`, metrics-explorer cards, the SLO
+      charts). THE one knob for that band — change it here and every chart header
+-     moves. Deliberately darker than surface-panel (grey-50) and grey-100: the
+-     panel body is white, and both of those land at ~1.05-1.09:1 against it —
+-     below the point where the band reads as a header at all. grey-200 gives
+-     1.26:1.
+-
+-     THE FILL AND ITS DIVIDER MOVE TOGETHER. The bar cannot use border-default
+-     (grey-200) at this fill, because that IS the fill — 1.00:1, and the bottom
+-     edge disappears entirely. That is why the bar owns a border token of its
+-     own, one step darker than the fill; darkening one without the other is the
+-     mistake this pair exists to prevent. */
+-  --color-panel-bar-bg: var(--color-grey-200);
+-  /* One step below the fill (1.18:1 against it), so the header/body edge stays
+-     readable. NOT border-default — see above. */
++     moves. A deliberately light tint (grey-100): softer than the previous
++     grey-200 so the header reads as a gentle band rather than a heavy fill. The
++     grey-300 divider still carries the header/body separation on its own, so the
++     lighter fill does not lose the edge.
++
++     THE FILL AND ITS DIVIDER MOVE TOGETHER — the divider must stay darker than
++     the fill (never border-default at grey-200, which would match a heavier fill
++     1.00:1 and vanish). At this lighter fill grey-300 sits comfortably above it. */
++  --color-panel-bar-bg: var(--color-grey-100);
++  /* Darker than the fill so the header/body edge stays readable. NOT
++     border-default — see above. */
+   --color-panel-bar-border: var(--color-grey-300);
+ 
+   /* ── Banner (OBanner) ──────────────────────────────────── */
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 70887edd66f..7467d4bbf8d 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -372,6 +372,12 @@
+       "action": "Neuer Bericht",
+       "actionDesc": "Planen Sie eine Dashboard-Lieferung"
+     },
++    "noVariables": {
++      "title": "Noch keine Variablen",
++      "description": "Fügen Sie eine Variable hinzu, um dieses Dashboard interaktiv zu gestalten – filtern Sie Panels nach Namespace, Pod und mehr.",
++      "action": "Variable hinzufügen",
++      "actionDesc": "Dashboard-Variable erstellen"
++    },
+     "noQueries": {
+       "title": "Keine laufenden Abfragen",
+       "description": "Derzeit gibt es keine aktiven Abfragen. Abfragen mit langer Laufzeit werden hier angezeigt, während sie ausgeführt werden."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "Pipeline-Verlauf",
+       "regexPatterns": "Regex-Muster",
+       "monitors": "Monitore",
+-      "modelPricing": "Modell-Preisdefinitionen"
++      "modelPricing": "Modell-Preisdefinitionen",
++      "variables": "Variablen"
+     },
+     "demo": {
+       "pageTitle": "Leere Zustände — vollständiger Satz zur Überprüfung",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "Variablen werden auf alle Tabs und Panels angewendet, wenn Global ausgewählt ist.",
+     "newTab": "Tab hinzufügen",
+     "editTab": "Tab bearbeiten",
++    "tabPanelCount": "{count} Panel | {count} Panels",
+     "generalSettingsTitle": "Allgemeine Einstellungen",
+     "tabSettingsTitle": "Einstellungen für Tabs",
+     "addGeneralSettings": "Allgemeines",
+@@ -4665,6 +4673,7 @@
+       "variables": "Variablen",
+       "tabsCount": "{n} Tabs",
+       "panelsCount": "{n} Panels",
++      "dependsOn": "Abhängig von: {names}",
+       "variablesDependencyGraph": "Variablen-Abhängigkeitsgraph",
+       "scope": "Bereich",
+       "deletedTab": "Gelöschter Tab",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Dashboard erfolgreich aktualisiert.",
+-      "updationFailed": "Dashboard-Aktualisierung fehlgeschlagen"
++      "updationFailed": "Dashboard-Aktualisierung fehlgeschlagen",
++      "dynamicFiltersHelp": "Fügt eine Ad-hoc-Filterzeile über den Panels hinzu.",
++      "appliesToEveryone": "Diese Einstellungen werden mit allen geteilt, die auf dieses Dashboard zugreifen können.",
++      "saveChanges": "Änderungen speichern"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Dashboard erfolgreich hinzugefügt.",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 4ce79ab2414..5f28a64f00d 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -372,6 +372,12 @@
+       "action": "New report",
+       "actionDesc": "Schedule a dashboard delivery"
+     },
++    "noVariables": {
++      "title": "No variables yet",
++      "description": "Add a variable to make this dashboard interactive — filter panels by namespace, pod, and more.",
++      "action": "Add variable",
++      "actionDesc": "Create a dashboard variable"
++    },
+     "noQueries": {
+       "title": "No running queries",
+       "description": "There are no active queries right now. Long-running queries will appear here while they run."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "pipeline history",
+       "regexPatterns": "regex patterns",
+       "monitors": "monitors",
+-      "modelPricing": "model pricing definitions"
++      "modelPricing": "model pricing definitions",
++      "variables": "variables"
+     },
+     "demo": {
+       "pageTitle": "Empty states — full set for review",
+@@ -3718,6 +3725,7 @@
+     "variableScopeHelp": "Variables will be applied to all tabs and panels if global is selected.",
+     "newTab": "Add Tab",
+     "editTab": "Edit Tab",
++    "tabPanelCount": "{count} panel | {count} panels",
+     "generalSettingsTitle": "General Settings",
+     "tabSettingsTitle": "Tabs Settings",
+     "addGeneralSettings": "General",
+@@ -4741,6 +4749,7 @@
+       "variables": "Variables",
+       "tabsCount": "{n} Tabs",
+       "panelsCount": "{n} Panels",
++      "dependsOn": "Depends on: {names}",
+       "variablesDependencyGraph": "Variables Dependency Graph",
+       "scope": "Scope",
+       "deletedTab": "Deleted Tab",
+@@ -4752,7 +4761,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Dashboard updated successfully.",
+-      "updationFailed": "Dashboard updation failed"
++      "updationFailed": "Dashboard updation failed",
++      "dynamicFiltersHelp": "Adds an ad-hoc filter row above the panels.",
++      "appliesToEveryone": "These settings are shared with everyone who can access this dashboard.",
++      "saveChanges": "Save changes"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Dashboard added successfully.",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index d461c1a5f74..02737476a12 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -372,6 +372,12 @@
+       "action": "Nuevo informe",
+       "actionDesc": "Programe la entrega de un panel"
+     },
++    "noVariables": {
++      "title": "No hay variables todavía",
++      "description": "Agrega una variable para hacer este tablero interactivo — filtra los paneles por namespace, pod y más.",
++      "action": "Agregar variable",
++      "actionDesc": "Crear una variable de tablero"
++    },
+     "noQueries": {
+       "title": "No hay consultas en ejecución",
+       "description": "No hay consultas activas en este momento. Las consultas de larga duración aparecerán aquí mientras se ejecuten."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "historial de pipelines",
+       "regexPatterns": "patrones de expresiones regulares",
+       "monitors": "monitores",
+-      "modelPricing": "definiciones de precios de modelos"
++      "modelPricing": "definiciones de precios de modelos",
++      "variables": "variables"
+     },
+     "demo": {
+       "pageTitle": "Estados vacíos — conjunto completo para revisión",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "Las variables se aplicarán a todas las pestañas y paneles si se selecciona global.",
+     "newTab": "Agregar pestaña",
+     "editTab": "Editar pestaña",
++    "tabPanelCount": "{count} panel | {count} paneles",
+     "generalSettingsTitle": "Ajustes generales",
+     "tabSettingsTitle": "Configuración de pestañas",
+     "addGeneralSettings": "General",
+@@ -4665,6 +4673,7 @@
+       "variables": "Variables",
+       "tabsCount": "{n} pestañas",
+       "panelsCount": "{n} paneles",
++      "dependsOn": "Depende de: {names}",
+       "variablesDependencyGraph": "Gráfico de dependencias de variables",
+       "scope": "Ámbito",
+       "deletedTab": "Pestaña eliminada",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Panel actualizado correctamente.",
+-      "updationFailed": "Error al actualizar el panel"
++      "updationFailed": "Error al actualizar el panel",
++      "dynamicFiltersHelp": "Agrega una fila de filtro ad-hoc sobre los paneles.",
++      "appliesToEveryone": "Estos ajustes se comparten con todos los que pueden acceder a este tablero.",
++      "saveChanges": "Guardar cambios"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Panel agregado correctamente.",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index 9174c0cc20d..0cc11102285 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -372,6 +372,12 @@
+       "action": "Nouveau rapport",
+       "actionDesc": "Planifier la livraison d'un tableau de bord"
+     },
++    "noVariables": {
++      "title": "Aucune variable pour le moment",
++      "description": "Ajoutez une variable pour rendre ce tableau de bord interactif — filtrez les panneaux par espace de noms, pod, etc.",
++      "action": "Ajouter une variable",
++      "actionDesc": "Créer une variable de tableau de bord"
++    },
+     "noQueries": {
+       "title": "Aucune requête en cours",
+       "description": "Il n'y a aucune requête active pour le moment. Les requêtes de longue durée apparaîtront ici pendant leur exécution."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "historique du pipeline",
+       "regexPatterns": "modèles regex",
+       "monitors": "superviseurs",
+-      "modelPricing": "définitions de tarification de modèle"
++      "modelPricing": "définitions de tarification de modèle",
++      "variables": "variables"
+     },
+     "demo": {
+       "pageTitle": "États vides — ensemble complet à examiner",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "Les variables seront appliquées à tous les onglets et panneaux si l'option globale est sélectionnée.",
+     "newTab": "Ajouter un onglet",
+     "editTab": "Modifier l'onglet",
++    "tabPanelCount": "{count} panneau | {count} panneaux",
+     "generalSettingsTitle": "Réglages généraux",
+     "tabSettingsTitle": "Paramètres des onglets",
+     "addGeneralSettings": "Général",
+@@ -4665,6 +4673,7 @@
+       "variables": "Variables",
+       "tabsCount": "{n} onglet(s)",
+       "panelsCount": "{n} panneau(x)",
++      "dependsOn": "Dépend de : {names}",
+       "variablesDependencyGraph": "Graphe de dépendance des variables",
+       "scope": "Portée",
+       "deletedTab": "Onglet supprimé",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Tableau de bord mis à jour avec succès.",
+-      "updationFailed": "Échec de la mise à jour du tableau de bord"
++      "updationFailed": "Échec de la mise à jour du tableau de bord",
++      "dynamicFiltersHelp": "Ajoute une ligne de filtre ad hoc au-dessus des panneaux.",
++      "appliesToEveryone": "Ces paramètres sont partagés avec toutes les personnes ayant accès à ce tableau de bord.",
++      "saveChanges": "Enregistrer les modifications"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Tableau de bord ajouté avec succès.",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index 2d6243ce587..c0f3bdc5021 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -372,6 +372,12 @@
+       "action": "Nuovo report",
+       "actionDesc": "Pianifica la consegna di una dashboard"
+     },
++    "noVariables": {
++      "title": "Ancora nessuna variabile",
++      "description": "Aggiungi una variabile per rendere interattiva questa dashboard — filtra i pannelli per namespace, pod e altro.",
++      "action": "Aggiungi variabile",
++      "actionDesc": "Crea una variabile della dashboard"
++    },
+     "noQueries": {
+       "title": "Nessuna query in esecuzione",
+       "description": "Al momento non ci sono domande attive. Le query di lunga durata verranno visualizzate qui durante l'esecuzione."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "cronologia della pipeline",
+       "regexPatterns": "modelli regex",
+       "monitors": "monitor",
+-      "modelPricing": "definizioni di prezzo del modello"
++      "modelPricing": "definizioni di prezzo del modello",
++      "variables": "variabili"
+     },
+     "demo": {
+       "pageTitle": "Stati vuoti — set completo per la revisione",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "Le variabili verranno applicate a tutte le schede e i pannelli se è selezionato globale.",
+     "newTab": "Aggiungi scheda",
+     "editTab": "Modifica scheda",
++    "tabPanelCount": "{count} pannello | {count} pannelli",
+     "generalSettingsTitle": "Impostazioni generali",
+     "tabSettingsTitle": "Impostazioni delle schede",
+     "addGeneralSettings": "Generale",
+@@ -4665,6 +4673,7 @@
+       "variables": "Variabili",
+       "tabsCount": "{n} schede",
+       "panelsCount": "{n} pannelli",
++      "dependsOn": "Dipende da: {names}",
+       "variablesDependencyGraph": "Grafico delle dipendenze delle variabili",
+       "scope": "Ambito",
+       "deletedTab": "Scheda eliminata",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Dashboard aggiornata con successo.",
+-      "updationFailed": "Aggiornamento dashboard fallito"
++      "updationFailed": "Aggiornamento dashboard fallito",
++      "dynamicFiltersHelp": "Aggiunge una riga di filtro ad hoc sopra i pannelli.",
++      "appliesToEveryone": "Queste impostazioni sono condivise con chiunque possa accedere a questa dashboard.",
++      "saveChanges": "Salva modifiche"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Dashboard aggiunta con successo.",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index 239c8bff107..90e2a0db040 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -372,6 +372,12 @@
+       "action": "新しいレポート",
+       "actionDesc": "ダッシュボードの配信をスケジュールする"
+     },
++    "noVariables": {
++      "title": "まだ変数がありません",
++      "description": "変数を追加して、このダッシュボードをインタラクティブにします — namespace、pod などでパネルをフィルタリングできます。",
++      "action": "変数を追加",
++      "actionDesc": "ダッシュボード変数を作成"
++    },
+     "noQueries": {
+       "title": "実行中のクエリなし",
+       "description": "現在、アクティブなクエリはありません。実行時間の長いクエリは、実行中もここに表示されます。"
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "パイプライン履歴",
+       "regexPatterns": "正規表現パターン",
+       "monitors": "モニター",
+-      "modelPricing": "モデルの価格設定"
++      "modelPricing": "モデルの価格設定",
++      "variables": "変数"
+     },
+     "demo": {
+       "pageTitle": "空の状態 — レビュー用の完全セット",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "グローバルが選択されている場合、変数はすべてのタブとパネルに適用されます。",
+     "newTab": "タブを追加",
+     "editTab": "タブを編集",
++    "tabPanelCount": "{count} パネル | {count} パネル",
+     "generalSettingsTitle": "一般設定",
+     "tabSettingsTitle": "タブ設定",
+     "addGeneralSettings": "一般設定",
+@@ -4665,6 +4673,7 @@
+       "variables": "変数",
+       "tabsCount": "{n} タブ",
+       "panelsCount": "{n} パネル",
++      "dependsOn": "依存先: {names}",
+       "variablesDependencyGraph": "変数依存関係グラフ",
+       "scope": "スコープ",
+       "deletedTab": "削除されたタブ",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "ダッシュボードが正常に更新されました。",
+-      "updationFailed": "ダッシュボードの更新に失敗しました"
++      "updationFailed": "ダッシュボードの更新に失敗しました",
++      "dynamicFiltersHelp": "パネルの上にアドホックなフィルタ行を追加します。",
++      "appliesToEveryone": "これらの設定は、このダッシュボードにアクセスできるすべてのユーザーと共有されます。",
++      "saveChanges": "変更を保存"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "ダッシュボードが正常に追加されました。",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index b0b199b5b85..d6e1f810c02 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -372,6 +372,12 @@
+       "action": "새 보고서",
+       "actionDesc": "대시보드 전송 예약"
+     },
++    "noVariables": {
++      "title": "아직 변수가 없습니다",
++      "description": "변수를 추가하여 이 대시보드를 대화형으로 만드세요 — 네임스페이스, 파드 등으로 패널을 필터링할 수 있습니다.",
++      "action": "변수 추가",
++      "actionDesc": "대시보드 변수 만들기"
++    },
+     "noQueries": {
+       "title": "실행 중인 쿼리 없음",
+       "description": "현재 활성 쿼리가 없습니다.장기 실행 쿼리는 실행 중에 여기에 표시됩니다."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "파이프라인 기록",
+       "regexPatterns": "정규식 패턴",
+       "monitors": "모니터",
+-      "modelPricing": "모델 가격 정의"
++      "modelPricing": "모델 가격 정의",
++      "variables": "변수"
+     },
+     "demo": {
+       "pageTitle": "빈 상태 — 검토용 전체 세트",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "글로벌을 선택하면 변수가 모든 탭과 패널에 적용됩니다.",
+     "newTab": "탭 추가",
+     "editTab": "탭 편집",
++    "tabPanelCount": "{count} 패널 | {count} 패널",
+     "generalSettingsTitle": "일반 설정",
+     "tabSettingsTitle": "탭 설정",
+     "addGeneralSettings": "일반",
+@@ -4665,6 +4673,7 @@
+       "variables": "변수",
+       "tabsCount": "{n}개 탭",
+       "panelsCount": "{n}개 패널",
++      "dependsOn": "다음에 따라 달라짐: {names}",
+       "variablesDependencyGraph": "변수 종속성 그래프",
+       "scope": "범위",
+       "deletedTab": "삭제된 탭",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "대시보드가 성공적으로 업데이트되었습니다.",
+-      "updationFailed": "대시보드 업데이트 실패"
++      "updationFailed": "대시보드 업데이트 실패",
++      "dynamicFiltersHelp": "패널 위에 임시 필터 행을 추가합니다.",
++      "appliesToEveryone": "이 설정은 이 대시보드에 액세스할 수 있는 모든 사용자와 공유됩니다.",
++      "saveChanges": "변경 사항 저장"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "대시보드가 성공적으로 추가되었습니다.",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index c301260df98..7c7b12ef6b5 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -372,6 +372,12 @@
+       "action": "Nieuw rapport",
+       "actionDesc": "Een levering op het dashboard plannen"
+     },
++    "noVariables": {
++      "title": "Nog geen variabelen",
++      "description": "Voeg een variabele toe om dit dashboard interactief te maken — filter panelen op namespace, pod, en meer.",
++      "action": "Variabele toevoegen",
++      "actionDesc": "Dashboardvariabele maken"
++    },
+     "noQueries": {
+       "title": "Geen lopende zoekopdrachten",
+       "description": "Er zijn momenteel geen actieve zoekopdrachten. Langlopende zoekopdrachten worden hier weergegeven terwijl ze worden uitgevoerd."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "pipelinegeschiedenis",
+       "regexPatterns": "regex-patronen",
+       "monitors": "monitors",
+-      "modelPricing": "prijsdefinities voor modellen"
++      "modelPricing": "prijsdefinities voor modellen",
++      "variables": "variabelen"
+     },
+     "demo": {
+       "pageTitle": "Lege statussen — volledige set ter beoordeling",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "Variabelen worden toegepast op alle tabbladen en panelen als globaal is geselecteerd.",
+     "newTab": "Tabblad toevoegen",
+     "editTab": "Tabblad bewerken",
++    "tabPanelCount": "{count} paneel | {count} panelen",
+     "generalSettingsTitle": "Algemene instellingen",
+     "tabSettingsTitle": "Tabblad-instellingen",
+     "addGeneralSettings": "Generaal",
+@@ -4665,6 +4673,7 @@
+       "variables": "Variabelen",
+       "tabsCount": "{n} tabbladen",
+       "panelsCount": "{n} panelen",
++      "dependsOn": "Afhankelijk van: {names}",
+       "variablesDependencyGraph": "Afhankelijkheidsgrafiek van variabelen",
+       "scope": "Bereik",
+       "deletedTab": "Tabblad verwijderd",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Dashboard succesvol bijgewerkt.",
+-      "updationFailed": "Dashboard bijwerken mislukt"
++      "updationFailed": "Dashboard bijwerken mislukt",
++      "dynamicFiltersHelp": "Voegt een ad-hoc filterrij toe boven de panelen.",
++      "appliesToEveryone": "Deze instellingen worden gedeeld met iedereen die toegang heeft tot dit dashboard.",
++      "saveChanges": "Wijzigingen opslaan"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Dashboard succesvol toegevoegd.",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 8b9a8a75864..37056c1bb5a 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -372,6 +372,12 @@
+       "action": "Nowy raport",
+       "actionDesc": "Zaplanuj dostawę pulpitu nawigacyjnego"
+     },
++    "noVariables": {
++      "title": "Brak zmiennych",
++      "description": "Dodaj zmienną, aby ten pulpit był interaktywny — filtruj panele według przestrzeni nazw, podów i innych.",
++      "action": "Dodaj zmienną",
++      "actionDesc": "Utwórz zmienną pulpitu"
++    },
+     "noQueries": {
+       "title": "Brak działających zapytań",
+       "description": "Obecnie nie ma aktywnych zapytań. Długotrwałe zapytania pojawią się tutaj, gdy będą wykonywane."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "historia potoku",
+       "regexPatterns": "wzorce regex",
+       "monitors": "monitory",
+-      "modelPricing": "definicje cen modeli"
++      "modelPricing": "definicje cen modeli",
++      "variables": "zmienne"
+     },
+     "demo": {
+       "pageTitle": "Stany puste — pełny zestaw do przeglądu",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "Zmienne zostaną zastosowane do wszystkich zakładek i paneli, jeśli wybrano globalny.",
+     "newTab": "Dodaj zakładkę",
+     "editTab": "Edytuj zakładkę",
++    "tabPanelCount": "{count} panel | {count} paneli",
+     "generalSettingsTitle": "Ustawienia ogólne",
+     "tabSettingsTitle": "Ustawienia zakładek",
+     "addGeneralSettings": "Ogólne",
+@@ -4665,6 +4673,7 @@
+       "variables": "Zmienne",
+       "tabsCount": "{n} zakładki",
+       "panelsCount": "{n} panele",
++      "dependsOn": "Zależy od: {names}",
+       "variablesDependencyGraph": "Graf zależności zmiennych",
+       "scope": "Zakres",
+       "deletedTab": "Usunięta zakładka",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Dashboard zaktualizowany pomyślnie.",
+-      "updationFailed": "Aktualizacja dashboardu nie powiodła się"
++      "updationFailed": "Aktualizacja dashboardu nie powiodła się",
++      "dynamicFiltersHelp": "Dodaje wiersz filtra ad hoc nad panelami.",
++      "appliesToEveryone": "Te ustawienia są udostępniane wszystkim, którzy mają dostęp do tego pulpitu.",
++      "saveChanges": "Zapisz zmiany"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Dashboard dodany pomyślnie.",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index ac29bd2e74c..7e1b76b104d 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -372,6 +372,12 @@
+       "action": "Novo relatório",
+       "actionDesc": "Agende a entrega de um painel"
+     },
++    "noVariables": {
++      "title": "Ainda não há variáveis",
++      "description": "Adicione uma variável para tornar este painel interativo — filtre painéis por namespace, pod e mais.",
++      "action": "Adicionar variável",
++      "actionDesc": "Criar uma variável de painel"
++    },
+     "noQueries": {
+       "title": "Sem consultas em execução",
+       "description": "Não há consultas ativas no momento. As consultas de longa duração aparecerão aqui enquanto são executadas."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "histórico de pipeline",
+       "regexPatterns": "padrões regex",
+       "monitors": "monitores",
+-      "modelPricing": "definições de preço de modelo"
++      "modelPricing": "definições de preço de modelo",
++      "variables": "variáveis"
+     },
+     "demo": {
+       "pageTitle": "Estados vazios — conjunto completo para revisão",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "As variáveis serão aplicadas a todas as guias e painéis se a opção global for selecionada.",
+     "newTab": "Adicionar aba",
+     "editTab": "Editar aba",
++    "tabPanelCount": "{count} painel | {count} painéis",
+     "generalSettingsTitle": "Configurações gerais",
+     "tabSettingsTitle": "Configurações de guias",
+     "addGeneralSettings": "Geral",
+@@ -4665,6 +4673,7 @@
+       "variables": "Variáveis",
+       "tabsCount": "{n} Abas",
+       "panelsCount": "{n} Painéis",
++      "dependsOn": "Depende de: {names}",
+       "variablesDependencyGraph": "Gráfico de dependência de variáveis",
+       "scope": "Escopo",
+       "deletedTab": "Aba excluída",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Painel atualizado com sucesso.",
+-      "updationFailed": "Falha ao atualizar painel"
++      "updationFailed": "Falha ao atualizar painel",
++      "dynamicFiltersHelp": "Adiciona uma linha de filtro ad-hoc acima dos painéis.",
++      "appliesToEveryone": "Estas configurações são compartilhadas com todos que podem acessar este painel.",
++      "saveChanges": "Salvar alterações"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Painel adicionado com sucesso.",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index c37dbc9d4df..b578065c5e3 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -372,6 +372,12 @@
+       "action": "Новый отчет",
+       "actionDesc": "Запланировать доставку дашборда"
+     },
++    "noVariables": {
++      "title": "Пока нет переменных",
++      "description": "Добавьте переменную, чтобы сделать эту панель интерактивной — фильтруйте панели по namespace, pod и другим параметрам.",
++      "action": "Добавить переменную",
++      "actionDesc": "Создать переменную дашборда"
++    },
+     "noQueries": {
+       "title": "Нет выполняющихся запросов",
+       "description": "Сейчас нет активных запросов. Длительные запросы будут отображаться здесь во время выполнения."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "история конвейера",
+       "regexPatterns": "регулярные выражения",
+       "monitors": "мониторы",
+-      "modelPricing": "определения цен моделей"
++      "modelPricing": "определения цен моделей",
++      "variables": "переменные"
+     },
+     "demo": {
+       "pageTitle": "Пустые состояния — полный набор для проверки",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "Если выбран глобальный, переменные будут применяться ко всем вкладкам и панелям.",
+     "newTab": "Добавить вкладку",
+     "editTab": "Редактировать вкладку",
++    "tabPanelCount": "{count} панель | {count} панелей",
+     "generalSettingsTitle": "Общие настройки",
+     "tabSettingsTitle": "Настройки вкладок",
+     "addGeneralSettings": "Общие",
+@@ -4665,6 +4673,7 @@
+       "variables": "Переменные",
+       "tabsCount": "{n} вкладок",
+       "panelsCount": "{n} панелей",
++      "dependsOn": "Зависит от: {names}",
+       "variablesDependencyGraph": "Граф зависимостей переменных",
+       "scope": "Область",
+       "deletedTab": "Удаленная вкладка",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Дашборд успешно обновлен.",
+-      "updationFailed": "Не удалось обновить дашборд"
++      "updationFailed": "Не удалось обновить дашборд",
++      "dynamicFiltersHelp": "Добавляет строку ad-hoc фильтра над панелями.",
++      "appliesToEveryone": "Эти настройки доступны всем, у кого есть доступ к этому дашборду.",
++      "saveChanges": "Сохранить изменения"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Дашборд успешно добавлен.",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index b34f715547f..f497aaf7aeb 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -372,6 +372,12 @@
+       "action": "Yeni rapor",
+       "actionDesc": "Kontrol paneli teslimatı planlayın"
+     },
++    "noVariables": {
++      "title": "Henüz değişken yok",
++      "description": "Bu panoyu etkileşimli hale getirmek için bir değişken ekleyin — panelleri ad alanı, pod ve daha fazlasına göre filtreleyin.",
++      "action": "Değişken ekle",
++      "actionDesc": "Pano değişkeni oluştur"
++    },
+     "noQueries": {
+       "title": "Çalışan sorgu yok",
+       "description": "Şu anda aktif sorgu yok. Uzun süren sorgular çalışırken burada görünecektir."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "pipeline geçmişi",
+       "regexPatterns": "regex desenleri",
+       "monitors": "izleyiciler",
+-      "modelPricing": "model fiyatlandırma tanımları"
++      "modelPricing": "model fiyatlandırma tanımları",
++      "variables": "değişkenler"
+     },
+     "demo": {
+       "pageTitle": "Boş durumlar — inceleme için tam set",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "Genel seçilmişse değişkenler tüm sekmelere ve panellere uygulanacaktır.",
+     "newTab": "Sekme Ekle",
+     "editTab": "Sekmeyi Düzenle",
++    "tabPanelCount": "{count} panel | {count} panel",
+     "generalSettingsTitle": "Genel Ayarlar",
+     "tabSettingsTitle": "Sekmeler Ayarları",
+     "addGeneralSettings": "General",
+@@ -4665,6 +4673,7 @@
+       "variables": "Değişkenler",
+       "tabsCount": "{n} Sekme",
+       "panelsCount": "{n} Panel",
++      "dependsOn": "Bağlı olduğu: {names}",
+       "variablesDependencyGraph": "Değişken Bağımlılık Grafiği",
+       "scope": "Kapsam",
+       "deletedTab": "Silinen Sekme",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Pano başarıyla güncellendi.",
+-      "updationFailed": "Pano güncelleme başarısız"
++      "updationFailed": "Pano güncelleme başarısız",
++      "dynamicFiltersHelp": "Panellerin üzerine geçici bir filtre satırı ekler.",
++      "appliesToEveryone": "Bu ayarlar bu panoya erişebilen herkesle paylaşılır.",
++      "saveChanges": "Değişiklikleri kaydet"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Pano başarıyla eklendi.",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 1c054bd64d2..92effa74cb0 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -372,6 +372,12 @@
+       "action": "Báo cáo mới",
+       "actionDesc": "Lên lịch gửi bảng điều khiển"
+     },
++    "noVariables": {
++      "title": "Chưa có biến nào",
++      "description": "Thêm biến để làm cho bảng điều khiển này tương tác — lọc các panel theo namespace, pod, và hơn thế nữa.",
++      "action": "Thêm biến",
++      "actionDesc": "Tạo biến bảng điều khiển"
++    },
+     "noQueries": {
+       "title": "Không có truy vấn đang chạy",
+       "description": "Hiện không có truy vấn đang hoạt động. Các truy vấn dài hạn sẽ xuất hiện ở đây khi chúng chạy."
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "lịch sử đường ống",
+       "regexPatterns": "mẫu regex",
+       "monitors": "giám sát",
+-      "modelPricing": "định nghĩa giá mô hình"
++      "modelPricing": "định nghĩa giá mô hình",
++      "variables": "biến"
+     },
+     "demo": {
+       "pageTitle": "Trạng thái trống — bộ đầy đủ để xem xét",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "Biến sẽ được áp dụng cho tất cả tab và bảng nếu chọn toàn cục.",
+     "newTab": "Thêm Tab",
+     "editTab": "Sửa Tab",
++    "tabPanelCount": "{count} panel | {count} panel",
+     "generalSettingsTitle": "Cài đặt chung",
+     "tabSettingsTitle": "Cài đặt Tab",
+     "addGeneralSettings": "Chung",
+@@ -4665,6 +4673,7 @@
+       "variables": "Biến",
+       "tabsCount": "{n} Tab",
+       "panelsCount": "{n} Panel",
++      "dependsOn": "Phụ thuộc vào: {names}",
+       "variablesDependencyGraph": "Biểu đồ phụ thuộc biến",
+       "scope": "Phạm vi",
+       "deletedTab": "Đã xóa Tab",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "Dashboard đã được cập nhật thành công.",
+-      "updationFailed": "Cập nhật Dashboard thất bại"
++      "updationFailed": "Cập nhật Dashboard thất bại",
++      "dynamicFiltersHelp": "Thêm một hàng bộ lọc tạm thời phía trên các panel.",
++      "appliesToEveryone": "Các cài đặt này được chia sẻ với mọi người có quyền truy cập bảng điều khiển này.",
++      "saveChanges": "Lưu thay đổi"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "Dashboard đã được thêm thành công.",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index 71a16c646ff..0655e4dff00 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -372,6 +372,12 @@
+       "action": "新报告",
+       "actionDesc": "安排仪表板交付"
+     },
++    "noVariables": {
++      "title": "尚无变量",
++      "description": "添加变量以让此仪表盘可交互 — 按命名空间、Pod 等筛选面板。",
++      "action": "添加变量",
++      "actionDesc": "创建仪表盘变量"
++    },
+     "noQueries": {
+       "title": "没有正在运行的查询",
+       "description": "目前没有活跃的查询。长时间运行的查询将在运行时显示在此处。"
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "管道历史记录",
+       "regexPatterns": "正则表达式模式",
+       "monitors": "监控器",
+-      "modelPricing": "模型定价定义"
++      "modelPricing": "模型定价定义",
++      "variables": "变量"
+     },
+     "demo": {
+       "pageTitle": "空状态 — 完整集合供审查",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "如果选择了全局变量，则变量将应用于所有选项卡和面板。",
+     "newTab": "添加选项卡",
+     "editTab": "编辑选项卡",
++    "tabPanelCount": "{count} 面板 | {count} 面板",
+     "generalSettingsTitle": "通用设置",
+     "tabSettingsTitle": "选项卡设置",
+     "addGeneralSettings": "基本设置",
+@@ -4665,6 +4673,7 @@
+       "variables": "变量",
+       "tabsCount": "{n} 个选项卡",
+       "panelsCount": "{n} 个面板",
++      "dependsOn": "依赖：{names}",
+       "variablesDependencyGraph": "变量依赖关系图",
+       "scope": "作用域",
+       "deletedTab": "已删除选项卡",
+@@ -4676,7 +4685,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "仪表盘更新成功。",
+-      "updationFailed": "仪表盘更新失败。"
++      "updationFailed": "仪表盘更新失败。",
++      "dynamicFiltersHelp": "在面板上方添加一个临时筛选行。",
++      "appliesToEveryone": "这些设置与所有可访问此仪表盘的人共享。",
++      "saveChanges": "保存更改"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "仪表盘添加成功。",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index c7a77672da2..68110828a43 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -372,6 +372,12 @@
+       "action": "新增報表",
+       "actionDesc": "排程儀表板傳送"
+     },
++    "noVariables": {
++      "title": "尚無變數",
++      "description": "新增變數以使此儀表板具互動性 — 依命名空間、Pod 等篩選面板。",
++      "action": "新增變數",
++      "actionDesc": "建立儀表板變數"
++    },
+     "noQueries": {
+       "title": "無執行中的查詢",
+       "description": "目前沒有進行中的查詢。長時間執行的查詢會在執行期間顯示於此處。"
+@@ -437,7 +443,8 @@
+       "pipelineHistory": "管線歷史記錄",
+       "regexPatterns": "正規表示式模式",
+       "monitors": "監控器",
+-      "modelPricing": "模型定價定義"
++      "modelPricing": "模型定價定義",
++      "variables": "變數"
+     },
+     "demo": {
+       "pageTitle": "空狀態 — 完整組合供檢視",
+@@ -3642,6 +3649,7 @@
+     "variableScopeHelp": "若選擇全域，變數將套用至所有分頁與面板。",
+     "newTab": "新增分頁",
+     "editTab": "編輯分頁",
++    "tabPanelCount": "{count} 個面板 | {count} 個面板",
+     "generalSettingsTitle": "一般設定",
+     "tabSettingsTitle": "分頁設定",
+     "addGeneralSettings": "一般",
+@@ -4660,6 +4668,7 @@
+       "variables": "變數",
+       "tabsCount": "{n} 個分頁",
+       "panelsCount": "{n} 個面板",
++      "dependsOn": "依賴於：{names}",
+       "variablesDependencyGraph": "變數相依性圖表",
+       "scope": "範圍",
+       "deletedTab": "已刪除分頁",
+@@ -4671,7 +4680,10 @@
+     },
+     "generalSettingsPage": {
+       "updatedSuccessfully": "儀表板更新成功。",
+-      "updationFailed": "儀表板更新失敗"
++      "updationFailed": "儀表板更新失敗",
++      "dynamicFiltersHelp": "在面板上方新增一個臨時篩選列。",
++      "appliesToEveryone": "這些設定會與所有可存取此儀表板的人共用。",
++      "saveChanges": "儲存變更"
+     },
+     "addDashboardPage": {
+       "addedSuccessfully": "儀表板新增成功。",
+diff --git a/web/src/utils/query/sqlDiagnostics.spec.ts b/web/src/utils/query/sqlDiagnostics.spec.ts
+index 6d780d4222c..5f7516935ff 100644
+--- a/web/src/utils/query/sqlDiagnostics.spec.ts
++++ b/web/src/utils/query/sqlDiagnostics.spec.ts
+@@ -103,6 +103,36 @@ type Mutation = {
+   apply: (sql: string) => { broken: string; expectedFragment: string } | null;
+ };
+ 
++/**
++ * Offset of the first `WHERE` keyword that sits at parenthesis depth 0 and
++ * outside any string literal — i.e. a statement-level filter, not one nested in
++ * `FILTER (WHERE …)`, a subquery, or a CTE body. null when there is none.
++ */
++function findStatementLevelWhere(sql: string): number | null {
++  let depth = 0;
++  let quote: string | null = null;
++  for (let i = 0; i < sql.length; i++) {
++    const c = sql[i];
++    if (quote) {
++      if (c === quote) quote = null;
++      continue;
++    }
++    if (c === "'" || c === '"' || c === "`") quote = c;
++    else if (c === "(") depth++;
++    else if (c === ")") depth--;
++    else if (
++      depth === 0 &&
++      (c === "W" || c === "w") &&
++      /^where$/i.test(sql.slice(i, i + 5)) &&
++      !/\w/.test(sql[i - 1] ?? "") &&
++      !/\w/.test(sql[i + 5] ?? "")
++    ) {
++      return i;
++    }
++  }
++  return null;
++}
++
+ const mutations: Mutation[] = [
+   {
+     name: "truncate_after_AND",
+@@ -166,8 +196,12 @@ const mutations: Mutation[] = [
+   {
+     name: "remove_WHERE_keyword",
+     apply: (sql) => {
+-      if (!/\bWHERE\s+\w/i.test(sql)) return null;
+-      const broken = sql.replace(/\bWHERE\s+/, "");
++      const m = findStatementLevelWhere(sql);
++      if (m === null) return null;
++      const rest = sql.slice(m + 5);
++      if (!/^\s+[a-zA-Z_]\w*(\.\w+)?\s*([=<>!]|(IS|IN|LIKE|ILIKE|RLIKE|NOT|BETWEEN)\b)/i.test(rest))
++        return null;
++      const broken = sql.slice(0, m) + rest.replace(/^\s+/, " ");
+       if (!parseError(broken)) return null; // mutation produced valid SQL
+       return { broken, expectedFragment: "WHERE" };
+     },
+@@ -175,9 +209,10 @@ const mutations: Mutation[] = [
+   {
+     name: "unquote_like_pattern",
+     apply: (sql) => {
+-      const m = sql.match(/\bLIKE\s+'([^'%][^']*%[^']*)'/i);
++      const re = /\bLIKE\s+'([^'%\s][^'\s]*%[^'\s]*)'(?=\s|$)/i;
++      const m = sql.match(re);
+       if (!m) return null;
+-      const broken = sql.replace(/\bLIKE\s+'([^'%][^']*%[^']*)'/, `LIKE ${m[1]}`);
++      const broken = sql.replace(re, `LIKE ${m[1]}`);
+       if (!parseError(broken)) return null;
+       return { broken, expectedFragment: "LIKE" };
+     },
+@@ -459,15 +494,7 @@ describe("validateSql — mutation detection on broken queries", () => {
+     truncate_after_GROUP: { rate: 0.99 },
+     truncate_after_HAVING: { rate: 0.99 },
+     truncate_after_LIMIT: { rate: 0.97 },
+-    // tightened missingWhere guard: ambiguous patterns suppressed; expanded query set lowers rate
+-    remove_WHERE_keyword: { rate: 0.8 },
+-    // Rated again: hasUnquotedLikePattern reads the operand out of the source
+-    // text, so the shapes that lex as valid SQL — LIKE E00%, LIKE /api/%,
+-    // LIKE Android% — are classified even though the parser stops somewhere
+-    // unrelated. `col LIKE other_col` stays untouched: the operand must carry a
+-    // % wildcard. This was a count (minSpecific: 6) while only `found === "%"`
+-    // was localizable, which is why every LIKE query a backend PR added diluted
+-    // the ratio — 6/12, then 6/13 after #13808, then 6/14 after #13810.
++    remove_WHERE_keyword: { rate: 0.85 },
+     unquote_like_pattern: { rate: 0.9 },
+     drop_AND_between_conditions: { rate: 0.9 },
+     // Complex-construct mutations
+diff --git a/web/src/views/Dashboards/RenderDashboardCharts.vue b/web/src/views/Dashboards/RenderDashboardCharts.vue
+index 488a9c2e0b6..7b3a98e52bd 100644
+--- a/web/src/views/Dashboards/RenderDashboardCharts.vue
++++ b/web/src/views/Dashboards/RenderDashboardCharts.vue
+@@ -126,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           v-else-if="panels.length > 0"
+           ref="gridStackContainer"
+           class="grid-stack m-0.5 bg-transparent"
++          :class="{ 'grid-interacting': isGridInteracting }"
+         >
+           <div
+             v-for="item in panels"
+@@ -404,6 +405,8 @@ export default defineComponent({
+     const router = useRouter();
+     const store = useStore();
+     const gridStackContainer = ref(null);
++    // True while a panel is being dragged or resized — drives the grid backdrop.
++    const isGridInteracting = ref(false);
+ 
+     // Initialize GridStack instance
+     // (not with ref: https://github.com/gridstack/gridstack.js/issues/2115)
+@@ -755,7 +758,7 @@ export default defineComponent({
+           column: 192, // 192-column grid for fine-grained positioning
+           // eslint-disable-next-line local/no-hardcoded-px -- GridStack parses this itself and writes it into its own injected stylesheet, where no document root font-size resolves rem
+           cellHeight: "17px", // Base cell height
+-          margin: 2, // Minimal margin between panels
++          margin: 4,
+           draggable: {
+             enable:
+               !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable dragging unless view-only or saving
+@@ -799,8 +802,32 @@ export default defineComponent({
+         }
+       });
+ 
++      // Full-resolution grid shown while a panel is being dragged or resized — every
++      // one of the 192 columns and every row. The grid is OPERATION-AWARE so its lines
++      // always sit on the panel edge that is actually moving, i.e. the exact position
++      // the panel will save to (every card is inset by the margin):
++      //   • move   → the top/left edges snap to `k*cell + margin`  (phase = +margin)
++      //   • resize → the bottom/right edges snap to `k*cell - margin` (phase = -margin)
++      // One line per cell at that phase means every line is reachable — no skipping.
++      const beginGridInteraction = (phaseSign) => {
++        const host = gridStackContainer.value;
++        if (host && gridStackInstance) {
++          const margin = gridStackInstance.getMargin();
++          host.style.setProperty("--grid-col-w", `${gridStackInstance.cellWidth()}px`);
++          host.style.setProperty("--grid-row-h", `${gridStackInstance.getCellHeight(true)}px`);
++          host.style.setProperty("--grid-phase", `${phaseSign * margin}px`);
++        }
++        isGridInteracting.value = true;
++      };
++      gridStackInstance.on("dragstart", () => beginGridInteraction(1));
++      gridStackInstance.on("resizestart", () => beginGridInteraction(-1));
++      gridStackInstance.on("dragstop", () => {
++        isGridInteracting.value = false;
++      });
++
+       // Trigger window resize after panel resize to update charts
+       gridStackInstance.on("resizestop", () => {
++        isGridInteracting.value = false;
+         window.dispatchEvent(new Event("resize"));
+       });
+     }; // Update panel layout data from GridStack items
+@@ -1150,6 +1177,9 @@ export default defineComponent({
+       // Clean up GridStack instance
+       if (gridStackInstance) {
+         gridStackInstance.off("change");
++        gridStackInstance.off("dragstart");
++        gridStackInstance.off("resizestart");
++        gridStackInstance.off("dragstop");
+         gridStackInstance.off("resizestop");
+         gridStackInstance.destroy(false);
+         gridStackInstance = null;
+@@ -1587,6 +1617,7 @@ export default defineComponent({
+       currentVariablesDataRef,
+       resetGridLayout,
+       refreshGridStack,
++      isGridInteracting,
+       // New scoped variables properties
+       variablesManager,
+       globalVariables,
+@@ -1642,7 +1673,7 @@ export default defineComponent({
+   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the grid-item border is a 1-device-pixel rule and must not scale with text or it smears at fractional zoom */
+   border: 1px solid var(--color-border-default);
+   border-radius: 0.375rem;
+-  overflow: visible;
++  overflow: hidden;
+   box-shadow: none;
+ }
+ 
+@@ -1654,6 +1685,45 @@ export default defineComponent({
+   border-radius: 0;
+ }
+ 
++/* Full-resolution grid shown while a panel is being dragged or resized — every one of
++   the 192 columns (--grid-col-w) and every row (--grid-row-h), a single hairline per
++   cell. `background-position` shifts the whole grid by --grid-phase (set in JS): to
++   +margin while moving (lines on the top/left snap edges) or -margin while resizing
++   (lines on the bottom/right snap edges), so the moving panel edge always lands on a
++   line, every line is reachable, and the lines sit where panels actually save. */
++.grid-stack.grid-interacting {
++  --grid-line: color-mix(in srgb, var(--color-border-default) 30%, transparent);
++  background-image:
++    repeating-linear-gradient(
++      to right,
++      var(--grid-line) 0,
++      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1-device-pixel column rule, must not scale */
++      var(--grid-line) 1px,
++      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: transparent gap resumes one device-pixel past the line */
++      transparent 1px,
++      transparent var(--grid-col-w, 0.45rem)
++    ),
++    repeating-linear-gradient(
++      to bottom,
++      var(--grid-line) 0,
++      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1-device-pixel row rule, must not scale */
++      var(--grid-line) 1px,
++      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: transparent gap resumes one device-pixel past the line */
++      transparent 1px,
++      transparent var(--grid-row-h, 1.0625rem)
++    );
++  /* First value = column layer (x offset), second = row layer (y offset). */
++  background-position:
++    var(--grid-phase, 0) 0,
++    0 var(--grid-phase, 0);
++  border-radius: 0.375rem;
++}
++
++.grid-stack.grid-interacting
++  :deep(.grid-stack-item:not(.panel-section-header) .grid-stack-item-content) {
++  background-color: var(--color-surface-base);
++}
++
+ /* GridStack theme overrides */
+ .displayDiv :deep(.grid-stack .grid-stack-item .drag-allow) {
+   cursor: move;
+@@ -1740,11 +1810,15 @@ export default defineComponent({
+ </style>
+ 
+ <style scoped>
+-/* keep(lib-override:vue-grid-layout): the drag placeholder is DOM that
+-   vue-grid-layout renders inside its own subtree, so it can only be reached
+-   through `:deep()` from the `.displayDiv` grid host this component owns.
+-   `!important` beats the library's own `.vue-grid-placeholder` background. */
+-.displayDiv :deep(.vue-grid-item.vue-grid-placeholder) {
+-  background: var(--color-dashboard-placeholder-bg) !important;
++/* keep(lib-override:gridstack): the drop placeholder is DOM that GridStack
++   injects into its own subtree, so it can only be reached through `:deep()`
++   from the `.displayDiv` grid host this component owns. `!important` beats the
++   library's own placeholder background. The tinted fill + dashed outline read
++   as a clear "panel lands here" target against the grid backdrop. */
++.displayDiv :deep(.grid-stack-placeholder > .placeholder-content) {
++  background: color-mix(in srgb, var(--color-dashboard-placeholder-bg) 35%, transparent) !important;
++  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the placeholder outline is a 1-device-pixel dashed rule and must not scale */
++  border: 1px dashed var(--color-dashboard-placeholder-bg) !important;
++  border-radius: 0.375rem;
+ }
+ </style>
+diff --git a/web/src/views/Dashboards/ScheduledDashboards.spec.ts b/web/src/views/Dashboards/ScheduledDashboards.spec.ts
+index b5c0415034d..7e5f2e5d38b 100644
+--- a/web/src/views/Dashboards/ScheduledDashboards.spec.ts
++++ b/web/src/views/Dashboards/ScheduledDashboards.spec.ts
+@@ -163,9 +163,12 @@ describe("ScheduledDashboards", () => {
+             props: ["tabs", "activeTab"],
+             emits: ["update:activeTab"],
+           },
+-          NoData: {
+-            name: "NoData",
+-            template: '<div data-test="no-data-mock" class="no-data-mock">No data available</div>',
++          OEmptyState: {
++            name: "OEmptyState",
++            template:
++              '<div data-test="o2-empty-state" class="o2-empty-state-mock">No reports yet</div>',
++            props: ["size", "preset", "filtered"],
++            emits: ["action"],
+           },
+           OInput: {
+             name: "OInput",
+@@ -236,7 +239,7 @@ describe("ScheduledDashboards", () => {
+         "scheduled-dashboards",
+       );
+       expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain(
+-        "h-fit",
++        "h-full",
+       );
+     });
+ 
+@@ -247,7 +250,7 @@ describe("ScheduledDashboards", () => {
+         "scheduled-dashboards",
+       );
+       expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain(
+-        "h-fit",
++        "h-full",
+       );
+     });
+   });
+@@ -563,9 +566,9 @@ describe("ScheduledDashboards", () => {
+       expect(table.props("loading")).toBe(true);
+     });
+ 
+-    it("should show no data message when not loading and no reports", () => {
++    it("should show empty state when not loading and no reports", () => {
+       const wrapper = createWrapper({ loading: false, reports: [] });
+-      expect(wrapper.find('[data-test="no-data-mock"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="o2-empty-state"]').exists()).toBe(true);
+     });
+   });
+ 
+diff --git a/web/src/views/Dashboards/ScheduledDashboards.vue b/web/src/views/Dashboards/ScheduledDashboards.vue
+index 2fd9b2e5a53..770a3e9aa3e 100644
+--- a/web/src/views/Dashboards/ScheduledDashboards.vue
++++ b/web/src/views/Dashboards/ScheduledDashboards.vue
+@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+     </template>
+ 
+-    <div data-test="scheduled-dashboards-container" class="scheduled-dashboards h-fit">
++    <div data-test="scheduled-dashboards-container" class="scheduled-dashboards h-full min-h-0">
+       <OTable
+         class="w-full"
+         data-test="scheduled-dashboard-table"
+@@ -99,7 +99,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         </template>
+ 
+         <template #empty>
+-          <NoData :filtered="!!scheduledFilterQuery" @action="scheduledFilterQuery = ''" />
++          <OEmptyState
++            size="hero"
++            preset="no-reports"
++            :filtered="!!scheduledFilterQuery"
++            @action="
++              (id) =>
++                id === 'clear-filters' ? (scheduledFilterQuery = '') : createScheduledReport()
++            "
++          />
+         </template>
+       </OTable>
+     </div>
+@@ -111,7 +119,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
+ import { useI18nTyped } from "@/types/i18n";
+ import { useRouter } from "vue-router";
+ import { ScheduledDashboardReport } from "@/ts/interfaces/report";
+-import NoData from "@/components/shared/grid/NoData.vue";
++import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+ import { convertUnixToDateFormat } from "@/utils/date";
+ import { useStore } from "vuex";
+ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";

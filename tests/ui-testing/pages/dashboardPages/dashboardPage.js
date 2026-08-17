@@ -158,6 +158,12 @@ export class DashboardPage {
     return this.panelErrorDataBtn;
   }
 
+  // Per-tab panel-count badge. Lives in the dashboard VIEW header (TabList),
+  // NOT the settings drawer. data-test is tabId-derived.
+  getTabPanelCountBadge(tabId) {
+    return this.page.locator(`[data-test="dashboard-tab-${tabId}-panel-count"]`);
+  }
+
   // Hover the warning button and return the tooltip text locator matching `text`.
   async getPanelErrorTooltipText(text) {
     const tooltipText = this.page

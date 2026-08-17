@@ -1,0 +1,22 @@
+[
+  {
+    "title": "should render description as a textarea, show Save changes label and persist a multi-line description",
+    "action": "new",
+    "verifies": "the description field is a multiline textarea, the save button reads 'Save changes', footer/helper copy renders, and a multi-line description persists across reopen"
+  },
+  {
+    "title": "should show a dependency chip on the dependent variable and not on the independent one",
+    "action": "new",
+    "verifies": "the dependent query-value variable shows a dependency-count chip ('1') with a 'Depends on: ...' tooltip while the independent variable shows no chip"
+  },
+  {
+    "title": "should show the no-variables empty state and its CTA opens the Add Variable form",
+    "action": "new",
+    "verifies": "a fresh dashboard's Variables tab shows the 'no variables yet' empty state and its CTA opens the Add Variable form"
+  },
+  {
+    "title": "should show panel-count badge 0 on an empty tab and 1 after adding a panel",
+    "action": "new",
+    "verifies": "the view-header tab panel-count badge reads 0 on an empty tab and increments to 1 after adding a panel"
+  }
+]

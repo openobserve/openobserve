@@ -1,0 +1,6 @@
+{
+  "group": "Dashboards-Settings",
+  "spec_filename": "dashboardSettings.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

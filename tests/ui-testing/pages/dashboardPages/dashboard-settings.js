@@ -26,6 +26,19 @@ export default class DashboardSetting {
     this.saveSettingBtn = page.locator(
       '[data-test="dashboard-general-setting-save-btn"]'
     );
+    // General Settings redesign: description is now a multiline <textarea>.
+    // Target the native <textarea> via the `-field` suffix (NOT an <input>) so
+    // a visibility assertion on this locator also proves the element is a textarea.
+    this.descriptionField = page.locator(
+      'textarea[data-test="dashboard-general-setting-description-field"]'
+    );
+    // Variables empty state (OTable #empty -> OEmptyState preset="no-variables").
+    this.variablesEmptyState = page.locator(
+      '[data-test="dashboard-variables-table"] [data-test="o2-empty-state"]'
+    );
+    this.variableTypeSelect = page.locator(
+      '[data-test="dashboard-variable-type-select"]'
+    );
     this.cancelBtn = page.locator('[data-test="cancel-button"]');
     this.deletebtn = page.locator(
       '[data-test="dashboard-tab-settings-tab-delete-btn"]'
@@ -136,6 +149,84 @@ export default class DashboardSetting {
   async saveSetting() {
     await this.saveSettingBtn.waitFor({ state: "visible" });
     await this.saveSettingBtn.click();
+  }
+
+  // ----- General Settings redesign (Dashboard Settings Redesign) -----
+
+  // Description field locator. Targets the native <textarea> via the `-field`
+  // suffix, so a toBeVisible() assertion on it also proves the field is a
+  // multiline textarea (not the pre-redesign <input>).
+  getDescriptionField() {
+    return this.descriptionField;
+  }
+
+  // Save button locator (label "Save changes" post-redesign).
+  getSaveBtn() {
+    return this.saveSettingBtn;
+  }
+
+  // Fill the multiline description textarea. Waits for the form to re-baseline
+  // from getDashboardData() before typing so the fill isn't overwritten.
+  async changeDashboardDescription(text) {
+    await this.descriptionField.waitFor({ state: "visible", timeout: 10000 });
+    await this.descriptionField.fill(text);
+  }
+
+  // Footer hint copy ("These settings are shared with everyone...").
+  getAppliesToEveryoneHint() {
+    return this.page.getByText(
+      "These settings are shared with everyone who can access this dashboard.",
+      { exact: true }
+    );
+  }
+
+  // Dynamic-filter helper copy ("Adds an ad-hoc filter row above the panels.").
+  getDynamicFiltersHelp() {
+    return this.page.getByText(
+      "Adds an ad-hoc filter row above the panels.",
+      { exact: true }
+    );
+  }
+
+  // ----- Variables redesign (dependency chip + empty state) -----
+
+  // No-variables OEmptyState (scoped to the variables OTable #empty slot).
+  getVariablesEmptyState() {
+    return this.variablesEmptyState;
+  }
+
+  // The Add Variable form's type select (renders once isAddVariable === true).
+  getVariableTypeSelect() {
+    return this.variableTypeSelect;
+  }
+
+  // Click the no-variables empty state's "Add variable" CTA (EmptyStateActionCard).
+  // The card has no data-test, so locate its button by accessible name within the
+  // empty state (the header "Add variable" button lives OUTSIDE this scope).
+  async clickVariablesEmptyStateCta() {
+    await this.variablesEmptyState.waitFor({ state: "visible", timeout: 10000 });
+    await this.variablesEmptyState
+      .getByRole("button", { name: /Add variable/ })
+      .click();
+  }
+
+  // Per-variable dependency-count chip (data-test is name-derived).
+  getVariableDependencyChip(name) {
+    return this.page.locator(`[data-test="dashboard-variable-${name}-dependencies"]`);
+  }
+
+  // Hover the dependency chip (tooltip is anchored to the whole chip).
+  async hoverVariableDependencyChip(name) {
+    const chip = this.getVariableDependencyChip(name);
+    await chip.waitFor({ state: "visible", timeout: 10000 });
+    await chip.hover();
+  }
+
+  // Tooltip bubble filtered to the "Depends on: ..." text.
+  getDependencyTooltipText(text) {
+    return this.page
+      .locator('[data-test="o-tooltip-content"]')
+      .filter({ hasText: text });
   }
 
   //Cancel dashboard changes//

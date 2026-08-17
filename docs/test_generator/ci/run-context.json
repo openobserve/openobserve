@@ -1,0 +1,21 @@
+{
+  "feature_slug": "dashboard-settings",
+  "feature_title": "Dashboard Settings Redesign",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboardSettings.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboardSettings.spec.js",
+  "playwright_group": "Dashboards-Settings",
+  "source_files": [
+    "web/src/components/dashboards/settings/GeneralSettings.vue",
+    "web/src/components/dashboards/settings/VariableSettings.vue",
+    "web/src/components/dashboards/tabs/TabList.vue",
+    "web/src/views/Dashboards/ScheduledDashboards.vue",
+    "web/src/views/Dashboards/RenderDashboardCharts.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
