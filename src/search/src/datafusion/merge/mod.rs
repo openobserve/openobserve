@@ -31,7 +31,10 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
-use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
+use parquet::{
+    arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter},
+    file::metadata::KeyValue,
+};
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
@@ -291,8 +294,8 @@ async fn write_vortex(
         .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
 }
 
-pub fn append_metadata(
-    writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
+pub fn append_metadata<W: AsyncFileWriter>(
+    writer: &mut AsyncArrowWriter<W>,
     file_meta: &FileMeta,
 ) -> Result<()> {
     writer.append_key_value_metadata(KeyValue::new(
