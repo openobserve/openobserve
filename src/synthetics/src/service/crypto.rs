@@ -1,16 +1,28 @@
 use super::*;
 
-/// Read once, at first use, and never re-read.
+/// The configured key, decoded and validated once at first use.
 ///
-/// `refresh_config` swaps the whole config and only *logs* that a key needs a
-/// restart, so without this a reload would silently change the key underneath
-/// checks whose secrets were encrypted under the old one. Their credentials
-/// would then decrypt to empty (`decrypt_secret(..).unwrap_or_default()`) and
-/// the checks would fail with no indication why. Pinning the boot value is what
-/// makes the restart-required warning true.
-fn configured_key() -> &'static str {
-    static KEY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    KEY.get_or_init(|| config::get_config().synthetics.encryption_key.clone())
+/// `Ok(None)` means unset — callers fall back to the per-org DEK. `Err` means
+/// set but unusable, which is returned to the caller rather than swallowed: a
+/// key that cannot be parsed must not silently become "no key", because that
+/// would put the deployment back on the per-region DEK and reintroduce the very
+/// bug this exists to fix, with no signal that it had happened.
+///
+/// Read once and pinned. `refresh_config` swaps the whole config and only
+/// *logs* that a key needs a restart, so re-reading would let a reload change
+/// the key underneath checks whose secrets were encrypted with the old one.
+/// Their credentials would then decrypt to empty
+/// (`decrypt_secret(..).unwrap_or_default()`) and the checks would fail with
+/// nothing to explain why.
+fn configured_key() -> &'static Result<Option<Vec<u8>>, String> {
+    static KEY: std::sync::OnceLock<Result<Option<Vec<u8>>, String>> = std::sync::OnceLock::new();
+    KEY.get_or_init(|| {
+        let raw = &config::get_config().synthetics.encryption_key;
+        if raw.is_empty() {
+            return Ok(None);
+        }
+        config::utils::encryption::decode_encryption_key(raw).map(Some)
+    })
 }
 
 /// Domain separator for [`synthetics_dek`]. Versioned rather than edited:
@@ -31,13 +43,16 @@ const DEK_CONTEXT: &str = "openobserve/synthetics/dek/v1/";
 /// Falls back to the per-org DEK when the key is unset, which is correct for a
 /// single-region deployment and keeps existing checks readable there.
 pub(crate) async fn synthetics_dek(org_id: &str) -> anyhow::Result<Vec<u8>> {
-    let configured = configured_key();
-    if !configured.is_empty() {
-        return Ok(derive_dek(configured.as_bytes(), org_id));
+    match configured_key() {
+        Ok(Some(key)) => Ok(derive_dek(key, org_id)),
+        Ok(None) => cipher::get_dek(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("DEK fetch failed: {e}")),
+        Err(e) => Err(anyhow::anyhow!(
+            "ZO_SYNTHETICS_ENCRYPTION_KEY is set but unusable ({e}); refusing to fall back to \
+             the per-region key, which would make this check unreadable in other regions"
+        )),
     }
-    cipher::get_dek(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("DEK fetch failed: {e}"))
 }
 
 /// HKDF-Expand (RFC 5869). Two blocks because AES-256-SIV takes 64 bytes and
@@ -291,6 +306,8 @@ mod dek_tests {
     /// their credentials would silently decrypt to empty.
     #[test]
     fn the_configured_key_is_pinned_at_boot_and_survives_a_reload() {
+        use base64::{Engine, prelude::BASE64_STANDARD};
+
         let _guard = crate::CONFIG_SWAP_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
@@ -302,14 +319,42 @@ mod dek_tests {
             config::CONFIG.store(std::sync::Arc::new(cfg));
         };
 
-        install("first-key");
-        let pinned = configured_key().to_owned();
+        install(&BASE64_STANDARD.encode([1u8; 64]));
+        let pinned = configured_key().clone();
 
-        // A reload lands a different key; the pinned one must not move.
-        install("second-key-after-reload");
-        assert_eq!(configured_key(), pinned);
+        // A reload lands a different, equally valid key; the pinned one must
+        // not move.
+        install(&BASE64_STANDARD.encode([2u8; 64]));
+        assert_eq!(*configured_key(), pinned);
 
         config::CONFIG.store(saved);
+    }
+
+    /// A weak or malformed value must be refused, not quietly used as key
+    /// material — `hunter2` derived a perfectly valid-looking key before this.
+    #[test]
+    fn a_non_base64_key_is_rejected() {
+        assert!(config::utils::encryption::decode_encryption_key("hunter2").is_err());
+    }
+
+    /// Right alphabet, wrong length: 32 bytes is not enough for AES-256-SIV.
+    #[test]
+    fn a_base64_key_of_the_wrong_length_is_rejected() {
+        use base64::{Engine, prelude::BASE64_STANDARD};
+        let short = BASE64_STANDARD.encode([7u8; 32]);
+        assert!(config::utils::encryption::decode_encryption_key(&short).is_err());
+    }
+
+    #[test]
+    fn a_valid_key_decodes_to_64_bytes() {
+        use base64::{Engine, prelude::BASE64_STANDARD};
+        let good = BASE64_STANDARD.encode([7u8; 64]);
+        assert_eq!(
+            config::utils::encryption::decode_encryption_key(&good)
+                .unwrap()
+                .len(),
+            64
+        );
     }
 
     #[test]

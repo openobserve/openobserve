@@ -18,6 +18,7 @@ enterprise = ["dep:o2_enterprise", "dep:o2_openfga"]
 
 [dependencies]
 anyhow.workspace = true
+base64.workspace = true
 aws-config.workspace = true
 aws-sdk-lambda.workspace = true
 chrono.workspace = true
