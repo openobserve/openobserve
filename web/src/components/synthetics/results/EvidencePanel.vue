@@ -28,23 +28,20 @@
  * and retries at `attempt-N-`. Showing one under another's label is a real
  * error, not a cosmetic one.
  */
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import {
   evidenceOriginTs,
   foldEvidenceBundle,
   type EvidenceEvent,
-  type EvidenceGroup,
 } from "@/composables/synthetics/syntheticResultsSchema";
+import { useEvidenceFilters } from "@/composables/synthetics/useEvidenceFilters";
 import EvidenceEvents from "./EvidenceEvents.vue";
+import EvidenceFilters from "./EvidenceFilters.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import {
   EVIDENCE_ERROR_MESSAGE,
@@ -92,31 +89,6 @@ const emit = defineEmits<{ (e: "clear-step-filter"): void; (e: "retry"): void }>
 
 const { t } = useI18nTyped();
 
-/**
- * Three views, not five kind chips.
- *
- * The chips were one per anomaly kind — console errors, page errors, non-2xx,
- * failed requests — which asked the reader to pick a severity before they knew
- * what happened, and left the two that matter most (a page error, a failed
- * request) sitting in separate filters from the surfaces they belong to. The
- * split here is DevTools': what the page SAID (console, uncaught exceptions and
- * dialogs included) versus what it ASKED FOR (every request, the ones that never
- * completed included). Severity survives inside each view as the group sections,
- * which are already ordered worst-first.
- */
-type EvidenceView = "all" | "network" | "console";
-
-const VIEW_GROUPS: Record<EvidenceView, EvidenceGroup["kind"][]> = {
-  all: ["pageErrors", "requestsFailed", "console", "network"],
-  network: ["requestsFailed", "network"],
-  console: ["pageErrors", "console"],
-};
-
-const view = ref<EvidenceView>("all");
-const firstPartyOnly = ref(false);
-/** Local, not persisted: the drawer is transient and closes with the run. */
-const wrapContent = ref(false);
-
 const loading = computed(() => props.status === "loading" || props.status === "idle");
 const loadError = computed(() => (props.status === "error" ? props.error : null));
 
@@ -158,60 +130,12 @@ const bundle = computed(() =>
  */
 const originTs = computed(() => evidenceOriginTs(props.events));
 
-/** The one axis the tabs do not cover: whose code it was. */
-function matches(e: EvidenceEvent): boolean {
-  return !firstPartyOnly.value || e.firstParty;
-}
-
-/**
- * One list for the view, in time order.
- *
- * Was one table PER GROUP KIND, which bought four pagination bars, four column
- * grids and four restarting timelines to say something the view toggle above
- * already says. Kind moved onto the row as a badge — the same conclusion step
- * attribution reached earlier, applied to the other axis.
- *
- * Chronological, not worst-first: one table means one timeline, and a timeline
- * that does not run in time order is not one. Severity survives per row (the
- * rail, the coloured status) and is one header click away.
- */
-const visibleEvents = computed(() =>
-  bundle.value.groups
-    .filter((g) => VIEW_GROUPS[view.value].includes(g.kind))
-    .flatMap((g) => g.events)
-    .filter(matches)
-    .sort((a, b) => (a.initiatedTs ?? a.ts) - (b.initiatedTs ?? b.ts)),
+// The step card is about to mount this same toolbar, so the view/first-party/
+// wrap state and the counts they drive live in one composable rather than two
+// copies that could drift apart.
+const { view, firstPartyOnly, wrap, views, visibleEvents } = useEvidenceFilters(
+  computed(() => bundle.value.events),
 );
-
-/**
- * Badge counts describe the ATTEMPT, not the current view: they are folded
- * before the first-party filter, so unchecking it never makes a number move
- * under the reader. Scoped to the step filter, though — a badge that counts the
- * run while the list shows one step is a lie, not a shortcut.
- */
-function countIn(kinds: EvidenceGroup["kind"][]): number {
-  return bundle.value.groups
-    .filter((g) => kinds.includes(g.kind))
-    .reduce((n, g) => n + g.events.length, 0);
-}
-
-const views = computed(() => [
-  {
-    key: "all" as EvidenceView,
-    label: t("synthetics.evidence.filterAll"),
-    count: bundle.value.counts.all,
-  },
-  {
-    key: "network" as EvidenceView,
-    label: t("synthetics.evidence.groupNetwork"),
-    count: countIn(VIEW_GROUPS.network),
-  },
-  {
-    key: "console" as EvidenceView,
-    label: t("synthetics.evidence.groupConsole"),
-    count: countIn(VIEW_GROUPS.console),
-  },
-]);
 </script>
 
 <template>
@@ -310,42 +234,12 @@ const views = computed(() => [
           {{ t("synthetics.evidence.truncated") }}
         </div>
 
-        <!-- Every option keeps its count and stays visible at zero: a hidden
-             zero is indistinguishable from an option that does not exist, and
-             "nothing on the console" is information. First-party sits beside
-             the group rather than in it — it narrows whichever option is
-             selected, so it is not a fourth one. -->
-        <div class="flex flex-wrap items-center gap-2">
-          <OToggleGroup v-model="view" type="single">
-            <OToggleGroupItem
-              v-for="v in views"
-              :key="v.key"
-              :value="v.key"
-              size="sm"
-              :data-test="`synthetics-evidence-filter-${v.key}`"
-            >
-              {{ v.label }} <span class="text-text-secondary">({{ v.count }})</span>
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <OCheckbox
-            v-model="firstPartyOnly"
-            size="sm"
-            :label="t('synthetics.evidence.firstPartyOnly')"
-            class="ml-2"
-            data-test="synthetics-evidence-first-party"
-          />
-          <OButton
-            variant="outline"
-            size="icon-chip"
-            class="ml-auto"
-            :active="wrapContent"
-            data-test="synthetics-evidence-wrap-btn"
-            @click="wrapContent = !wrapContent"
-          >
-            <OIcon name="wrap-text" size="sm" />
-            <OTooltip :content="t('search.messageWrapContent')" />
-          </OButton>
-        </div>
+        <EvidenceFilters
+          v-model:view="view"
+          v-model:first-party-only="firstPartyOnly"
+          v-model:wrap="wrap"
+          :views="views"
+        />
 
         <!-- One table for the view. Rows come from the shared component, so the
              step expansion and this panel cannot drift apart; kind and step are
@@ -357,7 +251,7 @@ const views = computed(() => [
           mode="panel"
           :filtered="!!stepFilter"
           :origin-ts="originTs"
-          :wrap="wrapContent"
+          :wrap="wrap"
           @clear-filters="emit('clear-step-filter')"
         />
       </template>
