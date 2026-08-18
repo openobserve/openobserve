@@ -7,8 +7,15 @@ import { ref, watch, onUnmounted, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { EvalTargetScope } from "@/services/online-evals.service";
 
-const WINDOW_MS = 24 * 60 * 60 * 1000;
+const WINDOW_MS = 60 * 60 * 1000;
 const DEBOUNCE_MS = 400;
+
+export function buildJobMatchedTargetsTimeRange(nowMs = Date.now()) {
+  return {
+    startUs: (nowMs - WINDOW_MS) * 1000,
+    endUs: nowMs * 1000,
+  };
+}
 
 /** Double-quote a SQL identifier so unusual stream names remain valid. */
 function quoteIdent(name: string): string {
@@ -68,8 +75,7 @@ export function useJobMatchedTargets(
     }
 
     const sql = buildJobMatchedTargetsSql(stream.value, whereClause.value, targetScope.value);
-    const endUs = Date.now() * 1000;
-    const startUs = (Date.now() - WINDOW_MS) * 1000;
+    const { startUs, endUs } = buildJobMatchedTargetsTimeRange();
     isLoading.value = true;
     try {
       const hits = await executeQuery(sql, startUs, endUs, "traces");
