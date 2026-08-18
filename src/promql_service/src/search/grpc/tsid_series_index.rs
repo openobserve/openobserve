@@ -17,7 +17,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     io::Cursor,
     ops::Range,
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, Mutex},
 };
 
 use arrow::{
@@ -37,13 +37,13 @@ use config::{
 };
 use datafusion::{
     common::{DFSchema, DataFusionError, Result},
+    execution::context::ExecutionProps,
     logical_expr::Expr,
+    physical_expr::create_physical_expr,
     physical_plan::PhysicalExpr,
-    prelude::SessionContext,
 };
 use futures::{StreamExt, stream};
 use hashlink::LruCache;
-use parking_lot::Mutex;
 use promql_parser::label::Matchers;
 use rayon::prelude::*;
 use search::types::QueryParams;
@@ -70,35 +70,32 @@ impl Default for SeriesSelectionCache {
 }
 
 impl SeriesSelectionCache {
+    fn entry_size(key: &str, ranges: &[Range<usize>]) -> usize {
+        key.len() + std::mem::size_of::<Vec<Range<usize>>>() + std::mem::size_of_val(ranges)
+    }
+
     fn get(&mut self, key: &str) -> Option<Arc<Vec<Range<usize>>>> {
         self.entries.get(key).cloned()
     }
 
     fn insert(&mut self, key: String, ranges: Arc<Vec<Range<usize>>>) {
-        let key_memory_size = key.len();
-        let ranges_memory_size = ranges.capacity() * std::mem::size_of::<Range<usize>>()
-            + std::mem::size_of::<Vec<Range<usize>>>();
-        let memory_size = key_memory_size + ranges_memory_size;
-        if memory_size > SERIES_SELECTION_CACHE_MAX_BYTES {
+        let size = Self::entry_size(&key, &ranges);
+        if size > SERIES_SELECTION_CACHE_MAX_BYTES {
             return;
         }
-        if let Some(previous) = self.entries.insert(key, Arc::clone(&ranges)) {
-            self.memory_size = self.memory_size.saturating_sub(
-                key_memory_size
-                    + previous.capacity() * std::mem::size_of::<Range<usize>>()
-                    + std::mem::size_of::<Vec<Range<usize>>>(),
-            );
+        if let Some(previous) = self.entries.insert(key.clone(), Arc::clone(&ranges)) {
+            self.memory_size = self
+                .memory_size
+                .saturating_sub(Self::entry_size(&key, &previous));
         }
-        self.memory_size += memory_size;
+        self.memory_size += size;
         while self.memory_size > SERIES_SELECTION_CACHE_MAX_BYTES {
             let Some((key, evicted)) = self.entries.remove_lru() else {
                 break;
             };
-            self.memory_size = self.memory_size.saturating_sub(
-                key.len()
-                    + evicted.capacity() * std::mem::size_of::<Range<usize>>()
-                    + std::mem::size_of::<Vec<Range<usize>>>(),
-            );
+            self.memory_size = self
+                .memory_size
+                .saturating_sub(Self::entry_size(&key, &evicted));
         }
     }
 }
@@ -153,7 +150,9 @@ pub(super) async fn search(
     let mut evaluated = Vec::with_capacity(index_files.len());
     let mut misses = Vec::new();
     {
-        let mut cache = SERIES_SELECTION_CACHE.lock();
+        let mut cache = SERIES_SELECTION_CACHE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         for (data_path, (account, sidecar_path, cache_key)) in index_files {
             if let Some(ranges) = cache.get(&cache_key) {
                 evaluated.push((data_path, ranges));
@@ -191,7 +190,9 @@ pub(super) async fn search(
         })
         .collect::<Result<Vec<_>>>()?;
     {
-        let mut cache = SERIES_SELECTION_CACHE.lock();
+        let mut cache = SERIES_SELECTION_CACHE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         for (path, cache_key, ranges) in newly_evaluated {
             cache.insert(cache_key, Arc::clone(&ranges));
             evaluated.push((path, ranges));
@@ -317,10 +318,9 @@ fn create_physical_filter(
         return Ok(None);
     };
     let df_schema = DFSchema::try_from(sidecar_schema.clone())?;
-    SessionContext::new()
-        .state()
-        .create_physical_expr(filter, &df_schema)
-        .map(Some)
+    // plain expression planning: no session/registry needed for column
+    // comparisons and regexp_like
+    create_physical_expr(&filter, &df_schema, &ExecutionProps::new()).map(Some)
 }
 
 fn evaluate_series_index(
@@ -462,6 +462,18 @@ mod tests {
         assert_eq!(
             evaluate_series_index(&data, None).unwrap(),
             vec![Range { start: 0, end: 8 }]
+        );
+
+        // regex matchers go through regexp_like on the (Utf8View) label column
+        let matchers = Matchers::new(vec![Matcher {
+            op: MatchOp::NotRe(regex::Regex::new("a").unwrap()),
+            name: "path".to_string(),
+            value: "a".to_string(),
+        }]);
+        let filter = create_physical_filter(&schema, &matchers).unwrap();
+        assert_eq!(
+            evaluate_series_index(&data, filter.as_deref()).unwrap(),
+            vec![Range { start: 2, end: 4 }]
         );
     }
 

@@ -32,7 +32,6 @@ infra.workspace = true
 itertools.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
-parking_lot.workspace = true
 prost.workspace = true
 proto.workspace = true
 promql.workspace = true
@@ -47,3 +46,6 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 usage_reporting.workspace = true
 utoipa.workspace = true
+
+[dev-dependencies]
+regex.workspace = true
