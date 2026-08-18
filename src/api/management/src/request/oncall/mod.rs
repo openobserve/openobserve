@@ -1573,7 +1573,7 @@ fn ack_confirm_page(org_id: &str, token: &str, title: &str) -> Response {
 <h1 style="font-size:1.25rem">{title}</h1>
 <p style="color:#555">Acknowledging tells the others you have this. The
 escalation stops.</p>
-<form method="post" action="/api/{org}/oncall/ack">
+<form method="post" action="/api/v2/{org}/oncall/ack">
 <input type="hidden" name="token" value="{token}">
 <button type="submit" style="font-size:1rem;padding:0.75rem 1.5rem;border-radius:0.25rem;
 border:0;background:#4f46e5;color:#fff">Acknowledge</button>

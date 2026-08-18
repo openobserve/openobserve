@@ -661,12 +661,21 @@ pub fn basic_routes() -> Router {
     // inside the handler itself (never via auth_middleware), because the whole
     // point is acknowledging from an email at 3am with no session. Like the
     // chart endpoint above, it must stay in basic_routes.
+    //
+    // **Under `/api/v2/` for a routing reason, not a versioning one.** A router
+    // node merges these same routes alongside its catch-all proxy
+    // `/api/{*path}`, and axum refuses to register a parameter and a wildcard
+    // at the same position: `/api/{org_id}/...` beside `/api/{*path}` panics
+    // the process at startup, so every router pod crash-loops. A *static*
+    // second segment does not conflict, which is why the three sibling
+    // token-authenticated routes here — chart render and both incident webhooks
+    // — are all `/api/v2/...`. This one has to be too.
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
         // GET renders a confirmation page; only POST acknowledges, so a mail
         // gateway prefetching the emailed link cannot take somebody's page.
         router = router.route(
-            "/api/{org_id}/oncall/ack",
+            "/api/v2/{org_id}/oncall/ack",
             get(oncall::ack_page).post(oncall::acknowledge),
         );
     }
@@ -1735,6 +1744,44 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
+
+    /// A router node merges `basic_routes()` beside its catch-all proxy
+    /// `/api/{*path}`, and axum **panics at registration** — not at request
+    /// time — when a parameter and a wildcard sit at the same position. So
+    /// `/api/{org_id}/...` in `basic_routes` crash-loops every router pod on
+    /// startup, while every single-node deployment stays perfectly healthy.
+    ///
+    /// That asymmetry is why this shipped: nothing in the test suite or in
+    /// local development builds the router-role tree. This test does.
+    ///
+    /// A **static** second segment does not conflict, which is why every
+    /// token-authenticated route here lives under `/api/v2/`. If you add one,
+    /// it must too.
+    #[test]
+    fn test_basic_routes_cannot_conflict_with_the_router_catch_all() {
+        // Registration is where the panic would happen, so building it is the
+        // whole assertion.
+        let merged = Router::<()>::new()
+            .merge(basic_routes())
+            .route("/api/{*path}", get(|| async { "proxy" }));
+        drop(merged);
+
+        // And the rule that keeps it true, stated where somebody adding a route
+        // will read it: nothing in `basic_routes` may take a path parameter
+        // directly after `/api/`.
+        let src = include_str!("mod.rs");
+        let offenders: Vec<&str> = src
+            .lines()
+            .map(str::trim)
+            .filter(|l| l.starts_with("\"/api/{") && !l.starts_with("\"/api/{*"))
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "these routes take a parameter straight after /api/ and will panic \
+             every router pod at startup; give them a static segment such as \
+             /api/v2/: {offenders:?}"
+        );
+    }
 
     #[tokio::test]
     async fn test_proxy_routes() {
