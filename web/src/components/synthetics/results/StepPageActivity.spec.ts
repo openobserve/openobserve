@@ -68,7 +68,9 @@ describe("StepPageActivity", () => {
 
   it("counts what the step has, not what it managed to show", () => {
     const w = mountActivity({ events: manyEvents(12) });
-    expect(w.find('[data-test="synthetics-step-page-activity-count"]').text()).toContain("12");
+    // Exact string, not a substring: the old "5 of 12" format also contains
+    // "12", so a loose match would pass on either format.
+    expect(w.find('[data-test="synthetics-step-page-activity-count"]').text()).toBe("12 events");
   });
 
   it("keeps the way to the run-level view open even when nothing overflows", () => {
@@ -99,8 +101,14 @@ describe("StepPageActivity", () => {
   });
 
   it("runs the step's events in time order, since a capped ranking no longer applies", () => {
+    // Same kind on both rows, `initiatedTs` set alongside `ts`: the composable's
+    // kind tie-break cannot order same-kind rows, so only a working time
+    // comparison can produce [100, 300] here.
     const w = mountActivity({
-      events: [ev({ ts: 300, status: 200 }), ev({ ts: 100, kind: "pageerror", message: "x" })],
+      events: [
+        ev({ ts: 300, initiatedTs: 300, kind: "response", status: 200 }),
+        ev({ ts: 100, initiatedTs: 100, kind: "response", status: 404 }),
+      ],
     });
     const shown = w.findComponent(EvidenceEvents).props("events") as Array<{ ts: number }>;
     expect(shown.map((e) => e.ts)).toEqual([100, 300]);
