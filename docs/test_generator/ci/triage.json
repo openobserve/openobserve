@@ -1,0 +1,29 @@
+{
+  "feature_slug": "workflow-drafts",
+  "feature_title": "Workflow Drafts",
+  "area": "Workflows",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "workflows-drafts.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Workflows/workflows-drafts.spec.js",
+  "playwright_group": "Workflows",
+  "source_files": [
+    "web/src/components/workflows/WorkflowEditor.vue",
+    "web/src/components/workflows/WorkflowsList.vue",
+    "web/src/components/workflows/WorkflowNodeDrawer.vue",
+    "web/src/plugins/workflows/WorkflowCanvas.vue",
+    "web/src/services/workflows.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed file list spans both editions: the bulk lives in OSS paths (src/, web/src/, tests/ui-testing/) implementing the workflow-drafts feature, while two enterprise-owned paths are also touched — o2_openfga/src/meta/route_permissions.rs (OFGA/RBAC route permission for the new promote endpoint) and o2_enterprise/src/enterprise/super_cluster/queue/mod.rs (super-cluster key registry). That OSS implementation plus an enterprise layer maps to edition 'both'.",
+    "skip": "Not skipping. The change is user-facing: it adds a drafts concept to the workflows UI (draft tag in the list, draft rows open the editor, save/promote draft actions, node disable) across web/src/components/workflows and web/src/plugins/workflows. trigger_comment.txt and feature_hint.txt are empty, so there is no tests-added label or skip request.",
+    "e2e": "E2E is warranted because the PR adds a new user-facing workflow-drafts flow: creating/saving an incomplete graph as a draft, seeing the draft badge in WorkflowsList, editing a draft, promoting a draft into a published workflow, and disabling/muting individual nodes. These are verifiable UI interactions backed by new REST endpoints.",
+    "area": "Area is Workflows: the vast majority of UI changes are under web/src/components/workflows and web/src/plugins/workflows, and the existing sibling E2E specs (workflows-crud.spec.js, workflows-negative.spec.js) live under the Workflows shard (tests/ui-testing/playwright-tests/Workflows).",
+    "group": "playwright_group is 'Workflows' — the ci_matrix.ent.json overlay already defines a 'Workflows' testfolder shard (actual_folder Workflows, chrome) whose run_files list workflows-crud.spec.js and workflows-negative.spec.js; the new spec belongs on that same shard.",
+    "existing_tests": "No E2E specs in the diff. The only tests/ui-testing change is tests/ui-testing/pages/workflowsPages/workflowsPage.js — a Playwright page object, not a .spec.js under playwright-tests — and the web/src/**/*.spec.ts files are Vitest unit tests, which do not count as E2E coverage."
+  }
+}

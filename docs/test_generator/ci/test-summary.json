@@ -1,0 +1,10 @@
+[
+  { "title": "saves a trigger-only workflow as a draft and shows the Draft tag in the list", "action": "new", "verifies": "an incomplete (trigger-only) graph saves leniently as a draft, renders a Draft tag, and omits the pause/resume action" },
+  { "title": "promotes a saved draft into a published workflow", "action": "new", "verifies": "publishing a completed draft drops the Draft tag and adds the pause/resume action" },
+  { "title": "opens the editor when a draft row is clicked", "action": "new", "verifies": "a draft row click routes to the editor, not the read-only Runs view" },
+  { "title": "blocks publishing a draft with an incomplete node", "action": "new", "verifies": "publish is rejected with 'Finish configuring all steps before publishing' while a node is set up later" },
+  { "title": "deletes a draft", "action": "new", "verifies": "the list delete action removes a draft row" },
+  { "title": "disables a node and shows the Disabled badge", "action": "new", "verifies": "muting a node paints the Disabled badge on its card" },
+  { "title": "prompts before leaving the editor with unsaved changes", "action": "new", "verifies": "the Unsaved Changes dialog appears and Discard navigates away" },
+  { "title": "shows a single Save action on an already-published workflow", "action": "new", "verifies": "a published workflow keeps Save + History and hides Save-as-Draft/Publish" }
+]

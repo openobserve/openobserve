@@ -1,0 +1,21 @@
+{
+  "feature_slug": "workflow-drafts",
+  "feature_title": "Workflow Drafts",
+  "area": "Workflows",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "workflows-drafts.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Workflows/workflows-drafts.spec.js",
+  "playwright_group": "Workflows",
+  "source_files": [
+    "web/src/components/workflows/WorkflowEditor.vue",
+    "web/src/components/workflows/WorkflowsList.vue",
+    "web/src/components/workflows/WorkflowNodeDrawer.vue",
+    "web/src/plugins/workflows/WorkflowCanvas.vue",
+    "web/src/services/workflows.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

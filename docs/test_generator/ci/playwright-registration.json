@@ -1,0 +1,6 @@
+{
+  "group": "Workflows",
+  "spec_filename": "workflows-drafts.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

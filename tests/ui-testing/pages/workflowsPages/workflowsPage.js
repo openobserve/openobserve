@@ -97,6 +97,27 @@ class WorkflowsPage {
     // Post-save "link to alerts" dialog (ODialog): Skip = secondary button.
     this.linkAlertsDialog = '[data-test="workflow-link-alerts-dialog"]';
     this.dialogSecondary = '[data-test="o-dialog-secondary-btn"]';
+    // ---- Workflow Drafts feature ----
+    // Save-as-Draft (lenient) + History (Runs, published-only) editor actions.
+    this.saveDraftBtn = '[data-test="workflow-editor-save-draft"]';
+    this.historyBtn = '[data-test="workflow-editor-history"]';
+    // Draft tag in the list name cell; pause/resume action is name-scoped and
+    // omitted for drafts (v-if="!row.is_draft").
+    this.draftTag = '[data-test="workflow-list-draft-tag"]';
+    this.pauseResumeAction = (name) => `[data-test="workflow-list-${name}-pause-start-action"]`;
+    // Read-only Runs inspection page (the route a NON-draft row click goes to).
+    this.runsPage = '[data-test="workflow-runs-page"]';
+    // Unsaved-changes guard (ConfirmDialog -> ODialog). Discard = primary button.
+    this.unsavedDialog = '[data-test="workflows-editor-unsaved-dialog"]';
+    this.dialogPrimary = '[data-test="o-dialog-primary-btn"]';
+    // Per-node disable (mute) toggle is hover-gated and static data-test'd; scope
+    // it within the hovered node card (`workflow-node-<type>`).
+    this.nodeCard = (type) => `[data-test="workflow-node-${type}"]`;
+    this.nodeDisableToggle = '[data-test="workflows-node-disable-toggle"]';
+    this.nodeDisabledBadge = (type) => `[data-test="workflow-node-${type}-disabled-badge"]`;
+    // "Set up later" is an OSwitch in the Destination drawer; the interactive
+    // element carries the `-btn` suffix (O2 switch pattern).
+    this.destSetUpLaterToggle = '[data-test="workflow-destination-set-up-later-btn"]';
   }
 
   // Workflows is an Enterprise-only feature. On OSS builds the API returns 404/403 and the menu is
@@ -205,6 +226,29 @@ class WorkflowsPage {
       if (!b) throw new Error('publish button not found: ' + sel);
       b.click();
     }, this.publishBtn);
+  }
+
+  // K9: the Save-as-Draft button can be intercepted by the same transient tooltip
+  // as Save/Publish — click it via evaluate() to dodge the overlay.
+  async clickSaveDraft() {
+    await this.page.evaluate((sel) => {
+      const b = document.querySelector(sel);
+      if (!b) throw new Error('save draft button not found: ' + sel);
+      b.click();
+    }, this.saveDraftBtn);
+  }
+
+  /**
+   * Build a Trigger -> Destination workflow but persist it as a DRAFT (lenient save,
+   * no graph validation) instead of publishing. Ends back on the list via goBack().
+   */
+  async buildTriggerToDestinationAndSaveDraft({ name, destName, url }) {
+    await this.goToAdd();
+    await this.setName(name);
+    await this.addNodeFromPalette('destination');
+    await this.createDestinationInline({ name: destName, url });
+    await this.saveNodeDrawer();
+    await this.clickSaveDraft();
   }
 
   /**
@@ -422,6 +466,98 @@ class WorkflowsPage {
   // ---------- enable / disable ----------
   async toggleEnable(name) {
     await this.page.locator(`[data-test="workflow-list-${name}-pause-start-action"]`).first().click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  // ---------- draft lifecycle (workflow-drafts) ----------
+
+  /** Click a draft row's NAME cell to open the editor. Drafts have no run history, so the list
+   *  routes a row-click to the editor instead of the read-only Runs view. */
+  async openDraftRow(name) {
+    await this.waitForListReady();
+    await this.search(name);
+    await this.page.getByText(name, { exact: true }).first().click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.expectEditorVisible();
+  }
+
+  /** Assert the named row renders the Draft tag. The list search is a synchronous client-side
+   *  filter (filteredWorkflows computed), so once THIS row's name renders the list shows only
+   *  this workflow — its Draft tag is then the only one on screen. */
+  async expectDraftTag(name) {
+    await this.search(name);
+    await expect(this.page.getByText(name, { exact: true }).first()).toBeVisible({ timeout: LIST_TIMEOUT_MS });
+    await expect(this.page.locator(this.draftTag).first()).toBeVisible({ timeout: LIST_TIMEOUT_MS });
+  }
+
+  /** Assert the named row does NOT render a Draft tag (i.e. it is published). */
+  async expectNoDraftTag(name) {
+    await this.search(name);
+    await expect(this.page.getByText(name, { exact: true }).first()).toBeVisible({ timeout: LIST_TIMEOUT_MS });
+    await expect(this.page.locator(this.draftTag).first()).toBeHidden();
+  }
+
+  /** Assert the named (published) row shows the pause/resume action. */
+  async expectPauseResumeAction(name) {
+    await this.search(name);
+    await expect(this.page.locator(this.pauseResumeAction(name)).first()).toBeVisible({ timeout: LIST_TIMEOUT_MS });
+  }
+
+  /** Assert the named (draft) row omits the pause/resume action (drafts aren't runnable). */
+  async expectNoPauseResumeAction(name) {
+    await this.search(name);
+    await this.rowByName(name).first().waitFor({ state: 'attached', timeout: LIST_TIMEOUT_MS });
+    await expect(this.page.locator(this.pauseResumeAction(name)).first()).toBeHidden();
+  }
+
+  /** Assert the read-only Runs page is NOT rendered (we are on the editor instead). */
+  async expectRunsPageNotVisible() {
+    await expect(this.page.locator(this.runsPage)).toBeHidden();
+  }
+
+  /** An already-published workflow keeps a single validated Save (no Save-as-Draft / Publish
+   *  split) and shows the History (Runs) button — the inverse of a draft. */
+  async expectPublishedWorkflowActionBar() {
+    await expect(this.page.locator(this.saveBtn)).toBeVisible({ timeout: DRAWER_TIMEOUT_MS });
+    await expect(this.page.locator(this.historyBtn)).toBeVisible();
+    await expect(this.page.locator(this.saveDraftBtn)).toBeHidden();
+    await expect(this.page.locator(this.publishBtn)).toBeHidden();
+  }
+
+  // ---------- node disable (mute) + set-up-later placeholder ----------
+
+  /** In an open Destination drawer, flip the section-level "Set up later" switch so the drawer
+   *  Save commits a placeholder (flagged incomplete) instead of a real destination. */
+  async markDestinationSetUpLater() {
+    await this.page.locator(this.destSetUpLaterToggle).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Hover the node card to reveal the hover-gated disable toggle, then click it. */
+  async toggleNodeDisable(type = 'destination') {
+    const card = this.page.locator(this.nodeCard(type));
+    await card.hover();
+    await card.locator(this.nodeDisableToggle).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Assert the node painted its "Disabled" badge after being muted. */
+  async expectNodeDisabledBadge(type) {
+    await expect(this.page.locator(this.nodeDisabledBadge(type))).toBeVisible({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  // ---------- unsaved-changes guard ----------
+
+  async clickCancel() {
+    await this.page.locator(this.cancelBtn).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Assert the "Unsaved Changes" confirm dialog is shown (title + dialog root). */
+  async expectUnsavedDialogVisible() {
+    const dlg = this.page.locator(this.unsavedDialog);
+    await expect(dlg).toBeVisible({ timeout: DRAWER_TIMEOUT_MS });
+    await expect(dlg.getByText('Unsaved Changes', { exact: true }).first()).toBeVisible();
+  }
+
+  /** Choose Discard (the primary button) to leave the editor and drop the edits. */
+  async discardUnsavedChanges() {
+    await this.page.locator(this.unsavedDialog).locator(this.dialogPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
   }
 }
 

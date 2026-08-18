@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Workflows/workflows-drafts.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Workflows/workflows-crud.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-negative.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the draft lifecycle. workflows-crud.spec.js covers the published happy path (build Trigger->Destination and save) and workflows-negative.spec.js covers trigger-only/empty-name validation + NFR. The Workflow Drafts feature adds a genuinely new sub-area: lenient Save-as-Draft of an incomplete graph, the Draft tag in WorkflowsList, draft-row-opens-editor, draft promote/publish, publish-blocked-on-incomplete-node, draft delete, node disable/mute, and the unsaved-changes guard. That is its own area within Workflows, so a dedicated spec (already designated by triage as workflows-drafts.spec.js) is correct rather than appending to the CRUD spec.",
+  "registration_note": "needs_registration is true because this is a brand-new spec file. It must be added to the Workflows shard's run_files in the ENTERPRISE ci-matrix overlay (ci_matrix.ent.json, not present in this OSS checkout — it is tree-merged from the enterprise repo). The Workflows shard currently lists workflows-crud.spec.js and workflows-negative.spec.js; append 'workflows-drafts.spec.js' to that run_files array. Do NOT add it to tests/ui-testing/ci-matrix/ci_matrix.json (that is the OSS base and Workflows is an ENT-only shard)."
+}
