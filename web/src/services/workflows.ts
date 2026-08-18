@@ -22,30 +22,69 @@ const workflows = {
     return http().get(url);
   },
 
-  // Save a new workflow.
-  createWorkflow: ({ org_identifier, data }: { org_identifier: string; data: object }) => {
-    const url = `/api/${org_identifier}/workflows`;
+  // Save a new workflow. `draft=true` saves to the drafts table WITHOUT the
+  // backend graph validation (no terminating node / orphan checks) — a draft can
+  // be an incomplete graph. Omit or false for a validated, published workflow.
+  createWorkflow: ({
+    org_identifier,
+    data,
+    draft = false,
+  }: {
+    org_identifier: string;
+    data: object;
+    draft?: boolean;
+  }) => {
+    const url = `/api/${org_identifier}/workflows${draft ? "?draft=true" : ""}`;
     return http().post(url, data);
   },
 
-  // Update an existing workflow by id.
+  // Update an existing workflow by id. `draft=true` updates the drafts-table row
+  // (no validation); false updates the published workflow (validated).
   updateWorkflow: ({
     org_identifier,
     id,
     data,
+    draft = false,
   }: {
     org_identifier: string;
     id: string;
     data: object;
+    draft?: boolean;
   }) => {
-    const url = `/api/${org_identifier}/workflows/${id}`;
+    const url = `/api/${org_identifier}/workflows/${id}${draft ? "?draft=true" : ""}`;
     return http().put(url, data);
   },
 
-  // Delete a workflow by id.
-  deleteWorkflow: ({ org_identifier, id }: { org_identifier: string; id: string }) => {
-    const url = `/api/${org_identifier}/workflows/${id}`;
+  // Delete a workflow by id. `draft=true` deletes from the drafts table.
+  deleteWorkflow: ({
+    org_identifier,
+    id,
+    draft = false,
+  }: {
+    org_identifier: string;
+    id: string;
+    draft?: boolean;
+  }) => {
+    const url = `/api/${org_identifier}/workflows/${id}${draft ? "?draft=true" : ""}`;
     return http().delete(url);
+  },
+
+  // Promote a draft into a proper (published) workflow. The backend re-validates
+  // the graph and returns 400 if it's still incomplete; on success it moves the
+  // row from the drafts table to the workflows table KEEPING the same id.
+  // `trigger_type` (AlertFired | IncidentEvent) mirrors the create payload's
+  // trigger_type and drives the incident association.
+  promoteWorkflow: ({
+    org_identifier,
+    id,
+    trigger_type,
+  }: {
+    org_identifier: string;
+    id: string;
+    trigger_type: string;
+  }) => {
+    const url = `/api/${org_identifier}/workflows/promote/${id}?trigger_type=${trigger_type}`;
+    return http().post(url);
   },
 
   // Enable/disable (pause/resume) a workflow.
@@ -71,13 +110,17 @@ const workflows = {
     workflow,
     inputs,
     from_node,
+    draft = false,
   }: {
     org_identifier: string;
     workflow: any;
     inputs: any[];
     from_node?: string;
+    // `draft=true` when dry-running a draft / unsaved graph, so the backend skips
+    // the strict published-workflow validation for the test run.
+    draft?: boolean;
   }) => {
-    const url = `/api/${org_identifier}/workflows/test`;
+    const url = `/api/${org_identifier}/workflows/test${draft ? "?draft=true" : ""}`;
     return http().post(url, { workflow, inputs, from_node });
   },
 

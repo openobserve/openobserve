@@ -148,8 +148,12 @@ function buildTimezoneOptions(): { label: I18nText; value: string }[] {
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const options: { label: I18nText; value: string }[] = [
       {
+        // Label is display copy, but the VALUE is persisted and parsed back:
+        // resolveBrowserTimezone()/buildPayload match this exact "Browser Time
+        // (<zone>)" shape, so it stays English. Same as EditScript.vue:755,
+        // DateTime.vue:434, QueryConfig.vue:2580.
         label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }),
-        value: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }),
+        value: raw("Browser Time (" + browserTz + ")"),
       },
       { label: raw("UTC"), value: "UTC" },
     ];

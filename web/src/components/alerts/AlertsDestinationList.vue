@@ -605,7 +605,7 @@ export default defineComponent({
               const message =
                 err.response.data?.message ||
                 err.response.data?.error ||
-                "Error while deleting destination";
+                t("alerts.messages.deleteDestinationFailed");
               toast({
                 variant: "error",
                 message,
@@ -799,7 +799,7 @@ export default defineComponent({
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting destinations. Please try again.";
+          t("alerts.messages.bulkDeleteDestinationsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",

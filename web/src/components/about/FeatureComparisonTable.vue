@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { FEATURE_REGISTRY, getFeatureNameKey, type FeatureDefinition } from "@/constants/features";
 
 const store = useStore();
@@ -212,48 +212,48 @@ const listFeatures = computed(() => FEATURE_REGISTRY.filter((f) => !EXCLUDED_FRO
 
 interface EditionMeta {
   id: string;
-  shortName: string;
-  hosting: string;
-  price: string;
-  priceSub: string;
-  license: string;
-  support: string;
-  ctaLabel: string;
+  shortName: I18nText;
+  hosting: I18nText;
+  price: I18nText;
+  priceSub: I18nText;
+  license: I18nText;
+  support: I18nText;
+  ctaLabel: I18nText;
   ctaUrl: string | null;
 }
 
 const editionList = computed((): EditionMeta[] => [
   {
     id: "opensource",
-    shortName: "Open Source",
-    hosting: "Self-hosted",
+    shortName: raw("Open Source"),
+    hosting: t("about.selfHosted"),
     price: t("about.value_cost_free"),
-    priceSub: "Forever, no limits",
-    license: t("about.value_license_agpl"),
+    priceSub: t("about.foreverNoLimits"),
+    license: raw("AGPL"),
     support: t("about.value_support_community"),
-    ctaLabel: buildType === "opensource" ? "Current plan" : "Learn more",
+    ctaLabel: buildType === "opensource" ? t("about.currentPlan") : t("about.learnMore"),
     ctaUrl: buildType === "opensource" ? null : "https://openobserve.ai",
   },
   {
     id: "enterprise",
-    shortName: "Enterprise",
-    hosting: "Self-hosted",
+    shortName: raw("Enterprise"),
+    hosting: t("about.selfHosted"),
     price: t("about.value_cost_free"),
-    priceSub: "Up to 50 GB/day · paid beyond",
+    priceSub: t("about.upToFiftyGbPaidBeyond"),
     license: t("about.value_license_enterprise"),
     support: t("about.value_support_enterprise"),
-    ctaLabel: buildType === "enterprise" ? "Current plan" : "Download",
+    ctaLabel: buildType === "enterprise" ? t("about.currentPlan") : t("about.download"),
     ctaUrl: buildType === "enterprise" ? null : "https://openobserve.ai/download",
   },
   {
     id: "cloud",
-    shortName: "Cloud",
-    hosting: "Fully managed",
-    price: "14-day trial",
-    priceSub: "Usage-based thereafter",
+    shortName: raw("Cloud"),
+    hosting: t("about.fullyManaged"),
+    price: t("about.trialFourteenDay"),
+    priceSub: t("about.usageBasedThereafter"),
     license: t("about.value_license_cloud"),
     support: t("about.value_support_cloud"),
-    ctaLabel: buildType === "cloud" ? "Current plan" : "Start free trial",
+    ctaLabel: buildType === "cloud" ? t("about.currentPlan") : t("about.startFreeTrial"),
     ctaUrl: buildType === "cloud" ? null : "https://cloud.openobserve.ai",
   },
 ]);

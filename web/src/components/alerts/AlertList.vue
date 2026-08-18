@@ -2271,7 +2271,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "error",
-            message: e?.response?.data?.message || "Failed to clone anomaly detection",
+            message: e?.response?.data?.message || t("alerts.messages.cloneAnomalyFailed"),
           });
         } finally {
           isSubmitting.value = false;
@@ -2435,7 +2435,7 @@ export default defineComponent({
           }
           toast({
             variant: "error",
-            message: err?.data?.message || "Error while deleting alert.",
+            message: err?.data?.message || t("alerts.messages.deleteAlertFailed"),
           });
         });
       if (config.enableAnalytics == "true") {
@@ -2631,7 +2631,7 @@ export default defineComponent({
       } catch (error: any) {
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to trigger alert",
+          message: error?.response?.data?.message || t("alerts.messages.triggerAlertFailed"),
         });
       }
     };
@@ -2650,7 +2650,7 @@ export default defineComponent({
       } catch (error: any) {
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to trigger retraining",
+          message: error?.response?.data?.message || t("alerts.messages.triggerRetrainingFailed"),
         });
       }
     };
@@ -3166,7 +3166,7 @@ export default defineComponent({
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting alerts. Please try again.";
+          t("alerts.messages.bulkDeleteAlertsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",

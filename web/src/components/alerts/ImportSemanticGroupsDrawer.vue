@@ -400,7 +400,7 @@ const loadFile = async (value: FileValue) => {
     // Validate groups
     for (const group of groups) {
       if (!group.id || !group.display || !Array.isArray(group.fields)) {
-        throw new Error("Invalid semantic group format");
+        throw new Error(t("alerts.import.invalidSemanticGroupFormat"));
       }
     }
 

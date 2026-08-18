@@ -220,7 +220,11 @@ function statusText(e: EvidenceEvent): string {
 function rowTitle(e: EvidenceEvent): string {
   const label = e.url ?? e.text ?? e.message ?? e.kind;
   return e.initiatedTs != null && e.initiatedTs !== e.ts
-    ? `${label}\ninitiated ${e.initiatedTs} · observed ${e.ts}`
+    ? t("synthetics.evidence.rowTitleWithTimestamps", {
+        label,
+        initiated: e.initiatedTs,
+        observed: e.ts,
+      })
     : label;
 }
 </script>

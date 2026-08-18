@@ -62,7 +62,7 @@ import { useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
-  addToDashboardSchema,
+  makeAddToDashboardSchema,
   addToDashboardDefaults,
   type AddToDashboardForm,
 } from "./AddToDashboard.schema";
@@ -113,6 +113,7 @@ export default defineComponent({
     const activeFolderId = ref("default");
     const activeTabId: any = ref(null);
     const { t } = useI18nTyped();
+    const addToDashboardSchema = makeAddToDashboardSchema(t);
 
     const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
       useNotifications();
@@ -239,7 +240,7 @@ export default defineComponent({
       t,
       getImageURL,
       // Options-API setup(): template only sees what's returned here, so the
-      // Zod schema import MUST be exposed or `:schema` resolves to undefined
+      // built schema MUST be exposed or `:schema` resolves to undefined
       // (which silently disables validation).
       addToDashboardSchema,
       addToDashboardDefaults,

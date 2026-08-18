@@ -451,9 +451,7 @@ function usedByCount(row: ScoreConfig) {
 }
 
 function usedByText(row: ScoreConfig) {
-  const count = usedByCount(row);
-  if (count === 1) return t("onlineEvals.scoreConfig.usedByScorer", { count });
-  return t("onlineEvals.scoreConfig.usedByScorers", { count });
+  return t("onlineEvals.scoreConfig.usedByScorer", { count: usedByCount(row) });
 }
 
 useShortcuts([

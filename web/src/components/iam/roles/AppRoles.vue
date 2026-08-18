@@ -86,7 +86,7 @@ import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
 import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
@@ -264,7 +264,7 @@ const deleteUserRole = (role: any) => {
 // user count with one getRoleUsers call on delete-click (the list payload has
 // no counts), and always warn about bound service accounts via static copy
 // since there is no role→service-accounts count endpoint.
-const deleteImpactMessage = ref("");
+const deleteImpactMessage = ref(raw(""));
 
 const showConfirmDialog = async (row: any) => {
   deleteConformDialog.value.show = true;
@@ -292,7 +292,7 @@ const _deleteRole = () => {
 // Blast-radius warning for the bulk-delete dialog. With exactly one role
 // selected we resolve its live user count (one getRoleUsers call), matching the
 // per-row delete. For 2+ roles we keep static copy to avoid N requests.
-const bulkDeleteImpactMessage = ref("");
+const bulkDeleteImpactMessage = ref(raw(""));
 
 const openBulkDeleteDialog = async () => {
   confirmBulkDelete.value = true;

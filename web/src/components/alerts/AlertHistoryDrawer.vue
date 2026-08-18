@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="anomalySql"
                     @click="
                       copyToClipboard(anomalySql, t, {
-                        successMessage: 'SQL Copied Successfully!',
+                        successMessage: t('common.itemCopiedSuccessfully', { item: 'SQL' }),
                         timeout: 3000,
                       })
                     "
@@ -321,12 +321,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     @click="
                       copyToClipboard(alertDetails.conditions, t, {
-                        successMessage:
-                          (alertDetails.type === 'sql'
-                            ? t('alerts.alertDetails.sqlQuery')
-                            : alertDetails.type === 'promql'
-                              ? t('alerts.alertDetails.promqlQuery')
-                              : t('alerts.alertDetails.conditions')) + ' Copied Successfully!',
+                        successMessage: t('common.itemCopiedSuccessfully', {
+                          item:
+                            alertDetails.type === 'sql'
+                              ? t('alerts.alertDetails.sqlQuery')
+                              : alertDetails.type === 'promql'
+                                ? t('alerts.alertDetails.promqlQuery')
+                                : t('alerts.alertDetails.conditions'),
+                        }),
                       })
                     "
                     variant="ghost-muted"
@@ -765,7 +767,7 @@ const getRowClass = (row: any) => {
 };
 
 const formatTimestampFull = (timestamp: number) => {
-  if (!timestamp) return "N/A";
+  if (!timestamp) return raw("N/A");
   return formatTimestamp(timestamp, "MMM DD, YYYY HH:mm:ss");
 };
 

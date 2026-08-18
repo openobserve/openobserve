@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
@@ -116,7 +118,7 @@ export class TableConverter implements PromQLChartConverter {
     // cells in logs and traces, so digits line up column-to-column. Label
     // columns hold free text and stay in the sans face.
     const makeTimestampColumn = (sticky = false): any => ({
-      ...baseColumn("timestamp", "Timestamp", "left"),
+      ...baseColumn("timestamp", gt("dashboard.utils.promqlTableTimestampColumn"), "left"),
       mono: true,
       ...(sticky ? { sticky, headerClasses: "sticky-column", classes: "sticky-column" } : {}),
     });
@@ -150,7 +152,7 @@ export class TableConverter implements PromQLChartConverter {
 
     // In "single" (Timestamp) mode, show timestamp + value columns
     if (tableMode === "single") {
-      return [makeTimestampColumn(), makeValueColumn("value", "Value")];
+      return [makeTimestampColumn(), makeValueColumn("value", gt("common.value"))];
     }
 
     // In "expanded_timeseries" mode, show timestamp + all metric labels + value
@@ -176,7 +178,7 @@ export class TableConverter implements PromQLChartConverter {
         columns.push(makeLabelColumn(key, stickyColumns.includes(key)));
       });
 
-      columns.push(makeValueColumn("value", "Value"));
+      columns.push(makeValueColumn("value", gt("common.value")));
 
       return columns;
     }
@@ -200,7 +202,10 @@ export class TableConverter implements PromQLChartConverter {
 
     aggregations.forEach((agg: string) => {
       const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
-      const columnLabel = aggregations.length === 1 ? "Value" : `Value (${agg})`;
+      const columnLabel =
+        aggregations.length === 1
+          ? gt("common.value")
+          : gt("dashboard.utils.promqlTableValueColumn", { aggregation: agg });
       columns.push(makeValueColumn(columnName, columnLabel));
     });
 

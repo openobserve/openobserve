@@ -33,6 +33,10 @@ vi.mock("@vue-flow/core", async () => {
     nodesInitializedCb: null,
     setViewport: vi.fn(),
     findNode: vi.fn(),
+    fitView: vi.fn(),
+    setCenter: vi.fn(),
+    removeEdges: vi.fn(),
+    getSelectedEdges: ref([]),
     viewport: ref({ x: 0, y: 0, zoom: 1 }),
     dimensions: ref({ width: 1000, height: 600 }),
   };
@@ -92,6 +96,10 @@ vi.mock("@vue-flow/core", async () => {
       },
       setViewport: state.setViewport,
       findNode: state.findNode,
+      fitView: state.fitView,
+      setCenter: state.setCenter,
+      getSelectedEdges: state.getSelectedEdges,
+      removeEdges: state.removeEdges,
       viewport: state.viewport,
       dimensions: state.dimensions,
     }),
@@ -149,15 +157,31 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", async () => {
   const api = {
     workflowObj: reactive({
       currentSelectedWorkflow: { nodes: <any[]>[], edges: <any[]>[] },
+      // testRun is read by the fit-view watch / onNodesInitialized (T4).
+      testRun: { result: <any>null, resultDrawer: { show: false, nodeId: "" } },
+      readOnly: false,
+      showNodePalette: false,
     }),
     onNodeChange: vi.fn(),
     onNodesChange: vi.fn(),
     onEdgesChange: vi.fn(),
+    onNodeDragStart: vi.fn(),
+    onNodeDragStop: vi.fn(),
     onConnect: vi.fn(),
     onDrop: vi.fn(),
     onDragOver: vi.fn(),
+    openTriggerPicker: vi.fn(),
+    openInsertPicker: vi.fn(),
   };
-  return { default: () => api };
+  return {
+    default: () => api,
+    // Named exports the canvas imports directly (undo history + tidy).
+    workflowHistory: reactive({ past: <any[]>[], future: <any[]>[] }),
+    pushWorkflowHistory: vi.fn(),
+    undoWorkflow: vi.fn(),
+    redoWorkflow: vi.fn(),
+    tidyWorkflowLayout: vi.fn(),
+  };
 });
 
 import * as vueFlowCore from "@vue-flow/core";

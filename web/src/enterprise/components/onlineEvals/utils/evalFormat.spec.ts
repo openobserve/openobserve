@@ -9,6 +9,9 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+import { gt } from "@/types/i18n";
+
 import {
   defaultOutputSchema,
   defaultTestValue,
@@ -128,16 +131,16 @@ describe("defaultTestValue", () => {
   // "Run test" immediately. They're well-known prompt-engineering variable
   // names — drift here would mean an empty test panel.
   it("returns canned text for known variable names", () => {
-    expect(defaultTestValue("input")).toContain("Paris");
-    expect(defaultTestValue("output")).toContain("Paris");
-    expect(defaultTestValue("context")).toContain("France");
-    expect(defaultTestValue("metadata")).toBe("{}");
-    expect(defaultTestValue("trace.id")).toBe("test_trace_123");
-    expect(defaultTestValue("span.id")).toBe("test_span_456");
+    expect(defaultTestValue("input", gt)).toContain("Paris");
+    expect(defaultTestValue("output", gt)).toContain("Paris");
+    expect(defaultTestValue("context", gt)).toContain("France");
+    expect(defaultTestValue("metadata", gt)).toBe("{}");
+    expect(defaultTestValue("trace.id", gt)).toBe("test_trace_123");
+    expect(defaultTestValue("span.id", gt)).toBe("test_span_456");
   });
 
   it("returns empty string for unknown variables", () => {
-    expect(defaultTestValue("whatever")).toBe("");
+    expect(defaultTestValue("whatever", gt)).toBe("");
   });
 });
 

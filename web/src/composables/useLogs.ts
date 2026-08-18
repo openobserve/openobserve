@@ -83,7 +83,7 @@ const useLogs = (t: TranslateFn) => {
       // else use organization settings
       const queryReq: any = buildSearch();
       if (queryReq == false) {
-        throw new Error(notificationMsg.value || "Something went wrong.");
+        throw new Error(notificationMsg.value || t("search.somethingWentWrongPeriod"));
       }
       if (searchObj.meta.jobId == "") {
         queryReq.query.size = parseInt(searchObj.meta.jobRecords);

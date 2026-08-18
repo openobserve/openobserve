@@ -264,7 +264,7 @@ export default defineComponent({
     // IMPORTANT: Always create a NEW isolated instance for ViewPanel
     // ViewPanel should NEVER share the variables manager with the parent dashboard
     // This ensures that variable changes in ViewPanel don't affect the parent dashboard
-    const variablesManager = useVariablesManager();
+    const variablesManager = useVariablesManager(t);
 
     // Provide to child components (ViewPanel's own isolated instance)
     provide("variablesManager", variablesManager);

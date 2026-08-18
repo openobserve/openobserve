@@ -132,7 +132,9 @@ export default defineComponent({
       } catch (err: any) {
         showErrorNotification(
           err?.message ??
-            `${props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1)} move failed.`,
+            t("toastMessages.sidebar.moveFailed", {
+              type: props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1),
+            }),
           {
             timeout: 5000,
           },

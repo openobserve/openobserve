@@ -31,7 +31,10 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
-use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
+use parquet::{
+    arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter},
+    file::metadata::KeyValue,
+};
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
@@ -57,18 +60,33 @@ use {
     o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule,
 };
 
-pub enum MergeParquetResult {
-    Single {
-        buf: Vec<u8>,
-        file_meta: FileMeta,
-        file_format: FileFormat,
-    },
-    #[allow(unused)]
-    Multiple {
-        bufs: Vec<Vec<u8>>,
-        file_metas: Vec<FileMeta>,
-        file_format: FileFormat,
-    },
+/// One file written by [`merge_parquet_files`].
+pub struct MergedFile {
+    pub buf: Vec<u8>,
+    pub meta: FileMeta,
+}
+
+pub struct MergeParquetResult {
+    pub files: Vec<MergedFile>,
+    pub file_format: FileFormat,
+}
+
+impl MergeParquetResult {
+    /// The merged file, for callers that always merge into exactly one file
+    /// (the ingester movers).
+    pub fn into_single(self) -> Result<(MergedFile, FileFormat)> {
+        let Self {
+            mut files,
+            file_format,
+        } = self;
+        if files.len() != 1 {
+            return Err(DataFusionError::Execution(format!(
+                "merge_parquet_files produced {} files, expected exactly one",
+                files.len()
+            )));
+        }
+        Ok((files.pop().unwrap(), file_format))
+    }
 }
 
 pub async fn merge_parquet_files(
@@ -192,9 +210,11 @@ pub async fn merge_parquet_files(
     );
 
     metadata.compressed_size = buf.len() as i64;
-    Ok(MergeParquetResult::Single {
-        buf,
-        file_meta: metadata,
+    Ok(MergeParquetResult {
+        files: vec![MergedFile {
+            buf,
+            meta: metadata,
+        }],
         file_format,
     })
 }
@@ -298,8 +318,8 @@ async fn write_vortex(
         .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
 }
 
-pub fn append_metadata(
-    writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
+pub fn append_metadata<W: AsyncFileWriter>(
+    writer: &mut AsyncArrowWriter<W>,
     file_meta: &FileMeta,
 ) -> Result<()> {
     writer.append_key_value_metadata(KeyValue::new(
@@ -432,10 +452,8 @@ mod tests {
         )
         .await
         .unwrap();
-        let MergeParquetResult::Single { buf, .. } = merged else {
-            panic!("trace time index merge must produce a single parquet file");
-        };
-        let batches = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(buf))
+        let (merged, _) = merged.into_single().unwrap();
+        let batches = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(merged.buf))
             .unwrap()
             .build()
             .unwrap()

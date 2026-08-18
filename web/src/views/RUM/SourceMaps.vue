@@ -460,7 +460,8 @@ const deleteSourceMap = async () => {
     console.error("Error deleting source maps:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.message || error?.message || "Failed to delete source maps",
+      message:
+        error?.response?.data?.message || error?.message || t("rum.failedToDeleteSourceMaps"),
     });
   }
 };

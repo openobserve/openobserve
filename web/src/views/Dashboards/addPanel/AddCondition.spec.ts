@@ -495,32 +495,49 @@ describe("AddCondition.vue", () => {
   });
 
   describe("Operator array", () => {
+    // The `value` half is the wire format persisted on the panel and matched by
+    // identity in sqlUtils / dashboardAutoQueryBuilder / panelValidation, so it is
+    // asserted separately from the (translatable) label a person reads.
+    const expectedOperatorValues = [
+      "=",
+      "<>",
+      ">=",
+      "<=",
+      ">",
+      "<",
+      "IN",
+      "NOT IN",
+      "str_match",
+      "str_match_ignore_case",
+      "match_all",
+      "re_match",
+      "re_not_match",
+      "Contains",
+      "Starts With",
+      "Ends With",
+      "Not Contains",
+      "Is Null",
+      "Is Not Null",
+    ];
+
     it("should contain all expected operators", () => {
       wrapper = createWrapper();
 
-      const expectedOperators = [
-        "=",
-        "<>",
-        ">=",
-        "<=",
-        ">",
-        "<",
-        "IN",
-        "NOT IN",
-        "str_match",
-        "str_match_ignore_case",
-        "match_all",
-        "re_match",
-        "re_not_match",
-        "Contains",
-        "Starts With",
-        "Ends With",
-        "Not Contains",
-        "Is Null",
-        "Is Not Null",
-      ];
+      expect(wrapper.vm.operators.map((op: any) => op.value)).toEqual(expectedOperatorValues);
+    });
 
-      expect(wrapper.vm.operators).toEqual(expectedOperators);
+    it("labels the SQL tokens with themselves and the prose operators from i18n", () => {
+      wrapper = createWrapper();
+      const labelOf = Object.fromEntries(
+        wrapper.vm.operators.map((op: any) => [op.value, op.label]),
+      );
+
+      // Syntax is its own label — nothing to translate.
+      expect(labelOf["="]).toBe("=");
+      expect(labelOf["str_match"]).toBe("str_match");
+      // Prose goes through t(); this spec's t echoes the key path.
+      expect(labelOf["Starts With"]).toBe("dashboard.filterOperators.startsWith");
+      expect(labelOf["Is Not Null"]).toBe("dashboard.filterOperators.isNotNull");
     });
   });
 

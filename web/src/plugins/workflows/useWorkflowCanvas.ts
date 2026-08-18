@@ -167,6 +167,11 @@ const defaultWorkflow = {
   nodes: <any>[],
   edges: <any>[],
   org: "",
+  // True while this is an unpublished draft (persisted via the drafts table,
+  // skips graph validation). Flips to false once promoted/published. A brand-new
+  // workflow starts false — it's neither a saved draft nor a published workflow
+  // until the first Save-as-Draft / Publish.
+  isDraft: false,
 };
 
 const defaultObject = {
@@ -183,6 +188,9 @@ const defaultObject = {
   currentSelectedNodeData: <any>null,
   // Edge to create when the staged node's drawer is saved (add flow).
   pendingEdge: <any>null,
+  // Insert-on-edge (T7): the edge to SPLICE when the staged node commits — the old
+  // edge A→B is removed and A→new + new→B are created.
+  pendingInsert: <any>null,
   dialog: { ...defaultDialog },
   // Step picker (the searchable "add next step" popover). Clicking a node's
   // source handle opens it with that node + handle; picking a type calls
@@ -195,7 +203,9 @@ const defaultObject = {
     show: false,
     source: "",
     handle: "out",
-    mode: "next" as "next" | "trigger",
+    mode: "next" as "next" | "trigger" | "insert",
+    // "insert" mode splices onto this edge (A→B becomes A→new→B on commit).
+    edgeId: "",
     position: null as { x: number; y: number } | null,
     anchor: null as { x: number; y: number } | null,
   },
@@ -234,6 +244,183 @@ const defaultObject = {
 const workflowObj = reactive(Object.assign({}, defaultObject));
 
 export { workflowObj };
+
+// ── Dirty tracking (T8) ──────────────────────────────────────────────────────
+// Mark the graph unsaved. Gated ONLY on `readOnly` (the Runs inspection canvas),
+// so — unlike the old `isEditWorkflow` gate — a brand-new CREATE-mode workflow
+// and node moves/renames count too. The route-leave + beforeunload guards in the
+// editor read `dirtyFlag`; it starts false on load and is cleared after Save.
+export const markWorkflowDirty = () => {
+  if (!workflowObj.readOnly) workflowObj.dirtyFlag = true;
+};
+
+// ── Undo history (T1) ────────────────────────────────────────────────────────
+// Snapshots of { nodes, edges } captured BEFORE each structural mutation, so an
+// undo restores the graph exactly as it was (nodes AND their edges). Module-level
+// (shared across the editor's component instances) and capped so a long build
+// session can't grow it unbounded. Redo is keyboard-only (product decision), but
+// the `future` stack backs it for free.
+const HISTORY_LIMIT = 50;
+export const workflowHistory = reactive<{ past: any[]; future: any[] }>({
+  past: [],
+  future: [],
+});
+const cloneGraph = () => ({
+  nodes: JSON.parse(JSON.stringify(workflowObj.currentSelectedWorkflow.nodes || [])),
+  edges: JSON.parse(JSON.stringify(workflowObj.currentSelectedWorkflow.edges || [])),
+});
+// Snapshot the CURRENT graph before a mutation. A new edit forks history, so the
+// redo stack is cleared. No-op on the read-only canvas.
+export const pushWorkflowHistory = () => {
+  if (workflowObj.readOnly) return;
+  workflowHistory.past.push(cloneGraph());
+  if (workflowHistory.past.length > HISTORY_LIMIT) workflowHistory.past.shift();
+  workflowHistory.future = [];
+};
+const applyGraphSnapshot = (snap: { nodes: any[]; edges: any[] }) => {
+  // Reassign whole arrays so VueFlow's v-model picks up the restore.
+  workflowObj.currentSelectedWorkflow.nodes = snap.nodes;
+  workflowObj.currentSelectedWorkflow.edges = snap.edges;
+  // The Test log deliberately PERSISTS across graph edits: it's cleared
+  // only by a new run or the explicit "Clear" button. A step this undo/redo removed
+  // stays listed struck-through (from the run-time snapshot). See executeTestRun.
+};
+export const undoWorkflow = () => {
+  if (!workflowHistory.past.length) return;
+  const prev = workflowHistory.past.pop();
+  workflowHistory.future.push(cloneGraph());
+  applyGraphSnapshot(prev);
+  markWorkflowDirty();
+};
+export const redoWorkflow = () => {
+  if (!workflowHistory.future.length) return;
+  const next = workflowHistory.future.pop();
+  workflowHistory.past.push(cloneGraph());
+  applyGraphSnapshot(next);
+  markWorkflowDirty();
+};
+export const resetWorkflowHistory = () => {
+  workflowHistory.past = [];
+  workflowHistory.future = [];
+};
+
+// ── Per-node metadata (T2 rename / T3 comment / T6 disable) ───────────────────
+// All three live in node.meta (Record<string,string>) so they round-trip through
+// serializeNode. Each marks the graph dirty; rename/comment are cheap live edits
+// (no history entry), while a disable toggle pushes one undo snapshot.
+const findWorkflowNode = (nodeId: string) =>
+  (workflowObj.currentSelectedWorkflow.nodes || []).find((n: any) => n.id === nodeId);
+
+// A node's display name (empty when never set → the card falls back to its
+// config-derived label).
+export const nodeCustomName = (node: any): string => node?.meta?.label || "";
+export const nodeComment = (node: any): string => node?.meta?.comment || "";
+// Disabled flag (T6) lives at the NODE ROOT as a boolean `is_disabled` (sibling of
+// `meta`), so serializeNode sends it there. Accepts the string form too for any
+// payload that round-tripped it as text.
+export const isNodeDisabled = (node: any): boolean =>
+  node?.is_disabled === true || node?.is_disabled === "true";
+
+// Write meta on a node reference (staged or already on the canvas). Empty values
+// drop the key so an unnamed/uncommented node serializes clean.
+const setNodeMeta = (node: any, key: string, value: string) => {
+  if (!node) return;
+  const meta = { ...(node.meta || {}) };
+  if (value) meta[key] = value;
+  else delete meta[key];
+  node.meta = meta;
+  markWorkflowDirty();
+};
+export const setNodeName = (node: any, name: string) =>
+  setNodeMeta(node, "label", (name || "").trim());
+export const setNodeComment = (node: any, text: string) => setNodeMeta(node, "comment", text || "");
+
+// Placeholder / "Configure Later" flag — a node the user saved without finishing
+// (today: a Destination with no destination selected). Stored in `meta.incomplete`
+// so it round-trips via serializeNode. Draft save allows it; Publish blocks it
+// (see WorkflowEditor.validate); Test lets the backend error on it.
+export const isNodeIncomplete = (node: any): boolean => node?.meta?.incomplete === "true";
+export const setNodeIncomplete = (node: any, incomplete: boolean) =>
+  setNodeMeta(node, "incomplete", incomplete ? "true" : "");
+
+export const toggleNodeDisabled = (nodeId: string) => {
+  const node = findWorkflowNode(nodeId);
+  if (!node || workflowObj.readOnly) return;
+  pushWorkflowHistory();
+  // Root-level boolean (sibling of `meta`) — see serializeNode / isNodeDisabled.
+  node.is_disabled = !isNodeDisabled(node);
+  // The Test log persists; a now-disabled step stays listed
+  // struck-through rather than clearing the whole run. See executeTestRun.
+  markWorkflowDirty();
+};
+
+// ── Auto-layout / Tidy up (T9) ────────────────────────────────────────────────
+const TIDY_COL = 300; // per-column horizontal spacing (node ~240 + gap)
+const TIDY_ROW = 160; // vertical gap between depths (matches addNodeAfter)
+const TIDY_NODE_W = 240; // fallback node width when the real one isn't measured yet
+// Re-arrange the graph into a clean top-down tree. The workflow graph is a strict
+// single-incoming tree (enforced in onConnect), so positions compute directly:
+// depth from the trigger → y, sibling slot → column CENTRE, each parent centred
+// over its children — no layout library needed. Node positions are LEFT-edge, so
+// a node is centred on its column by subtracting half its (measured) width; that's
+// why `getWidth` is passed in — without it a wide parent and a narrow child would
+// left-align and look off-centre. Pushes one undo snapshot (single Ctrl+Z revert).
+// Orphans (unreachable from the trigger, mid-build) stack in a trailing column.
+export const tidyWorkflowLayout = (getWidth?: (id: string) => number | undefined): boolean => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  const nodes = wf.nodes || [];
+  if (nodes.length <= 1 || workflowObj.readOnly) return false;
+  pushWorkflowHistory();
+  const children = buildChildrenMap(wf.edges || []);
+  const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
+  const rootId = trigger?.id || nodes[0]?.id;
+  // Column CENTRE x + depth for each node; converted to a left-edge position below.
+  const centerX = new Map<string, number>();
+  const depthOf = new Map<string, number>();
+  const visited = new Set<string>();
+  let nextSlot = 0;
+  const layout = (id: string, depth: number): number => {
+    visited.add(id);
+    depthOf.set(id, depth);
+    const kids = (children.get(id) ?? []).filter((k) => !visited.has(k));
+    let cx: number;
+    if (!kids.length) {
+      cx = nextSlot * TIDY_COL;
+      nextSlot++;
+    } else {
+      const cs = kids.map((k) => layout(k, depth + 1));
+      cx = (cs[0] + cs[cs.length - 1]) / 2; // centre the parent over its children
+    }
+    centerX.set(id, cx);
+    return cx;
+  };
+  if (rootId) layout(rootId, 0);
+  // Orphan subtrees (unreachable from the trigger — e.g. a node just dragged in, or
+  // a chain built before it's wired to the trigger). Lay each subtree ROOT out with
+  // the SAME recursive tree layout so a connected orphan chain keeps its parent→child
+  // order and depth, each in its own trailing columns. (The old code stacked every
+  // orphan node in ONE column ordered by array index, which reversed connected pairs
+  // like Condition→Function and overlapped separate orphans.)
+  const hasParent = new Set<string>();
+  for (const kids of children.values()) for (const k of kids) hasParent.add(k);
+  for (const n of nodes) {
+    // A subtree root is an unplaced node with no parent; layout() recurses into its
+    // children, so deeper orphan nodes are placed by that call, not this loop.
+    if (!visited.has(n.id) && !hasParent.has(n.id)) layout(n.id, 0);
+  }
+  // Safety net: place anything still unvisited (e.g. an orphan cycle) on its own.
+  for (const n of nodes) if (!visited.has(n.id)) layout(n.id, 0);
+  // Convert centre-x → left-edge position using each node's real (measured) width
+  // so cards line up on their centres, not their left edges.
+  wf.nodes = nodes.map((n: any) => {
+    const cx = centerX.get(n.id);
+    if (cx == null) return n;
+    const w = getWidth?.(n.id) || TIDY_NODE_W;
+    return { ...n, position: { x: cx - w / 2, y: (depthOf.get(n.id) ?? 0) * TIDY_ROW } };
+  });
+  markWorkflowDirty();
+  return true;
+};
 
 // The kind of the current graph's trigger node — the single lookup other pieces
 // (payload reference, condition fields, function sample) use to stay in sync
@@ -299,6 +486,59 @@ export const flowOrderedNodeIds = (nodes: any[], edges: any[], startId?: string)
   return order;
 };
 
+// A step in the executed-steps TREE (results dock). Carries the render structure —
+// depth, direct-child count, and per-column "does this rail continue" flags — so
+// the panel draws the traces-waterfall connector lines without re-deriving them.
+export interface StepTreeNode {
+  id: string;
+  depth: number;
+  childCount: number;
+  // One flag per depth column: does the rail at that column continue below this
+  // row (ancestor / this node has a following sibling)? The last entry is this
+  // node's own continuation, which picks its elbow shape (└ vs ├).
+  guides: boolean[];
+}
+
+// Build the ran nodes as a DFS PRE-ORDER tree (children immediately follow their
+// parent so the connector rails line up). Siblings are ordered by canvas position
+// (top-to-bottom, then left-to-right). `ranIds` bounds the walk to nodes that
+// actually ran; unreached ran nodes (orphans / a replay's from-node) start their
+// own subtree in flow order. Structure only — labels/status are resolved by the
+// caller — so it's reusable for both the live-run snapshot and the history view.
+export const buildStepTree = (nodes: any[], edges: any[], ranIds: string[]): StepTreeNode[] => {
+  const ran = new Set<string>(ranIds);
+  if (!ran.size || !(nodes || []).length) return [];
+  const byId = new Map<string, any>((nodes || []).map((n: any) => [n.id, n]));
+  const kidsOf: Record<string, string[]> = {};
+  for (const e of edges || []) (kidsOf[e.source] ||= []).push(e.target);
+  const sortKids = (ids: string[]) =>
+    ids
+      .filter((c) => ran.has(c) && byId.has(c))
+      .sort((a, b) => {
+        const na = byId.get(a);
+        const nb = byId.get(b);
+        return (
+          (na?.position?.y ?? 0) - (nb?.position?.y ?? 0) ||
+          (na?.position?.x ?? 0) - (nb?.position?.x ?? 0)
+        );
+      });
+
+  const rows: StepTreeNode[] = [];
+  const seen = new Set<string>();
+  const visit = (id: string, depth: number, guides: boolean[]) => {
+    if (seen.has(id)) return; // cycle / diamond guard
+    seen.add(id);
+    const kids = sortKids(kidsOf[id] || []);
+    rows.push({ id, depth, childCount: kids.length, guides });
+    kids.forEach((c, idx) => visit(c, depth + 1, [...guides, idx < kids.length - 1]));
+  };
+  // Start from each unvisited ran node in flow order — the first is the run's root
+  // (trigger or replay from-node); any remainder are orphans.
+  for (const id of flowOrderedNodeIds(nodes, edges).filter((id) => ran.has(id)))
+    if (!seen.has(id)) visit(id, 0, []);
+  return rows;
+};
+
 // `startIds` + everything downstream of them (a Set; the starts are included).
 //
 // Example — for Trigger(t) → Function(f) → Destination(d):
@@ -356,6 +596,9 @@ const serializeNode = (node: any) => {
       y: node.position?.y ?? 0,
     },
     data,
+    // Disabled flag (T6) sits at the NODE ROOT (sibling of `meta`), as a real
+    // boolean — always sent so the backend can skip a muted node on a run.
+    is_disabled: node.is_disabled === true || node.is_disabled === "true",
   };
   if (Object.keys(meta).length) out.meta = meta;
   if (node.style) out.style = node.style;
@@ -396,11 +639,15 @@ export const executeTestRun = async (opts: {
 }): Promise<{ ok: boolean; error?: string }> => {
   const wf = workflowObj.currentSelectedWorkflow;
   try {
+    // Dry-run a DRAFT when the graph is a saved draft, has unsaved edits, or was
+    // never persisted — the backend then skips the strict published validation.
+    const draft = !!(wf.isDraft || workflowObj.dirtyFlag || !wf.id);
     const res = await workflowService.testWorkflow({
       org_identifier: opts.orgId,
       workflow: serializeWorkflow(),
       inputs: opts.inputs,
       from_node: opts.fromNode || undefined,
+      draft,
     });
     const errors = res.data?.errors || {};
     // Per-node INPUT map: node_id -> the records that node received. A node's
@@ -415,10 +662,27 @@ export const executeTestRun = async (opts: {
     )?.id;
     const startId = opts.fromNode || triggerId;
     const ranNodeIds = startId ? [...reachableFrom(wf.edges || [], [startId])] : [];
+    // Snapshot the executed-steps TREE at run time. The results dock now persists
+    // across graph edits, so a step later deleted or disabled must still
+    // render — with its frozen label/icon, struck-through. We freeze the tree shape
+    // (depth + connector guides) plus each step's display data/meta here; the panel
+    // resolves live label/status on top (reflecting a later rename) and falls back
+    // to this frozen data for a removed node. History runs don't set this — the
+    // panel rebuilds the tree from the live graph there. See WorkflowResultsPanel.
+    const stepById = new Map<string, any>((wf.nodes || []).map((n: any) => [n.id, n]));
+    const ranSteps = buildStepTree(wf.nodes || [], wf.edges || [], ranNodeIds).map((s) => {
+      const n = stepById.get(s.id);
+      return {
+        ...s,
+        data: n?.data ? { ...n.data } : undefined,
+        meta: n?.meta ? { ...n.meta } : undefined,
+      };
+    });
     workflowObj.testRun.result = {
       errors,
       inputs,
       ranNodeIds,
+      ranSteps,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
     };
     return { ok: true };
@@ -569,13 +833,18 @@ export const hydrateWorkflow = (wf: any) => {
     const styled = makeEdge(src, tgt, e.sourceHandle);
     return { ...e, ...styled, id: e.id || styled.id };
   });
-  workflowObj.currentSelectedWorkflow = { ...wf, nodes, edges };
+  // List rows carry `is_draft`; normalize it onto the store's `isDraft` so the
+  // editor knows to save via the draft endpoints and to offer Publish.
+  workflowObj.currentSelectedWorkflow = { ...wf, nodes, edges, isDraft: !!wf.is_draft };
   // Snapshot the NORMALIZED graph (VueFlow type + styled edges), not raw `wf`,
   // so any cancel/restore or dirty-compare baseline matches what's on canvas.
   workflowObj.workflowWithoutChange = JSON.parse(
     JSON.stringify(workflowObj.currentSelectedWorkflow),
   );
   workflowObj.isEditWorkflow = true;
+  // A freshly-loaded workflow is clean and carries no prior local edit history.
+  workflowObj.dirtyFlag = false;
+  resetWorkflowHistory();
 };
 
 export default function useWorkflowCanvas(t: TranslateFn) {
@@ -600,10 +869,25 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     // connected edges. Only a STRUCTURAL change (an edge added or removed) is a
     // real edit, so gate the dirty flag on that. Otherwise inspecting a run
     // (hover a node → click its error badge → Esc) would mark the workflow
-    // unsaved and wrongly force a Save-before-Test on the next run.
+    // unsaved and wrongly force a Save-before-Test on the next run. `markWorkflowDirty`
+    // itself no-ops on the read-only Runs canvas.
     const structural = changes.some((c: any) => c?.type === "add" || c?.type === "remove");
-    if (structural && workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
-    if (structural) workflowObj.edgesChange = true;
+    if (structural) {
+      workflowObj.edgesChange = true;
+      markWorkflowDirty();
+    }
+  }
+
+  // Dragging a node is a structural change too (T1/T8). Snapshot on drag START
+  // (positions haven't moved yet, so undo restores the exact pre-drag layout) and
+  // mark dirty on drag STOP. Both no-op on the read-only Runs canvas.
+  function onNodeDragStart() {
+    if (workflowObj.readOnly) return;
+    pushWorkflowHistory();
+  }
+  function onNodeDragStop() {
+    if (workflowObj.readOnly) return;
+    markWorkflowDirty();
   }
 
   // Manual wiring (dragging between handles). Programmatic add uses addNodeAfter.
@@ -627,10 +911,12 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       return;
     }
 
+    pushWorkflowHistory();
     workflowObj.currentSelectedWorkflow.edges = [
       ...edges,
       newEdge(connection.source, connection.target, connection.sourceHandle),
     ];
+    markWorkflowDirty();
   }
 
   // The trigger starts the workflow, so it can't be a connection target.
@@ -660,16 +946,19 @@ export default function useWorkflowCanvas(t: TranslateFn) {
 
   function deleteNode(nodeId: string) {
     const wf = workflowObj.currentSelectedWorkflow;
+    // Snapshot BEFORE removal so one undo brings the node AND its edges back.
+    pushWorkflowHistory();
     wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
     wf.edges = wf.edges.filter((e: any) => e.source !== nodeId && e.target !== nodeId);
-    // The graph changed — prior Test badges are stale.
-    workflowObj.testRun.result = null;
+    // The Test log PERSISTS: the deleted step stays listed in the dock,
+    // struck-through, from the run-time snapshot (result.ranSteps). Its canvas badge
+    // is gone with the node. Cleared only by a new run or the explicit Clear button.
     if (workflowObj.currentSelectedNodeData?.id === nodeId) {
       workflowObj.currentSelectedNodeData = null;
       workflowObj.dialog.show = false;
     }
     workflowObj.deleteConfirm = { show: false, nodeId: "" };
-    if (workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
+    markWorkflowDirty();
   }
 
   // Hover-`+` opens the step picker dialog anchored to this source + handle.
@@ -679,6 +968,23 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       source: sourceId,
       handle,
       mode: "next",
+      edgeId: "",
+      position: null,
+      anchor: event ? { x: event.clientX, y: event.clientY } : null,
+    };
+  }
+
+  // Insert-on-edge (T7): open the step picker to splice a node onto an existing
+  // edge. Picking a type calls addNodeOnEdge, which stages the node and (on commit)
+  // rewires A→new→B.
+  function openInsertPicker(edge: any, event?: MouseEvent) {
+    if (workflowObj.readOnly || !edge?.id) return;
+    workflowObj.stepPicker = {
+      show: true,
+      source: edge.source,
+      handle: "out",
+      mode: "insert",
+      edgeId: edge.id,
       position: null,
       anchor: event ? { x: event.clientX, y: event.clientY } : null,
     };
@@ -693,6 +999,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       source: "",
       handle: "out",
       mode: "trigger",
+      edgeId: "",
       position: screenToFlowCoordinate({ x: event.clientX, y: event.clientY }),
       anchor: { x: event.clientX, y: event.clientY },
     };
@@ -704,6 +1011,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       source: "",
       handle: "out",
       mode: "next",
+      edgeId: "",
       position: null,
       anchor: null,
     };
@@ -842,6 +1150,9 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     const meta = nodeMeta(nodeType);
     if (!meta) return;
 
+    // Placing the trigger is a real add — snapshot before, mark dirty after, so
+    // it's undoable and the unsaved guard catches a just-started workflow.
+    pushWorkflowHistory();
     const id = getUUID();
     workflowObj.currentSelectedWorkflow.nodes = [
       ...workflowObj.currentSelectedWorkflow.nodes,
@@ -857,11 +1168,14 @@ export default function useWorkflowCanvas(t: TranslateFn) {
         },
       },
     ];
+    markWorkflowDirty();
     // Don't auto-open the trigger's (read-only) detail panel — placing the trigger
     // shouldn't interrupt the build flow. The user can click the node to open it.
   }
 
   const NODE_W = 240;
+  // Vertical gap between a node and the next row (matches addNodeAfter / tidy).
+  const INSERT_ROW_GAP = 160;
   function addNodeAfter(sourceId: string, handle: string, nodeType: string) {
     const wf = workflowObj.currentSelectedWorkflow;
     const src = wf.nodes.find((n: any) => n.id === sourceId);
@@ -887,6 +1201,48 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       data: { label: id, node_type: nodeType },
     };
     workflowObj.pendingEdge = { source: sourceId, sourceHandle };
+    workflowObj.pendingInsert = null;
+    workflowObj.currentSelectedNodeID = id;
+    workflowObj.isEditNode = false;
+    workflowObj.dialog.name = nodeType;
+    workflowObj.dialog.expand = false;
+    workflowObj.dialog.show = true;
+  }
+
+  // Insert-on-edge (T7): STAGE a node to be spliced onto edge A→B. On commit the
+  // old edge is removed and A→new + new→B are created (see commitNode). The node is
+  // positioned at the midpoint of A and B; B is nudged down so it doesn't overlap.
+  function addNodeOnEdge(edgeId: string, nodeType: string) {
+    const wf = workflowObj.currentSelectedWorkflow;
+    const edge = (wf.edges || []).find((e: any) => e.id === edgeId);
+    const meta = nodeMeta(nodeType);
+    if (!edge || !meta) return;
+    const src = wf.nodes.find((n: any) => n.id === edge.source);
+    const tgt = wf.nodes.find((n: any) => n.id === edge.target);
+    if (!src || !tgt) return;
+
+    const id = getUUID();
+    // Place the spliced node a full row below the source and aligned with the
+    // target's column (so new→target reads as a straight edge). commitNode then
+    // nudges the target + downstream down to keep a full row of breathing room
+    // below the new node.
+    const position = {
+      x: tgt.position?.x ?? src.position?.x ?? 0,
+      y: (src.position?.y ?? 0) + INSERT_ROW_GAP,
+    };
+    workflowObj.currentSelectedNodeData = {
+      id,
+      type: meta.ioType,
+      position,
+      data: { label: id, node_type: nodeType },
+    };
+    workflowObj.pendingEdge = null;
+    workflowObj.pendingInsert = {
+      edgeId,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+    };
     workflowObj.currentSelectedNodeID = id;
     workflowObj.isEditNode = false;
     workflowObj.dialog.name = nodeType;
@@ -895,16 +1251,41 @@ export default function useWorkflowCanvas(t: TranslateFn) {
   }
 
   // Drawer Save: merge the form payload, then either update the existing node
-  // (edit) or commit the staged node + its auto-wired edge (add).
+  // (edit) or commit the staged node + its auto-wired edge (add / insert).
   function commitNode(payload: any = {}) {
     const wf = workflowObj.currentSelectedWorkflow;
     const node = workflowObj.currentSelectedNodeData;
     if (!node) return;
+    // Snapshot BEFORE the add/edit so one undo reverts the whole commit.
+    pushWorkflowHistory();
     node.data = { ...node.data, ...payload };
 
     if (workflowObj.isEditNode) {
       const idx = wf.nodes.findIndex((n: any) => n.id === node.id);
       if (idx !== -1) wf.nodes[idx] = node;
+    } else if (workflowObj.pendingInsert) {
+      // Splice onto the edge: drop A→B, add A→new and new→B (T7).
+      const ins = workflowObj.pendingInsert;
+      wf.nodes = [...wf.nodes, node];
+      wf.edges = [
+        ...wf.edges.filter((e: any) => e.id !== ins.edgeId),
+        newEdge(ins.source, node.id, ins.sourceHandle),
+        newEdge(node.id, ins.target),
+      ];
+      // Give the spliced node breathing room: nudge the target + everything
+      // downstream of it down so there's a full row gap below the new node.
+      const tgtNode = wf.nodes.find((n: any) => n.id === ins.target);
+      const shift = tgtNode
+        ? Math.max(0, (node.position?.y ?? 0) + INSERT_ROW_GAP - (tgtNode.position?.y ?? 0))
+        : 0;
+      if (shift > 0) {
+        const subtree = reachableFrom(wf.edges, [ins.target]);
+        wf.nodes = wf.nodes.map((n: any) =>
+          subtree.has(n.id)
+            ? { ...n, position: { x: n.position?.x ?? 0, y: (n.position?.y ?? 0) + shift } }
+            : n,
+        );
+      }
     } else {
       wf.nodes = [...wf.nodes, node];
       if (workflowObj.pendingEdge) {
@@ -915,18 +1296,23 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       }
     }
     workflowObj.pendingEdge = null;
+    workflowObj.pendingInsert = null;
     workflowObj.isEditNode = false;
     workflowObj.dialog.expand = false;
     workflowObj.dialog.show = false;
-    // The graph changed — prior Test badges are stale.
-    workflowObj.testRun.result = null;
-    if (workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
+    // The Test log PERSISTS across edits — adding / inserting / editing
+    // a node keeps the dock and existing badges in place instead of a jarring
+    // close+reopen. A newly-added node simply has no badge (it wasn't in the run);
+    // an edited node keeps its last-run badge until re-tested. Cleared only by a new
+    // run or the explicit "Clear" button. See executeTestRun for the run snapshot.
+    markWorkflowDirty();
   }
 
   // Drawer Cancel: discard a staged (not-yet-added) node; leave existing nodes
   // untouched.
   function cancelNodeDrawer() {
     workflowObj.pendingEdge = null;
+    workflowObj.pendingInsert = null;
     workflowObj.currentSelectedNodeData = null;
     workflowObj.currentSelectedNodeID = "";
     workflowObj.isEditNode = false;
@@ -960,13 +1346,16 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       source: "",
       handle: "out",
       mode: "next",
+      edgeId: "",
       position: null,
       anchor: null,
     };
+    workflowObj.pendingInsert = null;
     workflowObj.showNodePalette = false;
     workflowObj.isEditWorkflow = false;
     workflowObj.isEditNode = false;
     workflowObj.dirtyFlag = false;
+    resetWorkflowHistory();
     workflowObj.nodesChange = false;
     workflowObj.edgesChange = false;
     // The singleton is shared between the editor and the read-only Runs view;
@@ -991,14 +1380,18 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     onNodeChange,
     onNodesChange,
     onEdgesChange,
+    onNodeDragStart,
+    onNodeDragStop,
     onConnect,
     validateConnection,
     // node ops
     openStepPicker,
     openTriggerPicker,
+    openInsertPicker,
     closeStepPicker,
     addTriggerNode,
     addNodeAfter,
+    addNodeOnEdge,
     addNodeToEnd,
     endNodeId,
     onDragStart,

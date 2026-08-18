@@ -17,6 +17,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import incidents from "./incidents";
 import http from "./http";
 import serviceStreamsApi from "./service_streams";
+import { gt } from "@/types/i18n";
 
 // Mock the http module
 vi.mock("./http");
@@ -191,7 +192,7 @@ describe("incidents service", () => {
 
       vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
 
-      const result = await incidents.getCorrelatedStreams("test-org", mockIncident);
+      const result = await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "api-gateway",
@@ -224,7 +225,7 @@ describe("incidents service", () => {
 
       vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
 
-      await incidents.getCorrelatedStreams("test-org", mockIncident);
+      await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "default",
@@ -252,7 +253,7 @@ describe("incidents service", () => {
 
       vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
 
-      await incidents.getCorrelatedStreams("test-org", mockIncident);
+      await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "api-gateway",
