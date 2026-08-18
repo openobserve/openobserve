@@ -793,6 +793,7 @@ async fn merge_files(
         &bloom_filter_fields,
         new_file_meta,
         true,
+        false,
     )
     .await;
 

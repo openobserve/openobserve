@@ -449,6 +449,7 @@ async fn upload_chunk(
             &bloom_filter_fields,
             new_file_meta,
             true,
+            false,
         )
         .await?;
         match merge_result {

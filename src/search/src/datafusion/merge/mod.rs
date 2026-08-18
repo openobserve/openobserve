@@ -81,6 +81,11 @@ pub enum MergeParquetResult {
     },
 }
 
+/// Merge `tables` into one file (`MergeParquetResult::Single`), or — for the
+/// compactor's hour-end merge of a TSID-major metrics stream (`finalize`) —
+/// into size-bounded TSID-major files with `.sidx` sidecars
+/// (`MergeParquetResult::Multiple`).
+#[allow(clippy::too_many_arguments)]
 pub async fn merge_parquet_files(
     stream_type: StreamType,
     stream_name: &str,
@@ -89,14 +94,18 @@ pub async fn merge_parquet_files(
     bloom_filter_fields: &[String],
     mut metadata: FileMeta,
     is_ingester: bool,
+    finalize: bool,
 ) -> Result<MergeParquetResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
     let file_format = merge_output_file_format(stream_type, is_ingester, cfg.common.file_format);
     let sort_order = merge_output_sort_order(stream_type, file_format, &schema);
-    // compactor: size-bounded TSID-major files with series-index sidecars
-    let metrics_tsid_major = !is_ingester && sort_order == FileSortOrder::HashTimestampAsc;
+    // compactor hour-end merge: size-bounded TSID-major files with series-index
+    // sidecars. Ingester and incremental compactor merges write one plain
+    // hash-sorted file instead.
+    let metrics_tsid_major =
+        !is_ingester && finalize && sort_order == FileSortOrder::HashTimestampAsc;
 
     #[cfg(feature = "enterprise")]
     if stream_type == StreamType::Metrics && !is_ingester {
@@ -445,6 +454,7 @@ mod tests {
             &[],
             metadata,
             false,
+            false,
         )
         .await;
 
@@ -488,6 +498,7 @@ mod tests {
                 ..Default::default()
             },
             true,
+            false,
         )
         .await
         .unwrap();

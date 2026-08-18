@@ -25,7 +25,7 @@ use config::{
     meta::{
         promql::{
             HASH_LABEL, format_tsid_major_file_name, is_hash_sorted_file_name,
-            is_tsid_major_file_name, to_tsid_series_index_name,
+            is_tsid_major_file_name, to_hash_sorted_file_key, to_tsid_series_index_name,
         },
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
@@ -518,6 +518,7 @@ pub async fn merge_by_stream(
             }
 
             let rewrite_single_tsid_layout = files_with_size.len() == 1
+                && !is_incremental
                 && needs_tsid_layout_rewrite(stream_type, &files_with_size);
             if files_with_size.len() <= 1 && !skip_group_files && !rewrite_single_tsid_layout {
                 return Ok(vec![]);
@@ -533,6 +534,7 @@ pub async fn merge_by_stream(
                     stream_name: stream_name.clone(),
                     prefix: prefix.clone(),
                     files: files_with_size.clone(),
+                    finalize: !is_incremental,
                 });
             } else {
                 let mut new_file_list = Vec::new();
@@ -558,6 +560,7 @@ pub async fn merge_by_stream(
                             stream_name: stream_name.clone(),
                             prefix: prefix.clone(),
                             files: new_file_list.clone(),
+                            finalize: !is_incremental,
                         });
                         new_file_size = 0;
                         new_file_list.clear();
@@ -582,6 +585,7 @@ pub async fn merge_by_stream(
                         stream_name: stream_name.clone(),
                         prefix: prefix.clone(),
                         files: new_file_list.clone(),
+                        finalize: true,
                     });
                 }
 
@@ -723,6 +727,8 @@ pub async fn merge_by_stream(
 // - stream_name: the name of the stream
 // - prefix: the prefix of the files
 // - files_with_size: the files to merge
+// - finalize: hour-end merge of a closed hour (TSID-major metrics write their final layout only
+//   then; incremental merges write plain hash-sorted files)
 // returns:
 // - new_files: the files that are merged
 // - retain_file_list: the files that are not merged
@@ -733,6 +739,7 @@ pub async fn merge_files(
     stream_name: &str,
     prefix: &str,
     files_with_size: &[FileKey],
+    finalize: bool,
 ) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
     let start = std::time::Instant::now();
     #[cfg(feature = "enterprise")]
@@ -745,8 +752,14 @@ pub async fn merge_files(
     #[cfg(not(feature = "enterprise"))]
     let is_match_downsampling_rule = false;
 
-    let rewrite_single_tsid_layout =
-        files_with_size.len() == 1 && needs_tsid_layout_rewrite(stream_type, files_with_size);
+    // TSID-major finalization: rewrite a lone legacy/hash-sorted file and merge
+    // the complete batch regardless of size. Incremental merges keep the
+    // regular size grouping and never rewrite a single file.
+    let finalize_tsid_major =
+        finalize && metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
+    let rewrite_single_tsid_layout = finalize_tsid_major
+        && files_with_size.len() == 1
+        && needs_tsid_layout_rewrite(stream_type, files_with_size);
     if files_with_size.len() <= 1 && !is_match_downsampling_rule && !rewrite_single_tsid_layout {
         return Ok((Vec::new(), Vec::new()));
     }
@@ -755,8 +768,7 @@ pub async fn merge_files(
     let mut new_compressed_file_size = 0;
     let mut new_file_list = Vec::new();
     let cfg = get_config();
-    let merge_complete_tsid_major_batch =
-        metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
+    let merge_complete_tsid_major_batch = finalize_tsid_major;
     for file in files_with_size.iter() {
         if (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
             || new_compressed_file_size + file.meta.compressed_size
@@ -778,8 +790,9 @@ pub async fn merge_files(
             .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge
-    let rewrite_single_tsid_layout =
-        new_file_list.len() == 1 && needs_tsid_layout_rewrite(stream_type, &new_file_list);
+    let rewrite_single_tsid_layout = finalize_tsid_major
+        && new_file_list.len() == 1
+        && needs_tsid_layout_rewrite(stream_type, &new_file_list);
     if new_file_list.len() <= 1 && !is_match_downsampling_rule && !rewrite_single_tsid_layout {
         return Ok((Vec::new(), Vec::new()));
     }
@@ -796,8 +809,9 @@ pub async fn merge_files(
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
-    let rewrite_single_tsid_layout =
-        new_file_list.len() == 1 && needs_tsid_layout_rewrite(stream_type, &new_file_list);
+    let rewrite_single_tsid_layout = finalize_tsid_major
+        && new_file_list.len() == 1
+        && needs_tsid_layout_rewrite(stream_type, &new_file_list);
     if new_file_list.len() <= 1 && !is_match_downsampling_rule && !rewrite_single_tsid_layout {
         return Ok((Vec::new(), retain_file_list));
     }
@@ -964,6 +978,7 @@ pub async fn merge_files(
                     &bloom_filter_fields,
                     new_file_meta,
                     false,
+                    finalize,
                 )
                 .await
             })
@@ -1001,7 +1016,7 @@ pub async fn merge_files(
             buf,
             file_meta: mut new_file_meta,
             file_format,
-            ..
+            sort_order,
         } => {
             if new_file_meta.compressed_size == 0 {
                 return Err(anyhow::anyhow!(
@@ -1010,7 +1025,12 @@ pub async fn merge_files(
             }
 
             let id = ider::generate_file_name();
-            let new_file_key = format!("{prefix}/{id}{}", file_format.extension());
+            let mut new_file_key = format!("{prefix}/{id}{}", file_format.extension());
+            // incremental TSID-major merge: hash-sorted but not finalized, the
+            // hour-end pass merges it again into the final layout
+            if sort_order == FileSortOrder::HashTimestampAsc {
+                new_file_key = to_hash_sorted_file_key(&new_file_key);
+            }
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
