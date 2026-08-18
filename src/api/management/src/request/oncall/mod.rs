@@ -2746,6 +2746,72 @@ pub async fn create_ownership_rule(
 }
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/oncall/ownership/{rule_id}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "UpdateOnCallOwnershipRule",
+    summary = "Repoint an ownership rule at a team, a path, or both",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("rule_id" = String, Path, description = "Rule ID"),
+    ),
+    request_body(content = CreateOwnershipRuleRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn update_ownership_rule(
+    Path((org_id, rule_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<CreateOwnershipRuleRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::routing::update_rule(
+            &org_id,
+            &rule_id,
+            &body.team_id,
+            body.dimensions,
+        )
+        .await
+        {
+            Ok(Some(rule)) => MetaHttpResponse::json(rule),
+            Ok(None) => {
+                MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Rule not found")
+                    .into_response()
+            }
+            Err(e) => {
+                // Same unique-index shape as create: repointing a rule onto a
+                // path another team already claims is a conflict, not a fault.
+                if e.to_string().to_lowercase().contains("unique")
+                    || e.to_string().to_lowercase().contains("duplicate")
+                {
+                    return MetaHttpResponse::error(
+                        StatusCode::CONFLICT.as_u16(),
+                        "another team already owns this path",
+                    )
+                    .into_response();
+                }
+                to_response(e)
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, rule_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
     delete,
     path = "/{org_id}/oncall/ownership/{rule_id}",
     context_path = "/api",
