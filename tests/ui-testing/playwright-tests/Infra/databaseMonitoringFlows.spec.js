@@ -45,11 +45,20 @@ test.describe('Database Monitoring — flows', () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
   let dbm;
+  /**
+   * The engine THIS org actually holds, resolved once per test from the data.
+   *
+   * Never hardcoded: a suite pinned to `postgresql` sends a system filter that
+   * cannot match a MySQL org, so every scoped assertion below would fail
+   * against a healthy page and look like a product defect.
+   */
+  let engine = 'postgresql';
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     pm = new PageManager(page);
     dbm = pm.databaseMonitoringPage;
+    engine = (await dbm.firstScopeFromApi()).engine || 'postgresql';
   });
 
   test.afterEach(async ({}, testInfo) => {
@@ -291,7 +300,7 @@ test.describe('Database Monitoring — flows', () => {
   test('P1: a scoped deep link reproduces its scope after a reload', {
     tag: ['@dbm', '@infra', '@P1', '@all'],
   }, async ({ page }) => {
-    await dbm.navigateWithScope('tableHealth', { system: 'postgresql' });
+    await dbm.navigateWithScope('tableHealth', { system: engine });
     await dbm.expectLoaded();
     await dbm.settleTab('tableHealth');
     const before = await dbm.rowsOn('tableHealth');
@@ -304,7 +313,13 @@ test.describe('Database Monitoring — flows', () => {
     await dbm.expectLoaded();
     await dbm.settleTab('tableHealth');
 
-    expect(page.url(), 'the scope was dropped from the URL on reload').toContain('postgresql');
+    // The PARAM, not a substring of the URL — on a MySQL org the identifier
+    // itself contains "mysql", so a substring check would pass even if the
+    // scope had been dropped entirely.
+    expect(
+      new URL(page.url()).searchParams.get('system'),
+      'the scope was dropped from the URL on reload',
+    ).toBe(engine);
     const after = await dbm.rowsOn('tableHealth');
     testLogger.info(`reload: before=${before} after=${after}`);
     // Same scope, same window, continuously-ingesting rig: the row count may
@@ -322,7 +337,7 @@ test.describe('Database Monitoring — flows', () => {
     }, async () => {
       await dbm.navigateWithScope(tab, {
         instance: 'instance-that-cannot-exist-12345',
-        system: 'postgresql',
+        system: engine,
       });
       await dbm.expectLoaded();
 
@@ -357,7 +372,7 @@ test.describe('Database Monitoring — flows', () => {
     tag: ['@dbm', '@infra', '@P1', '@all'],
   }, async ({ page }) => {
     // Arrive already filtered, the way a pasted permalink does.
-    await dbm.navigateWithScope('overview', { system: 'postgresql' });
+    await dbm.navigateWithScope('overview', { system: engine });
     await dbm.expectLoaded();
     await dbm.settleTab('overview');
 
@@ -381,13 +396,19 @@ test.describe('Database Monitoring — flows', () => {
     // the URL. A chip that disappears while the query string still carries the
     // filter comes back on the next reload.
     await expect(dbm.scopeChip, 'the chip survived Clear all').toBeHidden({ timeout: 15000 });
-    expect(page.url(), 'Clear all left the filter in the URL').not.toContain('postgresql');
+    // Assert on the PARAM, not on the URL as a substring: the org identifier
+    // is in the same URL, and `mysql_server` contains "mysql", so a substring
+    // check reports a filter that was cleared correctly as still present.
+    expect(
+      new URL(page.url()).searchParams.get('system'),
+      'Clear all left the system filter in the URL',
+    ).toBeNull();
   });
 
   test('P1: Clear all also empties the search box on the overview', {
     tag: ['@dbm', '@infra', '@P1', '@all'],
   }, async () => {
-    await dbm.navigateWithScope('overview', { system: 'postgresql' });
+    await dbm.navigateWithScope('overview', { system: engine });
     await dbm.expectLoaded();
     await dbm.settleTab('overview');
 
@@ -416,7 +437,7 @@ test.describe('Database Monitoring — flows', () => {
     // but `instance` stayed in the URL and re-seeded the next tab, so the
     // section was still filtered by something nothing on screen mentioned.
     const instance = (await dbm.firstInstanceFromApi()) || 'postgres';
-    await dbm.navigateWithScope('overview', { system: 'postgresql', instance });
+    await dbm.navigateWithScope('overview', { system: engine, instance });
     await dbm.expectLoaded();
     await dbm.settleTab('overview');
 

@@ -136,10 +136,24 @@ test.describe('Database Monitoring', () => {
         ).toBeGreaterThan(0);
       }
 
-      // Exact equality only when the badge is untruncated and the table is not
-      // paginating: "50+" means "at least 50", and page 1 of a paginated table
-      // legitimately shows fewer rows than the badge counts.
-      if (!truncated && badge > 0 && badge <= 20) {
+      // Exact equality ONLY where the badge and the table count the same
+      // thing, which is not universal:
+      //
+      //   Table health — badge counts the rows the tab lists. Comparable.
+      //   Activity     — badge counts the SESSION POPULATION, from the
+      //                  response's `by_state` (useDbmTabCounts.ts:356, "From
+      //                  `by_state`, the population"), while the table lists
+      //                  sampled activity ROWS. Measured on MySQL: by_state
+      //                  sums to 7 live sessions over 223 sampled rows, so
+      //                  badge 7 beside 20 rendered rows is both numbers being
+      //                  right about different questions. Postgres hid this —
+      //                  its by_state sums to 195, comfortably over the 20-row
+      //                  page, so the branch below never fired.
+      //
+      // The invariant that DOES hold everywhere is the one asserted above: a
+      // non-zero badge must never sit over an empty table.
+      const badgeCountsRows = tab === 'tableHealth';
+      if (badgeCountsRows && !truncated && badge > 0 && badge <= 20) {
         expect(rows, `${tab} badge ${badge} != ${rows} rendered rows`).toBe(badge);
       }
     });
@@ -172,11 +186,18 @@ test.describe('Database Monitoring', () => {
     // the strict selector policy rules out reading it by text or nth-child. The
     // API is also the better source: it gives the value the FILTER is matched
     // against, not the string the cell happens to display.
-    const instance = await dbm.firstInstanceFromApi();
+    const { instance, engine } = await dbm.firstScopeFromApi();
     test.skip(!instance, 'table-health rows carry no instance value to filter on');
 
-    testLogger.info(`Filtering table health by instance=${instance}`);
-    await dbm.navigateWithScope('tableHealth', { instance, system: 'postgresql' });
+    // The ENGINE comes from the data too, never hardcoded. Pinning
+    // `system: 'postgresql'` here passed against the Postgres rig and failed
+    // against the MySQL one for a reason that looked exactly like the original
+    // defect — `instance=my-prod-1` AND `system=postgresql` correctly matches
+    // nothing, so a healthy page reported "filtering emptied a populated
+    // table". A suite that only runs green against one engine is not testing
+    // the filter, it is testing the fixture.
+    testLogger.info(`Filtering table health by instance=${instance} system=${engine}`);
+    await dbm.navigateWithScope('tableHealth', { instance, system: engine });
     await dbm.waitForSettled(dbm.tableHealthTable, [
       dbm.tableHealthNotCollecting,
       dbm.tableHealthNoMatches,
