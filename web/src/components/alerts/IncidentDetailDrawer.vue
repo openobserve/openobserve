@@ -588,6 +588,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                       <div class="flex flex-col gap-2 px-4 pb-3">
+                        <!-- Which team is carrying this, at what priority. The
+                             panel used to answer neither, so an incident named
+                             no owner while the record behind it did. -->
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallTeam") }}
+                          </span>
+                          <span class="text-text-body truncate text-xs">
+                            {{ raw(oncallTeamName) }}
+                            <OTooltip side="bottom" :content="raw(oncallTeamName)" />
+                          </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallPriority") }}
+                          </span>
+                          <OTag type="alertPriority" :value="oncallPriority" size="sm" />
+                        </div>
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallState") }}
@@ -600,12 +618,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallOpened") }}
+                          </span>
+                          <OTimeCell :value="oncallResponse.opened_at" unit="us" />
+                        </div>
+                        <!-- Who answered, and when. An unanswered page is the
+                             fact worth a colour: it is still climbing. -->
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallAckedBy") }}
                           </span>
-                          <span class="text-text-body text-xs">
-                            {{ raw(oncallResponse.acked_by) || raw("—") }}
+                          <OUserCell v-if="oncallResponse.acked_by" :value="oncallResponse.acked_by" />
+                          <span v-else class="text-status-warning-text text-xs">
+                            {{ t("alerts.incidents.onCallUnanswered") }}
                           </span>
                         </div>
+                        <!-- A snoozed page looks identical to a quiet one, and
+                             it is the reading that gets an incident forgotten. -->
+                        <div
+                          v-if="oncallResponse.snoozed_until"
+                          class="flex items-center justify-between gap-2"
+                          data-test="incident-oncall-snoozed"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallSnoozedUntil") }}
+                          </span>
+                          <OTimeCell :value="oncallResponse.snoozed_until" unit="us" />
+                        </div>
+                        <div
+                          v-if="oncallResponse.closed_at"
+                          class="flex items-center justify-between gap-2"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallResolved") }}
+                          </span>
+                          <OTimeCell :value="oncallResponse.closed_at" unit="us" />
+                        </div>
+                        <!-- The ladder ran a second time because the record
+                             changed hands. Without it the timeline reads as one
+                             very long escalation. -->
+                        <div
+                          v-if="(oncallResponse.ladder_run ?? 1) > 1"
+                          class="flex items-center justify-between gap-2"
+                          data-test="incident-oncall-ladder-run"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallLadderRun") }}
+                          </span>
+                          <span class="text-text-body text-xs">
+                            {{ raw(String(oncallResponse.ladder_run)) }}
+                          </span>
+                        </div>
+
+                        <!-- Impacted teams are paged alongside the owner to
+                             contain the blast radius. Listing only the first
+                             record hid every one of them. -->
+                        <div
+                          v-if="oncallLiaisons.length"
+                          class="border-border-default flex flex-col gap-1 border-t pt-2"
+                          data-test="incident-oncall-liaisons"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallAlsoPaged") }}
+                          </span>
+                          <span
+                            v-for="liaison in oncallLiaisons"
+                            :key="liaison.id"
+                            class="flex items-center justify-between gap-2"
+                          >
+                            <span class="text-text-body truncate text-xs">
+                              {{ raw(oncallTeamNameFor(liaison.team_id)) }}
+                            </span>
+                            <OTag
+                              type="oncallResponseState"
+                              :value="liaison.state"
+                              size="sm"
+                            />
+                          </span>
+                        </div>
+
                         <router-link
                           class="text-accent text-xs"
                           :to="{
@@ -1438,6 +1529,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -1462,6 +1555,8 @@ export default defineComponent({
     OButton,
     OSpinner,
     OTooltip,
+    OTimeCell,
+    OUserCell,
     OIcon,
     OTag,
     OInlineEdit,
@@ -1501,6 +1596,11 @@ export default defineComponent({
     // on-call is off, and when nothing was routed — all of which mean the
     // panel simply does not render.
     const oncallResponse = ref<OnCallResponse | null>(null);
+    /// Every record this incident opened. The owner's is the headline; an
+    /// impacted team gets its own record and used to be dropped on the floor
+    /// by taking `[0]` and discarding the rest.
+    const oncallResponses = ref<OnCallResponse[]>([]);
+    const oncallTeamNames = ref<Record<string, string>>({});
     const triggers = ref<IncidentAlert[]>([]);
 
     /// Newest firing wins: an incident can page more than once, and the panel
@@ -1512,11 +1612,48 @@ export default defineComponent({
           org_identifier: org,
           incident_id: incidentId,
         });
-        oncallResponse.value = (res.data ?? [])[0] ?? null;
+        const records = res.data ?? [];
+        oncallResponses.value = records;
+        // The owner fixes the thing; a liaison contains the blast radius. The
+        // owner's record is the one the panel is about.
+        oncallResponse.value =
+          records.find((record) => record.responder_role !== "impacted") ?? records[0] ?? null;
+        await loadOnCallTeamNames(org, records);
       } catch {
         oncallResponse.value = null;
+        oncallResponses.value = [];
       }
     }
+
+    /// A team id is a ksuid, and printing one asks the reader to look it up
+    /// somewhere else. One list call resolves every record's team at once.
+    async function loadOnCallTeamNames(org: string, records: OnCallResponse[]) {
+      if (!records.some((record) => record.team_id)) return;
+      try {
+        const res = await oncallService.listTeams({ org_identifier: org });
+        oncallTeamNames.value = Object.fromEntries(
+          (res.data ?? []).map((team) => [team.id, team.name]),
+        );
+      } catch {
+        // The ids still render; a failed lookup must not blank the panel.
+        oncallTeamNames.value = {};
+      }
+    }
+
+    const oncallTeamNameFor = (teamId: string) => oncallTeamNames.value[teamId] ?? teamId;
+
+    const oncallTeamName = computed(() =>
+      oncallResponse.value ? oncallTeamNameFor(oncallResponse.value.team_id) : "",
+    );
+
+    /// `OTag` keys its palette on the lowercase name, and the wire sends 1–5.
+    const oncallPriority = computed(() =>
+      oncallResponse.value ? `p${oncallResponse.value.priority}` : "",
+    );
+
+    const oncallLiaisons = computed(() =>
+      oncallResponses.value.filter((record) => record.id !== oncallResponse.value?.id),
+    );
     const alerts = ref<any[]>([]);
 
     // Title editing
@@ -3426,6 +3563,10 @@ export default defineComponent({
       updating,
       incidentDetails,
       oncallResponse,
+      oncallLiaisons,
+      oncallTeamName,
+      oncallTeamNameFor,
+      oncallPriority,
       triggers,
       alerts,
       selectedAlertIndex,
