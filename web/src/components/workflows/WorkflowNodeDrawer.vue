@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                upstream step that passed while emitting the wrong records. -->
           <OButton
             v-if="canvasReadOnly && historyRunId"
-            variant="primary"
+            variant="outline"
             size="sm-action"
             data-test="workflow-node-edit-step"
             @click="editThisStep"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                advertises an action the surface refuses. -->
           <OButton
             v-if="showIo && !canvasReadOnly"
-            variant="primary"
+            variant="outline"
             size="sm-action"
             data-test="workflow-node-execute"
             :loading="executing"
@@ -128,7 +128,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onNameLive"
           @commit="onNameCommit"
         />
-        <div class="text-text-secondary mt-0.5 truncate text-xs">{{ typeBreadcrumb }}</div>
+        <div class="mt-0.5 flex items-center gap-2">
+          <span class="text-text-secondary truncate text-xs">{{ typeBreadcrumb }}</span>
+
+          <!-- Run label + switcher — read-only history only. The chip shows the run id
+               (already on the result — no fetch); the history button opens a menu of
+               runs to load onto THIS node. -->
+          <template v-if="historyRunId">
+            <span
+              data-test="workflow-ndv-run-label"
+              class="border-border-default text-text-secondary rounded-default inline-flex max-w-[20rem] shrink-0 items-center border px-1.5 py-0.5 text-xs"
+              :title="raw(historyRunId)"
+            >
+              <span class="truncate">{{ t("workflow.ndv.runLabel") }} · {{ historyRunId }}</span>
+            </span>
+
+            <ODropdown v-model:open="runMenuOpen" align="start" side="bottom">
+              <template #trigger>
+                <OButton
+                  variant="outline"
+                  size="icon-xs-sq"
+                  class="shrink-0"
+                  data-test="workflow-ndv-run-switcher"
+                >
+                  <OIcon name="history" size="xs" />
+                  <OTooltip :content="t('workflow.ndv.switchRun')" side="bottom" />
+                </OButton>
+              </template>
+              <div class="max-h-80 w-72 overflow-auto py-1">
+                <ODropdownItem
+                  v-for="run in sortedRuns"
+                  :key="run.run_id"
+                  :data-test="`workflow-ndv-run-${run.run_id}`"
+                  @click="switchRun(run.run_id)"
+                >
+                  <div class="flex w-full items-center justify-between gap-2">
+                    <span class="flex min-w-0 items-center gap-1.5">
+                      <OIcon
+                        v-if="run.run_id === historyRunId"
+                        name="check"
+                        size="xs"
+                        class="text-accent shrink-0"
+                      />
+                      <span v-else class="w-3.5 shrink-0" aria-hidden="true"></span>
+                      <OTimeCell
+                        :value="run.start_time"
+                        unit="us"
+                        mode="absolute"
+                        :timezone="store.state.timezone"
+                        :empty-label="raw('—')"
+                      />
+                    </span>
+                    <OBadge :variant="run.error ? 'error-soft' : 'success-soft'" size="xs">
+                      {{ run.error ? t("workflow.history.failed") : t("workflow.history.success") }}
+                    </OBadge>
+                  </div>
+                </ODropdownItem>
+              </div>
+            </ODropdown>
+          </template>
+        </div>
       </div>
     </template>
 
@@ -268,12 +327,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </section>
 
+      <!-- This node wasn't part of the loaded run (added later / never reached): a plain
+           notice in place of the panes — no misleading sample data. The Steps rail stays
+           so the user can jump to a step that IS in this run. -->
+      <div
+        v-if="nodeMissingFromRun"
+        data-test="workflow-ndv-not-in-run"
+        class="text-text-secondary flex min-w-0 flex-1 flex-col items-center justify-center gap-2 text-center"
+      >
+        <OIcon name="info" size="lg" class="text-text-placeholder" />
+        <span class="text-sm">{{ t("workflow.ndv.notInRun") }}</span>
+      </div>
+
       <!-- INPUT — the upstream SOURCES list (immediate parent = this node's real input,
            expanded by default; earlier ancestors collapsed below, inspect-only). Hidden
            for the trigger: it has no input (its output IS the event), so Config expands
            into the space and only Config · Output show. -->
       <section
-        v-if="showIo && !readonlyBody"
+        v-if="showIo && !readonlyBody && !nodeMissingFromRun"
         data-test="workflow-ndv-input"
         class="relative flex w-[var(--io-w)] min-w-0 shrink-0 flex-col gap-2"
         :style="{ '--io-w': inputWidth + 'px' }"
@@ -330,7 +401,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- CONFIG — ONE body instance so it never remounts when the I/O panes toggle
            (e.g. entering the inline function editor). Each body exposes submit(). -->
-      <section data-test="workflow-ndv-config" class="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      <!-- Config — hidden for the read-only trigger (nothing to configure; its event
+           fills the Output pane instead of leaving this pane empty). -->
+      <section
+        v-if="!nodeMissingFromRun && !isReadonlyTrigger"
+        data-test="workflow-ndv-config"
+        class="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+      >
         <!-- Body + Comment share ONE scroll column, so the Comment sits directly
              AFTER the body content: right under a short body (Condition — no gap),
              and at the bottom under a filling body (Function, which is flex-1).
@@ -378,16 +455,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </section>
 
-      <!-- OUTPUT (only with run data). -->
+      <!-- OUTPUT (only with run data). For the TRIGGER there's no config to sit beside,
+           so the event (its output) fills the width instead of a narrow pane. -->
       <section
-        v-if="showIo"
+        v-if="showIo && !nodeMissingFromRun"
         data-test="workflow-ndv-output"
-        class="relative flex w-[var(--io-w)] min-w-0 shrink-0 flex-col gap-2"
-        :style="{ '--io-w': outputWidth + 'px' }"
+        class="relative flex min-w-0 flex-col gap-2"
+        :class="isReadonlyTrigger ? 'flex-1' : 'w-[var(--io-w)] shrink-0'"
+        :style="isReadonlyTrigger ? undefined : { '--io-w': outputWidth + 'px' }"
       >
         <!-- Drag handle on Output's LEFT edge (sits in the gap toward Config). Extends
-             through the dialog's vertical body padding like the Input handle. -->
+             through the dialog's vertical body padding like the Input handle. Hidden for
+             the trigger — the event pane is full-width, nothing to resize against. -->
         <div
+          v-if="!isReadonlyTrigger"
           class="-my-dialog-content-py absolute inset-y-0 -left-2.5 z-10 flex w-2.5 cursor-col-resize items-center justify-center"
           data-test="workflow-ndv-output-resize"
           @mousedown.prevent="startResize('output', $event)"
@@ -487,6 +568,10 @@ import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import workflowService from "@/services/workflows";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import WorkflowTrigger from "@/plugins/workflows/nodes/WorkflowTrigger.vue";
 import WorkflowCondition from "@/plugins/workflows/nodes/WorkflowCondition.vue";
 import WorkflowFunction from "@/plugins/workflows/nodes/WorkflowFunction.vue";
@@ -507,6 +592,7 @@ import useWorkflowCanvas, {
   executeTestRun,
   currentTriggerKind,
   buildStepTree,
+  loadWorkflowRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18nTyped();
@@ -604,6 +690,77 @@ const editThisStep = () => {
     },
   });
 };
+
+// ── Run label + switcher (read-only history) ─────────────────────────────────
+// The label just shows the run id — it's already on `testRun.result`, so NO api call
+// (the NDV remounts on every node-detail open; fetching the run list there hit the
+// history endpoint each time). The switcher's run LIST is fetched only when the user
+// OPENS the menu — and freshly each time, so a long-open panel still sees new runs.
+const runMenuOpen = ref(false);
+const runsMeta = ref<any[]>([]);
+const loadingRuns = ref(false);
+const fetchRuns = async () => {
+  if (loadingRuns.value) return; // avoid a concurrent duplicate; still refetches on reopen
+  const workflowId = workflowObj.currentSelectedWorkflow?.id;
+  if (!workflowId) return;
+  loadingRuns.value = true;
+  try {
+    // The history endpoint windows by time (the Runs panel passes a picker range);
+    // omitting it can come back empty. Pass a very wide window (10y) so EVERY run
+    // available (bounded only by retention) is listed.
+    const nowUs = Date.now() * 1000;
+    const res = await workflowService.getWorkflowHistory({
+      org_identifier: store.state.selectedOrganization.identifier,
+      id: workflowId,
+      start_time: nowUs - 10 * 365 * 24 * 60 * 60 * 1_000_000,
+      end_time: nowUs,
+    });
+    runsMeta.value = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+  } catch {
+    /* non-fatal — the menu just stays empty */
+  } finally {
+    loadingRuns.value = false;
+  }
+};
+watch(runMenuOpen, (open) => open && fetchRuns());
+// ALL runs (newest first) — the menu scrolls; bounded only by history retention.
+const sortedRuns = computed(() =>
+  [...runsMeta.value].sort((a: any, b: any) => (b.start_time || 0) - (a.start_time || 0)),
+);
+const switchRun = async (runId: string) => {
+  runMenuOpen.value = false;
+  const id = workflowObj.currentSelectedWorkflow?.id;
+  if (!runId || !id || runId === historyRunId.value) return;
+  await loadWorkflowRun({
+    orgId: store.state.selectedOrganization.identifier,
+    workflowId: id,
+    runId,
+  });
+};
+
+// Did THIS node take part in the selected run? A node keyed in the run's per-node
+// input or error map ran; the trigger always runs. Absent from both => it was added
+// after this run (or never reached) — warn instead of showing blank panes.
+const nodeRanInHistory = (id: string): boolean => {
+  const r: any = workflowObj.testRun.result;
+  return !!(
+    r &&
+    ((r.inputs && Object.prototype.hasOwnProperty.call(r.inputs, id)) ||
+      (r.errors && Object.prototype.hasOwnProperty.call(r.errors, id)))
+  );
+};
+const nodeInRun = computed(() => {
+  if (!historyRunId.value) return true;
+  if (readonlyBody.value) return true; // trigger — always part of the run
+  return nodeRanInHistory(nodeId.value);
+});
+// This node wasn't part of the loaded run — show a plain notice in place of the panes
+// (which would otherwise fall back to the trigger SAMPLE and look like real data).
+const nodeMissingFromRun = computed(() => !!historyRunId.value && !nodeInRun.value);
+// Read-only TRIGGER: its Config summary is just the kind (nothing to configure), which
+// leaves a big empty pane. Drop Config and let the event (Output) fill the width. Only
+// in read-only — the editor's trigger body IS a useful payload reference.
+const isReadonlyTrigger = computed(() => canvasReadOnly.value && readonlyBody.value);
 // A test run exists to inspect. Once it does, opening OR navigating to any node keeps
 // the NDV — even a node that didn't run shows empty Input/Output (not a config-only
 // drawer), so the prev/next walk stays in NDV format the whole way.

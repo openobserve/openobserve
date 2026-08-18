@@ -2603,6 +2603,9 @@
       "noBranchItems": "No Items On This Branch.",
       "noUpstream": "No Upstream Steps.",
       "noRunYet": "No Run Yet.",
+      "runLabel": "Run",
+      "switchRun": "Switch Run",
+      "notInRun": "This Step Is Not Included In This Run.",
       "runTest": "Run Test",
       "noItems": "No Items",
       "itemsCount": "{count} Item | {count} Items",
@@ -2611,7 +2614,7 @@
       "itemN": "Item {n}",
       "executeStep": "Run Step",
       "sample": "Sample",
-      "editStep": "Edit This Step"
+      "editStep": "Edit Step"
     },
     "runOverlay": {
       "banner": "Showing step data from a past run ({run}). You can edit freely — this run is never changed.",
