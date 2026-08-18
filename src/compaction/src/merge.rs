@@ -59,33 +59,15 @@ use tokio::{
 
 use super::worker::{MergeBatch, MergeSender};
 
-/// The time range one merge job covers: the hour of `offset` (aligned down),
-/// or the whole day for daily-partitioned streams.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct JobTimeRange {
-    /// `%Y/%m/%d/%H` bounds for the file_list query (inclusive)
-    date_start: String,
-    date_end: String,
-    /// Last microsecond of the range: no file of the job can be newer, so
-    /// "is the range old enough" is decided against this.
-    end_ts: i64,
-}
-
-fn job_time_range(offset: i64, partition_time_level: PartitionTimeLevel) -> JobTimeRange {
+/// Last microsecond of the range a merge job at `offset` covers: the hour of
+/// `offset`, or the whole day for daily-partitioned streams. No file of the
+/// job can be newer, so "is the range old enough" is decided against this.
+fn job_range_end(offset: i64, partition_time_level: PartitionTimeLevel) -> i64 {
     let offset = offset - offset % hour_micros(1);
-    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     if partition_time_level == PartitionTimeLevel::Daily {
-        JobTimeRange {
-            date_start: offset_time.format("%Y/%m/%d/00").to_string(),
-            date_end: offset_time.format("%Y/%m/%d/23").to_string(),
-            end_ts: offset - offset % day_micros(1) + day_micros(1) - 1,
-        }
+        offset - offset % day_micros(1) + day_micros(1) - 1
     } else {
-        JobTimeRange {
-            date_start: offset_time.format("%Y/%m/%d/%H").to_string(),
-            date_end: offset_time.format("%Y/%m/%d/%H").to_string(),
-            end_ts: offset + hour_micros(1) - 1,
-        }
+        offset + hour_micros(1) - 1
     }
 }
 
@@ -342,7 +324,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // against the end of that hour (see merge_by_stream), so only enqueue it
     // once the whole hour is older than the rule's offset; otherwise the job
     // would run as a plain merge and the advanced offset would skip the hour.
-    let job_end_ts = job_time_range(offset, get_partition_time_level(stream_type)).end_ts;
+    let job_end_ts = job_range_end(offset, get_partition_time_level(stream_type));
     if offset >= time_now_day
         || time_now.timestamp_micros() - offset
             <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
@@ -427,14 +409,23 @@ pub async fn merge_by_stream(
     let is_incremental = !super::is_past_hour(offset);
 
     // check offset
-    let JobTimeRange {
-        date_start,
-        date_end,
-        end_ts: range_end_ts,
-    } = job_time_range(offset, get_partition_time_level(stream_type));
+    let partition_time_level = get_partition_time_level(stream_type);
+    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
+    let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
+        (
+            offset_time.format("%Y/%m/%d/00").to_string(),
+            offset_time.format("%Y/%m/%d/23").to_string(),
+        )
+    } else {
+        (
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+        )
+    };
     // What this hour of files turns into. Decided once here — the workers and
     // the merge only read it — from the end of the range, so a whole-hour
     // mode applies to the hour as a unit.
+    let range_end_ts = job_range_end(offset, partition_time_level);
     let mode = MergeMode::for_compactor(stream_type, stream_name, range_end_ts, !is_incremental);
     // a whole-hour merge needs every file of the hour, even those already
     // above the size target that a normal merge would leave alone
@@ -1226,28 +1217,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_job_time_range_hourly_and_daily() {
+    fn test_job_range_end_hourly_and_daily() {
         // 2026-08-18 10:10:00 UTC
         let offset = Utc
             .with_ymd_and_hms(2026, 8, 18, 10, 10, 0)
             .unwrap()
             .timestamp_micros();
-        let hourly = job_time_range(offset, PartitionTimeLevel::Hourly);
-        assert_eq!(hourly.date_start, "2026/08/18/10");
-        assert_eq!(hourly.date_end, "2026/08/18/10");
         assert_eq!(
-            hourly.end_ts,
+            job_range_end(offset, PartitionTimeLevel::Hourly),
             Utc.with_ymd_and_hms(2026, 8, 18, 11, 0, 0)
                 .unwrap()
                 .timestamp_micros()
                 - 1
         );
-
-        let daily = job_time_range(offset, PartitionTimeLevel::Daily);
-        assert_eq!(daily.date_start, "2026/08/18/00");
-        assert_eq!(daily.date_end, "2026/08/18/23");
         assert_eq!(
-            daily.end_ts,
+            job_range_end(offset, PartitionTimeLevel::Daily),
             Utc.with_ymd_and_hms(2026, 8, 19, 0, 0, 0)
                 .unwrap()
                 .timestamp_micros()
