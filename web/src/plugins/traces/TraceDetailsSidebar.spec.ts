@@ -987,7 +987,7 @@ describe("TraceDetailsSidebar", async () => {
         ]);
 
         expect(timelineMarkers()[0].classes()).toContain("bg-trace-event-info");
-        expect(timelineMarkers()[1].classes()).toContain("bg-badge-error-solid-bg");
+        expect(timelineMarkers()[1].classes()).toContain("bg-trace-event-error");
       });
     });
   });

@@ -851,7 +851,7 @@ describe("SpanBlock", () => {
       ]);
 
       expect(markers()[0].classes()).toContain("bg-trace-event-info");
-      expect(markers()[1].classes()).toContain("bg-badge-error-solid-bg");
+      expect(markers()[1].classes()).toContain("bg-trace-event-error");
     });
 
     // Regression: `default`-stream events carry `level` and no `exception.*`.
@@ -859,14 +859,14 @@ describe("SpanBlock", () => {
     it("renders a level=ERROR event with the error token", async () => {
       await setEvents([{ name: "search failed", level: "ERROR", _timestamp: eventNsAt(0.4) }]);
 
-      expect(markers()[0].classes()).toContain("bg-badge-error-solid-bg");
+      expect(markers()[0].classes()).toContain("bg-trace-event-error");
       expect(markers()[0].attributes("data-event-severity")).toBe("error");
     });
 
     it("renders a level=WARN event with the warning token", async () => {
       await setEvents([{ name: "retrying", level: "WARN", _timestamp: eventNsAt(0.4) }]);
 
-      expect(markers()[0].classes()).toContain("bg-badge-warning-solid-bg");
+      expect(markers()[0].classes()).toContain("bg-trace-event-warning");
       expect(markers()[0].attributes("data-event-severity")).toBe("warning");
     });
 
@@ -924,7 +924,7 @@ describe("SpanBlock", () => {
       expect(markers()).toHaveLength(1);
       expect(markers()[0].attributes("data-event-severity")).toBe("error");
       expect(markers()[0].classes()).toContain("h-3");
-      expect(markers()[0].classes()).toContain("bg-badge-error-solid-bg");
+      expect(markers()[0].classes()).toContain("bg-trace-event-error");
     });
 
     it("gives the marker a hit area wider than the tick itself", async () => {
@@ -992,7 +992,7 @@ describe("SpanBlock", () => {
       ]);
 
       expect(markers()).toHaveLength(1);
-      expect(markers()[0].classes()).toContain("bg-badge-error-solid-bg");
+      expect(markers()[0].classes()).toContain("bg-trace-event-error");
     });
 
     it("selects the span when a marker is clicked", async () => {

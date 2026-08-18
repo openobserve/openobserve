@@ -437,13 +437,29 @@
   --color-badge-blue-soft-bg: var(--color-blue-50);
   --color-badge-blue-soft-text: var(--color-blue-700);
 
-  /* Trace span-event markers */
-  /* Achromatic: the waterfall bar is filled with an arbitrary per-service
-     colour, so a hue-based marker can vanish on a same-hue bar. An alpha black
-     darkens whatever is beneath it, holding contrast against any fill.
-     Error and warning keep their badge hues — there the colour is semantic.
-     The dark override is NOT the mirror of this value — see dark.css. */
-  --color-trace-event-info: color-mix(in srgb, var(--color-black) 40%, transparent);
+  /* Trace span-event markers.
+
+     Aliases onto the app-wide status vocabulary rather than defining colours of
+     their own, so a marker means what the same colour means everywhere else —
+     `TraceTree` already renders the span error icon and the event-count error
+     tally with `status-error-text`. The light/dark swap lives in the status
+     tokens, so these three need no dark override.
+
+     Info is `status-neutral-text`, not `status-info-text`. Standard info is blue,
+     and blue is the most heavily represented family in the span-bar palette, so a
+     blue tick would collide with the bars it is meant to stand out from.
+     Achromatic collides with nothing: every span-bar colour is saturated (min
+     OKLab chroma 0.110 light / 0.096 dark) against neutral's 0.022 / 0.012, so no
+     service bar is ever grey.
+
+     These carry hue, not contrast. No colour clears 3:1 against an arbitrary
+     service colour — the bar palette spans the whole hue circle across luminance
+     0.134-0.849, and only near-black clears it, by which point it has no chroma
+     left. Visibility comes from the tick overhanging its bar onto the row
+     background, where all three of these clear 3:1 in both themes. */
+  --color-trace-event-error: var(--color-status-error-text);
+  --color-trace-event-warning: var(--color-status-warning-text);
+  --color-trace-event-info: var(--color-status-neutral-text);
 
   /* Bracket-pair colorization — Monaco rainbow brackets (vs light) */
   --color-bracket-1: #0431fa;
@@ -1790,6 +1806,8 @@
   --color-badge-blue-soft-text: var(--color-badge-blue-soft-text);
 
   /* Trace span-event markers */
+  --color-trace-event-error: var(--color-trace-event-error);
+  --color-trace-event-warning: var(--color-trace-event-warning);
   --color-trace-event-info: var(--color-trace-event-info);
 
   /* Editor bracket-pair colorization */
