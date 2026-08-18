@@ -30,19 +30,20 @@ use datafusion::{
 use hashbrown::HashSet;
 use promql_parser::label::{MatchOp, Matchers};
 
-pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
-    let mut df = df;
+/// Build the DataFusion predicates used for PromQL label matchers.
+///
+/// Keeping predicate construction separate lets storage-side secondary
+/// indexes evaluate exactly the same matcher semantics as the final scan.
+pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
+    let mut predicates = Vec::new();
     for mat in matchers.matchers.iter() {
         if mat.name == TIMESTAMP_COL_NAME || mat.name == VALUE_LABEL {
             continue;
         }
-        let field_type = {
-            let schema = df.schema().as_arrow();
-            let Ok(field) = schema.field_with_name(&mat.name) else {
-                continue;
-            };
-            field.data_type().clone()
+        let Ok(field) = schema.field_with_name(&mat.name) else {
+            continue;
         };
+        let field_type = field.data_type().clone();
         let literal = |value: String| -> Expr {
             match &field_type {
                 // Explicitly type equality matcher literals to the label column;
@@ -52,13 +53,9 @@ pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
                 _ => lit(value),
             }
         };
-        match &mat.op {
-            MatchOp::Equal => {
-                df = df.filter(col(mat.name.clone()).eq(literal(mat.value.clone())))?
-            }
-            MatchOp::NotEqual => {
-                df = df.filter(col(mat.name.clone()).not_eq(literal(mat.value.clone())))?
-            }
+        let predicate = match &mat.op {
+            MatchOp::Equal => col(mat.name.clone()).eq(literal(mat.value.clone())),
+            MatchOp::NotEqual => col(mat.name.clone()).not_eq(literal(mat.value.clone())),
             MatchOp::Re(regex) => {
                 let regex = format!("^{}$", regex.as_str());
                 // DataFusion 54 can lower a regex on Utf8View to a mixed-type
@@ -69,8 +66,7 @@ pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
                 } else {
                     col(mat.name.clone())
                 };
-                let predicate = regexp_like().call(vec![value, lit(regex)]);
-                df = df.filter(predicate)?
+                regexp_like().call(vec![value, lit(regex)])
             }
             MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
@@ -79,10 +75,19 @@ pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
                 } else {
                     col(mat.name.clone())
                 };
-                let predicate = regexp_like().call(vec![value, lit(regex)]);
-                df = df.filter(predicate.not())?
+                regexp_like().call(vec![value, lit(regex)]).not()
             }
-        }
+        };
+        predicates.push(predicate);
+    }
+    predicates
+}
+
+pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
+    let predicates = matcher_predicates(df.schema().as_arrow(), matchers);
+    let mut df = df;
+    for predicate in predicates {
+        df = df.filter(predicate)?;
     }
     Ok(df)
 }
