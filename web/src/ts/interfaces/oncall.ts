@@ -533,7 +533,16 @@ export interface ConfigRisk {
   priority?: string | null;
   user_email?: string | null;
   rotation?: string | null;
+  /** Which slot the finding is about, where it is about one. */
+  slot?: string | null;
   rung_micros?: number | null;
+  /** Micros — when the gap starts. */
+  at?: number | null;
+  rule_id?: string | null;
+  /** The ownership rule's dimensions, as the rule itself spells them. */
+  path?: string | null;
+  /** How many alert rules the finding costs, where that is what makes it real. */
+  alert_count?: number | null;
 }
 
 export interface ConfigRisks {

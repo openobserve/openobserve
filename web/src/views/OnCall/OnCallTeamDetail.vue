@@ -101,7 +101,10 @@
       <OnCallTeamAttention
         :risks="configRisks"
         :reachability="reachability"
+        :overview="overview"
+        :checked-at="insightsCheckedAt"
         @act="onAttentionAct"
+        @recheck="fetchInsights"
       />
     </OContent>
 
@@ -491,6 +494,9 @@ const testingPage = ref(false);
 const overview = ref<TeamOverview | null>(null);
 const reachability = ref<TeamReachability | null>(null);
 const configRisks = ref<ConfigRisks | null>(null);
+/// Micros — when the findings last came back, so the banner can say how fresh
+/// they are rather than implying they are live.
+const insightsCheckedAt = ref<number | null>(null);
 const teamLoad = ref<TeamLoad | null>(null);
 const segments = ref<ResolvedSegment[]>([]);
 const segmentsLoading = ref(false);
@@ -744,6 +750,7 @@ async function fetchInsights() {
   reachability.value = reach.status === "fulfilled" ? (reach.value.data ?? null) : null;
   configRisks.value = risks.status === "fulfilled" ? (risks.value.data ?? null) : null;
   teamLoad.value = load.status === "fulfilled" ? (load.value.data ?? null) : null;
+  insightsCheckedAt.value = Date.now() * 1000;
 }
 
 async function fetchPages() {
