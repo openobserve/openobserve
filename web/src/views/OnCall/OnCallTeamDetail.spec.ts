@@ -41,6 +41,9 @@ vi.mock("@/services/oncall", () => ({
     teamReachability: vi.fn(),
     teamConfigRisks: vi.fn(),
     teamLoad: vi.fn(),
+    // Deleting a rotation is a whole-schedule save with one layer removed —
+    // there is no per-rotation endpoint.
+    setSchedule: vi.fn(),
   },
 }));
 
@@ -392,6 +395,13 @@ describe("OnCallTeamDetail", () => {
   });
 
   describe("the schedule tab", () => {
+    /// The delete confirm, told apart from the presets dialog's own by title.
+    function deleteConfirm(wrapper: any) {
+      return wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.props("title") === "Delete this rotation?");
+    }
+
     async function openSchedule() {
       const wrapper = render();
       await flushPromises();
@@ -409,7 +419,7 @@ describe("OnCallTeamDetail", () => {
       const wrapper = await openSchedule();
 
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallRotationRail" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallScheduleAnswer" }).exists()).toBe(true);
       const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
       expect(editor.exists()).toBe(true);
       expect(editor.props("drawerOnly")).toBe(true);
@@ -419,13 +429,55 @@ describe("OnCallTeamDetail", () => {
     /// the editor, and the read view stays underneath it.
     it("hands the clicked rotation to the editor without unmounting the view", async () => {
       const wrapper = await openSchedule();
-      wrapper.findComponent({ name: "OnCallRotationRail" }).vm.$emit("edit", "Primary");
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("edit", "Primary");
       await flushPromises();
 
       const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
       expect(editor.props("intent")).toEqual({ mode: "edit", name: "Primary" });
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallRotationRail" }).exists()).toBe(true);
+    });
+
+    /// Until the lane menu carried it, a rotation could be created and never
+    /// removed: the only delete control lived in the bulk table, which
+    /// `drawer-only` — the mode this tab has always used — does not render.
+    it("deletes a rotation by saving the schedule without it", async () => {
+      service.setSchedule.mockResolvedValue({ data: {} });
+      const wrapper = await openSchedule();
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "Primary");
+      await flushPromises();
+
+      // BY TITLE, not `findComponent`: the presets dialog mounts a ConfirmDialog
+      // of its own and sits earlier in the tree, so the first match is its
+      // "Replace the current schedule?" — which is always closed, and would
+      // make this assertion pass for the wrong reason if it ever inverted.
+      const confirm = deleteConfirm(wrapper);
+      // Named in the prompt: two rotations in one team routinely differ by one
+      // word, and deleting the wrong one silently stops paging.
+      expect(confirm!.props("modelValue")).toBe(true);
+      expect(confirm!.props("message")).toContain("Primary");
+      expect(service.setSchedule).not.toHaveBeenCalled();
+
+      confirm!.vm.$emit("update:ok");
+      await flushPromises();
+
+      const sent = service.setSchedule.mock.calls[0][0];
+      expect(sent.data.rotations.map((r: any) => r.name)).not.toContain("Primary");
+    });
+
+    /// Nothing is sent until the reader confirms — the dialog is the guard, not
+    /// a receipt for a delete that already happened.
+    it("leaves the schedule alone when the delete is cancelled", async () => {
+      service.setSchedule.mockResolvedValue({ data: {} });
+      const wrapper = await openSchedule();
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "Primary");
+      await flushPromises();
+      deleteConfirm(wrapper)!.vm.$emit("update:cancel");
+      await flushPromises();
+
+      expect(service.setSchedule).not.toHaveBeenCalled();
+      expect(deleteConfirm(wrapper)!.props("modelValue")).toBe(false);
     });
 
     /// The point of saving is to see what the engine now says.

@@ -244,7 +244,6 @@
               :testing="testingPage"
               @test-page="sendTestPage"
             />
-            <OnCallLoadBalance :load="teamLoad" />
           </div>
         </OContent>
       </OTabPanel>
@@ -257,71 +256,69 @@
           :timezone="team?.timezone ?? 'UTC'"
           @changed="fetchAll"
         />
+        <!-- "1.9× load" is a fact about PEOPLE, and the only thing to be done
+             about it — change who is in the rotation — is on this tab. It sat
+             beside the schedule, one tab away from every control that fixes it. -->
+        <OContent y>
+          <OnCallLoadBalance :load="teamLoad" />
+        </OContent>
       </OTabPanel>
 
       <!-- What the schedule WILL do, then the rotations that decide it, then
            the editor. Reading before editing: the timeline is resolved by the
            engine, so it answers "is this right" in a way the draft cannot. -->
       <OTabPanel name="schedule">
-        <!-- Read, or edit — never both. The editor carries its own draft
-             calendar and rotation table, so showing it under these two put two
-             of each on the screen. -->
+        <!-- One answer line, then one timeline. Everything the rail used to
+             restate now lives on the lane it describes. -->
+        <OnCallScheduleAnswer
+          :slots="onCallNow"
+          :segments="segments"
+          :timezone="team?.timezone ?? 'UTC'"
+          @assign-secondary="onAssignSecondary"
+          @request-swap="coverOpen = true"
+        />
+
         <OContent y class="flex flex-col gap-5">
-            <!-- Only when the window ahead has a hole in it. Handover and who
-                 is on call are already in the strip above the tabs. -->
-            <OnCallGapBanner
-              :segments="segments"
-              :timezone="team?.timezone ?? 'UTC'"
-              @fill-gap="onFillGap"
-            />
+          <!-- Every act on a rotation arrives here, and every one of them opens
+               the SAME drawer: a rotation is one form, and which button was
+               pressed only decides what it opens on. -->
+          <OnCallScheduleTimeline
+            v-model:window="scheduleWindow"
+            :rotations="schedule?.rotations ?? []"
+            :segments="segments"
+            :timezone="team?.timezone ?? 'UTC'"
+            :loading="segmentsLoading"
+            @fill-gap="onFillGap"
+            @add="openScheduleEditor({ mode: 'new' })"
+            @edit="openScheduleEditor({ mode: 'edit', name: $event })"
+            @assign-people="openScheduleEditor({ mode: 'edit', name: $event })"
+            @duplicate="openScheduleEditor({ mode: 'duplicate', name: $event })"
+            @override="coverOpen = true"
+            @delete="rotationToDelete = $event"
+            @presets="presetsOpen = true"
+          />
 
-            <!-- The rail answers "which rotation is carrying this, and what do
-                 I do about it"; the chart answers "when". Side by side because
-                 the second question is always asked of the first. -->
-            <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-              <OnCallRotationRail
-                :rotations="schedule?.rotations ?? []"
-                :segments="segments"
-                :load="teamLoad"
-                :timezone="team?.timezone ?? 'UTC'"
-                @edit="openScheduleEditor({ mode: 'edit', name: $event })"
-                @add="openScheduleEditor({ mode: 'new' })"
-                @override="coverOpen = true"
-                @duplicate="openScheduleEditor({ mode: 'duplicate', name: $event })"
-                @presets="presetsOpen = true"
-              />
+          <OnCallSchedulePresets
+            v-model:open="presetsOpen"
+            :team-id="teamId"
+            :members="members"
+            :has-schedule="!!schedule?.rotations?.length"
+            @applied="onScheduleSaved"
+          />
 
-              <OnCallScheduleTimeline
-                v-model:window="scheduleWindow"
-                :rotations="schedule?.rotations ?? []"
-                :segments="segments"
-                :timezone="team?.timezone ?? 'UTC'"
-                :loading="segmentsLoading"
-                @fill-gap="onFillGap"
-              />
-            </div>
-
-            <OnCallSchedulePresets
-              v-model:open="presetsOpen"
-              :team-id="teamId"
-              :members="members"
-              :has-schedule="!!schedule?.rotations?.length"
-              @applied="onScheduleSaved"
-            />
-
-            <!-- Drawer only: the read view stays underneath. Swapping the tab
-                 into a separate editing mode meant "Add rotation" first landed
-                 on a page-sized editor with a second button of the same name. -->
-            <OnCallScheduleEditor
-              drawer-only
-              :team-id="teamId"
-              :timezone="team?.timezone ?? 'UTC'"
-              :schedule="schedule"
-              :members="members"
-              :intent="scheduleIntent"
-              @saved="onScheduleSaved"
-              @intent-handled="scheduleIntent = null"
-            />
+          <!-- Drawer only: the read view stays underneath. Swapping the tab
+               into a separate editing mode meant "Add rotation" first landed
+               on a page-sized editor with a second button of the same name. -->
+          <OnCallScheduleEditor
+            drawer-only
+            :team-id="teamId"
+            :timezone="team?.timezone ?? 'UTC'"
+            :schedule="schedule"
+            :members="members"
+            :intent="scheduleIntent"
+            @saved="onScheduleSaved"
+            @intent-handled="scheduleIntent = null"
+          />
         </OContent>
       </OTabPanel>
 
@@ -382,6 +379,16 @@
 
     <OnCallTeamForm v-model:open="editOpen" :team="team" @saved="onTeamSaved" />
 
+    <!-- Named in the prompt: a rotation is what puts somebody on call, and two
+         rotations in one team routinely differ by one word. -->
+    <ConfirmDialog
+      :model-value="!!rotationToDelete"
+      :title="t('oncall.laneDeleteTitle')"
+      :message="t('oncall.laneDeleteMessage', { name: rotationToDelete ?? '' })"
+      @update:ok="deleteRotation"
+      @update:cancel="rotationToDelete = null"
+    />
+
     <OnCallCoverForm
       v-model:open="coverOpen"
       :members="members"
@@ -409,12 +416,12 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
-import OnCallRotationRail from "@/components/oncall/OnCallRotationRail.vue";
-import OnCallGapBanner from "@/components/oncall/OnCallGapBanner.vue";
+import OnCallScheduleAnswer from "@/components/oncall/OnCallScheduleAnswer.vue";
 import OnCallSchedulePresets from "@/components/oncall/OnCallSchedulePresets.vue";
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
@@ -453,7 +460,7 @@ import type {
   TeamReachability,
   ScheduleEditorIntent,
 } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY, sameSlot } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable, upcomingShifts, winningRotation } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -497,6 +504,8 @@ function openScheduleEditor(intent: ScheduleEditorIntent) {
 
 const coverOpen = ref(false);
 const presetsOpen = ref(false);
+/// The rotation the reader asked to delete, held until they confirm it.
+const rotationToDelete = ref<string | null>(null);
 const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);
 const editingPolicy = ref(false);
@@ -856,6 +865,53 @@ async function fetchSegments() {
 
 /// The gap the chart offered to fill pre-fills the window, so the common case
 /// is choosing a person and pressing save.
+/// The pool a secondary rotation staffs. Lower-cased at the comparison, so it
+/// does not depend on somebody spelling it the way the ladder does.
+const SECONDARY_SLOT = "secondary";
+
+/// "Assign secondary" is one button with two meanings, and the difference is
+/// whether the team already has a secondary rotation to put people INTO. Both
+/// land on the same drawer, which is the point: the reader asked to staff the
+/// secondary, not to learn how this team models one.
+function onAssignSecondary() {
+  const existing = (schedule.value?.rotations ?? []).find((rotation) =>
+    sameSlot(rotation.slot, SECONDARY_SLOT),
+  );
+  openScheduleEditor(existing ? { mode: "edit", name: existing.name } : { mode: "new" });
+}
+
+/// Deleting a rotation is a schedule save with one layer removed — there is no
+/// per-rotation endpoint, and inventing one client-side by PUTting a partial
+/// schedule would drop every other layer.
+///
+/// Until this existed a rotation could be created and never removed: the bulk
+/// table that carried the only delete control is not rendered in `drawer-only`,
+/// which is the mode this tab has always used.
+async function deleteRotation() {
+  const name = rotationToDelete.value;
+  const current = schedule.value;
+  rotationToDelete.value = null;
+  if (!name || !current) return;
+
+  const rotations = current.rotations.filter((rotation) => rotation.name !== name);
+  try {
+    await oncallService.setSchedule({
+      org_identifier: orgId.value,
+      team_id: teamId.value,
+      data: { timezone: current.timezone, rotations },
+    });
+    toast({ variant: "success", message: t("oncall.laneDeleted", { name: raw(name) }) });
+    await onScheduleSaved();
+  } catch (err: any) {
+    // The server's own sentence: it refuses a save that would leave two
+    // rotations equally in force, and which two is the whole story.
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.laneDeleteFailed"),
+    });
+  }
+}
+
 function onFillGap(gap: ResolvedSegment) {
   coverGap.value = { from: gap.from, to: gap.to };
   coverOpen.value = true;
