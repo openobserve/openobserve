@@ -82,15 +82,35 @@ services:
       - -c
       - log_checkpoints=on
       - -c
-      - log_temp_files=0
+      # Log only spills a real operator would care about. At `0` (log EVERY
+      # temp file) this rig produced 152,919 temp_file rows in a 2.5-minute
+      # window -- 97% of ALL server-vantage data -- which buried every other
+      # signal, tripped the collector's memory limiter ("data refused due to
+      # high memory usage") and dropped the filelog rows that Slowest calls
+      # and Deadlocks are built from.
+      - log_temp_files=1MB
       - -c
       - max_connections=200
       - -c
-      - work_mem=64kB # tiny on purpose: forces temp-file spills on big sorts
+      # The real Postgres default. Was 64kB, ~1000x smaller than production,
+      # which made almost every sort spill to disk -- an unrealistic profile
+      # that turned the exceptional temp_file event into the dominant one.
+      # The workload's large sorts still exceed 4MB and still spill, so the
+      # signal stays exercised; it is now RARE, as it is in production.
+      - work_mem=4MB
     environment:
       POSTGRES_USER: dbm
       POSTGRES_PASSWORD: dbm
       POSTGRES_DB: dbmlab
+    # A production-shaped host name, in ADDITION to the compose service name.
+    # Whatever the collector connects THROUGH becomes the instance identity the
+    # UI's "database" filter offers, and `postgres` reads as a placeholder
+    # rather than a server an operator would recognise. The `postgres` alias is
+    # kept so the workload's own PGHOST keeps resolving unchanged.
+    networks:
+      default:
+        aliases:
+          - pg-prod-1
     ports:
       - "55432:5432"
     volumes:

@@ -1,0 +1,8 @@
+# Live sinks for the `file/raw_*` exporters. These are RUNTIME capture data,
+# not fixtures: the collector appends to them continuously (measured 40-80 MB
+# within an hour on the pg/pgcs lanes, and the detached recipe sink is ~90 GB
+# per hour). The rig re-creates them on start -- pg-rig.sh mkdir -p's the lane
+# directory and truncates the events file -- so nothing here needs to survive a
+# clone. The checked-in evidence lives in captures/*.md and captures/*.json.
+captures/raw/
+captures/raw_*/
