@@ -895,21 +895,66 @@ describe("TraceDetailsSidebar", async () => {
         expect(timelineMarkers()).toHaveLength(1);
       });
 
-      it("expands the row named by focusEventIndex", async () => {
-        await setSpanEvents([
-          { name: "first", _timestamp: eventNsAt(0.25) },
-          { name: "second", _timestamp: eventNsAt(0.75) },
-        ]);
+      // Regression: this watcher read eventsTableRef with the default
+      // flush: "pre", so it ran before the v-if-gated Events panel mounted and
+      // getRow() returned undefined. The old test hid that by stubbing the ref
+      // before the assertion; this one starts with no table, as the real
+      // marker-click path does.
+      //
+      // OTable is stubbed on this one mount so its own template ref doesn't
+      // win the race against the fake table injected below: the real OTable
+      // re-asserts eventsTableRef on every render (Vue keeps template refs in
+      // sync with the live component), which would satisfy the watcher with a
+      // real-but-irrelevant row before the test gets to swap in its spy. The
+      // real OTable is still exercised by the "When events exist" tests above.
+      it("expands the row once the events table appears", async () => {
         const toggleExpanded = vi.fn();
-        (wrapper.vm as any).eventsTableRef = {
-          table: { getRow: () => ({ toggleExpanded }) },
-        };
+        const localWrapper = mount(TraceDetailsSidebar, {
+          attachTo: "#app",
+          props: {
+            span: {
+              ...mockSpan,
+              events: JSON.stringify([
+                { name: "first", _timestamp: eventNsAt(0.25) },
+                { name: "second", _timestamp: eventNsAt(0.75) },
+              ]),
+            },
+            baseTracePosition: mockBaseTracePosition,
+            searchQuery: "",
+            activeTab: "events",
+          },
+          global: {
+            plugins: [i18n, router, mockStore],
+            stubs: { ...baseStubs, OTable: true },
+          },
+        });
+        const vm = localWrapper.vm as any;
 
-        await wrapper.setProps({ focusEventIndex: 1 });
+        // No table yet — exactly the state a cold marker click lands in.
+        expect(vm.eventsTableRef?.table).toBeFalsy();
+        await localWrapper.setProps({ focusEventIndex: 1 });
+        await flushPromises();
+        expect(toggleExpanded).not.toHaveBeenCalled();
+        expect(vm.selectedEventIndex).toBe(1);
+
+        // The panel mounts and the ref fills in.
+        vm.eventsTableRef = { table: { getRow: () => ({ toggleExpanded }) } };
         await flushPromises();
 
         expect(toggleExpanded).toHaveBeenCalledWith(true);
-        expect((wrapper.vm as any).selectedEventIndex).toBe(1);
+        localWrapper.unmount();
+      });
+
+      it("expands immediately when the table is already mounted", async () => {
+        await setSpanEvents([{ name: "only", _timestamp: eventNsAt(0.25) }]);
+        const toggleExpanded = vi.fn();
+        const vm = wrapper.vm as any;
+        vm.eventsTableRef = { table: { getRow: () => ({ toggleExpanded }) } };
+
+        await wrapper.setProps({ focusEventIndex: 0 });
+        await flushPromises();
+
+        expect(toggleExpanded).toHaveBeenCalledWith(true);
       });
 
       it("ignores a null focusEventIndex", async () => {
