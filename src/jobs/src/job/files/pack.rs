@@ -26,7 +26,10 @@ use bytes::Bytes;
 use chrono::Duration;
 use config::{
     FileFormat, cluster, get_config,
-    meta::stream::{FileMeta, StreamType},
+    meta::{
+        promql::{metrics_hash_sort_enabled, to_hash_sorted_file_key},
+        stream::{FileMeta, StreamType},
+    },
     metrics,
     utils::{parquet::generate_filename_with_time_range, time::now_micros},
 };
@@ -42,7 +45,10 @@ use infra::{
 };
 use ingester::{PackSegment, PendingStreamStats};
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::merge::{self, MergeParquetResult};
+use search::datafusion::{
+    merge::{self, MergeParquetResult},
+    sort_order::FileSortOrder,
+};
 use tantivy_utils::index_builder::create_tantivy_index;
 use tokio::sync::{Mutex, RwLock};
 
@@ -388,7 +394,10 @@ async fn upload_chunk(
         bufs.push(data);
     }
 
-    let (buf, mut new_file_meta, file_format) = if chunk.len() == 1 {
+    // Segments are persisted in arrival order. The hash-sorted metrics layout
+    // must be produced by the merge, so it never takes the as-is fast path.
+    let single_segment_as_is = chunk.len() == 1 && !metrics_hash_sort_enabled(stream_type);
+    let (buf, mut new_file_meta, file_format, sort_order) = if single_segment_as_is {
         // fast path: upload the parquet bytes as-is, no decode/re-encode
         let buf = Bytes::from(bufs.pop().unwrap());
         let file_meta = FileMeta {
@@ -399,7 +408,7 @@ async fn upload_chunk(
             compressed_size: buf.len() as i64,
             ..Default::default()
         };
-        (buf, file_meta, FileFormat::Parquet)
+        (buf, file_meta, FileFormat::Parquet, FileSortOrder::None)
     } else {
         // merge multiple segments in memory
         let mut segment_schemas = Vec::with_capacity(bufs.len());
@@ -447,7 +456,8 @@ async fn upload_chunk(
                 buf,
                 file_meta,
                 file_format,
-            } => (Bytes::from(buf), file_meta, file_format),
+                sort_order,
+            } => (Bytes::from(buf), file_meta, file_format, sort_order),
             MergeParquetResult::Multiple { .. } => {
                 return Err(anyhow::anyhow!(
                     "merge_parquet_files error: unexpected multiple files on ingester"
@@ -468,13 +478,16 @@ async fn upload_chunk(
         chunk[0].meta.partition_key,
         generate_filename_with_time_range(min_ts, max_ts, 0)
     );
-    let new_file_key = super::generate_ingester_storage_file_key(
+    let mut new_file_key = super::generate_ingester_storage_file_key(
         org_id,
         stream_type,
         stream_name,
         &wal_like_name,
         file_format,
     );
+    if sort_order == FileSortOrder::HashTimestampAsc {
+        new_file_key = to_hash_sorted_file_key(&new_file_key);
+    }
 
     log::info!(
         "[INGESTER:PACK:JOB:{thread_id}] uploading {} segments into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
