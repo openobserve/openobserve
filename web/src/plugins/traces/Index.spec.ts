@@ -505,6 +505,10 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should update URL with tab=spans when searchMode changes to spans", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "traces" }, name: "traces", path: "/traces" },
+      } as any);
+
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -572,6 +576,43 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(routerReplaceSpy).not.toHaveBeenCalled();
     });
 
+    it("should restore the Spans default when the tab query is removed", async () => {
+      const currentRoute = ref({
+        query: { tab: "traces" },
+        name: "traces",
+        path: "/traces",
+      }) as typeof router.currentRoute;
+      routerCurrentRouteSpy.mockReturnValue(currentRoute);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      currentRoute.value = {
+        ...currentRoute.value,
+        query: {},
+      };
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
+    });
+
     it("should switch to service-graph tab from ?tab= on enterprise", async () => {
       routerCurrentRouteSpy.mockReturnValue({
         value: {
@@ -624,7 +665,9 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
     it("should render the ServiceGraph stub inline in service-graph mode (enterprise)", async () => {
-      mockSearchObj.meta.searchMode = "service-graph";
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
       wrapper = mountIndex();
       await flushPromises();
 
@@ -633,7 +676,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
-      mockSearchObj.meta.searchMode = "services-catalog";
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "services-catalog" }, name: "traces", path: "/traces" },
+      } as any);
       wrapper = mountIndex();
       await flushPromises();
 
@@ -642,7 +687,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should apply the built filter and switch mode on view-traces from the graph", async () => {
-      mockSearchObj.meta.searchMode = "service-graph";
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
       wrapper = mountIndex();
       await flushPromises();
 

@@ -614,6 +614,7 @@ describe("useRoutes (router.ts)", () => {
     });
 
     it("redirects the standalone Service Graph path to the canonical query tab", () => {
+      config.isEnterprise = "true";
       const { homeChildRoutes } = useRoutes();
       const route = homeChildRoutes.find((candidate) => candidate.path === "traces/service-graph");
       if (!route || typeof route.redirect !== "function") {
@@ -623,6 +624,19 @@ describe("useRoutes (router.ts)", () => {
       expect(route.redirect({ query: { org_identifier: "default", period: "7d" } })).toEqual({
         name: "traces",
         query: { org_identifier: "default", period: "7d", tab: "service-graph" },
+      });
+    });
+
+    it("redirects the standalone Service Graph path to Spans in OSS", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/service-graph");
+      if (!route || typeof route.redirect !== "function") {
+        throw new Error("Missing Service Graph legacy redirect");
+      }
+
+      expect(route.redirect({ query: { org_identifier: "default", stream: "traces" } })).toEqual({
+        name: "traces",
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
       });
     });
 
@@ -645,6 +659,7 @@ describe("useRoutes (router.ts)", () => {
     });
 
     it("keeps the oldest Service Graph path as a query-preserving redirect", () => {
+      config.isEnterprise = "true";
       const { homeChildRoutes } = useRoutes();
       const route = homeChildRoutes.find((candidate) => candidate.path === "service-graph");
       if (!route || typeof route.redirect !== "function") {
@@ -655,6 +670,30 @@ describe("useRoutes (router.ts)", () => {
         name: "traces",
         query: { org_identifier: "default", tab: "service-graph" },
       });
+    });
+
+    it("normalizes an unsupported Service Graph tab before entering Traces in OSS", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "traces");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        {
+          query: { org_identifier: "default", stream: "traces", tab: "service-graph" },
+          hash: "",
+        },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        name: "traces",
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+        hash: "",
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
     });
 
     it("does not expose standalone Service Graph or Service Catalog route names", () => {
@@ -1618,7 +1657,7 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "traces");
 
-      const mockTo = {};
+      const mockTo = { query: { tab: "spans" } };
       const mockFrom = {};
       const mockNext = vi.fn();
       route.beforeEnter(mockTo, mockFrom, mockNext);

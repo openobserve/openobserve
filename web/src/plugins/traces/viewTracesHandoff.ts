@@ -40,9 +40,8 @@ export interface ViewTracesPayload {
  * Build the traces search-bar filter (a bare WHERE condition — no SELECT/ORDER
  * BY, since the traces editor is not in SQL mode) from a `view-traces` payload.
  *
- * Extracted verbatim from the former in-page handler so Service Graph and
- * Services Catalog, now on their own routes, build the same string and hand off
- * to Traces through the URL instead of by mutating shared state.
+ * Shared by the embedded Service Graph and Services Catalog tabs so both build
+ * the same filter before returning to the traces search view.
  *
  * @returns the filter string, or "" when the payload names no service (there is
  *          nothing to filter on without one).
@@ -96,29 +95,4 @@ export function buildViewTracesFilter(data: ViewTracesPayload): string {
  */
 export function normalizeViewTracesPayload(data: string | ViewTracesPayload): ViewTracesPayload {
   return typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
-}
-
-/**
- * Turn a `view-traces` payload into the query params the Traces route hydrates
- * from. Mirrors the param names `restoreUrlQueryParams` already understands
- * (`stream`, `from`/`to`) and adds `filter` for the prebuilt WHERE condition,
- * so a handoff URL is bookmarkable and survives a reload.
- */
-export function viewTracesQuery(data: string | ViewTracesPayload): Record<string, string> {
-  const payload = normalizeViewTracesPayload(data);
-  const query: Record<string, string> = {};
-
-  const mode = payload.mode === "spans" ? "spans" : "traces";
-  if (mode !== "spans") query.tab = mode;
-
-  if (payload.stream) query.stream = payload.stream;
-
-  const filter = buildViewTracesFilter(payload);
-  if (filter) query.filter = filter;
-
-  if (payload.timeRange?.startTime && payload.timeRange?.endTime) {
-    query.from = String(payload.timeRange.startTime);
-    query.to = String(payload.timeRange.endTime);
-  }
-  return query;
 }
