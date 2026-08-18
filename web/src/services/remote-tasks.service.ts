@@ -11,8 +11,10 @@ export type RemoteTaskAuthType = "none" | "bearer" | "basic" | "api_key_header";
 export type RemoteTaskVerificationStatus = "unverified" | "verified" | "failed";
 export type RemoteTaskHttpMethod = "POST" | "PUT" | "PATCH";
 
-/// Auth as it comes back from the server: the shape, and whether a Secret is
-/// configured — never the Secret itself.
+/**
+ * Auth as it comes back from the server: the shape, and whether a Secret is
+ * configured — never the Secret itself.
+ */
 export interface RemoteTaskAuthView {
   type: RemoteTaskAuthType;
   usesSecret: boolean;
@@ -25,8 +27,10 @@ export interface RemoteTaskSigningView {
   keyId?: string;
 }
 
-/// A custom header on the way out. A Secret-backed header reports that it is,
-/// and carries no value.
+/**
+ * A custom header on the way out. A Secret-backed header reports that it is,
+ * and carries no value.
+ */
 export interface RemoteTaskHeaderView {
   key: string;
   value?: string;
@@ -37,11 +41,11 @@ export interface RemoteTask {
   id: string;
   orgId: string;
   entityId: string;
-  /// 0 marks the head's draft, which no experiment can reference.
+  /** 0 marks the head's draft, which no experiment can reference. */
   version: number;
   isDraft: boolean;
   isReferenceable: boolean;
-  /// `name@version`, present only when there is a version to pin.
+  /** `name@version`, present only when there is a version to pin. */
   taskRef?: string;
   name: string;
   description?: string | null;
@@ -65,8 +69,10 @@ export interface RemoteTask {
   updatedAt: number;
 }
 
-/// A write carries Secret references, never Secret values — the write-only rule
-/// the registration form depends on.
+/**
+ * A write carries Secret references, never Secret values — the write-only rule
+ * the registration form depends on.
+ */
 export interface RemoteTaskAuthPayload {
   type: RemoteTaskAuthType;
   secretRef?: string;
@@ -99,7 +105,7 @@ export interface RemoteTaskPayload {
   maxAttempts?: number;
   maxConcurrency?: number;
   signing?: RemoteTaskSigningPayload;
-  /// The published version an edit started from. Ignored when a draft exists.
+  /** The published version an edit started from. Ignored when a draft exists. */
   fromVersion?: number;
 }
 
@@ -116,8 +122,10 @@ export interface RemoteTaskVerificationReport {
   latencyMs: number;
 }
 
-/// The outcome of a test connection. `published` is false when it failed, in
-/// which case no version was minted and the draft is unchanged bar the reason.
+/**
+ * The outcome of a test connection. `published` is false when it failed, in
+ * which case no version was minted and the draft is unchanged bar the reason.
+ */
 export interface RemoteTaskPublishResult {
   published: boolean;
   versionBumped: boolean;
@@ -166,7 +174,7 @@ const remoteTasksService = {
   create: async (orgId: string, payload: RemoteTaskPayload): Promise<RemoteTask> =>
     (await http().post(`/api/${orgId}/remote_tasks`, payload)).data,
 
-  /// Save the head's single draft. Published versions are untouched.
+  /** Save the head's single draft. Published versions are untouched. */
   saveDraft: async (
     orgId: string,
     entityId: string,
@@ -181,7 +189,7 @@ const remoteTasksService = {
     await http().delete(`/api/${orgId}/remote_tasks/${entityId}/draft`);
   },
 
-  /// Test connection, and publish on success. The only way a version is minted.
+  /** Test connection, and publish on success. The only way a version is minted. */
   testConnection: async (
     orgId: string,
     entityId: string,
@@ -190,7 +198,7 @@ const remoteTasksService = {
     (await http().post(`/api/${orgId}/remote_tasks/${entityId}/test_connection`, payload))
       .data,
 
-  /// Volatile test-run bench. Returns the per-row exchange and nothing durable.
+  /** Volatile test-run bench. Returns the per-row exchange and nothing durable. */
   testRun: async (
     orgId: string,
     entityId: string,
