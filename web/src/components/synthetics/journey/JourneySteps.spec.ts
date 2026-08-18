@@ -818,18 +818,27 @@ describe("JourneySteps", () => {
         [{ data: makeSteps(3), mode: "editor", canRecordFrom: false }, 1],
       ];
 
+      // Pointer and keyboard carry the guard separately, so both are exercised —
+      // one path passing says nothing about the other.
+      const events = [
+        () => new MouseEvent("mouseenter"),
+        () => new FocusEvent("focusin", { bubbles: true }),
+      ];
+
       for (const [props, index] of cases) {
-        const w = mount(JourneySteps, { props: props as any, global: { stubs: STUBS } });
-        await flushPromises();
+        for (const makeEvent of events) {
+          const w = mount(JourneySteps, { props: props as any, global: { stubs: STUBS } });
+          await flushPromises();
 
-        recordBeforeTarget(w, index).dispatchEvent(new MouseEvent("mouseenter"));
-        await flushPromises();
+          recordBeforeTarget(w, index).dispatchEvent(makeEvent());
+          await flushPromises();
 
-        expect(
-          w.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
-          `a disabled control at index ${index} still previewed`,
-        ).toBe(false);
-        w.unmount();
+          expect(
+            w.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
+            `a disabled control at index ${index} still previewed on ${makeEvent().type}`,
+          ).toBe(false);
+          w.unmount();
+        }
       }
     });
 
@@ -853,6 +862,48 @@ describe("JourneySteps", () => {
       expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
         false,
       );
+    });
+
+    it("holds the preview while either the pointer or focus is still on the control", async () => {
+      // Pointer and keyboard are independent. Sharing one slot meant whichever
+      // left first cleared the marker for both — so tabbing to the control and
+      // then moving the mouse across the row lost the preview while the control
+      // was still focused, which is the case the focus binding exists for.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const target = recordBeforeTarget(wrapper, 1);
+      const shown = () =>
+        wrapper.find('[data-test="synthetics-journey-recording-marker"]').exists();
+
+      // Focus first, then a pointer round-trip.
+      target.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+      target.dispatchEvent(new MouseEvent("mouseenter"));
+      await flushPromises();
+      expect(shown()).toBe(true);
+
+      target.dispatchEvent(new MouseEvent("mouseleave"));
+      await flushPromises();
+      expect(shown(), "mouseleave cleared a marker the focus still owns").toBe(true);
+
+      target.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await flushPromises();
+      expect(shown()).toBe(false);
+
+      // And the mirror: pointer first, then a focus round-trip.
+      target.dispatchEvent(new MouseEvent("mouseenter"));
+      target.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+      await flushPromises();
+      target.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await flushPromises();
+      expect(shown(), "focusout cleared a marker the pointer still owns").toBe(true);
+
+      target.dispatchEvent(new MouseEvent("mouseleave"));
+      await flushPromises();
+      expect(shown()).toBe(false);
     });
 
     it("keeps the committed anchor solid while another row is hovered", async () => {

@@ -271,47 +271,65 @@ const reorderEnabled = computed(() => props.enableReorder && !props.filterActive
 const isLocked = computed(() => props.locked);
 
 /** Whether the recording marker belongs above `row`. */
-function isAnchor(row: TData): boolean {
-  return !!props.anchorId && (row as { id?: string }).id === props.anchorId;
+function rowId(row: TData): string | null {
+  return (row as { id?: string }).id ?? null;
 }
 
-/** The row whose record control is under the pointer or keyboard focus. */
+function isAnchor(row: TData): boolean {
+  return !!props.anchorId && rowId(row) === props.anchorId;
+}
+
+// Pointer and keyboard are tracked apart. Sharing one slot meant whichever left
+// first cleared the preview for both, so tabbing to a control and then moving
+// the mouse across the row lost the marker while the control was still focused.
 const hoverAnchorId = ref<string | null>(null);
+const focusAnchorId = ref<string | null>(null);
 
 /**
- * One rule for the control's `:disabled` and for its hover preview.
+ * One rule for the control's `:disabled` and for whether it may be previewed.
  *
- * They cannot be written twice: the button is what gets disabled, but the span
- * around it is what reports the hover, so a second copy of the condition would
- * preview a click that cannot happen.
+ * The button is what gets disabled, but the span around it is what reports the
+ * hover — so a second copy of the condition would preview a click that cannot
+ * happen. The pointer/focus handlers deliberately do NOT consult it: `markerTone`
+ * gates the render, which also covers the case no handler can see.
  */
 function recordBeforeDisabled(row: TData): boolean {
   return isLocked.value || isFirstRow(row) || !props.canRecordFrom;
 }
 
 function onRecordBeforeEnter(row: TData) {
-  if (recordBeforeDisabled(row)) return;
-  hoverAnchorId.value = (row as { id?: string }).id ?? null;
+  hoverAnchorId.value = rowId(row);
 }
 
 function onRecordBeforeLeave() {
   hoverAnchorId.value = null;
 }
 
+function onRecordBeforeFocus(row: TData) {
+  focusAnchorId.value = rowId(row);
+}
+
+function onRecordBeforeBlur() {
+  focusAnchorId.value = null;
+}
+
 /**
  * Which marker a row shows, if any. Hover is a preview; anchor is committed.
  *
- * The hover branch re-reads `recordBeforeDisabled` rather than trusting the enter
- * handler's check: a replay can start from the toolbar while the pointer rests on
- * a control, and with nothing moving no `mouseleave` ever arrives to clear it.
+ * The single gate on previewing. Checking `recordBeforeDisabled` here rather than
+ * in the handlers covers the case they cannot see: a replay started from the
+ * toolbar locks the table while the pointer rests on a control, and with nothing
+ * moving no `mouseleave` ever arrives to clear it.
  * Results rows are excluded outright — a finished run has nothing to insert into,
  * and only the editor's details column is positioned to host the marker.
  */
 function markerTone(row: TData): "anchor" | "hover" | null {
   if (!isEditor.value) return null;
   if (isAnchor(row)) return "anchor";
-  const id = (row as { id?: string }).id;
-  return id && id === hoverAnchorId.value && !recordBeforeDisabled(row) ? "hover" : null;
+  const id = rowId(row);
+  if (!id) return null;
+  const previewed = id === hoverAnchorId.value || id === focusAnchorId.value;
+  return previewed && !recordBeforeDisabled(row) ? "hover" : null;
 }
 
 /**
@@ -549,8 +567,8 @@ function handleUpdateExpanded(ids: string[]) {
             class="inline-flex"
             @mouseenter="onRecordBeforeEnter(row)"
             @mouseleave="onRecordBeforeLeave"
-            @focusin="onRecordBeforeEnter(row)"
-            @focusout="onRecordBeforeLeave"
+            @focusin="onRecordBeforeFocus(row)"
+            @focusout="onRecordBeforeBlur"
           >
             <OButton
               variant="ghost"
