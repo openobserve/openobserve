@@ -347,16 +347,30 @@ impl ScopeFilters {
 
 /// Read one record family from `_o2_db_stats`.
 ///
-/// Time semantics: rollup `_timestamp` is the window END, so the read keeps
-/// windows ending inside `(start_time, end_time]`.
-pub(crate) fn build_stats_sql(
-    org_id: &str,
-    record_type: &str,
-    start_time: i64,
-    end_time: i64,
-    preds: &str,
-) -> String {
-    build_stats_sql_projected(org_id, record_type, start_time, end_time, preds, "*")
+/// Time semantics: rollup `_timestamp` is the window END, so the read must keep
+/// windows ending inside `(start_time, end_time]` — the window whose END lands
+/// exactly on `start_time` belongs to the PREVIOUS range, and admitting it
+/// double-counts one window at every adjacent range boundary (the paging /
+/// refresh case where two successive reads share an edge).
+///
+/// **No builder here spells a `_timestamp` bound** — this one used to, and the
+/// inline `_timestamp > start AND _timestamp <= end` it carried was measured to
+/// be a NO-OP. Against the live `_o2_db_stats` stream (17,849 rows) with a
+/// boundary `_timestamp` carrying 97 rows, the read returned 13,483 rows both
+/// WITH the inline predicate and WITHOUT it: the boundary rows were admitted
+/// either way, so the double-count the old comment claimed to prevent was
+/// happening in production the whole time. Only shifting the PAYLOAD excluded
+/// them (13,386, −97).
+///
+/// The window is therefore carried solely by the request payload, which the
+/// planner pushes down as a physical `_timestamp >= start AND _timestamp < end`
+/// FilterExec per scan (`search/src/datafusion/table_provider/helpers.rs`).
+/// [`stats_read_range`] converts the caller's range into that payload:
+/// `_timestamp` is integer µs, so on integers `> start` ≡ `>= start + 1` and
+/// `<= end` ≡ `< end + 1`, making the payload `[start + 1, end + 1)` exactly
+/// the intended `(start, end]`.
+pub(crate) fn build_stats_sql(org_id: &str, record_type: &str, preds: &str) -> String {
+    build_stats_sql_projected(org_id, record_type, preds, "*")
 }
 
 /// [`build_stats_sql`] with an explicit projection, for the reads that consume
@@ -367,15 +381,47 @@ pub(crate) fn build_stats_sql(
 pub(crate) fn build_stats_sql_projected(
     org_id: &str,
     record_type: &str,
-    start_time: i64,
-    end_time: i64,
     preds: &str,
     projection: &str,
 ) -> String {
     format!(
-        "SELECT {projection} FROM \"{O2_DB_STATS_STREAM}\"\nWHERE _timestamp > {start_time} AND _timestamp <= {end_time}\n    AND org_id = '{}'\n    AND record_type = '{record_type}'{preds}\nLIMIT {STATS_READ_SIZE}",
+        "SELECT {projection} FROM \"{O2_DB_STATS_STREAM}\"\nWHERE org_id = '{}'\n    AND record_type = '{record_type}'{preds}\nLIMIT {STATS_READ_SIZE}",
         escape_sq(org_id)
     )
+}
+
+/// The payload window for a `_o2_db_stats` read: the ONLY thing that bounds
+/// these scans (see [`build_stats_sql`]).
+///
+/// Rollup `_timestamp` is the window END, so a stats read wants the OPEN span
+/// `(start, end)` — BOTH edges exclusive, for the same reason at each end:
+///
+/// * a window ending exactly on `start_time` finished before the range opened;
+///   it is the PREVIOUS range's last window.
+/// * a window ending exactly on `end_time` has not finished inside the range;
+///   it is the NEXT range's first window. The caller's `[start, end)` is a
+///   half-open span of wall clock, so its own last window is the one ending
+///   one grid step BEFORE `end_time`.
+///
+/// Counting either edge makes two adjacent reads (paging, refresh, the Δ
+/// baseline) both claim the same window.
+///
+/// The payload filter is `>= lo AND < hi` and `_timestamp` is integer µs, so
+/// `> start` ≡ `>= start + 1`, and `< end` is already exclusive: `(start, end)`
+/// is the payload `[start + 1, end)`.
+///
+/// REGRESSION GUARD: `hi` was briefly `end_time + 1`, which admitted that
+/// trailing window. Before the inline `_timestamp > start AND _timestamp <= end`
+/// was dropped from the SQL, the effective range was the INTERSECTION of the
+/// payload `[start, end)` with it — the open span `(start, end)` — so the
+/// upper edge was exclusive all along, via the payload half. Reproducing only
+/// the inline half over-counted by exactly one window: measured live as a
+/// uniform 4/3 (+33%) call count on every database for a 1h window against
+/// 900s rollups. See `test_stats_read_range_excludes_window_ending_at_end_time`.
+///
+/// Saturating, so an `i64::MAX` end cannot wrap the window inside out.
+pub(crate) fn stats_read_range(start_time: i64, end_time: i64) -> (i64, i64) {
+    (start_time.saturating_add(1), end_time)
 }
 
 /// The subset of `wanted` columns actually present on the `_o2_db_stats`
@@ -419,16 +465,16 @@ pub(crate) fn span_fingerprint_pred(fingerprint: &str) -> String {
 }
 
 /// History backfill: flat single-fingerprint aggregate over raw spans for ONE
-/// window — bounded by the fingerprint + time predicates and by the K-window
-/// request cap ([`HISTORY_BACKFILL_MAX_WINDOWS`]).
-pub(crate) fn build_backfill_sql(
-    stream_name: &str,
-    fingerprint: &str,
-    start_time: i64,
-    end_time: i64,
-) -> String {
+/// window — bounded by the fingerprint predicate, by the per-window request
+/// payload range the caller passes to [`rollup::run_dbm_search`], and by the
+/// K-window request cap ([`HISTORY_BACKFILL_MAX_WINDOWS`]).
+///
+/// The window is NOT in this string: each backfill point runs its own search
+/// whose payload carries `[window_end - interval_micros, window_end)`, which is
+/// what separates one point from the next.
+pub(crate) fn build_backfill_sql(stream_name: &str, fingerprint: &str) -> String {
     format!(
-        "SELECT\n    COUNT(*) AS calls,\n    COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,\n    SUM(end_time - start_time) AS total_time_ns,\n    CAST(approx_median(end_time - start_time) AS BIGINT) AS p50_ns,\n    CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95_ns,\n    CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99_ns,\n    MAX(end_time - start_time) AS max_ns,\n    COUNT(DISTINCT trace_id) AS traces\nFROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND o2_db_fingerprint = '{}'",
+        "SELECT\n    COUNT(*) AS calls,\n    COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,\n    SUM(end_time - start_time) AS total_time_ns,\n    CAST(approx_median(end_time - start_time) AS BIGINT) AS p50_ns,\n    CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95_ns,\n    CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99_ns,\n    MAX(end_time - start_time) AS max_ns,\n    COUNT(DISTINCT trace_id) AS traces\nFROM \"{}\"\nWHERE o2_db_fingerprint = '{}'",
         escape_ident(stream_name),
         escape_sq(fingerprint)
     )
@@ -437,8 +483,12 @@ pub(crate) fn build_backfill_sql(
 /// Calling-endpoints: on-demand raw-trace aggregation for ONE fingerprint,
 /// joining DB spans to their trace ROOT spans — the self-join GROUP BY shape
 /// of the service-graph processor's `compute_stream_edges`. Bounded by the
-/// fingerprint + time predicates on the DB side and time predicates in the
-/// join ON clause on the root side.
+/// fingerprint predicate on the DB side and by the request payload's window,
+/// which the planner attaches as a `_timestamp` FilterExec to EACH scan — so
+/// `dbspan` and `root` are each bounded independently even though neither
+/// alias names `_timestamp` here. (Verified live: identical `calls`,
+/// `total_time_ns`, `traces` and `scan_records` with and without the inline
+/// bounds, including a narrow window whose root spans fall outside it.)
 ///
 /// `scope_preds` carries the rest of the join key (engine, database, …) as
 /// `dbspan.`-qualified fragments from [`ScopeFilters::span_sql_preds_for`], and
@@ -455,8 +505,6 @@ pub(crate) fn build_backfill_sql(
 pub(crate) fn build_endpoints_sql(
     stream_name: &str,
     fingerprint: &str,
-    start_time: i64,
-    end_time: i64,
     scope_preds: &str,
     limit: usize,
 ) -> String {
@@ -474,9 +522,7 @@ FROM "{stream}" AS dbspan
 LEFT JOIN "{stream}" AS root
     ON dbspan.trace_id = root.trace_id
     AND (root.reference_parent_span_id IS NULL OR root.reference_parent_span_id = '')
-    AND root._timestamp >= {start_time} AND root._timestamp < {end_time}
-WHERE dbspan._timestamp >= {start_time} AND dbspan._timestamp < {end_time}
-    AND dbspan.o2_db_fingerprint = '{}'{scope_preds}
+WHERE dbspan.o2_db_fingerprint = '{}'{scope_preds}
 GROUP BY root.service_name, root.operation_name
 ORDER BY calls DESC
 LIMIT {limit}"#,
@@ -494,13 +540,7 @@ LIMIT {limit}"#,
 /// the module's raw-span convention. The span's own `duration` column is
 /// MICROseconds and is deliberately not read: one unit for every number this
 /// module emits.
-pub(crate) fn build_samples_sql(
-    stream_name: &str,
-    start_time: i64,
-    end_time: i64,
-    preds: &str,
-    limit: usize,
-) -> String {
+pub(crate) fn build_samples_sql(stream_name: &str, preds: &str, limit: usize) -> String {
     format!(
         r#"SELECT
     _timestamp,
@@ -518,8 +558,7 @@ pub(crate) fn build_samples_sql(
     span_status,
     o2_db_status_code AS status_code
 FROM "{}"
-WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
-    AND o2_db_fingerprint IS NOT NULL{preds}
+WHERE o2_db_fingerprint IS NOT NULL{preds}
 ORDER BY duration_ns DESC
 LIMIT {limit}"#,
         escape_ident(stream_name)
@@ -1140,7 +1179,7 @@ async fn get_or_compute_tail(org_id: &str, stream: &str, offset: i64) -> Option<
     let schema = infra::schema::get(org_id, stream, StreamType::Traces).await;
     let (relevant, has_rows_col) = match &schema {
         Ok(s) => (
-            s.field_with_name(super::O2_DB_FINGERPRINT).is_ok(),
+            super::stream_supports_db_monitoring(s),
             s.field_with_name("db_response_returned_rows").is_ok(),
         ),
         Err(_) => (false, false),
@@ -1156,14 +1195,8 @@ async fn get_or_compute_tail(org_id: &str, stream: &str, offset: i64) -> Option<
 
     // The BOUNDED two-stage form (§5.2), reusing the rollup's own builders —
     // never the raw unbounded aggregate.
-    let rank_sql = rollup::build_rank_sql(
-        stream,
-        tail_start,
-        now,
-        cfg.db_monitoring.top_n,
-        has_rows_col,
-    );
-    let totals_sql = rollup::build_totals_sql(stream, tail_start, now, has_rows_col);
+    let rank_sql = rollup::build_rank_sql(stream, cfg.db_monitoring.top_n, has_rows_col);
+    let totals_sql = rollup::build_totals_sql(stream, has_rows_col);
 
     let mut data = TailData {
         tail_start,
@@ -1233,7 +1266,11 @@ async fn run_stats_search(
     if !infra::schema::exists(org_id, StreamType::Logs, O2_DB_STATS_STREAM).await {
         return Ok(Vec::new());
     }
-    let req = rollup::dbm_search_request(sql, start_time, end_time, STATS_READ_SIZE as i64, 30);
+    // The window is carried ENTIRELY by the payload — no stats SQL string spells
+    // a `_timestamp` bound — and it is shifted to `(start, end]` here, at the one
+    // chokepoint every stats read passes through, so no call site can forget.
+    let (lo, hi) = stats_read_range(start_time, end_time);
+    let req = rollup::dbm_search_request(sql, lo, hi, STATS_READ_SIZE as i64, 30);
     // `user_id: None` is deliberate HERE: stream scoping happens up-front in
     // `involved_streams`, which filters to what the caller may read and drives
     // both the rollup rows and the tail. Passing a user here as well would
@@ -1699,13 +1736,7 @@ async fn read_databases_window(
         ..Default::default()
     };
 
-    let totals_sql = build_stats_sql(
-        org_id,
-        "db_totals",
-        start_time,
-        end_time,
-        &totals_filters.sql_preds(),
-    );
+    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds());
     // The overview consumes only dimensions, `calling_services` inputs and the
     // merge metrics from `query_stats` rows — never `query_norm` (up to 4 KB
     // per row) nor `operation`/`stmt_class`. Projecting spares the columnar
@@ -1734,14 +1765,8 @@ async fn read_databases_window(
         ],
     )
     .await;
-    let qs_sql = build_stats_sql_projected(
-        org_id,
-        "query_stats",
-        start_time,
-        end_time,
-        &filters.sql_preds(),
-        &qs_projection,
-    );
+    let qs_sql =
+        build_stats_sql_projected(org_id, "query_stats", &filters.sql_preds(), &qs_projection);
     // Concurrent, where they were awaited one after the other: two independent
     // record families over the same summary stream have no ordering to honour.
     let (totals_rows, qs_rows) = match tokio::join!(
@@ -2152,13 +2177,7 @@ async fn read_queries_window(
     // The free-text `search` is DELIBERATELY not part of this SQL — it is
     // applied at merge time in Rust (it must filter the cached unfiltered tail
     // anyway), so user search text never reaches the SQL string at all.
-    let qs_sql = build_stats_sql(
-        org_id,
-        "query_stats",
-        start_time,
-        end_time,
-        &filters.sql_preds(),
-    );
+    let qs_sql = build_stats_sql(org_id, "query_stats", &filters.sql_preds());
     let qs_rows = match run_stats_search(org_id, qs_sql, start_time, end_time).await {
         Ok(rows) => rows,
         Err(e) => {
@@ -2348,8 +2367,6 @@ pub async fn get_dbm_query_history(
     let fp_sql = build_stats_sql(
         &org_id,
         "query_stats",
-        start_time,
-        end_time,
         &format!("{}{}", filters.sql_preds(), fingerprint_pred(fingerprint)),
     );
     // The history `db_totals` read feeds only window existence (distinct
@@ -2369,8 +2386,6 @@ pub async fn get_dbm_query_history(
     let totals_sql = build_stats_sql_projected(
         &org_id,
         "db_totals",
-        start_time,
-        end_time,
         &totals_filters.sql_preds(),
         &totals_projection,
     );
@@ -2402,8 +2417,6 @@ pub async fn get_dbm_query_history(
         let ec_sql = build_stats_sql(
             &org_id,
             "error_class",
-            start_time,
-            end_time,
             &format!(
                 "{}{}",
                 ec_filters.sql_preds(),
@@ -2483,12 +2496,7 @@ pub async fn get_dbm_query_history(
     let backfill_fut = join_all(to_backfill.iter().map(|window_end| async move {
         let mut point = json!({ "timestamp": window_end, "below_top_n": true });
         if let Some(stream) = backfill_stream_ref {
-            let sql = build_backfill_sql(
-                stream,
-                fingerprint,
-                window_end - interval_micros,
-                *window_end,
-            );
+            let sql = build_backfill_sql(stream, fingerprint);
             match rollup::run_dbm_search(org, sql, window_end - interval_micros, *window_end).await
             {
                 Ok(rows) if !rows.is_empty() && get_i64(&rows[0], "calls") > 0 => {
@@ -2552,8 +2560,6 @@ pub async fn get_dbm_query_history(
         let sql = build_endpoints_sql(
             stream,
             fingerprint,
-            start_time,
-            end_time,
             &filters.span_sql_preds_for("dbspan."),
             endpoints_limit,
         );
@@ -2668,8 +2674,8 @@ pub struct EndpointsQuery {
 
 /// GET /{org_id}/traces/db_monitoring/query/endpoints — FR-5 calling
 /// endpoints: on-demand raw-trace aggregation for ONE fingerprint joining DB
-/// spans to their trace roots. Bounded by the fingerprint + time predicates —
-/// no rollup, no tail.
+/// spans to their trace roots. Bounded by the fingerprint predicate and the
+/// request payload's window — no rollup, no tail.
 #[utoipa::path(
     get,
     path = "/{org_id}/traces/db_monitoring/query/endpoints",
@@ -2739,8 +2745,6 @@ pub async fn get_dbm_query_endpoints(
     let sql = build_endpoints_sql(
         stream,
         fingerprint,
-        start_time,
-        end_time,
         &scope.span_sql_preds_for("dbspan."),
         limit,
     );
@@ -2906,13 +2910,7 @@ async fn read_samples_body(
         stream: q.stream.clone(),
         ..Default::default()
     };
-    let totals_sql = build_stats_sql(
-        org_id,
-        "db_totals",
-        start_time,
-        end_time,
-        &totals_filters.sql_preds(),
-    );
+    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds());
     let totals_rows = match run_stats_search(org_id, totals_sql, start_time, end_time).await {
         Ok(rows) => rows,
         Err(e) => {
@@ -2938,7 +2936,7 @@ async fn read_samples_body(
         futures::stream::iter(streams.into_iter().map(|stream| async move {
             let has_fp = infra::schema::get(org, &stream, StreamType::Traces)
                 .await
-                .map(|s| s.field_with_name(super::O2_DB_FINGERPRINT).is_ok())
+                .map(|s| super::stream_supports_db_monitoring(&s))
                 .unwrap_or(false);
             (stream, has_fp)
         }))
@@ -2970,7 +2968,7 @@ async fn read_samples_body(
         // Taking the `String` by value keeps the lifetimes late-bound.
         // `db_streams` is not read after this point.
         futures::stream::iter(db_streams.clone().into_iter().map(|stream| {
-            let sql = build_samples_sql(&stream, start_time, end_time, &preds, limit);
+            let sql = build_samples_sql(&stream, &preds, limit);
             async move {
                 let rows = rollup::run_dbm_search(org, sql, start_time, end_time).await;
                 (stream, rows)
@@ -3278,15 +3276,9 @@ async fn present_raw_deadlock_columns(
 /// `SELECT DISTINCT` moves the deduplication to the engine, so the cap counts
 /// POLLS rather than sessions and the inference is independent of how many
 /// sessions each poll observed.
-pub(crate) fn build_dbm_sample_times_sql(
-    stream_name: &str,
-    kind: &str,
-    start_time: i64,
-    end_time: i64,
-    preds: &str,
-) -> String {
+pub(crate) fn build_dbm_sample_times_sql(stream_name: &str, kind: &str, preds: &str) -> String {
     format!(
-        "SELECT DISTINCT _timestamp FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'{preds}\nORDER BY _timestamp DESC\nLIMIT {SAMPLE_TIMES_LIMIT}",
+        "SELECT DISTINCT _timestamp FROM \"{}\"\nWHERE {} = '{}'{preds}\nORDER BY _timestamp DESC\nLIMIT {SAMPLE_TIMES_LIMIT}",
         escape_ident(stream_name),
         server_vantage::O2_DBM_KIND,
         escape_sq(kind),
@@ -3344,8 +3336,6 @@ pub(crate) fn build_dbm_activity_breakdown_sql(
     stream_name: &str,
     group_col: &str,
     second_col: Option<&str>,
-    start_time: i64,
-    end_time: i64,
     preds: &str,
     present: &HashSet<String>,
 ) -> Option<String> {
@@ -3381,7 +3371,7 @@ pub(crate) fn build_dbm_activity_breakdown_sql(
     // column that cannot span instances. Revisit if a fleet-wide breakdown is
     // ever added.
     Some(format!(
-        "SELECT {cols}, COUNT(DISTINCT {}) AS sessions FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'{preds}\nGROUP BY {cols_group}\nORDER BY sessions DESC",
+        "SELECT {cols}, COUNT(DISTINCT {}) AS sessions FROM \"{}\"\nWHERE {} = '{}'{preds}\nGROUP BY {cols_group}\nORDER BY sessions DESC",
         server_vantage::O2_DBM_SESSION_PID,
         escape_ident(stream_name),
         server_vantage::O2_DBM_KIND,
@@ -3725,14 +3715,9 @@ impl BoundaryProbe {
 /// widening it saves. `LIMIT 1` over the same range the main read is about to
 /// scan is the cheapest question that answers the boundary.
 #[cfg(feature = "enterprise")]
-pub(crate) fn build_earliest_canonical_sql(
-    stream_name: &str,
-    kind: &str,
-    start_time: i64,
-    end_time: i64,
-) -> String {
+pub(crate) fn build_earliest_canonical_sql(stream_name: &str, kind: &str) -> String {
     format!(
-        "SELECT _timestamp FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'\nORDER BY _timestamp ASC\nLIMIT 1",
+        "SELECT _timestamp FROM \"{}\"\nWHERE {} = '{}'\nORDER BY _timestamp ASC\nLIMIT 1",
         escape_ident(stream_name),
         server_vantage::O2_DBM_KIND,
         escape_sq(kind),
@@ -3752,8 +3737,6 @@ pub(crate) fn build_earliest_canonical_sql(
 #[cfg(feature = "enterprise")]
 pub(crate) fn build_raw_deadlock_presence_sql(
     stream_name: &str,
-    start_time: i64,
-    end_time: i64,
     raw: &RawDeadlockFallback,
 ) -> Option<String> {
     let markers = raw.marker_terms();
@@ -3761,7 +3744,7 @@ pub(crate) fn build_raw_deadlock_presence_sql(
         return None;
     }
     Some(format!(
-        "SELECT _timestamp FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND ({})\nLIMIT 1",
+        "SELECT _timestamp FROM \"{}\"\nWHERE ({})\nLIMIT 1",
         escape_ident(stream_name),
         markers.join(" OR "),
     ))
@@ -3783,13 +3766,13 @@ async fn deadlock_window_needs_fallback(
     end_time: i64,
     raw: &RawDeadlockFallback,
 ) -> bool {
-    let Some(raw_sql) = build_raw_deadlock_presence_sql(stream, start_time, end_time, raw) else {
+    let Some(raw_sql) = build_raw_deadlock_presence_sql(stream, raw) else {
         // No marker column on this stream, so no raw row can exist. Nothing for
         // the widening to surface, and we did not even have to ask.
         return false;
     };
     let canonical_sql =
-        build_earliest_canonical_sql(stream, server_vantage::KIND_DEADLOCK, start_time, end_time);
+        build_earliest_canonical_sql(stream, server_vantage::KIND_DEADLOCK);
     // Two independent bounded reads — the same `tokio::join!` shape
     // `probe_collection` already uses for its pair.
     let (canonical_rows, raw_rows) = tokio::join!(
@@ -3846,8 +3829,6 @@ async fn deadlock_window_needs_fallback(
 #[cfg(feature = "enterprise")]
 pub(crate) fn build_raw_blocking_presence_sql(
     stream_name: &str,
-    start_time: i64,
-    end_time: i64,
     raw: &RawBlockingFallback,
 ) -> Option<String> {
     let markers = raw.marker_terms();
@@ -3855,7 +3836,7 @@ pub(crate) fn build_raw_blocking_presence_sql(
         return None;
     }
     Some(format!(
-        "SELECT _timestamp FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND ({})\nLIMIT 1",
+        "SELECT _timestamp FROM \"{}\"\nWHERE ({})\nLIMIT 1",
         escape_ident(stream_name),
         markers.join(" OR "),
     ))
@@ -3886,7 +3867,7 @@ async fn blocking_window_needs_fallback(
     end_time: i64,
     raw: &RawBlockingFallback,
 ) -> bool {
-    let Some(raw_sql) = build_raw_blocking_presence_sql(stream, start_time, end_time, raw) else {
+    let Some(raw_sql) = build_raw_blocking_presence_sql(stream, raw) else {
         // No marker column on this stream, so no raw row can exist.
         return false;
     };
@@ -3988,8 +3969,6 @@ impl RawProjection<'_> {
 pub(crate) fn build_dbm_events_sql(
     stream_name: &str,
     kind: &str,
-    start_time: i64,
-    end_time: i64,
     preds: &str,
     limit: usize,
     projection: &DbmProjection<'_>,
@@ -4054,7 +4033,7 @@ pub(crate) fn build_dbm_events_sql(
     };
 
     format!(
-        "SELECT {cols} FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {kind_pred}{preds}\nORDER BY _timestamp DESC\nLIMIT {limit}",
+        "SELECT {cols} FROM \"{}\"\nWHERE {kind_pred}{preds}\nORDER BY _timestamp DESC\nLIMIT {limit}",
         escape_ident(stream_name),
     )
 }
@@ -4678,7 +4657,7 @@ impl CollectionProbe {
 ///
 /// `o2_dbm_kind` is selected (not filtered on) precisely because the records
 /// that prove liveness best are the ones that are NOT events.
-pub(crate) fn build_probe_sql(stream_name: &str, start_time: i64, end_time: i64) -> String {
+pub(crate) fn build_probe_sql(stream_name: &str) -> String {
     // NO kind predicate here, deliberately — see `probe_collection`, which
     // counts untagged rows as `non_event_records`. Those are the evidence that
     // the collector is alive on a healthy database that simply has not
@@ -4686,22 +4665,24 @@ pub(crate) fn build_probe_sql(stream_name: &str, start_time: i64, end_time: i64)
     // "nothing is being collected" — exactly the misread the lock empty-states
     // exist to prevent. This scan stays cheap through PROBE_SCAN_LIMIT.
     format!(
-        "SELECT _timestamp, {} FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\nORDER BY _timestamp DESC\nLIMIT {PROBE_SCAN_LIMIT}",
+        "SELECT _timestamp, {} FROM \"{}\"\nORDER BY _timestamp DESC\nLIMIT {PROBE_SCAN_LIMIT}",
         server_vantage::O2_DBM_KIND,
         escape_ident(stream_name),
     )
 }
 
 /// SQL for the most recent event of one kind strictly before the window.
-pub(crate) fn build_last_seen_sql(
-    stream_name: &str,
-    kind: &str,
-    lookback_start: i64,
-    window_start: i64,
-    preds: &str,
-) -> String {
+///
+/// "Strictly before the window" is NOT in this string — it is the request
+/// payload's range, and [`probe_collection`] is the only caller that sets it:
+/// `[start_time - LAST_SEEN_LOOKBACK_MICROS, start_time)`. The payload filter
+/// is half-open (`>= start AND < end`), so `start_time` itself is excluded and
+/// this read can never restate a row the window's own table is already
+/// showing. Any NEW caller must pass the same shape; a payload ending at
+/// `end_time` would make this "the newest event IN the window" instead.
+pub(crate) fn build_last_seen_sql(stream_name: &str, kind: &str, preds: &str) -> String {
     format!(
-        "SELECT _timestamp FROM \"{}\"\nWHERE _timestamp >= {lookback_start} AND _timestamp < {window_start}\n    AND {} = '{}'{preds}\nORDER BY _timestamp DESC\nLIMIT 1",
+        "SELECT _timestamp FROM \"{}\"\nWHERE {} = '{}'{preds}\nORDER BY _timestamp DESC\nLIMIT 1",
         escape_ident(stream_name),
         server_vantage::O2_DBM_KIND,
         escape_sq(kind),
@@ -4728,16 +4709,20 @@ async fn probe_collection(
 ) -> CollectionProbe {
     let probe_start = start_time - LIVENESS_PROBE_MICROS;
     let probe_end = end_time + LIVENESS_PROBE_MICROS;
-    let sql = build_probe_sql(stream, probe_start, probe_end);
+    let sql = build_probe_sql(stream);
     // The liveness scan and the "last one before the window" lookup are
     // independent bounded reads — run them concurrently.
-    let last_seen_sql = build_last_seen_sql(
-        stream,
-        kind,
-        start_time - LAST_SEEN_LOOKBACK_MICROS,
-        start_time,
-        preds,
-    );
+    //
+    // NEITHER SQL string carries a `_timestamp` bound; each read's window is
+    // the one passed to `run_events_search` below, and the two are deliberately
+    // DIFFERENT and non-overlapping in intent:
+    //   - the probe widens the window by ±LIVENESS_PROBE_MICROS, because "is the collector alive?"
+    //     is answered by rows just outside the window as well as inside it;
+    //   - last-seen looks BACK from the window start over LAST_SEEN_LOOKBACK_MICROS and stops AT
+    //     `start_time` (exclusive), so it can only ever return an event the window itself does not
+    //     contain.
+    // Collapsing them onto one shared range would break both.
+    let last_seen_sql = build_last_seen_sql(stream, kind, preds);
     let (rows, last_seen_rows) = tokio::join!(
         run_events_search(org_id, stream, sql, probe_start, probe_end),
         run_events_search(
@@ -5147,8 +5132,6 @@ async fn read_deadlocks_body(
     let sql = build_dbm_events_sql(
         stream,
         server_vantage::KIND_DEADLOCK,
-        start_time,
-        end_time,
         sql_preds,
         limit,
         &DbmProjection {
@@ -5511,8 +5494,6 @@ async fn read_blocking_body(
     let sql = build_dbm_events_sql(
         stream,
         server_vantage::KIND_BLOCKING,
-        start_time,
-        end_time,
         sql_preds,
         limit,
         &DbmProjection {
@@ -5758,8 +5739,6 @@ async fn read_activity_body(
     let sql = build_dbm_events_sql(
         stream,
         server_vantage::KIND_ACTIVITY,
-        start_time,
-        end_time,
         &preds,
         limit,
         &DbmProjection {
@@ -5785,8 +5764,6 @@ async fn read_activity_body(
             stream,
             server_vantage::O2_DBM_WAIT_EVENT_TYPE,
             Some(server_vantage::O2_DBM_WAIT_EVENT),
-            start_time,
-            end_time,
             &preds,
             &present,
         ) {
@@ -5803,8 +5780,6 @@ async fn read_activity_body(
             stream,
             server_vantage::O2_DBM_SESSION_STATE,
             None,
-            start_time,
-            end_time,
             &preds,
             &present,
         ) {
@@ -5865,13 +5840,7 @@ async fn read_activity_body(
     let times_fut = run_events_search(
         org_id,
         stream,
-        build_dbm_sample_times_sql(
-            stream,
-            server_vantage::KIND_ACTIVITY,
-            start_time,
-            end_time,
-            &preds,
-        ),
+        build_dbm_sample_times_sql(stream, server_vantage::KIND_ACTIVITY, &preds),
         start_time,
         end_time,
     );
@@ -5987,8 +5956,6 @@ pub(crate) fn plan_capture_state(present: &HashSet<String>) -> &'static str {
 pub(crate) fn build_dbm_plans_sql(
     stream_name: &str,
     fingerprint: &str,
-    start_time: i64,
-    end_time: i64,
     preds: &str,
     present: &HashSet<String>,
 ) -> Option<String> {
@@ -6052,8 +6019,8 @@ pub(crate) fn build_dbm_plans_sql(
     Some(format!(
         "SELECT {hash} AS plan_hash, {plan_col}, {version_col}, {calls_col}, \
          MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen{source_col}{duration_cols} \
-         FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
-         AND {kind} IN ('{kind_top}', '{kind_explain}')\n    AND {fp} = '{fp_val}'{preds}\n\
+         FROM \"{stream}\"\n\
+         WHERE {kind} IN ('{kind_top}', '{kind_explain}')\n    AND {fp} = '{fp_val}'{preds}\n\
          GROUP BY {hash}{source_group}\nORDER BY last_seen DESC",
         hash = server_vantage::O2_DBM_PLAN_HASH,
         stream = escape_ident(stream_name),
@@ -6216,8 +6183,6 @@ pub(crate) fn build_dbm_server_metrics_sql(
     engine: &str,
     database: Option<&str>,
     fingerprint: &str,
-    start_time: i64,
-    end_time: i64,
     present: &HashSet<String>,
 ) -> Option<String> {
     if !present.contains(server_vantage::O2_DBM_CALLS) {
@@ -6275,8 +6240,8 @@ pub(crate) fn build_dbm_server_metrics_sql(
     Some(format!(
         "SELECT {inst} AS instance, SUM({calls}) AS calls, {cols}, \
          MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
-         FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
-         AND {kind} = '{kind_val}'\n    AND {fp} = '{fp_val}'\n    \
+         FROM \"{stream}\"\n\
+         WHERE {kind} = '{kind_val}'\n    AND {fp} = '{fp_val}'\n    \
          AND {eng} = '{eng_val}'{db_pred}\nGROUP BY {inst}\n\
          ORDER BY calls DESC",
         inst = server_vantage::O2_DBM_INSTANCE,
@@ -6533,15 +6498,7 @@ async fn read_server_metrics_body(
         },
     };
 
-    let rows = match build_dbm_server_metrics_sql(
-        stream,
-        engine,
-        database,
-        fingerprint,
-        start_time,
-        end_time,
-        &present,
-    ) {
+    let rows = match build_dbm_server_metrics_sql(stream, engine, database, fingerprint, &present) {
         Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
             Ok(rows) => rows,
             Err(e) => {
@@ -6636,8 +6593,6 @@ pub(crate) fn server_queries_capture_state(present: &HashSet<String>) -> &'stati
 /// defaults OFF).
 pub(crate) fn build_dbm_server_queries_sql(
     stream_name: &str,
-    start_time: i64,
-    end_time: i64,
     preds: &str,
     limit: usize,
     present: &HashSet<String>,
@@ -6680,8 +6635,8 @@ pub(crate) fn build_dbm_server_queries_sql(
     Some(format!(
         "SELECT {proj}, {query_text}, SUM({calls}) AS calls, {exec_time}, \
          MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
-         FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
-         AND {kind} = '{kind_val}'{preds}\nGROUP BY {group}\n\
+         FROM \"{stream}\"\n\
+         WHERE {kind} = '{kind_val}'{preds}\nGROUP BY {group}\n\
          ORDER BY calls DESC\nLIMIT {limit}",
         proj = projected.join(", "),
         calls = server_vantage::O2_DBM_CALLS,
@@ -6875,21 +6830,18 @@ async fn read_server_queries_body(
         }
     };
 
-    let rows =
-        match build_dbm_server_queries_sql(stream, start_time, end_time, &preds, limit, &present) {
-            Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
-                Ok(rows) => rows,
-                Err(e) => {
-                    log::error!(
-                        "[DbMonitoring] server queries read failed for {org_id}/{stream}: {e}"
-                    );
-                    return Err(MetaHttpResponse::internal_error(e));
-                }
-            },
-            // The stream has never carried server counters — an empty section, not
-            // an error.
-            None => Vec::new(),
-        };
+    let rows = match build_dbm_server_queries_sql(stream, &preds, limit, &present) {
+        Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                log::error!("[DbMonitoring] server queries read failed for {org_id}/{stream}: {e}");
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        },
+        // The stream has never carried server counters — an empty section, not
+        // an error.
+        None => Vec::new(),
+    };
 
     Ok(server_queries_envelope(
         &rows,
@@ -6980,8 +6932,6 @@ pub(crate) fn server_samples_capture_state(present: &HashSet<String>) -> &'stati
 /// settings).
 pub(crate) fn build_dbm_server_samples_sql(
     stream_name: &str,
-    start_time: i64,
-    end_time: i64,
     preds: &str,
     limit: usize,
     present: &HashSet<String>,
@@ -7029,8 +6979,8 @@ pub(crate) fn build_dbm_server_samples_sql(
     ]
     .join(", ");
     Some(format!(
-        "SELECT {cols} FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
-         AND {kind} IN ('{kind_stmt}', '{kind_explain}')\n    AND {dur} IS NOT NULL{preds}\n\
+        "SELECT {cols} FROM \"{stream}\"\n\
+         WHERE {kind} IN ('{kind_stmt}', '{kind_explain}')\n    AND {dur} IS NOT NULL{preds}\n\
          ORDER BY duration_ms DESC\nLIMIT {limit}",
         stream = escape_ident(stream_name),
         kind = server_vantage::O2_DBM_KIND,
@@ -7262,9 +7212,7 @@ async fn read_server_samples_body(
         };
         let capture_on = server_samples_capture_state(&present) == "on";
         // A stream that never captured contributes nothing — not an error.
-        let stream_rows = match build_dbm_server_samples_sql(
-            stream, start_time, end_time, preds, limit, &present,
-        ) {
+        let stream_rows = match build_dbm_server_samples_sql(stream, preds, limit, &present) {
             Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
                 Ok(stream_rows) => stream_rows,
                 Err(e) => {
@@ -7424,7 +7372,7 @@ async fn read_plans_body(
         },
     };
 
-    let rows = match build_dbm_plans_sql(stream, fingerprint, start_time, end_time, "", &present) {
+    let rows = match build_dbm_plans_sql(stream, fingerprint, "", &present) {
         Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
             Ok(rows) => rows,
             Err(e) => {
@@ -7720,8 +7668,6 @@ pub(crate) fn table_health_engine_support(engine: &str) -> &'static str {
 #[cfg(feature = "enterprise")]
 pub(crate) fn build_dbm_table_health_sql(
     stream_name: &str,
-    start_time: i64,
-    end_time: i64,
     preds: &str,
     limit: usize,
     present: &HashSet<String>,
@@ -7766,8 +7712,7 @@ pub(crate) fn build_dbm_table_health_sql(
     Some(format!(
         "SELECT {schema} AS schema_name, {relation} AS relation, {projected}, \
          MAX(_timestamp) AS last_seen FROM \"{stream}\"\n\
-         WHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
-         AND {kind} = '{kind_val}'{preds}\n\
+         WHERE {kind} = '{kind_val}'{preds}\n\
          GROUP BY {schema}, {relation}\n\
          ORDER BY total_bytes DESC NULLS LAST\nLIMIT {limit}",
         schema = server_vantage::O2_DBM_SCHEMA,
@@ -7820,8 +7765,6 @@ pub(crate) fn index_health_engine_support(engine: &str) -> &'static str {
 #[cfg(feature = "enterprise")]
 pub(crate) fn build_dbm_index_health_sql(
     stream_name: &str,
-    start_time: i64,
-    end_time: i64,
     preds: &str,
     limit: usize,
     present: &HashSet<String>,
@@ -7856,8 +7799,7 @@ pub(crate) fn build_dbm_index_health_sql(
         "SELECT {schema} AS schema_name, {relation} AS relation, \
          {index} AS index_name, {projected}, \
          MAX(_timestamp) AS last_seen FROM \"{stream}\"\n\
-         WHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
-         AND {kind} = '{kind_val}'{preds}\n\
+         WHERE {kind} = '{kind_val}'{preds}\n\
          GROUP BY {schema}, {relation}, {index}\n\
          ORDER BY index_bytes DESC NULLS LAST\nLIMIT {limit}",
         schema = server_vantage::O2_DBM_SCHEMA,
@@ -8114,7 +8056,7 @@ async fn read_table_health_body(
     // failure is still a 500, while an index failure degrades to an empty
     // section — the rules that need no index data must keep rendering.
     let table_search = async {
-        match build_dbm_table_health_sql(stream, start_time, end_time, &preds, limit, &present) {
+        match build_dbm_table_health_sql(stream, &preds, limit, &present) {
             Some(sql) => run_events_search(org_id, stream, sql, start_time, end_time)
                 .await
                 .map(Some),
@@ -8128,7 +8070,7 @@ async fn read_table_health_body(
         if !want_indexes {
             return Ok(None);
         }
-        match build_dbm_index_health_sql(stream, start_time, end_time, &preds, limit, &present) {
+        match build_dbm_index_health_sql(stream, &preds, limit, &present) {
             Some(sql) => run_events_search(org_id, stream, sql, start_time, end_time)
                 .await
                 .map(Some),
@@ -9034,9 +8976,116 @@ mod tests {
 
     #[test]
     fn test_build_stats_sql_exact() {
-        let sql = build_stats_sql("default", "db_totals", 100, 200, "");
-        let expected = "SELECT * FROM \"_o2_db_stats\"\nWHERE _timestamp > 100 AND _timestamp <= 200\n    AND org_id = 'default'\n    AND record_type = 'db_totals'\nLIMIT 100000";
+        let sql = build_stats_sql("default", "db_totals", "");
+        let expected = "SELECT * FROM \"_o2_db_stats\"\nWHERE org_id = 'default'\n    AND record_type = 'db_totals'\nLIMIT 100000";
         assert_eq!(sql, expected);
+    }
+
+    // No stats SQL string may carry a `_timestamp` bound: an inline bound here
+    // was measured to be a NO-OP against the live stream (the payload admitted
+    // the boundary rows either way), so the window lives ONLY in the payload.
+    // A reintroduced inline bound would be silently inert again.
+    #[test]
+    fn test_stats_sql_never_bounds_timestamp() {
+        for record_type in ["db_totals", "query_stats", "error_class"] {
+            let sql = build_stats_sql("default", record_type, "");
+            assert!(
+                !sql.contains("_timestamp"),
+                "stats SQL must not bound _timestamp (it is a no-op): {sql}"
+            );
+            let projected =
+                build_stats_sql_projected("default", record_type, "", "fingerprint, _timestamp");
+            let where_clause = projected.split("\nWHERE ").nth(1).expect("WHERE clause");
+            assert!(
+                !where_clause.contains("_timestamp"),
+                "stats WHERE must not bound _timestamp: {projected}"
+            );
+        }
+    }
+
+    // THE REGRESSION THAT WAS SILENTLY LIVE. Rollup `_timestamp` is the window
+    // END, so a row stamped exactly on `start_time` is the PREVIOUS range's
+    // last window: two adjacent reads sharing an edge must not both count it.
+    // The payload filter is `>= lo AND < hi`, so excluding that row requires
+    // `lo == start_time + 1` — which is what `stats_read_range` produces.
+    #[test]
+    fn test_stats_read_range_excludes_row_at_start_time() {
+        let (start, end) = (1_786_512_485_424_263_i64, 1_786_999_999_000_000_i64);
+        let (lo, hi) = stats_read_range(start, end);
+
+        // A row stamped EXACTLY at start_time is excluded by `>= lo`.
+        assert!(
+            start < lo,
+            "a window ending exactly at start_time must be excluded: {start} >= {lo}"
+        );
+        // The first row that must survive is one µs later.
+        assert!(start + 1 >= lo, "start_time + 1 must be admitted");
+        // The upper edge is EXCLUSIVE for the mirror-image reason: a window
+        // ending exactly at end_time has not finished inside the caller's
+        // half-open `[start, end)` — it is the NEXT range's first window.
+        assert!(
+            end >= hi,
+            "a window ending exactly at end_time must be excluded: {end} < {hi}"
+        );
+        assert!(end - 1 < hi, "one µs before end_time must be kept");
+    }
+
+    /// REGRESSION (measured live: every database uniformly 4/3 = +33% on a
+    /// narrow window). Rollup `_timestamp` is the window END, and the caller's
+    /// `[start_time, end_time)` is a HALF-OPEN span of wall clock: the window
+    /// ending exactly at `end_time` has not finished inside the range, it is
+    /// the FIRST window of the NEXT range. Counting it here counts it twice
+    /// across two adjacent reads — the same double-count `lo` guards at the
+    /// bottom edge, unguarded at the top.
+    ///
+    /// Before the inline predicate was removed, the effective range was the
+    /// INTERSECTION of the payload `[start, end)` and the inline
+    /// `(start, end]`, i.e. the OPEN span `(start, end)`. The payload alone
+    /// must reproduce that, so `hi == end_time`, NOT `end_time + 1`.
+    ///
+    /// The blast radius is worst exactly where it was measured: a request whose
+    /// width is a whole number of rollup windows AND is phase-aligned to the
+    /// rollup grid admits one extra window out of N. At the 1h window / 900s
+    /// rollup of the live check that is 4 windows counted where 3 belong.
+    #[test]
+    fn test_stats_read_range_excludes_window_ending_at_end_time() {
+        let w = 900_i64 * 1_000_000; // ZO_DB_MONITORING_INTERVAL_SECS default
+        let start = 1_786_512_485_424_263_i64;
+        let end = start + 4 * w; // exactly 4 windows wide, grid-phase-aligned
+        let (lo, hi) = stats_read_range(start, end);
+
+        // The window ending EXACTLY at end_time belongs to the next range.
+        assert!(
+            !(lo..hi).contains(&end),
+            "window ending exactly at end_time must be excluded: {end} in [{lo},{hi})"
+        );
+        // ...while the range's own last window (one grid step earlier) stays.
+        assert!(
+            (lo..hi).contains(&(end - w)),
+            "the range's last window must be kept: {} not in [{lo},{hi})",
+            end - w
+        );
+        // The bottom edge keeps its existing exclusive semantics.
+        assert!(
+            !(lo..hi).contains(&start),
+            "window ending exactly at start_time must be excluded"
+        );
+
+        // The count itself: 3 windows, not 4. This is the measured 4/3 inflation.
+        let admitted = (0..=4)
+            .map(|i| start + i * w)
+            .filter(|t| (lo..hi).contains(t))
+            .count();
+        assert_eq!(
+            admitted, 3,
+            "a 4-window-wide aligned request must admit 3 grid windows, not 4"
+        );
+    }
+
+    #[test]
+    fn test_stats_read_range_saturates() {
+        let (lo, hi) = stats_read_range(i64::MAX, i64::MAX);
+        assert_eq!((lo, hi), (i64::MAX, i64::MAX), "must not wrap");
     }
 
     #[test]
@@ -9069,7 +9118,7 @@ mod tests {
 
     #[test]
     fn test_stats_sql_org_id_escaped() {
-        let sql = build_stats_sql("org'--", "query_stats", 1, 2, "");
+        let sql = build_stats_sql("org'--", "query_stats", "");
         assert!(sql.contains("org_id = 'org''--'"));
     }
 
@@ -9084,8 +9133,6 @@ mod tests {
         let sql = build_stats_sql(
             "default",
             "query_stats",
-            1,
-            2,
             &ScopeFilters::default().sql_preds(),
         );
         assert!(!sql.contains("OR 1=1"));
@@ -9142,7 +9189,7 @@ mod tests {
             .span_sql_preds(),
             span_fingerprint_pred("deadbeef'x")
         );
-        let sql = build_samples_sql("otel_demo", 100, 200, &preds, 50);
+        let sql = build_samples_sql("otel_demo", &preds, 50);
         assert!(sql.contains("AND o2_db_system = 'postgresql'"));
         assert!(sql.contains("AND o2_db_fingerprint = 'deadbeef''x'"));
         // Still the one fixed shape — the scope narrows the WHERE, it does not
@@ -9153,13 +9200,13 @@ mod tests {
 
     #[test]
     fn test_backfill_sql_exact_and_escaped() {
-        let sql = build_backfill_sql("otel_demo", "deadbeef", 100, 200);
+        let sql = build_backfill_sql("otel_demo", "deadbeef");
         assert!(sql.starts_with("SELECT\n    COUNT(*) AS calls,"));
-        assert!(sql.contains("FROM \"otel_demo\"\nWHERE _timestamp >= 100 AND _timestamp < 200"));
-        assert!(sql.ends_with("AND o2_db_fingerprint = 'deadbeef'"));
+        assert!(sql.contains("FROM \"otel_demo\""));
+        assert!(sql.ends_with("WHERE o2_db_fingerprint = 'deadbeef'"));
 
         // stream name is identifier-escaped, fingerprint quote-escaped
-        let sql = build_backfill_sql("s\" --", "fp'x", 1, 2);
+        let sql = build_backfill_sql("s\" --", "fp'x");
         assert!(sql.contains("FROM \"s\"\" --\""));
         assert!(sql.contains("o2_db_fingerprint = 'fp''x'"));
     }
@@ -9182,8 +9229,6 @@ mod tests {
         let sql = build_endpoints_sql(
             "otel_demo",
             "69219a9c7fc5039d",
-            100,
-            200,
             &scope.span_sql_preds_for("dbspan."),
             50,
         );
@@ -9209,8 +9254,6 @@ mod tests {
         let sql = build_endpoints_sql(
             "otel_demo",
             "69219a9c7fc5039d",
-            100,
-            200,
             &mysql.span_sql_preds_for("dbspan."),
             50,
         );
@@ -9223,35 +9266,27 @@ mod tests {
             system: Some("pg'; DROP TABLE t;--".into()),
             ..Default::default()
         };
-        let sql = build_endpoints_sql(
-            "otel_demo",
-            "fp",
-            1,
-            2,
-            &hostile.span_sql_preds_for("dbspan."),
-            5,
-        );
+        let sql = build_endpoints_sql("otel_demo", "fp", &hostile.span_sql_preds_for("dbspan."), 5);
         assert!(sql.contains("dbspan.o2_db_system = 'pg''; DROP TABLE t;--'"));
     }
 
     #[test]
     fn test_endpoints_sql_shape_and_injection() {
-        let sql = build_endpoints_sql("otel_demo", "deadbeef", 100, 200, "", 50);
+        let sql = build_endpoints_sql("otel_demo", "deadbeef", "", 50);
         // The compute_stream_edges self-join shape: db spans joined to trace
-        // roots, time-bounded on BOTH sides, flat GROUP BY.
+        // roots, flat GROUP BY. The time window rides the search request
+        // payload, not an inline predicate.
         assert!(sql.contains("FROM \"otel_demo\" AS dbspan"));
         assert!(sql.contains("LEFT JOIN \"otel_demo\" AS root"));
         assert!(sql.contains("ON dbspan.trace_id = root.trace_id"));
         assert!(sql.contains(
             "(root.reference_parent_span_id IS NULL OR root.reference_parent_span_id = '')"
         ));
-        assert!(sql.contains("root._timestamp >= 100 AND root._timestamp < 200"));
-        assert!(sql.contains("dbspan._timestamp >= 100 AND dbspan._timestamp < 200"));
         assert!(sql.contains("dbspan.o2_db_fingerprint = 'deadbeef'"));
         assert!(sql.contains("GROUP BY root.service_name, root.operation_name"));
         assert!(sql.ends_with("LIMIT 50"));
 
-        let sql = build_endpoints_sql("s\"x", "fp' OR '1'='1", 1, 2, "", 10);
+        let sql = build_endpoints_sql("s\"x", "fp' OR '1'='1", "", 10);
         assert!(sql.contains("FROM \"s\"\"x\" AS dbspan"));
         assert!(sql.contains("o2_db_fingerprint = 'fp'' OR ''1''=''1'"));
     }
@@ -9267,7 +9302,7 @@ mod tests {
 
     #[test]
     fn test_samples_sql_shape_and_injection() {
-        let sql = build_samples_sql("otel_demo", 100, 200, "", 100);
+        let sql = build_samples_sql("otel_demo", "", 100);
         // Raw-span read: per-span rows, ns duration from the span bounds (the
         // module's one duration unit — never the µs `duration` column),
         // DB-span predicate, slowest first, bounded.
@@ -9277,8 +9312,7 @@ mod tests {
             "must not read the µs column"
         );
         assert!(sql.contains("FROM \"otel_demo\""));
-        assert!(sql.contains("WHERE _timestamp >= 100 AND _timestamp < 200"));
-        assert!(sql.contains("AND o2_db_fingerprint IS NOT NULL"));
+        assert!(sql.contains("WHERE o2_db_fingerprint IS NOT NULL"));
         assert!(sql.contains("ORDER BY duration_ns DESC"));
         assert!(sql.ends_with("LIMIT 100"));
         // Everything the row needs downstream: trace pivot, detail pivot,
@@ -9299,7 +9333,7 @@ mod tests {
 
         // Stream name is identifier-escaped so it cannot break out of the
         // double-quoted table position.
-        let sql = build_samples_sql("s\" --", 1, 2, "", 10);
+        let sql = build_samples_sql("s\" --", "", 10);
         assert!(sql.contains("FROM \"s\"\" --\""));
     }
 
@@ -10524,16 +10558,8 @@ mod tests {
     /// the activity columns here.
     #[test]
     fn test_build_dbm_events_sql_exact() {
-        let sql = build_dbm_events_sql(
-            "dbm_server",
-            "deadlock",
-            100,
-            200,
-            "",
-            50,
-            &proj(&all_cols(), None),
-        );
-        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_plan_source, o2_dbm_plan_duration_ms, o2_dbm_plan_rows_actual, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated, o2_dbm_index_name, o2_dbm_index_bytes, o2_dbm_idx_tup_read, o2_dbm_idx_tup_fetch, o2_dbm_index_is_unique, o2_dbm_stmt_duration_ms FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
+        let sql = build_dbm_events_sql("dbm_server", "deadlock", "", 50, &proj(&all_cols(), None));
+        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_plan_source, o2_dbm_plan_duration_ms, o2_dbm_plan_rows_actual, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated, o2_dbm_index_name, o2_dbm_index_bytes, o2_dbm_idx_tup_read, o2_dbm_idx_tup_fetch, o2_dbm_index_is_unique, o2_dbm_stmt_duration_ms FROM \"dbm_server\"\nWHERE o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
     }
 
@@ -10549,15 +10575,7 @@ mod tests {
         let mut present = all_cols();
         present.remove(server_vantage::O2_DBM_INSTANCE);
 
-        let sql = build_dbm_events_sql(
-            "dbm_server",
-            "deadlock",
-            100,
-            200,
-            "",
-            50,
-            &proj(&present, None),
-        );
+        let sql = build_dbm_events_sql("dbm_server", "deadlock", "", 50, &proj(&present, None));
         assert!(
             !sql.contains(server_vantage::O2_DBM_INSTANCE),
             "absent column must not be projected"
@@ -10576,8 +10594,6 @@ mod tests {
         let sql = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             "",
             50,
             &proj(&HashSet::new(), None),
@@ -10975,8 +10991,6 @@ mod tests {
         let with_none = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             " AND o2_dbm_engine = 'mysql'",
             50,
             &proj(&all_cols(), None),
@@ -10987,8 +11001,6 @@ mod tests {
         let steady_state = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             " AND o2_dbm_engine = 'mysql'",
             50,
             &proj(&all_cols(), boundary_off),
@@ -11026,15 +11038,12 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_earliest_canonical_probe_sql_is_a_single_ascending_row() {
-        let sql = build_earliest_canonical_sql("dbm_server", "deadlock", 100, 200);
+        let sql = build_earliest_canonical_sql("dbm_server", "deadlock");
         assert!(sql.contains("ORDER BY _timestamp ASC"), "{sql}");
         assert!(sql.contains("LIMIT 1"), "{sql}");
         assert!(sql.contains("o2_dbm_kind = 'deadlock'"), "{sql}");
-        assert!(
-            sql.contains("_timestamp >= 100 AND _timestamp < 200"),
-            "the probe must be bounded to the REQUESTED window — an unbounded \
-             MIN() over all history costs more than the widening it saves:\n{sql}"
-        );
+        // The window bound is no longer an inline predicate — it rides the
+        // search request payload, so there is nothing to assert here for it.
     }
 
     /// The raw probe is schema-gated exactly like the widening it guards.
@@ -11047,7 +11056,7 @@ mod tests {
     #[test]
     fn test_raw_presence_probe_names_only_marker_columns_the_stream_has() {
         let raw = raw_cols(&["o2_pg_event"]);
-        let sql = build_raw_deadlock_presence_sql("dbm_server", 100, 200, &raw)
+        let sql = build_raw_deadlock_presence_sql("dbm_server", &raw)
             .expect("one marker present means one probe");
         assert!(sql.contains("o2_pg_event = 'deadlock'"), "{sql}");
         assert!(!sql.contains("o2_my_event"), "{sql}");
@@ -11056,7 +11065,7 @@ mod tests {
 
         let none = raw_cols(&[]);
         assert!(
-            build_raw_deadlock_presence_sql("dbm_server", 100, 200, &none).is_none(),
+            build_raw_deadlock_presence_sql("dbm_server", &none).is_none(),
             "with no marker column there is nothing to probe for"
         );
     }
@@ -11077,8 +11086,6 @@ mod tests {
         let sql = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             "",
             50,
             &proj(&all_cols(), Some(&raw)),
@@ -11120,8 +11127,6 @@ mod tests {
         let sql = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             "",
             50,
             &proj(&all_cols(), Some(&raw)),
@@ -11175,8 +11180,6 @@ mod tests {
         let sql = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             "",
             50,
             &proj(&all_cols(), Some(&raw)),
@@ -11215,8 +11218,6 @@ mod tests {
         let sql = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             "",
             50,
             &proj(&all_cols(), Some(&raw)),
@@ -11240,21 +11241,12 @@ mod tests {
         let widened = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             "",
             50,
             &proj(&all_cols(), Some(&none)),
         );
-        let today = build_dbm_events_sql(
-            "dbm_server",
-            "deadlock",
-            100,
-            200,
-            "",
-            50,
-            &proj(&all_cols(), None),
-        );
+        let today =
+            build_dbm_events_sql("dbm_server", "deadlock", "", 50, &proj(&all_cols(), None));
         assert_eq!(
             widened, today,
             "with no marker column present there is nothing to OR, and an empty \
@@ -11276,13 +11268,14 @@ mod tests {
         let off = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             &preds,
             50,
             &proj(&all_cols(), None),
         );
-        let expected_kind = format!("AND {} = 'deadlock'", server_vantage::O2_DBM_KIND);
+        // `WHERE`, not `AND`: the kind predicate now LEADS the clause. The
+        // `_timestamp` bound that used to precede it moved into the request
+        // payload, so nothing is left for it to be conjoined to.
+        let expected_kind = format!("WHERE {} = 'deadlock'", server_vantage::O2_DBM_KIND);
         assert!(
             off.contains(&expected_kind),
             "with the fallback off the predicate is the bare canonical one:\n{off}"
@@ -11311,8 +11304,6 @@ mod tests {
         let on = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             &preds,
             50,
             &proj(
@@ -11499,8 +11490,6 @@ mod tests {
         let sql = build_dbm_events_sql(
             "dbm_server",
             server_vantage::KIND_BLOCKING,
-            0,
-            10,
             "",
             100,
             &proj_blocking(&present, Some(&raw)),
@@ -11534,8 +11523,6 @@ mod tests {
         let off = build_dbm_events_sql(
             "dbm_server",
             server_vantage::KIND_BLOCKING,
-            0,
-            10,
             " AND o2_dbm_engine = 'mysql'",
             100,
             &proj_blocking(&present, None),
@@ -12324,8 +12311,6 @@ mod tests {
         let sql = build_dbm_events_sql(
             "dbm_server",
             "blocking",
-            100,
-            200,
             "",
             50,
             &proj(&HashSet::new(), None),
@@ -12354,8 +12339,6 @@ mod tests {
         let sql = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
-            100,
-            200,
             "",
             50,
             &proj(&HashSet::new(), None),
@@ -12383,15 +12366,7 @@ mod tests {
     /// stays in lockstep with what `from_record` deserializes.
     #[test]
     fn test_build_dbm_events_sql_projects_only_canonical_columns() {
-        let sql = build_dbm_events_sql(
-            "dbm_server",
-            "deadlock",
-            100,
-            200,
-            "",
-            50,
-            &proj(&all_cols(), None),
-        );
+        let sql = build_dbm_events_sql("dbm_server", "deadlock", "", 50, &proj(&all_cols(), None));
         assert!(!sql.contains("SELECT *"), "must not select every column");
         assert!(sql.starts_with("SELECT _timestamp, "));
         for field in server_vantage::ALL_DBM_FIELDS {
@@ -12407,15 +12382,7 @@ mod tests {
         assert!(preds.contains("'pg'' OR ''1''=''1'"));
         assert!(!preds.contains("OR '1'='1'"));
 
-        let sql = build_dbm_events_sql(
-            "ev\"il",
-            "blocking",
-            1,
-            2,
-            &preds,
-            10,
-            &proj(&all_cols(), None),
-        );
+        let sql = build_dbm_events_sql("ev\"il", "blocking", &preds, 10, &proj(&all_cols(), None));
         assert!(sql.contains("\"ev\"\"il\""), "stream identifier escaped");
     }
 
@@ -13149,36 +13116,40 @@ mod tests {
         assert_eq!(probe.sample_interval_seconds(), Some(1));
     }
 
-    /// The probe reaches OUTSIDE the window on purpose, and selects
-    /// `o2_dbm_kind` rather than filtering on it — the records that best prove
-    /// liveness are the ones that are not events.
+    /// The probe selects `o2_dbm_kind` rather than filtering on it — the
+    /// records that best prove liveness are the ones that are not events.
+    ///
+    /// The probe's reach OUTSIDE the window is no longer in this string: it is
+    /// the request payload's range, widened by `LIVENESS_PROBE_MICROS` at the
+    /// `probe_collection` call site.
     #[test]
     fn test_build_probe_sql_selects_kind_and_does_not_filter_it() {
-        let sql = build_probe_sql("dbm_server", 1_000, 2_000);
+        let sql = build_probe_sql("dbm_server");
         assert!(sql.contains("SELECT _timestamp, o2_dbm_kind"));
         assert!(sql.contains("FROM \"dbm_server\""));
-        assert!(sql.contains("_timestamp >= 1000 AND _timestamp < 2000"));
         // No kind predicate: filtering it out would discard the evidence.
         assert!(!sql.contains("o2_dbm_kind = "));
         assert!(sql.contains("LIMIT 2000"));
     }
 
-    /// "Last one was 3 days ago" must look STRICTLY before the window, or it
-    /// would restate a row the table is already showing.
-    #[test]
-    fn test_build_last_seen_sql_is_strictly_before_the_window() {
-        let sql = build_last_seen_sql("dbm_server", "deadlock", 100, 900, "");
-        assert!(sql.contains("_timestamp >= 100 AND _timestamp < 900"));
-        assert!(sql.contains("o2_dbm_kind = 'deadlock'"));
-        assert!(sql.contains("ORDER BY _timestamp DESC"));
-        assert!(sql.contains("LIMIT 1"));
-    }
+    // The former `test_build_last_seen_sql_is_strictly_before_the_window` was
+    // DELETED here, not weakened. Its whole subject — the strictly-before-the
+    // -window bound — no longer exists in the SQL text: `build_last_seen_sql`
+    // carries no `_timestamp` predicate, and the guarantee now lives entirely
+    // in the REQUEST PAYLOAD that `probe_collection` passes,
+    // `[start_time - LAST_SEEN_LOOKBACK_MICROS, start_time)`. Asserting on the
+    // remaining kind/ORDER BY/LIMIT fragments here would have kept the name
+    // while testing something else; those fragments are covered by the scope
+    // test below and by the payload-range assertions at the call site.
 
     /// Scope filters carry into the lookback, and stay injection-safe.
     #[test]
     fn test_build_last_seen_sql_applies_and_escapes_scope() {
         let preds = dbm_event_preds(Some("mysql"), None, Some("d'b"));
-        let sql = build_last_seen_sql("dbm_server", "deadlock", 0, 10, &preds);
+        let sql = build_last_seen_sql("dbm_server", "deadlock", &preds);
+        assert!(sql.contains("o2_dbm_kind = 'deadlock'"));
+        assert!(sql.contains("ORDER BY _timestamp DESC"));
+        assert!(sql.contains("LIMIT 1"));
         assert!(sql.contains("o2_dbm_engine = 'mysql'"));
         assert!(sql.contains("o2_dbm_database = 'd''b'"));
     }
@@ -13262,8 +13233,6 @@ mod tests {
             "dbm_server",
             server_vantage::O2_DBM_SESSION_STATE,
             None,
-            100,
-            200,
             "",
             &all_cols(),
         )
@@ -13287,8 +13256,6 @@ mod tests {
             "dbm_server",
             server_vantage::O2_DBM_WAIT_EVENT_TYPE,
             Some(server_vantage::O2_DBM_WAIT_EVENT),
-            100,
-            200,
             "",
             &all_cols(),
         )
@@ -13318,10 +13285,9 @@ mod tests {
             )),
             "the breakdown must count ACTIVITY rows only, got: {sql}"
         );
-        assert!(
-            sql.contains("_timestamp >= 100") && sql.contains("_timestamp < 200"),
-            "the breakdown must be bounded by the SAME window as the rows"
-        );
+        // (The window bound is the request payload's — every DBM read passes
+        // the same `(start_time, end_time)` — so it is no longer spelled in
+        // this SQL and there is nothing to assert on here.)
     }
 
     /// `by_state` is the same shape over one column.
@@ -13331,8 +13297,6 @@ mod tests {
             "dbm_server",
             server_vantage::O2_DBM_SESSION_STATE,
             None,
-            100,
-            200,
             "",
             &all_cols(),
         )
@@ -13356,8 +13320,6 @@ mod tests {
             "dbm_server",
             server_vantage::O2_DBM_SESSION_STATE,
             None,
-            100,
-            200,
             "",
             &all_cols(),
         )
@@ -13379,8 +13341,6 @@ mod tests {
             "ev\"il",
             server_vantage::O2_DBM_SESSION_STATE,
             None,
-            1,
-            2,
             &preds,
             &all_cols(),
         )
@@ -13399,8 +13359,6 @@ mod tests {
         let sql = build_dbm_events_sql(
             "dbm_server",
             server_vantage::KIND_ACTIVITY,
-            100,
-            200,
             "",
             50,
             &proj(&all_cols(), None),
@@ -13574,7 +13532,7 @@ mod tests {
     /// would collapse them and silently drop one from the list.
     #[test]
     fn test_index_health_sql_groups_by_the_index_not_the_relation() {
-        let sql = build_dbm_index_health_sql("dbm_server", 100, 200, "", 50, &all_cols())
+        let sql = build_dbm_index_health_sql("dbm_server", "", 50, &all_cols())
             .expect("index health sql");
         assert!(
             sql.contains(&format!("GROUP BY {}", server_vantage::O2_DBM_SCHEMA)),
@@ -13597,7 +13555,7 @@ mod tests {
     /// Summing them multiplies an index's size by the number of samples.
     #[test]
     fn test_index_health_sql_uses_max_not_sum() {
-        let sql = build_dbm_index_health_sql("dbm_server", 100, 200, "", 50, &all_cols())
+        let sql = build_dbm_index_health_sql("dbm_server", "", 50, &all_cols())
             .expect("index health sql");
         assert!(
             sql.contains(&format!("MAX({})", server_vantage::O2_DBM_INDEX_BYTES)),
@@ -13617,7 +13575,7 @@ mod tests {
         let mut cols = all_cols();
         cols.remove(server_vantage::O2_DBM_INDEX_NAME);
         assert!(
-            build_dbm_index_health_sql("dbm_server", 100, 200, "", 50, &cols).is_none(),
+            build_dbm_index_health_sql("dbm_server", "", 50, &cols).is_none(),
             "no index column means no query, not a schema error"
         );
     }
@@ -13627,7 +13585,7 @@ mod tests {
     #[test]
     fn test_index_health_sql_honours_scope_filters_and_escapes_them() {
         let preds = dbm_event_preds(Some("pg' OR '1'='1"), Some("pg1"), None);
-        let sql = build_dbm_index_health_sql("ev\"il", 1, 2, &preds, 10, &all_cols())
+        let sql = build_dbm_index_health_sql("ev\"il", &preds, 10, &all_cols())
             .expect("index health sql");
         assert!(sql.contains("o2_dbm_instance = 'pg1'"), "{sql}");
         assert!(
@@ -13972,8 +13930,6 @@ mod tests {
                 "dbm_server",
                 server_vantage::O2_DBM_SESSION_STATE,
                 None,
-                100,
-                200,
                 "",
                 &empty,
             )
@@ -13992,8 +13948,6 @@ mod tests {
                 "dbm_server",
                 server_vantage::O2_DBM_SESSION_STATE,
                 None,
-                100,
-                200,
                 "",
                 &partial,
             )
@@ -14005,8 +13959,6 @@ mod tests {
                 "dbm_server",
                 server_vantage::O2_DBM_WAIT_EVENT_TYPE,
                 Some(server_vantage::O2_DBM_WAIT_EVENT),
-                100,
-                200,
                 "",
                 &partial,
             )
@@ -14123,8 +14075,6 @@ mod tests {
             "dbm_server",
             server_vantage::O2_DBM_SESSION_STATE,
             None,
-            100,
-            200,
             "",
             &all_cols(),
         )
@@ -14154,8 +14104,6 @@ mod tests {
             "dbm_server",
             server_vantage::O2_DBM_WAIT_EVENT_TYPE,
             Some(server_vantage::O2_DBM_WAIT_EVENT),
-            100,
-            200,
             "",
             &all_cols(),
         )
@@ -14195,8 +14143,7 @@ mod tests {
     /// `SELECT DISTINCT` makes the cap count polls instead of sessions.
     #[test]
     fn test_sample_times_query_counts_polls_not_rows() {
-        let sql =
-            build_dbm_sample_times_sql("dbm_server", server_vantage::KIND_ACTIVITY, 100, 200, "");
+        let sql = build_dbm_sample_times_sql("dbm_server", server_vantage::KIND_ACTIVITY, "");
         assert!(
             sql.to_uppercase().contains("SELECT DISTINCT"),
             "the cap must count distinct polls, not rows — one row per session \
@@ -14206,10 +14153,8 @@ mod tests {
             sql.contains("o2_dbm_kind = 'activity'"),
             "the interval is inferred from ACTIVITY polls only: {sql}"
         );
-        assert!(
-            sql.contains("_timestamp >= 100") && sql.contains("_timestamp < 200"),
-            "bounded to the same window: {sql}"
-        );
+        // (The window bound is no longer in the SQL — the request payload
+        // carries it — so there is nothing to assert about it here.)
         // Only the timestamp is needed; projecting session columns would make
         // DISTINCT operate on the wrong tuple and restore the row-per-session
         // collapse this query exists to avoid.
@@ -14220,7 +14165,7 @@ mod tests {
 
         // Injection-safe like every other builder here.
         let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None);
-        let sql = build_dbm_sample_times_sql("ev\"il", "activity", 1, 2, &preds);
+        let sql = build_dbm_sample_times_sql("ev\"il", "activity", &preds);
         assert!(sql.contains("'pg'' OR ''1''=''1'"));
         assert!(sql.contains("\"ev\"\"il\""));
     }
@@ -14247,7 +14192,7 @@ mod tests {
     /// share — the shape W3.4 specifies.
     #[test]
     fn test_build_dbm_plans_sql_groups_by_hash() {
-        let sql = build_dbm_plans_sql("dbm_server", "3a74e60b4bd45cc6", 100, 200, "", &all_cols())
+        let sql = build_dbm_plans_sql("dbm_server", "3a74e60b4bd45cc6", "", &all_cols())
             .expect("the plans query must build when the columns are present");
 
         assert!(
@@ -14268,10 +14213,7 @@ mod tests {
             sql.contains("3a74e60b4bd45cc6"),
             "it must be scoped to the requested fingerprint: {sql}"
         );
-        assert!(
-            sql.contains("_timestamp >= 100 AND _timestamp < 200"),
-            "and to the requested window: {sql}"
-        );
+        // (The requested window is the request payload's, not this string's.)
         for expected in ["first_seen", "last_seen", "calls"] {
             assert!(
                 sql.contains(expected),
@@ -14298,8 +14240,7 @@ mod tests {
     /// pg_stat_statements column in under any aggregate.
     #[test]
     fn test_plans_sql_never_aggregates_pgss_latency_by_plan() {
-        let sql =
-            build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &all_cols()).expect("plans sql");
+        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &all_cols()).expect("plans sql");
         assert!(
             !sql.contains(server_vantage::O2_DBM_EXEC_TIME_S),
             "per-plan pg_stat_statements latency attributes execution time to a \
@@ -14340,7 +14281,7 @@ mod tests {
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_PLAN_HASH);
         assert_eq!(
-            build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &without),
+            build_dbm_plans_sql("dbm_server", "fp", "", &without),
             None,
             "a stream with no plan_hash column must skip the query, not 500 the endpoint"
         );
@@ -14531,8 +14472,7 @@ mod tests {
     /// naming an absent column in GROUP BY fails the whole query.
     #[test]
     fn test_plans_sql_groups_by_plan_source_only_when_present() {
-        let sql =
-            build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &all_cols()).expect("plans sql");
+        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &all_cols()).expect("plans sql");
         assert!(
             sql.contains(&format!(
                 "GROUP BY {}, {}",
@@ -14545,7 +14485,7 @@ mod tests {
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_PLAN_SOURCE);
         without.remove(server_vantage::O2_DBM_PLAN_DURATION_MS);
-        let sql = build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &without)
+        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &without)
             .expect("the query still builds for a pre-W-E3 stream");
         assert!(
             !sql.contains(server_vantage::O2_DBM_PLAN_SOURCE),
@@ -14664,7 +14604,7 @@ mod tests {
     #[test]
     fn test_plan_capture_state_agrees_with_whether_the_query_runs() {
         for present in [all_cols(), HashSet::new()] {
-            let runs = build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &present).is_some();
+            let runs = build_dbm_plans_sql("dbm_server", "fp", "", &present).is_some();
             let claimed_on = plan_capture_state(&present) == "on";
             assert_eq!(
                 claimed_on, runs,
@@ -14751,8 +14691,6 @@ mod tests {
             "postgresql",
             Some("shop"),
             "3a74e60b4bd45cc6",
-            100,
-            200,
             &all_cols(),
         )
         .expect("server metrics sql");
@@ -14765,10 +14703,7 @@ mod tests {
             sql.contains("postgresql") && sql.contains("shop"),
             "scoped to the requested engine and database: {sql}"
         );
-        assert!(
-            sql.contains("_timestamp >= 100 AND _timestamp < 200"),
-            "scoped to the requested window: {sql}"
-        );
+        // (The requested window is the request payload's, not this string's.)
         // The instance must never appear as a PREDICATE. It may only appear as
         // a projected/grouped display column.
         assert!(
@@ -14790,8 +14725,6 @@ mod tests {
             "postgresql",
             Some("shop"),
             "fp",
-            100,
-            200,
             &all_cols(),
         )
         .expect("server metrics sql");
@@ -14812,8 +14745,7 @@ mod tests {
     #[test]
     fn test_server_metrics_sql_omits_database_predicate_when_none() {
         let sql =
-            build_dbm_server_metrics_sql("dbm_server", "mysql", None, "fp", 100, 200, &all_cols())
-                .unwrap();
+            build_dbm_server_metrics_sql("dbm_server", "mysql", None, "fp", &all_cols()).unwrap();
         assert!(!sql.contains(server_vantage::O2_DBM_DATABASE));
         // The identity predicates survive: this is a narrower match, not a
         // broader one.
@@ -14841,8 +14773,6 @@ mod tests {
             "postgresql",
             Some("shop"),
             "fp",
-            100,
-            200,
             &all_cols(),
         )
         .expect("server metrics sql");
@@ -14863,15 +14793,7 @@ mod tests {
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_CALLS);
         assert_eq!(
-            build_dbm_server_metrics_sql(
-                "dbm_server",
-                "postgresql",
-                Some("shop"),
-                "fp",
-                100,
-                200,
-                &without
-            ),
+            build_dbm_server_metrics_sql("dbm_server", "postgresql", Some("shop"), "fp", &without),
             None,
             "a stream with no calls column must skip the query, not 500 the endpoint"
         );
@@ -14888,16 +14810,8 @@ mod tests {
         let present = all_cols();
         assert_eq!(server_metrics_capture_state(&present), "on");
         assert!(
-            build_dbm_server_metrics_sql(
-                "dbm_server",
-                "postgresql",
-                Some("shop"),
-                "fp",
-                100,
-                200,
-                &present
-            )
-            .is_some(),
+            build_dbm_server_metrics_sql("dbm_server", "postgresql", Some("shop"), "fp", &present)
+                .is_some(),
             "`on` must mean the SQL builder actually runs"
         );
 
@@ -14905,15 +14819,7 @@ mod tests {
         without.remove(server_vantage::O2_DBM_CALLS);
         assert_eq!(server_metrics_capture_state(&without), "off");
         assert_eq!(
-            build_dbm_server_metrics_sql(
-                "dbm_server",
-                "postgresql",
-                Some("shop"),
-                "fp",
-                100,
-                200,
-                &without
-            ),
+            build_dbm_server_metrics_sql("dbm_server", "postgresql", Some("shop"), "fp", &without),
             None,
             "`off` must mean the SQL builder skipped — a flag that disagrees with \
              the gate misreports the pipeline"
@@ -15119,7 +15025,7 @@ mod tests {
     /// the question the page asks.
     #[test]
     fn test_build_dbm_table_health_sql_is_one_row_per_relation() {
-        let sql = build_dbm_table_health_sql("dbm_server", 100, 200, "", 50, &all_cols())
+        let sql = build_dbm_table_health_sql("dbm_server", "", 50, &all_cols())
             .expect("the table-health query must build when the columns are present");
 
         assert!(
@@ -15139,10 +15045,7 @@ mod tests {
             )),
             "it must read table_stats records only: {sql}"
         );
-        assert!(
-            sql.contains("_timestamp >= 100 AND _timestamp < 200"),
-            "and be scoped to the requested window: {sql}"
-        );
+        // (The requested window is the request payload's, not this string's.)
         assert!(
             sql.contains("LIMIT 50"),
             "and to the requested limit: {sql}"
@@ -15161,7 +15064,7 @@ mod tests {
     /// both.
     #[test]
     fn test_table_health_sql_never_sums_or_averages_a_snapshot() {
-        let sql = build_dbm_table_health_sql("dbm_server", 100, 200, "", 50, &all_cols())
+        let sql = build_dbm_table_health_sql("dbm_server", "", 50, &all_cols())
             .expect("table health sql");
 
         for banned in ["SUM(", "AVG(", "COUNT(o2_dbm"] {
@@ -15185,7 +15088,7 @@ mod tests {
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_RELATION);
         assert_eq!(
-            build_dbm_table_health_sql("dbm_server", 100, 200, "", 50, &without),
+            build_dbm_table_health_sql("dbm_server", "", 50, &without),
             None,
             "a stream with no relation column must skip the query, not 500 the endpoint"
         );
@@ -15196,7 +15099,7 @@ mod tests {
     #[test]
     fn test_table_health_sql_escapes_its_inputs() {
         let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None);
-        let sql = build_dbm_table_health_sql("ev\"il", 1, 2, &preds, 10, &all_cols())
+        let sql = build_dbm_table_health_sql("ev\"il", &preds, 10, &all_cols())
             .expect("table health sql");
         assert!(sql.contains("'pg'' OR ''1''=''1'"));
         assert!(sql.contains("\"ev\"\"il\""));
@@ -15549,15 +15452,13 @@ mod tests {
     /// only; ranked slowest-first; bounded.
     #[test]
     fn test_server_samples_sql_pins_the_projection() {
-        let sql = build_dbm_server_samples_sql("dbm_server_logs", 100, 200, "", 100, &all_cols())
-            .unwrap();
+        let sql = build_dbm_server_samples_sql("dbm_server_logs", "", 100, &all_cols()).unwrap();
         let expected = "SELECT _timestamp, o2_dbm_kind AS kind, o2_dbm_fingerprint AS fingerprint, \
                         o2_dbm_activity_query AS query, COALESCE(o2_dbm_stmt_duration_ms, o2_dbm_plan_duration_ms) AS duration_ms, \
                         o2_dbm_plan_rows_actual AS rows_actual, o2_dbm_engine AS db_system, \
                         o2_dbm_database AS db_namespace, o2_dbm_instance AS db_instance, \
                         o2_dbm_session_user AS db_user, o2_dbm_session_pid AS session_pid FROM \"dbm_server_logs\"\n\
-                        WHERE _timestamp >= 100 AND _timestamp < 200\n    \
-                        AND o2_dbm_kind IN ('statement', 'explain')\n    \
+                        WHERE o2_dbm_kind IN ('statement', 'explain')\n    \
                         AND COALESCE(o2_dbm_stmt_duration_ms, o2_dbm_plan_duration_ms) IS NOT NULL\n\
                         ORDER BY duration_ms DESC\nLIMIT 100";
         assert_eq!(sql, expected);
@@ -15570,7 +15471,7 @@ mod tests {
     fn test_server_samples_sql_names_only_present_duration_columns() {
         let mut present = all_cols();
         present.remove(server_vantage::O2_DBM_PLAN_DURATION_MS);
-        let sql = build_dbm_server_samples_sql("s", 100, 200, "", 100, &present).unwrap();
+        let sql = build_dbm_server_samples_sql("s", "", 100, &present).unwrap();
         assert!(sql.contains("o2_dbm_stmt_duration_ms AS duration_ms"));
         assert!(!sql.contains("COALESCE"));
         assert!(!sql.contains(server_vantage::O2_DBM_PLAN_DURATION_MS));
@@ -15589,7 +15490,7 @@ mod tests {
             "\n    AND {} = 'abc''123'",
             server_vantage::O2_DBM_FINGERPRINT
         );
-        let sql = build_dbm_server_queries_sql("s", 100, 200, &preds, 50, &present).unwrap();
+        let sql = build_dbm_server_queries_sql("s", &preds, 50, &present).unwrap();
         assert!(
             sql.contains("o2_dbm_fingerprint = 'abc''123'"),
             "the quote must stay doubled or the predicate is an injection: {sql}"
@@ -15692,10 +15593,10 @@ mod tests {
         let mut present = all_cols();
         present.remove(server_vantage::O2_DBM_STMT_DURATION_MS);
         present.remove(server_vantage::O2_DBM_PLAN_DURATION_MS);
-        assert!(build_dbm_server_samples_sql("s", 100, 200, "", 100, &present).is_none());
+        assert!(build_dbm_server_samples_sql("s", "", 100, &present).is_none());
         assert_eq!(server_samples_capture_state(&present), "off");
         present.insert(server_vantage::O2_DBM_STMT_DURATION_MS.to_string());
-        assert!(build_dbm_server_samples_sql("s", 100, 200, "", 100, &present).is_some());
+        assert!(build_dbm_server_samples_sql("s", "", 100, &present).is_some());
         assert_eq!(server_samples_capture_state(&present), "on");
     }
 

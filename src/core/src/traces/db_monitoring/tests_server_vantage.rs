@@ -7530,3 +7530,809 @@ fn ws1_zero_query_id_is_not_a_join_key() {
     server_vantage::apply_to_record(&mut rec);
     assert!(rec.get(server_vantage::O2_DBM_SERVER_QUERY_ID).is_none());
 }
+
+// ─── Read-path pruning: the `o2_dbm_kind` secondary-index seed ───────────────
+//
+// Subject: `server_vantage::needs_kind_index_field` (the decision) and
+// `server_vantage::batch_has_dbm_records` (the trigger). The async
+// `ensure_server_stream_index_field` around them is a thin read-decide-write
+// wrapper over a schema store, so the properties worth pinning — idempotency,
+// don't-clobber, the FTS/bloom exclusion and the migration case — all live in
+// the decision.
+//
+// The seed exists because `/badges` was measured at 7.33 s on a stream holding
+// 2.84 M rows/hour against 0.14 s on an empty one. It replaces an earlier
+// partition-key implementation; see `needs_kind_index_field` for why the two
+// cannot coexist on one stream.
+
+use config::meta::stream::{StreamPartition, StreamSettings};
+
+/// The field IS set — the base claim. A stream with default settings comes back
+/// carrying the kind column as a secondary-index field, FIRST.
+///
+/// It is no longer the ONLY one: the deadlock/blocking reads OR the kind
+/// predicate together with marker columns, and an OR is index-eligible only if
+/// every operand is indexed, so the marker columns are seeded beside it. That
+/// half is pinned by `idx_seed_covers_every_marker_column_of_the_deadlock_or`
+/// and `idx_seed_set_is_exactly_the_or_predicate_columns`; this test keeps
+/// asserting the canonical column specifically, because it is the operand every
+/// DBM read has and the one the whole mechanism is anchored on.
+#[test]
+fn idx_seed_sets_the_kind_index_field() {
+    let mut settings = StreamSettings::default();
+    assert!(
+        server_vantage::needs_kind_index_field(&mut settings),
+        "a stream with no index fields must need the seed"
+    );
+    assert_eq!(
+        settings.index_fields.first().map(String::as_str),
+        Some(server_vantage::O2_DBM_KIND),
+        "the kind column is seeded, and first — it is the operand every DBM read has"
+    );
+    assert_eq!(
+        server_vantage::SERVER_STREAM_INDEX_FIELD,
+        server_vantage::O2_DBM_KIND,
+        "the canonical seeded field must be the one every DBM read filters on"
+    );
+    assert!(
+        server_vantage::server_stream_index_fields()
+            .contains(&server_vantage::SERVER_STREAM_INDEX_FIELD),
+        "the canonical field must be a member of the seeded set"
+    );
+}
+
+/// THE user's explicit requirement: `o2_dbm_kind` is a SECONDARY INDEX and must
+/// not be full-text search, nor a bloom filter field.
+///
+/// The distinction is structural in `tantivy_utils::index_builder`: FTS keys are
+/// folded into one shared `_all` column under `O2_TOKENIZER`, while every
+/// `index_fields` member gets its own column with the `"raw"` tokenizer — one
+/// term per whole cell value, which is what makes `o2_dbm_kind = 'activity'` an
+/// exact-match lookup. Adding it to `full_text_search_keys` would also be
+/// REJECTED by `persist_stream_settings`, which refuses a field that is both.
+///
+/// Bloom is excluded on merit rather than by the store: `activity` appears in
+/// nearly every file, the case a bloom filter is worst at.
+#[test]
+fn idx_seed_is_a_secondary_index_never_fts_or_bloom() {
+    let mut settings = StreamSettings::default();
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+
+    assert!(
+        settings
+            .index_fields
+            .contains(&server_vantage::O2_DBM_KIND.to_string()),
+        "the field must land in index_fields — that is the tantivy secondary index"
+    );
+    assert!(
+        !settings
+            .full_text_search_keys
+            .contains(&server_vantage::O2_DBM_KIND.to_string()),
+        "the field must NEVER be a full-text-search key: wrong tokenizer, wrong column, and the \
+         settings store rejects a field that is both FTS and secondary index"
+    );
+    assert!(
+        !settings
+            .bloom_filter_fields
+            .contains(&server_vantage::O2_DBM_KIND.to_string()),
+        "the field must NOT be a bloom filter field: `activity` is present in nearly every file, \
+         which is exactly what blooms are worst at"
+    );
+}
+
+/// The index cutoff is stamped explicitly.
+///
+/// `normalize_stream_settings` stamps `index_fields_updated_at` only for fields
+/// it promotes out of `bloom_filter_fields`. A field appended straight to
+/// `index_fields` gets none, and would inherit the stream-wide
+/// `index_updated_at` — on an old stream, its creation time — advertising the
+/// index over files written long before it existed.
+/// `split_file_list_by_time_range` trusts that cutoff (`min_ts >=
+/// index_updated_at && index_size > 0`), so a wrong one routes index-less files
+/// down the index path.
+#[test]
+fn idx_seed_stamps_the_index_cutoff() {
+    let before = config::utils::time::now_micros();
+    let mut settings = StreamSettings::default();
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+    let after = config::utils::time::now_micros();
+
+    let stamped = settings
+        .index_fields_updated_at
+        .get(server_vantage::O2_DBM_KIND)
+        .copied()
+        .expect("the seed must stamp an index cutoff for the field it adds");
+    assert!(
+        stamped >= before && stamped <= after,
+        "the cutoff must be `now` ({before}..={after}), got {stamped} — a stale cutoff claims \
+         index coverage over files that carry no index"
+    );
+}
+
+/// Idempotent. Ingest calls this on every batch carrying DBM records — on a
+/// busy stream that is many times a second — so the second call must report
+/// "nothing to do" rather than appending a duplicate or issuing a write.
+#[test]
+fn idx_seed_is_idempotent() {
+    let mut settings = StreamSettings::default();
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+    let after_first = settings.index_fields.clone();
+    let stamped_first = settings
+        .index_fields_updated_at
+        .get(server_vantage::O2_DBM_KIND)
+        .copied()
+        .unwrap();
+
+    for round in 0..5 {
+        assert!(
+            !server_vantage::needs_kind_index_field(&mut settings),
+            "round {round}: a re-seed must report no work, or ingest writes settings forever"
+        );
+    }
+    assert_eq!(
+        settings.index_fields, after_first,
+        "re-seeding must not append a duplicate field"
+    );
+    assert_eq!(
+        settings
+            .index_fields_updated_at
+            .get(server_vantage::O2_DBM_KIND)
+            .copied(),
+        Some(stamped_first),
+        "re-seeding must not move the cutoff forward — that would silently un-index existing files"
+    );
+}
+
+/// Never clobbers a user's own configuration. A stream the customer already
+/// indexed by their own column keeps that field, in its original position, and
+/// gains ours beside it — and every unrelated setting is untouched.
+#[test]
+fn idx_seed_appends_and_never_clobbers_user_settings() {
+    let mut settings = StreamSettings {
+        partition_keys: vec![StreamPartition::new("kubernetes_namespace_name")],
+        full_text_search_keys: vec!["log".to_string()],
+        bloom_filter_fields: vec!["trace_id".to_string()],
+        index_fields: vec!["trace_id".to_string()],
+        data_retention: 45,
+        ..Default::default()
+    };
+
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+
+    let expected: Vec<String> = std::iter::once("trace_id".to_string())
+        .chain(
+            server_vantage::server_stream_index_fields()
+                .into_iter()
+                .map(str::to_string),
+        )
+        .collect();
+    assert_eq!(
+        settings.index_fields, expected,
+        "the user's index field must survive, first, with the whole DBM set appended after it in \
+         seed order"
+    );
+    // Everything else read back exactly as it went in.
+    assert_eq!(settings.full_text_search_keys, vec!["log".to_string()]);
+    assert_eq!(settings.bloom_filter_fields, vec!["trace_id".to_string()]);
+    assert_eq!(
+        settings
+            .partition_keys
+            .iter()
+            .map(|p| p.field.as_str())
+            .collect::<Vec<_>>(),
+        vec!["kubernetes_namespace_name"],
+        "an unrelated user partition key must be left exactly as it was"
+    );
+    assert_eq!(settings.data_retention, 45);
+}
+
+/// A user who already indexed `o2_dbm_kind` themselves gets no second entry,
+/// and no re-stamped cutoff.
+///
+/// The seed still has work to do on such a stream — the marker columns are
+/// missing, so its deadlock and blocking reads would get no index (see
+/// `idx_seed_completes_a_partially_seeded_stream`) — but the field the user
+/// already configured must be left completely alone: no duplicate, and no new
+/// `index_fields_updated_at` entry, which would re-date their existing index
+/// and un-index every file written under it.
+#[test]
+fn idx_seed_respects_a_user_configured_kind_index() {
+    let mut settings = StreamSettings {
+        index_fields: vec![server_vantage::O2_DBM_KIND.to_string()],
+        ..Default::default()
+    };
+    server_vantage::needs_kind_index_field(&mut settings);
+
+    assert_eq!(
+        settings
+            .index_fields
+            .iter()
+            .filter(|f| f.as_str() == server_vantage::O2_DBM_KIND)
+            .count(),
+        1,
+        "the field is already a secondary index; the seed must not add it a second time"
+    );
+    assert!(
+        !settings
+            .index_fields_updated_at
+            .contains_key(server_vantage::O2_DBM_KIND),
+        "an already-present field must not be stamped — that would re-date the user's existing \
+         index"
+    );
+}
+
+/// THE MIGRATION CASE: a stream already carrying the previous implementation's
+/// `o2_dbm_kind` partition key.
+///
+/// `persist_stream_settings` rejects any field that is both a partition key and
+/// a secondary index, and the check is SYMMETRIC — it fails whichever list we
+/// add to. Partition keys are also append-only: omitting one from a settings
+/// write marks it `disabled: true` and KEEPS it in `partition_keys`, where the
+/// intersection check still sees it. So such a stream cannot be converted from
+/// this code path at all, and attempting it would fail the save on every batch
+/// forever. We stand down instead — on THAT FIELD.
+///
+/// The stand-down is per field, not for the whole set: the store's rejection is
+/// per field but fails the entire settings write, so including the conflicted
+/// one would take the marker columns down with it forever. The markers are
+/// still seeded (`idx_seed_skips_only_the_partition_key_conflicted_field`
+/// pins the mirror case); what this test holds is that the conflicted field
+/// itself is never added and never stamped, whatever its flag or type.
+#[test]
+fn idx_seed_declines_when_the_field_is_already_a_partition_key() {
+    // Enabled, disabled, and non-default type all block equally: the store's
+    // check looks at the field name, not the flag.
+    let mut disabled = StreamPartition::new(server_vantage::O2_DBM_KIND);
+    disabled.disabled = true;
+
+    for keys in [
+        vec![StreamPartition::new(server_vantage::O2_DBM_KIND)],
+        vec![disabled],
+        vec![StreamPartition::new_hash(server_vantage::O2_DBM_KIND, 32)],
+    ] {
+        let mut settings = StreamSettings {
+            partition_keys: keys,
+            ..Default::default()
+        };
+        server_vantage::needs_kind_index_field(&mut settings);
+
+        assert!(
+            !settings
+                .index_fields
+                .iter()
+                .any(|f| f == server_vantage::O2_DBM_KIND),
+            "the store would reject a field that is both partition key and secondary index; the \
+             seed must not attempt it"
+        );
+        assert!(
+            !settings
+                .index_fields_updated_at
+                .contains_key(server_vantage::O2_DBM_KIND),
+            "declining must not stamp a cutoff for the declined field"
+        );
+        // …and the decision settles: a stream seeded as far as it legally can
+        // be must stop reporting work, or ingest writes settings forever.
+        assert!(!server_vantage::needs_kind_index_field(&mut settings));
+    }
+}
+
+/// The store also rejects a field that is both FTS and secondary index, so a
+/// stream whose owner deliberately made `o2_dbm_kind` full-text-searchable has
+/// that field left alone rather than written to on every batch forever.
+///
+/// Again per field — the marker columns are unaffected by the kind column's
+/// conflict and are still seeded.
+#[test]
+fn idx_seed_declines_when_the_field_is_already_full_text_search() {
+    let mut settings = StreamSettings {
+        full_text_search_keys: vec![server_vantage::O2_DBM_KIND.to_string()],
+        ..Default::default()
+    };
+    server_vantage::needs_kind_index_field(&mut settings);
+
+    assert!(
+        !settings
+            .index_fields
+            .iter()
+            .any(|f| f == server_vantage::O2_DBM_KIND),
+        "the store would reject this write; the seed must not attempt it"
+    );
+    assert!(
+        !settings
+            .index_fields_updated_at
+            .contains_key(server_vantage::O2_DBM_KIND)
+    );
+    assert!(!server_vantage::needs_kind_index_field(&mut settings));
+}
+
+/// A bloom filter on the same field does NOT block the index — it requires it.
+/// `persist_stream_settings` rejects a bloom field that is NOT also a secondary
+/// index field, so seeding the index here is the write that makes such a
+/// stream valid rather than one that breaks it.
+#[test]
+fn idx_seed_proceeds_when_the_field_is_a_bloom_filter_field() {
+    let mut settings = StreamSettings {
+        bloom_filter_fields: vec![server_vantage::O2_DBM_KIND.to_string()],
+        ..Default::default()
+    };
+    assert!(
+        server_vantage::needs_kind_index_field(&mut settings),
+        "bloom requires the secondary index; adding it is legal and required"
+    );
+    assert!(
+        settings
+            .index_fields
+            .contains(&server_vantage::O2_DBM_KIND.to_string())
+    );
+    assert_eq!(
+        settings.bloom_filter_fields,
+        vec![server_vantage::O2_DBM_KIND.to_string()],
+        "the user's bloom configuration must be left exactly as it was — we neither add nor \
+         remove bloom fields"
+    );
+}
+
+/// The bounded-cardinality tripwire, kept from the partition-key implementation
+/// because it still means something — just for a different reason.
+///
+/// It no longer guards write-side file fan-out (an index does not split files).
+/// It guards SELECTIVITY: a tantivy index only pays off when a term matches a
+/// small minority of rows, and `guard_matched_rows` abandons the index for a
+/// file once matches exceed `inverted_index_skip_threshold` percent (default
+/// 35). With 8 kinds the most common one, `activity`, was measured at ~21.6% —
+/// under the cutoff but not comfortably. Fewer kinds would mean a LARGER share
+/// each and a greater chance of tripping the guard, so this stays a tripwire.
+#[test]
+fn idx_seed_kind_cardinality_stays_small() {
+    let kinds = [
+        server_vantage::KIND_ACTIVITY,
+        server_vantage::KIND_BLOCKING,
+        server_vantage::KIND_DEADLOCK,
+        server_vantage::KIND_EXPLAIN,
+        server_vantage::KIND_INDEX_STATS,
+        server_vantage::KIND_STATEMENT,
+        server_vantage::KIND_TABLE_STATS,
+        server_vantage::KIND_TOP_QUERY,
+    ];
+    let distinct: std::collections::BTreeSet<&str> = kinds.iter().copied().collect();
+    assert_eq!(distinct.len(), kinds.len(), "kind values must be distinct");
+    assert!(
+        distinct.len() >= 8,
+        "kinds dropped to {} — each remaining kind is now a larger share of the stream and more \
+         likely to exceed the inverted-index skip threshold; re-measure selectivity",
+        distinct.len()
+    );
+}
+
+/// Untagged rows remain queryable. Rows carrying no `o2_dbm_kind` simply produce
+/// no term in the indexed column; a query with no kind predicate builds no
+/// `IndexCondition` for it and reads everything. Pinned here at the level this
+/// unit test can reach: the seed touches ONLY `index_fields`, so it cannot
+/// change which rows exist or which a non-DBM query sees.
+#[test]
+fn idx_seed_leaves_unrelated_read_paths_untouched() {
+    let mut settings = StreamSettings {
+        full_text_search_keys: vec!["log".to_string()],
+        ..Default::default()
+    };
+    let fts_before = settings.full_text_search_keys.clone();
+    let uds_before = settings.defined_schema_fields.clone();
+
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+
+    assert_eq!(
+        settings.full_text_search_keys, fts_before,
+        "a customer's ordinary log search must be unaffected"
+    );
+    assert_eq!(
+        settings.defined_schema_fields, uds_before,
+        "the seed must not touch the user-defined schema"
+    );
+}
+
+/// The trigger is data-driven: a batch with no canonicalized DBM record must
+/// not seed. Every log stream in the deployment flows through this check, so a
+/// false positive would index streams that have nothing to do with DBM.
+#[test]
+fn idx_seed_trigger_ignores_a_batch_with_no_dbm_records() {
+    let batch = vec![
+        (
+            1_786_612_398_267_000i64,
+            obj(json!({"log": "ordinary line one"})),
+        ),
+        (
+            1_786_612_398_268_000i64,
+            obj(json!({"log": "ordinary line two", "level": "info"})),
+        ),
+    ];
+    assert!(!server_vantage::batch_has_dbm_records(&batch));
+    assert!(!server_vantage::batch_has_dbm_records(&[]));
+}
+
+/// …and fires on a batch where even one record carries a kind, which is what a
+/// mixed stream (DBM recipes plus the customer's own log lines) looks like.
+#[test]
+fn idx_seed_trigger_fires_on_a_mixed_batch() {
+    let batch = vec![
+        (
+            1_786_612_398_267_000i64,
+            obj(json!({"log": "ordinary line"})),
+        ),
+        (
+            1_786_612_398_268_000i64,
+            obj(json!({"o2_dbm_kind": server_vantage::KIND_ACTIVITY})),
+        ),
+    ];
+    assert!(
+        server_vantage::batch_has_dbm_records(&batch),
+        "one DBM record in the batch is enough — the stream carries DBM data"
+    );
+}
+
+// ─── The MARKER columns of the deadlock/blocking OR ──────────────────────────
+//
+// Seeding `o2_dbm_kind` alone is not enough for the two kinds it helps most.
+// `build_dbm_events_sql` (api.rs) does not emit a bare `o2_dbm_kind = 'X'` for
+// deadlocks and blocking — the A1 read-time fallback widens it to a FOUR-WAY OR
+// across marker COLUMNS:
+//
+//     (o2_dbm_kind = 'deadlock' OR o2_pg_event = 'deadlock'
+//      OR o2_my_event = 'deadlock' OR o2_maria_event = 'deadlock')
+//
+// and `build_raw_deadlock_presence_sql` / `build_raw_blocking_presence_sql`
+// emit the marker OR with NO canonical operand at all.
+//
+// `is_expr_valid_for_index` (search/…/physical_optimizer/index.rs:272-274)
+// recurses into `Operator::And | Operator::Or` with `&&`, so for an OR EVERY
+// operand must independently name an indexed column. One missing marker rejects
+// the WHOLE condition and the read falls back to a full scan — no index at all.
+//
+// That is the worst place to lose it: deadlock and blocking are the RARE kinds,
+// the ones whose row share sits far under `inverted_index_skip_threshold` (35%)
+// and where the index actually pays. `statement` — measured at 50.4% of rows —
+// is already past the cutoff and gains nothing either way.
+//
+// So the seeded set is the canonical kind column PLUS the union of the marker
+// columns of `DEADLOCK_MARKERS` and `BLOCKING_MARKERS`. Nothing else: every
+// extra indexed column costs ingest work and index bytes, so each one here must
+// be traceable to a real OR operand in the read path.
+
+/// Every marker column named by a real read-path OR predicate is seeded.
+///
+/// The set is derived from `DEADLOCK_MARKERS`/`BLOCKING_MARKERS` — the same
+/// arrays `RawDeadlockFallback::marker_terms` and
+/// `RawBlockingFallback::marker_terms` build the OR operands from — so a fifth
+/// engine added there is seeded automatically instead of silently
+/// de-optimizing the page.
+#[test]
+fn idx_seed_covers_every_marker_column_of_the_deadlock_or() {
+    let mut settings = StreamSettings::default();
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+
+    for (col, _) in server_vantage::DEADLOCK_MARKERS {
+        assert!(
+            settings.index_fields.iter().any(|f| f == col),
+            "marker column {col:?} is an operand of the deadlock OR, so it MUST be a secondary \
+             index field — `is_expr_valid_for_index` recurses an OR with `&&`, and one \
+             un-indexed operand rejects the entire condition and disables the index for the \
+             whole query. index_fields = {:?}",
+            settings.index_fields
+        );
+    }
+    for (col, _) in server_vantage::BLOCKING_MARKERS {
+        assert!(
+            settings.index_fields.iter().any(|f| f == col),
+            "marker column {col:?} is an operand of the blocking OR (and of \
+             `build_raw_blocking_presence_sql`, which has no canonical operand at all), so it \
+             MUST be a secondary index field. index_fields = {:?}",
+            settings.index_fields
+        );
+    }
+}
+
+/// The seeded set is EXACTLY the columns the OR predicates need — no more.
+///
+/// Every indexed column costs tantivy work at parquet-write time and bytes in
+/// the index file, so this pins the set closed. A new entry here has to be
+/// justified by a real OR operand in a real read query.
+#[test]
+fn idx_seed_set_is_exactly_the_or_predicate_columns() {
+    let mut settings = StreamSettings::default();
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+
+    let mut expected: Vec<&str> = std::iter::once(server_vantage::O2_DBM_KIND)
+        .chain(server_vantage::DEADLOCK_MARKERS.iter().map(|(c, _)| *c))
+        .chain(server_vantage::BLOCKING_MARKERS.iter().map(|(c, _)| *c))
+        .collect();
+    expected.sort_unstable();
+    expected.dedup();
+
+    let mut got: Vec<&str> = settings.index_fields.iter().map(String::as_str).collect();
+    got.sort_unstable();
+    assert_eq!(
+        got, expected,
+        "the seeded set must be exactly the canonical kind column plus the marker columns of the \
+         read-path ORs — no fewer (the OR is rejected wholesale) and no more (every extra \
+         indexed column is ingest cost and index bytes with no query behind it)"
+    );
+    // `o2_recipe` is shared by the MSSQL deadlock marker and all four blocking
+    // markers, so the union must collapse it to one entry.
+    assert_eq!(
+        settings
+            .index_fields
+            .iter()
+            .filter(|f| f.as_str() == "o2_recipe")
+            .count(),
+        1,
+        "o2_recipe appears in both marker arrays; the seed must not add it twice"
+    );
+}
+
+/// Every seeded field gets its own `index_fields_updated_at` cutoff, not just
+/// the first.
+///
+/// `split_file_list_by_time_range` keeps a file on the index path only when
+/// `min_ts >= index_updated_at && index_size > 0`, and a field with no entry
+/// falls back to the stream-wide `index_updated_at` — on an old stream, its
+/// creation time. A marker column stamped that way would advertise index
+/// coverage over every pre-seed file, which carries no index for it at all.
+#[test]
+fn idx_seed_stamps_a_cutoff_for_every_field_it_adds() {
+    let before = config::utils::time::now_micros();
+    let mut settings = StreamSettings::default();
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+    let after = config::utils::time::now_micros();
+
+    for field in &settings.index_fields {
+        let stamped = settings
+            .index_fields_updated_at
+            .get(field)
+            .copied()
+            .unwrap_or_else(|| panic!("no index cutoff stamped for seeded field {field:?}"));
+        assert!(
+            stamped >= before && stamped <= after,
+            "cutoff for {field:?} must be `now` ({before}..={after}), got {stamped}"
+        );
+    }
+    assert_eq!(
+        settings.index_fields_updated_at.len(),
+        settings.index_fields.len(),
+        "one cutoff per seeded field, and no cutoff for a field we did not add"
+    );
+}
+
+/// Idempotency holds for the WHOLE set, over repeated rounds.
+///
+/// Ingest calls this on every batch carrying DBM records. A partial-set check
+/// (e.g. "is the kind column there?") would return `false` on a stream that has
+/// the kind column but is missing a marker — leaving it permanently
+/// half-seeded — or, if written the other way, would re-append every round.
+#[test]
+fn idx_seed_multi_field_is_idempotent_across_rounds() {
+    let mut settings = StreamSettings::default();
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+    let after_first = settings.index_fields.clone();
+    let stamps_first = settings.index_fields_updated_at.clone();
+
+    for round in 0..5 {
+        assert!(
+            !server_vantage::needs_kind_index_field(&mut settings),
+            "round {round}: a fully-seeded stream must report no work, or ingest writes settings \
+             forever"
+        );
+    }
+    assert_eq!(
+        settings.index_fields, after_first,
+        "re-seeding must not append duplicates"
+    );
+    assert_eq!(
+        settings.index_fields_updated_at, stamps_first,
+        "re-seeding must not move any cutoff forward — that silently un-indexes existing files"
+    );
+}
+
+/// A HALF-SEEDED stream is completed, not skipped.
+///
+/// This is the upgrade case: a stream seeded by the single-field version of
+/// this code already has `o2_dbm_kind` in `index_fields` and nothing else. Its
+/// deadlock and blocking reads still get NO index, because the OR still has
+/// three un-indexed operands. The seed must notice the missing markers and add
+/// exactly those — leaving the already-present field, and its original cutoff,
+/// untouched.
+#[test]
+fn idx_seed_completes_a_partially_seeded_stream() {
+    let old_stamp = config::utils::time::now_micros() - 86_400_000_000;
+    let mut settings = StreamSettings {
+        index_fields: vec![server_vantage::O2_DBM_KIND.to_string()],
+        ..Default::default()
+    };
+    settings
+        .index_fields_updated_at
+        .insert(server_vantage::O2_DBM_KIND.to_string(), old_stamp);
+
+    assert!(
+        server_vantage::needs_kind_index_field(&mut settings),
+        "a stream carrying only the kind column is still missing every marker operand of the \
+         deadlock/blocking OR, so there IS work to do"
+    );
+    for (col, _) in server_vantage::DEADLOCK_MARKERS {
+        assert!(settings.index_fields.iter().any(|f| f == col));
+    }
+    assert_eq!(
+        settings.index_fields[0],
+        server_vantage::O2_DBM_KIND,
+        "the already-present field keeps its position; the missing ones are appended after it"
+    );
+    assert_eq!(
+        settings
+            .index_fields_updated_at
+            .get(server_vantage::O2_DBM_KIND)
+            .copied(),
+        Some(old_stamp),
+        "an already-indexed field keeps its ORIGINAL cutoff — re-stamping it to `now` would \
+         un-index every file written since it was first seeded"
+    );
+}
+
+/// The per-field FTS stand-down: one conflicted field is skipped, the rest are
+/// still seeded.
+///
+/// `persist_stream_settings` rejects the WHOLE settings write if any single
+/// field is both FTS and secondary index, so including a conflicted marker
+/// would fail the save on every batch forever — and take the other four fields
+/// down with it. Skipping only the conflicted one keeps the rest indexed.
+#[test]
+fn idx_seed_skips_only_the_fts_conflicted_field() {
+    let mut settings = StreamSettings {
+        full_text_search_keys: vec!["o2_recipe".to_string()],
+        ..Default::default()
+    };
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+
+    assert!(
+        !settings.index_fields.iter().any(|f| f == "o2_recipe"),
+        "the store rejects a field that is both FTS and secondary index; including it would fail \
+         the whole save"
+    );
+    assert!(
+        settings
+            .index_fields
+            .iter()
+            .any(|f| f == server_vantage::O2_DBM_KIND),
+        "the conflict on one field must not stop the others being seeded"
+    );
+    assert!(settings.index_fields.iter().any(|f| f == "o2_pg_event"));
+    assert!(
+        !settings.index_fields_updated_at.contains_key("o2_recipe"),
+        "a field we declined must not be stamped"
+    );
+    // And it stays idempotent: the conflicted field is permanently absent, so a
+    // re-seed must not keep reporting work.
+    assert!(
+        !server_vantage::needs_kind_index_field(&mut settings),
+        "a stream seeded as far as it legally can be must report no further work, or ingest \
+         writes settings on every batch forever"
+    );
+}
+
+/// The per-field PARTITION-KEY stand-down, same shape.
+///
+/// A stream that partitions by `o2_recipe` (a plausible operator choice — it is
+/// the recipe tag) cannot also index it: `persist_stream_settings` rejects the
+/// intersection, and partition keys are append-only so the conflict cannot be
+/// cleared from here. Stand down on that field only.
+#[test]
+fn idx_seed_skips_only_the_partition_key_conflicted_field() {
+    let mut disabled = StreamPartition::new("o2_my_event");
+    disabled.disabled = true;
+
+    for keys in [
+        vec![StreamPartition::new("o2_my_event")],
+        vec![disabled],
+        vec![StreamPartition::new_hash("o2_my_event", 32)],
+    ] {
+        let mut settings = StreamSettings {
+            partition_keys: keys,
+            ..Default::default()
+        };
+        assert!(server_vantage::needs_kind_index_field(&mut settings));
+        assert!(
+            !settings.index_fields.iter().any(|f| f == "o2_my_event"),
+            "the store rejects a field that is both partition key and secondary index, whatever \
+             the flag or type"
+        );
+        assert!(
+            settings
+                .index_fields
+                .iter()
+                .any(|f| f == server_vantage::O2_DBM_KIND),
+            "one conflicted field must not block the rest"
+        );
+        assert!(settings.index_fields.iter().any(|f| f == "o2_pg_event"));
+        assert!(!settings.index_fields_updated_at.contains_key("o2_my_event"));
+        assert!(
+            !server_vantage::needs_kind_index_field(&mut settings),
+            "seeded as far as legally possible must report no further work"
+        );
+    }
+}
+
+/// A stream where EVERY seedable field is blocked reports no work at all,
+/// rather than writing empty settings on every batch.
+#[test]
+fn idx_seed_stands_down_entirely_when_every_field_is_blocked() {
+    let mut fts: Vec<String> = server_vantage::DEADLOCK_MARKERS
+        .iter()
+        .chain(server_vantage::BLOCKING_MARKERS.iter())
+        .map(|(c, _)| c.to_string())
+        .collect();
+    fts.sort_unstable();
+    fts.dedup();
+    let mut settings = StreamSettings {
+        partition_keys: vec![StreamPartition::new(server_vantage::O2_DBM_KIND)],
+        full_text_search_keys: fts,
+        ..Default::default()
+    };
+
+    assert!(
+        !server_vantage::needs_kind_index_field(&mut settings),
+        "nothing is legally seedable here, so there is no settings write to make"
+    );
+    assert!(settings.index_fields.is_empty());
+    assert!(settings.index_fields_updated_at.is_empty());
+}
+
+/// Bloom on a MARKER column still requires the index, exactly as it does on the
+/// kind column: `persist_stream_settings` rejects a bloom field that is not
+/// also a secondary index field, so seeding is the write that makes such a
+/// stream valid.
+#[test]
+fn idx_seed_multi_field_proceeds_when_a_marker_is_a_bloom_field() {
+    let mut settings = StreamSettings {
+        bloom_filter_fields: vec!["o2_pg_event".to_string()],
+        ..Default::default()
+    };
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+    assert!(settings.index_fields.iter().any(|f| f == "o2_pg_event"));
+    assert_eq!(
+        settings.bloom_filter_fields,
+        vec!["o2_pg_event".to_string()],
+        "we neither add nor remove bloom fields"
+    );
+}
+
+/// A user's own index field survives, first, with the whole DBM set appended
+/// after it — the multi-field form of the don't-clobber guarantee.
+#[test]
+fn idx_seed_multi_field_appends_and_never_clobbers_user_settings() {
+    let mut settings = StreamSettings {
+        partition_keys: vec![StreamPartition::new("kubernetes_namespace_name")],
+        full_text_search_keys: vec!["log".to_string()],
+        bloom_filter_fields: vec!["trace_id".to_string()],
+        index_fields: vec!["trace_id".to_string()],
+        data_retention: 45,
+        ..Default::default()
+    };
+
+    assert!(server_vantage::needs_kind_index_field(&mut settings));
+
+    assert_eq!(
+        settings.index_fields[0], "trace_id",
+        "the user's index field must survive, first"
+    );
+    assert!(
+        !settings.index_fields_updated_at.contains_key("trace_id"),
+        "we must not re-date a field the user already had indexed"
+    );
+    assert_eq!(settings.full_text_search_keys, vec!["log".to_string()]);
+    assert_eq!(settings.bloom_filter_fields, vec!["trace_id".to_string()]);
+    assert_eq!(
+        settings
+            .partition_keys
+            .iter()
+            .map(|p| p.field.as_str())
+            .collect::<Vec<_>>(),
+        vec!["kubernetes_namespace_name"],
+    );
+    assert_eq!(settings.data_retention, 45);
+}

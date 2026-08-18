@@ -724,6 +724,383 @@ pub(crate) fn has_reserved_dbm_key(rec: &Map<String, Value>) -> bool {
         .any(|k| k.starts_with(RESERVED_DBM_PREFIX) || k == O2_EVENT_NAME)
 }
 
+// ─── Read-path pruning: the `o2_dbm_kind` secondary index ────────────────────
+//
+// Every DBM read over the server-vantage stream is `WHERE _timestamp BETWEEN …
+// AND o2_dbm_kind = '<one kind>'`, and until this seed landed NOTHING could
+// skip rows for it. Measured on a stream carrying 2.84 M rows/hour of which
+// 21.6 % were DBM records, `/badges` took 7.33 s against 0.14 s on an empty
+// org — same binary, same query, same window.
+//
+// This seeds `o2_dbm_kind` as a SECONDARY INDEX (`index_fields`), i.e. a
+// tantivy inverted index. Explicitly NOT full-text search, and the distinction
+// is structural rather than cosmetic — `tantivy_utils::index_builder` takes
+// `full_text_search_keys` and `index_fields` as two separate inputs and unions
+// them into one tantivy file, but treats them differently:
+//
+//   * FTS fields are concatenated into ONE shared `_all` column tokenized with `O2_TOKENIZER`, so a
+//     term match there cannot tell you WHICH field produced it;
+//   * each `index_fields` member gets its OWN column, `.set_tokenizer("raw")` and `.set_fast(None)`
+//     — one term per whole cell value, so `o2_dbm_kind = 'activity'` is an exact-match lookup on a
+//     dedicated column.
+//
+// Adding the field to `full_text_search_keys` would therefore be both wrong
+// (wrong tokenizer, wrong column) and REJECTED: `persist_stream_settings`
+// refuses a field that is both FTS and secondary index. `index_fields` alone
+// is the correct and only input.
+//
+// The other storage mechanisms were considered and do not apply:
+//
+//   * per-file column min/max statistics do not exist — `FileMeta` carries `min_ts`/`max_ts`/
+//     `records`/sizes and nothing per-column;
+//   * bloom filters would be near-useless here: a bloom answers "is this value CERTAINLY absent",
+//     and `activity` is present in nearly every file, which is the case bloom filters are worst at.
+//     `bloom_filter_fields` is deliberately NOT seeded. (The both-lists rule in `compaction::bloom`
+//     gates only the `.bf` sidecar; the tantivy index needs `index_fields` alone, so declining the
+//     bloom costs nothing on the index path.)
+//   * parquet row-group pushdown skips row groups INSIDE a file already fetched and opened — it
+//     reduces decode, never the file count.
+//
+// How the pruning actually lands: `is_expr_valid_for_index` accepts `=`, `!=`,
+// `IN`, `NOT`, `AND`, `OR`, `str_match` and `match_all` over an indexed column
+// (it rejects raw SQL `LIKE`, range comparisons and `IS NULL`). Most DBM SQL
+// builders emit a plain top-level `o2_dbm_kind = '<literal>'`, which qualifies.
+//
+// The deadlock and blocking reads do NOT. When the A1 read-time fallback is
+// active they widen that predicate to an OR across marker COLUMNS, and
+// `is_expr_valid_for_index` recurses an `Or` with `&&` — so every operand must
+// independently name an indexed column or the whole condition is rejected and
+// no index is used at all. That is why the seed covers the marker columns too;
+// see `server_stream_index_fields` for the derivation and the per-column
+// justification.
+// The resulting row bitmap becomes a parquet `ParquetAccessPlan`, applied BELOW
+// any aggregate — so `GROUP BY` and `COUNT(DISTINCT …)` both benefit, including
+// the activity badge's own aggregate, which a partition key could help only at
+// file granularity.
+//
+// Precedent, and the reason this lives at ingest rather than in the rollup
+// job: `crate::traces::time_index::ensure_index_stream` seeds the trace time
+// index stream's `index_fields` from the ingest path, per request, reading the
+// existing settings first and writing only when something is actually missing.
+// This is the same shape for the same reason — the settings must be in place on
+// the node about to write parquet, and only ingest knows the stream exists.
+//
+// ── KNOWN RISK: selectivity. Read this before claiming the fix works. ────────
+//
+// A tantivy index only pays off when the predicate is SELECTIVE. `guard_matched_rows`
+// returns `Skipped` — falling back to DataFusion for that file — when matched
+// rows exceed `inverted_index_skip_threshold` PERCENT of the file's rows; and if
+// `cpu_num` files each blow that threshold, the whole tantivy step is abandoned
+// for the entire file list and every filter is added back.
+//
+// The effective default threshold is **35%** (declared `default = 35`, and a
+// configured 0 is rewritten to 35 at config load). On the measured stream
+// `o2_dbm_kind='activity'` was ~21.6% of rows — UNDER 35, so it should index
+// today, but it is the same order of magnitude as the cutoff and not a
+// comfortable margin. A deployment whose activity share runs higher (a stream
+// carrying little else, or a tightened threshold) will trip the guard, skip
+// tantivy, and see NO improvement at all.
+//
+// So this is NOT an unconditional fix for the 7.33 s: it helps when the kind
+// being queried is a small minority of the file, and degrades to exactly
+// today's behavior when it is not. The rarer kinds (deadlock, blocking,
+// explain) are the strongest case; `activity` is the weakest. Measure before
+// claiming a win.
+
+/// The canonical secondary-index field: the column every DBM read filters on.
+///
+/// Its values come from the `KIND_*` consts, a compile-time-bounded set pinned
+/// by `idx_seed_kind_cardinality_stays_small` below.
+///
+/// This is necessary but NOT sufficient on its own — see
+/// [`server_stream_index_fields`] for why the marker columns must be seeded
+/// beside it.
+pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
+
+/// Every field DBM seeds as a secondary index on a server-vantage stream.
+///
+/// # Why this is a SET and not just `o2_dbm_kind`
+///
+/// Seeding the kind column alone looks sufficient — every DBM read filters on
+/// it — but it silently delivers NOTHING for the two kinds that need the index
+/// most. `api.rs`'s `build_dbm_events_sql` does not emit a bare
+/// `o2_dbm_kind = 'deadlock'` when the A1 read-time fallback is active; it
+/// widens the predicate to an OR across marker COLUMNS:
+///
+/// ```sql
+/// (o2_dbm_kind = 'deadlock' OR o2_pg_event = 'deadlock'
+///  OR o2_my_event = 'deadlock' OR o2_maria_event = 'deadlock'
+///  OR o2_recipe = 'mssql_deadlock')
+/// ```
+///
+/// and the two presence probes (`build_raw_deadlock_presence_sql`,
+/// `build_raw_blocking_presence_sql`) emit the marker OR with **no canonical
+/// operand at all** — `WHERE (<markers>) LIMIT 1`.
+///
+/// `is_expr_valid_for_index`, in
+/// `search/src/datafusion/optimizer/physical_optimizer/index.rs`, recurses
+/// `Operator::And | Operator::Or` with `&&`. For an OR that means EVERY operand
+/// must independently name an indexed column: one un-indexed marker rejects the
+/// **entire** condition, no `IndexCondition` is built, and the read falls back
+/// to a full scan. Seeding four of the five fields is therefore worth exactly
+/// as much as seeding none of them.
+///
+/// That failure lands in the worst possible place. Deadlock and blocking are
+/// the RARE kinds — the ones whose row share sits far below
+/// `inverted_index_skip_threshold` (35%), where a tantivy index actually pays
+/// off. The common kinds are already past that cutoff (`statement` was measured
+/// at 50.4% of rows) and gain nothing from the index either way. So the kinds
+/// the single-field seed helped were precisely the kinds that needed no help.
+///
+/// # Why exactly these fields, and no others
+///
+/// Derived programmatically from [`DEADLOCK_MARKERS`] and [`BLOCKING_MARKERS`]
+/// — the same arrays `RawDeadlockFallback::marker_terms` and
+/// `RawBlockingFallback::marker_terms` build the OR operands from — so the
+/// seeding list cannot drift from the detection lists. A fifth engine added
+/// there is seeded automatically rather than silently de-optimizing the page.
+///
+/// The union collapses to FIVE fields, because the two marker arrays are
+/// deliberately different shapes:
+///
+/// | Field | Justified by |
+/// |---|---|
+/// | `o2_dbm_kind` | the canonical operand of every DBM read |
+/// | `o2_pg_event` | `DEADLOCK_MARKERS` — Postgres deadlocks (filelog) |
+/// | `o2_my_event` | `DEADLOCK_MARKERS` — MySQL deadlocks (filelog) |
+/// | `o2_maria_event` | `DEADLOCK_MARKERS` — MariaDB deadlocks (filelog) |
+/// | `o2_recipe` | `DEADLOCK_MARKERS` (MSSQL, `mssql_deadlock`) **and** all four `BLOCKING_MARKERS` values |
+///
+/// `BLOCKING_MARKERS` adds no column of its own: every blocking recipe is a
+/// **sqlquery** recipe with no log line to tag, so all four engines key on
+/// `o2_recipe` alone — one column with four values, unlike the deadlock array's
+/// four columns. `o2_recipe` is shared between the two arrays and must appear
+/// once, which is why this dedupes rather than concatenating.
+///
+/// Every extra indexed column costs tantivy work at parquet-write time and
+/// bytes in the index file, so the set is kept closed: an addition here needs a
+/// real OR operand in a real read query behind it.
+///
+/// # Seeding a column the stream does not have is SAFE
+///
+/// Worth stating explicitly, because it is easily conflated with a hazard that
+/// looks identical and is not: naming a marker column in a SQL `WHERE` on a
+/// stream that lacks it fails the whole query with a 400, which is why
+/// `marker_terms` schema-gates every term it emits. **Writing a name into
+/// `index_fields` is a different operation and carries no such requirement.**
+///
+/// `persist_stream_settings` validates only cross-list conflicts (FTS ∩ index,
+/// bloom ⊄ index, partition key ∩ index, reserved names) and never checks
+/// `index_fields` against the arrow schema. The write path filters absent
+/// fields out before building the tantivy schema, so they simply produce no
+/// column; the read path filters `index_fields` against the live schema before
+/// it ever reaches `is_expr_valid_for_index`, and per-file misses set
+/// `has_skipped_conditions`, which adds the DataFusion filter back and keeps
+/// results correct. `traces::time_index::ensure_index_stream` already seeds
+/// `trace_id`/`session_id` this way on streams that may hold no data at all.
+///
+/// So a deployment that has never run a MariaDB recipe carries an
+/// `o2_maria_event` entry that indexes nothing, costs nothing, and becomes
+/// live the day that recipe first ships.
+pub fn server_stream_index_fields() -> Vec<&'static str> {
+    let mut fields = Vec::with_capacity(1 + DEADLOCK_MARKERS.len() + BLOCKING_MARKERS.len());
+    fields.push(SERVER_STREAM_INDEX_FIELD);
+    for (col, _) in DEADLOCK_MARKERS.iter().chain(BLOCKING_MARKERS.iter()) {
+        if !fields.contains(col) {
+            fields.push(col);
+        }
+    }
+    fields
+}
+
+/// Decide whether `settings` needs the DBM secondary index added, and add it.
+///
+/// Returns `true` when the caller must persist; `false` leaves `settings`
+/// untouched. Split out from the async seed so the decision — which is the part
+/// with the idempotency and don't-clobber obligations — is testable without a
+/// schema store.
+///
+/// Properties this function is responsible for:
+///
+/// The fields it seeds are [`server_stream_index_fields`] — the canonical
+/// `o2_dbm_kind` plus the marker columns of the deadlock/blocking OR
+/// predicates. That doc explains why the set cannot be trimmed to the
+/// canonical column alone. Each property below holds PER FIELD:
+///
+/// 1. **Idempotent.** A second call over settings this function already seeded returns `false`, so
+///    a stream being written to a thousand times a second issues at most one settings write. A
+///    field that is blocked and can never be added counts as no work, so a partly-blocked stream
+///    settles too instead of writing forever.
+/// 2. **Never clobbers the user.** Each field is APPENDED to whatever `index_fields` already holds;
+///    every other field of `StreamSettings` is left exactly as read. A user who indexed their own
+///    column keeps it, in its original position, and gains ours beside it.
+/// 3. **Sets the index cutoff explicitly, for every field it adds.** `normalize_stream_settings`
+///    stamps `index_fields_updated_at` only for fields it promotes out of `bloom_filter_fields`; a
+///    field appended straight to `index_fields` gets NO timestamp and would inherit the stream-wide
+///    `index_updated_at`, which on an old stream is its creation time. That would advertise the
+///    index over files written long before it existed, whose parquet carries no index at all. We
+///    stamp `now` per field so the cutoff means what it says — and never re-stamp a field that was
+///    already there, which would un-index everything written since.
+/// 4. **Declines PER FIELD when that field is already a PARTITION KEY or an FTS key.** The store's
+///    rejections are per field but fail the whole settings write, so one conflicted field must not
+///    take the rest down with it. The partition-key arm is the migration case, and it is a genuine
+///    dead end rather than a case we can seed through — see below.
+/// 5. **Completes a half-seeded stream.** A stream carrying only `o2_dbm_kind` — the shape the
+///    single-field version of this code left behind — still has three un-indexed operands in its
+///    deadlock OR and so still gets no index. The missing markers are added; the field already
+///    present keeps its original cutoff.
+///
+/// **The migration case (a stream carrying the previous implementation's
+/// partition key).** `persist_stream_settings` rejects any field that is both a
+/// partition key and a secondary index, and the check is SYMMETRIC — it fails
+/// the same way whichever list we add to. Worse, partition keys are effectively
+/// APPEND-ONLY: a key omitted from an incoming settings write is not dropped,
+/// it is marked `disabled: true` and KEPT, and it stays in `partition_keys`
+/// where the intersection check still sees it. So a stream that was already
+/// seeded by the partition-key implementation **cannot** be converted to the
+/// index from this code path at all — not by removing the key, not by disabling
+/// it. We detect that shape and stand down, logging once, rather than failing
+/// the settings save on every batch forever. Such a stream keeps the partition
+/// key it already has (which does prune, at file granularity) and simply does
+/// not gain the index; converting it requires an operator to edit the stream
+/// settings, which is the only place that can rewrite `partition_keys`.
+pub fn needs_kind_index_field(settings: &mut config::meta::stream::StreamSettings) -> bool {
+    // Every property below is decided PER FIELD, not once for the set. That is
+    // what makes the multi-field form correct rather than merely longer:
+    //
+    //  * the conflict checks must be per field because the store's rejections are per field but
+    //    fail the WHOLE settings write — including one conflicted field would take the other four
+    //    down with it, forever, on every batch. Skipping only the conflicted one keeps the rest
+    //    indexed and keeps the write legal.
+    //  * the already-present check must be per field because of the UPGRADE case: a stream seeded
+    //    by the single-field version of this code has `o2_dbm_kind` and nothing else, and its
+    //    deadlock/blocking reads still get no index at all. Asking only about the first field would
+    //    report "nothing to do" and leave it permanently half-seeded.
+    //
+    // Idempotency is preserved across both: a field that is present, or that is
+    // blocked and can never be added, contributes no work — so a stream seeded
+    // as far as it legally can be reports `false` forever, exactly as before.
+    let mut added_any = false;
+    for field in server_stream_index_fields() {
+        if settings.index_fields.iter().any(|f| f == field) {
+            // Already indexed — by us on an earlier batch, or by the user.
+            // Either way we must not re-stamp its cutoff: moving it forward
+            // would silently un-index every file written since it was seeded.
+            continue;
+        }
+        // The store rejects a field that is both a secondary index and an FTS
+        // key, and rejects one that is both a secondary index and a partition
+        // key. The partition-key arm is the migration case: it cannot be
+        // cleared from here (keys are append-only; omitting one only disables
+        // it), so we stand down on that field rather than fail the save on
+        // every batch forever.
+        if settings.full_text_search_keys.iter().any(|f| f == field)
+            || settings.partition_keys.iter().any(|p| p.field == field)
+        {
+            continue;
+        }
+        settings.index_fields.push(field.to_string());
+        // See property 3: without this the cutoff falls back to stream creation
+        // time and claims index coverage over files that have none.
+        settings
+            .index_fields_updated_at
+            .insert(field.to_string(), config::utils::time::now_micros());
+        added_any = true;
+    }
+    added_any
+}
+
+/// Does this batch contain at least one canonicalized DBM record?
+///
+/// The seed trigger is DATA-driven, not name-driven, and that is deliberate.
+/// The read API defaults to the `dbm_server` stream but every endpoint accepts
+/// a `stream` override, so a deployment may export the recipes anywhere; keying
+/// the seed on the literal name would miss those and would also fire on a
+/// user's own stream that merely happened to be called `dbm_server`. Asking
+/// "did canonicalization actually stamp a kind onto anything in this batch"
+/// answers exactly the question that matters — this stream carries DBM data, so
+/// DBM reads will filter it by kind.
+///
+/// Cheap by construction: it stops at the first hit, and on the overwhelmingly
+/// common case (a stream carrying no DBM data at all) it is one `get` per
+/// record over a map the ingest loop has already built.
+pub fn batch_has_dbm_records(records: &[(i64, Map<String, Value>)]) -> bool {
+    records
+        .iter()
+        .any(|(_, rec)| rec.get(O2_DBM_KIND).and_then(Value::as_str).is_some())
+}
+
+/// Seed [`server_stream_index_fields`] as secondary indexes on a stream that is
+/// receiving DBM records, so DBM reads can prune rows via tantivy instead of
+/// scanning them.
+///
+/// Modelled on [`crate::traces::time_index`]'s `ensure_index_stream`: called
+/// from the ingest path, once per (request, stream), it reads the existing
+/// settings first and writes only when the field is genuinely absent. Every
+/// failure mode is logged and swallowed — a settings write that does not
+/// happen costs read latency, and must never cost the customer their ingest.
+///
+/// **Not retroactive, by construction.** Index files are written per-parquet at
+/// the WAL→parquet move and again at compaction merge, so only files produced
+/// AFTER this seed carry an index at all. The read side agrees:
+/// `split_file_list_by_time_range` keeps a file on the index path only when
+/// `file.meta.min_ts >= index_updated_at && file.meta.index_size > 0`, so
+/// `index_fields_updated_at` is a "from here on" cutoff, never a backfill
+/// trigger. Pre-seed files fall to the ordinary DataFusion scan and remain
+/// fully queryable — old and new coexist in one window. The improvement
+/// therefore arrives as pre-seed data ages out, which is why a before/after
+/// measurement MUST use post-change data only.
+///
+/// **Untagged rows stay queryable.** Rows with no `o2_dbm_kind` — the
+/// receiver-native events and the customer's ordinary log lines — simply
+/// produce no term in the indexed column. A query with no `o2_dbm_kind`
+/// predicate builds no `IndexCondition` for it and reads everything; a query
+/// for `kind = 'activity'` matches only rows carrying that term. Nothing is
+/// dropped.
+///
+/// **Reversible**, which the partition key it replaces was not. A partition key
+/// is append-only — omitting it from a settings write marks it `disabled: true`
+/// and keeps it forever, so seeding one was a one-way door per stream. An
+/// `index_fields` entry can simply be removed by an operator, and the stream
+/// reverts to full scans with no residue in its layout. That is a real
+/// operational advantage of this approach.
+pub async fn ensure_server_stream_index_field(org_id: &str, stream_name: &str) {
+    use config::meta::stream::StreamType;
+
+    let Some(settings) = infra::schema::get_settings(org_id, stream_name, StreamType::Logs).await
+    else {
+        // No settings row yet. `save_stream_settings` requires the stream to
+        // exist, and on the very first batch it may not — the schema is
+        // created later in this same request. Returning here costs one
+        // unindexed batch and the next request seeds it, which is far cheaper
+        // than racing schema creation.
+        return;
+    };
+    let mut settings = (*settings).clone();
+    if !needs_kind_index_field(&mut settings) {
+        return;
+    }
+    if let Err(e) =
+        schema::save_stream_settings(org_id, stream_name, StreamType::Logs, settings).await
+    {
+        // Warn, never fail: the ingest this is attached to must land either
+        // way. A stream stuck without the index reads exactly as slowly as it
+        // does today — the pre-fix status quo, not a regression.
+        log::warn!(
+            "[DbMonitoring] could not seed the {} secondary index fields on {org_id}/{stream_name}; \
+             DBM reads on this stream will keep scanning every row: {e}",
+            server_stream_index_fields().len(),
+        );
+    } else {
+        log::info!(
+            "[DbMonitoring] seeded secondary index fields {:?} on {org_id}/{stream_name}; \
+             newly-written files will prune by kind, and the deadlock/blocking marker OR is now \
+             index-eligible",
+            server_stream_index_fields(),
+        );
+    }
+}
+
 pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     if !config::get_config().db_monitoring.enabled {
         return;

@@ -331,6 +331,40 @@ async fn write_logs(
         partition_keys = stream_settings.partition_keys;
     }
 
+    // DBM read-path pruning: a stream receiving server-vantage DBM records gets
+    // `o2_dbm_kind` seeded as a SECONDARY INDEX (`index_fields`, a raw-tokenized
+    // tantivy column — explicitly not full-text search), so a DBM read filtering
+    // on one kind prunes rows via the index instead of scanning the stream. The
+    // reasoning, the selectivity risk, the migration case and the
+    // `time_index.rs` precedent this follows are all documented on
+    // `ensure_server_stream_index_field`.
+    //
+    // Placed here rather than in the rollup job because the settings must exist
+    // on the node about to write parquet (the index is built per-file at the
+    // WAL→parquet move), and because only the ingest path knows which stream the
+    // recipes actually export to (every DBM read endpoint takes a `stream`
+    // override; the seed is data-driven, not name-driven).
+    //
+    // Gated on the batch actually carrying a canonicalized DBM record, so the
+    // overwhelming majority of log ingests — which carry none — pay one
+    // short-circuiting scan and nothing else. `apply_to_record` has already run
+    // by this point (it is called per record on the way in), so the kind stamp
+    // is present to be seen.
+    //
+    // No settings re-read follows, unlike the partition-key implementation this
+    // replaces: partition keys had to be read back because THIS function
+    // computes the write path from them, whereas the secondary index is
+    // consumed later, by the parquet writer reading stream settings for itself.
+    if config::get_config().db_monitoring.enabled
+        && crate::traces::db_monitoring::server_vantage::batch_has_dbm_records(&json_data)
+    {
+        crate::traces::db_monitoring::server_vantage::ensure_server_stream_index_field(
+            org_id,
+            stream_name,
+        )
+        .await;
+    }
+
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     crate::ingestion::get_stream_alerts(

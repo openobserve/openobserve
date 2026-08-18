@@ -5645,6 +5645,39 @@ mod tests {
         );
     }
 
+    /// Same wiring check, same reason, for the two feed knobs — and here the
+    /// cost of missing wiring is worse than a blank column. Both default OFF,
+    /// so on a fresh install the Activity page and the Plans section are empty
+    /// for a SERVER-SIDE reason; without the flags in `zoConfig` the UI can
+    /// only guess, and it guessed wrong in both places: Activity blamed the
+    /// user's collector, and the Plans empty state asserted "we're capturing
+    /// plans for this database" over a feed that is switched off.
+    #[test]
+    fn test_activity_and_top_query_knobs_reach_the_frontend() {
+        let status = include_str!("../../api/management/src/request/status/mod.rs");
+        for (field, source) in [
+            (
+                "database_monitoring_activity_enabled",
+                "cfg.db_monitoring.activity_enabled",
+            ),
+            (
+                "database_monitoring_top_query_enabled",
+                "cfg.db_monitoring.top_query_enabled",
+            ),
+        ] {
+            assert!(
+                status.contains(field),
+                "{field} must be exposed on the config payload the UI reads: the \
+                 empty states it drives are otherwise unable to tell a knob that \
+                 is off from a collector that is broken"
+            );
+            assert!(
+                status.contains(source),
+                "{field} must be fed from {source}, not hardcoded"
+            );
+        }
+    }
+
     #[test]
     fn test_check_limit_config_batch_size_clamping() {
         let mut cfg = Config::init().unwrap();

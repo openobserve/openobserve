@@ -72,6 +72,26 @@ struct RecentIngestedTraceStream {
 }
 
 // ─── SQL builders (pure — unit-tested against exact strings) ─────────────────
+//
+// **No builder here spells a `_timestamp` bound.** The window is carried by the
+// request payload: every one of these strings is executed through
+// [`run_dbm_search`], which puts `(start_time, end_time)` on
+// `config::meta::search::Query`, and the search planner pushes that down as a
+// physical `_timestamp >= start AND _timestamp < end` FilterExec attached to
+// EACH scan (`search/src/datafusion/table_provider/helpers.rs`) — per table
+// alias, so even a self-join is bounded on both sides. An inline copy of the
+// same predicate is therefore pure duplication: a second literal window that
+// has to be kept in sync with the payload's by hand, with nothing checking it.
+// `Sql::time_range` is unconditionally `(query.start_time, query.end_time)`
+// (`search/src/sql/mod.rs`); nothing parses the window back out of the WHERE
+// clause, so removing the text cannot narrow the scan.
+//
+// NO DBM builder carries its own bound any more, [`super::api::build_stats_sql`]
+// included. That family wants `(start, end]` over rows stamped at the window
+// END, which is not the payload's interval — but the inline predicate it used
+// to spell was measured to be a NO-OP (the payload admitted the boundary rows
+// either way). The shift is applied to the PAYLOAD instead, in
+// [`super::api::stats_read_range`].
 
 /// The shared §5.1 metric block: batch-aware statement count, call/error
 /// counts, total/percentile/max latency (ns — `start_time`/`end_time` are
@@ -100,13 +120,7 @@ fn metric_block(has_rows_col: bool) -> String {
 /// `SUM(total_time_ns)` per (system, instance, fingerprint) → `DENSE_RANK` per
 /// (system, instance) ordered by that fingerprint total → keep `rnk <= top_n`,
 /// retaining ALL constituent rows of each winning fingerprint.
-pub(crate) fn build_rank_sql(
-    stream_name: &str,
-    start_time: i64,
-    end_time: i64,
-    top_n: usize,
-    has_rows_col: bool,
-) -> String {
+pub(crate) fn build_rank_sql(stream_name: &str, top_n: usize, has_rows_col: bool) -> String {
     let metrics = metric_block(has_rows_col);
     format!(
         r#"SELECT * FROM (
@@ -124,8 +138,7 @@ SELECT
     max(o2_db_stmt_class) AS stmt_class,
     {metrics}
 FROM "{stream_name}"
-WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
-    AND o2_db_fingerprint IS NOT NULL
+WHERE o2_db_fingerprint IS NOT NULL
 GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db_env, service_name
     ) AS agg
   ) AS fp_totaled
@@ -144,12 +157,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
 /// SETS on a live cluster (the UNION ALL shape is the live-verified one), and
 /// (b) without `GROUPING()` discriminator columns a genuinely-NULL group value
 /// would be ambiguous with the other grain's NULL marker.
-pub(crate) fn build_totals_sql(
-    stream_name: &str,
-    start_time: i64,
-    end_time: i64,
-    has_rows_col: bool,
-) -> String {
+pub(crate) fn build_totals_sql(stream_name: &str, has_rows_col: bool) -> String {
     let metrics = metric_block(has_rows_col);
     format!(
         r#"SELECT
@@ -159,8 +167,7 @@ pub(crate) fn build_totals_sql(
     CAST(NULL AS STRING) AS stmt_class,
     {metrics}
 FROM "{stream_name}"
-WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
-    AND o2_db_fingerprint IS NOT NULL
+WHERE o2_db_fingerprint IS NOT NULL
 GROUP BY o2_db_system, o2_db_instance, o2_db_namespace
 UNION ALL
 SELECT
@@ -170,8 +177,7 @@ SELECT
     o2_db_stmt_class AS stmt_class,
     {metrics}
 FROM "{stream_name}"
-WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
-    AND o2_db_fingerprint IS NOT NULL
+WHERE o2_db_fingerprint IS NOT NULL
 GROUP BY o2_db_system, o2_db_instance, o2_db_stmt_class"#
     )
 }
@@ -180,7 +186,7 @@ GROUP BY o2_db_system, o2_db_instance, o2_db_stmt_class"#
 /// (fingerprint, system, instance, env, status code). Bounding to the winning
 /// fingerprint set happens client-side ([`fold_error_class`]) — the IN-list is
 /// already in hand from the rank stage and the search path is subquery-hostile.
-fn build_error_class_sql(stream_name: &str, start_time: i64, end_time: i64) -> String {
+fn build_error_class_sql(stream_name: &str) -> String {
     format!(
         r#"SELECT
     o2_db_fingerprint AS fingerprint,
@@ -190,8 +196,7 @@ fn build_error_class_sql(stream_name: &str, start_time: i64, end_time: i64) -> S
     COALESCE(o2_db_status_code, 'unknown') AS status_code,
     COUNT(*) AS errors
 FROM "{stream_name}"
-WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
-    AND o2_db_fingerprint IS NOT NULL
+WHERE o2_db_fingerprint IS NOT NULL
     AND span_status = 'ERROR'
 GROUP BY o2_db_fingerprint, o2_db_system, o2_db_instance, o2_db_env, COALESCE(o2_db_status_code, 'unknown')"#
     )
@@ -590,7 +595,12 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
                 else {
                     return;
                 };
-                if schema.field_with_name(super::O2_DB_FINGERPRINT).is_err() {
+                // Fingerprint alone is NOT enough: an `o2_db_*`-only schema
+                // (merge's CREATE branch, see `REQUIRED_SPAN_FIELDS`) has the
+                // fingerprint column and none of the span columns the rollup
+                // SQL spells, and would fail every window at plan time while
+                // holding this stream's offset back forever.
+                if !super::stream_supports_db_monitoring(&schema) {
                     return;
                 }
                 // Row-count columns are opportunistic (rare in the wild).
@@ -612,12 +622,40 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// What the meta store must still hold for this node's offset advance to be
+/// legitimate — the `expected` half of the compare-and-swap.
+///
+/// It is the window's `start_time` on every iteration BUT the first of a fresh
+/// stream: a fresh stream seeds its in-memory offset to `now - window` without
+/// writing it, so the stored value is still `0` while `start_time` is the seed.
+/// Comparing against the seed there would fail the CAS forever and the stream
+/// would never advance; comparing against `0` is what "nobody has written this
+/// stream yet" actually looks like on disk.
+///
+/// `stored_before` is the value read from the store this tick, and `processed`
+/// the number of windows already advanced in this loop — after the first
+/// advance the stored value IS the previous `end_time`, which is this
+/// iteration's `start_time`.
+fn expected_stored_offset(start_time: i64, stored_before: i64, processed: usize) -> i64 {
+    if processed == 0 && stored_before == 0 {
+        0
+    } else {
+        start_time
+    }
+}
+
 /// Process one stream's pending windows against its own offset.
 ///
 /// First run (offset 0) starts one window back from now. On each successful
 /// window the offset advances and persists; on failure it does NOT advance —
 /// the same window is retried next tick. At most [`MAX_CATCHUP_WINDOWS`]
 /// windows are scanned per tick.
+///
+/// Both the lock claim and every advance are COMPARE-AND-SWAP against the value
+/// this node read. The records are appended to a stream whose reads SUM the
+/// constituent rows of a window, so a window written twice is double-counted
+/// permanently — and an unguarded read-then-write is exactly how two nodes come
+/// to process the same window.
 async fn process_stream(
     org_id: &str,
     stream_name: &str,
@@ -641,13 +679,34 @@ async fn process_stream(
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(());
     }
-    // Claim the lock before processing.
+    // Claim the lock before processing — CONDITIONALLY on the value this node
+    // just read. The check above and this write are two round trips, and a
+    // second node running the same two against a dead holder's lock would have
+    // both claim it and both roll up the same windows into an append-only
+    // stream that SUMS them. Losing the race means another node owns the
+    // stream now; its windows are not this node's to write.
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        crate::db::db_monitoring::set_offset(org_id, stream_name, offset, Some(&LOCAL_NODE.uuid))
-            .await?;
+        let won = crate::db::db_monitoring::compare_and_set_offset(
+            org_id,
+            stream_name,
+            (offset, node.as_str()),
+            offset,
+            Some(&LOCAL_NODE.uuid),
+        )
+        .await?;
+        if !won {
+            log::debug!(
+                "[DbMonitoring] {org_id}/{stream_name} lock claim lost to another node; skipping this tick"
+            );
+            return Ok(());
+        }
     }
 
-    // First run: begin one window back — never a full-history backfill.
+    // First run: begin one window back — never a full-history backfill. The
+    // STORED value is still 0 here (nothing has written the seeded offset), so
+    // the first advance must compare against 0, not against the seed — see
+    // [`expected_stored_offset`].
+    let stored_before = offset;
     if offset == 0 {
         offset = now - window_micros;
     }
@@ -655,11 +714,30 @@ async fn process_stream(
     let mut processed = 0;
     while offset + window_micros <= now && processed < MAX_CATCHUP_WINDOWS {
         let (start_time, end_time) = (offset, offset + window_micros);
+        let expected = expected_stored_offset(start_time, stored_before, processed);
         // Any window failure propagates WITHOUT advancing the offset.
         process_window(org_id, stream_name, start_time, end_time, has_rows_col).await?;
+        // Advance ONLY IF the offset is still the one this node processed from
+        // and this node still holds the lock. The window's records are already
+        // in the stream; if another node has taken over in the meantime, it is
+        // processing from its own offset and a blind write here would drag it
+        // backwards — re-running windows it has already written, each re-run
+        // appending a second copy that every later read sums.
+        let won = crate::db::db_monitoring::compare_and_set_offset(
+            org_id,
+            stream_name,
+            (expected, LOCAL_NODE.uuid.as_str()),
+            end_time,
+            Some(&LOCAL_NODE.uuid),
+        )
+        .await?;
+        if !won {
+            log::warn!(
+                "[DbMonitoring] {org_id}/{stream_name} lost its offset while processing window [{start_time},{end_time}); stopping (another node owns this stream)"
+            );
+            return Ok(());
+        }
         offset = end_time;
-        crate::db::db_monitoring::set_offset(org_id, stream_name, offset, Some(&LOCAL_NODE.uuid))
-            .await?;
         processed += 1;
     }
     Ok(())
@@ -677,13 +755,7 @@ async fn process_window(
     let cfg = get_config();
 
     // (1) stage-1 rank query: top-N fingerprints per (system, instance).
-    let rank_sql = build_rank_sql(
-        stream_name,
-        start_time,
-        end_time,
-        cfg.db_monitoring.top_n,
-        has_rows_col,
-    );
+    let rank_sql = build_rank_sql(stream_name, cfg.db_monitoring.top_n, has_rows_col);
     let stage1_rows = run_dbm_search(org_id, rank_sql, start_time, end_time).await?;
     if stage1_rows.is_empty() {
         // Idle window — nothing to roll up, nothing to write.
@@ -693,8 +765,8 @@ async fn process_window(
     // (2) db_totals + class totals (one UNION ALL query) and (3) error_class:
     // independent of each other — only the empty-window early exit above
     // depends on stage 1 — so they run concurrently.
-    let totals_sql = build_totals_sql(stream_name, start_time, end_time, has_rows_col);
-    let error_sql = build_error_class_sql(stream_name, start_time, end_time);
+    let totals_sql = build_totals_sql(stream_name, has_rows_col);
+    let error_sql = build_error_class_sql(stream_name);
     let (totals_rows, error_rows) = tokio::join!(
         run_dbm_search(org_id, totals_sql, start_time, end_time),
         run_dbm_search(org_id, error_sql, start_time, end_time)
@@ -847,7 +919,7 @@ mod tests {
 
     #[test]
     fn test_rank_sql_exact_with_rows_columns() {
-        let sql = build_rank_sql("otel_demo", 100, 200, 200, true);
+        let sql = build_rank_sql("otel_demo", 200, true);
         let expected = r#"SELECT * FROM (
   SELECT *, DENSE_RANK() OVER (PARTITION BY db_system, db_instance ORDER BY fp_total DESC) AS rnk FROM (
     SELECT *, SUM(total_time_ns) OVER (PARTITION BY db_system, db_instance, fingerprint) AS fp_total FROM (
@@ -873,8 +945,7 @@ SELECT
     SUM(CASE WHEN db_response_returned_rows IS NOT NULL THEN db_response_returned_rows ELSE 0 END) AS rows_returned,
     COUNT(db_response_returned_rows) AS rows_emitting_calls
 FROM "otel_demo"
-WHERE _timestamp >= 100 AND _timestamp < 200
-    AND o2_db_fingerprint IS NOT NULL
+WHERE o2_db_fingerprint IS NOT NULL
 GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db_env, service_name
     ) AS agg
   ) AS fp_totaled
@@ -886,7 +957,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
     // must never reference it (a missing column is a hard error, not NULL).
     #[test]
     fn test_rank_sql_omits_rows_columns_when_absent() {
-        let sql = build_rank_sql("s", 1, 2, 50, false);
+        let sql = build_rank_sql("s", 50, false);
         assert!(!sql.contains("db_response_returned_rows"));
         assert!(!sql.contains("rows_returned"));
         assert!(sql.contains("COUNT(DISTINCT trace_id) AS traces\nFROM \"s\""));
@@ -896,11 +967,11 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
     // Property assertions (not an exact golden — the rank golden above pins
     // the live-verified shape; here only the load-bearing structure matters):
     // two grains via one UNION ALL, each with the NULL marker for the OTHER
-    // grain's discriminator, the shared metric block, time bounds, and the
-    // fingerprint filter.
+    // grain's discriminator, the shared metric block, and the fingerprint
+    // filter. (No time bound to assert: the window is the request payload's.)
     #[test]
     fn test_totals_sql_shape() {
-        let sql = build_totals_sql("s", 1, 2, false);
+        let sql = build_totals_sql("s", false);
         assert_eq!(sql.matches("UNION ALL").count(), 1);
         let (ns_arm, class_arm) = sql.split_once("UNION ALL").unwrap();
         // Namespace grain: stmt_class = NULL marker.
@@ -913,8 +984,8 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
         assert!(class_arm.contains("GROUP BY o2_db_system, o2_db_instance, o2_db_stmt_class"));
         for arm in [ns_arm, class_arm] {
             assert!(arm.contains(r#"FROM "s""#));
-            assert!(arm.contains("WHERE _timestamp >= 1 AND _timestamp < 2"));
-            assert!(arm.contains("AND o2_db_fingerprint IS NOT NULL"));
+            // Leading WHERE term now that the time bound is the payload's.
+            assert!(arm.contains("WHERE o2_db_fingerprint IS NOT NULL"));
             for agg in [
                 "AS statements",
                 "AS calls",
@@ -938,10 +1009,10 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
     // 'unknown' status-code coalesce in both SELECT and GROUP BY.
     #[test]
     fn test_error_class_sql_shape() {
-        let sql = build_error_class_sql("s", 1, 2);
+        let sql = build_error_class_sql("s");
         assert!(sql.contains(r#"FROM "s""#));
-        assert!(sql.contains("WHERE _timestamp >= 1 AND _timestamp < 2"));
-        assert!(sql.contains("AND o2_db_fingerprint IS NOT NULL"));
+        // Leading WHERE term now that the time bound is the payload's.
+        assert!(sql.contains("WHERE o2_db_fingerprint IS NOT NULL"));
         assert!(sql.contains("AND span_status = 'ERROR'"));
         assert!(sql.contains("COALESCE(o2_db_status_code, 'unknown') AS status_code"));
         assert!(sql.contains("COUNT(*) AS errors"));
@@ -1199,5 +1270,35 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
         assert_eq!(get_i64(&row, "s"), 0); // strings are not silently parsed
         assert_eq!(get_i64(&row, "n"), 0);
         assert_eq!(get_i64(&row, "missing"), 0);
+    }
+
+    // ── Offset CAS: the guard against writing a window twice ────────────────
+
+    /// The steady-state expectation: the store must still hold the offset this
+    /// window started from. Anything else means another node moved it, and the
+    /// advance must not clobber that — a window re-run appends a SECOND copy
+    /// of records the read path sums.
+    #[test]
+    fn test_expected_stored_offset_is_the_window_start() {
+        assert_eq!(expected_stored_offset(1_000, 1_000, 0), 1_000);
+        // Later iterations: the store holds the previous end_time == this start.
+        assert_eq!(expected_stored_offset(2_000, 1_000, 1), 2_000);
+        assert_eq!(expected_stored_offset(3_000, 1_000, 2), 3_000);
+    }
+
+    /// A FRESH stream seeds its offset in memory (`now - window`) without ever
+    /// writing it, so the stored value is still 0 when the first advance runs.
+    /// Expecting the seed there fails the CAS on every tick forever — the
+    /// stream silently never rolls up at all.
+    #[test]
+    fn test_expected_stored_offset_first_window_of_a_fresh_stream_is_zero() {
+        let seeded_start = 9_999_000;
+        assert_eq!(expected_stored_offset(seeded_start, 0, 0), 0);
+        // Only the FIRST advance of that fresh stream: once one has landed, the
+        // store holds a real offset and the normal rule applies again.
+        assert_eq!(
+            expected_stored_offset(seeded_start + 1_000, 0, 1),
+            seeded_start + 1_000
+        );
     }
 }

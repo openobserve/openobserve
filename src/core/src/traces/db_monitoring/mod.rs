@@ -152,6 +152,42 @@ pub const ALL_DB_FIELDS: [&str; 11] = [
     O2_DB_BATCH_MULTIPLIER,
 ];
 
+/// The base span columns every DBM read spells alongside the `o2_db_*` ones —
+/// the timestamp, the trace/service identity, and the two ends of the duration
+/// arithmetic (`end_time - start_time`, the module's nanosecond convention).
+///
+/// A trace stream that carries `o2_db_fingerprint` is normally a full span
+/// stream and has all of these. It is NOT guaranteed to: `ensure_db_fields_in_schema`
+/// provisions the eleven `o2_db_*` columns through `infra::schema::merge`, and on a
+/// stream with no schema yet that takes merge's CREATE branch — persisting, and
+/// caching on the node, a schema whose ONLY fields are `o2_db_*`. A stream in that
+/// state passes an `o2_db_fingerprint`-only gate and then fails EVERY DBM query at
+/// plan time with `No field named _timestamp` (seen live on `rig4_ent_t/default`:
+/// samples 500ed and the rollup refused to advance its offset), because DataFusion
+/// resolves column references against the stream schema and the projection narrows
+/// to the columns actually present.
+///
+/// Gating on these too turns that stream into what it actually is — a stream with
+/// no DB spans to report — and the endpoints answer an empty window instead of an
+/// error, which is the behaviour the gate always claimed.
+pub const REQUIRED_SPAN_FIELDS: [&str; 5] = [
+    config::TIMESTAMP_COL_NAME,
+    "trace_id",
+    "service_name",
+    "start_time",
+    "end_time",
+];
+
+/// Whether `schema` can answer a DBM read: it must carry the fingerprint column
+/// (there are DB spans to report) AND the base span columns every builder spells
+/// ([`REQUIRED_SPAN_FIELDS`]). Both halves are load-bearing; see that constant.
+pub fn stream_supports_db_monitoring(schema: &arrow_schema::Schema) -> bool {
+    schema.field_with_name(O2_DB_FINGERPRINT).is_ok()
+        && REQUIRED_SPAN_FIELDS
+            .iter()
+            .all(|f| schema.field_with_name(f).is_ok())
+}
+
 /// Normalizer/fingerprint algorithm version (`o2_db_fp_version`). Bump ONLY with a release
 /// note: a bump is a trend discontinuity for every stored fingerprint.
 ///
