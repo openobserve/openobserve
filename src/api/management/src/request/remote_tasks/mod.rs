@@ -467,9 +467,7 @@ pub async fn test_run_remote_task(
         .into_iter()
         .enumerate()
         .map(|(index, sample)| bench::BenchSample {
-            row_id: sample
-                .row_id
-                .unwrap_or_else(|| format!("sample-{index}")),
+            row_id: sample.row_id.unwrap_or_else(|| format!("sample-{index}")),
             input: sample.input,
             metadata: sample.metadata,
         })
