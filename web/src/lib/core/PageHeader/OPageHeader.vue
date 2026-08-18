@@ -97,10 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </slot>
         </template>
 
-        <!-- Listing/index page: the module icon tile. -->
+        <!-- Listing/index page: the module icon tile. Decorative, so < md it
+             yields its 2.375rem to the title and actions (the Back tile above
+             is navigation and always stays). -->
         <span
           v-else-if="icon"
-          class="rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center"
+          class="rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center max-md:hidden"
           aria-hidden="true"
         >
           <OIcon :name="icon" size="md" />
@@ -128,11 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
              the subtitle is present or not, so the title doesn't appear to shift
              when navigating between views. Content is vertically centered. -->
+          <!-- max-md:hidden: on phones a truncated tagline reads as clutter next
+               to the actions — the title carries the page alone. -->
           <OText
             v-if="hasSubtitle"
             variant="meta"
             as="div"
-            class="-mt-0.5 flex h-5 min-w-0 items-center"
+            class="-mt-0.5 flex h-5 min-w-0 items-center max-md:hidden"
           >
             <slot name="subtitle">
               <!-- leading-normal (not the meta variant's leading-none): truncate

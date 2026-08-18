@@ -78,9 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Toolbar inside the table frame: stream-type filter + search.
                < md the search wraps to its own full-width row. -->
           <template #toolbar>
-            <div
-              class="flex w-full items-center justify-between gap-2 max-md:flex-wrap max-md:gap-y-1"
-            >
+            <!-- max-md:contents flattens this wrapper so the tabs, the search and
+                 OTable's own controls share one wrapping toolbar. -->
+            <div class="flex w-full items-center justify-between gap-2 max-md:contents">
               <OToggleGroup
                 :model-value="streamActiveTab"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="no-border o2-search-input w-64 max-md:w-full"
+                class="no-border o2-search-input w-64 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               />

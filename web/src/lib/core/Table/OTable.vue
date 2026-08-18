@@ -1053,21 +1053,25 @@ defineExpose({
         data-test="o2-table-toolbar"
       >
         <slot name="toolbar" />
-        <OTableColumnToggle
-          v-if="
-            props.persistColumns &&
-            props.tableId &&
-            props.columns.some((c) => c.hideable && !c.isAction)
-          "
-          :columns="props.columns"
-          :column-visibility="internalColumnVisibility"
-          :has-resized-columns="props.enableColumnResize && hasResizedColumns"
-          class="shrink-0"
-          data-test="o2-table-column-toggle"
-          @update:column-visibility="handleColumnVisibilityChange"
-          @reset:column-sizes="handleResetColumnSizes"
-        />
-        <slot name="toolbar-trailing" />
+        <!-- Grouped so that when the mobile toolbar wraps, the controls land
+             right-aligned on their row instead of ragged bottom-left. -->
+        <div class="flex shrink-0 items-center gap-2 max-md:ml-auto">
+          <OTableColumnToggle
+            v-if="
+              props.persistColumns &&
+              props.tableId &&
+              props.columns.some((c) => c.hideable && !c.isAction)
+            "
+            :columns="props.columns"
+            :column-visibility="internalColumnVisibility"
+            :has-resized-columns="props.enableColumnResize && hasResizedColumns"
+            class="shrink-0"
+            data-test="o2-table-column-toggle"
+            @update:column-visibility="handleColumnVisibilityChange"
+            @reset:column-sizes="handleResetColumnSizes"
+          />
+          <slot name="toolbar-trailing" />
+        </div>
       </div>
       <!-- ── Sub-header slot: custom full-width content between the toolbar and
          the table body (e.g. a summary-stat strip). ── -->

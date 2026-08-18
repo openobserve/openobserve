@@ -72,7 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
               <!-- < md the toolbar wraps: tabs row, then a full-width search row. -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
+                <!-- max-md:contents flattens this wrapper so the tabs, the search
+                     and OTable's own controls share one wrapping toolbar. -->
+                <div class="flex w-full items-center gap-2 max-md:contents">
                   <div class="app-tabs-container">
                     <AppTabs
                       class="tabs-selection-container"
@@ -86,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     />
                   </div>
-                  <div class="min-w-0 flex-1 max-md:basis-full">
+                  <div class="min-w-0 flex-1 max-md:min-w-40">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -113,7 +115,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="report-list-search-scope-current"
                             :title="t('reports.searchThisFolderTitle')"
-                            >{{ t("reports.searchThisFolder") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("reports.searchThisFolder")
+                            }}</span></OToggleGroupItem
                           >
                           <OToggleGroupItem
                             value="all"
@@ -121,7 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="report-list-search-across-folders-toggle"
                             :title="t('reports.searchAllFoldersTitle')"
-                            >{{ t("reports.searchAllFolders") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("reports.searchAllFolders")
+                            }}</span></OToggleGroupItem
                           >
                         </OToggleGroup>
                       </template>

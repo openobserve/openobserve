@@ -153,8 +153,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
-                <div class="min-w-0 flex-1">
+              <!-- max-md:contents flattens this wrapper so the search and
+                   OTable's own controls share one row on mobile. -->
+              <div class="flex w-full items-center gap-2 max-md:contents">
+                <div class="min-w-0 flex-1 max-md:min-w-40">
                   <OInput
                     v-model="dynamicQueryModel"
                     :placeholder="
@@ -181,7 +183,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="folder-outline"
                           data-test="dashboard-search-scope-current"
                           :title="t('dashboard.searchThisFolderTitle')"
-                          >{{ t("dashboard.searchThisFolder") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("dashboard.searchThisFolder")
+                          }}</span></OToggleGroupItem
                         >
                         <OToggleGroupItem
                           value="all"
@@ -189,7 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="search"
                           data-test="dashboard-search-across-folders-toggle"
                           :title="t('dashboard.searchAllFoldersTitle')"
-                          >{{ t("dashboard.searchAllFolders") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("dashboard.searchAllFolders")
+                          }}</span></OToggleGroupItem
                         >
                       </OToggleGroup>
                     </template>

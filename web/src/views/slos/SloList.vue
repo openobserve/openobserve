@@ -70,7 +70,7 @@
       @row-click="onRowClick"
     >
       <template #toolbar>
-        <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1.5">
+        <div class="flex w-full items-center gap-2 max-md:contents">
           <OButton
             v-if="selectedIds.length"
             variant="outline"
@@ -99,7 +99,7 @@
                will not shrink below its content width without it, which is
                how a long placeholder pushes the toolbar wider than the table.
                Same wrapper the Alerts toolbar uses. -->
-          <div class="min-w-0 flex-1 max-md:basis-full">
+          <div class="min-w-0 flex-1 max-md:min-w-40">
             <OSearchInput
               v-model="search"
               class="w-full"

@@ -128,7 +128,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh.
                    < md it wraps: type filter row, then the search row. -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
+                <!-- max-md:contents flattens this wrapper so the tabs, the search
+                     and OTable's own controls share one wrapping toolbar: tabs
+                     row, then search + columns + refresh on a single row. -->
+                <div class="flex w-full items-center gap-2 max-md:contents">
                   <OToggleGroup
                     :model-value="activeTab"
                     @update:model-value="
@@ -162,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("alerts.anomalyDetection") }}
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1 max-md:basis-full">
+                  <div class="min-w-0 flex-1 max-md:min-w-40">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -189,7 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
                             :title="t('alerts.searchThisFolderTooltip')"
-                            >{{ t("alerts.searchThisFolder") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("alerts.searchThisFolder")
+                            }}</span></OToggleGroupItem
                           >
                           <OToggleGroupItem
                             value="all"
@@ -197,7 +202,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
                             :title="t('alerts.searchAllFoldersTooltip')"
-                            >{{ t("alerts.searchAllFolders") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("alerts.searchAllFolders")
+                            }}</span></OToggleGroupItem
                           >
                         </OToggleGroup>
                       </template>

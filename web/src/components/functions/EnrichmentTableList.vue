@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar: type filter + search (< md: search wraps to its own row) -->
             <template #toolbar>
-              <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
+              <div class="flex w-full items-center gap-2 max-md:contents">
                 <OToggleGroup
                   :model-value="selectedFilter"
                   @update:model-value="
