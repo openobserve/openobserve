@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'z-auto overflow-visible max-h-[3.125rem]!'
+            ? 'z-auto overflow-visible max-h-[3.125rem]! max-md:h-auto! max-md:max-h-none!'
             : 'z-auto overflow-visible'
         "
         @update:model-value="onSplitterUpdate"
@@ -446,6 +446,9 @@ watch(
     } else if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
       searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
     }
+    // < md the toolbar wraps to two rows, so the fixed 90px top pane clips the
+    // query editor; give it room and restore the desktop height on the way out.
+    splitterModel.value = mobile ? 150 : 90;
   },
   { immediate: true },
 );
