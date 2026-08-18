@@ -74,7 +74,8 @@ pub use rotation::{
 };
 pub use routing::{
     ContextTeam, OwnershipError, OwnershipRule, Routed, RoutingConfig, RoutingDecision,
-    RoutingInputs, UnroutedSignal, canonical_path, outstanding, resolve_owner, route,
+    RoutingInputs, SERVICE_DIMENSION, UnroutedSignal, canonical_path, outstanding, resolve_owner,
+    route,
 };
 pub use subject::{SubjectError, SubjectRef, SubjectType};
 pub use team::{

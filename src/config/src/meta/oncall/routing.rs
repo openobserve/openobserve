@@ -32,6 +32,15 @@ use utoipa::ToSchema;
 
 use super::subject::SubjectType;
 
+/// The dimension every platform has, whatever else it reports.
+///
+/// Spelled as the semantic group's own id (`default_semantic_groups.json`), so
+/// a rule written against it matches what extraction produces. Named here
+/// rather than typed as a literal at each call site because the fallback in the
+/// incident path and the rules an operator writes have to agree exactly — a
+/// route on `service` and a dimension emitted as `service_name` never meet.
+pub const SERVICE_DIMENSION: &str = "service";
+
 /// Canonical form of a set of dimensions: sorted by name, rendered `k=v/k=v`.
 ///
 /// The same spelling an [`OwnershipRule`] stores, so an unrouted signal's path
@@ -604,6 +613,57 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    /// The custom-SQL case, which is the one routing is worst at.
+    ///
+    /// An aggregation — `SELECT count(*) … ` with no `GROUP BY`, a join, a
+    /// query that selects only the columns it alerts on — produces a result row
+    /// with **no identity fields**, so extraction yields nothing and no
+    /// ownership rule can match. It should be rare, and when it happens the
+    /// page lands on the default team or the unrouted queue for an alert whose
+    /// service the incident path has already identified from the registry.
+    ///
+    /// This pins the contract the fallback depends on: a rule written on the
+    /// canonical `service` dimension catches a signal routed by service alone.
+    /// If `SERVICE_DIMENSION` and the semantic group's id ever drift apart,
+    /// this fails — which is the point of naming it once.
+    #[test]
+    fn test_a_signal_identified_only_by_service_still_finds_its_owner() {
+        let rules = vec![
+            rule("r_deep", "team_commerce", &[("k8s-cluster", "eks-us-prod"), ("k8s-namespace", "commerce")]),
+            rule("r_service", "team_payments", &[(SERVICE_DIMENSION, "payments-gateway")]),
+        ];
+
+        // What the fallback produces when the row carried nothing: the service
+        // the incident correlated to, and only that.
+        let only_service = dims(&[(SERVICE_DIMENSION, "payments-gateway")]);
+        assert_eq!(
+            resolve_owner(&rules, &only_service).map(|r| r.team_id.as_str()),
+            Some("team_payments"),
+            "a service-only signal must reach the team that owns that service"
+        );
+
+        // And the empty case it replaces — the reason the fallback exists.
+        assert_eq!(
+            resolve_owner(&rules, &dims(&[])),
+            None,
+            "with no dimensions at all nothing can match, which is where these \
+             alerts used to land"
+        );
+
+        // A row that does carry identity is unaffected: the fallback only ever
+        // fires when extraction produced nothing, so no existing alert moves.
+        let rich = dims(&[
+            ("k8s-cluster", "eks-us-prod"),
+            ("k8s-namespace", "commerce"),
+            (SERVICE_DIMENSION, "checkout-api"),
+        ]);
+        assert_eq!(
+            resolve_owner(&rules, &rich).map(|r| r.team_id.as_str()),
+            Some("team_commerce"),
+            "the more specific path still wins"
+        );
     }
 
     fn rule(id: &str, team: &str, pairs: &[(&str, &str)]) -> OwnershipRule {

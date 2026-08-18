@@ -658,13 +658,45 @@ pub async fn correlate_alert_to_incident(
     // fed it. Only on creation: an alert joining an existing incident must not
     // open a second record.
     #[cfg(feature = "enterprise")]
-    if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome
+    if let IncidentCorrelationOutcome::NewIncidentCreated {
+        incident_id,
+        service_name,
+    } = &outcome
         && o2_enterprise::enterprise::oncall::is_enabled()
     {
-        let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_of_row(
+        let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_of_row(
             &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
             result_row,
         );
+        // Fall back to what correlation already worked out.
+        //
+        // Routing reads the alert's **first result row**, which is right for an
+        // ordinary alert and useless for a custom SQL one: `SELECT count(*)`
+        // with no `GROUP BY` returns a row with an aggregate and no identity
+        // fields at all, so no ownership rule can match and the page lands on
+        // the default team or the unrouted queue — for an alert whose service
+        // this very function has *already identified*.
+        //
+        // Correlation resolves the service a strictly better way than a row
+        // scan can: it queries the service-discovery registry first and only
+        // falls back to extracting from the row. Re-deriving from the row here
+        // and ignoring that answer was throwing away the better of the two.
+        //
+        // Only when the row yielded nothing. A row that carries its own
+        // identity keeps routing on it, so no existing alert changes team —
+        // this can only add a route where there was none.
+        if dimensions.is_empty() && !service_name.trim().is_empty() {
+            dimensions.insert(
+                config::meta::oncall::SERVICE_DIMENSION.to_string(),
+                service_name.clone(),
+            );
+            log::debug!(
+                "[incidents] {}/{}: no identity fields in the result row; routing on the \
+                 correlated service `{service_name}`",
+                alert.org_id,
+                alert.name,
+            );
+        }
         // Single-sourced with the alert path in `scheduler::handlers`. The two
         // used to disagree — P2 here, P3 there — so ticking `creates_incident`
         // on an alert quietly changed how loudly it woke somebody.
