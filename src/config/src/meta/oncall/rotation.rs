@@ -208,31 +208,32 @@ pub struct Rotation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ends_at: Option<i64>,
     /// How many handovers after the person on shift the **derived secondary**
-    /// sits — what `NextOnCall` resolves to.
+    /// sits.
     ///
     /// A team has one member list. The secondary is derived from it rather
     /// than staffed separately, which is why there is no second list to keep
     /// in sync; slots are the opt-in upgrade for a genuinely different pool.
-    /// The offset used to be a hard-coded `1`, which made this week's
-    /// secondary next week's primary — a lockstep nobody asked for and
-    /// everybody reads as a bug on the calendar. It is now
-    /// [`default_secondary_offset`], half the roster, so ten people put five
-    /// weeks between the two roles.
     ///
-    /// **Absent means derived, not "1".** The alternative — writing `1` into
-    /// every stored rotation so nothing moves — would have frozen the bug into
-    /// the data and left the fix reachable only by editing every team by hand.
-    /// The feature is unreleased, so there is no deployment whose pairings are
-    /// load-bearing, and a field that is *absent* keeps serialising
-    /// byte-for-byte as it was stored while still tracking a roster that
-    /// grows. The cost is that adding a tenth person moves the pairing; that
-    /// is deliberate and visible, and the resolution stays a pure function of
+    /// **The default is `1`: the secondary is the person who takes over next.**
+    ///
+    /// It was briefly half the roster, on the argument that an offset of one
+    /// makes this week's secondary next week's primary — a permanent pairing
+    /// of the same two people. That argument is real and it lost to a bigger
+    /// one. Half a roster produces a secondary **nobody can derive**: the
+    /// calendar names the next shift holder, the ladder names somebody else,
+    /// both are correct, and a responder asking "who backs me up?" has to open
+    /// a second screen to find out. It also picks the person with the *least*
+    /// recent context — on call three weeks ago, and not again for three more.
+    ///
+    /// One is predictable, matches what the calendar already shows, and is
+    /// explainable in six words. A default's first duty is to be understood.
+    /// Teams that want real separation set this field; the lockstep they are
+    /// avoiding is a preference, not a correctness property.
+    ///
+    /// **Absent means derived, not stored.** A rotation that never writes this
+    /// keeps serialising byte-for-byte while still tracking a roster that
+    /// grows, and the resolution stays a pure function of
     /// (rotation, instant, absences).
-    ///
-    /// **Settable**, because shadow-then-lead — the secondary this week
-    /// leading next week — is a deliberate onboarding pattern for some teams.
-    /// It has to stay reachable by writing `1`; it just stops being the only
-    /// option.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secondary_offset: Option<u32>,
 
@@ -274,27 +275,31 @@ pub struct Rotation {
 /// The value [`Rotation::source`] carries for a rotation nobody chose.
 pub const SOURCE_DEFAULT: &str = "default";
 
-/// How far behind the primary the derived secondary sits, for a roster of
-/// `len`, when the rotation has not said.
+/// How far ahead of the person on shift the derived secondary sits, when the
+/// rotation has not said.
 ///
-/// `max(1, len/2)` — as far from the primary as the cycle allows, which is
-/// what stops "secondary" meaning "next week's primary".
+/// **One.** The secondary is whoever takes over next — the person the calendar
+/// already shows in the next cell.
 ///
-/// The small rosters, because they are the interesting ones:
+/// This was `max(1, len/2)` for two days, on the argument that an offset of one
+/// pairs the same two people forever. Replaced after watching somebody read the
+/// product: on a five-person team the calendar said the next holder was one
+/// person and the ladder's second rung said another, both correct, and the only
+/// way to learn who would actually be woken second was to open a different tab.
+/// A rule that requires a second screen to answer "who backs me up" is worse
+/// than a rule that pairs people predictably.
 ///
-/// - **1** — `1`, and unused: a one-person rotation has no next, and
-///   [`next_on_call_in_slot`] refuses before the offset is consulted.
-/// - **2** — `1`. They alternate. There is no other person to be, so the
-///   lockstep is arithmetic rather than a choice.
-/// - **3** — `1`, so the lockstep returns. It is not fixable: the only other
-///   usable offset is `2`, which is `-1` modulo 3, and that just reverses the
-///   adjacency — the secondary becomes *last* week's primary instead of next
-///   week's. Three people cannot be more than one handover apart in both
-///   directions at once, so the rule stays the documented one rather than
-///   growing a special case that buys nothing.
-/// - **4** — `2`, and from here the separation is real.
-pub fn default_secondary_offset(len: usize) -> u32 {
-    (len / 2).max(1) as u32
+/// It also chose badly on the merits: half a roster picks whoever was on call
+/// longest ago and is furthest from being on call again — the least context,
+/// not the most.
+///
+/// `len` is unused and kept in the signature because the offset is a property
+/// of the *rule*, not of the roster, and every call site already has it — a
+/// future rule that does depend on size should not have to change them all.
+/// Teams wanting real separation set [`Rotation::secondary_offset`]; what they
+/// are avoiding is a preference, not a correctness property.
+pub fn default_secondary_offset(_len: usize) -> u32 {
+    1
 }
 
 /// Why a rotation was rejected.
@@ -3614,7 +3619,7 @@ mod tests {
         assert_eq!(on_call[0].slot, "primary");
         assert_eq!(on_call[0].user_email, "ana@o2.ai");
         assert_eq!(on_call[1].slot, "secondary");
-        assert_eq!(on_call[1].user_email, "cy@o2.ai");
+        assert_eq!(on_call[1].user_email, "bob@o2.ai");
         assert_eq!(
             on_call[1].rotation, "Platform",
             "the derived slot names the rotation it is derived from, not a placeholder"
@@ -3655,7 +3660,7 @@ mod tests {
             segments.iter().all(|s| s.user_email.is_some()),
             "every segment of a staffed derived slot has a holder — got {segments:?}"
         );
-        assert_eq!(segments[0].user_email.as_deref(), Some("cy@o2.ai"));
+        assert_eq!(segments[0].user_email.as_deref(), Some("bob@o2.ai"));
         assert_eq!(segments[0].rotation.as_deref(), Some("Platform"));
     }
 
@@ -3713,14 +3718,15 @@ mod tests {
             )
             .deriving("secondary"),
         ];
-        // offset = max(1, 4/2) = 2, so the secondary is two handovers ahead.
+        // Default offset 1: the secondary is whoever takes over next, which is
+        // the same person the calendar shows in the next cell.
         assert_eq!(
             on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, ANCHOR, TZ).as_deref(),
             Some("ana@o2.ai")
         );
         assert_eq!(
             on_call_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ).as_deref(),
-            Some("cy@o2.ai"),
+            Some("bob@o2.ai"),
             "the derived position is now addressable by slot name"
         );
         assert_eq!(
@@ -4315,26 +4321,26 @@ mod tests {
         )
     }
 
-    /// The rule itself, over every roster size a real team has.
+    /// The rule itself, over every roster size a real team has: **one**,
+    /// whatever the size.
     ///
-    /// `max(1, len/2)`. The two clamped sizes are the interesting ones and
-    /// they are in the table rather than in prose: 2 people alternate because
-    /// there is nobody else to be, and 3 people fall back to lockstep because
-    /// offset 2 on three people is offset -1 and merely reverses which side of
-    /// the primary the secondary sits on.
+    /// The size-dependent version is what made the product unreadable — the
+    /// calendar named one successor and the ladder named another, and both
+    /// were right. A rule a responder can hold in their head beats a rule that
+    /// spaces the pairing out.
     #[test]
-    fn test_the_default_offset_is_half_the_roster() {
+    fn test_the_default_offset_is_one_for_every_roster() {
         let table = [
             (1usize, 1u32),
             (2, 1),
             (3, 1),
-            (4, 2),
-            (5, 2),
-            (6, 3),
-            (7, 3),
-            (8, 4),
-            (9, 4),
-            (10, 5),
+            (4, 1),
+            (5, 1),
+            (6, 1),
+            (7, 1),
+            (8, 1),
+            (9, 1),
+            (10, 1),
         ];
         for (len, want) in table {
             assert_eq!(default_secondary_offset(len), want, "roster of {len}");
@@ -4357,13 +4363,13 @@ mod tests {
             (1usize, None),
             (2, Some("p1@o2.ai")),
             (3, Some("p1@o2.ai")),
-            (4, Some("p2@o2.ai")),
-            (5, Some("p2@o2.ai")),
-            (6, Some("p3@o2.ai")),
-            (7, Some("p3@o2.ai")),
-            (8, Some("p4@o2.ai")),
-            (9, Some("p4@o2.ai")),
-            (10, Some("p5@o2.ai")),
+            (4, Some("p1@o2.ai")),
+            (5, Some("p1@o2.ai")),
+            (6, Some("p1@o2.ai")),
+            (7, Some("p1@o2.ai")),
+            (8, Some("p1@o2.ai")),
+            (9, Some("p1@o2.ai")),
+            (10, Some("p1@o2.ai")),
         ];
         for (len, want) in table {
             let rotations = vec![roster(len)];
@@ -4375,10 +4381,16 @@ mod tests {
         }
     }
 
-    /// The whole point, stated as the thing the screen shows: with ten people
-    /// the secondary is not next week's primary any more.
+    /// The whole point, stated as the thing the screen shows: **the secondary
+    /// is the person the calendar already says takes over next.**
+    ///
+    /// This test used to assert the exact opposite — that the secondary must
+    /// *not* be next week's primary — which is how the product ended up naming
+    /// two different people "next" on two different tabs. Keeping the inverted
+    /// version here as history would be worse than useless, so it is inverted
+    /// with its reason.
     #[test]
-    fn test_ten_people_put_five_weeks_between_the_two_roles() {
+    fn test_the_secondary_is_the_person_who_takes_over_next() {
         let rotations = vec![roster(10)];
         for week in 0..10i64 {
             let at = ANCHOR + week * MICROS_PER_WEEK;
@@ -4386,16 +4398,17 @@ mod tests {
             let secondary = next_on_call(&rotations, &[], &[], at, TZ).unwrap();
             let next_weeks_primary =
                 on_call_now(&rotations, &[], &[], at + MICROS_PER_WEEK, TZ).unwrap();
-            assert_ne!(
+            assert_eq!(
                 secondary, next_weeks_primary,
-                "week {week}: the secondary must not be next week's primary"
+                "week {week}: one 'next', not two — the ladder and the calendar \
+                 must name the same person"
             );
             assert_eq!(
                 secondary,
-                format!("p{}@o2.ai", (week as usize + 5) % 10),
+                format!("p{}@o2.ai", (week as usize + 1) % 10),
                 "week {week}"
             );
-            assert_ne!(secondary, primary);
+            assert_ne!(secondary, primary, "and never the same person twice");
         }
     }
 
@@ -4494,29 +4507,35 @@ mod tests {
         });
         let r: Rotation = serde_json::from_value(stored).unwrap();
         assert_eq!(r.secondary_offset, None);
-        assert_eq!(r.resolved_secondary_offset(), 5);
+        assert_eq!(r.resolved_secondary_offset(), 1);
         assert_eq!(
             next_on_call(&[r], &[], &[], ANCHOR, TZ).as_deref(),
-            Some("p5@o2.ai")
+            Some("p1@o2.ai")
         );
     }
 
-    /// A roster change moves the pairing — that is accepted — but the answer
-    /// stays a pure function of the rotation and the instant.
+    /// **A roster change no longer moves the pairing at all**, which is the
+    /// second thing the offset change bought.
+    ///
+    /// Under `max(1, len/2)` the secondary depended on the roster's *size*, so
+    /// adding a tenth person silently repaired who backed up whom for everyone
+    /// — accepted at the time as "deliberate and visible", and visible to
+    /// nobody. At an offset of one the answer depends only on position, so the
+    /// pairing survives the team growing.
     #[test]
-    fn test_a_roster_change_moves_the_pairing_deterministically() {
+    fn test_a_roster_change_does_not_move_the_pairing() {
         let nine = roster(9);
         assert_eq!(
             next_on_call(&[nine.clone()], &[], &[], ANCHOR, TZ).as_deref(),
-            Some("p4@o2.ai")
+            Some("p1@o2.ai")
         );
         let mut ten = nine;
         ten.members.push("p9@o2.ai".into());
         for _ in 0..5 {
             assert_eq!(
                 next_on_call(&[ten.clone()], &[], &[], ANCHOR, TZ).as_deref(),
-                Some("p5@o2.ai"),
-                "the tenth person moved the pairing, and it stays moved"
+                Some("p1@o2.ai"),
+                "the tenth person joined and nobody's backup changed"
             );
         }
     }
@@ -4532,7 +4551,11 @@ mod tests {
     /// would change every week somebody was away.
     #[test]
     fn test_an_absence_moves_the_primary_and_not_the_secondary() {
-        let rotations = vec![roster(6)]; // default offset 3
+        // Offset pinned at 3: the default is 1, which puts the secondary on
+        // exactly the person the primary's skip advances to, so the two rules
+        // could not be told apart and this test would pass while asserting
+        // nothing.
+        let rotations = vec![roster(6).with_secondary_offset(3)];
         let week = ANCHOR + MICROS_PER_WEEK;
 
         assert_eq!(
@@ -4561,7 +4584,10 @@ mod tests {
     /// that one.
     #[test]
     fn test_an_absent_secondary_passes_to_the_next_person_along() {
-        let rotations = vec![roster(6)];
+        // Offset pinned: this is a test about the *secondary's* own skip, and
+        // the default offset of 1 puts the secondary on the person the
+        // primary's skip already moved to, which would test both rules at once.
+        let rotations = vec![roster(6).with_secondary_offset(3)];
         let unavailability = vec![away("p3@o2.ai", ANCHOR, ANCHOR + MICROS_PER_WEEK)];
         assert_eq!(
             on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
@@ -4578,7 +4604,10 @@ mod tests {
     /// advances one, independently, and the gap between them is not doubled.
     #[test]
     fn test_the_offset_and_the_skip_do_not_compound() {
-        let rotations = vec![roster(8)]; // offset 4
+        // Pinned for the same reason: at the default offset of 1 there is no
+        // gap left to double, so the compounding this test exists to rule out
+        // could not show up either way.
+        let rotations = vec![roster(8).with_secondary_offset(4)];
         let end = ANCHOR + MICROS_PER_WEEK;
         let unavailability = vec![away("p0@o2.ai", ANCHOR, end), away("p4@o2.ai", ANCHOR, end)];
         assert_eq!(
@@ -4645,8 +4674,8 @@ mod tests {
     #[test]
     fn test_the_resolved_slot_reports_the_offset_it_used() {
         let resolved = resolve_on_call(&[roster(10)], &[], &[], ANCHOR, TZ);
-        assert_eq!(resolved[0].next_user_email.as_deref(), Some("p5@o2.ai"));
-        assert_eq!(resolved[0].next_offset, Some(5));
+        assert_eq!(resolved[0].next_user_email.as_deref(), Some("p1@o2.ai"));
+        assert_eq!(resolved[0].next_offset, Some(1));
 
         // One person: no next, so no offset to report about it.
         let alone = resolve_on_call(&[roster(1)], &[], &[], ANCHOR, TZ);

@@ -141,13 +141,19 @@ impl EscalationTarget {
 
     /// What a page says it is going to. Read by a woken engineer, so it names
     /// the person where there is one and the role where there is not.
+    ///
+    /// **`NextOnCall` says "the secondary", not "the next on-call".** The old
+    /// wording collided with the calendar's own "Next", which names the person
+    /// taking over at the next handover — a different question with a
+    /// different answer, on a different tab, and both correct. One word per
+    /// concept: the calendar owns "next", the ladder owns "secondary".
     pub fn describe(&self) -> String {
         match self {
             Self::OnCallNow => "the on-call".to_string(),
-            Self::NextOnCall => "the next on-call".to_string(),
+            Self::NextOnCall => "the secondary".to_string(),
             Self::EveryoneOnSchedule => "everyone on the rotation".to_string(),
             Self::OnCallInSlot { slot } => format!("the {slot} on-call"),
-            Self::NextOnCallInSlot { slot } => format!("the next {slot} on-call"),
+            Self::NextOnCallInSlot { slot } => format!("the {slot} secondary"),
             Self::EveryoneInSlot { slot } => format!("everyone on the {slot} rotation"),
             Self::User { email } => email.clone(),
             Self::WholeTeam => "the whole team".to_string(),
@@ -245,7 +251,7 @@ mod tests {
     fn test_a_target_describes_itself_for_the_page() {
         assert_eq!(EscalationTarget::user("ana@o2.ai").describe(), "ana@o2.ai");
         assert_eq!(EscalationTarget::OnCallNow.describe(), "the on-call");
-        assert_eq!(EscalationTarget::NextOnCall.describe(), "the next on-call");
+        assert_eq!(EscalationTarget::NextOnCall.describe(), "the secondary");
     }
 
     /// Persisted inside the policy JSON, so the tag is a wire format.
