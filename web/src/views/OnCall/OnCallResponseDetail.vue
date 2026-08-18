@@ -180,6 +180,8 @@
                   v-if="escalation"
                   :progress="escalation"
                   :events="events"
+                  :deliveries="deliveries"
+                  :deliveries-total="deliveriesTotal"
                   :responder-role="isImpacted ? 'impacted' : 'owner'"
                 />
                 <OnCallDeliveryLedger

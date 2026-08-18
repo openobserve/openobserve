@@ -119,6 +119,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type {
+  DeliveryRecord,
   EscalationProgress,
   OnCallResponseEvent,
   ResponderRole,
@@ -132,6 +133,10 @@ const props = withDefaults(
     progress: EscalationProgress;
     /** The record's timeline, for the whole-rung-lost cross-reference. */
     events?: OnCallResponseEvent[];
+    /** The delivery ledger — the only place per-send attempts are recorded. */
+    deliveries?: DeliveryRecord[];
+    /** The ledger's exact size. `null` means unknown, which withholds the tag. */
+    deliveriesTotal?: number | null;
     /**
      * Why this team holds the record. The server always sends it; the default
      * keeps a caller that has only the progress payload rendering the owner
@@ -139,7 +144,7 @@ const props = withDefaults(
      */
     responderRole?: ResponderRole;
   }>(),
-  { events: () => [], responderRole: "owner" },
+  { events: () => [], deliveries: () => [], deliveriesTotal: null, responderRole: "owner" },
 );
 
 const { t } = useI18nTyped();
@@ -167,19 +172,37 @@ const unreachedRungs = computed(() => {
 /// apart structurally rather than by parsing the body: a reached or lost rung
 /// always writes per-send delivery entries; an empty rung writes only its
 /// page line, because there was never anyone to attempt.
-const emptyRungs = computed(() => {
-  const currentRun = Math.max(1, ...props.events.map((e) => e.ladder_run ?? 1));
-  const inRun = props.events.filter((e) => (e.ladder_run ?? 1) === currentRun);
-  const attempted = new Set(
-    inRun.filter((e) => e.kind === "delivery").map((e) => e.rung_micros ?? 0),
-  );
+///
+/// The attempts come from the **ledger**, not from `events[]`: storage keeps
+/// `delivery` out of the timeline, so reading it there found nothing and
+/// tagged every rung — including the ones that landed — as matching nobody.
+const attemptedRungs = computed(() => {
+  const currentRun = Math.max(1, ...props.deliveries.map((d) => d.ladder_run ?? 1));
   return new Set(
-    inRun
+    props.deliveries
+      .filter((d) => (d.ladder_run ?? 1) === currentRun)
+      .map((d) => d.rung_micros ?? 0),
+  );
+});
+
+/// A page of the ledger cannot prove a rung had no attempts — the missing one
+/// may be on the next page. Below that bar the tag is withheld: an unlabelled
+/// rung is a smaller wrong than one labelled "matched nobody" falsely.
+const ledgerIsWhole = computed(
+  () => props.deliveriesTotal === null || props.deliveries.length >= props.deliveriesTotal,
+);
+
+const emptyRungs = computed(() => {
+  if (!ledgerIsWhole.value) return new Set<number>();
+  const currentRun = Math.max(1, ...props.events.map((e) => e.ladder_run ?? 1));
+  return new Set(
+    props.events
       .filter(
         (e) =>
+          (e.ladder_run ?? 1) === currentRun &&
           e.kind === "page" &&
           e.delivered !== false &&
-          !attempted.has(e.rung_micros ?? 0),
+          !attemptedRungs.value.has(e.rung_micros ?? 0),
       )
       .map((e) => e.rung_micros ?? 0),
   );

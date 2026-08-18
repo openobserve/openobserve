@@ -27,10 +27,15 @@ const stubs = {
   OTimeCell: { name: "OTimeCell", template: "<span />" },
 };
 
+/// `deliveries` is a SEPARATE argument because the wire keeps them separate:
+/// `/responses/{id}` never returns a `delivery` event, so a fixture that puts
+/// one in `events[]` proves nothing the running product can reproduce.
 function render(
   progress: Partial<EscalationProgress>,
   events: unknown[] = [],
   responderRole: "owner" | "impacted" = "owner",
+  deliveries: unknown[] = [],
+  deliveriesTotal: number | null = null,
 ) {
   return mount(OnCallEscalation, {
     props: {
@@ -43,6 +48,8 @@ function render(
         ...progress,
       },
       events: events as never,
+      deliveries: deliveries as never,
+      deliveriesTotal: deliveriesTotal ?? (deliveries.length || null),
       responderRole,
     },
     global: { plugins: [i18n], stubs },
@@ -167,8 +174,11 @@ describe("OnCallEscalation", () => {
         // Rung 0: matched nobody at all — page line only, no delivery rows.
         { kind: "page", at: 1, actor: "o2-engine", body: "nobody matched on_call_now", rung_micros: 0 },
         // Rung +5m: had a person, every send failed — the lost marker.
-        { kind: "delivery", at: 2, actor: "o2-engine", body: "email to bo failed", rung_micros: 300_000_000, recipient: "bo@o2.ai", channel: "email", delivered: false },
         { kind: "page", at: 2, actor: "o2-engine", body: "could not reach bo@o2.ai", rung_micros: 300_000_000, delivered: false },
+      ],
+      "owner",
+      [
+        { kind: "delivery", at: 2, actor: "o2-engine", body: "email to bo failed", rung_micros: 300_000_000, recipient: "bo@o2.ai", channel: "email", delivered: false },
       ],
     );
     expect(wrapper.find('[data-test="oncall-escalation-rung-empty-0"]').exists()).toBe(true);
@@ -206,13 +216,29 @@ describe("OnCallEscalation", () => {
   it("puts no nobody-tag on a rung that landed", () => {
     const wrapper = render(
       { fired: [{ after_micros: 0, at: 1, targets: ["ana@o2.ai"] }] },
+      [{ kind: "page", at: 1, actor: "o2-engine", body: "paged ana@o2.ai", rung_micros: 0 }],
+      "owner",
       [
         { kind: "delivery", at: 1, actor: "o2-engine", body: "email delivered to ana", rung_micros: 0, recipient: "ana@o2.ai", channel: "email", delivered: true },
-        { kind: "page", at: 1, actor: "o2-engine", body: "paged ana@o2.ai", rung_micros: 0 },
       ],
     );
     expect(wrapper.find('[data-test="oncall-escalation-rung-empty-0"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-escalation-rung-lost-0"]').exists()).toBe(false);
+  });
+
+  /// A page of the ledger cannot prove a rung had no attempts — the missing
+  /// row may be on the next page. Withholding the tag is the smaller wrong.
+  it("withholds the nobody tag while the ledger is truncated", () => {
+    const wrapper = render(
+      { fired: [{ after_micros: 0, at: 1, targets: ["ana@o2.ai"] }] },
+      [{ kind: "page", at: 1, actor: "o2-engine", body: "paged ana@o2.ai", rung_micros: 0 }],
+      "owner",
+      [
+        { kind: "delivery", at: 9, actor: "o2-engine", body: "email to bo", rung_micros: 300_000_000, recipient: "bo@o2.ai", channel: "email", delivered: true },
+      ],
+      120,
+    );
+    expect(wrapper.find('[data-test="oncall-escalation-rung-empty-0"]').exists()).toBe(false);
   });
 
 });
