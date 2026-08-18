@@ -4120,8 +4120,8 @@
       "dbmRunMysqlDesc": "Runs both configs together. Use the same user and password you created in step 1.",
       "dbmRunMariadbDesc": "Runs both configs together. Use the same user and password you created in step 1.",
       "dbmVerifyTitle": "Database Monitoring · See deadlocks and blocked queries",
-      "dbmVerifyDesc": "Open **Traces → Databases** and pick a tab below. Events appear as soon as your database reports one — an empty tab there tells you whether nothing happened or nothing is being collected.",
-      "dbmVerifyFullDesc": "Open **Traces → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and estimated plans appear on a query's detail page. Table health fills after the first 60-second snapshot.",
+      "dbmVerifyDesc": "Open **Infra → Databases** and pick a tab below. Events appear as soon as your database reports one — an empty tab there tells you whether nothing happened or nothing is being collected.",
+      "dbmVerifyFullDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and estimated plans appear on a query's detail page on MySQL 8.0.22 and newer. Table health fills after the first 60-second snapshot.",
       "dbmDatabaseLabel": "Database",
       "dbmPgLogPathLabel": "Postgres Log File",
       "dbmPgLogPathHelp": "The collector must be able to read this file. Find it with: SHOW log_directory;",
@@ -4133,7 +4133,9 @@
       "dbmPrepareMssqlDesc": "**Everything above is complete on its own** — query timings already reach Databases from your application's traces, with no setup here. This last group adds what a trace can never see: deadlocks and blocked queries, which only the database itself records. Both grants are needed — one lets the collector read other sessions, the other lets it read the deadlock history. Run them in a SQL client, **not** your shell.",
       "dbmConfigureMssqlDesc": "Writes `dbm-config.yaml` — set the database to connect to below. SQL Server gets deadlocks and blocked queries here; activity samples, top queries and plans are not supported for SQL Server in OpenObserve yet.",
       "dbmRunMssqlDesc": "Runs both configs together. Use the same login and password you created in step 1.",
-      "dbmVerifyBlockingDesc": "Open **Traces → Databases → Blocked queries**. Sessions waiting on a lock appear as soon as one is sampled — an empty tab there tells you whether nothing is blocked or nothing is being collected."
+      "dbmVerifyBlockingDesc": "Open **Infra → Databases → Blocked queries**. Sessions waiting on a lock appear as soon as one is sampled — an empty tab there tells you whether nothing is blocked or nothing is being collected.",
+      "dbmVerifyFullSlowTableHealthDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and estimated plans appear on a query's detail page. Table health takes up to five minutes — reading table sizes gets slower as your schema grows, so it runs less often than the rest.",
+      "dbmVerifyTableHealthDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one — an empty tab there tells you whether nothing happened or nothing is being collected. Table health fills after the first 60-second snapshot."
     },
     "instrumentBeforeImportTitle": "Instrument Before Importing The Client",
     "instrumentBeforeImportBody": "If your app runs but no spans arrive, instrumentation likely loaded after the client was imported. Re-order so the init runs first:",
@@ -15241,6 +15243,18 @@
         "coverage": "{count} services seen in {traced} of the {executions} executions above. The rest came from callers you are not tracing yet.",
         "coverageUnknown": "{count} services seen in {traced} traced calls. Your database did not report a total for this statement, so there is no share to give.",
         "noneNamed": "{traced} calls were traced, but none of them could be tied back to a service — their traces start outside this time range."
+      },
+      "callersEmpty": {
+        "title": "No traced calls for this query yet",
+        "description": "Your database reported this statement, but nothing traced the application that ran it — so there is no caller to name and no individual run to open. Instrument the services that talk to this database and they appear here.",
+        "checklistTitle": "What has to be true",
+        "setUp": "Set up tracing",
+        "checks": {
+          "server": {
+            "ok": "Your database is reporting this query",
+            "okDetail": "that is where the timings on the other tabs come from"
+          }
+        }
       }
     },
     "list": {
