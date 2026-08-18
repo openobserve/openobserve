@@ -17,6 +17,7 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import EvidenceFilters from "./EvidenceFilters.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { raw } from "@/types/i18n";
 
 const VIEWS = [
@@ -53,9 +54,10 @@ describe("EvidenceFilters", () => {
     expect(w.emitted("update:wrap")?.[0]).toEqual([true]);
   });
 
-  it("marks the wrap button active when wrapping", () => {
-    expect(
-      mountFilters({ wrap: true }).find('[data-test="synthetics-evidence-wrap-btn"]').exists(),
-    ).toBe(true);
+  it("marks the wrap button active when wrapping, and only then", () => {
+    // The only OButton here is the wrap toggle, so its `active` prop is the
+    // narrowest stable signal — narrower than parsing the generated classes.
+    expect(mountFilters({ wrap: true }).findComponent(OButton).props("active")).toBe(true);
+    expect(mountFilters({ wrap: false }).findComponent(OButton).props("active")).toBe(false);
   });
 });

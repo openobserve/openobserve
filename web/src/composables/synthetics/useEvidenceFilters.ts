@@ -16,6 +16,7 @@
 import { computed, type ComputedRef, type Ref, ref } from "vue";
 import { gt, type I18nText } from "@/types/i18n";
 import {
+  EVIDENCE_GROUP_ORDER,
   evidenceGroupKind,
   type EvidenceEvent,
   type EvidenceGroup,
@@ -117,7 +118,16 @@ export function useEvidenceFilters(events: Ref<EvidenceEvent[]> | ComputedRef<Ev
     events.value
       .filter((e) => VIEW_GROUPS[view.value].includes(evidenceGroupKind(e)))
       .filter(matches)
-      .sort((a, b) => (a.initiatedTs ?? a.ts) - (b.initiatedTs ?? b.ts)),
+      .sort((a, b) => {
+        const byTime = (a.initiatedTs ?? a.ts) - (b.initiatedTs ?? b.ts);
+        // Tie-break worse-kind-first, which is what flat-mapping the folded
+        // groups used to give implicitly — otherwise simultaneous events fall
+        // in arrival order, which means nothing to the reader.
+        return byTime !== 0
+          ? byTime
+          : EVIDENCE_GROUP_ORDER.indexOf(evidenceGroupKind(a)) -
+              EVIDENCE_GROUP_ORDER.indexOf(evidenceGroupKind(b));
+      }),
   );
 
   return { view, firstPartyOnly, wrap, views, visibleEvents };

@@ -84,4 +84,17 @@ describe("useEvidenceFilters", () => {
     src.value = EVENTS;
     expect(f.visibleEvents.value).toHaveLength(3);
   });
+
+  it("tie-breaks simultaneous events worse-kind-first, not by arrival order", () => {
+    const at = (kind: EvidenceEvent["kind"], over: Partial<EvidenceEvent> = {}) =>
+      ev({ ts: 500, initiatedTs: 500, kind, ...over });
+    const f = useEvidenceFilters(
+      computed(() => [
+        at("response", { status: 200 }),
+        at("console", { level: "error", text: "x" }),
+        at("pageerror", { message: "boom" }),
+      ]),
+    );
+    expect(f.visibleEvents.value.map((e) => e.kind)).toEqual(["pageerror", "console", "response"]);
+  });
 });
