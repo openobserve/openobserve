@@ -335,6 +335,34 @@ const MARKER_WIDTH_PX = 3;
 /** Leading-edge flag for a block too narrow to position markers inside. */
 const MARKER_FLAG_WIDTH_PX = 4;
 
+/**
+ * Pixels a marker extends past its block, top and bottom.
+ *
+ * Markers used to sit inset inside the block (`0.2H` to `0.8H`), which left them
+ * wholly on an arbitrary service colour with no outline and no overhang — the one
+ * surface carrying neither of the two channels the marker vocabulary relies on
+ * (see SEVERITY_MARKER_CLASS). Overhanging puts part of every mark on the chart
+ * background, a known luminance, exactly as the waterfall tick does.
+ *
+ * 1px is what the existing layout affords and it does not collide: rows are
+ * pitched `BLOCK_HEIGHT + BLOCK_PADDING` apart, so a block owns `[y, y + 24]` and
+ * the gutter to its neighbour is 2px. A 1px overhang spans `[y - 1, y + 25]`,
+ * leaving 1px of clear gutter on each side.
+ *
+ * ROW_ORIGIN_Y exists because of this: without it the root row sits at `y = 0`
+ * and its top overhang would land at canvas `y = -1`, off the top edge. The
+ * custom series sets no `clip`, so nothing would catch that.
+ */
+const MARKER_OVERHANG_PX = 1;
+
+/**
+ * Y offset of the first row, reserving room for the root block's marker overhang.
+ *
+ * Absorbed by the `+ 20` slack already in chartContentHeight, so no other
+ * geometry moves.
+ */
+const ROW_ORIGIN_Y = MARKER_OVERHANG_PX;
+
 // Exposed for tests only — neither is part of this component's public surface.
 defineExpose({ buildSpanEventMarkers, severityColor });
 
@@ -561,7 +589,7 @@ const chartOptions = computed(() => {
           const point2 = api.coord([startX + width, 0]);
 
           const x = point1[0];
-          const y = depth * (BLOCK_HEIGHT + BLOCK_PADDING);
+          const y = ROW_ORIGIN_Y + depth * (BLOCK_HEIGHT + BLOCK_PADDING);
           const rectWidth = point2[0] - point1[0];
 
           const blockWidth = Math.max(rectWidth, MIN_BLOCK_WIDTH);
@@ -575,11 +603,11 @@ const chartOptions = computed(() => {
             type: "rect",
             shape: {
               x: x + (marker.isFlag ? 0 : (blockWidth * marker.left) / 100),
-              y: y + BLOCK_HEIGHT * 0.2,
+              y: y - MARKER_OVERHANG_PX,
               // 3px matches the DOM surfaces' `w-0.75` tick. The flag is wider
               // so it stays distinguishable from a positioned marker.
               width: marker.isFlag ? MARKER_FLAG_WIDTH_PX : MARKER_WIDTH_PX,
-              height: BLOCK_HEIGHT * 0.6,
+              height: BLOCK_HEIGHT + 2 * MARKER_OVERHANG_PX,
               r: 1,
             },
             style: {
@@ -670,7 +698,7 @@ const handleChartMouseMove = (event: any) => {
 const scrollToSpan = (spanId: string) => {
   const row = visualLayout.value.rowMap.get(spanId);
   if (row === undefined || !chartScrollRef.value) return;
-  const yPos = row * (BLOCK_HEIGHT + BLOCK_PADDING);
+  const yPos = ROW_ORIGIN_Y + row * (BLOCK_HEIGHT + BLOCK_PADDING);
   chartScrollRef.value.scrollTop = yPos;
 };
 

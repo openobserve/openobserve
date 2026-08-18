@@ -1493,6 +1493,42 @@ describe("FlameGraphView span event markers", () => {
     const flag = renderBlock(mountView(), 2).children[1];
     expect(flag.shape.width).toBe(4);
   });
+
+  // Markers used to sit inset inside the block, which left them wholly on an
+  // arbitrary service colour with no outline and no overhang — this was the one
+  // surface carrying neither channel the marker vocabulary relies on. They now
+  // overhang by 1px on each side, exactly as the waterfall tick overhangs its
+  // bar, so part of every mark lands on the chart background.
+  it("overhangs its block by 1px top and bottom", () => {
+    const group = renderBlock(mountView(), 100);
+    const block = group.children[0];
+    const marker = group.children[1];
+
+    expect(marker.shape.y).toBe(block.shape.y - 1);
+    expect(marker.shape.y + marker.shape.height).toBe(block.shape.y + block.shape.height + 1);
+  });
+
+  // The overhang has to fit the gutter it borrows from. Rows are pitched
+  // BLOCK_HEIGHT + BLOCK_PADDING apart, so a 1px overhang on each side leaves
+  // 1px of the 2px gutter clear and never reaches the neighbouring block.
+  it("keeps the overhang inside the inter-row gutter", () => {
+    const group = renderBlock(mountView(), 100);
+    const marker = group.children[1];
+    const block = group.children[0];
+    const rowPitch = 24 + 2;
+
+    const overhangEachSide = (marker.shape.height - block.shape.height) / 2;
+    expect(overhangEachSide * 2).toBeLessThan(rowPitch - block.shape.height + 1);
+  });
+
+  // The root row sits at depth 0. Without a row origin offset its top overhang
+  // would land at canvas y = -1 — off the top edge, and the custom series sets
+  // no `clip`, so nothing would catch it.
+  it("keeps the root row's overhang on the canvas", () => {
+    const marker = renderBlock(mountView(), 100).children[1];
+
+    expect(marker.shape.y).toBeGreaterThanOrEqual(0);
+  });
 });
 
 describe("FlameGraphView severity colours", () => {

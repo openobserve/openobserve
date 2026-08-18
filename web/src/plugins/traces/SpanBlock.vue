@@ -183,7 +183,11 @@ const BAR_LABEL_ABOVE_REM = "-1rem";
  *
  * Height is not part of the shared vocabulary, because it cannot transfer: the
  * sidebar mini-timeline draws into a 20px track and the flame graph into a 24px
- * block, so each surface sizes against its own geometry. Colour does transfer.
+ * block, so each surface sizes against its own geometry. Colour transfers, and
+ * so does the *fact* of overhanging — the flame graph overhangs its block by 1px,
+ * the width its inter-row gutter affords. The sidebar is the one surface that
+ * does not, because its track is a known neutral rather than a service colour,
+ * so it has nothing to escape onto.
  */
 
 export default defineComponent({
