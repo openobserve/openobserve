@@ -115,3 +115,13 @@ export const dashboardsByFolderQuery = defineQuery<[folderId: string], any[]>({
   refetchOnWindowFocus: true,
   scope: ["dashboards"],
 });
+
+/**
+ * Reactive sugar over `dashboardsByFolderQuery` for `setup()` consumers: the
+ * same cache entry and policy, only the consumption shape differs. A null
+ * folder disables the read instead of keying on a sentinel.
+ */
+export const useDashboards = (folderId: () => string | null | undefined) =>
+  dashboardsByFolderQuery.use(() => [folderId() as string], {
+    enabled: () => !!folderId(),
+  });

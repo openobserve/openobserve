@@ -62,15 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch, onMounted } from "vue";
+import { computed, defineComponent, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { getAllDashboardsByFolderId } from "@/utils/commons";
-import { useLoading } from "@/composables/useLoading";
+import { useDashboards } from "@/services/dashboards";
 
 export default defineComponent({
   name: "SelectDashboardDropdown",
@@ -88,54 +87,44 @@ export default defineComponent({
     const store: any = useStore();
     const showAddDashboardDialog: any = ref(false);
     const addDashboardRef = ref<InstanceType<typeof AddDashboard> | null>(null);
-    const dashboardList: any = ref([]);
 
     //dropdown selected dashboard id (primitive string for OSelect)
     const selectedDashboard = ref<string | null>(null);
     const { t } = useI18nTyped();
 
+    // Reactive read: mount, folderId change and refetch all flow from the key.
+    const dashboardsQuery = useDashboards(() => props.folderId as string | null);
+
+    // Newest first, matching the Vuex bridge's ordering.
+    const dashboardList = computed(() =>
+      [...(dashboardsQuery.data.value ?? [])]
+        .sort((a: any, b: any) => (b.created ?? "").localeCompare(a.created ?? ""))
+        .map((dashboard: any) => ({
+          label: dashboard.title,
+          value: dashboard.dashboard_id,
+        })),
+    );
+
     // on add dashboard, select added dashboard
     const updateDashboardList = async (dashboardId: any) => {
       showAddDashboardDialog.value = false;
-      await getDashboardList.execute();
+      await dashboardsQuery.refetch();
       selectedDashboard.value = dashboardId ?? null;
     };
 
-    // get all dashboards based on selected folderId
-    const getDashboardList = useLoading(async () => {
-      if (!props.folderId) return;
-
-      const allDashboardDataByFolderId = await getAllDashboardsByFolderId(store, props.folderId);
-
-      dashboardList.value = allDashboardDataByFolderId?.map((dashboard: any) => ({
-        label: dashboard.title,
-        value: dashboard.dashboardId,
-      }));
-
-      // select first dashboard
-      if (dashboardList.value.length > 0) {
-        selectedDashboard.value = dashboardList?.value[0]?.value ?? null;
-      } else {
-        selectedDashboard.value = null;
-      }
-
-      emit("dashboard-list-updated");
-    });
-
-    onMounted(() => {
-      getDashboardList.execute();
-    });
-
-    onActivated(() => {
-      getDashboardList.execute();
-    });
-
-    // get all dashboards based on selected folderId
+    // Each (re)load: keep a still-valid selection, else fall back to the first
+    // row — covers mount, folder switch and background revalidation alike.
     watch(
-      () => [props.folderId],
-      () => {
-        getDashboardList.execute();
+      () => dashboardsQuery.data.value,
+      (data) => {
+        if (data === undefined) return; // pending, or disabled by a null folder
+        const list = dashboardList.value;
+        if (!list.some((d: any) => d.value === selectedDashboard.value)) {
+          selectedDashboard.value = list[0]?.value ?? null;
+        }
+        emit("dashboard-list-updated");
       },
+      { immediate: true },
     );
 
     watch(
@@ -158,7 +147,7 @@ export default defineComponent({
       showAddDashboardDialog,
       addDashboardRef,
       dashboardList,
-      getDashboardList,
+      isPending: dashboardsQuery.isPending,
     };
   },
 });
