@@ -47,8 +47,15 @@ resource = Resource.create(
         "deployment.environment.name": ENV,
     }
 )
+# SPAN EXPORT IS OPT-OUT. Set WORKLOAD_TRACES=0 for a server-vantage-ONLY run:
+# the client half of the correlation proof is exactly what a "no traces" lane
+# must not produce. Without the BatchSpanProcessor the tracer provider is a
+# no-op recorder, so the instrumentors below stay installed (they also drive
+# psycopg2's connection bookkeeping) but no span ever leaves the process.
+TRACES_ON = os.environ.get("WORKLOAD_TRACES", "1").lower() not in ("0", "false", "no")
 provider = TracerProvider(resource=resource)
-provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+if TRACES_ON:
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
 trace.set_tracer_provider(provider)
 
 Psycopg2Instrumentor().instrument()
@@ -615,8 +622,22 @@ THREADS = [
     ("redis", redis_traffic),
 ]
 
+# ENGINE FILTER. WORKLOAD_ENGINES is a comma list of thread-name PREFIXES
+# ("pg", "mysql", "mariadb", "mssql", "redis"); unset means all of them, which
+# is the historical behaviour. A Postgres-only lane sets WORKLOAD_ENGINES=pg so
+# the mysql/maria/mssql/redis workers are never spawned -- their connect() would
+# otherwise fail every 30s against containers that are deliberately down, and
+# the supervisor would respawn them forever.
+_want = os.environ.get("WORKLOAD_ENGINES", "").strip()
+if _want:
+    _prefixes = tuple(w.strip() + "-" for w in _want.split(",") if w.strip())
+    THREADS = [
+        (n, f) for n, f in THREADS if n.startswith(_prefixes) or n in _want.split(",")
+    ]
+
 if __name__ == "__main__":
     log("workload starting:", ", ".join(n for n, _ in THREADS))
+    log("traces:", "on" if TRACES_ON else "OFF (server-vantage only)")
 
     # SUPERVISED START — NOT STYLE, THIS IS THE `mssql_*`-ZERO-ROWS BUG FIX.
     #

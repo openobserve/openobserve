@@ -1,0 +1,100 @@
+# OVERRIDE for the Postgres-only lane (pg-rig.sh). Applied on top of
+# docker-compose.yml; it does NOT replace it.
+#
+# WHY THIS EXISTS: LOG ROTATION.
+# The base compose sets log_rotation_age=0 + log_rotation_size=0 +
+# log_truncate_on_rotation=off, i.e. rotation fully DISABLED, while also setting
+# log_min_duration_statement=0 and auto_explain.log_min_duration=0 -- every
+# statement AND its full JSON plan, kept forever. On 2026-08-18 that had grown
+# postgresql.log to 119 GB on a host with 43 GiB free, and it broke the pipeline
+# silently: filelog/pg opened the 119 GB file at startup and never reached the
+# tail, so recipe rows and metrics kept flowing while deadlock/filelog events
+# simply never appeared in the org. A healthy-looking collector emitting no
+# events is the exact failure shape this rig exists to catch, so cap the file.
+#
+# 256 MB x truncate-on-rotation: big enough to hold plenty of context for a
+# deadlock investigation, small enough that filelog/pg always tails a live file.
+# The verbose logging itself is LEFT ON -- it is the point of the rig.
+services:
+  postgres:
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements,auto_explain
+      - -c
+      - auto_explain.log_min_duration=2s
+      - -c
+      - auto_explain.log_format=json
+      - -c
+      - auto_explain.log_analyze=on
+      - -c
+      - auto_explain.log_timing=off
+      - -c
+      - auto_explain.log_buffers=on
+      - -c
+      - auto_explain.log_nested_statements=off
+      - -c
+      - auto_explain.sample_rate=0.01
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - pg_stat_statements.max=10000
+      - -c
+      - pg_stat_statements.track_utility=on
+      - -c
+      - track_io_timing=on
+      - -c
+      - track_functions=all
+      - -c
+      - track_activity_query_size=4096
+      - -c
+      - log_lock_waits=on
+      - -c
+      - deadlock_timeout=500ms
+      - -c
+      - log_min_duration_statement=100ms
+      - -c
+      - log_destination=stderr
+      - -c
+      - logging_collector=on
+      - -c
+      - log_directory=/var/log/postgresql
+      # ---- ROTATION: the only real difference from the base compose ----------
+      # A single rotating file keeps filelog/pg's include glob (postgresql.log)
+      # matching exactly one live file, so no collector-side change is needed.
+      - -c
+      - log_filename=postgresql.log
+      - -c
+      - log_rotation_age=0
+      - -c
+      - log_rotation_size=262144   # KB -> 256 MB, then wrap
+      - -c
+      - log_truncate_on_rotation=on
+      # -----------------------------------------------------------------------
+      - -c
+      - "log_line_prefix=%m [%p] %q%u@%d app=%a vxid=%v txid=%x line=%l qid=%Q "
+      - -c
+      - compute_query_id=on
+      - -c
+      - log_statement=none
+      - -c
+      - log_autovacuum_min_duration=0
+      - -c
+      - log_checkpoints=on
+      - -c
+      # Log only spills a real operator would care about. At `0` (log EVERY
+      # temp file) this lane produced 152,919 temp_file rows in a 2.5-minute
+      # window -- 97% of ALL server-vantage data -- which buried every other
+      # signal, tripped the collector's memory limiter ("data refused due to
+      # high memory usage") and dropped the very filelog rows Slowest calls
+      # and Deadlocks are built from.
+      - log_temp_files=1MB
+      - -c
+      - max_connections=200
+      - -c
+      # The real Postgres default. Was 64kB, ~1000x smaller than production,
+      # so almost every sort spilled to disk -- an unrealistic profile that
+      # turned the exceptional temp_file event into the dominant one. The
+      # workload's large sorts still exceed 4MB and still spill, so the signal
+      # stays exercised; it is now RARE, as it is in production.
+      - work_mem=4MB
