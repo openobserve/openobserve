@@ -375,34 +375,7 @@ const useRoutes = () => {
       redirect: redirectToTraceTab("services-catalog"),
     },
     {
-      // Database Monitoring reads the database spans already inside traces, so
-      // it lives under /traces. The PARENT is gated on
-      // `database_monitoring_enabled` ALONE — there is no per-database-host
-      // SKU, and the section as a whole is not enterprise-only, so no
-      // isEnterprise conjunct belongs here or on the nav entry.
-      //
-      // A PARENT with children, because the sub-views are in-page tabs over one
-      // shared scope rather than separate destinations — so the RUNTIME-FLAG
-      // gate is written once here and inherited, instead of being repeated (and
-      // drifting) on each leaf. The BUILD-TYPE gate cannot be: only three of
-      // the children (deadlocks, blocking, table health) are enterprise-only,
-      // so those three carry their own `dbmEnterpriseGuard` beforeEnter, which
-      // runs after this one and bounces an OSS reader to `dbmDatabases`.
-      //
-      // The parent's component is a BARE host: a `<router-view>` wrapped in one
-      // `<keep-alive>`, and nothing else. It contributes no header, no layout
-      // and no DOM, so the reason this parent previously had no component at
-      // all still holds — each page renders its own OPageLayout, and a shell
-      // that added a header would nest two of them and push the child's header
-      // down (the bug documented at Functions.vue:18-22).
-      //
-      // It exists because `meta.keepAlive` below was inert without it. The flag
-      // was set on every child and read by nobody: with no parent component
-      // there was no `<router-view>` to wrap, so each tab switch destroyed the
-      // outgoing page and remounted the incoming one, re-running its fan-out
-      // and discarding its filters and sort. Same pattern as RUM's
-      // RealUserMonitoring.vue.
-      path: "traces/databases",
+      path: "infra/databases",
       component: DbmShell,
       beforeEnter(to: any, from: any, next: any) {
         if (!dbMonitoringEnabled()) {
@@ -495,6 +468,18 @@ const useRoutes = () => {
           },
         },
       ],
+    },
+    {
+      // Database Monitoring moved from `traces/databases` to `infra/databases`.
+      // Every old link keeps working: the wildcard carries the tab segment
+      // (`queries`, `deadlocks`, `table-health`, …) and the `query` object is
+      // forwarded, so a permalink's scope filters and time range survive the
+      // hop rather than dumping the reader on an unfiltered Databases tab.
+      path: "traces/databases/:dbmPath(.*)*",
+      redirect: (to: any) => ({
+        path: `/infra/databases${to.params.dbmPath?.length ? `/${[to.params.dbmPath].flat().join("/")}` : ""}`,
+        query: to.query,
+      }),
     },
     {
       path: "traces/trace-details",

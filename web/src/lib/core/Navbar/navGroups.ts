@@ -62,7 +62,7 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
  *     Billings, AI, IAM, Management).
  *   • link + subnav — a tile that navigates to a main page on click AND surfaces
  *     a section nav on hover. Produced by NAV_GROUPS (Reliability → /alerts,
- *     Data → /streams, Dashboards → /dashboards, Infra → /traces/databases) and
+ *     Data → /streams, Dashboards → /dashboards, Infra → /infra/databases) and
  *     by any NAV_SUBNAV entry.
  *   • pure group    — a flyout with no page of its own (click toggles it).
  *     Supported by the renderer but not emitted by any current entry.
@@ -232,7 +232,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     // The tile lands on Database Monitoring — today its only destination, and
     // the one that stays correct as the section grows, since a new Infra page
     // would be added after it rather than in front of it.
-    parentLink: "/traces/databases",
+    parentLink: "/infra/databases",
     // Nothing to absorb: Infra is a NEW rail section, not a fold of existing
     // tiles. Database Monitoring only ever lived inside the Traces flyout, so
     // no top-level item disappears when Infra appears — hence `standalone`,

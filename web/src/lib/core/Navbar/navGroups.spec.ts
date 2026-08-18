@@ -373,7 +373,10 @@ describe("groupNavLinks", () => {
     const infra = infraGroup(entries);
     expect(infra).toBeTruthy();
     // Clicking the tile lands on Database Monitoring — Infra's only destination.
-    expect(infra?.item.link).toBe("/traces/databases");
+    // Under `/infra/`, not the `/traces/` prefix it shipped with: the section
+    // is Infra's, and the URL now agrees with the rail. `/traces/databases`
+    // still resolves via the redirect registered in router.ts.
+    expect(infra?.item.link).toBe("/infra/databases");
     expect(infra?.children.map((c) => c.name)).toEqual(["dbmDatabases"]);
   });
 
