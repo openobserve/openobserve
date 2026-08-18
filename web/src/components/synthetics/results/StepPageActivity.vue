@@ -101,6 +101,17 @@ const countLabel = computed(() =>
   t("synthetics.runDetail.pageActivityEvents", { count: props.events.length }),
 );
 
+/** The step HAS events, but the current view/first-party filter matched none. */
+const filteredEmpty = computed(
+  () => props.events.length > 0 && filters.visibleEvents.value.length === 0,
+);
+
+/** Same recovery as the panel: back to the full, unfiltered bucket. */
+function clearFilters() {
+  filters.view.value = "all";
+  filters.firstPartyOnly.value = false;
+}
+
 const isLoading = computed(() => props.status === "idle" || props.status === "loading");
 
 /**
@@ -137,9 +148,9 @@ function reloadPage() {
     stop the divider short of the edges.
 
     Not a disclosure. It was one, and the collapse never earned its cost: the
-    section defaults open, the body is height-capped below, and the trigger being
-    a <button> forced the section's own action into the body where it read as a
-    row of the list rather than as the header's action.
+    section defaults open, the body pages itself rather than scrolling, and the
+    trigger being a <button> forced the section's own action into the body
+    where it read as a row of the list rather than as the header's action.
   -->
   <section
     class="card-container rounded-default border-border-default bg-card-glass-bg flex flex-col overflow-hidden border"
@@ -245,6 +256,18 @@ function reloadPage() {
       </p>
 
       <template v-else>
+        <!-- X-8.2: reduced fidelity is reported, same wording and affordance as
+             the panel — a silently short list reads as a quiet run, which is
+             the opposite of what a truncated capture means. -->
+        <div
+          v-if="truncated"
+          class="rounded-default border-status-warning-text/30 border p-2 text-xs"
+          data-test="synthetics-step-page-activity-truncated"
+        >
+          <OIcon name="warning" size="xs" class="text-status-warning-text mr-1" />
+          {{ t("synthetics.evidence.truncated") }}
+        </div>
+
         <EvidenceFilters
           v-model:view="filters.view.value"
           v-model:first-party-only="filters.firstPartyOnly.value"
@@ -259,8 +282,10 @@ function reloadPage() {
           <EvidenceEvents
             :events="filters.visibleEvents.value"
             mode="inline"
+            :filtered="filteredEmpty"
             :origin-ts="originTs"
             :wrap="filters.wrap.value"
+            @clear-filters="clearFilters"
           />
         </div>
       </template>

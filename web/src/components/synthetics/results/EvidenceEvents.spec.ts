@@ -277,6 +277,28 @@ describe("EvidenceEvents", () => {
     expect(stepText()).toEqual(["Apple pay", "Mango lassi", "Zebra crossing"]);
   });
 
+  it("actually reorders rows when the Status header is clicked, inline", async () => {
+    // Non-sorted to start, so a working sort visibly moves rows rather than
+    // leaving an order that happened to already match. Inline, because the
+    // only prior behavioural sort test drove a column (Step) inline does not
+    // have — elapsed/type/status/duration had zero behavioural coverage.
+    const w = mountEvents({
+      events: [ev({ status: 500 }), ev({ status: 200 }), ev({ status: 404 })],
+      mode: "inline",
+    });
+    const statusText = () =>
+      w.findAll('[data-test="synthetics-evidence-events-status"]').map((c) => c.text());
+    expect(statusText()).toEqual(["500", "200", "404"]);
+
+    await w
+      .find('[data-test="o2-table-th-status"] [data-test="o2-table-th-sort-trigger"]')
+      .trigger("click");
+
+    // TanStack infers a numeric column as sort-desc-first, unlike the string
+    // Step column above — still a visible reorder of the un-sorted input.
+    expect(statusText()).toEqual(["500", "404", "200"]);
+  });
+
   it("labels the footer count instead of leaving a bare number", () => {
     expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("footerTitle")).toBeTruthy();
   });
@@ -323,6 +345,13 @@ describe("EvidenceEvents", () => {
     const msg = cols.find((c) => c.id === "message");
     expect(msg?.meta?.autoWidth).toBe(true);
     expect(msg?.meta?.fillRemaining).toBe(true);
+  });
+
+  it("floors the message column so a narrow card scrolls instead of collapsing it", () => {
+    // A filler with no minSize defaults to 48px (useTableCore) and shrinks to a
+    // sliver on the step card, which is narrower than the panel.
+    const cols = mountEvents().findComponent(OTable).props("columns") as Array<Record<string, any>>;
+    expect(cols.find((c) => c.id === "message")?.minSize).toBe(200);
   });
 
   it("scrolls horizontally rather than squeezing columns at narrow widths", () => {

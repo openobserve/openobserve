@@ -20,6 +20,7 @@ import i18n from "@/locales";
 import StepPageActivity from "./StepPageActivity.vue";
 import EvidenceEvents from "./EvidenceEvents.vue";
 import EvidenceFilters from "./EvidenceFilters.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { EvidenceEvent } from "@/composables/synthetics/syntheticResultsSchema";
 
 const ev = (over: Partial<EvidenceEvent> = {}): EvidenceEvent => ({
@@ -144,5 +145,48 @@ describe("StepPageActivity", () => {
     const text = w.find('[data-test="synthetics-step-page-activity-empty"]').text();
     expect(text).toContain("No events in this step's window.");
     expect(text).not.toContain("0 events were not attributed");
+  });
+
+  it("reports a truncated capture, the same notice the panel gives", () => {
+    // A silently short list reads as a quiet run — the opposite of what a
+    // truncated capture means. Same i18n key and data-test convention as
+    // EvidencePanel's own notice.
+    const w = mountActivity({ events: manyEvents(2), truncated: true });
+    expect(w.find('[data-test="synthetics-step-page-activity-truncated"]').exists()).toBe(true);
+  });
+
+  it("stays silent about truncation when the capture was not cut", () => {
+    const w = mountActivity({ events: manyEvents(2), truncated: false });
+    expect(w.find('[data-test="synthetics-step-page-activity-truncated"]').exists()).toBe(false);
+  });
+
+  it("flags the table's empty state as filtered, not as a quiet step, when a filter matches nothing", async () => {
+    // First-party only, on a step whose events are all third-party: the header
+    // still says events exist, so the table must say "no MATCHES", not "no
+    // events" — and offer a way out.
+    const w = mountActivity({
+      events: [ev({ firstParty: false }), ev({ firstParty: false })],
+    });
+    await w.findComponent(OCheckbox).vm.$emit("update:modelValue", true);
+    expect(w.findComponent(EvidenceEvents).props("filtered")).toBe(true);
+  });
+
+  it("does not flag the empty state as filtered when the step genuinely has no events", () => {
+    const w = mountActivity({ events: [] });
+    expect(w.findComponent(EvidenceEvents).exists()).toBe(false);
+  });
+
+  it("clears the view and first-party filters when the table asks to", async () => {
+    const w = mountActivity({
+      events: [ev({ firstParty: false }), ev({ firstParty: false })],
+    });
+    await w.findComponent(OCheckbox).vm.$emit("update:modelValue", true);
+    expect(w.findComponent(EvidenceEvents).props("events")).toHaveLength(0);
+
+    w.findComponent(EvidenceEvents).vm.$emit("clear-filters");
+    await w.vm.$nextTick();
+
+    expect(w.findComponent(EvidenceEvents).props("events")).toHaveLength(2);
+    expect(w.findComponent(EvidenceEvents).props("filtered")).toBe(false);
   });
 });

@@ -132,6 +132,9 @@ const columns = computed<OTableColumnDef<EvidenceRow>[]>(() => [
     id: "message",
     header: t("synthetics.evidence.colMessage"),
     size: 200,
+    // A filler with no floor collapses to OTable's 48px default before the
+    // table starts scrolling — set one so it scrolls instead of collapsing.
+    minSize: 200,
     // Bounded elastic: absorbs the leftover and ellipsises, so the table fits
     // its container and only the FIXED columns can force a horizontal scroll.
     meta: { autoWidth: true, fillRemaining: true },
