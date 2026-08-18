@@ -161,8 +161,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
           <div v-else class="flex min-w-0 flex-col gap-px">
-            <span class="text-text-heading text-compact truncate font-semibold">
+            <span
+              v-if="row.db_instance"
+              class="text-text-heading text-compact truncate font-semibold"
+            >
               {{ row.db_instance }}
+            </span>
+            <!-- An engine-only fleet row: the statement feed proved this engine
+                 exists but named no host. Saying so beats a blank name line. -->
+            <span
+              v-else
+              class="text-text-label text-compact truncate italic"
+              data-test="dbm-databases-unnamed-instance"
+            >
+              {{ t("dbm.databases.unnamedInstance") }}
+              <OTooltip side="bottom" :content="t('dbm.databases.unnamedInstanceHint')" />
             </span>
             <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
@@ -540,14 +553,6 @@ const neverAggregated = ref(false);
  * one.
  */
 const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
-
-/**
- * W4/W4b. Off by default: the join costs a second read across up to eight
- * metric streams per page load, so nobody acquires it by upgrading.
- */
-const instanceMetricsEnabled = computed(() =>
-  Boolean(store.state.zoConfig?.database_monitoring_instance_metrics),
-);
 
 /** What the receiver said, keyed by `(system, host)`. Empty until it answers. */
 const instanceMetrics = ref<Map<string, DbmInstanceMetricSet>>(new Map());
@@ -1008,22 +1013,21 @@ watch(expandedIds, () => fillOpenBreakdowns());
 
 /**
  * Every instance the SERVER vantage has named, read off the shell's shared
- * badge snapshot — the activity and blocking samples are `dbm_server` rows and
- * each carries the instance it was sampled on. No new request: the shell
- * already paid for these to draw the tab badges, and a second read over the
- * same window could disagree with the badge beside it.
+ * badge snapshot. The snapshot derives the list once, from every
+ * `dbm_server`-fed member it holds — activity samples, blocking samples, and
+ * the zero-trace fallback's statement lists — and the fallback tab badge
+ * counts the SAME list, so the tile over this table and the badge beside it
+ * cannot disagree. No new request: the shell already paid for these to draw
+ * the badges, and a second read over the same window could disagree with them.
  *
  * Identity only. The union must not carry any figure from these rows onto the
  * overview — the server vantage measured no query traffic, and the fleet union
- * marks what it adds as `trafficless` for exactly that reason.
+ * marks what it adds as `trafficless` for exactly that reason. A statement row
+ * names its engine but no host; the union degrades it to one engine-only row.
  */
-const serverKnownInstances = computed<DbmServerInstanceRef[]>(() => {
-  const counts = tabCountsContext.counts.value;
-  return [...counts.sessions, ...counts.blockingSamples].map((row) => ({
-    db_system: row.db_system,
-    db_instance: row.db_instance,
-  }));
-});
+const serverKnownInstances = computed<DbmServerInstanceRef[]>(
+  () => tabCountsContext.counts.value.serverInstanceRefs,
+);
 
 // The shell's fan-out lands on its own schedule — often after this page's own
 // read. Rebuild the union when it does, so server-known instances appear
@@ -1051,10 +1055,6 @@ const applyInstanceMetrics = () => {
   rows.value = unionFleetRows(hits, instanceMetrics.value, {
     failedStreams: failedMetricStreams.value,
     system: systemFilter.value,
-    // Only this page knows the read never happened. Without it every row on a
-    // default install reads as "your collector sent no metric", which accuses a
-    // receiver that was never asked and sends the reader to debug nothing.
-    enabled: instanceMetricsEnabled.value,
     // The instances the SERVER vantage knows, from data the shell already
     // fetched for the tab badges. This is what keeps the overview honest for
     // the user who wired up collector recipes but has no APM: their fleet is
@@ -1153,7 +1153,7 @@ const metricStreamFields = async (
  * the page is exactly what it is today.
  */
 const loadInstanceMetrics = async (token: number) => {
-  if (!org.value || !instanceMetricsEnabled.value) return;
+  if (!org.value) return;
   const window = { startTime: current.value.startTime, endTime: current.value.endTime };
   // Ask the (session-cached) stream catalog which of the eight metric streams
   // exist before sweeping, so a deployment carrying two of them fires two

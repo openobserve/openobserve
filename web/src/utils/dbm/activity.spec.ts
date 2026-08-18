@@ -1305,12 +1305,12 @@ describe("activityEmptyCause", () => {
   });
 
   /**
-   * THE DEFAULT DEPLOYMENT, and the reason this function takes the breakdown at
-   * all. `ZO_DB_MONITORING_ACTIVITY_ENABLED` ships OFF, so a cluster with the
-   * deadlock recipes running has records in `dbm_server` — the liveness probe
-   * counts records of ANY kind, so `not_collecting` comes back FALSE — while no
-   * activity row has ever been written and the breakdown SQL is skipped
-   * entirely for want of the columns.
+   * The reason this function takes the breakdown at all: a cluster running
+   * only the deadlock recipes — no session sampler in its collector config —
+   * has records in `dbm_server` (the liveness probe counts records of ANY
+   * kind, so `not_collecting` comes back FALSE) while no activity row has ever
+   * been written and the breakdown SQL is skipped entirely for want of the
+   * columns.
    *
    * Reading only `not_collecting` there reports "no active sessions, all good"
    * on a database nobody is sampling. That is the exact lie the healthy state

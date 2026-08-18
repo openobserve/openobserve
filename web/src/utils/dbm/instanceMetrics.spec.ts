@@ -25,6 +25,8 @@ import {
   foldMetricRows,
   instanceIdentityKey,
   mergeInstanceMetrics,
+  metricSystemFor,
+  metricsForSet,
   normalizeInstanceHost,
   receiverHostOf,
   unmatchedReason,
@@ -1259,56 +1261,67 @@ describe("unmatchedReason", () => {
   });
 });
 
-// ── the join switched off ────────────────────────────────────────────────────
-//
-// `ZO_DB_MONITORING_INSTANCE_METRICS` defaults off, so on a fresh install the
-// page never reads a metric stream. Folding that into `no-data` would render
-// as "your collector reports this instance but sent no reading" — an
-// accusation aimed at a receiver that was never asked. The two claims send the
-// reader to fix entirely different things, so the merge has to tell them
-// apart, and only the caller knows which one it is.
-
-describe("mergeInstanceMetrics when the join is switched off", () => {
-  it("reports disabled rather than no-data, so the cell can name the knob", () => {
-    const [row] = mergeInstanceMetrics([totalsRow()], new Map(), { enabled: false });
-    expect(row.metrics?.state).toBe("disabled");
-  });
-
-  it("accuses nothing about the instance itself", () => {
-    const [row] = mergeInstanceMetrics([totalsRow()], new Map(), { enabled: false });
-    expect(row.metrics).toEqual({
-      state: "disabled",
-      saturation: { state: "absent", used: null, limit: null, ratio: null },
-      cacheHitRatio: null,
-      replicationLag: null,
-      deadlocks: null,
-      connectionSeries: [],
-      connectionPoints: [],
-      unmatchedReason: null,
-    });
-  });
-
-  // The knob being ON with an empty read is a different fact: something was
-  // asked and nothing came back.
-  it("still reports no-data when the join is on and the read produced nothing", () => {
-    const [row] = mergeInstanceMetrics([totalsRow()], new Map(), { enabled: true });
-    expect(row.metrics?.state).toBe("no-data");
-  });
-
-  // Every existing caller omits the flag. Defaulting it to "off" would relabel
-  // every no-data row in the product as a configuration problem.
-  it("treats an unstated flag as the join being on, as every existing caller assumes", () => {
+describe("mergeInstanceMetrics with an empty read", () => {
+  // The per-signal join knob is gone: with DBM enabled the read always runs,
+  // so an empty result can only mean something was asked and nothing came
+  // back — `no-data`, never a state that blames a setting.
+  it("reports no-data when the read produced nothing", () => {
     const [row] = mergeInstanceMetrics([totalsRow()], new Map());
     expect(row.metrics?.state).toBe("no-data");
   });
+});
 
-  // The flag says the read never happened, so nothing could have matched and
-  // nothing could have failed. Both of those readings would be fabrications.
-  it("reports disabled even when a stream is listed as failed", () => {
-    const [row] = mergeInstanceMetrics([totalsRow()], new Map(), {
-      enabled: false,
-      failedStreams: ["postgresql_backends"],
+// ── MariaDB rides the mysql metric streams ───────────────────────────────────
+//
+// No mariadb receiver exists upstream: a MariaDB server is scraped by the
+// MYSQL receiver pointed at it, so its readings land in the mysql streams
+// under the mysql identity. Without the alias, every MariaDB row rendered a
+// permanently empty health column while the metrics sat one key away.
+describe("the MariaDB metric-system alias", () => {
+  const mariaMetrics = () =>
+    new Map([
+      [
+        "mysql|maria-1",
+        {
+          connections: { latest: 7, series: [7], points: [{ timestamp: 1, value: 7 }] },
+        },
+      ],
+    ]);
+
+  it("maps mariadb to mysql and leaves every other engine alone", () => {
+    expect(metricSystemFor("mariadb")).toBe("mysql");
+    expect(metricSystemFor(" MariaDB ")).toBe("mysql");
+    expect(metricSystemFor("mysql")).toBe("mysql");
+    expect(metricSystemFor("postgresql")).toBe("postgresql");
+    expect(metricSystemFor(null)).toBe("");
+  });
+
+  it("matches a mariadb client row to metrics the mysql receiver reported", () => {
+    const [row] = mergeInstanceMetrics(
+      [totalsRow({ db_system: "mariadb", db_instance: "maria-1" })],
+      mariaMetrics(),
+    );
+    expect(row.metrics?.state).toBe("matched");
+    expect(row.metrics?.saturation.used).toBe(7);
+  });
+
+  it("reads mariadb replication lag in mysql units — seconds, not WAL bytes", () => {
+    const metrics = metricsForSet("mariadb", {
+      replicationLag: { latest: 4, series: [4], points: [{ timestamp: 1, value: 4 }] },
     });
-    expect(row.metrics?.state).toBe("disabled");
+    expect(metrics.replicationLag).toEqual({ value: 4, unit: "seconds" });
+  });
+
+  it("diagnoses an unmatched mariadb row against the mysql keys, not a missing receiver", () => {
+    // The mysql receiver IS reporting (another host), so the likely cause is
+    // a pooler between the client and the server — the same verdict a mysql
+    // row would get. "no-receiver" would send the reader to install a
+    // mariadb receiver that does not exist.
+    const [row] = mergeInstanceMetrics(
+      [totalsRow({ db_system: "mariadb", db_instance: "maria-2" })],
+      mariaMetrics(),
+    );
+    expect(row.metrics?.state).toBe("unmatched");
+    expect(row.metrics?.unmatchedReason).toBe("pooler");
   });
 });

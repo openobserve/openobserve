@@ -116,22 +116,21 @@ describe("mysqlCard builder", () => {
   });
 
   /**
-   * THE v0.148.0 EVENTS BLOCK, SHIPPED OFF — see the Postgres spec for the full
-   * story: both events are opt-in on both sides (default-OFF upstream since
-   * v0.148.0, and discarded by the server unless the matching
-   * `ZO_DB_MONITORING_*_ENABLED` flag is set), so the recipe ships them off and
-   * the card's copy names the pairing. The block itself must still be present
-   * and top-level, where nesting it deeper is a fatal config error.
+   * THE v0.148.0 EVENTS BLOCK, SHIPPED ON — upstream flipped both events to
+   * default-OFF at v0.148.0, so the block is the switch that turns collection
+   * on, and the server now accepts both feeds whenever Database Monitoring is
+   * enabled (the per-signal `ZO_DB_MONITORING_*_ENABLED` knobs are gone, so
+   * there is no second switch to pair). The block itself must be present and
+   * top-level, where nesting it deeper is a fatal config error.
    */
-  it("ships the receiver's activity and top-query events off, matching the server defaults", () => {
+  it("ships the receiver's activity and top-query events on, spelled out", () => {
     const card = mysqlCard(SUBS);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
     expect(config).toContain("mysql/dbm_events:");
-    expect(config).toContain("db.server.query_sample: { enabled: false }");
-    expect(config).toContain("db.server.top_query: { enabled: false }");
-    expect(config).not.toContain("enabled: true }");
+    expect(config).toContain("db.server.query_sample: { enabled: true }");
+    expect(config).toContain("db.server.top_query: { enabled: true }");
     // MySQL spells it top_query_count (postgres says top_n_query), and rejects
     // max_rows_per_query inside top_query_collection — verified at v0.158.0,
     // where an unknown key is a fatal config error.
@@ -151,11 +150,12 @@ describe("mysqlCard builder", () => {
     const eventsProcessors = config.match(/logs\/dbm_events:[\s\S]*?processors: \[([^\]]+)\]/)![1];
     expect(eventsProcessors).not.toContain("filter/dbm");
 
-    // Same as the Postgres card: shipping the feeds off is only honest if the
-    // step's own note names BOTH switches a user has to flip to turn one on.
-    expect(configure.note).toContain("ZO_DB_MONITORING_ACTIVITY_ENABLED");
-    expect(configure.note).toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
-    expect(configure.note).toMatch(/enabled: false/);
+    // Same as the Postgres card: with the server always accepting the feeds,
+    // prescribing an environment variable would send the user to set a knob
+    // that no longer exists. The note states the block is the one switch.
+    expect(configure.note).not.toContain("ZO_DB_MONITORING_ACTIVITY_ENABLED");
+    expect(configure.note).not.toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
+    expect(configure.note).toMatch(/enabled: true/);
 
     // The verify step now promises the Activity and Table health tabs too.
     const verify = card.steps.find((s) => s.id === "verify-dbm")!;

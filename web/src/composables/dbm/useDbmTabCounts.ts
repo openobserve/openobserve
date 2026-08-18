@@ -124,6 +124,7 @@ import dbMonitoringService, {
 } from "@/services/db_monitoring";
 import type { DbmRange } from "@/composables/dbm/useDbmScope";
 import { activitySampleTotal } from "@/utils/dbm/activity";
+import { dedupeServerInstanceRefs, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { countClaim, overlapClaim, type DbmCountClaim } from "@/utils/dbm/format";
 
 /**
@@ -192,6 +193,16 @@ export interface DbmTabCounts {
   sessions: ActivitySession[];
   /** The blocking samples, for the high-impact-blocker rule. As `sessions`. */
   blockingSamples: BlockingSample[];
+  /**
+   * Every (engine, instance) identity the SERVER vantage named this window,
+   * deduplicated — from the activity and blocking samples AND, when the
+   * zero-trace fallback fired, the database-reported statement lists. The
+   * Overview's fleet union renders these, and the fallback `databaseCount`
+   * below is their length: one list, so the tile and the badge cannot
+   * disagree. A statement-list row names its engine but no instance; the
+   * dedupe degrades it to one engine-only ref (see `dedupeServerInstanceRefs`).
+   */
+  serverInstanceRefs: DbmServerInstanceRef[];
 }
 
 /**
@@ -213,6 +224,7 @@ export const emptyDbmTabCounts = (): DbmTabCounts => ({
   activityStates: [],
   sessions: [],
   blockingSamples: [],
+  serverInstanceRefs: [],
 });
 
 /**
@@ -358,6 +370,7 @@ export const fetchDbmTabCounts = async (
     activityStates: activity ? (activity.by_state ?? []) : [],
     sessions: activity ? (activity.hits ?? []) : [],
     blockingSamples: blocking ? (blocking.hits ?? []) : [],
+    serverInstanceRefs: [],
   };
 
   // ── The zero-trace fallback ────────────────────────────────────────────────
@@ -373,9 +386,25 @@ export const fetchDbmTabCounts = async (
   // envelope: present-and-null means fired-and-failed, absent means the
   // condition never fired.
   const fallbackFired = "server_queries" in badges || "server_samples" in badges;
+  const sq = badges.server_queries ?? null;
+  const ss = badges.server_samples ?? null;
+
+  // Every identity the server vantage names, from ALL four `dbm_server`-fed
+  // members, deduplicated onto the fleet union's own grain. The Overview page
+  // renders exactly this list as its server-known instances, and the fallback
+  // `databaseCount` below is its length — one derivation, so the Databases
+  // tile and the tab badge agree by construction. (Before this, the tile read
+  // only sessions + blocking samples — both empty on an OSS build, where
+  // `/blocking` is a 403 stub — and showed 0 while the badge counted the
+  // statement lists.)
+  counts.serverInstanceRefs = dedupeServerInstanceRefs([
+    ...counts.sessions,
+    ...counts.blockingSamples,
+    ...(sq?.hits ?? []),
+    ...(ss?.hits ?? []),
+  ]);
+
   if (fallbackFired) {
-    const sq = badges.server_queries ?? null;
-    const ss = badges.server_samples ?? null;
     // The same claims the fallback pages put on their own badges: the list
     // length with the cap disclosed — a full page renders `50+`, never the
     // cap as a total. An empty server answer leaves the honest client zero.
@@ -393,26 +422,12 @@ export const fetchDbmTabCounts = async (
     // print it; a `null` member (fired-and-failed) still claims nothing.
     if (sq && !sq.hits?.length) counts.queryCount = countClaim(0, false, "server");
     if (ss && !ss.hits?.length) counts.sampleCallsCount = countClaim(0, false, "server");
-    // Overview: identity only, no request at all — distinct instances the
-    // server vantage NAMES, from rows already in hand (the same sources the
-    // fleet page's own union reads). This can undercount an instance known
-    // only to the metric streams; the Overview page's own exact union
-    // overrides this the moment it loads.
-    if (counts.databaseCount === 0) {
-      const named = new Set<string>();
-      for (const row of [
-        ...counts.sessions,
-        ...counts.blockingSamples,
-        ...(sq?.hits ?? []),
-        ...(ss?.hits ?? []),
-      ]) {
-        const { db_system, db_instance } = row as {
-          db_system?: string | null;
-          db_instance?: string | null;
-        };
-        if (db_system || db_instance) named.add(`${db_system ?? ""}|${db_instance ?? ""}`);
-      }
-      if (named.size) counts.databaseCount = named.size;
+    // Overview: identity only, no request at all — the SAME deduplicated ref
+    // list the fleet union renders, so this badge counts the rows the tile
+    // counts. It can undercount an instance known only to the metric streams;
+    // the Overview page's own exact union overrides this the moment it loads.
+    if (counts.databaseCount === 0 && counts.serverInstanceRefs.length) {
+      counts.databaseCount = counts.serverInstanceRefs.length;
     }
   }
 

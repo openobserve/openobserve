@@ -724,36 +724,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
 
-            <!-- The stream HAS plan history, so `plan_capture` says `on`, but both
-             ingest knobs are off server-side and nothing new can land. Without
-             this branch the sentence below claimed we were capturing plans for
-             this database and blamed the statement for an absent feed. -->
-            <template v-else-if="planEmpty === 'captureKnobOff'">
-              <DbmStateNote
-                :title="t('dbm.detail.plans.captureSwitchedOff')"
-                :hint="t('dbm.detail.plans.captureSwitchedOffHint')"
-                placement="centered"
-                data-test="dbm-detail-plans-knob-off"
-              />
-            </template>
-
             <template v-else-if="planEmpty === 'noPlanForQuery'">
               <DbmStateNote
                 :title="t('dbm.detail.plans.noPlanForQuery')"
                 :hint="t('dbm.detail.plans.noPlanForQueryHint')"
                 placement="centered"
-              />
-            </template>
-
-            <!-- Good news, not a gap: executed-plan capture is on and running, and
-             no execution of this query was slow enough to be captured. Must
-             never read as a config error. -->
-            <template v-else-if="planEmpty === 'noExecutionCaptured'">
-              <DbmStateNote
-                :title="t('dbm.detail.plans.noExecutionCaptured')"
-                :hint="t('dbm.detail.plans.noExecutionCapturedHint')"
-                placement="centered"
-                data-test="dbm-detail-plans-not-slow"
               />
             </template>
 
@@ -1396,21 +1371,6 @@ const traceVantage = computed(() =>
 const planDrift = ref<PlanDriftLevel>("none");
 /** Why the section is empty, when it is — see `planEmptyReason`. */
 const planEmpty = ref<ReturnType<typeof planEmptyReason>>("captureOff");
-/**
- * The top-query ingest knob, default OFF, read from `zoConfig` the way the
- * Databases page reads `database_monitoring_instance_metrics`.
- *
- * Needed because the response's `plan_capture` is derived from the stream
- * SCHEMA, so it stays `on` after the knob is switched back off — and the empty
- * state was then telling a reader "we're capturing plans for this database"
- * over a feed that is switched off. The OTHER producer's knob does not come
- * from here: the plans response already reports it per-request as
- * `explain_enabled`, which is the authoritative value the section already
- * branches on, so `planEmptyReason` takes it from the payload.
- */
-const topQueryEnabled = computed(
-  () => store.state.zoConfig?.database_monitoring_top_query_enabled as boolean | undefined,
-);
 const plansError = ref<string | null>(null);
 /**
  * Anchor for the promoted drift callout's "View plans" jump. A component ref
@@ -2655,9 +2615,7 @@ const loadQueryInsights = async (token: number = requestSeq.current()) => {
     if (data.plans) {
       plans.value = planRows(data.plans);
       planDrift.value = planDriftLevel(data.plans);
-      planEmpty.value = planEmptyReason(data.plans, {
-        topQueryEnabled: topQueryEnabled.value,
-      });
+      planEmpty.value = planEmptyReason(data.plans);
     } else {
       plansError.value = t("dbm.common.loadFailed");
       plans.value = [];

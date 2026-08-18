@@ -44,18 +44,15 @@
  *
  * A server-known instance carries only what its vantage measured — its
  * identity. Its metrics cell goes through the same resolver a client row's
- * does, so it states why the metrics read has nothing (`disabled`, `no-data`,
- * `unmatched`) rather than fabricating a figure. And with the metrics join
- * switched off (`context.enabled === false`) the metric streams contribute no
- * instances — that read never ran — but server-known instances still appear,
- * because their discovery never depended on it; their health column says
- * `disabled`, which is the truth about the read that was never made.
+ * does, so it states why the metrics read has nothing (`no-data`, `unmatched`)
+ * rather than fabricating a figure.
  */
 
 import type { DbTotalsRow } from "@/services/db_monitoring";
 
 import {
   instanceIdentityKey,
+  metricSystemFor,
   metricsForSet,
   resolveRowMetrics,
   splitIdentityKey,
@@ -81,6 +78,49 @@ export interface DbmServerInstanceRef {
   db_system?: string | null;
   db_instance?: string | null;
 }
+
+/**
+ * The distinct instances a set of `dbm_server` rows names, deduplicated onto
+ * the union's own identity grain.
+ *
+ * An ENGINE-ONLY ref — a row carrying `db_system` but no `db_instance`, which
+ * is what the statement-log feed produces today — collapses into any NAMED
+ * ref of the same engine: those statements almost certainly ran on one of the
+ * named instances, and a second "engine, unnamed" row beside them would count
+ * a database nobody can point at. An engine with NO named ref keeps one
+ * engine-only entry, because it is the only evidence that engine exists at
+ * all. A row naming no engine identifies nothing the fleet can render, and is
+ * dropped.
+ *
+ * This list is built ONCE, in the shared badge fold (`useDbmTabCounts`), and
+ * consumed by both the tab badge and the Overview's fleet union — the tile and
+ * the badge count the same identities by construction, not by coincidence.
+ */
+export const dedupeServerInstanceRefs = (
+  rows: readonly DbmServerInstanceRef[],
+): DbmServerInstanceRef[] => {
+  const named = new Map<string, DbmServerInstanceRef>();
+  const engineOnly = new Map<string, DbmServerInstanceRef>();
+  for (const row of rows) {
+    const engine = (row.db_system ?? "").trim().toLowerCase();
+    if (!engine) continue;
+    const key = instanceIdentityKey(row.db_system, row.db_instance);
+    if (key) {
+      if (!named.has(key)) {
+        named.set(key, { db_system: row.db_system, db_instance: row.db_instance });
+      }
+    } else if (!engineOnly.has(engine)) {
+      engineOnly.set(engine, { db_system: row.db_system, db_instance: null });
+    }
+  }
+  const namedEngines = new Set([...named.keys()].map((key) => splitIdentityKey(key)?.system ?? ""));
+  return [
+    ...named.values(),
+    ...[...engineOnly.entries()]
+      .filter(([engine]) => !namedEngines.has(engine))
+      .map(([, ref]) => ref),
+  ];
+};
 
 export type DbmFleetRow = Partial<DbTotalsRow> & {
   db_system: string;
@@ -147,6 +187,11 @@ export const unionFleetRows = (
   const clientRows: DbmFleetRow[] = rows.map((row) => {
     const key = instanceIdentityKey(row.db_system, row.db_instance);
     if (key) claimed.add(key);
+    // The METRIC-ALIAS key too: a MariaDB client row's readings live under the
+    // mysql identity (see `metricSystemFor`), and without this claim the same
+    // host would come back as a second, trafficless "mysql" row.
+    const aliasKey = instanceIdentityKey(metricSystemFor(row.db_system), row.db_instance);
+    if (aliasKey) claimed.add(aliasKey);
     return {
       ...row,
       // The client grain includes the NAMESPACE — one host serving two
@@ -166,9 +211,19 @@ export const unionFleetRows = (
   for (const instance of fleetInstances(metricsByKey)) {
     discovered.set(instance.key, instance.metrics);
   }
+  // Engines the server vantage names WITHOUT an instance — the statement-log
+  // feed's rows carry no `db_instance`. They degrade to one engine-only row
+  // below rather than being dropped, so a server-vantage-only org still counts
+  // the database its statements prove exists.
+  const engineOnlyRefs = new Set<string>();
   for (const server of context.serverInstances ?? []) {
     const key = instanceIdentityKey(server.db_system, server.db_instance);
-    if (key && !discovered.has(key)) discovered.set(key, null);
+    if (key) {
+      if (!discovered.has(key)) discovered.set(key, null);
+      continue;
+    }
+    const engineName = (server.db_system ?? "").trim().toLowerCase();
+    if (engineName) engineOnlyRefs.add(engineName);
   }
 
   const trafficless: DbmFleetRow[] = [];
@@ -185,11 +240,36 @@ export const unionFleetRows = (
       trafficless: true,
       // A server-known instance states no metric figure the metrics read never
       // made: it goes through the same resolver a client row does, so its cell
-      // says WHY there is nothing — disabled, no-data, or unmatched — instead
-      // of carrying a number from a vantage that never measured one.
+      // says WHY there is nothing — no-data or unmatched — instead of carrying
+      // a number from a vantage that never measured one.
       metrics: set
         ? metricsForSet(parts.system, set)
         : resolveRowMetrics(parts.system, parts.host, metricsByKey, context),
+    });
+  }
+
+  // The engine-only degradation. Emitted only when NOTHING names an instance
+  // of this engine — a client row or a discovered instance is strictly better
+  // evidence, and the unnamed statements very likely ran on it. The row states
+  // engine identity and nothing else: no instance, no figures.
+  const knownEngines = new Set([
+    ...rows.map((row) => (row.db_system ?? "").trim().toLowerCase()),
+    ...[...discovered.keys()].map((key) => splitIdentityKey(key)?.system ?? ""),
+  ]);
+  for (const engineName of [...engineOnlyRefs].sort((a, b) => a.localeCompare(b))) {
+    if (knownEngines.has(engineName)) continue;
+    if (engine && engineName !== engine) continue;
+    trafficless.push({
+      db_system: engineName,
+      // Empty by construction: the feed named the engine and nothing more. The
+      // cell renders the absence; inventing a host here would fabricate an
+      // address nobody reported.
+      db_instance: "",
+      // A bare engine name cannot collide with an identity key — those always
+      // carry a `|host` half.
+      rowKey: fleetRowKey(engineName),
+      trafficless: true,
+      metrics: resolveRowMetrics(engineName, "", metricsByKey, context),
     });
   }
 

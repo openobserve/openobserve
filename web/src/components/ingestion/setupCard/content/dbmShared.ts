@@ -1202,17 +1202,13 @@ const MARIADB_INDEX_STATS_RECEIVER = `  sqlquery/mariadb_index_stats:
  * Postgres activity samples + server top queries (with estimated plans), from
  * the stock `postgresqlreceiver`'s log events.
  *
- * THE `events:` BLOCK SHIPS AT `false`, MATCHING THE SERVER. Both events are
- * opt-in on both sides — the collector's own defaults have been OFF since
- * upstream v0.148.0, and the server discards both feeds unless
- * `ZO_DB_MONITORING_ACTIVITY_ENABLED` / `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
- * are set (both default false, see `DatabaseMonitoring` in config.rs). Shipping
- * the recipe at `true` made the customer's database pay full collection cost,
- * the receiver's EXPLAIN pass included, for rows the server then threw away.
- * The keys stay present rather than being deleted so the setting is explicit
- * and a user who wants the feeds flips one visible line here and the matching
- * server flag — the pairing is stated in the block's own comment and in each
- * card's `dbm-configure` note.
+ * THE `events:` BLOCK SHIPS AT `true`. Upstream flipped both events to
+ * default-OFF at v0.148.0, so the block is what switches the collection on —
+ * and OpenObserve always accepts both feeds when Database Monitoring is
+ * enabled (one server flag, `ZO_DB_MONITORING_ENABLED`; the per-signal ingest
+ * knobs that could silently discard collected rows are gone). The keys stay
+ * spelled out rather than relying on any default so the setting is explicit
+ * and reviewable, and a user trimming collection cost flips one visible line.
  *
  * `events:` is a TOP-LEVEL receiver key, a SIBLING of the collection blocks —
  * nesting an `enabled` inside query_sample_collection / top_query_collection
@@ -1271,25 +1267,20 @@ const PG_EVENTS_RECEIVER = `  postgresql/dbm_events:
       # shorter TTL expires entries sooner, which puts more queries back
       # through the cycle, and would multiply the one cost here that is real.
       collection_interval: 15s
-    # OFF, TO MATCH THE SERVER. Both events are opt-in on BOTH sides, and both
-    # sides must be switched on together or the work is wasted:
-    #   * here, enabled: true starts the collection on your database;
-    #   * on OpenObserve, ZO_DB_MONITORING_ACTIVITY_ENABLED=true (query_sample)
-    #     and ZO_DB_MONITORING_TOP_QUERY_ENABLED=true (top_query) are what let
-    #     the rows be read back. Both default to false.
-    # Collecting with the server flag off makes your database pay full
-    # collection cost -- including the receiver's EXPLAIN pass -- for rows that
-    # cross the wire and are then discarded, so leave these false until the
-    # matching server flag is set.
+    # ON. These two events are what fill the Activity tab and the server-side
+    # Top queries; upstream has shipped them default-OFF since v0.148.0, so
+    # this block is the switch. OpenObserve reads both feeds whenever Database
+    # Monitoring is enabled on the server -- no second flag to pair. Set one to
+    # false to trim collection cost on your database (query_sample is the
+    # high-volume one; top_query includes the receiver's EXPLAIN pass).
     #
-    # The block itself must STAY, at true or false. Upstream v0.148.0 flipped
-    # both events from default-ON to default-OFF, so the keys are what makes
+    # The block itself must STAY, at true or false: the keys are what makes
     # the setting explicit and reviewable; and events: must stay a TOP-LEVEL
     # key on the receiver (a sibling of the collection settings above), never
     # nested inside them.
     events:
-      db.server.query_sample: { enabled: false }
-      db.server.top_query: { enabled: false }`;
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }`;
 
 /**
  * MySQL activity samples + server top queries, from the stock `mysqlreceiver`'s
@@ -1337,25 +1328,20 @@ const MYSQL_EVENTS_RECEIVER = `  mysql/dbm_events:
       collection_interval: 15s
       lookback_time: 120
       query_plan_cache_size: 1000
-    # OFF, TO MATCH THE SERVER. Both events are opt-in on BOTH sides, and both
-    # sides must be switched on together or the work is wasted:
-    #   * here, enabled: true starts the collection on your database;
-    #   * on OpenObserve, ZO_DB_MONITORING_ACTIVITY_ENABLED=true (query_sample)
-    #     and ZO_DB_MONITORING_TOP_QUERY_ENABLED=true (top_query) are what let
-    #     the rows be read back. Both default to false.
-    # Collecting with the server flag off makes your database pay full
-    # collection cost -- including the receiver's EXPLAIN pass -- for rows that
-    # cross the wire and are then discarded, so leave these false until the
-    # matching server flag is set.
+    # ON. These two events are what fill the Activity tab and the server-side
+    # Top queries; upstream has shipped them default-OFF since v0.148.0, so
+    # this block is the switch. OpenObserve reads both feeds whenever Database
+    # Monitoring is enabled on the server -- no second flag to pair. Set one to
+    # false to trim collection cost on your database (query_sample is the
+    # high-volume one).
     #
-    # The block itself must STAY, at true or false. Upstream v0.148.0 flipped
-    # both events from default-ON to default-OFF, so the keys are what makes
+    # The block itself must STAY, at true or false: the keys are what makes
     # the setting explicit and reviewable; and events: must stay a TOP-LEVEL
     # key on the receiver (a sibling of the collection settings above), never
     # nested inside them.
     events:
-      db.server.query_sample: { enabled: false }
-      db.server.top_query: { enabled: false }`;
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }`;
 
 /**
  * Assemble the full DBM config for an engine.

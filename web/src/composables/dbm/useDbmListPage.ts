@@ -164,20 +164,6 @@ export function useDbmListPage(options: DbmListPageOptions) {
 
   const org = computed(() => (store.state?.selectedOrganization?.identifier as string) ?? "");
   const dbmEnabled = computed(() => Boolean(store.state?.zoConfig?.database_monitoring_enabled));
-  /**
-   * `ZO_DB_MONITORING_ACTIVITY_ENABLED`, the per-feed knob for session
-   * sampling. Defaults OFF, so it is the ordinary reason the Activity page is
-   * empty on a fresh install — and until it reached `zoConfig` the page could
-   * not tell that apart from a collector that is not reporting, so it printed
-   * the collector diagnosis for a server setting.
-   *
-   * `undefined` (an older server that does not send the field) stays
-   * `undefined` rather than collapsing to `false`: the checklist must not
-   * assert a knob is off on the strength of a field nobody sent.
-   */
-  const activityIngestEnabled = computed(
-    () => store.state?.zoConfig?.database_monitoring_activity_enabled as boolean | undefined,
-  );
 
   /** Read by the empty states to say what else in DBM is answering. */
   const queryCount = computed(() => claimedCount(tabCountsContext.counts.value.queryCount));
@@ -315,7 +301,6 @@ export function useDbmListPage(options: DbmListPageOptions) {
     lastRunAt,
     org,
     dbmEnabled,
-    activityIngestEnabled,
     queryCount,
     databaseCount,
     run,

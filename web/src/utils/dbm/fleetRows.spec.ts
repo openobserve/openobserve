@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 import type { DbTotalsRow } from "@/services/db_monitoring";
 
 import type { DbmInstanceMetricSet } from "./instanceMetrics";
-import { fleetInstances, unionFleetRows } from "./fleetRows";
+import { dedupeServerInstanceRefs, fleetInstances, unionFleetRows } from "./fleetRows";
 
 const totalsRow = (overrides: Partial<DbTotalsRow> = {}): DbTotalsRow =>
   ({
@@ -380,12 +380,65 @@ describe("unionFleetRows with server-vantage instances", () => {
     expect(rows).toHaveLength(1);
   });
 
-  it("skips a server row whose instance identity cannot be resolved", () => {
+  it("degrades a server row naming only its engine to one engine-only row", () => {
+    // The statement-log feed carries no `db_instance`. Dropping the row hid a
+    // working database entirely — the Overview tile read 0 while the badge
+    // beside it counted the statements — so the engine survives as a row that
+    // states engine identity and nothing else.
     const rows = unionFleetRows([], new Map(), {
       serverInstances: [
         { db_system: "postgresql", db_instance: null },
         { db_system: "", db_instance: "pgprod-1" },
       ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      db_system: "postgresql",
+      db_instance: "",
+      trafficless: true,
+    });
+  });
+
+  it("drops a server row naming no engine at all", () => {
+    // Without an engine there is nothing the fleet can render or filter.
+    expect(
+      unionFleetRows([], new Map(), { serverInstances: [{ db_system: "", db_instance: null }] }),
+    ).toEqual([]);
+  });
+
+  it("collapses an engine-only row into any named evidence of the same engine", () => {
+    // A client row, a metric instance, or a named server ref all prove the
+    // engine with an address attached — a second "engine, unnamed" row beside
+    // them would count a database nobody can point at.
+    const beside = (over: Parameters<typeof unionFleetRows>[2]) =>
+      unionFleetRows([], new Map(), {
+        ...over,
+        serverInstances: [
+          ...(over?.serverInstances ?? []),
+          { db_system: "postgresql", db_instance: null },
+        ],
+      });
+    expect(
+      beside({ serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }] }).map(
+        (r) => r.db_instance,
+      ),
+    ).toEqual(["pgprod-1"]);
+    const withClient = unionFleetRows([totalsRow()], new Map(), {
+      serverInstances: [{ db_system: "postgresql", db_instance: null }],
+    });
+    expect(withClient.map((r) => r.db_instance)).toEqual(["pgprod-1"]);
+    // A DIFFERENT engine's named row is no evidence: both rows stand.
+    const other = beside({ serverInstances: [{ db_system: "mysql", db_instance: "my-1" }] });
+    expect(other.map((r) => [r.db_system, r.db_instance])).toEqual([
+      ["mysql", "my-1"],
+      ["postgresql", ""],
+    ]);
+  });
+
+  it("honours the engine filter for engine-only rows too", () => {
+    const rows = unionFleetRows([], new Map(), {
+      system: "mysql",
+      serverInstances: [{ db_system: "postgresql", db_instance: null }],
     });
     expect(rows).toEqual([]);
   });
@@ -425,54 +478,82 @@ describe("unionFleetRows with server-vantage instances", () => {
   });
 });
 
-// ── the join switched off ────────────────────────────────────────────────────
+// ── the server-vantage ref dedupe ────────────────────────────────────────────
 //
-// The metric-stream read is one of TWO things that discover a trafficless
-// instance — the other is the server vantage's own `dbm_server` rows. The
-// query vantage cannot see an instance nobody queried, by construction. So
-// with the join off the union is the client rows plus whatever the server
-// vantage named, and the health column has to SAY the read never ran rather
-// than leaving a blank cell that reads as "this feature is broken".
+// One derivation feeds both the tab badge (its length) and the fleet union
+// (its rows), which is what keeps the Databases tile and the badge beside it
+// in agreement by construction.
 
-describe("unionFleetRows when the join is switched off", () => {
-  it("marks the client rows disabled rather than accusing the receiver", () => {
-    const rows = unionFleetRows([totalsRow({ db_instance: "busy-1" })], new Map(), {
-      enabled: false,
-    });
-    expect(rows).toHaveLength(1);
-    expect(rows[0].metrics?.state).toBe("disabled");
-    expect(rows[0].metrics?.unmatchedReason).toBeNull();
+describe("dedupeServerInstanceRefs", () => {
+  it("deduplicates named refs onto the identity grain, port and case included", () => {
+    const refs = dedupeServerInstanceRefs([
+      { db_system: "postgresql", db_instance: "pgprod-1" },
+      { db_system: "PostgreSQL", db_instance: "PGPROD-1:5432" },
+      { db_system: "mysql", db_instance: "my-1" },
+    ]);
+    expect(refs).toHaveLength(2);
   });
 
-  // The honest consequence of the knob being off: METRIC discovery is exactly
-  // what was switched off, so no metric stream can contribute a trafficless
-  // row. Only the server vantage's own rows can.
-  it("discovers no trafficless instance, because the read that finds them never ran", () => {
-    const rows = unionFleetRows([totalsRow({ db_instance: "busy-1" })], new Map(), {
-      enabled: false,
-    });
-    expect(rows.every((row) => !row.trafficless)).toBe(true);
+  it("degrades an engine-only ref to one entry, only when its engine has no named ref", () => {
+    expect(
+      dedupeServerInstanceRefs([
+        { db_system: "postgresql", db_instance: null },
+        { db_system: "postgresql", db_instance: null },
+      ]),
+    ).toEqual([{ db_system: "postgresql", db_instance: null }]);
+    expect(
+      dedupeServerInstanceRefs([
+        { db_system: "postgresql", db_instance: null },
+        { db_system: "postgresql", db_instance: "pgprod-1" },
+      ]),
+    ).toEqual([{ db_system: "postgresql", db_instance: "pgprod-1" }]);
   });
 
-  // The server vantage's discovery never depended on the metrics knob — its
-  // rows arrived regardless. What the knob being off changes is the metrics
-  // CELL, which must say the read was never made rather than accuse a
-  // collector nobody asked.
-  it("still surfaces a server-known instance, its metrics cell saying disabled", () => {
-    const rows = unionFleetRows([], new Map(), {
-      enabled: false,
-      serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }],
-    });
-    expect(rows).toHaveLength(1);
-    expect(rows[0].trafficless).toBe(true);
-    expect(rows[0].metrics?.state).toBe("disabled");
+  it("drops a ref naming no engine", () => {
+    expect(dedupeServerInstanceRefs([{ db_system: null, db_instance: "host-1" }])).toEqual([]);
   });
 
-  it("leaves the union unchanged when the join is on", () => {
-    const rows = unionFleetRows([], new Map([["postgresql|idle-replica", metrics()]]), {
-      enabled: true,
-    });
+  it("counts what the union renders — the agreement the tile depends on", () => {
+    const refs = dedupeServerInstanceRefs([
+      { db_system: "postgresql", db_instance: "pgprod-1" },
+      { db_system: "postgresql", db_instance: null },
+      { db_system: "mysql", db_instance: null },
+    ]);
+    const rows = unionFleetRows([], new Map(), { serverInstances: refs });
+    expect(rows).toHaveLength(refs.length);
+  });
+});
+
+// ── MariaDB rides the mysql metric streams ───────────────────────────────────
+
+describe("unionFleetRows with the MariaDB alias", () => {
+  it("attaches mysql-keyed metrics to a mariadb client row", () => {
+    const rows = unionFleetRows(
+      [totalsRow({ db_system: "mariadb", db_instance: "maria-1" })],
+      new Map([["mysql|maria-1", metrics()]]),
+    );
     expect(rows).toHaveLength(1);
-    expect(rows[0].trafficless).toBe(true);
+    expect(rows[0].metrics?.state).toBe("matched");
+  });
+
+  it("does not fabricate a trafficless mysql twin for a matched mariadb row", () => {
+    // The metric instance is keyed `mysql|maria-1` because the mysql receiver
+    // produced it; the client row already IS that server, so no second row.
+    const rows = unionFleetRows(
+      [totalsRow({ db_system: "mariadb", db_instance: "maria-1" })],
+      new Map([["mysql|maria-1", metrics()]]),
+    );
+    expect(rows.filter((r) => r.trafficless)).toEqual([]);
+  });
+
+  it("still discovers a genuinely unclaimed mysql instance beside a mariadb row", () => {
+    const rows = unionFleetRows(
+      [totalsRow({ db_system: "mariadb", db_instance: "maria-1" })],
+      new Map([
+        ["mysql|maria-1", metrics()],
+        ["mysql|my-other", metrics()],
+      ]),
+    );
+    expect(rows.filter((r) => r.trafficless).map((r) => r.db_instance)).toEqual(["my-other"]);
   });
 });

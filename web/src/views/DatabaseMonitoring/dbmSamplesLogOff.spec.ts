@@ -154,7 +154,10 @@ describe("the slow-query-log-off state names itself", () => {
   /**
    * The copy has to name the SETTING, or the reader cannot act on it — and it
    * has to say why the sibling tab still works, which is the actual question
-   * the empty page raises.
+   * the empty page raises. It must also disclose the coverage limit honestly:
+   * per-execution capture ships for PostgreSQL only (no MySQL slow-log recipe
+   * exists), so naming a MySQL knob here would prescribe a setting that feeds
+   * nothing.
    */
   it("names the setting and explains the sibling tab", () => {
     const en = JSON.parse(
@@ -163,7 +166,26 @@ describe("the slow-query-log-off state names itself", () => {
     const samples = (en as unknown as { dbm: { samples: Record<string, string> } }).dbm.samples;
 
     expect(samples.logOffDescription).toContain("log_min_duration_statement");
-    expect(samples.logOffDescription).toContain("long_query_time");
+    expect(samples.logOffDescription).not.toContain("long_query_time");
+    expect(samples.logOffDescription).toMatch(/PostgreSQL-only/);
     expect(samples.logOffDescription).toContain("Top queries");
+  });
+
+  /**
+   * The fallback list's own header carries the same disclosure: when the
+   * server-vantage rows are what the reader sees, the page must say the feed
+   * is Postgres-only rather than let a mixed fleet read absence of MySQL rows
+   * as "MySQL had no slow calls".
+   */
+  it("discloses the Postgres-only capture on the server list itself", () => {
+    const en = JSON.parse(
+      readFileSync(join(here, "../../locales/languages/en-US.json"), "utf8"),
+    ) as Record<string, never>;
+    const serverList = (
+      en as unknown as { dbm: { samples: { serverList: Record<string, string> } } }
+    ).dbm.samples.serverList;
+
+    expect(serverList.subtitle).toContain("PostgreSQL only");
+    expect(serverList.subtitle).toMatch(/MySQL and MariaDB/);
   });
 });
