@@ -2699,6 +2699,29 @@ describe("TraceDetails", () => {
 
       expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
     });
+
+    // Regression: onSelectSpanEvent set sidebarActiveTab synchronously, but
+    // selectedSpanId is a computed over the store, so its watcher ran on the
+    // next flush and — with no span previously selected (`!oldSpanId`) —
+    // overwrote the tab with the default. Measured in a browser: the sidebar
+    // opened on "attributes" every time.
+    it("should keep sidebarActiveTab as 'events' after a marker click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.onSelectSpanEvent({ spanId, eventIndex: 2 });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("events");
+    });
+
+    it("should still apply the default tab for an ordinary span click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
   });
 
   describe("effectiveSpanId", () => {

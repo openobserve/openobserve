@@ -2093,11 +2093,28 @@ export default defineComponent({
     const hoveredSpanId = ref("");
     const effectiveSpanId = computed(() => hoveredSpanId.value || selectedSpanId.value);
 
+    /**
+     * A sidebar tab requested explicitly by an interaction, as opposed to the
+     * default the watcher below picks.
+     *
+     * The watcher runs on the flush after `selectedSpanId` changes, i.e. after
+     * the handler that changed it has returned — so a handler cannot simply
+     * assign `sidebarActiveTab` and expect it to survive. Recording the intent
+     * here removes the ordering question entirely: whichever runs first, the
+     * explicit tab wins and the default is skipped.
+     */
+    const pendingSidebarTab = ref<string | null>(null);
+
     // Set the default sidebar tab on the first span selection,
     // and re-evaluate when the current tab no longer exists for the new span
     // (e.g. moving from LLM span with "preview" to a non-LLM span).
     watch(selectedSpanId, (newSpanId, oldSpanId) => {
       if (newSpanId && spanMap.value[newSpanId]) {
+        if (pendingSidebarTab.value) {
+          sidebarActiveTab.value = pendingSidebarTab.value;
+          pendingSidebarTab.value = null;
+          return;
+        }
         const canPreview = hasTracePreview(spanMap.value[newSpanId]);
         if (!oldSpanId || (sidebarActiveTab.value === "preview" && !canPreview)) {
           sidebarActiveTab.value = canPreview ? "preview" : "attributes";
@@ -2789,6 +2806,9 @@ export default defineComponent({
      * Events tab, which carries its own span-scoped mini-timeline.
      */
     const onSelectSpanEvent = (payload: { spanId: string; eventIndex: number }) => {
+      // Record the tab before the selection, so the watcher this triggers sees
+      // the request rather than overwriting it with the default.
+      pendingSidebarTab.value = "events";
       updateSelectedSpan(payload.spanId);
       sidebarActiveTab.value = "events";
       // Re-assign through null so clicking the same marker twice re-triggers
@@ -2938,6 +2958,7 @@ export default defineComponent({
       traceTabs,
       onTabReorder,
       sidebarActiveTab,
+      pendingSidebarTab,
       traceTree,
       collapseMapping,
       traceRootSpan,
