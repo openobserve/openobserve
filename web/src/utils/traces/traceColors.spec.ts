@@ -27,11 +27,11 @@ import { chartColor } from "../chartTheme";
 
 describe("traceColors", () => {
   describe("SPAN_COLOR_COUNT", () => {
-    it("resolves to the 35 --color-trace-span-* tokens in base/dark.css", () => {
+    it("resolves to the 16 --color-trace-span-* tokens in base/dark.css", () => {
       // Concrete pin: guards against the FALLBACKS-key derivation matching the
       // wrong set (renamed prefix, added/removed token) — the length assertions
       // elsewhere use SPAN_COLOR_COUNT on both sides and can't catch that.
-      expect(SPAN_COLOR_COUNT).toBe(35);
+      expect(SPAN_COLOR_COUNT).toBe(16);
     });
   });
 

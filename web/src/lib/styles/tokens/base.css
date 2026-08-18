@@ -263,45 +263,44 @@
      dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
      empty value ECharts reads as its own "auto" default — preserving today's look. --- */
 
-  /* --- Trace span palette (35 colors) — light values; dark overrides in dark.css.
+  /* --- Trace span palette (16 colors) — light values; dark overrides in dark.css.
      Read by traceColors.ts getSpanColorHex()/getAllSpanColors() via chartColor().
-     This is the only span-bar palette; a parallel 50-colour var() set used to sit
-     above and was deleted unused. --- */
-  --color-trace-span-1: #10b981;
-  --color-trace-span-2: #06b6d4;
-  --color-trace-span-3: #84cc16;
-  --color-trace-span-4: #6366f1;
-  --color-trace-span-5: #f59e0b;
-  --color-trace-span-6: #3b82f6;
-  --color-trace-span-7: #14b8a6;
-  --color-trace-span-8: #d946ef;
-  --color-trace-span-9: #7c3aed;
-  --color-trace-span-10: #f59e0b;
-  --color-trace-span-11: #0284c7;
-  --color-trace-span-12: #84cc16;
-  --color-trace-span-13: #6366f1;
-  --color-trace-span-14: #f9a8d4;
-  --color-trace-span-15: #10b981;
+
+     RESERVED HUES: no value here may fall in OKLab hue 345°-115° (rose through
+     red, orange and amber to yellow). That band belongs to the span-event
+     markers, which draw from --color-status-* — error sits at hue 20°, warning
+     at 49°. Reserving it is what lets a red or amber tick mean "event" and never
+     "service": no colour clears 3:1 contrast against an arbitrary bar, so the
+     markers are identified by hue, not luminance. See
+     composables/traces/useSpanEvents.ts.
+
+     The palette shrank from 35 slots to 16 to honour that rule. It lost nothing
+     real: the 35 held only 23 distinct values, and because getOrSetServiceColor
+     hands out slots sequentially, the duplicates meant two services in one trace
+     already drew identical bars past ~11 services. Separation improved — min
+     pairwise OKLab ΔE is 0.051, up from 0.042, and min ΔE from a bar to a status
+     colour is 0.127, up from 0.039.
+
+     Ordered farthest-point, so consecutively allocated services differ as much
+     as the set allows (min adjacent ΔE 0.071). Keep both themes the same length:
+     SPAN_COLOR_COUNT is one number for both, derived from chartTheme's
+     FALLBACKS. --- */
+  --color-trace-span-1: #84cc16;
+  --color-trace-span-2: #7c3aed;
+  --color-trace-span-3: #0ea5e9;
+  --color-trace-span-4: #d946ef;
+  --color-trace-span-5: #a78bfa;
+  --color-trace-span-6: #10b981;
+  --color-trace-span-7: #22d3ee;
+  --color-trace-span-8: #0284c7;
+  --color-trace-span-9: #a855f7;
+  --color-trace-span-10: #6366f1;
+  --color-trace-span-11: #3b82f6;
+  --color-trace-span-12: #21cb60;
+  --color-trace-span-13: #06b6d4;
+  --color-trace-span-14: #14b8a6;
+  --color-trace-span-15: #818cf8;
   --color-trace-span-16: #8b5cf6;
-  --color-trace-span-17: #f97316;
-  --color-trace-span-18: #22d3ee;
-  --color-trace-span-19: #06b6d4;
-  --color-trace-span-20: #21cb60;
-  --color-trace-span-21: #a855f7;
-  --color-trace-span-22: #fbbf24;
-  --color-trace-span-23: #3b82f6;
-  --color-trace-span-24: #14b8a6;
-  --color-trace-span-25: #6366f1;
-  --color-trace-span-26: #fb923c;
-  --color-trace-span-27: #0ea5e9;
-  --color-trace-span-28: #f472b6;
-  --color-trace-span-29: #a855f7;
-  --color-trace-span-30: #818cf8;
-  --color-trace-span-31: #f97316;
-  --color-trace-span-32: #fca5a5;
-  --color-trace-span-33: #06b6d4;
-  --color-trace-span-34: #a78bfa;
-  --color-trace-span-35: #3b82f6;
 
   /* --- Chart metric-panel text default — contrast fallback when a panel has no
      background; read via chartColor() by getContrastColor's callers. --- */
