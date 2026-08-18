@@ -218,7 +218,10 @@ function childTo(child: SubnavChild) {
   const route = router.currentRoute.value;
   const query: LocationQueryRaw = route.name === child.name ? { ...route.query } : {};
   if (orgIdentifier.value) query.org_identifier = orgIdentifier.value;
-  if (child.tab) query.tab = child.tab;
+  if (child.tab) {
+    delete query.search_mode;
+    query.tab = child.tab;
+  }
   return { name: child.name, query };
 }
 

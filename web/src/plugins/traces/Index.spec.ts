@@ -507,7 +507,11 @@ describe("Index.vue (Main Traces Page)", () => {
 
     it("should update URL with tab=spans when searchMode changes to spans", async () => {
       routerCurrentRouteSpy.mockReturnValue({
-        value: { query: { tab: "traces" }, name: "traces", path: "/traces" },
+        value: {
+          query: { tab: "traces", search_mode: "spans" },
+          name: "traces",
+          path: "/traces",
+        },
       } as any);
 
       wrapper = mount(Index, {
@@ -533,11 +537,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await searchBarEl.vm.$emit("update:searchMode", "spans");
       await flushPromises();
 
-      expect(routerReplaceSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({ tab: "spans" }),
-        }),
-      );
+      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
     });
 
     it("should switch to spans when the tab query changes on the mounted Traces route", async () => {

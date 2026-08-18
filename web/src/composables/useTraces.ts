@@ -292,9 +292,7 @@ const useTraces = () => {
 
     query["trace_id"] = router.currentRoute.value.query.trace_id;
 
-    if (searchObj.meta.searchMode === "spans") {
-      query["search_mode"] = "spans";
-    }
+    query["tab"] = searchObj.meta.searchMode;
 
     if (router.currentRoute.value.query.span_id)
       query["span_id"] = router.currentRoute.value.query.span_id;

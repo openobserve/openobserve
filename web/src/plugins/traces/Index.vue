@@ -1512,8 +1512,11 @@ watch(
       return;
     }
     if (tab !== mode) {
+      const query = { ...router.currentRoute.value.query };
+      delete query.search_mode;
+      query.tab = mode;
       router.replace({
-        query: { ...router.currentRoute.value.query, tab: mode },
+        query,
       });
     }
   },
@@ -2023,8 +2026,14 @@ const applyHandoffFilter = (): boolean => {
 watch(
   () => searchObj.meta.searchMode,
   (mode) => {
-    if (router.currentRoute.value.query.tab === mode) return;
+    if (
+      router.currentRoute.value.query.tab === mode &&
+      router.currentRoute.value.query.search_mode === undefined
+    ) {
+      return;
+    }
     const query = { ...router.currentRoute.value.query };
+    delete query.search_mode;
     query.tab = mode;
     router.replace({ query });
   },
