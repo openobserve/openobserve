@@ -53,6 +53,15 @@ describe("groupNavLinks", () => {
     ]);
   });
 
+  it("routes every Traces flyout item through the canonical query tab", () => {
+    expect(NAV_SUBNAV.traces).toEqual([
+      expect.objectContaining({ name: "traces", tab: "traces", defaultForRoute: true }),
+      expect.objectContaining({ name: "traces", tab: "spans" }),
+      expect.objectContaining({ name: "traces", tab: "service-graph", gate: "enterprise" }),
+      expect.objectContaining({ name: "traces", tab: "services-catalog" }),
+    ]);
+  });
+
   it("places the Data group right after the Reliability group it is anchored to", () => {
     const entries = groupNavLinks([
       link("home"),

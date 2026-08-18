@@ -295,23 +295,27 @@ describe("ONavGroup", () => {
     });
   });
 
-  // Traces: Service Graph / Service Catalog are standalone routes, but the same
-  // views also render in-page on /traces?tab=… — `activeOnTab` makes the flyout
-  // highlight follow what the user is looking at on either path.
-  describe("tab-alias active state (activeOnTab)", () => {
+  describe("query-tab navigation and active state", () => {
     const tracesChildren: SubnavChild[] = [
-      { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
+      {
+        titleKey: "menu.traces",
+        icon: "account-tree",
+        name: "traces",
+        tab: "traces",
+        defaultForRoute: true,
+      },
+      { titleKey: "traces.spansTab", icon: "layers", name: "traces", tab: "spans" },
       {
         titleKey: "menu.serviceGraph",
         icon: "share",
-        name: "serviceGraph",
-        activeOnTab: { name: "traces", tab: "service-graph" },
+        name: "traces",
+        tab: "service-graph",
       },
       {
         titleKey: "menu.services",
         icon: "menu-book",
-        name: "servicesCatalog",
-        activeOnTab: { name: "traces", tab: "services-catalog" },
+        name: "traces",
+        tab: "services-catalog",
       },
     ];
 
@@ -321,16 +325,6 @@ describe("ONavGroup", () => {
         routes: [
           { path: "/", name: "home", component: { template: "<div />" } },
           { path: "/traces", name: "traces", component: { template: "<div />" } },
-          {
-            path: "/traces/service-graph",
-            name: "serviceGraph",
-            component: { template: "<div />" },
-          },
-          {
-            path: "/traces/services",
-            name: "servicesCatalog",
-            component: { template: "<div />" },
-          },
         ],
       });
     }
@@ -363,36 +357,53 @@ describe("ONavGroup", () => {
       return w;
     }
 
-    function activeNames(w: VueWrapper): string[] {
+    function activeTabs(w: VueWrapper): string[] {
       return w
         .findAll('[data-test^="nav-group-item-"]')
         .filter((el) => el.attributes("aria-current") === "page")
-        .map((el) => el.attributes("data-test")!.replace("nav-group-item-", ""));
+        .map((el) => el.attributes("data-test")!.replace("nav-group-item-traces-", ""));
     }
 
     it("marks Traces on plain /traces", async () => {
       wrapper = await mountAt("/traces");
-      expect(activeNames(wrapper)).toEqual(["traces"]);
+      expect(activeTabs(wrapper)).toEqual(["traces"]);
+    });
+
+    it("marks Traces on /traces?tab=traces", async () => {
+      wrapper = await mountAt("/traces?tab=traces");
+      expect(activeTabs(wrapper)).toEqual(["traces"]);
     });
 
     it("marks Service Graph, not Traces, on /traces?tab=service-graph", async () => {
       wrapper = await mountAt("/traces?tab=service-graph");
-      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
+      expect(activeTabs(wrapper)).toEqual(["service-graph"]);
     });
 
     it("marks Service Catalog, not Traces, on /traces?tab=services-catalog", async () => {
       wrapper = await mountAt("/traces?tab=services-catalog");
-      expect(activeNames(wrapper)).toEqual(["servicesCatalog"]);
+      expect(activeTabs(wrapper)).toEqual(["services-catalog"]);
     });
 
-    it("marks Traces on the in-page granularity tabs (?tab=spans)", async () => {
+    it("marks Spans on /traces?tab=spans", async () => {
       wrapper = await mountAt("/traces?tab=spans");
-      expect(activeNames(wrapper)).toEqual(["traces"]);
+      expect(activeTabs(wrapper)).toEqual(["spans"]);
     });
 
-    it("marks Service Graph on its standalone route", async () => {
-      wrapper = await mountAt("/traces/service-graph");
-      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
+    it("builds canonical Traces URLs for every flyout item", async () => {
+      wrapper = await mountAt("/traces");
+
+      expect(wrapper.get('[data-test="nav-group-item-traces-traces"]').attributes("href")).toBe(
+        "/traces?org_identifier=default&tab=traces",
+      );
+      expect(wrapper.get('[data-test="nav-group-item-traces-spans"]').attributes("href")).toBe(
+        "/traces?org_identifier=default&tab=spans",
+      );
+      expect(
+        wrapper.get('[data-test="nav-group-item-traces-service-graph"]').attributes("href"),
+      ).toBe("/traces?org_identifier=default&tab=service-graph");
+      expect(
+        wrapper.get('[data-test="nav-group-item-traces-services-catalog"]').attributes("href"),
+      ).toBe("/traces?org_identifier=default&tab=services-catalog");
     });
   });
 });
