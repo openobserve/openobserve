@@ -792,9 +792,9 @@ describe("JourneySteps", () => {
 
       target.dispatchEvent(new MouseEvent("mouseleave"));
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        false,
+      );
     });
 
     it("previews nothing where the control cannot be used", async () => {
@@ -833,15 +833,15 @@ describe("JourneySteps", () => {
 
       target.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        true,
+      );
 
       target.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        false,
+      );
     });
 
     it("keeps the committed anchor solid while another row is hovered", async () => {
