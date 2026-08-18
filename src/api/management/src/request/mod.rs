@@ -53,6 +53,7 @@ pub mod profiling;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
+pub mod remote_tasks;
 pub mod score_configs;
 #[cfg(feature = "enterprise")]
 pub mod scorers;

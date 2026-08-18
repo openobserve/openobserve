@@ -55,8 +55,8 @@ use {
     },
     openobserve_api_management::request::{
         actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, experiments, gen_ai, keys, license, providers, score_configs,
-        scorers, service_streams, synthetics, workflows,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, providers, remote_tasks,
+        score_configs, scorers, service_streams, synthetics, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1165,6 +1165,11 @@ pub fn service_routes() -> Router {
 
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
+                .route("/{org_id}/remote_tasks", get(remote_tasks::list_remote_tasks).post(remote_tasks::create_remote_task))
+                .route("/{org_id}/remote_tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
+                .route("/{org_id}/remote_tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
+                .route("/{org_id}/remote_tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
+                .route("/{org_id}/remote_tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
                 .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))

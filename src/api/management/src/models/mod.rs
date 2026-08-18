@@ -38,8 +38,9 @@ pub mod experiments;
 pub mod folders;
 #[cfg(feature = "enterprise")]
 pub mod providers;
-pub mod reports;
 #[cfg(feature = "enterprise")]
+pub mod remote_tasks;
+pub mod reports;
 pub mod score_configs;
 #[cfg(feature = "enterprise")]
 pub mod scorers;
