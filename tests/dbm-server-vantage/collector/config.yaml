@@ -1180,7 +1180,11 @@ receivers:
       - type: regex_parser
         id: my_dl_lock
         parse_from: attributes.my_message
-        regex: '(?s)RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<my_lock_index>\S+) of table (?P<my_lock_table>`?(?P<my_db>[^`. ]+)`?\.\S+) trx id \d+ (?P<my_lock_mode>lock_mode \S+)'
+        # Side + trx id are captured so the lock detail can be JOINED to the
+        # participant: InnoDB writes `*** (N) HOLDS THE LOCK(S)` as its own
+        # timestamped entry, so it never shares a record with the
+        # `*** (N) TRANSACTION:` block that names the thread and statement.
+        regex: '(?s)\*\*\* \((?P<my_lock_side>\d+)\) (?:HOLDS THE LOCK|WAITING FOR THIS LOCK).*?RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<my_lock_index>\S+) of table (?P<my_lock_table>`?(?P<my_db>[^`. ]+)`?\.\S+) trx id (?P<my_lock_trx_id>\d+) (?P<my_lock_mode>lock_mode \S+)'
         on_error: send
       # MySQL names the ROLLED BACK transaction explicitly.
       - type: regex_parser
@@ -1255,7 +1259,8 @@ receivers:
         on_error: send
       - type: regex_parser
         parse_from: attributes.maria_message
-        regex: '(?s)RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<maria_lock_index>\S+) of table (?P<maria_lock_table>`?(?P<my_db>[^`. ]+)`?\.\S+) trx id \d+ (?P<maria_lock_mode>lock_mode \S+)'
+        # Same join as the MySQL recipe above -- MariaDB splits these records too.
+        regex: '(?s)\*\*\* \((?P<maria_lock_side>\d+)\) (?:HOLDS THE LOCK|WAITING FOR THIS LOCK).*?RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<maria_lock_index>\S+) of table (?P<maria_lock_table>`?(?P<my_db>[^`. ]+)`?\.\S+) trx id (?P<maria_lock_trx_id>\d+) (?P<maria_lock_mode>lock_mode \S+)'
         on_error: send
       - type: regex_parser
         parse_from: attributes.maria_message

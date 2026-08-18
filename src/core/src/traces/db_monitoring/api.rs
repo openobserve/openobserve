@@ -4343,7 +4343,9 @@ pub(crate) fn stitch_mysql_deadlocks(
 ) -> Vec<server_vantage::DeadlockEvent> {
     let mut passthrough: Vec<server_vantage::DeadlockEvent> = Vec::new();
     // Group key: only same-server single-participant MySQL entries can stitch.
-    let mut groups: BTreeMap<(String, String, String), Vec<server_vantage::DeadlockEvent>> =
+    // (engine, instance) — the database is deliberately NOT part of the key;
+    // see the comment where the key is built below.
+    let mut groups: BTreeMap<(String, String), Vec<server_vantage::DeadlockEvent>> =
         BTreeMap::new();
 
     for ev in events {
@@ -4382,11 +4384,26 @@ pub(crate) fn stitch_mysql_deadlocks(
             }
             continue;
         };
-        let key = (
-            ev.engine.clone().unwrap_or_default(),
-            instance,
-            ev.database.clone().unwrap_or_default(),
-        );
+        // The key is (engine, instance) ONLY — deliberately not the database.
+        //
+        // InnoDB splits one deadlock side across two records, and only ONE of
+        // them names the database: the `*** (N) TRANSACTION:` block carries the
+        // thread and statement with no database, while the
+        // `*** (N) HOLDS THE LOCK(S)` block carries `db.table` and no
+        // participant. Keying on the database therefore put the two halves of
+        // the SAME side into different groups, so they could never merge: the
+        // lock halves surfaced as content-free rows (participants=0) and the
+        // real sides kept the null database that made the Deadlocks tab's
+        // `?database=` filter useless on MySQL.
+        //
+        // Dropping it from the key is safe because the group is already scoped
+        // to one server (engine + instance) and closed by a proximity window of
+        // a couple of seconds; two deadlocks in DIFFERENT databases on the same
+        // instance inside that window are still separated by
+        // `merge_mysql_deadlocks`' own guard, which starts a new group as soon
+        // as a transaction id repeats. The merged event takes whichever
+        // database its members supply.
+        let key = (ev.engine.clone().unwrap_or_default(), instance);
         groups.entry(key).or_default().push(ev);
     }
 
@@ -12007,6 +12024,109 @@ mod tests {
             "the verdict names side 2, so thread 82 is the victim — resolved in the \
              stitcher's deferred post-pass, not on any single record"
         );
+        assert_eq!(ev.victim_pid, Some(82));
+    }
+
+    /// The REAL InnoDB shape: lock detail arrives on its own record, and must
+    /// reach the side it describes.
+    ///
+    /// MySQL and MariaDB split one deadlock side across TWO timestamped entries
+    /// — `*** (N) TRANSACTION:` carries the thread and statement, while
+    /// `*** (N) HOLDS THE LOCK(S):` carries the locked object, the lock mode and
+    /// the DATABASE. `line_start_pattern` splits on the timestamp, so the two
+    /// can never share a record. Measured on the rig before this was handled: of
+    /// 108 records carrying a participant, ZERO carried a database; of 252
+    /// carrying a database, ZERO carried a participant. Every stitched deadlock
+    /// therefore had `objects: []`, null lock_mode/lock_target and a null
+    /// database — and because `my_db` is the ONLY MySQL source in
+    /// `detect_database`, the Deadlocks tab's `?database=` filter could not work
+    /// on MySQL or MariaDB at all.
+    ///
+    /// Three things have to hold together, and each broke the other two when it
+    /// was got wrong:
+    ///   * the lock record must be EMITTED (not dropped for having no side),
+    ///   * it must GROUP with its side (so the group key cannot include the
+    ///     database — only one of the two records has one), and
+    ///   * it must not count toward the repeated-transaction-id guard (it
+    ///     deliberately shares its side's trx id, which otherwise reads as a
+    ///     second deadlock and splits every side into its own fragment).
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_innodb_lock_records_fold_into_the_side_they_describe() {
+        let rows = vec![
+            json!({
+                "_timestamp": 1_786_166_303_139_783i64, "o2_my_event": "deadlock",
+                "my_trx_side": "1", "my_trx_id": "4589", "my_trx_thread": "89",
+                "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+                "server_address": "db-7:3306",
+            }),
+            // Side 1's lock detail — its own record, no thread, no statement.
+            json!({
+                "_timestamp": 1_786_166_303_139_801i64, "o2_my_event": "deadlock",
+                "my_lock_side": "1", "my_lock_trx_id": "4589",
+                "my_db": "dbmlab", "my_lock_table": "`dbmlab`.`accounts`",
+                "my_lock_index": "PRIMARY", "my_lock_mode": "lock_mode X",
+                "server_address": "db-7:3306",
+            }),
+            json!({
+                "_timestamp": 1_786_166_303_139_834i64, "o2_my_event": "deadlock",
+                "my_trx_side": "2", "my_trx_id": "4678", "my_trx_thread": "82",
+                "my_trx_query": "UPDATE accounts SET balance = balance + 1 WHERE id = 12",
+                "server_address": "db-7:3306",
+            }),
+            json!({
+                "_timestamp": 1_786_166_303_139_850i64, "o2_my_event": "deadlock",
+                "my_lock_side": "2", "my_lock_trx_id": "4678",
+                "my_db": "dbmlab", "my_lock_table": "`dbmlab`.`accounts`",
+                "my_lock_index": "PRIMARY", "my_lock_mode": "lock_mode X",
+                "server_address": "db-7:3306",
+            }),
+            json!({
+                "_timestamp": 1_786_166_303_139_966i64, "o2_my_event": "deadlock",
+                "my_victim_side": "2", "server_address": "db-7:3306",
+            }),
+        ];
+        let events: Vec<_> = rows.iter().filter_map(deadlock_event_for_row).collect();
+        assert_eq!(events.len(), 5, "five raw records before the stitch");
+
+        let stitched = stitch_mysql_deadlocks(events);
+        assert_eq!(
+            stitched.len(),
+            1,
+            "five records are ONE deadlock — a lock record left ungrouped surfaces \
+             as a content-free row and inflates the Deadlocks count"
+        );
+        let ev = &stitched[0];
+        assert_eq!(
+            ev.participants.len(),
+            2,
+            "TWO sides — the lock records describe existing sides and must fold \
+             into them, never arrive as extra participants"
+        );
+        assert_eq!(
+            ev.database.as_deref(),
+            Some("dbmlab"),
+            "the database reaches the event from the lock record — this is what \
+             the Deadlocks tab's ?database= filter reads"
+        );
+        for p in &ev.participants {
+            assert!(
+                p.pid.is_some() && p.query.is_some(),
+                "every surviving participant is a real side, not a lock fragment"
+            );
+            assert_eq!(
+                p.lock_mode.as_deref(),
+                Some("lock_mode X"),
+                "side {:?} lost its lock mode in the fold",
+                p.side
+            );
+            assert!(
+                p.lock_target.is_some(),
+                "side {:?} lost its locked object in the fold",
+                p.side
+            );
+        }
+        // The verdict still lands: folding must not disturb victim resolution.
         assert_eq!(ev.victim_pid, Some(82));
     }
 
