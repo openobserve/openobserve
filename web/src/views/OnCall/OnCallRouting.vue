@@ -255,6 +255,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
 
+        <!-- The dialog used to go quiet here: no request, no message, and a
+             disabled Save with nothing on screen saying what was missing. -->
+        <p
+          v-if="addPairProblem"
+          class="text-text-secondary text-xs"
+          data-test="oncall-routing-dimension-problem"
+        >
+          {{ addPairProblem }}
+        </p>
+
         <!-- Values are lowercased on the server to match what the extractor
              pulls off a record. Showing the normalised form means the rule
              read back is the rule that will match. -->
@@ -386,12 +396,21 @@ const dialogTitle = computed<I18nText>(() => {
   return editingRule.value ? t("oncall.editOwnershipRule") : t("oncall.addOwnershipRule");
 });
 
-const canAddPair = computed(
-  () =>
-    !!draftName.value.trim() &&
-    !!draftValue.value.trim() &&
-    !draftPairs.value.some((pair) => pair.name === draftName.value.trim()),
-);
+
+/// Why `Add` is refused, in the reader's terms. A disabled button beside a
+/// select whose placeholder was a real dimension key read as a filled form
+/// that simply would not save — no request, no validation message, nothing on
+/// screen saying what was missing.
+const addPairProblem = computed<I18nText | "">(() => {
+  const name = draftName.value.trim();
+  if (!name) return t("oncall.dimensionNeedsName");
+  if (!draftValue.value.trim()) return t("oncall.dimensionNeedsValue");
+  if (draftPairs.value.some((pair) => pair.name === name))
+    return t("oncall.dimensionAlreadyUsed", { name: raw(name) });
+  return "";
+});
+
+const canAddPair = computed(() => !addPairProblem.value);
 
 const draftPath = computed(() =>
   ownershipPath(Object.fromEntries(draftPairs.value.map((pair) => [pair.name, pair.value]))),

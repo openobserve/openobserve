@@ -120,6 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </span>
 
+      <!-- The dialog used to go quiet here: no request, no message, and a
+           disabled Save with nothing on screen saying what was missing. -->
+      <p
+        v-if="adding && addPairProblem"
+        class="text-text-secondary text-xs"
+        data-test="oncall-rule-editor-dimension-problem"
+      >
+        {{ addPairProblem }}
+      </p>
+
       <OText variant="meta">{{ t("oncall.ruleEditorNarrow") }}</OText>
 
       <span class="flex flex-wrap items-baseline gap-x-2">
@@ -274,12 +284,21 @@ const signalOptions = computed(() =>
   props.signals.map((signal) => ({ label: titleOf(signal), value: signal.id })),
 );
 
-const canAddPair = computed(
-  () =>
-    !!draftName.value.trim() &&
-    !!draftValue.value.trim() &&
-    !pairs.value.some((pair) => pair.name === draftName.value.trim()),
-);
+
+/// Why `Add` is refused, in the reader's terms. A disabled button beside a
+/// select whose placeholder was a real dimension key read as a filled form
+/// that simply would not save — no request, no validation message, nothing on
+/// screen saying what was missing.
+const addPairProblem = computed<I18nText | "">(() => {
+  const name = draftName.value.trim();
+  if (!name) return t("oncall.dimensionNeedsName");
+  if (!draftValue.value.trim()) return t("oncall.dimensionNeedsValue");
+  if (pairs.value.some((pair) => pair.name === name))
+    return t("oncall.dimensionAlreadyUsed", { name: raw(name) });
+  return "";
+});
+
+const canAddPair = computed(() => !addPairProblem.value);
 
 const conditionCount = computed<I18nText>(() =>
   pairs.value.length

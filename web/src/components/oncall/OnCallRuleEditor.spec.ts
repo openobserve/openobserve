@@ -142,6 +142,28 @@ describe("OnCallRuleEditor", () => {
     expect(wrapper.text()).not.toContain("PROD");
   });
 
+  /// The placeholder was `k8s-namespace` — a real, valid dimension key — on a
+  /// select, so the field read as already filled while `draftName` was "". Add
+  /// and Save stayed disabled, no request was made, and nothing on screen said
+  /// why: the dialog simply never became usable.
+  it("says why Add is refused instead of going quiet", async () => {
+    // A new rule opens with the adder already showing — which is exactly the
+    // state that used to look filled and refuse to save.
+    const wrapper = render();
+    await flushPromises();
+
+    const problem = () => wrapper.find('[data-test="oncall-rule-editor-dimension-problem"]').text();
+    expect(problem()).toContain("Pick the dimension");
+
+    await wrapper
+      .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
+      .vm.$emit("update:modelValue", "k8s-cluster");
+    expect(problem()).toContain("value it has to equal");
+
+    await wrapper.find('[data-test="oncall-rule-editor-dimension-value"]').setValue("prod");
+    expect(wrapper.find('[data-test="oncall-rule-editor-dimension-problem"]').exists()).toBe(false);
+  });
+
   /// A rule pinning the same dimension twice cannot mean anything, and the
   /// second value would silently win.
   it("refuses a duplicate condition name", async () => {
@@ -158,6 +180,11 @@ describe("OnCallRuleEditor", () => {
     expect(
       wrapper.find('[data-test="oncall-rule-editor-confirm-condition"]').attributes("disabled"),
     ).toBeDefined();
+    // And it says which dimension is already spoken for, rather than leaving
+    // the reader to compare the row against the list above it.
+    expect(wrapper.find('[data-test="oncall-rule-editor-dimension-problem"]').text()).toContain(
+      "k8s-cluster",
+    );
   });
 
   it("cannot be saved with no condition", async () => {
