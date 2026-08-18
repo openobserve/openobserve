@@ -137,6 +137,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip side="bottom" :content="t('dbm.filters.removeScope')" />
         </OButton>
       </span>
+
+      <!-- Clear all, INLINE beside the chips.
+           The same action already exists inside the popover, but only there:
+           with two or three chips showing, resetting the view meant opening
+           the Filters dropdown to find a button whose effect is on the row the
+           reader is already looking at, or removing each chip one at a time.
+           Shown only when something is actually set, so the toolbar stays
+           quiet on an unfiltered page. -->
+      <OButton
+        v-if="activeCount"
+        variant="ghost-primary"
+        size="xs"
+        class="shrink-0"
+        data-test="dbm-queries-scope-clear-inline"
+        @click="emit('clear')"
+      >
+        {{ t("dbm.filters.clearScope") }}
+      </OButton>
     </div>
   </div>
 </template>
