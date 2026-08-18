@@ -304,9 +304,12 @@ export class ReportFoldersPage {
 
   async clickMove() {
     await this.moveSubmitBtn.click();
-    await this.moveDialog.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
-    // Wait for ODialog close animation to finish before next interaction
+    // Hard assert: the dialog only closes once the move request resolves, so catching
+    // this would let an in-flight/failed move pass and break a later test instead.
+    await expect(this.moveDialog).toBeHidden({ timeout: 15000 });
     await this.page.locator('[data-test="o-dialog-overlay"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    // onMoveUpdated re-fetches the active folder — let it settle.
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async cancelMove() {
@@ -338,8 +341,18 @@ export class ReportFoldersPage {
   }
 
   async searchReports(query) {
+    // Clear first — fill()-ing the value the Vue model already holds is a no-op.
+    await this.reportSearchInput.fill('');
     await this.reportSearchInput.fill(query);
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  }
+
+  // Real re-fetch: loadReports serves the folder from a Vuex cache, and the refresh
+  // button is the only control that drops it (invalidateFolderCache + loadReports).
+  async refreshReportList() {
+    const refreshBtn = this.page.locator('[data-test="report-list-refresh-btn"]');
+    await refreshBtn.click({ force: true, timeout: 5000 }).catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async clearReportSearch() {
@@ -348,16 +361,13 @@ export class ReportFoldersPage {
   }
 
   async expectReportVisibleInTable(reportName) {
-    // Under parallel load the reports table is slow to pick up a just-created (via API) report:
-    // the list fetch + search debounce lag mean a single 10s wait times out (reportFolders
-    // :46/:79/:150). Poll: re-apply the search filter (which re-fetches the current folder's
-    // list) until the row's pause/start control renders. Non-masking — still fails if the
-    // report genuinely never appears.
+    // Refresh then re-filter on each attempt: the in-folder search is a client-side
+    // filter, so re-typing alone can never pull in a report the page hasn't fetched.
     const btn = this.reportPauseStartBtn(reportName);
     await expect(async () => {
       if (await btn.isVisible().catch(() => false)) return;
-      await this.reportSearchInput.fill(reportName, { force: true }).catch(() => {});
-      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await this.refreshReportList();
+      await this.searchReports(reportName);
       await expect(btn).toBeVisible({ timeout: 5000 });
     }).toPass({ timeout: 45000 });
   }
