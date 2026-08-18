@@ -223,22 +223,14 @@ struct ConfigResponse<'a> {
     /// Database Monitoring (`ZO_DB_MONITORING_ENABLED`). Plain OSS flag — no
     /// enterprise gating (design §8): menu/route gating in the UI checks this
     /// flag alone, without an `isEnterprise` conjunct.
+    ///
+    /// The ONLY DBM field on this payload, by product decision: DBM is a single
+    /// switch — enabled means every signal is canonicalized and served,
+    /// disabled means none is. The per-signal flags (instance metrics,
+    /// activity, top query) were removed together with their config knobs, so
+    /// the UI never has to distinguish "feed switched off here" from "collector
+    /// not reporting".
     database_monitoring_enabled: bool,
-    /// `ZO_DB_MONITORING_INSTANCE_METRICS`. The instance-metrics join happens
-    /// in the browser, so the UI is the only thing that can act on this knob.
-    database_monitoring_instance_metrics: bool,
-    /// `ZO_DB_MONITORING_ACTIVITY_ENABLED`. Exposed for the same reason as
-    /// `instance_metrics` above: the UI is the only thing that can act on it.
-    /// Both this and `top_query` default OFF, so the Activity and Plans pages
-    /// are empty on a fresh install — and without the flag the page cannot tell
-    /// "the feed is switched off here" from "your collector is not reporting",
-    /// so it blamed the collector for a server setting.
-    database_monitoring_activity_enabled: bool,
-    /// `ZO_DB_MONITORING_TOP_QUERY_ENABLED`. Gates top-query + estimated-plan
-    /// ingest. The Plans empty state used to assert "we're capturing plans for
-    /// this database" off stream-schema presence alone, which is false once
-    /// this is off — the column survives from history while nothing new lands.
-    database_monitoring_top_query_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -530,9 +522,6 @@ pub async fn zo_config() -> impl IntoResponse {
         synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
-        database_monitoring_instance_metrics: cfg.db_monitoring.instance_metrics,
-        database_monitoring_activity_enabled: cfg.db_monitoring.activity_enabled,
-        database_monitoring_top_query_enabled: cfg.db_monitoring.top_query_enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,

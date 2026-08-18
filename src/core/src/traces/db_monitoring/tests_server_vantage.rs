@@ -69,11 +69,6 @@ fn with_knobs<T>(knobs: &[(&str, &str)], f: impl FnOnce() -> T) -> T {
     out
 }
 
-/// Force one boolean ingest knob ON for the duration of `f`.
-fn with_knob<T>(env_var: &str, f: impl FnOnce() -> T) -> T {
-    with_knobs(&[(env_var, "true")], f)
-}
-
 // ─── Fixtures: the verbatim proof records ────────────────────────────────────
 
 /// Proof §2.1 — the captured Postgres deadlock DETAIL record.
@@ -303,9 +298,6 @@ fn enterprise_owned_records_do_not_canonicalize_on_oss() {
 #[cfg(feature = "enterprise")]
 #[test]
 fn enterprise_hooks_do_not_shadow_oss_arms() {
-    if !config::get_config().db_monitoring.statement_enabled {
-        return; // an env override turned the arm off; the default-on pin lives in config tests
-    }
     // Case 1 — `statement_duration` sits ABOVE the recipe-tag hook. The real
     // statement fixture, plus an enterprise recipe tag. The OSS arm must keep it.
     let mut rec = pg_statement_duration_flattened();
@@ -1855,27 +1847,12 @@ fn mysql_query_sample() -> Map<String, Value> {
     }))
 }
 
-/// Canonicalize through the ingest entry point, tolerating the D-G default.
-///
-/// `canonicalize_record`'s activity arm is gated on
-/// `db_monitoring.activity_enabled`, which defaults OFF — and `get_config()` is a
-/// process-wide cached singleton, so a unit test cannot flip it. These tests are
-/// about DISPATCH (does a query_sample reach the activity arm, and does anything
-/// else reach it by mistake), not about the gate, which
-/// `the_activity_dispatch_arm_consults_the_config_knob` covers separately.
-///
-/// So: when the knob is on, assert on the real dispatcher. When it is off, drive
-/// the same arm directly. Both paths assert the SAME thing, and neither is
-/// skipped — a test that silently no-ops under the shipped default would be a
-/// test that never runs in CI.
+/// Canonicalize through the ingest entry point. The activity arm has no gate
+/// of its own any more — DBM's single `enabled` switch is checked by the
+/// CALLER of `canonicalize_record` — so dispatch is asserted directly on the
+/// real dispatcher. (This helper predates the config collapse, when the arm
+/// had an opt-in knob and the off path had to drive the arm by hand.)
 fn dispatch_activity(rec: &Map<String, Value>) -> Option<BTreeMap<String, Value>> {
-    if config::get_config().db_monitoring.activity_enabled {
-        return canonicalize_record(rec);
-    }
-    // The gate is the ONLY difference; everything below it must still hold.
-    if server_vantage::resolve_event_name(rec) == Some(server_vantage::EVENT_QUERY_SAMPLE) {
-        return server_vantage::canonicalize_query_sample(rec).map(|s| s.to_record());
-    }
     canonicalize_record(rec)
 }
 
@@ -2474,9 +2451,8 @@ fn client_supplied_activity_columns_are_stripped() {
 
     server_vantage::apply_to_record(&mut rec);
 
-    // The STRIP is unconditional — it runs before dispatch and is not gated on
-    // the activity knob, which is the point: a forged column must never survive
-    // regardless of whether the feature that would legitimately write it is on.
+    // The STRIP is unconditional — it runs before dispatch, which is the
+    // point: a forged column must never survive canonicalization.
     assert!(
         rec.get(server_vantage::O2_DBM_BLOCKING_PIDS).is_none(),
         "a forged blocker list on an unblocked session must not survive"
@@ -2486,27 +2462,16 @@ fn client_supplied_activity_columns_are_stripped() {
         Some(&json!(999_999)),
         "the caller-supplied pid must never survive as engine-derived truth"
     );
-    // NOTE the kind is deliberately NOT asserted absent: with activity ingest
-    // on, this record genuinely IS an activity event, so the derived kind is
-    // "activity" — the same string the caller forged. Equality there proves
-    // nothing either way, which is exactly why the discriminating assertions
-    // are on the pid (a value the caller cannot guess) rather than on the kind.
-
-    // With the feature ON the derived value replaces the forgery; with the
-    // feature OFF (the D-G default) the column is simply absent. Both are
-    // correct; a surviving 999_999 is not.
-    if config::get_config().db_monitoring.activity_enabled {
-        assert_eq!(
-            rec.get(server_vantage::O2_DBM_SESSION_PID),
-            Some(&json!(81491)),
-            "the derived pid must win over the caller-supplied one"
-        );
-    } else {
-        assert!(
-            rec.get(server_vantage::O2_DBM_SESSION_PID).is_none(),
-            "with activity ingest off, no session column is written at all"
-        );
-    }
+    // NOTE the kind is deliberately NOT asserted absent: this record genuinely
+    // IS an activity event, so the derived kind is "activity" — the same
+    // string the caller forged. Equality there proves nothing either way,
+    // which is exactly why the discriminating assertion is on the pid (a
+    // value the caller cannot guess) rather than on the kind.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SESSION_PID),
+        Some(&json!(81491)),
+        "the derived pid must win over the caller-supplied one"
+    );
 }
 
 // ─── Findings from the cold test review (all reproduced before acting) ───────
@@ -2836,69 +2801,32 @@ fn every_column_any_writer_emits_is_reserved() {
     }
 }
 
-/// **The config knob must GATE something.**
+/// **The activity arm is always on.**
 ///
-/// D-G exists to stop an upgrade silently acquiring new ingest cost, and activity
-/// is the highest-volume signal DBM has (~200 rows/sec per 200-session instance).
-/// A flag that defaults false but is read by nobody delivers exactly the cost it
-/// was added to prevent, while `test_db_monitoring_config_defaults` stays green.
-///
-/// A SOURCE-SCRAPING test, matching the precedent set by
-/// `writing_the_event_name_is_gated_on_db_monitoring_enabled` above:
-/// `get_config()` is a process-wide cached singleton, so a unit test cannot flip
-/// the knob and observe the behavior change. What CAN be asserted is that the
-/// dispatch arm consults it — and that the gate is scoped to the activity arm
-/// rather than smothering the shipped deadlock/blocking paths.
+/// The opt-in knob that used to gate query_sample ingest was removed when the
+/// DBM config collapsed to the single `ZO_DB_MONITORING_ENABLED` switch, so a
+/// query_sample record must canonicalize through the REAL dispatcher with no
+/// env juggling at all — and the two pre-existing kinds keep canonicalizing
+/// beside it (enterprise-only: on OSS those two kinds are not canonicalized,
+/// which `enterprise_owned_records_do_not_canonicalize_on_oss` pins instead).
 #[test]
-fn the_activity_dispatch_arm_consults_the_config_knob() {
-    let src = include_str!("server_vantage.rs");
-    let start = src
-        .find("pub fn canonicalize_record(")
-        .expect("canonicalize_record must exist — it is the ingest entry point");
-    let body = src[start..]
-        .split("\n}\n")
-        .next()
-        .expect("canonicalize_record must have a body");
-
-    assert!(
-        body.contains("activity_enabled"),
-        "the query_sample dispatch arm must consult \
-         `db_monitoring.activity_enabled`; a default-off knob that gates nothing \
-         still ingests ~200 rows/sec/instance for a feature the operator turned off"
+fn the_activity_dispatch_arm_is_always_on() {
+    let out = canonicalize_record(&with_event_name(pg_query_sample_unblocked()))
+        .expect("a query_sample record must canonicalize with DBM enabled");
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+        Some(server_vantage::KIND_ACTIVITY),
     );
 
-    // The gate must be SCOPED to activity. An early return at the top of the
-    // function would disable deadlock and blocking ingest too — a silent
-    // regression of two shipped pages behind a knob about a third.
-    let gate = body
-        .find("activity_enabled")
-        .expect("checked immediately above");
-    // The deadlock and blocking canonicalizers moved to `o2_enterprise`, so the
-    // anchor is now the HOOK that replaced them at the identical position. The
-    // property is unchanged: the activity gate must sit BELOW the arms that
-    // already shipped, or turning activity off silently disables them too.
-    let deadlock = body
-        .find("claim_deadlock_markers")
-        .expect("the enterprise deadlock hook must still sit in the dispatcher");
-    assert!(
-        gate > deadlock,
-        "the activity gate must come AFTER the deadlock/blocking arms, or turning \
-         activity off silently disables the two pages that already shipped"
-    );
-
-    // And behaviourally, under the shipped default (activity OFF), the two
-    // pre-existing kinds must still canonicalize. Enterprise-only: on OSS those
-    // two kinds are not canonicalized at all, which the OSS-side
-    // `enterprise_owned_records_do_not_canonicalize_on_oss` pins instead.
     #[cfg(feature = "enterprise")]
     {
         assert!(
             canonicalize_record(&pg_deadlock_record()).is_some(),
-            "deadlock ingest must be unaffected by the activity knob"
+            "deadlock ingest must canonicalize alongside activity"
         );
         assert!(
             canonicalize_record(&pg_blocking_record()).is_some(),
-            "blocking ingest must be unaffected by the activity knob"
+            "blocking ingest must canonicalize alongside activity"
         );
     }
 }
@@ -3233,14 +3161,6 @@ fn mysql_top_query() -> Map<String, Value> {
     }))
 }
 
-/// Force the top_query ingest knob on for the duration of a test.
-///
-/// The knob defaults OFF (D-G), so the dispatch arm is unreachable without it —
-/// which is itself pinned by `top_query_dispatch_is_gated_off_by_default`.
-fn with_top_query_enabled<T>(f: impl FnOnce() -> T) -> T {
-    with_knob("ZO_DB_MONITORING_TOP_QUERY_ENABLED", f)
-}
-
 // ── W3.1 · Canonicalization ─────────────────────────────────────────────────
 
 /// The Postgres happy path, over the real record.
@@ -3545,22 +3465,20 @@ fn every_stored_top_query_value_is_a_scalar() {
     // map — not this canonicalizer's return value. A merge step that unpacked
     // the plan would be invisible to the sweep above and would still kill every
     // batch.
-    with_top_query_enabled(|| {
-        for (name, mut rec) in [
-            ("with a plan", pg_top_query()),
-            ("empty plan", pg_top_query_empty_plan()),
-            ("mysql", mysql_top_query_with_event_name()),
-        ] {
-            server_vantage::apply_to_record(&mut rec);
-            for (k, v) in &rec {
-                assert!(
-                    !v.is_object() && !v.is_array(),
-                    "{name}: `{k}` reaches the schema inferrer as a nested value — that rejects \
-                     the WHOLE ingest batch (X5)"
-                );
-            }
+    for (name, mut rec) in [
+        ("with a plan", pg_top_query()),
+        ("empty plan", pg_top_query_empty_plan()),
+        ("mysql", mysql_top_query_with_event_name()),
+    ] {
+        server_vantage::apply_to_record(&mut rec);
+        for (k, v) in &rec {
+            assert!(
+                !v.is_object() && !v.is_array(),
+                "{name}: `{k}` reaches the schema inferrer as a nested value — that rejects \
+                 the WHOLE ingest batch (X5)"
+            );
         }
-    });
+    }
 }
 
 /// The tolerant reader, mirroring `participants_of` (D-B).
@@ -4185,19 +4103,17 @@ fn the_plan_hash_version_is_stored_beside_the_hash() {
 /// The dispatch arm, on the trusted OTLP event name.
 #[test]
 fn canonicalize_record_dispatches_top_query_on_the_event_name() {
-    with_top_query_enabled(|| {
-        let mut rec = pg_top_query();
-        rec.insert(
-            server_vantage::O2_EVENT_NAME.into(),
-            json!(server_vantage::EVENT_TOP_QUERY),
-        );
-        let out = canonicalize_record(&rec).expect("a top_query event must reach its arm");
-        assert_eq!(
-            out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
-            Some(server_vantage::KIND_TOP_QUERY),
-        );
-        assert!(out.contains_key(server_vantage::O2_DBM_PLAN_HASH));
-    });
+    let mut rec = pg_top_query();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_TOP_QUERY),
+    );
+    let out = canonicalize_record(&rec).expect("a top_query event must reach its arm");
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+        Some(server_vantage::KIND_TOP_QUERY),
+    );
+    assert!(out.contains_key(server_vantage::O2_DBM_PLAN_HASH));
 }
 
 /// MySQL has no `postgresql.*` attribute to sniff, so the OTLP event name is the
@@ -4205,18 +4121,16 @@ fn canonicalize_record_dispatches_top_query_on_the_event_name() {
 /// silently dropped.
 #[test]
 fn canonicalize_record_dispatches_mysql_top_query() {
-    with_top_query_enabled(|| {
-        let mut rec = mysql_top_query();
-        rec.insert(
-            server_vantage::O2_EVENT_NAME.into(),
-            json!(server_vantage::EVENT_TOP_QUERY),
-        );
-        let out = canonicalize_record(&rec).expect("MySQL top_query must reach its arm");
-        assert_eq!(
-            out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
-            Some(server_vantage::KIND_TOP_QUERY),
-        );
-    });
+    let mut rec = mysql_top_query();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_TOP_QUERY),
+    );
+    let out = canonicalize_record(&rec).expect("MySQL top_query must reach its arm");
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+        Some(server_vantage::KIND_TOP_QUERY),
+    );
 }
 
 /// The A2 shape-sniff fallback: `postgresql.calls` is top_query-exclusive, and
@@ -4224,43 +4138,34 @@ fn canonicalize_record_dispatches_mysql_top_query() {
 /// has an OTLP envelope.
 #[test]
 fn top_query_reaches_its_arm_by_shape_sniff() {
-    with_top_query_enabled(|| {
-        let rec = pg_top_query();
-        assert!(
-            !rec.contains_key(server_vantage::O2_EVENT_NAME),
-            "the fixture must have no event name, or this proves nothing"
-        );
-        let out = canonicalize_record(&rec).expect("the shape sniff must route a JSON-path record");
-        assert_eq!(
-            out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
-            Some(server_vantage::KIND_TOP_QUERY),
-        );
-    });
+    let rec = pg_top_query();
+    assert!(
+        !rec.contains_key(server_vantage::O2_EVENT_NAME),
+        "the fixture must have no event name, or this proves nothing"
+    );
+    let out = canonicalize_record(&rec).expect("the shape sniff must route a JSON-path record");
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+        Some(server_vantage::KIND_TOP_QUERY),
+    );
 }
 
-/// **D-G: the knob defaults OFF, so nothing is ingested on upgrade.**
+/// **The top_query arm is always on.**
 ///
-/// Asserted through the DISPATCH rather than the config struct, because a knob
-/// that exists and defaults false while the arm ignores it is the bug.
+/// The opt-in knob that used to gate this arm was removed when the DBM config
+/// collapsed to the single `ZO_DB_MONITORING_ENABLED` switch. Asserted through
+/// the DISPATCH with no env juggling: a top_query record must canonicalize.
 #[test]
-fn top_query_dispatch_is_gated_off_by_default() {
-    let _guard = KNOB_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    unsafe { std::env::remove_var("ZO_DB_MONITORING_TOP_QUERY_ENABLED") };
-    config::refresh_config().expect("config refresh");
-    assert!(
-        !config::get_config().db_monitoring.top_query_enabled,
-        "ZO_DB_MONITORING_TOP_QUERY_ENABLED must default OFF (D-G)"
-    );
-
+fn top_query_dispatch_is_always_on() {
     let mut rec = pg_top_query();
     rec.insert(
         server_vantage::O2_EVENT_NAME.into(),
         json!(server_vantage::EVENT_TOP_QUERY),
     );
+    let out = canonicalize_record(&rec).expect("a top_query record must canonicalize");
     assert_eq!(
-        canonicalize_record(&rec),
-        None,
-        "with the knob off, a top_query record must produce no DBM columns at all"
+        out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+        Some(server_vantage::KIND_TOP_QUERY),
     );
 }
 
@@ -4271,79 +4176,68 @@ fn top_query_dispatch_is_gated_off_by_default() {
 /// an arm that never fires at all — which is also how the feature ships broken.
 #[test]
 fn each_record_kind_reaches_its_own_arm() {
-    with_top_query_enabled(|| {
-        // The two enterprise kinds are in the table only on an enterprise build;
-        // on OSS they canonicalize to nothing at all, which
-        // `enterprise_owned_records_do_not_canonicalize_on_oss` pins.
-        #[cfg(feature = "enterprise")]
-        let enterprise_kinds = [
-            (
-                "pg deadlock",
-                pg_deadlock_record(),
-                server_vantage::KIND_DEADLOCK,
-            ),
-            (
-                "pg blocking",
-                pg_blocking_record(),
-                server_vantage::KIND_BLOCKING,
-            ),
-        ];
-        #[cfg(not(feature = "enterprise"))]
-        let enterprise_kinds: [(&str, Map<String, Value>, &str); 0] = [];
+    // The two enterprise kinds are in the table only on an enterprise build;
+    // on OSS they canonicalize to nothing at all, which
+    // `enterprise_owned_records_do_not_canonicalize_on_oss` pins.
+    #[cfg(feature = "enterprise")]
+    let enterprise_kinds = [
+        (
+            "pg deadlock",
+            pg_deadlock_record(),
+            server_vantage::KIND_DEADLOCK,
+        ),
+        (
+            "pg blocking",
+            pg_blocking_record(),
+            server_vantage::KIND_BLOCKING,
+        ),
+    ];
+    #[cfg(not(feature = "enterprise"))]
+    let enterprise_kinds: [(&str, Map<String, Value>, &str); 0] = [];
 
-        for (name, rec, expected) in enterprise_kinds.into_iter().chain([
-            (
-                "pg top_query",
-                pg_top_query(),
-                server_vantage::KIND_TOP_QUERY,
-            ),
-            (
-                "mysql top_query",
-                mysql_top_query_with_event_name(),
-                server_vantage::KIND_TOP_QUERY,
-            ),
-        ]) {
-            let out =
-                canonicalize_record(&rec).unwrap_or_else(|| panic!("{name} must canonicalize"));
-            assert_eq!(
-                out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
-                Some(expected),
-                "{name} must reach its own arm and keep its own kind"
-            );
-        }
-    });
+    for (name, rec, expected) in enterprise_kinds.into_iter().chain([
+        (
+            "pg top_query",
+            pg_top_query(),
+            server_vantage::KIND_TOP_QUERY,
+        ),
+        (
+            "mysql top_query",
+            mysql_top_query_with_event_name(),
+            server_vantage::KIND_TOP_QUERY,
+        ),
+    ]) {
+        let out = canonicalize_record(&rec).unwrap_or_else(|| panic!("{name} must canonicalize"));
+        assert_eq!(
+            out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+            Some(expected),
+            "{name} must reach its own arm and keep its own kind"
+        );
+    }
 }
 
-/// **The parent DBM knob still wins over the child.**
+/// **The single DBM switch disables top_query ingest entirely.**
 ///
 /// `apply_to_record` early-returns when `db_monitoring.enabled` is off, BEFORE
-/// the reservation strip. So with the parent off nothing is canonicalized —
-/// which also means a caller's forged `o2_dbm_*` values are not stripped, and a
-/// reader must not mistake them for ingest-derived ones. The combination
-/// (parent off, child on) is what a user who disabled DBM wholesale then
-/// upgraded actually runs.
+/// the reservation strip. So with DBM off nothing is canonicalized — which
+/// also means a caller's forged `o2_dbm_*` values are not stripped, and a
+/// reader must not mistake them for ingest-derived ones.
 #[test]
 fn the_parent_knob_disables_top_query_ingest_entirely() {
-    with_knobs(
-        &[
-            ("ZO_DB_MONITORING_TOP_QUERY_ENABLED", "true"),
-            ("ZO_DB_MONITORING_ENABLED", "false"),
-        ],
-        || {
-            let mut rec = pg_top_query();
-            rec.insert(
-                server_vantage::O2_EVENT_NAME.into(),
-                json!(server_vantage::EVENT_TOP_QUERY),
-            );
-            server_vantage::apply_to_record(&mut rec);
-            assert!(
-                !rec.contains_key(server_vantage::O2_DBM_KIND),
-                "with DB monitoring off wholesale, top_query ingest must write nothing — the \
+    with_knobs(&[("ZO_DB_MONITORING_ENABLED", "false")], || {
+        let mut rec = pg_top_query();
+        rec.insert(
+            server_vantage::O2_EVENT_NAME.into(),
+            json!(server_vantage::EVENT_TOP_QUERY),
+        );
+        server_vantage::apply_to_record(&mut rec);
+        assert!(
+            !rec.contains_key(server_vantage::O2_DBM_KIND),
+            "with DB monitoring off wholesale, top_query ingest must write nothing — the \
                  child knob cannot re-enable a disabled feature"
-            );
-            assert!(!rec.contains_key(server_vantage::O2_DBM_PLAN));
-        },
-    );
+        );
+        assert!(!rec.contains_key(server_vantage::O2_DBM_PLAN));
+    });
 }
 
 /// The MySQL fixture with its OTLP event name attached — MySQL carries no
@@ -4365,50 +4259,48 @@ fn mysql_top_query_with_event_name() -> Map<String, Value> {
 /// database did.
 #[test]
 fn a_caller_cannot_supply_a_plan_or_its_hash() {
-    with_top_query_enabled(|| {
-        let mut rec = pg_top_query();
-        rec.insert(
-            server_vantage::O2_DBM_PLAN.into(),
-            json!("[{\"Plan\":{\"Node Type\":\"Forged\"}}]"),
-        );
-        rec.insert(
-            server_vantage::O2_DBM_PLAN_HASH.into(),
-            json!("deadbeefdeadbeef"),
-        );
-        rec.insert(server_vantage::O2_DBM_CALLS.into(), json!(999_999));
+    let mut rec = pg_top_query();
+    rec.insert(
+        server_vantage::O2_DBM_PLAN.into(),
+        json!("[{\"Plan\":{\"Node Type\":\"Forged\"}}]"),
+    );
+    rec.insert(
+        server_vantage::O2_DBM_PLAN_HASH.into(),
+        json!("deadbeefdeadbeef"),
+    );
+    rec.insert(server_vantage::O2_DBM_CALLS.into(), json!(999_999));
 
-        server_vantage::apply_to_record(&mut rec);
+    server_vantage::apply_to_record(&mut rec);
 
-        // Asserted POSITIVELY: `assert_ne!` against the forged value is also
-        // satisfied by a canonicalizer that strips everything and writes nothing
-        // back, which is a broken feature passing a security test.
-        let expected =
-            server_vantage::canonicalize_top_query(&pg_top_query()).expect("the receiver's record");
-        assert_eq!(
-            rec.get(server_vantage::O2_DBM_PLAN_HASH)
-                .and_then(Value::as_str),
-            expected.plan_hash.as_deref(),
-            "the surviving hash must be the one WE computed from the receiver's plan"
-        );
-        assert_eq!(
-            rec.get(server_vantage::O2_DBM_CALLS)
-                .and_then(Value::as_i64),
-            Some(19687),
-            "the surviving call count must be the receiver's measured value"
-        );
-        let plan = rec
-            .get(server_vantage::O2_DBM_PLAN)
-            .and_then(Value::as_str)
-            .expect("the receiver's plan must be stored");
-        assert!(
-            plan.contains("ModifyTable"),
-            "the stored plan must be the receiver's"
-        );
-        assert!(
-            !plan.contains("Forged"),
-            "the stored plan must never be the caller's"
-        );
-    });
+    // Asserted POSITIVELY: `assert_ne!` against the forged value is also
+    // satisfied by a canonicalizer that strips everything and writes nothing
+    // back, which is a broken feature passing a security test.
+    let expected =
+        server_vantage::canonicalize_top_query(&pg_top_query()).expect("the receiver's record");
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_PLAN_HASH)
+            .and_then(Value::as_str),
+        expected.plan_hash.as_deref(),
+        "the surviving hash must be the one WE computed from the receiver's plan"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_CALLS)
+            .and_then(Value::as_i64),
+        Some(19687),
+        "the surviving call count must be the receiver's measured value"
+    );
+    let plan = rec
+        .get(server_vantage::O2_DBM_PLAN)
+        .and_then(Value::as_str)
+        .expect("the receiver's plan must be stored");
+    assert!(
+        plan.contains("ModifyTable"),
+        "the stored plan must be the receiver's"
+    );
+    assert!(
+        !plan.contains("Forged"),
+        "the stored plan must never be the caller's"
+    );
 }
 
 /// The real captured plan: 19 levels deep, 2385 bytes, from `pg-top-query.jsonl`.
@@ -4745,50 +4637,48 @@ fn the_reserved_field_list_has_no_duplicates() {
 /// so only the strip can remove them.
 #[test]
 fn the_strip_removes_forged_columns_the_receiver_never_writes() {
-    with_top_query_enabled(|| {
-        // A Postgres record, so the shape sniff routes it: `o2_event_name` is
-        // itself a reserved field, and `apply_to_record`'s strip removes it
-        // before dispatch — the OTLP producer loop re-inserts the trusted value
-        // afterwards (`logs/otlp.rs:548-554`), which is the D-I design, but a
-        // direct call here has no producer loop to do that. MySQL cannot be
-        // sniffed, so a MySQL record reaching this function directly is
-        // unroutable by construction.
-        //
-        // The plan is blanked so nothing legitimate overwrites the forged plan
-        // columns; the counters forged below are MySQL-only absences on a PG
-        // record — either way, only the strip can remove them.
-        let mut rec = pg_top_query();
-        rec.insert("postgresql_query_plan".into(), json!(""));
-        rec.remove("postgresql_rows");
-        rec.remove("postgresql_shared_blks_hit");
-        rec.insert(server_vantage::O2_DBM_ROWS.into(), json!(4_242_424));
-        rec.insert(server_vantage::O2_DBM_SHARED_BLKS_HIT.into(), json!(777));
-        rec.insert(server_vantage::O2_DBM_PLAN_HASH_VERSION.into(), json!(999));
-        rec.insert(
-            server_vantage::O2_DBM_PLAN.into(),
-            json!("[{\"Plan\":{\"Node Type\":\"Forged\"}}]"),
-        );
+    // A Postgres record, so the shape sniff routes it: `o2_event_name` is
+    // itself a reserved field, and `apply_to_record`'s strip removes it
+    // before dispatch — the OTLP producer loop re-inserts the trusted value
+    // afterwards (`logs/otlp.rs:548-554`), which is the D-I design, but a
+    // direct call here has no producer loop to do that. MySQL cannot be
+    // sniffed, so a MySQL record reaching this function directly is
+    // unroutable by construction.
+    //
+    // The plan is blanked so nothing legitimate overwrites the forged plan
+    // columns; the counters forged below are MySQL-only absences on a PG
+    // record — either way, only the strip can remove them.
+    let mut rec = pg_top_query();
+    rec.insert("postgresql_query_plan".into(), json!(""));
+    rec.remove("postgresql_rows");
+    rec.remove("postgresql_shared_blks_hit");
+    rec.insert(server_vantage::O2_DBM_ROWS.into(), json!(4_242_424));
+    rec.insert(server_vantage::O2_DBM_SHARED_BLKS_HIT.into(), json!(777));
+    rec.insert(server_vantage::O2_DBM_PLAN_HASH_VERSION.into(), json!(999));
+    rec.insert(
+        server_vantage::O2_DBM_PLAN.into(),
+        json!("[{\"Plan\":{\"Node Type\":\"Forged\"}}]"),
+    );
 
-        server_vantage::apply_to_record(&mut rec);
+    server_vantage::apply_to_record(&mut rec);
 
-        for forged in [
-            server_vantage::O2_DBM_ROWS,
-            server_vantage::O2_DBM_SHARED_BLKS_HIT,
-            server_vantage::O2_DBM_PLAN_HASH_VERSION,
-            server_vantage::O2_DBM_PLAN,
-        ] {
-            assert!(
-                !rec.contains_key(forged),
-                "`{forged}` is not written for this record, so a surviving value can only be \
-                 the caller's — the reservation strip must have removed it"
-            );
-        }
-        // The record still canonicalized; the strip did not eat the real data.
-        assert_eq!(
-            rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
-            Some(server_vantage::KIND_TOP_QUERY),
+    for forged in [
+        server_vantage::O2_DBM_ROWS,
+        server_vantage::O2_DBM_SHARED_BLKS_HIT,
+        server_vantage::O2_DBM_PLAN_HASH_VERSION,
+        server_vantage::O2_DBM_PLAN,
+    ] {
+        assert!(
+            !rec.contains_key(forged),
+            "`{forged}` is not written for this record, so a surviving value can only be \
+             the caller's — the reservation strip must have removed it"
         );
-    });
+    }
+    // The record still canonicalized; the strip did not eat the real data.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+        Some(server_vantage::KIND_TOP_QUERY),
+    );
 }
 
 /// **A query_sample record must never land as a top query.**
@@ -4799,33 +4689,31 @@ fn the_strip_removes_forged_columns_the_receiver_never_writes() {
 /// queries — and the trusted event name must beat the sniff when they disagree.
 #[test]
 fn a_query_sample_never_lands_as_a_top_query() {
-    with_top_query_enabled(|| {
-        let out = canonicalize_record(&pg_query_sample_blocked());
-        assert_ne!(
-            out.as_ref()
-                .and_then(|o| o.get(server_vantage::O2_DBM_KIND))
-                .and_then(Value::as_str),
-            Some(server_vantage::KIND_TOP_QUERY),
-            "an activity sample is not a top query"
-        );
+    let out = canonicalize_record(&pg_query_sample_blocked());
+    assert_ne!(
+        out.as_ref()
+            .and_then(|o| o.get(server_vantage::O2_DBM_KIND))
+            .and_then(Value::as_str),
+        Some(server_vantage::KIND_TOP_QUERY),
+        "an activity sample is not a top query"
+    );
 
-        // Shape says top_query, the trusted OTLP name says query_sample. The
-        // name must win — it is the receiver's own discriminator, while the
-        // shape is a fallback for records that never had one.
-        let mut conflicted = pg_top_query();
-        conflicted.insert(
-            server_vantage::O2_EVENT_NAME.into(),
-            json!(server_vantage::EVENT_QUERY_SAMPLE),
-        );
-        assert_ne!(
-            canonicalize_record(&conflicted)
-                .as_ref()
-                .and_then(|o| o.get(server_vantage::O2_DBM_KIND))
-                .and_then(Value::as_str),
-            Some(server_vantage::KIND_TOP_QUERY),
-            "a present event name must beat the shape sniff"
-        );
-    });
+    // Shape says top_query, the trusted OTLP name says query_sample. The
+    // name must win — it is the receiver's own discriminator, while the
+    // shape is a fallback for records that never had one.
+    let mut conflicted = pg_top_query();
+    conflicted.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_QUERY_SAMPLE),
+    );
+    assert_ne!(
+        canonicalize_record(&conflicted)
+            .as_ref()
+            .and_then(|o| o.get(server_vantage::O2_DBM_KIND))
+            .and_then(Value::as_str),
+        Some(server_vantage::KIND_TOP_QUERY),
+        "a present event name must beat the shape sniff"
+    );
 }
 
 /// **A whitespace-only or literal-null plan is no plan.**
@@ -4913,21 +4801,19 @@ fn the_top_query_record_round_trips_with_correct_types() {
 /// `apply_to_record` — the entry point the OTLP and JSON ingest paths actually call.
 #[test]
 fn apply_to_record_canonicalizes_mysql_receiver_events() {
-    with_top_query_enabled(|| {
-        let mut rec = mysql_top_query();
-        rec.insert(
-            server_vantage::O2_EVENT_NAME.into(),
-            json!(server_vantage::EVENT_TOP_QUERY),
-        );
-        server_vantage::apply_to_record(&mut rec);
-        assert_eq!(
-            rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
-            Some(server_vantage::KIND_TOP_QUERY),
-            "a MySQL top_query must canonicalize through the real ingest entry point; \
-             it is discriminated by the OTLP event name and has no Postgres-shaped \
-             attribute to fall back on"
-        );
-    });
+    let mut rec = mysql_top_query();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_TOP_QUERY),
+    );
+    server_vantage::apply_to_record(&mut rec);
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+        Some(server_vantage::KIND_TOP_QUERY),
+        "a MySQL top_query must canonicalize through the real ingest entry point; \
+         it is discriminated by the OTLP event name and has no Postgres-shaped \
+         attribute to fall back on"
+    );
 }
 
 /// The Postgres path must keep working through the same entry point — it survives
@@ -4935,18 +4821,16 @@ fn apply_to_record_canonicalizes_mysql_receiver_events() {
 /// must not regress the case that already works.
 #[test]
 fn apply_to_record_still_canonicalizes_postgres_receiver_events() {
-    with_top_query_enabled(|| {
-        let mut rec = pg_top_query();
-        rec.insert(
-            server_vantage::O2_EVENT_NAME.into(),
-            json!(server_vantage::EVENT_TOP_QUERY),
-        );
-        server_vantage::apply_to_record(&mut rec);
-        assert_eq!(
-            rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
-            Some(server_vantage::KIND_TOP_QUERY),
-        );
-    });
+    let mut rec = pg_top_query();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_TOP_QUERY),
+    );
+    server_vantage::apply_to_record(&mut rec);
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+        Some(server_vantage::KIND_TOP_QUERY),
+    );
 }
 
 /// The OTHER half of B19: `query_sample` is discriminated the same way, so a
@@ -4957,19 +4841,17 @@ fn apply_to_record_still_canonicalizes_postgres_receiver_events() {
 fn apply_to_record_canonicalizes_mysql_query_sample() {
     // The real knob, not `dispatch_activity`: that helper BYPASSES the gate rather
     // than enabling it, so it cannot exercise the ingest entry point this pins.
-    with_knob("ZO_DB_MONITORING_ACTIVITY_ENABLED", || {
-        let mut rec = mysql_query_sample();
-        rec.insert(
-            server_vantage::O2_EVENT_NAME.into(),
-            json!(server_vantage::EVENT_QUERY_SAMPLE),
-        );
-        server_vantage::apply_to_record(&mut rec);
-        assert_eq!(
-            rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
-            Some(server_vantage::KIND_ACTIVITY),
-            "a MySQL query_sample must canonicalize through the real ingest entry point"
-        );
-    });
+    let mut rec = mysql_query_sample();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_QUERY_SAMPLE),
+    );
+    server_vantage::apply_to_record(&mut rec);
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+        Some(server_vantage::KIND_ACTIVITY),
+        "a MySQL query_sample must canonicalize through the real ingest entry point"
+    );
 }
 
 /// **The strip must not become a back door.**
@@ -4984,20 +4866,18 @@ fn apply_to_record_canonicalizes_mysql_query_sample() {
 /// that is the path the fix newly enables.
 #[test]
 fn the_carried_event_name_is_not_stored_on_the_record() {
-    with_top_query_enabled(|| {
-        let mut rec = mysql_top_query();
-        rec.insert(
-            server_vantage::O2_EVENT_NAME.into(),
-            json!(server_vantage::EVENT_TOP_QUERY),
-        );
-        server_vantage::apply_to_record(&mut rec);
-        assert!(
-            !rec.contains_key(server_vantage::O2_EVENT_NAME),
-            "the name carried across the strip is a dispatch input, not a stored \
-             field — the ingest paths re-insert the value taken from the OTLP \
-             envelope, and that is what makes the stored field trusted"
-        );
-    });
+    let mut rec = mysql_top_query();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_TOP_QUERY),
+    );
+    server_vantage::apply_to_record(&mut rec);
+    assert!(
+        !rec.contains_key(server_vantage::O2_EVENT_NAME),
+        "the name carried across the strip is a dispatch input, not a stored \
+         field — the ingest paths re-insert the value taken from the OTLP \
+         envelope, and that is what makes the stored field trusted"
+    );
 }
 
 // ─── W10 · Table health (`pg_table_stats`) ───────────────────────────────────
@@ -6927,11 +6807,6 @@ fn t1_prepared_statement_text_fingerprints_as_the_prepare_row() {
 
 // ── W-E3 · canonicalization, through `apply_to_record` ──────────────────────
 
-/// Force the explain ingest knob on for the duration of a test.
-fn with_explain_enabled<T>(f: impl FnOnce() -> T) -> T {
-    with_knob("ZO_DB_MONITORING_EXPLAIN_ENABLED", f)
-}
-
 /// A flattened auto_explain filelog record, exactly as the T2 recipe produces
 /// it: the prefix fields from `pg_prefix`, the tag from `mark_explain`, and the
 /// two guarded extractions — `ae_duration_ms` as a STRING (regex captures are
@@ -6953,22 +6828,6 @@ fn pg_auto_explain_flattened() -> Map<String, Value> {
     }))
 }
 
-/// D-G: the knob defaults OFF, and the dispatch arm must be unreachable
-/// without it — an upgrade must not silently acquire auto_explain ingest.
-#[test]
-fn explain_dispatch_is_gated_off_by_default() {
-    if config::get_config().db_monitoring.explain_enabled {
-        return; // an env override is present; the default-off pin lives in config tests
-    }
-    let mut rec = pg_auto_explain_flattened();
-    server_vantage::apply_to_record(&mut rec);
-    assert!(
-        !rec.contains_key(server_vantage::O2_DBM_KIND),
-        "with ZO_DB_MONITORING_EXPLAIN_ENABLED unset an explain record must \
-         pass through un-canonicalized"
-    );
-}
-
 /// The happy path over the real captured entry, THROUGH `apply_to_record`.
 ///
 /// The flagship assertions are the two cross-producer joins: the stored
@@ -6980,7 +6839,7 @@ fn explain_dispatch_is_gated_off_by_default() {
 fn pg_auto_explain_canonicalizes_through_apply_to_record() {
     let fx = ae_fixture();
     let mut rec = pg_auto_explain_flattened();
-    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+    server_vantage::apply_to_record(&mut rec);
 
     assert_eq!(
         rec.get(server_vantage::O2_DBM_KIND)
@@ -7063,7 +6922,7 @@ fn pg_auto_explain_without_analyze_omits_duration_columns_it_cannot_support() {
     );
     // The header duration still exists (it is measured by auto_explain, not by
     // the executor instrumentation) — but the ROWS actual cannot.
-    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+    server_vantage::apply_to_record(&mut rec);
     assert_eq!(
         rec.get(server_vantage::O2_DBM_KIND)
             .and_then(|v| v.as_str()),
@@ -7088,7 +6947,7 @@ fn pg_auto_explain_without_analyze_omits_duration_columns_it_cannot_support() {
 fn pg_auto_explain_without_a_plan_document_is_skipped() {
     let mut rec = pg_auto_explain_flattened();
     rec.remove("ae_plan_json");
-    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+    server_vantage::apply_to_record(&mut rec);
     assert!(
         !rec.contains_key(server_vantage::O2_DBM_KIND),
         "no document ⇒ no record; a truncated capture must fail silently and locally"
@@ -7103,7 +6962,7 @@ fn pg_auto_explain_without_a_plan_document_is_skipped() {
 fn pg_auto_explain_query_id_joins_and_zero_reads_as_absent() {
     let mut rec = pg_auto_explain_flattened();
     rec.insert("pg_query_id".into(), json!("-679379679796231264"));
-    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+    server_vantage::apply_to_record(&mut rec);
     assert_eq!(
         rec.get(server_vantage::O2_DBM_SERVER_QUERY_ID)
             .and_then(|v| v.as_str()),
@@ -7113,7 +6972,7 @@ fn pg_auto_explain_query_id_joins_and_zero_reads_as_absent() {
 
     let mut zero = pg_auto_explain_flattened();
     zero.insert("pg_query_id".into(), json!("0"));
-    with_explain_enabled(|| server_vantage::apply_to_record(&mut zero));
+    server_vantage::apply_to_record(&mut zero);
     assert!(
         !zero.contains_key(server_vantage::O2_DBM_SERVER_QUERY_ID),
         "%Q prints 0 for uncomputed queryids; a literal '0' key would glue \
@@ -7189,7 +7048,7 @@ fn top_query_rows_stamp_generic_plan_source_alongside_the_plan() {
 fn a_real_collector_emitted_explain_record_canonicalizes_end_to_end() {
     let fx = ae_fixture();
     let mut rec = obj(fx["collector_flattened"]["record"].clone());
-    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+    server_vantage::apply_to_record(&mut rec);
 
     assert_eq!(
         rec.get(server_vantage::O2_DBM_KIND)
@@ -7326,14 +7185,10 @@ fn ws1_parser_rejects_auto_explain_headers() {
 
 // ── canonicalization, through `apply_to_record` ──
 
-/// The happy path over the real captured row, THROUGH `apply_to_record` — the
-/// knob defaults ON, so no env juggling. Every canonical column is asserted
-/// against the live values.
+/// The happy path over the real captured row, THROUGH `apply_to_record`.
+/// Every canonical column is asserted against the live values.
 #[test]
 fn ws1_statement_duration_canonicalizes_through_apply_to_record() {
-    if !config::get_config().db_monitoring.statement_enabled {
-        return; // an env override is present; the default-on pin lives in config tests
-    }
     let mut rec = pg_statement_duration_flattened();
     server_vantage::apply_to_record(&mut rec);
 
@@ -7423,9 +7278,6 @@ fn ws1_statement_duration_canonicalizes_through_apply_to_record() {
 /// long" is honest without its statement.
 #[test]
 fn ws1_lexer_failure_stores_no_raw_text_in_canonical_fields() {
-    if !config::get_config().db_monitoring.statement_enabled {
-        return;
-    }
     let mut rec = pg_statement_duration_flattened();
     rec.insert("stmt_text".into(), json!("SELECT 'unterminated"));
     rec.insert(
@@ -7460,9 +7312,6 @@ fn ws1_lexer_failure_stores_no_raw_text_in_canonical_fields() {
 /// the fallback source.
 #[test]
 fn ws1_message_fallback_parses_without_stmt_attributes() {
-    if !config::get_config().db_monitoring.statement_enabled {
-        return;
-    }
     let mut rec = pg_statement_duration_flattened();
     rec.remove("stmt_duration_ms");
     rec.remove("stmt_kind");
@@ -7489,9 +7338,6 @@ fn ws1_message_fallback_parses_without_stmt_attributes() {
 /// parser: the tailer's regex also captures `parse`/`bind` lines.
 #[test]
 fn ws1_pre_parsed_phase_lines_are_rejected() {
-    if !config::get_config().db_monitoring.statement_enabled {
-        return;
-    }
     let mut rec = pg_statement_duration_flattened();
     rec.insert("stmt_kind".into(), json!("parse s_1"));
     server_vantage::apply_to_record(&mut rec);
@@ -7522,9 +7368,6 @@ fn ws1_caller_supplied_duration_is_stripped() {
 /// auto_explain path.
 #[test]
 fn ws1_zero_query_id_is_not_a_join_key() {
-    if !config::get_config().db_monitoring.statement_enabled {
-        return;
-    }
     let mut rec = pg_statement_duration_flattened();
     rec.insert("pg_query_id".into(), json!("0"));
     server_vantage::apply_to_record(&mut rec);

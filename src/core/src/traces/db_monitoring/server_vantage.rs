@@ -1185,8 +1185,12 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
 ///
 /// This is the single ingest-side entry point (the logs analogue of [`super::enrich`]).
 pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, Value>> {
-    // One config load per record — the gated arms below all read from it.
-    let cfg = config::get_config();
+    // No per-signal gating: DBM is a single switch (`ZO_DB_MONITORING_ENABLED`,
+    // checked by the CALLER before dispatch reaches this function), so every
+    // arm below canonicalizes whenever DBM is enabled. The per-kind knobs that
+    // used to gate the explain/statement/activity/top_query arms were removed
+    // when the config collapsed to that one flag.
+    //
     // Deadlocks — Postgres DETAIL entries and MySQL/MariaDB per-transaction
     // entries. ENTERPRISE-OWNED: the canonicalizers moved to
     // `o2_enterprise::enterprise::db_monitoring::deadlock`, and the hook below
@@ -1232,21 +1236,13 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     }
     // Real executed plans (W-E3) — auto_explain filelog records. Same tag
     // family as the deadlock arms above: filelog produces no OTLP EventName,
-    // so the collector tag is the only discriminator there is. Gated on its
-    // own knob (D-G), scoped to THIS arm only — deadlocks and blocking
-    // shipped enabled and must not switch off behind a knob about a sixth
-    // record type.
-    if cfg.db_monitoring.explain_enabled
-        && rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("explain")
-    {
+    // so the collector tag is the only discriminator there is.
+    if rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("explain") {
         return canonicalize_pg_auto_explain(rec).map(|e| e.to_record());
     }
     // Completed-statement durations (W-S1) — `log_min_duration_statement`
     // filelog records. Same tag family as deadlock/explain: filelog produces
-    // no OTLP EventName, so the collector tag is the discriminator. Gated on
-    // its own knob, scoped to THIS arm only, like explain above — but the
-    // knob defaults ON (see the config docs: these lines are already being
-    // ingested, so the knob gates columns, not a feed).
+    // no OTLP EventName, so the collector tag is the discriminator.
     //
     // POSTGRES ONLY, deliberately: MySQL/MariaDB's per-execution equivalent
     // is the slow query log, which no shipped recipe tails (only error.log
@@ -1254,9 +1250,7 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     // `# Query_time:` headers), needing multi-line stitching nothing here
     // does yet. An arm without a producer would be dead code that reads as
     // coverage — add the MySQL arm together with a slow-log tailer recipe.
-    if cfg.db_monitoring.statement_enabled
-        && rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("statement_duration")
-    {
+    if rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("statement_duration") {
         return canonicalize_pg_statement_duration(rec).map(|e| e.to_record());
     }
     // Enterprise: recipe-tag records (mssql deadlock, blocking, table/index
@@ -1311,20 +1305,14 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     #[cfg(feature = "enterprise")]
     let _ = is_enterprise_recipe;
 
-    // Active sessions (W2) — LAST, and gated on its own knob.
-    //
-    // The gate is scoped to this arm rather than being an early return: activity
-    // is opt-in (D-G) because it is the highest-volume signal DBM has
-    // (~200 rows/sec for a 200-session instance), but deadlocks and blocking
-    // already shipped enabled and must not switch off behind a knob about a
-    // third record type.
-    if cfg.db_monitoring.activity_enabled && resolve_event_name(rec) == Some(EVENT_QUERY_SAMPLE) {
+    // Active sessions (W2) — LAST: the EventName-keyed arms sit below every
+    // tag-keyed arm so a dual-marker record (constructible on the untrusted
+    // `/_json` path) cannot change which arm claims it.
+    if resolve_event_name(rec) == Some(EVENT_QUERY_SAMPLE) {
         return canonicalize_query_sample(rec).map(|s| s.to_record());
     }
-    // Top queries + plans (W3) — gated on its own knob, for the same reason
-    // activity is: plan documents are large (the captured Postgres plans reach
-    // 2.4 KB each) and a user upgrading must not silently acquire the cost.
-    if cfg.db_monitoring.top_query_enabled && resolve_event_name(rec) == Some(EVENT_TOP_QUERY) {
+    // Top queries + plans (W3).
+    if resolve_event_name(rec) == Some(EVENT_TOP_QUERY) {
         return canonicalize_top_query(rec).map(|s| s.to_record());
     }
     None
@@ -1828,7 +1816,14 @@ pub fn canonicalize_pg_auto_explain(rec: &Map<String, Value>) -> Option<AutoExpl
     Some(AutoExplainEvent {
         engine,
         database: detect_database(rec),
-        instance: detect_instance(rec),
+        // Same derivation chain as the receiver-event siblings (N5): the
+        // collector's resource attributes first, then the shared detectors —
+        // filelog records carry no receiver endpoint field, so without the
+        // resource-attr fallback these rows stored NO instance and the
+        // `?instance=` filter silently excluded every one of them.
+        instance: first_str(rec, &["mysql_instance_endpoint", "service_instance_id"])
+            .map(|a| super::strip_port(&a))
+            .or_else(|| detect_instance(rec)),
         timestamp: detect_timestamp(rec),
         query: query_norm.or(query),
         fingerprint,
@@ -2024,7 +2019,12 @@ pub fn canonicalize_pg_statement_duration(
     Some(StatementDurationEvent {
         engine,
         database: detect_database(rec),
-        instance: detect_instance(rec),
+        // Same derivation chain as the receiver-event siblings (N5) — see the
+        // auto_explain arm above for why the resource-attr fallback matters on
+        // filelog records.
+        instance: first_str(rec, &["mysql_instance_endpoint", "service_instance_id"])
+            .map(|a| super::strip_port(&a))
+            .or_else(|| detect_instance(rec)),
         timestamp: detect_timestamp(rec),
         duration_ms,
         session_pid: first_i64(rec, &["pg_pid"]),
