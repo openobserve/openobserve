@@ -45,13 +45,10 @@ use infra::{
     },
     storage,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
-    merge::{self, MergeParquetResult, MergedFile},
-    sort_order::FileSortOrder,
+    merge::{self, MergeMode, MergeOutput, MergeParquetResult, MergedFile},
 };
 use search_service::file_list;
 use tantivy_utils::index_builder::create_tantivy_index;
@@ -459,24 +456,18 @@ pub async fn merge_by_stream(
                 }
             }
 
-            #[cfg(feature = "enterprise")]
-            let skip_group_files = stream_type == StreamType::Metrics
-                && get_largest_downsampling_rule(
-                    &stream_name,
-                    files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
-                )
-                .is_some();
+            // what this batch of files turns into; decided once here, the
+            // worker and the merge only read it
+            let max_ts = files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap();
+            let mode = MergeMode::for_compactor(stream_type, &stream_name, max_ts);
 
-            #[cfg(not(feature = "enterprise"))]
-            let skip_group_files = false;
-
-            if files_with_size.len() <= 1 && !skip_group_files {
+            if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
                 return Ok(vec![]);
             }
 
             // group files need to merge
             let mut batch_groups = Vec::new();
-            if skip_group_files {
+            if mode.merges_whole_batch() {
                 batch_groups.push(MergeBatch {
                     batch_id: 0,
                     org_id: org_id.clone(),
@@ -484,6 +475,7 @@ pub async fn merge_by_stream(
                     stream_name: stream_name.clone(),
                     prefix: prefix.clone(),
                     files: files_with_size.clone(),
+                    mode: mode.clone(),
                 });
             } else {
                 let mut new_file_list = Vec::new();
@@ -509,6 +501,7 @@ pub async fn merge_by_stream(
                             stream_name: stream_name.clone(),
                             prefix: prefix.clone(),
                             files: new_file_list.clone(),
+                            mode: mode.clone(),
                         });
                         new_file_size = 0;
                         new_file_list.clear();
@@ -529,6 +522,7 @@ pub async fn merge_by_stream(
                         stream_name: stream_name.clone(),
                         prefix: prefix.clone(),
                         files: new_file_list.clone(),
+                        mode: mode.clone(),
                     });
                 }
 
@@ -670,6 +664,7 @@ pub async fn merge_by_stream(
 // - stream_name: the name of the stream
 // - prefix: the prefix of the files
 // - files_with_size: the files to merge
+// - mode: what the merge produces (decided by the scheduler)
 // returns:
 // - new_files: the files that are merged
 // - retain_file_list: the files that are not merged
@@ -680,19 +675,13 @@ pub async fn merge_files(
     stream_name: &str,
     prefix: &str,
     files_with_size: &[FileKey],
+    mode: &MergeMode,
 ) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
     let start = std::time::Instant::now();
-    #[cfg(feature = "enterprise")]
-    let is_match_downsampling_rule = get_largest_downsampling_rule(
-        stream_name,
-        files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
-    )
-    .is_some();
-
-    #[cfg(not(feature = "enterprise"))]
-    let is_match_downsampling_rule = false;
-
-    if files_with_size.len() <= 1 && !is_match_downsampling_rule {
+    // a whole-batch mode (downsampling) merges everything it is given, even a
+    // single file; otherwise 0/1 files means nothing to do
+    let merge_whole_batch = mode.merges_whole_batch();
+    if files_with_size.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -704,7 +693,7 @@ pub async fn merge_files(
         if (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
             || new_compressed_file_size + file.meta.compressed_size
                 > cfg.compact.max_file_size as i64)
-            && !is_match_downsampling_rule
+            && !merge_whole_batch
         {
             break;
         }
@@ -720,7 +709,7 @@ pub async fn merge_files(
             .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge
-    if new_file_list.len() <= 1 && !is_match_downsampling_rule {
+    if new_file_list.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -736,7 +725,7 @@ pub async fn merge_files(
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
-    if new_file_list.len() <= 1 && !is_match_downsampling_rule {
+    if new_file_list.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), retain_file_list));
     }
 
@@ -847,7 +836,7 @@ pub async fn merge_files(
     };
 
     let tables = match TableBuilder::new()
-        .sort_order(FileSortOrder::TimestampDesc)
+        .sort_order(mode.input_sort_order())
         .build(session, files.clone(), schema.clone())
         .await
     {
@@ -859,17 +848,16 @@ pub async fn merge_files(
     };
 
     let merge_result = {
-        let stream_name = stream_name.to_string();
+        let mode = mode.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 merge::merge_parquet_files(
-                    stream_type,
-                    &stream_name,
                     schema,
                     tables,
                     &bloom_filter_fields,
                     new_file_meta,
-                    false,
+                    &mode,
+                    MergeOutput::for_compactor(stream_type),
                 )
                 .await
             })
