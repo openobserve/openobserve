@@ -2363,7 +2363,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_TSID_MAJOR_ENABLED",
         default = false,
-        help = "Experimental TSID-major metrics layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-` file name prefix; the compactor writes compacted Parquet metrics ordered by (__hash__, _timestamp), splits them at ZO_COMPACT_MAX_FILE_SIZE logical-size boundaries, and creates per-file series-index sidecars. Only affects newly written Parquet metrics files; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Experimental TSID-major metrics layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `tsid-sorted-` file name prefix; the compactor writes compacted Parquet metrics ordered by (__hash__, _timestamp), splits them at ZO_COMPACT_MAX_FILE_SIZE logical-size boundaries, and creates per-file series-index sidecars. Only affects newly written Parquet metrics files; SQL queries on metrics streams must not assume a _timestamp order while it is on."
     )]
     pub metrics_tsid_major_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds

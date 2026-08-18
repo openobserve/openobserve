@@ -25,7 +25,7 @@ use chrono::{Duration, Utc};
 use config::{
     FxIndexMap, cluster, get_config,
     meta::{
-        promql::to_hash_sorted_file_key,
+        promql::MetricsFileLayout,
         search::StorageType,
         stream::{FileKey, FileMeta, StreamType},
     },
@@ -836,7 +836,7 @@ async fn merge_files(
         file_format,
     );
     if sort_order == FileSortOrder::HashTimestampAsc {
-        new_file_key = to_hash_sorted_file_key(&new_file_key);
+        new_file_key = MetricsFileLayout::HashSorted.mark_file_key(&new_file_key);
     }
     log::info!(
         "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",

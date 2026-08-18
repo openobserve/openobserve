@@ -80,67 +80,8 @@ pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
 
-const TSID_MAJOR_FILE_PREFIX: &str = "tsid-major-v3-";
 pub const TSID_SERIES_INDEX_ROW_START: &str = "__oo_sidx_row_start";
 pub const TSID_SERIES_INDEX_ROW_COUNT: &str = "__oo_sidx_row_count";
-
-/// Format a size-bounded Parquet metrics file ordered by
-/// `(__hash__, _timestamp)`. Every such file owns a sibling `.sidx` sidecar.
-pub fn format_tsid_major_file_name(id: &str) -> String {
-    format!("{TSID_MAJOR_FILE_PREFIX}{id}.parquet")
-}
-
-pub fn is_tsid_major_file_name(path: &str) -> bool {
-    path.rsplit('/')
-        .next()
-        .and_then(|file_name| file_name.strip_prefix(TSID_MAJOR_FILE_PREFIX))
-        .and_then(|id| id.strip_suffix(".parquet"))
-        .is_some_and(|id| !id.is_empty())
-}
-
-/// Return the sibling series-index object for a TSID-major Parquet file.
-pub fn to_tsid_series_index_name(path: &str) -> Option<String> {
-    if !is_tsid_major_file_name(path) {
-        return None;
-    }
-    path.strip_suffix(".parquet")
-        .map(|path| format!("{path}.sidx"))
-}
-
-#[cfg(test)]
-mod tsid_major_tests {
-    use super::*;
-
-    #[test]
-    fn recognizes_tsid_major_file_name_and_sidecar() {
-        let name = format_tsid_major_file_name("456");
-        assert_eq!(name, "tsid-major-v3-456.parquet");
-        assert!(is_tsid_major_file_name(&name));
-        assert!(is_tsid_major_file_name(&format!(
-            "files/default/metrics/test/2026/08/13/10/{name}"
-        )));
-        assert_eq!(
-            to_tsid_series_index_name(&format!("files/default/{name}")),
-            Some("files/default/tsid-major-v3-456.sidx".to_string())
-        );
-    }
-
-    #[test]
-    fn rejects_other_tsid_layouts_and_formats() {
-        assert!(!is_tsid_major_file_name(
-            "tsid-range-v3-b04-p000a-x.parquet"
-        ));
-        assert!(!is_tsid_major_file_name("tsid-major-v1-x.parquet"));
-        assert!(!is_tsid_major_file_name("tsid-major-v3-x.vortex"));
-        assert!(!is_tsid_major_file_name("tsid-major-v3-.parquet"));
-    }
-}
-
-/// File name prefix of Parquet metrics files whose rows are ordered by
-/// `(__hash__ ASC, _timestamp ASC)` instead of the classic `_timestamp DESC`.
-/// The marker lets readers and later merges know the physical order of a file
-/// without opening it.
-const HASH_SORTED_FILE_PREFIX: &str = "hash-sorted-";
 
 /// True when `stream_type` uses the TSID-major layout
 /// (`ZO_METRICS_TSID_MAJOR_ENABLED`): Parquet metrics files ordered by
@@ -156,55 +97,178 @@ pub fn metrics_tsid_major_enabled(stream_type: StreamType) -> bool {
         && cfg.common.file_format.for_stream(stream_type) == crate::FileFormat::Parquet
 }
 
-/// Add the hash-sorted marker to the file name of `key`
-/// (`files/.../7099303408192061440.parquet` ->
-/// `files/.../hash-sorted-7099303408192061440.parquet`).
-pub fn to_hash_sorted_file_key(key: &str) -> String {
-    match key.rfind('/') {
-        Some(pos) => format!(
-            "{}/{HASH_SORTED_FILE_PREFIX}{}",
-            &key[..pos],
-            &key[pos + 1..]
-        ),
-        None => format!("{HASH_SORTED_FILE_PREFIX}{key}"),
-    }
+/// Physical layout of a metrics data file, encoded in its file-name prefix so
+/// readers and later merges know the row order without opening the file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricsFileLayout {
+    /// Classic `_timestamp DESC` file (`{id}.parquet` / `{id}.vortex`).
+    Legacy,
+    /// Parquet ordered by `(__hash__ ASC, _timestamp ASC)` but not finalized:
+    /// written by the ingester and by incremental compactor merges of the
+    /// still-open hour (`tsid-sorted-{id}.parquet`).
+    HashSorted,
+    /// Size-bounded Parquet ordered by `(__hash__ ASC, _timestamp ASC)` with a
+    /// sibling `.sidx` series index; written by the compactor's hour-end merge
+    /// (`tsid-major-v3-{id}.parquet`).
+    TsidMajor,
 }
 
-/// True when the file was written in the hash-sorted layout.
-pub fn is_hash_sorted_file_name(path: &str) -> bool {
-    path.rsplit('/')
-        .next()
-        .and_then(|file_name| file_name.strip_prefix(HASH_SORTED_FILE_PREFIX))
-        .is_some_and(|rest| rest.ends_with(".parquet") && rest.len() > ".parquet".len())
+impl MetricsFileLayout {
+    const HASH_SORTED_PREFIX: &'static str = "tsid-sorted-";
+    const TSID_MAJOR_PREFIX: &'static str = "tsid-major-v3-";
+    const SERIES_INDEX_EXT: &'static str = ".sidx";
+
+    /// Layout of the file at `path` (a full object key or a bare file name).
+    pub fn of(path: &str) -> Self {
+        let file_name = path.rsplit('/').next().unwrap_or(path);
+        for (prefix, layout) in [
+            (Self::HASH_SORTED_PREFIX, Self::HashSorted),
+            (Self::TSID_MAJOR_PREFIX, Self::TsidMajor),
+        ] {
+            if let Some(id) = file_name.strip_prefix(prefix)
+                && let Some(id) = id.strip_suffix(".parquet")
+                && !id.is_empty()
+            {
+                return layout;
+            }
+        }
+        Self::Legacy
+    }
+
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Legacy => "",
+            Self::HashSorted => Self::HASH_SORTED_PREFIX,
+            Self::TsidMajor => Self::TSID_MAJOR_PREFIX,
+        }
+    }
+
+    /// True when the rows are ordered by `(__hash__, _timestamp)`.
+    pub fn is_hash_ordered(self) -> bool {
+        !matches!(self, Self::Legacy)
+    }
+
+    /// File name for a new file of this layout. Marked layouts are always
+    /// Parquet; `Legacy` keeps the extension of `file_format`.
+    pub fn file_name(self, id: &str, file_format: crate::FileFormat) -> String {
+        match self {
+            Self::Legacy => format!("{id}{}", file_format.extension()),
+            _ => format!("{}{id}.parquet", self.prefix()),
+        }
+    }
+
+    /// Add this layout's marker to the file name of an existing key
+    /// (`files/.../7099.parquet` -> `files/.../tsid-sorted-7099.parquet`).
+    pub fn mark_file_key(self, key: &str) -> String {
+        match key.rfind('/') {
+            Some(pos) => format!("{}/{}{}", &key[..pos], self.prefix(), &key[pos + 1..]),
+            None => format!("{}{key}", self.prefix()),
+        }
+    }
+
+    /// The sibling `.sidx` series-index object of a TSID-major file.
+    pub fn series_index_path(path: &str) -> Option<String> {
+        if Self::of(path) != Self::TsidMajor {
+            return None;
+        }
+        path.strip_suffix(".parquet")
+            .map(|path| format!("{path}{}", Self::SERIES_INDEX_EXT))
+    }
 }
 
 #[cfg(test)]
-mod hash_sorted_file_tests {
+mod metrics_file_layout_tests {
     use super::*;
+    use crate::FileFormat;
 
     #[test]
-    fn marks_and_recognizes_hash_sorted_files() {
-        let key = "files/default/metrics/cpu/2026/08/18/10/7099303408192061440.parquet";
-        let marked = to_hash_sorted_file_key(key);
+    fn recognizes_layouts_from_file_names() {
+        assert_eq!(
+            MetricsFileLayout::of("files/default/metrics/cpu/2026/08/18/10/7099.parquet"),
+            MetricsFileLayout::Legacy
+        );
+        assert_eq!(
+            MetricsFileLayout::of("7099.vortex"),
+            MetricsFileLayout::Legacy
+        );
+        assert_eq!(
+            MetricsFileLayout::of(
+                "files/default/metrics/cpu/2026/08/18/10/tsid-sorted-7099.parquet"
+            ),
+            MetricsFileLayout::HashSorted
+        );
+        assert_eq!(
+            MetricsFileLayout::of(
+                "files/default/metrics/test/2026/08/13/10/tsid-major-v3-456.parquet"
+            ),
+            MetricsFileLayout::TsidMajor
+        );
+        // wrong format, empty id, other versions, marker in a directory name
+        for name in [
+            "tsid-major-v3-x.vortex",
+            "tsid-sorted-1.vortex",
+            "tsid-major-v3-.parquet",
+            "tsid-sorted-.parquet",
+            "tsid-major-v1-x.parquet",
+            "tsid-range-v3-b04-p000a-x.parquet",
+            "files/tsid-sorted-dir/1.parquet",
+        ] {
+            assert_eq!(
+                MetricsFileLayout::of(name),
+                MetricsFileLayout::Legacy,
+                "{name}"
+            );
+        }
+        assert!(MetricsFileLayout::HashSorted.is_hash_ordered());
+        assert!(MetricsFileLayout::TsidMajor.is_hash_ordered());
+        assert!(!MetricsFileLayout::Legacy.is_hash_ordered());
+    }
+
+    #[test]
+    fn builds_and_marks_file_names() {
+        assert_eq!(
+            MetricsFileLayout::TsidMajor.file_name("456", FileFormat::Parquet),
+            "tsid-major-v3-456.parquet"
+        );
+        assert_eq!(
+            MetricsFileLayout::HashSorted.file_name("456", FileFormat::Parquet),
+            "tsid-sorted-456.parquet"
+        );
+        assert_eq!(
+            MetricsFileLayout::Legacy.file_name("456", FileFormat::Vortex),
+            "456.vortex"
+        );
+        let key = "files/default/metrics/cpu/2026/08/18/10/7099.parquet";
+        let marked = MetricsFileLayout::HashSorted.mark_file_key(key);
         assert_eq!(
             marked,
-            "files/default/metrics/cpu/2026/08/18/10/hash-sorted-7099303408192061440.parquet"
+            "files/default/metrics/cpu/2026/08/18/10/tsid-sorted-7099.parquet"
         );
-        assert!(is_hash_sorted_file_name(&marked));
-        assert!(!is_hash_sorted_file_name(key));
-        assert!(is_hash_sorted_file_name("hash-sorted-1.parquet"));
         assert_eq!(
-            to_hash_sorted_file_key("1.parquet"),
-            "hash-sorted-1.parquet"
+            MetricsFileLayout::of(&marked),
+            MetricsFileLayout::HashSorted
+        );
+        assert_eq!(MetricsFileLayout::Legacy.mark_file_key(key), key);
+        assert_eq!(
+            MetricsFileLayout::HashSorted.mark_file_key("1.parquet"),
+            "tsid-sorted-1.parquet"
         );
     }
 
     #[test]
-    fn rejects_other_layouts_and_formats() {
-        assert!(!is_hash_sorted_file_name("hash-sorted-1.vortex"));
-        assert!(!is_hash_sorted_file_name("hash-sorted-.parquet"));
-        assert!(!is_hash_sorted_file_name("files/hash-sorted-dir/1.parquet"));
-        assert!(!is_hash_sorted_file_name("tsid-major-v3-1.parquet"));
+    fn series_index_path_only_for_tsid_major() {
+        assert_eq!(
+            MetricsFileLayout::series_index_path("files/default/tsid-major-v3-456.parquet"),
+            Some("files/default/tsid-major-v3-456.sidx".to_string())
+        );
+        assert_eq!(
+            MetricsFileLayout::series_index_path("files/default/tsid-sorted-456.parquet"),
+            None
+        );
+        assert_eq!(
+            MetricsFileLayout::series_index_path("files/default/456.parquet"),
+            None
+        );
     }
 }
 

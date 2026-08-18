@@ -23,11 +23,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
-        promql::{
-            HASH_LABEL, format_tsid_major_file_name, is_hash_sorted_file_name,
-            is_tsid_major_file_name, metrics_tsid_major_enabled, to_hash_sorted_file_key,
-            to_tsid_series_index_name,
-        },
+        promql::{HASH_LABEL, MetricsFileLayout, metrics_tsid_major_enabled},
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
             StreamType,
@@ -70,13 +66,10 @@ use tokio::{
 use super::worker::{MergeBatch, MergeSender};
 
 fn needs_tsid_layout_rewrite(stream_type: StreamType, files: &[FileKey]) -> bool {
-    if !metrics_tsid_major_enabled(stream_type) {
-        return false;
-    }
-    files.iter().any(|file| {
-        FileFormat::from_extension(&file.key) != Some(FileFormat::Parquet)
-            || !is_tsid_major_file_name(&file.key)
-    })
+    metrics_tsid_major_enabled(stream_type)
+        && files
+            .iter()
+            .any(|file| MetricsFileLayout::of(&file.key) != MetricsFileLayout::TsidMajor)
 }
 
 /// Return true once a closed metrics hour already consists entirely of valid
@@ -918,7 +911,7 @@ pub async fn merge_files(
 
     // Physical order of the input files, which is what the merge query may
     // rely on:
-    // - every input is (__hash__, _timestamp) ordered (ingester `hash-sorted-` files or compactor
+    // - every input is (__hash__, _timestamp) ordered (ingester `tsid-sorted-` files or compactor
     //   `tsid-major-v3-` files) and the output is TSID-major too: declare that order so DataFusion
     //   merges the pre-sorted files (SortPreservingMerge, one file per partition) instead of
     //   materializing the whole batch in a SortExec;
@@ -928,18 +921,16 @@ pub async fn merge_files(
     // - otherwise the classic `_timestamp DESC` layout.
     let metrics_tsid_major_requested =
         metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
-    let all_hash_sorted = files
+    let hash_ordered_files = files
         .iter()
-        .all(|f| is_hash_sorted_file_name(&f.key) || is_tsid_major_file_name(&f.key));
-    let any_hash_sorted = files
-        .iter()
-        .any(|f| is_hash_sorted_file_name(&f.key) || is_tsid_major_file_name(&f.key));
+        .filter(|f| MetricsFileLayout::of(&f.key).is_hash_ordered())
+        .count();
     let input_sort_order = if metrics_tsid_major_requested
-        && all_hash_sorted
+        && hash_ordered_files == files.len()
         && schema.field_with_name(HASH_LABEL).is_ok()
     {
         FileSortOrder::HashTimestampAsc
-    } else if metrics_tsid_major_requested || any_hash_sorted {
+    } else if metrics_tsid_major_requested || hash_ordered_files > 0 {
         FileSortOrder::None
     } else {
         FileSortOrder::TimestampDesc
@@ -1018,13 +1009,15 @@ pub async fn merge_files(
                 ));
             }
 
-            let id = ider::generate_file_name();
-            let mut new_file_key = format!("{prefix}/{id}{}", file_format.extension());
             // incremental TSID-major merge: hash-sorted but not finalized, the
             // hour-end pass merges it again into the final layout
-            if sort_order == FileSortOrder::HashTimestampAsc {
-                new_file_key = to_hash_sorted_file_key(&new_file_key);
-            }
+            let layout = if sort_order == FileSortOrder::HashTimestampAsc {
+                MetricsFileLayout::HashSorted
+            } else {
+                MetricsFileLayout::Legacy
+            };
+            let id = ider::generate_file_name();
+            let new_file_key = format!("{prefix}/{}", layout.file_name(&id, file_format));
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
@@ -1089,18 +1082,18 @@ pub async fn merge_files(
                     ));
                 }
 
-                let id = ider::generate_file_name();
-                let file_name = if series_indexes.is_some() {
+                let layout = if series_indexes.is_some() {
                     if file_format != FileFormat::Parquet {
                         return Err(anyhow::anyhow!(
                             "TSID-major output must use Parquet, got {file_format}"
                         ));
                     }
-                    format_tsid_major_file_name(&id)
+                    MetricsFileLayout::TsidMajor
                 } else {
-                    format!("{id}{}", file_format.extension())
+                    MetricsFileLayout::Legacy
                 };
-                let new_file_key = format!("{prefix}/{file_name}");
+                let id = ider::generate_file_name();
+                let new_file_key = format!("{prefix}/{}", layout.file_name(&id, file_format));
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
@@ -1125,8 +1118,8 @@ pub async fn merge_files(
                     .and_then(|indexes| indexes.get_mut(index))
                     .map(std::mem::take)
                 {
-                    let series_index_key =
-                        to_tsid_series_index_name(&new_file_key).ok_or_else(|| {
+                    let series_index_key = MetricsFileLayout::series_index_path(&new_file_key)
+                        .ok_or_else(|| {
                             anyhow::anyhow!(
                                 "TSID series index has no indexed layout marker: {new_file_key}"
                             )

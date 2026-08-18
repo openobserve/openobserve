@@ -27,7 +27,7 @@ use chrono::Duration;
 use config::{
     FileFormat, cluster, get_config,
     meta::{
-        promql::{metrics_tsid_major_enabled, to_hash_sorted_file_key},
+        promql::{MetricsFileLayout, metrics_tsid_major_enabled},
         stream::{FileMeta, StreamType},
     },
     metrics,
@@ -487,7 +487,7 @@ async fn upload_chunk(
         file_format,
     );
     if sort_order == FileSortOrder::HashTimestampAsc {
-        new_file_key = to_hash_sorted_file_key(&new_file_key);
+        new_file_key = MetricsFileLayout::HashSorted.mark_file_key(&new_file_key);
     }
 
     log::info!(

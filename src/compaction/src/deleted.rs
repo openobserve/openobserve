@@ -17,7 +17,7 @@
 
 use config::{
     meta::{
-        promql::to_tsid_series_index_name,
+        promql::MetricsFileLayout,
         stream::{FileKey, FileMeta},
     },
     utils::inverted_index::to_tantivy_name,
@@ -90,7 +90,8 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     let series_index_files = files
         .iter()
         .filter_map(|file| {
-            to_tsid_series_index_name(&file.file).map(|path| (file.account.to_string(), path))
+            MetricsFileLayout::series_index_path(&file.file)
+                .map(|path| (file.account.to_string(), path))
         })
         .collect::<Vec<_>>();
     if !series_index_files.is_empty()

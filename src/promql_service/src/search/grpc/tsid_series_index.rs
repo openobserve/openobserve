@@ -29,8 +29,8 @@ use config::{
     PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
     meta::{
         promql::{
-            EXEMPLARS_LABEL, TSID_SERIES_INDEX_ROW_COUNT, TSID_SERIES_INDEX_ROW_START, VALUE_LABEL,
-            is_tsid_major_file_name, to_tsid_series_index_name,
+            EXEMPLARS_LABEL, MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT,
+            TSID_SERIES_INDEX_ROW_START, VALUE_LABEL,
         },
         stream::{FileKey, FileSelection},
     },
@@ -132,10 +132,10 @@ pub(super) async fn search(
     let filter_key = format!("{matchers:?}");
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
-        if !is_tsid_major_file_name(&file.key) {
+        if MetricsFileLayout::of(&file.key) != MetricsFileLayout::TsidMajor {
             return Ok(None);
         }
-        let sidecar_path = to_tsid_series_index_name(&file.key).ok_or_else(|| {
+        let sidecar_path = MetricsFileLayout::series_index_path(&file.key).ok_or_else(|| {
             DataFusionError::Execution(format!(
                 "TSID-major file has no series-index path: {}",
                 file.key
