@@ -99,7 +99,7 @@
                will not shrink below its content width without it, which is
                how a long placeholder pushes the toolbar wider than the table.
                Same wrapper the Alerts toolbar uses. -->
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1 max-md:basis-full">
             <OSearchInput
               v-model="search"
               class="w-full"

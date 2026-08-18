@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             @update:model-value="onSearchChange"
           />
         </div>
-        <div class="ml-auto flex shrink-0 items-center gap-2">
+        <div class="ml-auto flex shrink-0 items-center gap-2 max-md:w-full max-md:justify-end">
           <OToggleGroup
             :model-value="searchObj.meta.serviceGraphVisualizationType"
             type="single"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             :options="layoutOptions"
             :searchable="false"
             data-test="service-graph-layout-type"
-            class="h-8! min-h-8! w-[7.5rem]"
+            class="h-8! min-h-8! w-[7.5rem] max-md:w-24!"
             :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
             @update:model-value="onLayoutChange"
           />
