@@ -48,23 +48,33 @@ pub enum MergeMode {
     /// The file-list stream has no `_timestamp`; order by `min_ts DESC`.
     FileList,
     /// Metrics downsampling (enterprise): aggregate every series by the rule's
-    /// step, size-split output files. The whole batch is one merge.
+    /// step, size-split output files. Only for a closed hour, which is merged
+    /// as a whole.
     #[cfg(feature = "enterprise")]
     Downsampling(DownsamplingRule),
 }
 
 impl MergeMode {
-    /// Mode for a compactor batch of `stream_name` files whose newest sample
-    /// is `max_ts` (metrics downsampling rules select by time).
-    pub fn for_compactor(stream_type: StreamType, stream_name: &str, max_ts: i64) -> Self {
+    /// Mode for the compactor's merge of one `stream_name` hour (or day) that
+    /// ends at `max_ts`. `finalize` is true once that hour is closed; only then
+    /// may the whole hour be rewritten (metrics downsampling, whose rules
+    /// select by how old `max_ts` is). Incremental merges of the still-open
+    /// hour always use the plain per-stream mode.
+    pub fn for_compactor(
+        stream_type: StreamType,
+        stream_name: &str,
+        max_ts: i64,
+        finalize: bool,
+    ) -> Self {
         #[cfg(feature = "enterprise")]
-        if stream_type == StreamType::Metrics
+        if finalize
+            && stream_type == StreamType::Metrics
             && let Some(rule) = get_largest_downsampling_rule(stream_name, max_ts)
         {
             return Self::Downsampling(rule.clone());
         }
         #[cfg(not(feature = "enterprise"))]
-        let _ = max_ts;
+        let _ = (max_ts, finalize);
         Self::for_stream(stream_type, stream_name)
     }
 
@@ -81,8 +91,9 @@ impl MergeMode {
         }
     }
 
-    /// True when the batch must be merged as a whole regardless of
-    /// `ZO_COMPACT_MAX_FILE_SIZE` (the writer splits the output itself).
+    /// True when the whole hour must be merged as one batch — every file of
+    /// the hour, including ones already above the size target, and regardless
+    /// of `ZO_COMPACT_MAX_FILE_SIZE` (the writer splits the output itself).
     pub fn merges_whole_batch(&self) -> bool {
         match self {
             #[cfg(feature = "enterprise")]
@@ -191,11 +202,11 @@ mod tests {
             MergeMode::Classic
         ));
         assert!(matches!(
-            MergeMode::for_compactor(StreamType::Traces, "app", 0),
+            MergeMode::for_compactor(StreamType::Traces, "app", 0, true),
             MergeMode::Classic
         ));
         assert!(matches!(
-            MergeMode::for_compactor(StreamType::Filelist, "x", 0),
+            MergeMode::for_compactor(StreamType::Filelist, "x", 0, false),
             MergeMode::FileList
         ));
         assert!(!MergeMode::Classic.merges_whole_batch());

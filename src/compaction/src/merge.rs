@@ -405,10 +405,32 @@ pub async fn merge_by_stream(
             offset_time.format("%Y/%m/%d/%H").to_string(),
         )
     };
-    let files =
-        file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
-            .await
-            .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
+    // What this hour of files turns into. Decided once here — the workers and
+    // the merge only read it — from the end of the date range, so a
+    // whole-hour mode applies to the hour as a unit.
+    let range_end_ts = if partition_time_level == PartitionTimeLevel::Daily {
+        offset - offset % day_micros(1) + day_micros(1) - 1
+    } else {
+        offset + hour_micros(1) - 1
+    };
+    let mode = MergeMode::for_compactor(stream_type, stream_name, range_end_ts, !is_incremental);
+    // a whole-hour merge needs every file of the hour, even those already
+    // above the size target that a normal merge would leave alone
+    let max_original_size = if mode.merges_whole_batch() {
+        i64::MAX
+    } else {
+        infra_file_list::merge_max_original_size()
+    };
+    let files = file_list::query_for_merge(
+        org_id,
+        stream_type,
+        stream_name,
+        &date_start,
+        &date_end,
+        max_original_size,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] date range: [{date_start},{date_end}], files: {}",
@@ -438,6 +460,7 @@ pub async fn merge_by_stream(
     for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
+        let mode = mode.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
         let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
@@ -455,11 +478,6 @@ pub async fn merge_by_stream(
                     files_with_size = sort_by_time_range(files_with_size);
                 }
             }
-
-            // what this batch of files turns into; decided once here, the
-            // worker and the merge only read it
-            let max_ts = files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap();
-            let mode = MergeMode::for_compactor(stream_type, &stream_name, max_ts);
 
             if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
                 return Ok(vec![]);
