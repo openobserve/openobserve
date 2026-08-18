@@ -106,8 +106,15 @@ pub async fn merge_parquet_files(
 
     // get all sorted data
     let sql = if stream_type == StreamType::Metadata && is_trace_time_index_stream(stream_name) {
+        // Files whose records all had a null session_id were persisted without the
+        // column (all-null columns are pruned), so only select it when present.
+        let session_id_col = if schema.column_with_name("session_id").is_some() {
+            ", MAX(session_id) AS session_id"
+        } else {
+            ""
+        };
         format!(
-            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id, MAX(session_id) AS session_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
+            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id{session_id_col}, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead sort by min ts of entries
