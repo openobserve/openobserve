@@ -957,6 +957,69 @@ describe("TraceDetailsSidebar", async () => {
         expect(toggleExpanded).toHaveBeenCalledWith(true);
       });
 
+      // Regression: a focus request waiting for its table outlived the span it
+      // was made for. When the table finally resolved — for a different span —
+      // the stale index expanded an unrelated row.
+      //
+      // Isolated the same way, and for the same reason, as "expands the row
+      // once the events table appears" above: on the shared wrapper the real
+      // OTable is already mounted (Events tab active), and it reasserts
+      // eventsTableRef with a real, successful getRow(1) on the very first
+      // render `focusEvent(1)` triggers — which would disarm the watcher for
+      // the *right* row before the span even has a chance to change, making
+      // the final assertion pass for the wrong reason regardless of whether
+      // the span-change guard exists. Confirmed empirically: run verbatim
+      // against the shared wrapper, this test passes even without the fix.
+      it("drops a pending focus request when the span changes", async () => {
+        const toggleExpanded = vi.fn();
+        const localWrapper = mount(TraceDetailsSidebar, {
+          attachTo: "#app",
+          props: {
+            span: {
+              ...mockSpan,
+              events: JSON.stringify([
+                { name: "first", _timestamp: eventNsAt(0.25) },
+                { name: "second", _timestamp: eventNsAt(0.75) },
+              ]),
+            },
+            baseTracePosition: mockBaseTracePosition,
+            searchQuery: "",
+            activeTab: "events",
+          },
+          global: {
+            plugins: [i18n, router, mockStore],
+            stubs: { ...baseStubs, OTable: true },
+          },
+        });
+        const vm = localWrapper.vm as any;
+
+        // Arm a pending request: no usable table yet.
+        expect(vm.eventsTableRef?.table).toBeFalsy();
+        vm.focusEvent(1);
+        await flushPromises();
+        expect(toggleExpanded).not.toHaveBeenCalled();
+
+        // The span changes while the request is still waiting.
+        await localWrapper.setProps({
+          span: {
+            ...mockSpan,
+            span_id: "a-different-span",
+            events: JSON.stringify([
+              { name: "other first", _timestamp: eventNsAt(0.25) },
+              { name: "other second", _timestamp: eventNsAt(0.75) },
+            ]),
+          },
+        });
+        await flushPromises();
+
+        // The table for the new span resolves — the stale request must be gone.
+        vm.eventsTableRef = { table: { getRow: () => ({ toggleExpanded }) } };
+        await flushPromises();
+
+        expect(toggleExpanded).not.toHaveBeenCalled();
+        localWrapper.unmount();
+      });
+
       it("ignores a null focusEventIndex", async () => {
         await setSpanEvents([{ name: "only", _timestamp: eventNsAt(0.25) }]);
 
