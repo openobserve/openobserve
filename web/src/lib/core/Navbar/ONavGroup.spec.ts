@@ -413,7 +413,7 @@ describe("ONavGroup", () => {
 
     it("preserves the current Traces query when switching tabs", async () => {
       wrapper = await mountAt(
-        "/traces?org_identifier=default&tab=traces&stream=default&period=15m&query=c2VydmljZQ%3D%3D",
+        "/traces?org_identifier=default&tab=traces&search_mode=spans&stream=default&period=15m&query=c2VydmljZQ%3D%3D",
       );
 
       const href = wrapper.get('[data-test="nav-group-item-traces-spans"]').attributes("href");
@@ -421,6 +421,7 @@ describe("ONavGroup", () => {
 
       expect(query.get("org_identifier")).toBe("default");
       expect(query.get("tab")).toBe("spans");
+      expect(query.has("search_mode")).toBe(false);
       expect(query.get("stream")).toBe("default");
       expect(query.get("period")).toBe("15m");
       expect(query.get("query")).toBe("c2VydmljZQ==");
