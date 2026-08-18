@@ -74,8 +74,8 @@
             class="rounded-default focus-visible:ring-accent/40 cursor-pointer border p-3 text-left transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
             :class="
               isActivePreset(p)
-                ? 'border-accent ring-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] ring-1 ring-inset'
-                : 'border-border-default hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+                ? 'border-accent ring-accent bg-card-glass-tint-soft ring-1 ring-inset'
+                : 'border-border-default hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isActivePreset(p)"
             :data-test="`slos-sloalertcondition-preset-${p.key}`"
@@ -106,8 +106,19 @@
              full row. Same for the inside labels — `labelPosition` is the API. -->
         <div class="flex flex-wrap items-center gap-2">
           <span>{{ t("slos.alert.burnRate") }}</span>
-          <OSelect v-model="model.operator" :options="operatorOptions" width="xs" />
-          <OInput v-model.number="model.critical" type="number" step="0.1" width="xs" />
+          <OSelect
+            v-model="model.operator"
+            :options="operatorOptions"
+            width="xs"
+            data-test="slos-sloalertcondition-operator"
+          />
+          <OInput
+            v-model.number="model.critical"
+            type="number"
+            step="0.1"
+            width="xs"
+            data-test="slos-sloalertcondition-critical"
+          />
           <span>{{ t("slos.alert.inBothWindows") }}</span>
           <OInput
             v-model.number="longHours"
@@ -116,6 +127,7 @@
             suffix="h"
             :label="t('slos.alert.long')"
             label-position="inside"
+            data-test="slos-sloalertcondition-long"
           />
           <OInput
             v-model.number="shortMinutes"
@@ -124,6 +136,7 @@
             suffix="min"
             :label="t('slos.alert.short')"
             label-position="inside"
+            data-test="slos-sloalertcondition-short"
           />
         </div>
 

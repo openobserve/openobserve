@@ -86,10 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            --color-file-drag-bg (theme-aware; the old raw blue had no dark step).
            Stays a binding because the fill is driven by isDragOver at runtime. -->
     <DropzoneBackground
-      :style="{
-        backgroundColor: isDragOver ? 'var(--color-file-drag-bg)' : 'transparent',
-        transition: 'background-color 0.2s ease',
-      }"
+      class="[transition:background-color_0.2s_ease]"
+      :class="isDragOver ? 'bg-file-drag-bg' : 'bg-transparent'"
     >
       <p v-if="isDragOver">{{ t("pipeline.dropHere") }}</p>
     </DropzoneBackground>

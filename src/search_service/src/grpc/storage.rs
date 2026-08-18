@@ -39,6 +39,7 @@ use tracing::Instrument;
 
 use crate::{
     bloom_pruner,
+    datafusion::sort_order::FileSortOrder,
     index::IndexCondition,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     tantivy::tantivy_search,
@@ -51,7 +52,7 @@ pub async fn search(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
     file_list: &[FileKey],
-    sorted_by_time: bool,
+    sort_order: FileSortOrder,
     file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
@@ -268,7 +269,7 @@ pub async fn search(
         session,
         query.clone(),
         schema,
-        sorted_by_time,
+        sort_order,
         file_stat_cache,
         index_condition,
         fst_fields,

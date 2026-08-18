@@ -152,7 +152,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // AI-themed gradient — purple→pink gradient background, white text
   "ai-gradient": [
-    "bg-[image:var(--color-gradient-ai)] text-white border-0",
+    "bg-gradient-ai text-white border-0",
     "enabled:hover:shadow-md enabled:hover:shadow-ai-accent/40",
     "enabled:active:opacity-90",
     "focus-visible:ring-3 focus-visible:ring-ai-accent",
@@ -191,6 +191,16 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "preview-email": [
     "bg-brand-email text-text-inverse border-0 !rounded !h-auto !py-3 !px-6",
     "enabled:hover:bg-brand-email-hover",
+    "disabled:opacity-60",
+  ].join(" "),
+  // preview-opsgenie: Opsgenie ink (dark neutral CTA). Was a scoped
+  // `.opsgenie-actions button` override in DestinationPreview.vue that beat this
+  // variant map from unlayered CSS; it belongs with its sibling brand variants.
+  // `text-white` (not text-text-inverse) — the preview card is a fixed-light
+  // brand replica, so the label must stay white in dark mode too.
+  "preview-opsgenie": [
+    "bg-brand-email-ink text-white border-0 !rounded !text-sm !h-auto !py-2 !px-3",
+    "enabled:hover:bg-brand-email-ink-deep",
     "disabled:opacity-60",
   ].join(" "),
   // preview-action: Generic action button for destination previews with no brand color

@@ -44,6 +44,7 @@ use vortex::{
 use crate::datafusion::{
     exec::DataFusionContextBuilder,
     merge::{MergeParquetResult, append_metadata},
+    sort_order::FileSortOrder,
     table_provider::uniontable::NewUnionTable,
     vortex::{VORTEX_RUNTIME, vortex_write_strategy},
 };
@@ -67,7 +68,7 @@ pub async fn merge_parquet_files_with_downsampling(
     // create datafusion context
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files_with_downsampling")
-        .sorted_by_time(true)
+        .sort_order(FileSortOrder::TimestampDesc)
         .build(get_config().limit.datafusion_min_partition_num)
         .await?;
     // register union table

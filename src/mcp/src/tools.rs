@@ -360,8 +360,12 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     let spec = rmcp_openapi::Spec::from_value(api_json)?;
 
     let zo_config = config::get_config();
-    let base_url = url::Url::parse(&format!("http://localhost:{}", zo_config.http.port))
-        .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
+    // Include ZO_BASE_URI so tool calls hit the routes actually mounted under it
+    let base_url = url::Url::parse(&format!(
+        "http://localhost:{}{}",
+        zo_config.http.port, zo_config.common.base_uri
+    ))
+    .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
 
     // Set default headers including x-o2-mcp for MCP-initiated calls
     let mut default_headers = reqwest::header::HeaderMap::new();

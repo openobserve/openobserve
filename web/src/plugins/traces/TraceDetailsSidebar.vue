@@ -392,13 +392,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel v-if="canPreviewSpan" name="preview" class="llm-preview-panel p-3">
           <div class="llm-preview-container h-full! w-full overflow-hidden overflow-x-auto">
             <!-- Input and Output Side by Side -->
-            <div class="io-container flex h-full! w-full!" ref="ioContainerRef">
+            <div
+              class="io-container flex h-full! w-full!"
+              :class="isFullscreen ? 'bg-surface-panel' : ''"
+              ref="ioContainerRef"
+            >
               <!-- Input Section -->
               <div
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pr-2"
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
                   <div class="flex items-center gap-1">
@@ -471,6 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
                   <div class="flex items-center gap-1">
@@ -722,6 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="(col, index) in linkColumns"
                     :key="'result_' + index"
                     :data-test="`trace-events-table-th-${col.label}`"
+                    class="bg-border-default"
                   >
                     {{ col.label }}
                   </th>
@@ -2162,7 +2169,6 @@ export default defineComponent({
   }
 
   th {
-    background-color: var(--color-surface-panel);
   }
 
   th:first-child,
@@ -2238,7 +2244,6 @@ export default defineComponent({
 /* complex-state — :fullscreen chains on the LLM input/output panes */
 .llm-preview-container {
   .io-container:fullscreen {
-    background-color: var(--color-surface-panel);
     padding: 0.75rem;
     height: 100vh;
     max-height: 100vh;
@@ -2252,7 +2257,6 @@ export default defineComponent({
       flex-direction: column;
 
       .section-label {
-        background: var(--color-surface-panel);
         border-radius: var(--radius-default);
       }
 
@@ -2304,7 +2308,6 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: var(--color-grey-200);
 }
 
 .thead-sticky tr:last-child > * {

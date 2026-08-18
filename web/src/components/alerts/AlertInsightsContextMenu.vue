@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isAlertNameContext">
       <div class="menu-section px-0 py-1">
         <div
-          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="configureDedupForAlert"
           data-test="context-menu-configure-dedup"
         >
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>{{ t("alerts.insights.actions.configureDedup") }}</span>
         </div>
         <div
-          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>{{ t("alerts.insights.actions.editAlert") }}</span>
         </div>
         <div
-          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator />
       <div class="menu-section px-0 py-1">
         <div
-          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
@@ -156,15 +156,3 @@ onUnmounted(() => {
   document.removeEventListener("keydown", handleEscape);
 });
 </script>
-
-<style scoped>
-/* keep(complex-state): `.menu-item` hover/active are state pseudo-classes on this
-   component's own elements, with no utility equivalent. */
-.context-menu .menu-item:hover {
-  background-color: var(--color-dropdown-item-hover-bg);
-}
-
-.context-menu .menu-item:active {
-  background-color: var(--color-dropdown-item-active-bg);
-}
-</style>
