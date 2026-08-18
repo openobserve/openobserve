@@ -74,9 +74,9 @@ fn ingest_error_response(error: IngestError) -> Response {
         IngestError::NotClientDriven | IngestError::BatchTooLarge => {
             MetaHttpResponse::bad_request(error.to_string())
         }
-        IngestError::Sealed | IngestError::IncompleteRun { .. } => {
-            MetaHttpResponse::conflict(error)
-        }
+        IngestError::Sealed
+        | IngestError::SealedWrite { .. }
+        | IngestError::IncompleteRun { .. } => MetaHttpResponse::conflict(error),
         IngestError::Storage(error) => {
             log::error!("[Experiment] ingest storage error: {error}");
             MetaHttpResponse::internal_error("Internal server error")
@@ -775,12 +775,13 @@ pub async fn clone_experiment(
     context_path = "/api",
     tag = "Experiments",
     operation_id = "SubmitExperimentRecords",
+    security(("Authorization" = [])),
     summary = "Report client-executed Slot results and self-reported Scores",
     description = "Each record and Score is validated on its own and reported on its own, so a \
                    valid part succeeds when another part of the same batch fails. Every record \
                    must repeat the Experiment's taskFingerprint. Re-sending an already accepted \
                    part is harmless; after the Experiment is sealed only an exact duplicate is \
-                   accepted.",
+                   accepted, and anything new or changed conflicts.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("experiment_id" = String, Path, description = "Experiment ID"),
@@ -790,6 +791,7 @@ pub async fn clone_experiment(
         (status = 200, body = inline(SubmitExperimentRecordsResponseBody)),
         (status = 400, description = "Batch too large, or the Experiment does not run an SDK Task", body = ()),
         (status = 404, description = "Experiment not found", body = ()),
+        (status = 409, description = "The Experiment is sealed and a submitted part is new or changed", body = ()),
     ),
 )]
 pub async fn submit_experiment_records(
@@ -798,7 +800,7 @@ pub async fn submit_experiment_records(
     axum::Json(body): axum::Json<SubmitExperimentRecordsRequestBody>,
 ) -> Response {
     if let Err(response) =
-        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "POST").await
     {
         return response;
     }
@@ -815,6 +817,7 @@ pub async fn submit_experiment_records(
     context_path = "/api",
     tag = "Experiments",
     operation_id = "FinalizeExperiment",
+    security(("Authorization" = [])),
     summary = "Conclude a client-driven Experiment",
     description = "Sets the Experiment completed only when every Slot has a terminal execution \
                    record. Otherwise it returns 409 naming how many Slots are still missing.",
@@ -833,7 +836,7 @@ pub async fn finalize_experiment(
     Headers(user): Headers<UserEmail>,
 ) -> Response {
     if let Err(response) =
-        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "POST").await
     {
         return response;
     }
@@ -883,6 +886,56 @@ mod tests {
         assert_eq!(
             validate_comparison_dataset("dataset-a", "dataset-b"),
             Err("Experiments must use the same Dataset")
+        );
+    }
+
+    #[test]
+    fn ingest_errors_map_to_the_status_a_client_can_act_on() {
+        // A batch too large or an Experiment that never ran an SDK Task is the
+        // client's mistake to fix; an incomplete run is a conflict it can
+        // resolve by reporting the missing Slots.
+        assert_eq!(
+            ingest_error_response(IngestError::BatchTooLarge)
+                .status()
+                .as_u16(),
+            400
+        );
+        assert_eq!(
+            ingest_error_response(IngestError::NotClientDriven)
+                .status()
+                .as_u16(),
+            400
+        );
+        assert_eq!(
+            ingest_error_response(IngestError::IncompleteRun { missing: 3 })
+                .status()
+                .as_u16(),
+            409
+        );
+        assert_eq!(
+            ingest_error_response(IngestError::Sealed).status().as_u16(),
+            409
+        );
+        assert_eq!(
+            ingest_error_response(IngestError::SealedWrite { parts: 2 })
+                .status()
+                .as_u16(),
+            409
+        );
+        assert_eq!(
+            ingest_error_response(IngestError::Experiment(ExperimentError::NotFound))
+                .status()
+                .as_u16(),
+            404
+        );
+    }
+
+    #[test]
+    fn an_incomplete_run_reports_how_many_slots_are_missing() {
+        assert!(
+            IngestError::IncompleteRun { missing: 7 }
+                .to_string()
+                .contains('7')
         );
     }
 }

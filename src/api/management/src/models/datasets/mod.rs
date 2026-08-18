@@ -722,3 +722,80 @@ mod dataset_item_contract_tests {
         assert!(missing_dataset.is_err());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_upsert_body_round_trips_the_fields_that_carry_identity_and_concurrency() {
+        let body: UpsertDatasetItemsRequestBody = serde_json::from_value(serde_json::json!({
+            "idempotencyKey": "run-42",
+            "items": [{
+                "logicalId": "case-42",
+                "input": {"question": "refund?"},
+                "expectedOutput": "30 days",
+                "ifRowId": "row-7",
+                "restore": true,
+                "tags": ["hard"],
+            }],
+        }))
+        .unwrap();
+
+        let item = UpsertDatasetItem::from(body.items[0].clone());
+        assert_eq!(item.logical_id.as_deref(), Some("case-42"));
+        assert_eq!(item.if_row_id.as_deref(), Some("row-7"));
+        assert!(item.restore);
+        assert_eq!(item.tags, ["hard"]);
+    }
+
+    #[test]
+    fn an_omitted_logical_id_stays_absent_so_the_server_generates_one() {
+        let body: UpsertDatasetItemsRequestBody = serde_json::from_value(serde_json::json!({
+            "items": [{"input": "question"}],
+        }))
+        .unwrap();
+
+        let item = UpsertDatasetItem::from(body.items[0].clone());
+        assert!(item.logical_id.is_none());
+        assert!(item.if_row_id.is_none());
+        assert!(!item.restore);
+    }
+
+    #[test]
+    fn the_canonical_request_hashes_the_same_whether_optional_fields_are_sent_as_null() {
+        let omitted: UpsertDatasetItemsRequestBody = serde_json::from_value(serde_json::json!({
+            "items": [{"input": "question"}],
+        }))
+        .unwrap();
+        let explicit: UpsertDatasetItemsRequestBody = serde_json::from_value(serde_json::json!({
+            "idempotencyKey": null,
+            "items": [{"input": "question", "expectedOutput": null, "tags": []}],
+        }))
+        .unwrap();
+
+        assert_eq!(
+            serde_json::to_value(&omitted).unwrap(),
+            serde_json::to_value(&explicit).unwrap()
+        );
+    }
+
+    #[test]
+    fn an_upsert_response_reports_what_each_case_actually_did() {
+        let body = UpsertDatasetItemsResponseBody::from(UpsertDatasetItemsResult {
+            items: vec![UpsertedDatasetItem {
+                logical_id: "case-42".to_string(),
+                row_id: "row-8".to_string(),
+                global_version: 9,
+                outcome: UpsertOutcome::Restored,
+            }],
+            dataset_version: 9,
+            replayed: true,
+        });
+
+        let value = serde_json::to_value(&body).unwrap();
+        assert_eq!(value["items"][0]["outcome"], "restored");
+        assert_eq!(value["datasetVersion"], 9);
+        assert_eq!(value["replayed"], true);
+    }
+}

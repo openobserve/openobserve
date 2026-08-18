@@ -15,6 +15,10 @@ pub const LLM_EXPERIMENT_STREAM: &str = "_llm_experiment";
 pub enum ExperimentSkipReason {
     NoReference,
     NoTrace,
+    /// The Task itself declined to produce an output for this Slot. Unlike the
+    /// other two, this is never a scoring-applicability reason — only a Task
+    /// can decide it, and only for an execution record.
+    TaskSkip,
 }
 
 impl ExperimentSkipReason {
@@ -22,6 +26,7 @@ impl ExperimentSkipReason {
         match self {
             Self::NoReference => "no_reference",
             Self::NoTrace => "no_trace",
+            Self::TaskSkip => "task_skip",
         }
     }
 }
@@ -101,6 +106,11 @@ pub struct ExperimentExecutionRecord {
     pub trace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub task_fingerprint: Option<String>,
+    /// Client-reported event time. Informational only: it never controls
+    /// ordering, idempotency, or the scoring precheck — `_timestamp` does, and
+    /// only the server sets that.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executed_at: Option<i64>,
     pub _timestamp: i64,
 }
 
@@ -129,6 +139,7 @@ impl ExperimentExecutionRecord {
             cost: Some(0.0),
             trace_id: Some(String::new()),
             task_fingerprint: Some(String::new()),
+            executed_at: Some(0),
             ..Self::default()
         }
     }
@@ -161,6 +172,7 @@ mod tests {
             cost: Some(0.0004),
             trace_id: Some("trace-1".to_string()),
             task_fingerprint: None,
+            executed_at: None,
             _timestamp: 1_700_000_000_000_000,
         };
 
@@ -193,6 +205,7 @@ mod tests {
             "cost",
             "trace_id",
             "task_fingerprint",
+            "executed_at",
             "_timestamp",
         ] {
             assert!(
