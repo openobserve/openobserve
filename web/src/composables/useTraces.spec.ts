@@ -352,9 +352,9 @@ describe("useTraces", () => {
       expect(searchObj.data.searchAround.size).toBe(10);
     });
 
-    it("meta.searchMode defaults to traces", () => {
+    it("meta.searchMode defaults to spans", () => {
       const { searchObj } = useTraces();
-      expect(searchObj.meta.searchMode).toBe("traces");
+      expect(searchObj.meta.searchMode).toBe("spans");
     });
   });
 

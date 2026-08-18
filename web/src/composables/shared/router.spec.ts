@@ -640,7 +640,7 @@ describe("useRoutes (router.ts)", () => {
 
       expect(route.redirect({ query: { org_identifier: "default", stream: "traces" } })).toEqual({
         name: "traces",
-        query: { org_identifier: "default", stream: "traces", tab: "traces" },
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
       });
     });
 
@@ -693,7 +693,7 @@ describe("useRoutes (router.ts)", () => {
 
       expect(next).toHaveBeenCalledWith({
         name: "traces",
-        query: { org_identifier: "default", stream: "traces", tab: "traces" },
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
         hash: "",
         replace: true,
       });

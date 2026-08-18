@@ -577,7 +577,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(routerReplaceSpy).not.toHaveBeenCalled();
     });
 
-    it("should restore the Traces default when the tab query is removed", async () => {
+    it("should restore the spans default when the tab query is removed", async () => {
       const currentRoute = ref({
         query: { tab: "spans" },
         name: "traces",
@@ -610,8 +610,8 @@ describe("Index.vue (Main Traces Page)", () => {
       };
       await flushPromises();
 
-      expect(mockSearchObj.meta.searchMode).toBe("traces");
-      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "traces" } });
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
     });
 
     it("should switch to service-graph tab from ?tab= on enterprise", async () => {
