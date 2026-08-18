@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -105,7 +105,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/kubernetes.svg"),
-        label: t("ingestion.kubernetes"),
+        label: raw("Kubernetes"),
         contentClass: "tab_content",
       },
       {
@@ -117,7 +117,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/windows.svg"),
-        label: t("ingestion.windows"),
+        label: raw("Windows"),
         contentClass: "tab_content",
       },
       {
@@ -129,7 +129,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/linux.svg"),
-        label: t("ingestion.linux"),
+        label: raw("Linux"),
         contentClass: "tab_content",
       },
       {
@@ -153,7 +153,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/aws.svg"),
-        label: t("ingestion.awsconfig"),
+        label: raw("Amazon Web Services(AWS)"),
         contentClass: "tab_content",
       },
       {
@@ -165,7 +165,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/gcp.svg"),
-        label: t("ingestion.gcpconfig"),
+        label: raw("Google Cloud Platform(GCP)"),
         contentClass: "tab_content",
       },
       {
@@ -177,7 +177,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/azure.png"),
-        label: t("ingestion.azure"),
+        label: raw("Microsoft Azure"),
         contentClass: "tab_content",
       },
       {
@@ -189,7 +189,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
-        label: t("ingestion.tracesotlp"),
+        label: t("ingestion.tracesotlp", { product: raw("OpenTelemetry") }),
         contentClass: "tab_content",
       },
       {

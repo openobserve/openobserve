@@ -24,6 +24,7 @@ import { ref } from "vue";
 import LinuxConfig from "./LinuxConfig.vue";
 import linuxCard from "@/components/ingestion/setupCard/content/linux";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -63,7 +64,7 @@ const SUBS = {
 
 describe("linuxCard builder", () => {
   it("builds the Linux card metadata and step flow", () => {
-    const card = linuxCard(SUBS);
+    const card = linuxCard(SUBS, gt);
     expect(card.provider.name).toBe("Linux");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
     expect(card.steps.map((s) => s.id)).toEqual(["install", "verify"]);
@@ -76,14 +77,14 @@ describe("linuxCard builder", () => {
 
   it("offers generic and EC2 environments as one toggle", () => {
     // Replaces two hand-built clickable <div> cards plus a conditional callout.
-    const install = linuxCard(SUBS).steps[0];
+    const install = linuxCard(SUBS, gt).steps[0];
     expect(install.required).toBe(true);
     expect(install.variants?.map((v) => v.id)).toEqual(["generic", "ec2"]);
     expect(install.variants!.every((v) => !!v.icon)).toBe(true);
   });
 
   it("points each variant at its matching install script", () => {
-    const [generic, ec2] = linuxCard(SUBS).steps[0].variants!;
+    const [generic, ec2] = linuxCard(SUBS, gt).steps[0].variants!;
     expect(generic.code.raw).toContain("/linux/install.sh");
     expect(generic.code.raw).not.toContain("/ec2/");
     expect(ec2.code.raw).toContain("/linux/ec2/install.sh");
@@ -91,13 +92,13 @@ describe("linuxCard builder", () => {
 
   it("carries the IAM prerequisite only on the EC2 variant", () => {
     // Previously an amber callout rendered above the command for everyone.
-    const [generic, ec2] = linuxCard(SUBS).steps[0].variants!;
+    const [generic, ec2] = linuxCard(SUBS, gt).steps[0].variants!;
     expect(ec2.note).toContain("ec2:DescribeTags");
     expect(generic.note).not.toContain("ec2:DescribeTags");
   });
 
   it("offers the uninstall command", () => {
-    const uninstall = linuxCard(SUBS).extras?.uninstall;
+    const uninstall = linuxCard(SUBS, gt).extras?.uninstall;
     expect(uninstall?.code.raw).toContain("/linux/uninstall.sh");
     expect(uninstall?.code.lang).toBe("bash");
     // One uninstall script serves both the generic and EC2 installs.
@@ -105,7 +106,7 @@ describe("linuxCard builder", () => {
   });
 
   it("substitutes url/org and masks the ingestion token", () => {
-    const generic = linuxCard(SUBS).steps[0].variants![0];
+    const generic = linuxCard(SUBS, gt).steps[0].variants![0];
     expect(generic.code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
     expect(generic.code.raw).toContain(SUBS.token);
     // The old page rendered a literal [BASIC_PASSCODE] placeholder instead.
@@ -122,7 +123,7 @@ describe("LinuxConfig.vue", () => {
   });
 
   it("renders the shared setup card for the linux slug", () => {
-    expect(getDataSourceCard("linux", SUBS)?.provider.name).toBe("Linux");
+    expect(getDataSourceCard("linux", SUBS, gt)?.provider.name).toBe("Linux");
     wrapper = mount(LinuxConfig, { global: { plugins: [mockStore, mockI18n] } });
     const stub = wrapper.findComponent({ name: "SetupCardRenderer" });
     expect(stub.exists()).toBe(true);

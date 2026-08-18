@@ -170,14 +170,14 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
       label: raw("Kotlin DSL"),
       icon: gradleIcon,
       code: { lang: "kotlin", filename: "build.gradle.kts", raw: gradleKts },
-      note: "The session-replay dependency is optional — drop that line if you do not need screen recording.",
+      note: gt("ingestion.setupCard.androidInstallNote"),
     },
     {
       id: "groovy",
       label: raw("Groovy"),
       icon: gradleIcon,
       code: { lang: "groovy", filename: "build.gradle", raw: gradleGroovy },
-      note: "The session-replay dependency is optional — drop that line if you do not need screen recording.",
+      note: gt("ingestion.setupCard.androidInstallNote"),
     },
   ];
 
@@ -190,8 +190,8 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
       tagline: gt("ingestion.setupCard.rumAndroidTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
-      runtime: "Android",
-      setupTime: "~5 min",
+      runtime: raw("Android"),
+      setupTime: gt("ingestion.setupCard.setupTime5Min"),
       metaBadges: [
         gt("rum.sessions"),
         gt("ingestion.setupCard.pillViews"),
@@ -224,7 +224,7 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
           raw: initCode(subs, subs.rumToken),
           masked: initCode(subs, subs.rumTokenMasked),
         },
-        note: "Initialize as early as possible — the SDK must be enabled before the screens you want measured are created.",
+        note: gt("ingestion.setupCard.androidInitNote"),
       },
       {
         id: "session-replay",
@@ -241,7 +241,7 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
           gt("ingestion.setupCard.pillWireframeCapture"),
           gt("ingestion.setupCard.pillPrivacyMasking"),
         ],
-        note: "Privacy levels default to their strictest setting. Relax `setTextAndInputPrivacy`, `setImagePrivacy` and `setTouchPrivacy` only as far as your privacy policy allows.",
+        note: gt("ingestion.setupCard.androidSessionReplayNote"),
       },
       {
         id: "verify",
@@ -270,9 +270,8 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
     },
     extras: {
       installs: [ART_RUM, ART_LOGS, ART_REPLAY],
-      fixTitle: "Give Each Feature Its FULL Intake URL",
-      fixBody:
-        "The native Android SDK appends nothing to a custom endpoint — it posts to exactly the URL you pass. A base URL without the `/rum`, `/logs` or `/replay` suffix silently drops that signal. Use the complete per-feature URLs:",
+      fixTitle: gt("ingestion.setupCard.androidFixTitle"),
+      fixBody: gt("ingestion.setupCard.androidFixBody"),
       fixLang: "bash",
       fixSnippet: `# RUM
 ${rumEndpoint(subs)}
@@ -287,26 +286,26 @@ ${replayEndpoint(subs)}
 ${rumEndpoint(subs).replace(/\/\/(localhost|127\.0\.0\.1)/, "//10.0.2.2")}`,
       troubleshooting: [
         {
-          q: "RUM events arrive but there is no session replay",
-          a: `Almost always the endpoint. Session Replay is enabled separately and does **not** inherit the RUM \`useCustomEndpoint\`. Pass the full URL explicitly: \`useCustomEndpoint("${replayEndpoint(
-            subs,
-          )}")\` — note the trailing \`/replay\`, which the RUM endpoint does not have.`,
+          q: gt("ingestion.setupCard.androidTroubleNoReplayQ"),
+          a: gt("ingestion.setupCard.androidTroubleNoReplayA", {
+            replayUrl: replayEndpoint(subs),
+          }),
         },
         {
-          q: "Nothing arrives at all from an emulator or device",
-          a: "Check the host first. `localhost` inside an emulator or on a device is the device itself, not your machine: use `10.0.2.2` on the Android emulator, and your machine's LAN IP on a physical device on the same network.",
+          q: gt("ingestion.setupCard.androidTroubleNothingArrivesQ"),
+          a: gt("ingestion.setupCard.androidTroubleNothingArrivesA"),
         },
         {
-          q: "A release/debug build sends nothing over plain HTTP",
-          a: 'Android blocks cleartext traffic by default. For an `http://` endpoint, allow cleartext on the SDK with `_InternalProxy.allowClearTextHttp(builder)` and set `android:usesCleartextTraffic="true"` (or a network-security-config exception) for your host. Prefer HTTPS outside local development.',
+          q: gt("ingestion.setupCard.androidTroubleCleartextQ"),
+          a: gt("ingestion.setupCard.androidTroubleCleartextA"),
         },
         {
-          q: "Requests return 401 or 403",
-          a: "The `clientToken` is this org's **RUM token**, not the ingestion passcode. If it was rotated, regenerate it from this page's header and rebuild the app.",
+          q: gt("ingestion.setupCard.androidTrouble401Q"),
+          a: gt("ingestion.setupCard.androidTrouble401A"),
         },
         {
-          q: "Sessions appear but screens are all named the same",
-          a: "View tracking is not wired up. Pass a `useViewTrackingStrategy(...)` — e.g. `ActivityViewTrackingStrategy(trackExtras = true)` for Activities, or `NavigationViewTrackingStrategy(...)` if you use AndroidX Navigation — when building the `RumConfiguration`.",
+          q: gt("ingestion.setupCard.androidTroubleScreenNamesQ"),
+          a: gt("ingestion.setupCard.androidTroubleScreenNamesA"),
         },
       ],
     },

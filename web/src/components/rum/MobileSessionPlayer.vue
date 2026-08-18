@@ -129,9 +129,12 @@ function markerTooltip(event: any): string {
   const name = String(event?.name ?? event?.type ?? "");
   const label = name.length > 100 ? `${name.slice(0, 100)}…` : name;
   if (event?.frustration_types?.length) {
-    return `⚠️ FRUSTRATION: ${event.frustration_types.join(", ")}\n${label}`;
+    return t("rum.frustrationEventTooltip", {
+      types: event.frustration_types.join(", "),
+      name: label,
+    });
   }
-  return event?.type === "error" ? `⛔ ERROR: ${label}` : label;
+  return event?.type === "error" ? t("rum.errorEventTooltip", { name: label }) : label;
 }
 
 // ---- playback loop -------------------------------------------------------

@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon :name="tab.icon" :size="tab.iconSize" class="shrink-0" />
                 </template>
-                {{ t(tab.labelKey) }}
+                {{ "label" in tab ? raw(tab.label) : t(tab.labelKey) }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -996,7 +996,9 @@ const TRACE_TAB_DEFS = [
   { value: "waterfall", labelKey: "traces.waterfall", icon: "align-left", iconSize: "sm" },
   { value: "flame-graph", labelKey: "traces.flameGraph", icon: "flame", iconSize: "sm" },
   { value: "map", labelKey: "traces.traceGraph", icon: "account-tree", iconSize: "sm" },
-  { value: "dag", labelKey: "traces.dag", icon: "git-branch", iconSize: "sm" },
+  // `label` overrides `labelKey`: DAG is an acronym, and translating it produced
+  // "DÍA"/"JOUR"/"GIORNO" (day) in shipped locales.
+  { value: "dag", label: "DAG", icon: "git-branch", iconSize: "sm" },
   { value: "thread", labelKey: "traces.thread", icon: "chat", iconSize: "xs" },
 ] as const;
 

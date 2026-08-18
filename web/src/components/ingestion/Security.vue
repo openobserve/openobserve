@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -102,7 +102,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/falco.png"),
-        label: t("ingestion.falco"),
+        label: raw("Falco"),
         contentClass: "tab_content",
       },
       {
@@ -114,7 +114,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/os-query.png"),
-        label: t("ingestion.osquery"),
+        label: raw("Osquery"),
         contentClass: "tab_content",
       },
       {
@@ -126,7 +126,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/okta.png"),
-        label: t("ingestion.okta"),
+        label: raw("Okta"),
         contentClass: "tab_content",
       },
       {
@@ -138,7 +138,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/jumpcloud.svg"),
-        label: t("ingestion.jumpcloud"),
+        label: raw("Jumpcloud"),
         contentClass: "tab_content",
       },
       {
@@ -162,7 +162,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/office-365.png"),
-        label: t("ingestion.office365"),
+        label: raw("Office365"),
         contentClass: "tab_content",
       },
       {
@@ -174,7 +174,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/google-workspace.png"),
-        label: t("ingestion.gworkspace"),
+        label: raw("Google Workspace"),
         contentClass: "tab_content",
       },
     ];

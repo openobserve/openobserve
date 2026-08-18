@@ -17,7 +17,7 @@
 // https://openobserve.ai/blog/how-to-monitor-cassandra — Cassandra is scraped via
 // the JMX receiver (needs the OTel JMX metrics jar + JMX enabled on Cassandra).
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -49,14 +49,14 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function cassandraCard(subs: CardSubstitutions): RichCardContent {
+export default function cassandraCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Cassandra",
-      tagline: gt("ingestion.setupCard.cassandraTagline"),
+      name: raw("Cassandra"),
+      tagline: t("ingestion.setupCard.cassandraTagline"),
       logo: getImageURL("images/ingestion/cassandra.png"),
       tone: "#1287B1",
-      metaBadges: [gt("common.metrics")],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
       {
@@ -67,7 +67,7 @@ export default function cassandraCard(subs: CardSubstitutions): RichCardContent 
         completeOn: "copy",
         code: { lang: "bash", raw: JMX_JAR },
       },
-      collectorInstallStep(),
+      collectorInstallStep(t),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -93,7 +93,7 @@ export default function cassandraCard(subs: CardSubstitutions): RichCardContent 
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),
-        note: "Enable JMX remote access on Cassandra for the receiver to connect.",
+        note: t("ingestion.setupCard.cassandraJmxNote"),
       },
       {
         id: "run",
@@ -110,15 +110,16 @@ export default function cassandraCard(subs: CardSubstitutions): RichCardContent 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // Cassandra/JVM JMX metric names (cassandra.client.request.latency,
-        // cassandra.compaction.tasks.*, jvm.gc.*, jvm.memory.heap.used) — kept
-        // untranslated so the pills match the ingested metrics.
+        // What the verify step will show, in prose. These are NOT the ingested metric
+        // names (those are cassandra.client.request.latency, cassandra.compaction.tasks.*,
+        // jvm.gc.*, jvm.memory.heap.used) — they are a plain-English summary of them,
+        // so they are translated.
         pills: [
-          raw("Read Latency"),
-          raw("Write Latency"),
-          raw("Compactions"),
-          raw("GC Pauses"),
-          raw("Heap Usage"),
+          t("ingestion.setupCard.pillReadLatency"),
+          t("ingestion.setupCard.pillWriteLatency"),
+          t("ingestion.setupCard.pillCompactions"),
+          t("ingestion.setupCard.pillGcPauses"),
+          t("ingestion.setupCard.pillHeapUsage"),
         ],
       },
     ],

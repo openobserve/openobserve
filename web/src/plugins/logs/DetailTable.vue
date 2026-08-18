@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="tabItem.name"
             :data-test="tabItem.dataTest"
             :name="tabItem.name"
-            :label="raw(tabItem.label)"
+            :label="tabItem.label"
           />
         </OTabs>
       </div>
@@ -741,7 +741,7 @@ export default defineComponent({
       return tabs;
     });
 
-    type DetailTab = { name: string; label: string; dataTest: string };
+    type DetailTab = { name: string; label: I18nText; dataTest: string };
 
     const loadTabOrder = (): DetailTab[] => {
       try {
@@ -965,7 +965,10 @@ export default defineComponent({
 
     const createRegexPatternFromLogs = (key: string, value: any) => {
       emit("closeTable");
-      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      // Prompt text handed to the assistant — model input, deliberately English.
+      const promptToBeAdded = raw(
+        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
       router.push({
         path: "/settings/regex_patterns",
         query: {
@@ -1018,7 +1021,6 @@ export default defineComponent({
     };
 
     return {
-      raw,
       t,
       store,
       router,

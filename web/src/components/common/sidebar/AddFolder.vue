@@ -139,7 +139,9 @@ export default defineComponent({
       } catch (err: any) {
         showErrorNotification(
           err?.response?.data?.message ??
-            (props.editMode ? "Folder updation failed" : "Folder creation failed"),
+            (props.editMode
+              ? t("common.sidebar.folderUpdateFailed")
+              : t("common.sidebar.folderCreateFailed")),
           { timeout: 2000 },
         );
       }

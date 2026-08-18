@@ -26,7 +26,7 @@
 //     ndjson` into the agent's TCP receiver. That daemon is the thing to check
 //     when host metrics arrive but unified log entries do not.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -43,16 +43,16 @@ const install = `curl -O ${AGENTS_REPO}/mac/install.sh \\
   && chmod +x install.sh \\
   && sudo ./install.sh {url}/api/{org}/ {token}`;
 
-export default function macosCard(subs: CardSubstitutions): RichCardContent {
+export default function macosCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "macOS",
-      tagline: gt("ingestion.setupCard.taglineMacos"),
+      name: raw("macOS"),
+      tagline: t("ingestion.setupCard.taglineMacos"),
       logo: getImageURL("images/common/macos.png"),
       tone: "#86868b",
-      runtime: "Host",
-      setupTime: "~1 min",
-      metaBadges: [gt("common.logs"), gt("common.metrics")],
+      runtime: t("ingestion.setupCard.runtimeHost"),
+      setupTime: t("ingestion.setupCard.setupTime1Min"),
+      metaBadges: [t("common.logs"), t("common.metrics")],
     },
     steps: [
       {
@@ -72,39 +72,39 @@ export default function macosCard(subs: CardSubstitutions): RichCardContent {
         completeOn: "detect",
         detectionAnchor: true,
         pills: [
-          gt("ingestion.setupCard.pillUnifiedLog"),
-          gt("ingestion.setupCard.pillSystemLogs"),
+          t("ingestion.setupCard.pillUnifiedLog"),
+          t("ingestion.setupCard.pillSystemLogs"),
           // Universal acronym — identical in every locale.
           raw("CPU"),
-          gt("ingestion.setupCard.pillMemory"),
-          gt("ingestion.setupCard.pillDisk"),
-          gt("common.network"),
+          t("ingestion.setupCard.pillMemory"),
+          t("ingestion.setupCard.pillDisk"),
+          t("common.network"),
         ],
       },
     ],
     detect: hostMetricsDetect,
     extras: {
-      fixTitle: "Check The Agent Services",
-      fixBody:
-        "The installer registers two launchd daemons: the agent itself and the unified log bridge. If nothing arrives, confirm both are loaded and read the agent's log for an auth or connectivity error:",
+      fixTitle: t("ingestion.setupCard.macosAgentServicesFixTitle"),
+      fixBody: t("ingestion.setupCard.macosAgentFixBody"),
       fixLang: "bash",
       fixSnippet: `sudo launchctl print system/ai.openobserve.otelcol-contrib | head -20
 sudo launchctl print system/ai.openobserve.macos-unified-log | head -20
 sudo tail -50 /Library/Logs/openobserve-collector/collector.err`,
       troubleshooting: [
         {
-          q: "Host metrics arrive but there are no unified log entries",
-          a: "That is the bridge daemon, not the agent. Check `sudo launchctl print system/ai.openobserve.macos-unified-log`, and that the agent is listening for it with `sudo lsof -nP -iTCP:54525 -sTCP:LISTEN`.",
+          q: t("ingestion.setupCard.macosTroubleUnifiedLogQ"),
+          a: t("ingestion.setupCard.macosTroubleUnifiedLogA"),
         },
         {
-          q: "The unified log is sending far more than expected",
-          a: "It is high volume by default — hundreds of events per second on an idle Mac. Narrow it with the `LEVEL` and `PREDICATE` knobs at the top of `/opt/openobserve-collector/macos-unified-log.sh`, then apply with `sudo launchctl kickstart -k system/ai.openobserve.macos-unified-log`.",
+          q: t("ingestion.setupCard.macosTroubleVolumeQ"),
+          a: t("ingestion.setupCard.macosTroubleVolumeA"),
         },
         {
-          q: "The agent's own log file is empty",
-          a: "That is expected. The agent logs at `warn` and above so a healthy install writes almost nothing. To debug, raise it temporarily: `sudo sed -i '' 's/level: warn/level: info/' /etc/otel-config.yaml` then kickstart the service.",
+          q: t("ingestion.setupCard.macosTroubleEmptyLogQ"),
+          a: t("ingestion.setupCard.macosTroubleEmptyLogA"),
         },
         ...sharedAgentTroubleshooting(
+          t,
           "`sudo launchctl print system/ai.openobserve.otelcol-contrib`",
           { includeEc2: false },
         ),

@@ -22,6 +22,7 @@ import WindowsConfig from "./WindowsConfig.vue";
 import windowsCard from "@/components/ingestion/setupCard/content/windows";
 import linuxCard from "@/components/ingestion/setupCard/content/linux";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -61,14 +62,14 @@ const SUBS = {
 
 describe("windowsCard builder", () => {
   it("builds the Windows card metadata and step flow", () => {
-    const card = windowsCard(SUBS);
+    const card = windowsCard(SUBS, gt);
     expect(card.provider.name).toBe("Windows");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
     expect(card.steps.map((s) => s.id)).toEqual(["install", "verify"]);
   });
 
   it("uses PowerShell, not bash", () => {
-    const install = windowsCard(SUBS).steps[0];
+    const install = windowsCard(SUBS, gt).steps[0];
     expect(install.chip?.label).toBe("PowerShell");
     for (const v of install.variants!) {
       expect(v.code.lang).toBe("powershell");
@@ -78,7 +79,7 @@ describe("windowsCard builder", () => {
   });
 
   it("points each variant at its matching install script", () => {
-    const [generic, ec2] = windowsCard(SUBS).steps[0].variants!;
+    const [generic, ec2] = windowsCard(SUBS, gt).steps[0].variants!;
     expect(generic.code.raw).toContain("/windows/install.ps1");
     expect(generic.code.raw).not.toContain("/ec2/");
     expect(ec2.code.raw).toContain("/windows/ec2/install.ps1");
@@ -87,22 +88,22 @@ describe("windowsCard builder", () => {
   });
 
   it("substitutes url/org and masks the ingestion token", () => {
-    const generic = windowsCard(SUBS).steps[0].variants![0];
+    const generic = windowsCard(SUBS, gt).steps[0].variants![0];
     expect(generic.code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
     expect(generic.code.raw).not.toContain("[BASIC_PASSCODE]");
     expect(generic.code.masked).not.toContain(SUBS.token);
   });
 
   it("adds the execution-policy guidance Linux does not need", () => {
-    const questions = windowsCard(SUBS).extras!.troubleshooting!.map((r) => r.q);
+    const questions = windowsCard(SUBS, gt).extras!.troubleshooting!.map((r) => r.q);
     expect(questions[0]).toContain("fails to run");
     // Shares the rest of its troubleshooting with the Linux card.
-    const linuxQs = linuxCard(SUBS).extras!.troubleshooting!.map((r) => r.q);
+    const linuxQs = linuxCard(SUBS, gt).extras!.troubleshooting!.map((r) => r.q);
     expect(questions).toEqual(expect.arrayContaining(linuxQs));
   });
 
   it("offers the uninstall command in PowerShell", () => {
-    const uninstall = windowsCard(SUBS).extras?.uninstall;
+    const uninstall = windowsCard(SUBS, gt).extras?.uninstall;
     expect(uninstall?.code.raw).toContain("/windows/uninstall.ps1");
     expect(uninstall?.code.lang).toBe("powershell");
     expect(uninstall?.code.raw).not.toContain("curl -O");
@@ -117,7 +118,7 @@ describe("WindowsConfig.vue", () => {
   });
 
   it("renders the shared setup card for the windows slug", () => {
-    expect(getDataSourceCard("windows", SUBS)?.provider.name).toBe("Windows");
+    expect(getDataSourceCard("windows", SUBS, gt)?.provider.name).toBe("Windows");
     wrapper = mount(WindowsConfig, {
       global: { plugins: [mockStore, mockI18n] },
     });

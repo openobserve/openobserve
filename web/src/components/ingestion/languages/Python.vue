@@ -41,7 +41,7 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
             target="_blank"
             rel="noopener noreferrer"
             class="text-text-link hover:text-text-link-hover underline"
-            >{{ t("ingestion.python") }}</a
+            >{{ raw("Python") }}</a
           >
         </li>
         <li class="py-0.5">
@@ -50,7 +50,7 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
             target="_blank"
             rel="noopener noreferrer"
             class="text-text-link hover:text-text-link-hover underline"
-            >{{ t("ingestion.fastapi") }}</a
+            >{{ raw("FastAPI") }}</a
           >
         </li>
       </ol>

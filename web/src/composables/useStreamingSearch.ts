@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import { gt } from "@/types/i18n";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
@@ -415,7 +416,7 @@ const useHttpStreaming = () => {
                 // Refresh succeeded but stream is broken — signal error so UI can retry
                 onError(traceId, {
                   status: 401,
-                  message: "Session refreshed, please retry search",
+                  message: gt("search.sessionRefreshedRetrySearch"),
                 });
               } catch {
                 // Refresh failed — logout/reload already handled inside attemptTokenRefresh

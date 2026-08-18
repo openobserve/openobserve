@@ -1229,7 +1229,7 @@ export default defineComponent({
     const { searchObj } = searchState();
 
     // Use separate patterns state (completely isolated from logs)
-    const { patternsState } = usePatterns();
+    const { patternsState } = usePatterns(t);
 
     const {
       selectedPattern,
@@ -1533,7 +1533,10 @@ export default defineComponent({
           (s: any) => s.name === label,
         );
         return {
-          displayLabel: label,
+          // `label` stays the English sentinel: it is compared above to derive
+          // rawValue and matched against the ECharts series name. Only the
+          // rendered field is translated.
+          displayLabel: label === "(empty)" ? t("logs.searchResult.emptyValue") : label,
           rawValue,
           count: (counts as number[])[dataIndex] ?? 0,
           color: matchedSeries?.itemStyle?.color ?? "#888",
@@ -2177,7 +2180,7 @@ export default defineComponent({
     // ── Logs-grid rendering ───────────────────────────────────────────────────
     // `processHitsInChunks` builds a per-(column, rowIndex) map of colorized HTML
     // that the cell slots render via v-html.
-    const { processedResults, processHitsInChunks } = useLogsHighlighter();
+    const { processedResults, processHitsInChunks } = useLogsHighlighter(t);
 
     const isFunctionErrorOpen = ref(false);
 

@@ -22,10 +22,12 @@
 import { computed, defineComponent } from "vue";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "UsageReportBanner",
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
 
     // Purely reactive: the banner derives everything from
@@ -56,17 +58,17 @@ export default defineComponent({
       const ms = elapsedMs.value;
       if (ms >= SEVEN_DAYS) {
         const days = Math.floor(ms / (24 * ONE_HOUR));
-        return `Usage reporting has failed for ${days} day${days !== 1 ? "s" : ""}, RBAC and SSO features are disabled until usage is successfully reported`;
+        return t("billing.usageReportingFailedForDays", { count: days }, days);
       }
       const hours = Math.floor(ms / ONE_HOUR);
-      return `Usage reporting has been failing for ${hours} hour${hours !== 1 ? "s" : ""}, some features will get disabled soon`;
+      return t("billing.usageReportingFailingForHours", { count: hours }, hours);
     });
 
     const subtitle = computed(() => {
       if (isSevere.value) {
-        return "Please contact your administrator to resolve this issue.";
+        return t("billing.contactAdministratorToResolve");
       }
-      return "Please contact your administrator to ensure usage reporting is restored.";
+      return t("billing.contactAdministratorUsageReporting");
     });
 
     const bannerClass = computed(() => {

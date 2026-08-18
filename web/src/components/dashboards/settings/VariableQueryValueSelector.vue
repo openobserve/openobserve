@@ -147,7 +147,10 @@ export default defineComponent({
       return availableOptions.value.map((opt: any) => {
         if (typeof opt.value === "string" && opt.value.endsWith(`${CUSTOM_VALUE}`)) {
           const base = opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "");
-          return { ...opt, label: `${base} ${t("dashboard.variableQueryValueSelector.custom")}` };
+          return {
+            ...opt,
+            label: t("dashboard.variableQueryValueSelector.customValue", { value: base }),
+          };
         }
         return opt;
       });
@@ -308,7 +311,9 @@ export default defineComponent({
                 if (it === SELECT_ALL_VALUE)
                   return t("dashboard.variableQueryValueSelector.allSelected");
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t("dashboard.variableQueryValueSelector.custom")}`;
+                  return t("dashboard.variableQueryValueSelector.customValue", {
+                    value: it.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
+                  });
                 return it;
               })
               .join(", ");
@@ -329,7 +334,9 @@ export default defineComponent({
                 if (it === SELECT_ALL_VALUE)
                   return t("dashboard.variableQueryValueSelector.allSelected");
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t("dashboard.variableQueryValueSelector.custom")}`;
+                  return t("dashboard.variableQueryValueSelector.customValue", {
+                    value: it.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
+                  });
                 return it;
               })
               .join(", ");
@@ -350,7 +357,9 @@ export default defineComponent({
           typeof selectedValue.value === "string" &&
           selectedValue.value.endsWith(`${CUSTOM_VALUE}`)
         ) {
-          return `${selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t("dashboard.variableQueryValueSelector.custom")}`;
+          return t("dashboard.variableQueryValueSelector.customValue", {
+            value: selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
+          });
         } else {
           return selectedValue.value;
         }

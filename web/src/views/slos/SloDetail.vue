@@ -467,7 +467,7 @@ const backTarget = computed(() => ({
 const subtitle = computed(() => {
   if (!slo.value) return raw("");
   const parts = [
-    sliTypeLabel(slo.value.sli_type),
+    sliTypeLabel(slo.value.sli_type, t),
     t("slos.overRolling", { window: formatWindow(slo.value.window_secs) }),
     formatSlice(slo.value.slice_interval_secs),
   ];

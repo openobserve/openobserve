@@ -79,14 +79,17 @@ const PLATFORMS: {
     labelKey: "ingestion.rumPlatformBrowser",
     icon: "web",
     build: () =>
-      rumCard({
-        site: site.value,
-        endpoint: endpoint.value,
-        org: org.value,
-        rumToken: rumToken.value,
-        rumTokenMasked: maskText(rumToken.value),
-        insecureHTTP: insecureHTTP.value,
-      }),
+      rumCard(
+        {
+          site: site.value,
+          endpoint: endpoint.value,
+          org: org.value,
+          rumToken: rumToken.value,
+          rumTokenMasked: maskText(rumToken.value),
+          insecureHTTP: insecureHTTP.value,
+        },
+        t,
+      ),
   },
   {
     id: "react-native",
@@ -94,13 +97,16 @@ const PLATFORMS: {
     icon: "smartphone",
     beta: true,
     build: () =>
-      rumReactNativeCard({
-        endpoint: endpoint.value,
-        org: org.value,
-        rumToken: rumToken.value,
-        rumTokenMasked: maskText(rumToken.value),
-        insecureHTTP: insecureHTTP.value,
-      }),
+      rumReactNativeCard(
+        {
+          endpoint: endpoint.value,
+          org: org.value,
+          rumToken: rumToken.value,
+          rumTokenMasked: maskText(rumToken.value),
+          insecureHTTP: insecureHTTP.value,
+        },
+        t,
+      ),
   },
   {
     id: "android",

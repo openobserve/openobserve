@@ -65,14 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <OEmptyState illustration="radar" size="hero" :hide-action="true">
         <template #title>{{ t("rum.emptyState.title") }}</template>
-        <template #description><span v-html="t('rum.emptyState.description')" /></template>
+        <template #description>{{ t("rum.emptyState.description") }}</template>
 
         <template #actions>
           <!-- Instrument a web app -->
           <EmptyStateIngestionCard
             icon="devices"
             :label="t('rum.emptyState.webApp')"
-            :sublabel="t('rum.emptyState.webAppDesc')"
+            :sublabel="t('rum.emptyState.webAppDesc', { product: raw('JavaScript') })"
             icon-variant="blue"
             data-test="rum-empty-web-card"
             @click="getStarted"
@@ -122,7 +122,7 @@ import useErrorTracking from "@/composables/useErrorTracking";
 import usePerformance from "@/composables/rum/usePerformance";
 
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";

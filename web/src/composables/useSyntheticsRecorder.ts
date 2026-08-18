@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import type {
   BrowserStep,
@@ -61,7 +62,7 @@ export function isExtensionOutdated(version: string | undefined): boolean {
   return false;
 }
 
-const useSyntheticsRecorder = () => {
+const useSyntheticsRecorder = (t: TranslateFn) => {
   // Bridge transport — replaces chrome.runtime.* with window.postMessage.
   // Works on any origin: cloud, self-hosted, localhost. No externally_connectable needed.
   // The content script (content.js) on the OO page acts as a relay: postMessage ↔ internal Port ↔ SW.
@@ -465,7 +466,7 @@ const useSyntheticsRecorder = () => {
     });
     if (!res?.success) {
       console.debug("Disconnect ---", res);
-      error.value = res?.error || "Failed to start recording.";
+      error.value = res?.error || t("synthetics.failedToStartRecording");
       bridgeDisconnect();
       return;
     }
@@ -700,7 +701,7 @@ const useSyntheticsRecorder = () => {
     _cookies?: { name: string; value: string; domain: string }[],
   ): Promise<ReplayResponse | null> {
     if (steps.length === 0) {
-      error.value = "No replayable steps in this journey.";
+      error.value = t("synthetics.noReplayableSteps");
       return null;
     }
     error.value = "";

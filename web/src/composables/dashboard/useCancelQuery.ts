@@ -53,9 +53,12 @@ const useCancelQuery = (t: TranslateFn) => {
       })
       .catch((error) => {
         console.error("delete running queries error", error);
-        showErrorNotification(error.response?.data?.message || "Failed to cancel running query", {
-          timeout: 3000,
-        });
+        showErrorNotification(
+          error.response?.data?.message || t("dashboard.failedToCancelRunningQuery"),
+          {
+            timeout: 3000,
+          },
+        );
       })
       .finally(() => {
         traceIdRef.value = traceIdRef.value.filter((id: any) => !tracesIdsCopy.includes(id));

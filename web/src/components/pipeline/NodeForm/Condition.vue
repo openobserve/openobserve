@@ -225,8 +225,9 @@ let parser: any;
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
 
@@ -397,8 +398,8 @@ const openCancelDialog = () => {
     }
 
     dialog.value.show = true;
-    dialog.value.title = "Discard Changes";
-    dialog.value.message = "Are you sure you want to cancel condition changes?";
+    dialog.value.title = t("common.discardChanges");
+    dialog.value.message = t("pipeline.cancelConditionChangesConfirm");
     dialog.value.okCallback = closeDialog;
   } catch (e) {
     closeDialog();
@@ -455,8 +456,8 @@ const saveCondition = async () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.title = t("pipeline.deleteNodeTitle");
+  dialog.value.message = t("pipeline.deleteStreamRoutingConfirm");
   dialog.value.okCallback = deleteRoute;
 };
 

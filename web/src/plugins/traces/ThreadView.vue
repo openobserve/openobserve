@@ -33,11 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-warning! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
-        :title="
-          summary.turnCount === 1
-            ? t('traces.threadView.llmStep', { n: summary.turnCount })
-            : t('traces.threadView.llmSteps', { n: summary.turnCount })
-        "
+        :title="t('traces.threadView.llmStep', { n: summary.turnCount })"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
         <span
@@ -192,11 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span>{{ t("traces.threadView.historicalIcon") }}</span>
           <span>
-            {{
-              group.historicalUserCount === 1
-                ? t("traces.threadView.historicalMessage", { count: group.historicalUserCount })
-                : t("traces.threadView.historicalMessages", { count: group.historicalUserCount })
-            }}
+            {{ t("traces.threadView.historicalMessage", { count: group.historicalUserCount }) }}
           </span>
         </div>
 

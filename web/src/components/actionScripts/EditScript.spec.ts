@@ -573,7 +573,7 @@ describe("EditScript", () => {
       wrapper.vm.formData.name = "Changed";
       wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+      expect(wrapper.vm.dialog.title).toBe("Discard changes");
     });
 
     it("shows the discard dialog after a real form-field edit (regression guard)", async () => {
@@ -584,7 +584,7 @@ describe("EditScript", () => {
       await nextTick();
       wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+      expect(wrapper.vm.dialog.title).toBe("Discard changes");
     });
   });
 

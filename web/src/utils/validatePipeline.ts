@@ -1,3 +1,5 @@
+import { gt } from "@/types/i18n";
+
 interface QueryCondition {
   type?: "sql" | "promql";
   conditions?: any;
@@ -84,24 +86,32 @@ export function validatePipeline(
   pipeline.nodes.forEach((node) => {
     // Validate io_type
     if (!node.io_type) {
-      result.errors.push(`Node ${node.id} is missing required 'io_type' field`);
+      result.errors.push(gt("pipeline.validation.nodeMissingIoType", { id: node.id }));
     } else {
       const validIoTypes = ["input", "output", "default"];
       if (!validIoTypes.includes(node.io_type)) {
         result.errors.push(
-          `Node ${node.id} has invalid io_type '${node.io_type}'. Must be one of: ${validIoTypes.join(", ")}`,
+          gt("pipeline.validation.nodeInvalidIoType", {
+            id: node.id,
+            ioType: node.io_type,
+            types: validIoTypes.join(", "),
+          }),
         );
       }
     }
 
     // Validate node_type
     if (!node.data.node_type) {
-      result.errors.push(`Node ${node.id} is missing required 'node_type' field`);
+      result.errors.push(gt("pipeline.validation.nodeMissingNodeType", { id: node.id }));
     } else {
       const validNodeTypes = ["stream", "query", "function", "condition", "remote_stream"];
       if (!validNodeTypes.includes(node.data.node_type)) {
         result.errors.push(
-          `Node ${node.id} has invalid node_type '${node.data.node_type}'. Must be one of: ${validNodeTypes.join(", ")}`,
+          gt("pipeline.validation.nodeInvalidNodeType", {
+            id: node.id,
+            nodeType: node.data.node_type,
+            types: validNodeTypes.join(", "),
+          }),
         );
       }
     }
@@ -109,17 +119,25 @@ export function validatePipeline(
     // Validate stream_type if present
     if (node.data.stream_type && !validStreamTypes.includes(node.data.stream_type)) {
       result.errors.push(
-        `Node ${node.id} has invalid stream_type '${node.data.stream_type}'. Must be one of: ${validStreamTypes.join(", ")}`,
+        gt("pipeline.validation.nodeInvalidStreamType", {
+          id: node.id,
+          streamType: node.data.stream_type,
+          types: validStreamTypes.join(", "),
+        }),
       );
     }
 
     // Validate org_id matches source only for stream and remote_stream nodes
     if (["stream", "remote_stream"].includes(node.data.node_type)) {
       if (!node.data.org_id) {
-        result.errors.push(`Node ${node.id} is missing required 'org_id' field`);
+        result.errors.push(gt("pipeline.validation.nodeMissingOrgId", { id: node.id }));
       } else if (sourceOrgId && node.data.org_id !== sourceOrgId) {
         result.errors.push(
-          `Node ${node.id} has mismatched org_id. Expected '${sourceOrgId}', got '${node.data.org_id}'`,
+          gt("pipeline.validation.nodeMismatchedOrgId", {
+            id: node.id,
+            expected: sourceOrgId,
+            actual: node.data.org_id,
+          }),
         );
       }
 
@@ -142,7 +160,10 @@ export function validatePipeline(
 
           if (context.usedStreamsList.includes(streamName) && streamName !== originalStreamName) {
             result.errors.push(
-              `Input stream "${streamName}" in node ${node.id} is already used by another realtime pipeline`,
+              gt("pipeline.validation.inputStreamAlreadyUsed", {
+                stream: streamName,
+                id: node.id,
+              }),
             );
           }
         }
@@ -153,30 +174,33 @@ export function validatePipeline(
     if (node.io_type === "input" && node.data.node_type === "query") {
       // Validate query_condition
       if (!node.data.query_condition) {
-        result.errors.push(`Query node ${node.id} is missing query_condition`);
+        result.errors.push(
+          gt("pipeline.validation.queryNodeMissingQueryCondition", { id: node.id }),
+        );
       } else {
         const queryCondition = node.data.query_condition;
 
         // Validate query type
         if (!queryCondition.type) {
-          result.errors.push(
-            `Query node ${node.id} has empty query type. Must be either 'sql' or 'promql'`,
-          );
+          result.errors.push(gt("pipeline.validation.queryNodeEmptyQueryType", { id: node.id }));
         } else if (!["sql", "promql"].includes(queryCondition.type)) {
           result.errors.push(
-            `Query node ${node.id} has invalid query type '${queryCondition.type}'. Must be either 'sql' or 'promql'`,
+            gt("pipeline.validation.queryNodeInvalidQueryType", {
+              id: node.id,
+              type: queryCondition.type,
+            }),
           );
         }
 
         // Validate SQL query if type is sql
         if (queryCondition.type === "sql") {
           if (!queryCondition.sql || queryCondition.sql.trim() === "") {
-            result.errors.push(`Query node ${node.id} has empty SQL query`);
+            result.errors.push(gt("pipeline.validation.queryNodeEmptySql", { id: node.id }));
           }
           // Ensure promql related fields are null when type is sql
           if (queryCondition.promql !== null || queryCondition.promql_condition !== null) {
             result.errors.push(
-              `Query node ${node.id} has SQL type but contains PromQL related data`,
+              gt("pipeline.validation.queryNodeSqlWithPromqlData", { id: node.id }),
             );
           }
         }
@@ -184,12 +208,12 @@ export function validatePipeline(
         // Validate PromQL query if type is promql
         if (queryCondition.type === "promql") {
           if (!queryCondition.promql || queryCondition.promql.trim() === "") {
-            result.errors.push(`Query node ${node.id} has empty PromQL query`);
+            result.errors.push(gt("pipeline.validation.queryNodeEmptyPromql", { id: node.id }));
           }
           // Ensure sql field is null when type is promql
           if (queryCondition.sql !== null) {
             result.errors.push(
-              `Query node ${node.id} has PromQL type but contains SQL related data`,
+              gt("pipeline.validation.queryNodePromqlWithSqlData", { id: node.id }),
             );
           }
         }
@@ -197,54 +221,57 @@ export function validatePipeline(
 
       // Validate trigger_condition
       if (!node.data.trigger_condition) {
-        result.errors.push(`Query node ${node.id} is missing trigger_condition`);
+        result.errors.push(
+          gt("pipeline.validation.queryNodeMissingTriggerCondition", { id: node.id }),
+        );
       } else {
         const trigger = node.data.trigger_condition;
 
         // Validate frequency_type
         if (!trigger.frequency_type) {
           result.errors.push(
-            `Query node ${node.id} has empty frequency_type. Must be either 'minutes' or 'cron'`,
+            gt("pipeline.validation.queryNodeEmptyFrequencyType", { id: node.id }),
           );
         } else if (!["minutes", "cron"].includes(trigger.frequency_type)) {
           result.errors.push(
-            `Query node ${node.id} has invalid frequency_type '${trigger.frequency_type}'. Must be either 'minutes' or 'cron'`,
+            gt("pipeline.validation.queryNodeInvalidFrequencyType", {
+              id: node.id,
+              type: trigger.frequency_type,
+            }),
           );
         }
 
         // Validate timezone
         if (!trigger.timezone || trigger.timezone.trim() === "") {
-          result.errors.push(`Query node ${node.id} has empty timezone`);
+          result.errors.push(gt("pipeline.validation.queryNodeEmptyTimezone", { id: node.id }));
         }
 
         // Validate silence and threshold
         if (trigger.silence !== undefined && trigger.silence < 0) {
-          result.errors.push(`Query node ${node.id} has invalid silence value. Must be >= 0`);
+          result.errors.push(gt("pipeline.validation.queryNodeInvalidSilence", { id: node.id }));
         }
         if (trigger.threshold !== undefined && trigger.threshold < 0) {
-          result.errors.push(`Query node ${node.id} has invalid threshold value. Must be >= 0`);
+          result.errors.push(gt("pipeline.validation.queryNodeInvalidThreshold", { id: node.id }));
         }
 
         // Validate based on frequency_type
         if (trigger.frequency_type === "minutes") {
           if (!trigger.frequency || trigger.frequency < 1) {
             result.errors.push(
-              `Query node ${node.id} has invalid frequency. Must be >= 1 for minutes frequency type`,
+              gt("pipeline.validation.queryNodeInvalidFrequency", { id: node.id }),
             );
           }
           if (!trigger.period || trigger.period < 1) {
-            result.errors.push(
-              `Query node ${node.id} has invalid period. Must be >= 1 for minutes frequency type`,
-            );
+            result.errors.push(gt("pipeline.validation.queryNodeInvalidPeriod", { id: node.id }));
           }
           if (trigger.frequency !== trigger.period) {
             result.errors.push(
-              `Query node ${node.id} has mismatched frequency and period. They must be equal for minutes frequency type`,
+              gt("pipeline.validation.queryNodeMismatchedFrequencyPeriod", { id: node.id }),
             );
           }
         } else if (trigger.frequency_type === "cron") {
           if (!trigger.cron || trigger.cron.trim() === "") {
-            result.errors.push(`Query node ${node.id} has empty cron expression`);
+            result.errors.push(gt("pipeline.validation.queryNodeEmptyCron", { id: node.id }));
           }
         }
       }
@@ -254,15 +281,20 @@ export function validatePipeline(
     if (node.io_type === "default" && node.data.node_type === "function") {
       // Validate after_flatten exists and is boolean
       if (typeof node.data.after_flatten !== "boolean") {
-        result.errors.push(`Function node ${node.id} must have 'after_flatten' field as boolean`);
+        result.errors.push(
+          gt("pipeline.validation.functionNodeAfterFlattenRequired", { id: node.id }),
+        );
       }
 
       // Validate function name
       if (!node.data.name || node.data.name.trim() === "") {
-        result.errors.push(`Function node ${node.id} has empty function name`);
+        result.errors.push(gt("pipeline.validation.functionNodeEmptyName", { id: node.id }));
       } else if (context?.functionsList && !context.functionsList.includes(node.data.name)) {
         result.errors.push(
-          `Function node ${node.id} has invalid function name "${node.data.name}". Must be one of the available functions.`,
+          gt("pipeline.validation.functionNodeInvalidName", {
+            id: node.id,
+            name: node.data.name,
+          }),
         );
       }
     }
@@ -279,18 +311,23 @@ export function validatePipeline(
         }
 
         if (!streamName || streamName.trim() === "") {
-          result.errors.push(`Output stream node ${node.id} has empty stream name`);
+          result.errors.push(gt("pipeline.validation.outputStreamNodeEmptyName", { id: node.id }));
         }
       } else if (node.data.node_type === "remote_stream") {
         // For remote stream output, check destination name and validate against pipelineDestinations
         if (!node.data.destination_name || node.data.destination_name.trim() === "") {
-          result.errors.push(`Remote stream node ${node.id} has empty destination name`);
+          result.errors.push(
+            gt("pipeline.validation.remoteStreamNodeEmptyDestination", { id: node.id }),
+          );
         } else if (
           context?.pipelineDestinations &&
           !context.pipelineDestinations.includes(node.data.destination_name)
         ) {
           result.errors.push(
-            `Remote stream node ${node.id} has invalid destination "${node.data.destination_name}". Must be one of the available pipeline destinations.`,
+            gt("pipeline.validation.remoteStreamNodeInvalidDestination", {
+              id: node.id,
+              destination: node.data.destination_name,
+            }),
           );
         }
       }
@@ -301,10 +338,14 @@ export function validatePipeline(
   const nodeIds = new Set(pipeline.nodes.map((node) => node.id));
   pipeline.edges.forEach((edge) => {
     if (!nodeIds.has(edge.source)) {
-      result.errors.push(`Edge ${edge.id} references non-existent source node ${edge.source}`);
+      result.errors.push(
+        gt("pipeline.validation.edgeMissingSourceNode", { id: edge.id, source: edge.source }),
+      );
     }
     if (!nodeIds.has(edge.target)) {
-      result.errors.push(`Edge ${edge.id} references non-existent target node ${edge.target}`);
+      result.errors.push(
+        gt("pipeline.validation.edgeMissingTargetNode", { id: edge.id, target: edge.target }),
+      );
     }
   });
 
@@ -330,25 +371,27 @@ export function validatePipeline(
     if (node.io_type === "input") {
       if (incomingCount > 0) {
         result.errors.push(
-          `Input node ${nodeId} should not have incoming edges. Found ${incomingCount} incoming edges.`,
+          gt("pipeline.validation.inputNodeHasIncomingEdges", {
+            id: nodeId,
+            count: incomingCount,
+          }),
         );
       }
     } else if (node.io_type === "output") {
       if (incomingCount !== 1) {
         result.errors.push(
-          `Output node ${nodeId} should have exactly one incoming edge. Found ${incomingCount} incoming edges.`,
+          gt("pipeline.validation.outputNodeIncomingEdgeCount", {
+            id: nodeId,
+            count: incomingCount,
+          }),
         );
       }
     } else if (node.data.node_type === "function" || node.data.node_type === "condition") {
       if (incomingCount === 0) {
-        result.errors.push(
-          `Function/Condition node ${nodeId} should have at least one incoming edge.`,
-        );
+        result.errors.push(gt("pipeline.validation.functionNodeNeedsIncomingEdge", { id: nodeId }));
       }
       if (outgoingCount === 0) {
-        result.errors.push(
-          `Function/Condition node ${nodeId} should have at least one outgoing edge.`,
-        );
+        result.errors.push(gt("pipeline.validation.functionNodeNeedsOutgoingEdge", { id: nodeId }));
       }
     }
   });

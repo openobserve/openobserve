@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import AppHeader from "../components/Header.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   useLocalCurrentUser,
   useLocalOrganization,
@@ -433,7 +433,7 @@ export default defineComponent({
         name: "traces",
       },
       {
-        title: t("menu.rum"),
+        title: raw("RUM"),
         icon: "devices",
         link: "/rum",
         name: "rum",
@@ -498,63 +498,63 @@ export default defineComponent({
 
     const langList = [
       {
-        label: "English",
+        label: raw("English"),
         code: "en-us",
       },
       {
-        label: "Türkçe",
+        label: raw("Türkçe"),
         code: "tr-turk",
       },
       {
-        label: "简体中文",
+        label: raw("简体中文"),
         code: "zh-cn",
       },
       {
-        label: "繁體中文",
+        label: raw("繁體中文"),
         code: "zh-tw",
       },
       {
-        label: "Français",
+        label: raw("Français"),
         code: "fr",
       },
       {
-        label: "Español",
+        label: raw("Español"),
         code: "es",
       },
       {
-        label: "Deutsch",
+        label: raw("Deutsch"),
         code: "de",
       },
       {
-        label: "Italiano",
+        label: raw("Italiano"),
         code: "it",
       },
       {
-        label: "日本語",
+        label: raw("日本語"),
         code: "ja",
       },
       {
-        label: "한국어",
+        label: raw("한국어"),
         code: "ko",
       },
       {
-        label: "Nederlands",
+        label: raw("Nederlands"),
         code: "nl",
       },
       {
-        label: "Português",
+        label: raw("Português"),
         code: "pt",
       },
       {
-        label: "Русский",
+        label: raw("Русский"),
         code: "ru",
       },
       {
-        label: "Polski",
+        label: raw("Polski"),
         code: "pl",
       },
       {
-        label: "Tiếng Việt",
+        label: raw("Tiếng Việt"),
         code: "vi",
       },
     ];
@@ -1118,7 +1118,7 @@ export default defineComponent({
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
         // settings so it's available on boot and every org switch.
-        await useHomeDashboard().load(store.state?.selectedOrganization?.identifier);
+        await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
 
         if (
           orgSettings?.data?.data?.free_trial_expiry != null &&

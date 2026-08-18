@@ -430,7 +430,7 @@ pipelineObj.functions = functions;
 const refreshFunctionList = () => {
   getFunctions();
 };
-const { getUsedStreamsList, getPipelineDestinations } = usePipelines();
+const { getUsedStreamsList, getPipelineDestinations } = usePipelines(t);
 const functionOptions = ref<string[]>([]);
 const pipelineDestinationsList = ref<any[]>([]);
 const usedStreamsListResponse = ref<any[]>([]);
@@ -562,11 +562,11 @@ watch(
 onBeforeMount(() => {
   if (config.isEnterprise == "true") {
     nodeTypes.push({
-      label: "Remote",
+      label: t("pipeline.remoteNode"),
       subtype: "remote_stream",
       io_type: "output",
       icon: "img:" + externalOutputImage,
-      tooltip: "Destination: External Destination Node",
+      tooltip: t("pipeline.destinationExternalTooltip"),
       isSectionHeader: false,
     });
   }
@@ -1157,7 +1157,7 @@ const savePipelineJson = async (json: string) => {
     savePipeline();
   } catch (error) {
     // Handle JSON parsing errors
-    validationErrors.value = ["Invalid JSON format"];
+    validationErrors.value = [t("common.invalidJsonFormat")];
   }
 };
 

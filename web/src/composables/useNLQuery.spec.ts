@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { gt } from "@/types/i18n";
 
 // --- mocks declared before any imports that transitively load the modules ---
 
@@ -96,7 +97,7 @@ describe("useNLQuery", () => {
   // -------------------------------------------------------------------------
   describe("return value structure", () => {
     it("exposes detectNaturalLanguage, generateSQL, transformToSQL, isGenerating, streamingResponse", () => {
-      const nlq = useNLQuery();
+      const nlq = useNLQuery(gt);
       expect(typeof nlq.detectNaturalLanguage).toBe("function");
       expect(typeof nlq.generateSQL).toBe("function");
       expect(typeof nlq.transformToSQL).toBe("function");
@@ -110,107 +111,109 @@ describe("useNLQuery", () => {
   // -------------------------------------------------------------------------
   describe("detectNaturalLanguage", () => {
     it("returns false for empty string", () => {
-      expect(useNLQuery().detectNaturalLanguage("")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("")).toBe(false);
     });
 
     it("returns false for whitespace-only string", () => {
-      expect(useNLQuery().detectNaturalLanguage("   ")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("   ")).toBe(false);
     });
 
     it("returns false for SQL SELECT statement", () => {
-      expect(useNLQuery().detectNaturalLanguage("SELECT * FROM logs", "sql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("SELECT * FROM logs", "sql")).toBe(false);
     });
 
     it("returns false when first word is FROM", () => {
-      expect(useNLQuery().detectNaturalLanguage("FROM logs WHERE level = 'error'", "sql")).toBe(
+      expect(useNLQuery(gt).detectNaturalLanguage("FROM logs WHERE level = 'error'", "sql")).toBe(
         false,
       );
     });
 
     it("returns false for SQL comments (--)", () => {
-      expect(useNLQuery().detectNaturalLanguage("-- this is a comment", "sql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("-- this is a comment", "sql")).toBe(false);
     });
 
     it("returns false when text starts with WHERE", () => {
-      expect(useNLQuery().detectNaturalLanguage("WHERE level = 'error'", "sql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("WHERE level = 'error'", "sql")).toBe(false);
     });
 
     it("returns false for field=value comparison pattern", () => {
-      expect(useNLQuery().detectNaturalLanguage("level = 'error'", "sql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("level = 'error'", "sql")).toBe(false);
     });
 
     it("returns false for LIKE operator", () => {
-      expect(useNLQuery().detectNaturalLanguage("field LIKE '%pattern%'", "sql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("field LIKE '%pattern%'", "sql")).toBe(false);
     });
 
     it("returns false for IS NULL operator", () => {
-      expect(useNLQuery().detectNaturalLanguage("field IS NULL", "sql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("field IS NULL", "sql")).toBe(false);
     });
 
     it("returns true for plain natural language sentence", () => {
-      expect(useNLQuery().detectNaturalLanguage("show me errors from the last hour", "sql")).toBe(
+      expect(useNLQuery(gt).detectNaturalLanguage("show me errors from the last hour", "sql")).toBe(
         true,
       );
     });
 
     it("returns true for a question in natural language", () => {
       expect(
-        useNLQuery().detectNaturalLanguage("what happened to the service last night", "sql"),
+        useNLQuery(gt).detectNaturalLanguage("what happened to the service last night", "sql"),
       ).toBe(true);
     });
 
     // PromQL-specific
     it("returns false for PromQL simple metric name", () => {
-      expect(useNLQuery().detectNaturalLanguage("cpu_usage", "promql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("cpu_usage", "promql")).toBe(false);
     });
 
     it("returns false for PromQL with range selector", () => {
-      expect(useNLQuery().detectNaturalLanguage("http_requests_total[5m]", "promql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("http_requests_total[5m]", "promql")).toBe(false);
     });
 
     it("returns false for PromQL aggregation function", () => {
-      expect(useNLQuery().detectNaturalLanguage("sum(http_requests_total)", "promql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("sum(http_requests_total)", "promql")).toBe(
+        false,
+      );
     });
 
     it("returns false for PromQL metric with label selector", () => {
-      expect(useNLQuery().detectNaturalLanguage('http_requests_total{job="api"}', "promql")).toBe(
+      expect(useNLQuery(gt).detectNaturalLanguage('http_requests_total{job="api"}', "promql")).toBe(
         false,
       );
     });
 
     it("returns false for PromQL rate function", () => {
-      expect(useNLQuery().detectNaturalLanguage("rate(http_requests_total[5m])", "promql")).toBe(
+      expect(useNLQuery(gt).detectNaturalLanguage("rate(http_requests_total[5m])", "promql")).toBe(
         false,
       );
     });
 
     // VRL-specific
     it("returns false for VRL with dot accessor", () => {
-      expect(useNLQuery().detectNaturalLanguage(".level = 'error'", "vrl")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage(".level = 'error'", "vrl")).toBe(false);
     });
 
     // JavaScript-specific
     it("returns false for JavaScript const declaration", () => {
-      expect(useNLQuery().detectNaturalLanguage("const x = 5", "javascript")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("const x = 5", "javascript")).toBe(false);
     });
 
     it("returns false for JavaScript function declaration", () => {
-      expect(useNLQuery().detectNaturalLanguage("function foo() {}", "js")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("function foo() {}", "js")).toBe(false);
     });
 
     // Quick-mode function detection
     it("returns false when text contains a quick-mode function like match_all(", () => {
-      expect(useNLQuery().detectNaturalLanguage("match_all('error')", "sql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("match_all('error')", "sql")).toBe(false);
     });
 
     it("returns false when text contains str_match(", () => {
-      expect(useNLQuery().detectNaturalLanguage("str_match(level, 'error')", "sql")).toBe(false);
+      expect(useNLQuery(gt).detectNaturalLanguage("str_match(level, 'error')", "sql")).toBe(false);
     });
 
     // Recursion depth guard
     it("handles deeply nested parentheses without stack overflow", () => {
       const deeplyNested = "(".repeat(12) + "cpu_usage" + ")".repeat(12);
-      expect(() => useNLQuery().detectNaturalLanguage(deeplyNested, "promql")).not.toThrow();
+      expect(() => useNLQuery(gt).detectNaturalLanguage(deeplyNested, "promql")).not.toThrow();
     });
   });
 
@@ -219,17 +222,17 @@ describe("useNLQuery", () => {
   // -------------------------------------------------------------------------
   describe("transformToSQL", () => {
     it("prepends SQL comment (--) for sql language", () => {
-      const result = useNLQuery().transformToSQL("show errors", "SELECT * FROM logs", "sql");
+      const result = useNLQuery(gt).transformToSQL("show errors", "SELECT * FROM logs", "sql");
       expect(result).toBe("-- show errors\nSELECT * FROM logs");
     });
 
     it("prepends hash (#) comment for promql language", () => {
-      const result = useNLQuery().transformToSQL("cpu usage", "cpu_usage", "promql");
+      const result = useNLQuery(gt).transformToSQL("cpu usage", "cpu_usage", "promql");
       expect(result).toBe("# cpu usage\ncpu_usage");
     });
 
     it("prepends hash (#) comment for vrl language", () => {
-      const result = useNLQuery().transformToSQL(
+      const result = useNLQuery(gt).transformToSQL(
         "parse log",
         ".parsed = parse_json(.message)",
         "vrl",
@@ -238,22 +241,22 @@ describe("useNLQuery", () => {
     });
 
     it("prepends // comment for javascript language", () => {
-      const result = useNLQuery().transformToSQL("do something", "const x = 1;", "javascript");
+      const result = useNLQuery(gt).transformToSQL("do something", "const x = 1;", "javascript");
       expect(result).toBe("// do something\nconst x = 1;");
     });
 
     it("prepends // comment for js language alias", () => {
-      const result = useNLQuery().transformToSQL("note", "let y = 2;", "js");
+      const result = useNLQuery(gt).transformToSQL("note", "let y = 2;", "js");
       expect(result).toBe("// note\nlet y = 2;");
     });
 
     it("defaults to sql (--) when language is not specified", () => {
-      const result = useNLQuery().transformToSQL("natural", "SELECT 1");
+      const result = useNLQuery(gt).transformToSQL("natural", "SELECT 1");
       expect(result).toContain("-- natural");
     });
 
     it("handles multi-line natural language correctly", () => {
-      const result = useNLQuery().transformToSQL("line one\nline two", "SELECT 1", "sql");
+      const result = useNLQuery(gt).transformToSQL("line one\nline two", "SELECT 1", "sql");
       expect(result).toBe("-- line one\n-- line two\nSELECT 1");
     });
   });
@@ -263,7 +266,7 @@ describe("useNLQuery", () => {
   // -------------------------------------------------------------------------
   describe("generateSQL – state management", () => {
     it("returns null for empty prompt without calling AI", async () => {
-      const { generateSQL } = useNLQuery();
+      const { generateSQL } = useNLQuery(gt);
       const result = await generateSQL("  ", "default");
       expect(result).toBeNull();
       expect(mockFetchAiChat).not.toHaveBeenCalled();
@@ -273,7 +276,7 @@ describe("useNLQuery", () => {
       const sseChunk = `data: ${JSON.stringify({ content: "SELECT 1" })}\n\n`;
       mockFetchAiChat.mockResolvedValue(makeStreamResponse([sseChunk]));
 
-      const { generateSQL, isGenerating } = useNLQuery();
+      const { generateSQL, isGenerating } = useNLQuery(gt);
       await generateSQL("show me logs", "default");
       expect(isGenerating.value).toBe(false);
     });
@@ -281,7 +284,7 @@ describe("useNLQuery", () => {
     it("sets isGenerating to false after an exception", async () => {
       mockFetchAiChat.mockRejectedValue(new Error("network"));
 
-      const { generateSQL, isGenerating } = useNLQuery();
+      const { generateSQL, isGenerating } = useNLQuery(gt);
       await generateSQL("show me logs", "default");
       expect(isGenerating.value).toBe(false);
     });
@@ -290,7 +293,7 @@ describe("useNLQuery", () => {
       const sseChunk = `data: ${JSON.stringify({ type: "status", message: "processing" })}\n\n`;
       mockFetchAiChat.mockResolvedValue(makeStreamResponse([sseChunk]));
 
-      const { generateSQL, streamingResponse } = useNLQuery();
+      const { generateSQL, streamingResponse } = useNLQuery(gt);
       streamingResponse.value = "old value";
       await generateSQL("query", "default");
       // streamingResponse should have been reset to '' then updated
@@ -309,7 +312,7 @@ describe("useNLQuery", () => {
       })}\n\n`;
       mockFetchAiChat.mockResolvedValue(makeStreamResponse([sseChunk]));
 
-      const result = await useNLQuery().generateSQL("show logs", "default");
+      const result = await useNLQuery(gt).generateSQL("show logs", "default");
       expect(result).toBe("SELECT * FROM logs");
     });
 
@@ -319,7 +322,7 @@ describe("useNLQuery", () => {
       })}\n\n`;
       mockFetchAiChat.mockResolvedValue(makeStreamResponse([sseChunk]));
 
-      const result = await useNLQuery().generateSQL("count errors", "default");
+      const result = await useNLQuery(gt).generateSQL("count errors", "default");
       expect(result).toBe("SELECT count(*) FROM errors");
     });
 
@@ -335,7 +338,7 @@ describe("useNLQuery", () => {
         body: emptyStream,
       } as unknown as Response);
 
-      const result = await useNLQuery().generateSQL("what happened", "default");
+      const result = await useNLQuery(gt).generateSQL("what happened", "default");
       expect(result).toBeNull();
     });
 
@@ -345,28 +348,28 @@ describe("useNLQuery", () => {
         status: 500,
       } as unknown as Response);
 
-      const result = await useNLQuery().generateSQL("query", "default");
+      const result = await useNLQuery(gt).generateSQL("query", "default");
       expect(result).toBeNull();
     });
 
     it("returns null when fetchAiChat returns cancelled flag", async () => {
       mockFetchAiChat.mockResolvedValue({ cancelled: true });
 
-      const result = await useNLQuery().generateSQL("query", "default");
+      const result = await useNLQuery(gt).generateSQL("query", "default");
       expect(result).toBeNull();
     });
 
     it("returns null when fetchAiChat returns null", async () => {
       mockFetchAiChat.mockResolvedValue(null);
 
-      const result = await useNLQuery().generateSQL("query", "default");
+      const result = await useNLQuery(gt).generateSQL("query", "default");
       expect(result).toBeNull();
     });
 
     it("returns null when response has no body reader", async () => {
       mockFetchAiChat.mockResolvedValue({ ok: true, body: null } as unknown as Response);
 
-      const result = await useNLQuery().generateSQL("query", "default");
+      const result = await useNLQuery(gt).generateSQL("query", "default");
       expect(result).toBeNull();
     });
 
@@ -377,7 +380,7 @@ describe("useNLQuery", () => {
       })}\n\n`;
       mockFetchAiChat.mockResolvedValue(makeStreamResponse([sseChunk]));
 
-      const result = await useNLQuery().generateSQL("query", "default");
+      const result = await useNLQuery(gt).generateSQL("query", "default");
       expect(result).toBeNull();
     });
 
@@ -387,7 +390,7 @@ describe("useNLQuery", () => {
       })}\n\n`;
       mockFetchAiChat.mockResolvedValue(makeStreamResponse([sseChunk]));
 
-      const result = await useNLQuery().generateSQL("query", "default");
+      const result = await useNLQuery(gt).generateSQL("query", "default");
       expect(result).toBeNull();
     });
 
@@ -404,7 +407,7 @@ describe("useNLQuery", () => {
       })}\n\n`;
       mockFetchAiChat.mockResolvedValue(makeStreamResponse([sseChunk]));
 
-      const result = await useNLQuery().generateSQL("show logs", "default");
+      const result = await useNLQuery(gt).generateSQL("show logs", "default");
       expect(result).toBe("SELECT * FROM logs");
     });
 
@@ -416,7 +419,7 @@ describe("useNLQuery", () => {
       ];
       mockFetchAiChat.mockResolvedValue(makeStreamResponse(chunks));
 
-      const result = await useNLQuery().generateSQL("create dashboard", "default");
+      const result = await useNLQuery(gt).generateSQL("create dashboard", "default");
       expect(result).toContain("DASHBOARD_CREATED");
     });
 
@@ -428,7 +431,7 @@ describe("useNLQuery", () => {
       ];
       mockFetchAiChat.mockResolvedValue(makeStreamResponse(chunks));
 
-      const result = await useNLQuery().generateSQL("create alert", "default");
+      const result = await useNLQuery(gt).generateSQL("create alert", "default");
       expect(result).toContain("ALERT_CREATED");
     });
 
@@ -439,14 +442,14 @@ describe("useNLQuery", () => {
       ];
       mockFetchAiChat.mockResolvedValue(makeStreamResponse(chunks));
 
-      const result = await useNLQuery().generateSQL("create dashboard", "default");
+      const result = await useNLQuery(gt).generateSQL("create dashboard", "default");
       expect(result).toBeNull();
     });
 
     it("returns null when an exception is thrown during streaming", async () => {
       mockFetchAiChat.mockRejectedValue(new Error("connection reset"));
 
-      const result = await useNLQuery().generateSQL("show errors", "default");
+      const result = await useNLQuery(gt).generateSQL("show errors", "default");
       expect(result).toBeNull();
     });
   });
