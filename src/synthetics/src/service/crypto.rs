@@ -8,21 +8,28 @@ use super::*;
 /// would put the deployment back on the per-region DEK and reintroduce the very
 /// bug this exists to fix, with no signal that it had happened.
 ///
-/// Read once and pinned. `refresh_config` swaps the whole config and only
+/// Read once and pinned at first use — which in a super cluster is startup,
+/// because [`crate::super_cluster_preflight`] resolves it there. `refresh_config`
+/// swaps the whole config and only
 /// *logs* that a key needs a restart, so re-reading would let a reload change
 /// the key underneath checks whose secrets were encrypted with the old one.
 /// Their credentials would then decrypt to empty
 /// (`decrypt_secret(..).unwrap_or_default()`) and the checks would fail with
 /// nothing to explain why.
-fn configured_key() -> &'static Result<Option<Vec<u8>>, String> {
+pub(crate) fn configured_key() -> &'static Result<Option<Vec<u8>>, String> {
     static KEY: std::sync::OnceLock<Result<Option<Vec<u8>>, String>> = std::sync::OnceLock::new();
-    KEY.get_or_init(|| {
-        let raw = &config::get_config().synthetics.encryption_key;
-        if raw.is_empty() {
-            return Ok(None);
-        }
-        config::utils::encryption::decode_encryption_key(raw).map(Some)
-    })
+    KEY.get_or_init(|| resolve_key(&config::get_config().synthetics.encryption_key))
+}
+
+/// The decode step, split out so it can be tested without the process-global
+/// cache above: once anything in the binary resolves the key, the cache is
+/// fixed, and a test asserting on the config would then pass without
+/// exercising anything.
+pub(crate) fn resolve_key(raw: &str) -> Result<Option<Vec<u8>>, String> {
+    if raw.is_empty() {
+        return Ok(None);
+    }
+    config::utils::encryption::decode_encryption_key(raw).map(Some)
 }
 
 /// Domain separator for [`synthetics_dek`]. Versioned rather than edited:
@@ -229,47 +236,49 @@ pub(crate) async fn decrypt_synthetic_secrets(
 
     let dek = synthetics_dek(org_id).await?;
 
-    // Decrypt auth credential fields.
-    check.auth = check.auth.take().map(|auth| match auth {
-        SyntheticAuth::Basic { username, password } => SyntheticAuth::Basic {
+    // Every failure below propagates. Defaulting to an empty string here used
+    // to be silent and was destructive: the edit form rendered blanks, and
+    // saving that form re-encrypted them over ciphertext that was merely
+    // unreadable, losing the secret permanently. Failing the read keeps the
+    // stored value intact and tells the caller why.
+    check.auth = match check.auth.take() {
+        Some(SyntheticAuth::Basic { username, password }) => Some(SyntheticAuth::Basic {
             username,
-            password: decrypt_secret(&dek, &password).unwrap_or_default(),
-        },
-        SyntheticAuth::Bearer { token } => SyntheticAuth::Bearer {
-            token: decrypt_secret(&dek, &token).unwrap_or_default(),
-        },
+            password: decrypt_secret(&dek, &password)?,
+        }),
+        Some(SyntheticAuth::Bearer { token }) => Some(SyntheticAuth::Bearer {
+            token: decrypt_secret(&dek, &token)?,
+        }),
         other => other,
-    });
+    };
 
-    // Decrypt variable values.
     for var in &mut check.variables {
         if var.value.starts_with("AESenc:") {
-            var.value = decrypt_secret(&dek, &var.value).unwrap_or_default();
+            var.value = decrypt_secret(&dek, &var.value)?;
         }
     }
 
-    // Decrypt cookie values.
     for c in &mut check.cookies {
         if c.value.starts_with("AESenc:") {
-            c.value = decrypt_secret(&dek, &c.value).unwrap_or_default();
+            c.value = decrypt_secret(&dek, &c.value)?;
         }
     }
 
     // Rehydrate extracted config secrets back into config for the edit form.
     for (pointer, encrypted) in std::mem::take(&mut check.config_secrets) {
         if let Some(slot) = check.config.pointer_mut(&pointer) {
-            *slot = serde_json::Value::String(decrypt_secret(&dek, &encrypted).unwrap_or_default());
+            *slot = serde_json::Value::String(decrypt_secret(&dek, &encrypted)?);
         }
     }
 
     // Legacy rows: decrypt AESenc: values still stored in-place inside config.
     for path in check.check_type.secret_config_paths() {
-        let _ = for_each_string_at_path(&mut check.config, path, &mut |s: &mut String| {
+        for_each_string_at_path(&mut check.config, path, &mut |s: &mut String| {
             if s.starts_with("AESenc:") {
-                *s = decrypt_secret(&dek, s).unwrap_or_default();
+                *s = decrypt_secret(&dek, s)?;
             }
-            Ok::<(), ()>(())
-        });
+            Ok::<(), anyhow::Error>(())
+        })?;
     }
 
     Ok(())
@@ -303,31 +312,35 @@ mod dek_tests {
     /// NOT follow a reload. `refresh_config` swaps the whole config and only
     /// logs that a restart is needed, so if the key were re-read, a reload
     /// would change it under checks already encrypted with the old one and
-    /// their credentials would silently decrypt to empty.
+    /// `configured_key` must cache, so a config reload cannot swap the key
+    /// under checks whose secrets were encrypted with the old one — their
+    /// credentials would fail to decrypt and, before the Gap 1 fix, would have
+    /// been silently blanked.
+    ///
+    /// Asserted by identity rather than by swapping the config: the cache is
+    /// process-global, so any earlier test that touched the encrypt path has
+    /// already fixed it, and a config-swap assertion would pass without
+    /// proving anything. The decode branches are covered on `resolve_key`.
     #[test]
-    fn the_configured_key_is_pinned_at_boot_and_survives_a_reload() {
+    fn the_configured_key_is_resolved_once_and_cached() {
+        assert!(std::ptr::eq(configured_key(), configured_key()));
+    }
+
+    #[test]
+    fn resolve_key_treats_unset_as_no_key_rather_than_an_error() {
+        assert_eq!(resolve_key(""), Ok(None));
+    }
+
+    #[test]
+    fn resolve_key_rejects_a_malformed_value() {
+        assert!(resolve_key("hunter2").is_err());
+    }
+
+    #[test]
+    fn resolve_key_accepts_a_valid_key() {
         use base64::{Engine, prelude::BASE64_STANDARD};
-
-        let _guard = crate::CONFIG_SWAP_LOCK
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
-        let saved = config::CONFIG.load_full();
-
-        let install = |key: &str| {
-            let mut cfg = config::Config::init().unwrap();
-            cfg.synthetics.encryption_key = key.to_owned();
-            config::CONFIG.store(std::sync::Arc::new(cfg));
-        };
-
-        install(&BASE64_STANDARD.encode([1u8; 64]));
-        let pinned = configured_key().clone();
-
-        // A reload lands a different, equally valid key; the pinned one must
-        // not move.
-        install(&BASE64_STANDARD.encode([2u8; 64]));
-        assert_eq!(*configured_key(), pinned);
-
-        config::CONFIG.store(saved);
+        let good = BASE64_STANDARD.encode([7u8; 64]);
+        assert_eq!(resolve_key(&good), Ok(Some(vec![7u8; 64])));
     }
 
     /// A weak or malformed value must be refused, not quietly used as key
@@ -355,6 +368,35 @@ mod dek_tests {
                 .len(),
             64
         );
+    }
+
+    /// Gap 1: a wrong key must surface as an error. Defaulting to an empty
+    /// string let the edit form render blanks, and saving that form
+    /// re-encrypted them over ciphertext that was only unreadable — destroying
+    /// the secret. The read has to fail so the stored value survives.
+    #[test]
+    fn decrypting_with_the_wrong_key_is_an_error_not_a_blank() {
+        let right = derive_dek(&[1u8; 64], "acme");
+        let wrong = derive_dek(&[2u8; 64], "acme");
+        let stored = encrypt_secret(&right, "hunter2").unwrap();
+
+        assert_eq!(decrypt_secret(&right, &stored).unwrap(), "hunter2");
+        assert!(
+            decrypt_secret(&wrong, &stored).is_err(),
+            "a wrong key must not decrypt to a value a later save would persist"
+        );
+    }
+
+    /// The ciphertext must be readable by the same key on another region, which
+    /// is the entire point of deriving rather than minting.
+    #[test]
+    fn a_secret_encrypted_under_a_derived_key_round_trips() {
+        let dek = derive_dek(&[9u8; 64], "acme");
+        let stored = encrypt_secret(&dek, "s3cret").unwrap();
+        assert!(stored.starts_with("AESenc:"));
+        // Same inputs, independently derived — as a second region would.
+        let elsewhere = derive_dek(&[9u8; 64], "acme");
+        assert_eq!(decrypt_secret(&elsewhere, &stored).unwrap(), "s3cret");
     }
 
     #[test]

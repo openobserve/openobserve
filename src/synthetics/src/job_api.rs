@@ -22,10 +22,7 @@
 
 use std::collections::HashMap;
 
-use config::{
-    meta::synthetics::{Synthetic, SyntheticAuth, for_each_string_at_path},
-    utils::encryption::Algorithm,
-};
+use config::meta::synthetics::{Synthetic, SyntheticAuth, for_each_string_at_path};
 use infra::{
     db::ORM_CLIENT,
     table::{
@@ -629,7 +626,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         // All values are AESenc: at rest regardless of the secure flag.
         for var in &synthetic.variables {
             let value = if var.value.starts_with("AESenc:") {
-                aes_decrypt(&dek, &var.value)?
+                crate::service::decrypt_secret(&dek, &var.value)?
             } else {
                 var.value.clone()
             };
@@ -647,7 +644,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
                     let value = if c.value.is_empty() {
                         Ok(String::new())
                     } else {
-                        aes_decrypt(&dek, &c.value)
+                        crate::service::decrypt_secret(&dek, &c.value)
                     }?;
                     Ok(serde_json::json!({
                         "name":     c.name,
@@ -671,14 +668,16 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         if has_encrypted_config {
             for (pointer, encrypted) in std::mem::take(&mut synthetic.config_secrets) {
                 if let Some(slot) = synthetic.config.pointer_mut(&pointer) {
-                    *slot = serde_json::Value::String(aes_decrypt(&dek, &encrypted)?);
+                    *slot = serde_json::Value::String(crate::service::decrypt_secret(
+                        &dek, &encrypted,
+                    )?);
                 }
             }
             // Legacy rows: AESenc: values still stored in-place inside config.
             for path in synthetic.check_type.secret_config_paths() {
                 for_each_string_at_path(&mut synthetic.config, path, &mut |s: &mut String| {
                     if s.starts_with("AESenc:") {
-                        *s = aes_decrypt(&dek, s)?;
+                        *s = crate::service::decrypt_secret(&dek, s)?;
                     }
                     Ok::<(), anyhow::Error>(())
                 })?;
@@ -785,12 +784,18 @@ fn build_env_map(auth: &SyntheticAuth, dek: &[u8]) -> anyhow::Result<HashMap<Str
         SyntheticAuth::Basic { username, password } => {
             map.insert("_AUTH_USERNAME".into(), username.clone());
             if !password.is_empty() {
-                map.insert("_AUTH_PASSWORD".into(), aes_decrypt(dek, password)?);
+                map.insert(
+                    "_AUTH_PASSWORD".into(),
+                    crate::service::decrypt_secret(dek, password)?,
+                );
             }
         }
         SyntheticAuth::Bearer { token } => {
             if !token.is_empty() {
-                map.insert("_AUTH_TOKEN".into(), aes_decrypt(dek, token)?);
+                map.insert(
+                    "_AUTH_TOKEN".into(),
+                    crate::service::decrypt_secret(dek, token)?,
+                );
             }
         }
         SyntheticAuth::Secret { .. } => {}
@@ -810,14 +815,6 @@ fn redact_auth(auth: SyntheticAuth) -> SyntheticAuth {
         },
         other => other,
     }
-}
-
-/// Decrypt an AES-256-SIV ciphertext stored with the `AESenc:` prefix.
-fn aes_decrypt(dek: &[u8], stored: &str) -> anyhow::Result<String> {
-    let b64 = stored.strip_prefix("AESenc:").unwrap_or(stored);
-    Algorithm::Aes256Siv
-        .decrypt(dek, b64)
-        .map_err(|e| anyhow::anyhow!("AES decrypt failed: {e}"))
 }
 
 /// Acknowledges completion of a job.

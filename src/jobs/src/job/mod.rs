@@ -302,6 +302,13 @@ pub async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
     Ok(LOCAL_NODE.uuid.clone())
 }
 
+/// Re-exported so the server can fail startup on a misconfigured super cluster
+/// without taking a direct dependency on the synthetics crate. See
+/// [`openobserve_synthetics::super_cluster_preflight`].
+pub fn synthetics_super_cluster_preflight() -> Result<(), String> {
+    openobserve_synthetics::super_cluster_preflight()
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
