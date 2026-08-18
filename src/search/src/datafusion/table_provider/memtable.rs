@@ -27,6 +27,7 @@ use datafusion::{
     physical_expr::{LexOrdering, PhysicalSortExpr},
     physical_plan::{ExecutionPlan, expressions::Column, sorts::sort::SortExec},
 };
+use futures::future::BoxFuture;
 use hashbrown::HashMap;
 
 use crate::{
@@ -133,7 +134,42 @@ impl TableProvider for NewMemTable {
         TableType::Base
     }
 
-    async fn scan(
+    fn scan<'life0, 'life1, 'life2, 'life3, 'async_trait>(
+        &'life0 self,
+        state: &'life1 dyn Session,
+        projection: Option<&'life2 Vec<usize>>,
+        filters: &'life3 [Expr],
+        limit: Option<usize>,
+    ) -> BoxFuture<'async_trait, Result<Arc<dyn ExecutionPlan>>>
+    where
+        'life0: 'async_trait,
+        'life1: 'async_trait,
+        'life2: 'async_trait,
+        'life3: 'async_trait,
+        Self: 'async_trait,
+    {
+        self.scan_boxed(state, projection, filters, limit)
+    }
+
+    fn get_column_default(&self, column: &str) -> Option<&Expr> {
+        self.mem_table.get_column_default(column)
+    }
+}
+
+impl NewMemTable {
+    // Construct the future outside `#[async_trait]` so rustc can globally cache
+    // the recursive `Expr`/`LogicalPlan` Send/Sync proofs.
+    fn scan_boxed<'a>(
+        &'a self,
+        state: &'a dyn Session,
+        projection: Option<&'a Vec<usize>>,
+        filters: &'a [Expr],
+        limit: Option<usize>,
+    ) -> BoxFuture<'a, Result<Arc<dyn ExecutionPlan>>> {
+        Box::pin(self.scan_inner(state, projection, filters, limit))
+    }
+
+    async fn scan_inner(
         &self,
         state: &dyn Session,
         projection: Option<&Vec<usize>>,
@@ -208,10 +244,6 @@ impl TableProvider for NewMemTable {
         )?;
 
         apply_sort(filter_exec, self.sorted_by_time)
-    }
-
-    fn get_column_default(&self, column: &str) -> Option<&Expr> {
-        self.mem_table.get_column_default(column)
     }
 }
 

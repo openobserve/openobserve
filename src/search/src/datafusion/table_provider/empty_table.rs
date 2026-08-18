@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{future::ready, sync::Arc};
 
 use async_trait::async_trait;
 use datafusion::{
@@ -25,6 +25,7 @@ use datafusion::{
     physical_plan::ExecutionPlan,
     prelude::Expr,
 };
+use futures::future::BoxFuture;
 
 use crate::datafusion::distributed_plan::empty_exec::NewEmptyExec;
 
@@ -72,7 +73,45 @@ impl TableProvider for NewEmptyTable {
         TableType::Base
     }
 
-    async fn scan(
+    fn scan<'life0, 'life1, 'life2, 'life3, 'async_trait>(
+        &'life0 self,
+        state: &'life1 dyn Session,
+        projection: Option<&'life2 Vec<usize>>,
+        filters: &'life3 [Expr],
+        limit: Option<usize>,
+    ) -> BoxFuture<'async_trait, Result<Arc<dyn ExecutionPlan>>>
+    where
+        'life0: 'async_trait,
+        'life1: 'async_trait,
+        'life2: 'async_trait,
+        'life3: 'async_trait,
+        Self: 'async_trait,
+    {
+        self.scan_boxed(state, projection, filters, limit)
+    }
+
+    fn supports_filters_pushdown(
+        &self,
+        filters: &[&Expr],
+    ) -> Result<Vec<TableProviderFilterPushDown>> {
+        Ok(vec![TableProviderFilterPushDown::Inexact; filters.len()])
+    }
+}
+
+impl NewEmptyTable {
+    // Construct the future outside `#[async_trait]` so rustc can globally cache
+    // the recursive `Expr`/`LogicalPlan` Send/Sync proofs.
+    fn scan_boxed<'a>(
+        &'a self,
+        state: &'a dyn Session,
+        projection: Option<&'a Vec<usize>>,
+        filters: &'a [Expr],
+        limit: Option<usize>,
+    ) -> BoxFuture<'a, Result<Arc<dyn ExecutionPlan>>> {
+        Box::pin(ready(self.scan_inner(state, projection, filters, limit)))
+    }
+
+    fn scan_inner(
         &self,
         _state: &dyn Session,
         projection: Option<&Vec<usize>>,
@@ -92,13 +131,6 @@ impl TableProvider for NewEmptyTable {
             )
             .with_partitions(self.partitions),
         ))
-    }
-
-    fn supports_filters_pushdown(
-        &self,
-        filters: &[&Expr],
-    ) -> Result<Vec<TableProviderFilterPushDown>> {
-        Ok(vec![TableProviderFilterPushDown::Inexact; filters.len()])
     }
 }
 

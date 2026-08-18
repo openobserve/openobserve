@@ -31,6 +31,7 @@ use datafusion::{
     physical_plan::{ExecutionPlan, expressions::Column},
     prelude::Expr,
 };
+use futures::future::BoxFuture;
 use rayon::prelude::*;
 use tonic::async_trait;
 
@@ -82,7 +83,45 @@ impl TableProvider for ListingTableAdapter {
         TableType::Base
     }
 
-    async fn scan(
+    fn scan<'life0, 'life1, 'life2, 'life3, 'async_trait>(
+        &'life0 self,
+        state: &'life1 dyn Session,
+        projection: Option<&'life2 Vec<usize>>,
+        filters: &'life3 [Expr],
+        limit: Option<usize>,
+    ) -> BoxFuture<'async_trait, Result<Arc<dyn ExecutionPlan>>>
+    where
+        'life0: 'async_trait,
+        'life1: 'async_trait,
+        'life2: 'async_trait,
+        'life3: 'async_trait,
+        Self: 'async_trait,
+    {
+        self.scan_boxed(state, projection, filters, limit)
+    }
+
+    fn supports_filters_pushdown(
+        &self,
+        filters: &[&Expr],
+    ) -> Result<Vec<TableProviderFilterPushDown>> {
+        self.listing_table.supports_filters_pushdown(filters)
+    }
+}
+
+impl ListingTableAdapter {
+    // Construct the future outside `#[async_trait]` so rustc can globally cache
+    // the recursive `Expr`/`LogicalPlan` Send/Sync proofs.
+    fn scan_boxed<'a>(
+        &'a self,
+        state: &'a dyn Session,
+        projection: Option<&'a Vec<usize>>,
+        filters: &'a [Expr],
+        limit: Option<usize>,
+    ) -> BoxFuture<'a, Result<Arc<dyn ExecutionPlan>>> {
+        Box::pin(self.scan_inner(state, projection, filters, limit))
+    }
+
+    async fn scan_inner(
         &self,
         state: &dyn Session,
         projection: Option<&Vec<usize>>,
@@ -165,13 +204,6 @@ impl TableProvider for ListingTableAdapter {
         )?;
 
         Ok(plan)
-    }
-
-    fn supports_filters_pushdown(
-        &self,
-        filters: &[&Expr],
-    ) -> Result<Vec<TableProviderFilterPushDown>> {
-        self.listing_table.supports_filters_pushdown(filters)
     }
 }
 
