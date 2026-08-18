@@ -1034,16 +1034,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </DbmSection>
 
           <!-- Both sections above are trace-gated, so with no trace vantage
-               this panel would be an empty box. The tab is locked instead and
-               its tooltip says why — the same treatment the L2 strip gives a
-               view its build cannot fill. Unreachable in practice; kept so the
-               panel can never render blank if the gate and the lock disagree. -->
-          <DbmStateNote
+               this panel has nothing to draw. It says WHY, and what to do
+               about it, rather than locking the tab: the padlock is the
+               entitlement signal, and this is a setup state — the deployment
+               simply has not sent traces yet. `healthy: false` is deliberate:
+               nothing is broken, but a prerequisite is genuinely missing, and
+               the green "all clear" treatment would tell the reader to stop
+               looking. Same component, checklist and Set-up action the list
+               pages use for their own not-collecting states, so the whole
+               section explains a missing vantage one way. -->
+          <DbmLockEmptyState
             v-if="!traceVantage"
-            :title="t('dbm.detail.tabs.callers')"
-            :hint="t('dbm.detail.tabs.callersLocked')"
-            placement="centered"
+            :healthy="false"
+            :title="t('dbm.detail.callersEmpty.title')"
+            :description="t('dbm.detail.callersEmpty.description')"
+            :checklist-title="t('dbm.detail.callersEmpty.checklistTitle')"
+            :checks="callersEmptyChecks"
+            :actions="callersEmptyActions"
             data-test="dbm-detail-callers-empty"
+            @action="onCallersEmptyAction"
           />
         </OTabPanel>
       </OTabPanels>
@@ -1074,6 +1083,10 @@ import DbmSection from "@/components/dbm/DbmSection.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmStateNote from "@/components/dbm/DbmStateNote.vue";
+import DbmLockEmptyState, {
+  type DbmLockCheck,
+  type DbmLockEmptyAction,
+} from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -1368,6 +1381,56 @@ const traceVantage = computed(() =>
     loading: loading.value,
   }),
 );
+/**
+ * What has to be true for Callers and examples to have anything to show.
+ *
+ * Both of its sections read the CLIENT vantage: which services ran the
+ * statement, and individual executions to open as a trace. A database can
+ * report a statement perfectly well — this page's Overview and Plans tabs are
+ * proof — while nothing traced the application that issued it, which is the
+ * normal state of a deployment whose collector is wired for server-vantage
+ * only. The checklist names that distinction rather than leaving the reader to
+ * infer it from an empty box.
+ *
+ * The rows reuse the shared `dbm.empty.checks.*` vocabulary so this page
+ * describes a missing trace vantage in the same words the list pages do.
+ */
+const callersEmptyChecks = computed<DbmLockCheck[]>(() => [
+  {
+    id: "server-vantage",
+    // Deliberately a PASS: the reader is looking at a query the database did
+    // report. Opening with what works stops the panel reading as "this page is
+    // broken" and locates the gap precisely.
+    status: "pass",
+    title: t("dbm.detail.callersEmpty.checks.server.ok"),
+    detail: t("dbm.detail.callersEmpty.checks.server.okDetail"),
+  },
+  {
+    id: "traces",
+    status: "fail",
+    title: t("dbm.empty.checks.traces.no"),
+    detail: t("dbm.empty.checks.traces.noDetail"),
+  },
+  {
+    id: "db-spans",
+    status: "fail",
+    title: t("dbm.empty.checks.dbSpans.no"),
+    detail: t("dbm.empty.checks.dbSpans.noDetail"),
+  },
+]);
+
+/**
+ * One action, to the same setup page every other un-instrumented DBM surface
+ * routes to — rather than naming an env var here and stopping.
+ */
+const callersEmptyActions = computed<DbmLockEmptyAction[]>(() => [
+  { id: "open-setup", label: t("dbm.detail.callersEmpty.setUp"), primary: true },
+]);
+
+const onCallersEmptyAction = (id: string) => {
+  if (id === "open-setup") openDbmSetup();
+};
+
 const planDrift = ref<PlanDriftLevel>("none");
 /** Why the section is empty, when it is — see `planEmptyReason`. */
 const planEmpty = ref<ReturnType<typeof planEmptyReason>>("captureOff");
@@ -1478,7 +1541,15 @@ const detailTabs = computed(() => [
     hint: traceVantage.value
       ? t("dbm.detail.tabs.callersHint")
       : t("dbm.detail.tabs.callersLocked"),
-    disabled: !traceVantage.value,
+    // NOT disabled when the trace vantage is empty. The padlock this used to
+    // draw is the ENTITLEMENT signal — the L2 strip uses it for views an OSS
+    // build cannot serve — so wearing it here told an enterprise user to
+    // upgrade a plan they already have, for a tab that is missing DATA, not a
+    // licence. "No traces yet" is a fixable setup state with a next step, and
+    // it belongs inside the panel where there is room to say what to do; a
+    // disabled tab has nowhere to put that. The panel renders
+    // `DbmLockEmptyState` (see below) whenever the vantage is absent.
+    disabled: false,
   },
 ]);
 
@@ -1487,6 +1558,12 @@ const detailTabs = computed(() => [
  * change onto a stretch nothing traced — would be left on a locked tab showing
  * nothing. Move them to Overview, which always has something to say.
  */
+// No tab disables today — Callers stopped locking when the trace vantage is
+// empty, because it now explains the gap in-panel instead. Kept as the guard
+// for any tab that IS disabled later (an entitlement gate, say): a reader must
+// never be parked on a tab they cannot open. Deliberately NOT triggered by an
+// empty Callers — bouncing them off it would hide the very explanation they
+// need.
 watch(
   () => detailTabs.value.find((tab) => tab.key === activeTab.value)?.disabled,
   (disabled) => {

@@ -262,18 +262,41 @@ describe("the tab lives in the URL", () => {
   });
 });
 
-describe("the callers tab locks instead of opening empty", () => {
+describe("the callers tab explains itself instead of locking", () => {
   /**
-   * Both of its sections are trace-gated, so with no trace vantage the panel
-   * would be a blank box — which reads as "nothing calls this", the exact
-   * false finding Rule A exists to prevent. Locked, with the reason.
+   * The padlock is the ENTITLEMENT signal — the L2 strip uses it for views an
+   * OSS build cannot serve. Callers is not gated by build type: on enterprise
+   * it is empty only because nothing traced the application, which is a
+   * fixable SETUP state with a next step. Wearing the padlock there told a
+   * customer to upgrade a plan they already had, and a disabled tab has
+   * nowhere to put the instructions. So the tab stays open and the panel
+   * carries the explanation.
    */
-  it("disables the callers tab when there is no trace vantage", () => {
+  it("never disables the callers tab", () => {
     const start = page.indexOf("const detailTabs = computed(");
     expect(start, "detailTabs must exist").toBeGreaterThan(-1);
     const tabs = page.slice(start, page.indexOf("\n]);", start));
-    expect(tabs).toContain("disabled: !traceVantage.value");
-    expect(tabs).toContain("dbm.detail.tabs.callersLocked");
+    const callersEntry = tabs.slice(tabs.indexOf('key: "callers"'));
+    expect(
+      callersEntry,
+      "callers must not be disabled — the padlock means 'not in your plan'",
+    ).not.toContain("disabled: !traceVantage.value");
+    expect(callersEntry).toContain("disabled: false");
+  });
+
+  /**
+   * Empty must still say WHY. The panel renders the same instructive empty
+   * state the list pages use for a missing vantage, so the reader gets a
+   * checklist and a route to setup rather than a blank box.
+   */
+  it("renders an instructive empty state when the trace vantage is absent", () => {
+    const callersPanel = panel("callers");
+    expect(callersPanel).toContain("DbmLockEmptyState");
+    expect(callersPanel).toContain('v-if="!traceVantage"');
+    // `healthy: false` — nothing is broken, but a prerequisite is missing. The
+    // green all-clear treatment would tell the reader to stop looking.
+    expect(callersPanel).toMatch(/:healthy="false"/);
+    expect(callersPanel).toContain("dbm-detail-callers-empty");
   });
 
   /**
@@ -289,10 +312,12 @@ describe("the callers tab locks instead of opening empty", () => {
   });
 
   /**
-   * A reader parked on Callers when the vantage drops out — a window change
-   * onto a stretch nothing traced — must not be stranded on a locked tab.
+   * The guard stays even though no tab disables today: a reader must never be
+   * parked on a tab they cannot open, and a future entitlement gate would
+   * reintroduce exactly that. It must NOT fire for an empty Callers — moving
+   * the reader off would hide the explanation they need.
    */
-  it("moves a reader off the callers tab when it locks under them", () => {
+  it("keeps the guard that moves a reader off a tab that disables under them", () => {
     expect(page).toContain('if (disabled) selectTab("overview")');
   });
 });
