@@ -224,13 +224,11 @@ function download() {
           </OButton>
         </div>
 
-        <!-- Keyed by format so switching tabs remounts the editor: the wrapper
-             loads a language's Monaco contribution on mount and never swaps it
-             afterwards, so one shared instance would keep the first tab's
-             highlighting. The remount also guarantees a fresh layout. -->
+        <!-- One editor for both tabs. The wrapper retokenizes in place when
+             `language` changes, so switching tabs costs a model update rather
+             than tearing down and recreating Monaco. -->
         <QueryEditor
-          :key="format"
-          :editor-id="`${dataTest}-editor-${format}`"
+          :editor-id="`${dataTest}-editor`"
           class="min-h-0 min-w-0 flex-1"
           :query="code"
           :language="isTerraform ? 'hcl' : 'json'"

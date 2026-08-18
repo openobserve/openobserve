@@ -22,7 +22,10 @@
 //     configuration file and are dropped.
 //
 // Attributes that match the provider's own default are omitted, so the output
-// reads like config someone wrote rather than a state dump.
+// reads like config someone wrote rather than a state dump. `enabled` is the one
+// exception: whether an alert is live is the first thing a reviewer looks for,
+// and leaving it to the default would make a paused alert look identical to a
+// running one.
 
 import type {
   Node,
@@ -206,6 +209,8 @@ function alertResource(
     ...attr("stream_name", quote(String(alert.stream_name ?? ""))),
     ...attr("folder_id", folderId === null ? null : quote(folderId)),
     ...attr("description", str(alert.description)),
+    // Always written, unlike every other defaulted attribute. See the note at
+    // the top of this file, and the header the export carries.
     ...attr("enabled", String(alert.enabled !== false)),
     ...attr("is_real_time", boolWhen(alert.is_real_time, true)),
     ...attr("owner", str(alert.owner)),

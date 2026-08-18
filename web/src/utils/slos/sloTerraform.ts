@@ -123,6 +123,8 @@ function sloResource(
     ...attr("name", quote(String(slo.name ?? ""))),
     ...attr("folder_id", folderId === null ? null : quote(folderId)),
     ...attr("description", str(slo.description)),
+    // Always written, for the same reason the alert exporter does it: a paused
+    // objective and a running one should not read the same.
     ...attr("enabled", String(slo.enabled !== false)),
     ...attr("target", num(slo.target)),
     ...attr("window_secs", num(slo.window_secs)),

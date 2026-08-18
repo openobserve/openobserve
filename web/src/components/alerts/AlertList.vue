@@ -2926,15 +2926,29 @@ export default defineComponent({
         timeout: 0, // Set timeout to 0 to keep it showing until dismissed
       });
       try {
-        const alerts = await Promise.all(
-          selectedAlerts.value.map((alert: any) => fetchAlertForExport(alert.alert_id)),
+        const selected = selectedAlerts.value as any[];
+        const fetched = await Promise.all(
+          selected.map((alert: any) => fetchAlertForExport(alert.alert_id)),
         );
-        const usable = alerts.filter(Boolean);
+        const usable = fetched.filter(Boolean);
         // Every fetch coming back empty is a failure, not an export of nothing:
         // without this the dialog opens on a blank definition.
         if (!usable.length) throw new Error("empty export payload");
         alertsToExport.value = usable;
         showExportDialog.value = true;
+
+        // A definition that came back empty is a gap in the export. Dropping it
+        // quietly would leave the success toast reporting the smaller count as
+        // though everything had been exported.
+        const missing = selected.filter((_, i) => !fetched[i]).map((alert: any) => alert.name);
+        if (missing.length) {
+          toast({
+            variant: "warning",
+            message: t("toastMessages.alerts.someAlertsCouldNotBeExported", {
+              names: missing.join(", "),
+            }),
+          });
+        }
       } catch (error) {
         console.error("Error exporting alerts:", error);
         toast({

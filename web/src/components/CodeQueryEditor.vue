@@ -667,35 +667,57 @@ export default defineComponent({
       validateDoubleQuotes();
     };
 
-    onMounted(async () => {
-      if (props.language === "sql") {
+    // Monaco tokenizes a language only once its contribution has been imported,
+    // and each is a separate chunk so a page pays for the one it uses. Factored
+    // out of onMounted because a surface that switches language, such as the
+    // export dialog's JSON and Terraform tabs, has to load the new one too.
+    const loadLanguageContribution = async (language: string) => {
+      if (language === "sql") {
         await import("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js");
       }
 
-      if (props.language === "json") {
+      if (language === "json") {
         await import("monaco-editor/esm/vs/language/json/monaco.contribution.js");
       }
 
-      if (props.language === "html") {
+      if (language === "html") {
         await import("monaco-editor/esm/vs/language/html/monaco.contribution.js");
       }
 
-      if (props.language === "markdown") {
+      if (language === "markdown") {
         await import("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js");
       }
 
       // Terraform / OpenTofu configuration, e.g. the alert and SLO exports.
-      if (props.language === "hcl") {
+      if (language === "hcl") {
         await import("monaco-editor/esm/vs/basic-languages/hcl/hcl.contribution.js");
       }
 
-      if (props.language === "python") {
+      if (language === "python") {
         await import("monaco-editor/esm/vs/basic-languages/python/python.contribution.js");
       }
-      if (props.language === "javascript") {
+      if (language === "javascript") {
         await import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js");
       }
+    };
 
+    // Retokenize in place rather than making the consumer remount: recreating the
+    // editor to change language throws away the DOM, the scroll position and the
+    // undo stack, which reads as a hitch on every toggle. Providers are left
+    // alone deliberately; they register per language and re-registering here
+    // would stack duplicates on a surface that toggles repeatedly.
+    watch(
+      () => props.language,
+      async (language) => {
+        if (!editorObj || !language) return;
+        await loadLanguageContribution(language);
+        const model = editorObj.getModel();
+        if (model) monaco.editor.setModelLanguage(model, language);
+      },
+    );
+
+    onMounted(async () => {
+      await loadLanguageContribution(props.language);
       setupEditor();
     });
 

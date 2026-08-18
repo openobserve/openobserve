@@ -514,6 +514,17 @@ async function openExport(items: SloListItem[]) {
     if (!usable.length) throw new Error("empty export payload");
     slosToExport.value = usable;
     exportDialog.value = true;
+
+    // A definition that came back empty is a gap in the export. Dropping it
+    // quietly would leave the success toast reporting the smaller count as
+    // though everything had been exported.
+    const missing = items.filter((_, i) => fetched[i] === null).map((item) => item.name);
+    if (missing.length) {
+      toast({
+        variant: "warning",
+        message: t("slos.exportPartial", { names: missing.join(", ") }),
+      });
+    }
   } catch (e: any) {
     toast({
       variant: "error",
