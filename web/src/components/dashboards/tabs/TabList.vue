@@ -49,10 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                the sizer alone drives the max-content column. Keep that track a bare
                `max-content`: a 0 min (`minmax(0,…)`) collapses it to 0px once the
                tab strip overflows. -->
-          <span
-            v-if="editingTabId === tab.tabId"
-            class="grid grid-cols-[max-content] items-center"
-          >
+          <span v-if="editingTabId === tab.tabId" class="grid grid-cols-[max-content] items-center">
             <span
               aria-hidden="true"
               class="invisible col-start-1 row-start-1 px-0.5 text-sm whitespace-pre"
