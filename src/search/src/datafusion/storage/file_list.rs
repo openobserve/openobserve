@@ -104,8 +104,15 @@ pub fn clear(trace_id: &str) {
     drop(w);
 }
 
+/// Look up the selection registered by [`set`] for an object location of the
+/// form `{trace_key}/$$/[{account}/::/]{file.key}`.
 pub fn get_scan_selection(file_key: &str) -> Option<ScanSelection> {
     let (trace_id, filename) = file_key.split_once("/$$/")?;
+    // `set` keys selections by the bare `file.key`; strip the account prefix
+    // it inserts into the object location for multi-account storage
+    let filename = filename
+        .split_once("/::/")
+        .map_or(filename, |(_, filename)| filename);
     let r = SCAN_SELECTIONS.read();
     let data = r.get(trace_id)?;
     data.get(filename).cloned()
@@ -137,5 +144,42 @@ mod tests {
     fn test_get_scan_selection_no_separator_returns_none() {
         let result = get_scan_selection("no-separator-here");
         assert!(result.is_none());
+    }
+
+    /// The selection must be found through the object location `set` builds,
+    /// both without and with a storage account prefix.
+    #[tokio::test]
+    async fn test_get_scan_selection_round_trip_with_account() {
+        let trace_id = "trace_scan_selection_round_trip";
+        let mut plain = FileKey::from_file_name("files/org/logs/s/2024/01/01/00/plain.parquet");
+        plain.with_selection(
+            FileSelection::RowGroups(std::sync::Arc::new(vec![1])),
+            Some(1024),
+        );
+        let mut multi = FileKey::from_file_name("files/org/logs/s/2024/01/01/00/multi.parquet");
+        multi.account = "acct".to_string();
+        multi.with_selection(
+            FileSelection::RowGroups(std::sync::Arc::new(vec![2])),
+            Some(2048),
+        );
+        set(trace_id, "schema", "parquet", vec![plain, multi]).await;
+
+        let locations: Vec<String> = get(&format!("{trace_id}/schema=schema/format=parquet"))
+            .unwrap()
+            .into_iter()
+            .map(|m| m.location.to_string())
+            .collect();
+        assert_eq!(locations.len(), 2);
+        for location in &locations {
+            let selection = get_scan_selection(location)
+                .unwrap_or_else(|| panic!("no selection for {location}"));
+            if location.contains("/acct/::/") {
+                assert_eq!(selection.row_group_size, Some(2048));
+            } else {
+                assert!(!location.contains("::"));
+                assert_eq!(selection.row_group_size, Some(1024));
+            }
+        }
+        clear(trace_id);
     }
 }

@@ -983,6 +983,12 @@ pub async fn merge_files(
         files: merged_files,
         file_format,
     } = buf;
+    // an empty result would delete the source files without a replacement
+    if merged_files.is_empty() {
+        return Err(anyhow::anyhow!(
+            "merge_parquet_files error: produced no files"
+        ));
+    }
     let mut new_files = Vec::with_capacity(merged_files.len());
     for MergedFile {
         buf,
