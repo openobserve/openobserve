@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import type { EscalationProgress } from "@/ts/interfaces/oncall";
 
 const stubs = {
+  OButton: { name: "OButton", template: "<button><slot /></button>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
@@ -65,7 +66,7 @@ describe("OnCallEscalation", () => {
       next_at: (Date.now() + 12 * 60_000) * 1000,
     });
 
-    const next = wrapper.find('[data-test="oncall-escalation-next"]');
+    const next = wrapper.find('[data-test="oncall-escalation-end"]');
     // The engine's word, not the engine's exact bytes: an older engine still
     // sends the retired "the next on-call" and must not put a second
     // vocabulary on the same tab as the editor.
@@ -82,7 +83,7 @@ describe("OnCallEscalation", () => {
       next_targets: ["the on-call"],
       next_at: (Date.now() - 5_000) * 1000,
     });
-    expect(wrapper.find('[data-test="oncall-escalation-next"]').text()).toContain(
+    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain(
       "any moment",
     );
   });
@@ -100,7 +101,9 @@ describe("OnCallEscalation", () => {
     );
     const second = wrapper.find('[data-test="oncall-escalation-rung-300000000"]');
     expect(second.text()).toContain("bob@o2.ai");
-    expect(second.text()).toContain("+5m");
+    // Levels, not delays: "L2" is how a policy is talked about, and the
+    // timestamp beside it already says when.
+    expect(second.text()).toContain("L2");
   });
 
   /// A stopped ladder has no next rung, and a countdown to something that will
@@ -117,8 +120,10 @@ describe("OnCallEscalation", () => {
         next_targets: ["the whole team"],
       });
 
-      expect(wrapper.find('[data-test="oncall-escalation-stopped"]').text()).toContain(phrase);
-      expect(wrapper.find('[data-test="oncall-escalation-next"]').exists()).toBe(false);
+      const end = wrapper.find('[data-test="oncall-escalation-end"]');
+      expect(end.text()).toContain(phrase);
+      // The countdown is replaced by the reason, not printed beside it.
+      expect(end.text()).not.toMatch(/in \d/);
     }
   });
 
@@ -126,7 +131,7 @@ describe("OnCallEscalation", () => {
   /// this panel exists to make loud.
   it("says plainly when the ladder ran out", () => {
     const wrapper = render({ exhausted: true });
-    expect(wrapper.find('[data-test="oncall-escalation-exhausted"]').text()).toContain(
+    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain(
       "nobody left to escalate to",
     );
   });
@@ -205,14 +210,17 @@ describe("OnCallEscalation", () => {
 
   it("reads a spent liaison ladder as finished, not as exhausted", () => {
     const wrapper = render({ exhausted: true }, [], "impacted");
-    expect(wrapper.find('[data-test="oncall-escalation-liaison-done"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-escalation-exhausted"]').exists()).toBe(false);
+    const end = wrapper.find('[data-test="oncall-escalation-end"]');
+    expect(end.text()).toContain("finished by design");
+    expect(end.text()).not.toContain("nobody left to escalate to");
   });
 
   /// The owner's ladder running out is still the loud failure it was.
   it("keeps the exhausted warning on an owner record", () => {
     const wrapper = render({ exhausted: true });
-    expect(wrapper.find('[data-test="oncall-escalation-exhausted"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain(
+      "nobody left to escalate to",
+    );
     expect(wrapper.find('[data-test="oncall-escalation-liaison-note"]').exists()).toBe(false);
   });
 
@@ -244,4 +252,91 @@ describe("OnCallEscalation", () => {
     expect(wrapper.find('[data-test="oncall-escalation-rung-empty-0"]').exists()).toBe(false);
   });
 
+
+  /// A repeating policy fires the same rung five times. Five near-identical
+  /// lines bury the fact worth reading — that the whole repeat reached nobody
+  /// — so consecutive rungs aiming at the same people fold into one row.
+  it("folds a repeat of the same rung into one row with a count", () => {
+    const minute = 60_000_000;
+    const wrapper = render(
+      {
+        fired: [
+          { after_micros: 0, at: 1_000_000, targets: ["the on-call"] },
+          { after_micros: 10 * minute, at: 1_000_000 + 10 * minute, targets: ["the whole team"] },
+          { after_micros: 20 * minute, at: 1_000_000 + 20 * minute, targets: ["the whole team"] },
+          { after_micros: 30 * minute, at: 1_000_000 + 30 * minute, targets: ["the whole team"] },
+        ],
+      },
+      [
+        { kind: "page", at: 1, actor: "o2-engine", body: "paged", rung_micros: 10 * minute, delivered: false },
+        { kind: "page", at: 2, actor: "o2-engine", body: "paged", rung_micros: 20 * minute, delivered: false },
+        { kind: "page", at: 3, actor: "o2-engine", body: "paged", rung_micros: 30 * minute, delivered: false },
+      ],
+    );
+
+    // The level tag is one per group; the rung data-test prefix also matches
+    // the lost/empty markers hanging off it.
+    expect(wrapper.findAll('[data-test^="oncall-escalation-level-"]')).toHaveLength(2);
+    const repeat = wrapper.find(`[data-test="oncall-escalation-rung-${10 * minute}"]`);
+    expect(repeat.text()).toContain("L2–4");
+    expect(repeat.text()).toContain("×3");
+    // The cadence said once, instead of three timestamps a reader subtracts.
+    expect(repeat.text()).toContain("every 10m");
+  });
+
+  /// Folding must not swallow the one attempt in the middle that landed —
+  /// "failed ×5" over a run that included a success is a lie about the night.
+  it("does not fold rungs that ended differently", () => {
+    const minute = 60_000_000;
+    const wrapper = render(
+      {
+        fired: [
+          { after_micros: 0, at: 1, targets: ["the whole team"] },
+          { after_micros: 10 * minute, at: 2, targets: ["the whole team"] },
+        ],
+      },
+      [
+        { kind: "page", at: 1, actor: "o2-engine", body: "paged", rung_micros: 0, delivered: false },
+        { kind: "page", at: 2, actor: "o2-engine", body: "paged", rung_micros: 10 * minute },
+      ],
+    );
+    expect(wrapper.findAll('[data-test^="oncall-escalation-level-"]')).toHaveLength(2);
+  });
+
+  /// The policy's own ending, which `/escalation` cannot say: an exhausted
+  /// ladder that notifies the default team did not stop with nobody left.
+  it("says which ending the policy chose when the rungs ran out", () => {
+    const wrapper = mount(OnCallEscalation, {
+      props: {
+        progress: {
+          fired: [],
+          next_targets: [],
+          next_at: null,
+          exhausted: true,
+          stopped_because: null,
+        },
+        finalAction: "notify_default_team",
+      },
+      global: { plugins: [i18n], stubs },
+    });
+    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain(
+      "default team",
+    );
+  });
+
+  /// The rail offers the edit only when the caller says where it goes; the
+  /// component itself has no opinion about routing.
+  it("offers the edit affordance only with a team", () => {
+    const bare = render({});
+    expect(bare.find('[data-test="oncall-escalation-edit"]').exists()).toBe(false);
+
+    const withTeam = mount(OnCallEscalation, {
+      props: {
+        progress: { fired: [], next_targets: [], next_at: null, exhausted: false },
+        teamId: "team_1",
+      },
+      global: { plugins: [i18n], stubs },
+    });
+    expect(withTeam.find('[data-test="oncall-escalation-edit"]').exists()).toBe(true);
+  });
 });

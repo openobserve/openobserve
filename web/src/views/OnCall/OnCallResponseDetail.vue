@@ -13,6 +13,12 @@
       <template v-if="response">
         <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
         <OTag type="oncallResponseState" :value="response.state" size="sm" />
+        <!-- How long it has been ringing, beside the word "ringing". The two
+             were a stat tile apart, and the one people read first is the
+             one that says how bad this already is. -->
+        <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
+          {{ elapsedLabel }}
+        </span>
         <OTag v-if="snoozedUntilLabel" variant="warning-soft" size="sm">
           {{ t("oncall.snoozed") }}
         </OTag>
@@ -65,6 +71,20 @@
             {{ raw(opt.label) }}
           </ODropdownItem>
         </ODropdown>
+
+        <!-- Escalate keeps this yours; hand off makes it theirs. Both verbs
+             have existed server-side since the ladder did, and only one of
+             them had a button. -->
+        <OButton
+          variant="outline"
+          size="sm-action"
+          :loading="escalatingNow"
+          :disabled="escalation?.exhausted"
+          data-test="oncall-response-escalate-btn"
+          @click="escalateNow"
+        >
+          {{ t("oncall.escalate") }}
+        </OButton>
 
         <OButton
           variant="outline"
@@ -122,6 +142,19 @@
 
     <template v-if="response">
       <OContent y>
+        <!-- The one sentence this screen exists to say when it is true:
+             nobody has seen this page, and here is why. -->
+        <OnCallReachAlarm
+          :state="response.state"
+          :deliveries="deliveries"
+          :deliveries-total="deliveriesTotal"
+          :progress="escalation"
+          :smtp-configured="smtpConfigured"
+          :escalating="escalatingNow"
+          @escalate="escalateNow"
+          @open-reachability="openReachability"
+        />
+
         <!-- Snoozing does not assign the page, and the banner has to keep
              saying so — a quiet page that looks owned is how one gets dropped. -->
         <OBanner
@@ -159,164 +192,120 @@
         </OBanner>
 
         <OStatStrip :items="summaryStats" data-test="oncall-response-stats" />
-      </OContent>
 
-      <OTabs v-model="tab" data-test="oncall-response-tabs">
-        <OTab name="overview" :label="t('oncall.tabOverview')" icon="info-outline" />
-        <OTab name="activity" :label="t('oncall.tabActivity')" icon="event-note" />
-        <OTab name="causes" :label="t('oncall.tabPriorCauses')" icon="lightbulb-outline" />
-      </OTabs>
-
-      <OTabPanels v-model="tab" grow scroll="y">
-        <OTabPanel name="overview">
-          <OContent y>
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div class="flex flex-col gap-6 lg:col-span-2">
-                <!-- Renders nothing until a verdict event exists (§G.7) — the
-                     default deployment has no agent and must not show an
-                     analysis panel that sits empty forever. -->
-                <OnCallVerdictCard :events="events" />
-                <OnCallEscalation
-                  v-if="escalation"
-                  :progress="escalation"
-                  :events="events"
-                  :deliveries="deliveries"
-                  :deliveries-total="deliveriesTotal"
-                  :responder-role="isImpacted ? 'impacted' : 'owner'"
-                />
-                <OnCallDeliveryLedger
-                  :records="deliveries"
-                  :total="deliveriesTotal"
-                  :loading="deliveriesLoading"
-                />
-              </div>
-
-              <!-- Same key/value grid the rest of the app uses for a details
-                   rail, rather than a third spelling of the same thing. -->
-              <!-- Stacked on a phone: a fixed label column leaves an email or
-                   a ksuid about five characters of room on a narrow screen. -->
-              <dl
-                class="text-compact grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[10rem_1fr]"
-              >
-                <dt class="text-text-secondary">{{ t("oncall.ackedBy") }}</dt>
-                <dd class="text-text-body">{{ raw(response.acked_by) || ABSENT }}</dd>
-
-                <dt class="text-text-secondary">{{ t("oncall.team") }}</dt>
-                <dd class="text-text-body">{{ raw(teamName) }}</dd>
-
-                <!-- The engine records why it picked this team. It was only
-                     ever readable by scrolling the timeline, which is not
-                     where somebody asks "why me". -->
-                <template v-if="routingReason">
-                  <dt class="text-text-secondary">{{ t("oncall.routedBecause") }}</dt>
-                  <dd class="text-text-body" data-test="oncall-response-routing-reason">
-                    {{ raw(routingReason) }}
-                  </dd>
-                </template>
-
-                <!-- The rule that fired is the first thing a woken engineer
-                     wants to open, and this row used to be an unclickable
-                     ksuid. -->
-                <dt class="text-text-secondary">{{ t("oncall.subject") }}</dt>
-                <dd class="text-text-body break-all">
-                  <router-link
-                    v-if="response.subject.subject_type === 'alert'"
-                    class="text-accent"
-                    :to="{
-                      name: 'alertDetail',
-                      params: { alert_id: response.subject.source_id },
-                      query: { org_identifier: orgId },
-                    }"
-                    data-test="oncall-response-subject-link"
-                  >
-                    {{ raw(subjectName) }}
-                  </router-link>
-                  <template v-else>{{ raw(subjectName) }}</template>
-                </dd>
-
-                <template v-if="subjectStream">
-                  <dt class="text-text-secondary">{{ t("oncall.subjectStream") }}</dt>
-                  <dd class="text-text-body" data-test="oncall-response-subject-stream">
-                    {{ raw(subjectStream) }}
-                  </dd>
-                </template>
-
-                <dt class="text-text-secondary">{{ t("oncall.firing") }}</dt>
-                <dd class="text-text-body">{{ raw(`#${response.subject.firing}`) }}</dd>
-
-                <template v-if="response.incident_id">
-                  <dt class="text-text-secondary">{{ t("oncall.incident") }}</dt>
-                  <dd>
-                    <router-link
-                      class="text-accent"
-                      :to="{
-                        name: 'incidentDetail',
-                        params: { id: response.incident_id },
-                        query: { org_identifier: orgId },
-                      }"
-                      data-test="oncall-response-incident-link"
-                    >
-                      {{ raw(response.incident_id) }}
-                    </router-link>
-                  </dd>
-                </template>
-
-                <dt class="text-text-secondary">{{ t("oncall.openedAt") }}</dt>
-                <dd><OTimeCell :value="response.opened_at" unit="us" /></dd>
-
-                <template v-if="response.cause">
-                  <dt class="text-text-secondary">{{ t("oncall.resolveCause") }}</dt>
-                  <dd class="text-text-body">
-                    {{ t(`oncall.cause_${response.cause}`) }}
-                    <span v-if="response.cause_note" class="text-text-muted">
-                      {{ raw(response.cause_note) }}
-                    </span>
-                  </dd>
-                </template>
-              </dl>
-            </div>
-          </OContent>
-        </OTabPanel>
-
-        <OTabPanel name="activity">
-          <OContent y>
-            <OnCallTimeline :events="events" :opened-at="response.opened_at" />
-
-            <!-- Pinned under the thread it appends to. A note is a comment. -->
-            <div class="border-border-default mt-4 flex flex-col gap-2 border-t pt-4">
-              <OTextarea
-                v-model="noteBody"
-                :placeholder="t('oncall.notePlaceholder')"
-                :rows="2"
-                data-test="oncall-response-note-input"
-              />
-              <div class="flex justify-end">
-                <OButton
-                  variant="outline"
-                  size="sm-action"
-                  :loading="addingNote"
-                  :disabled="!noteBody.trim()"
-                  data-test="oncall-response-note-submit"
-                  @click="addNote"
-                >
-                  {{ t("oncall.addNote") }}
-                </OButton>
-              </div>
-            </div>
-          </OContent>
-        </OTabPanel>
-
-        <OTabPanel name="causes">
-          <OContent y>
-            <OnCallPriorCauses :groups="priorCauses" @open="openResponse" />
-            <OnCallFiringHistory
-              class="mt-4"
-              :firings="firingHistory"
-              @open="openResponse"
+        <!-- Two columns rather than three tabs. Everything a responder needs
+             to decide is on one screen: the tabs cost a click each for facts
+             that were never optional, and the rail's answers — who this is
+             reaching, what fires next, why this team — are the ones people
+             opened the tabs to find. -->
+        <div class="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div class="flex flex-col gap-6 lg:col-span-2">
+            <OnCallWhatFired
+              :org-id="orgId"
+              :subject-type="response.subject.subject_type"
+              :source-id="response.subject.source_id"
+              :alert="subjectAlert"
+              :runbook-url="response.runbook_url"
+              :observed="latestEvaluation"
+              :opened-at="response.opened_at"
             />
-          </OContent>
-        </OTabPanel>
-      </OTabPanels>
+
+            <!-- Renders nothing until a verdict event exists (§G.7) — the
+                 default deployment has no agent and must not show an
+                 analysis panel that sits empty forever. -->
+            <OnCallVerdictCard :events="events" />
+
+            <OCard data-test="oncall-response-activity">
+              <OCardSection>
+                <OnCallTimeline :events="events" :opened-at="response.opened_at" />
+
+                <!-- Pinned under the thread it appends to. A note is a comment. -->
+                <div class="border-border-default mt-4 flex flex-col gap-2 border-t pt-4">
+                  <OTextarea
+                    v-model="noteBody"
+                    :placeholder="t('oncall.notePlaceholder')"
+                    :rows="2"
+                    data-test="oncall-response-note-input"
+                  />
+                  <div class="flex justify-end">
+                    <OButton
+                      variant="outline"
+                      size="sm-action"
+                      :loading="addingNote"
+                      :disabled="!noteBody.trim()"
+                      data-test="oncall-response-note-submit"
+                      @click="addNote"
+                    >
+                      {{ t("oncall.addNote") }}
+                    </OButton>
+                  </div>
+                </div>
+              </OCardSection>
+            </OCard>
+
+            <!-- The receipt behind the ladder's claims, and the history behind
+                 the rail's one-line summary. Both are evidence a reader asks
+                 for second, so they open rather than occupy the fold. -->
+            <OCollapsible
+              :label="t('oncall.deliveriesTitle')"
+              data-test="oncall-response-deliveries"
+            >
+              <OnCallDeliveryLedger
+                :records="deliveries"
+                :total="deliveriesTotal"
+                :loading="deliveriesLoading"
+              />
+            </OCollapsible>
+
+            <OCollapsible :label="t('oncall.tabPriorCauses')" data-test="oncall-response-causes">
+              <OnCallPriorCauses :groups="priorCauses" @open="openResponse" />
+              <OnCallFiringHistory
+                class="mt-4"
+                :firings="firingHistory"
+                @open="openResponse"
+              />
+            </OCollapsible>
+          </div>
+
+          <div class="flex flex-col gap-6">
+            <OnCallWhoIsOn
+              :slots="onCallSlots"
+              :deliveries="deliveries"
+              :handover-at="handoverAt"
+              :handover-to="handoverTo"
+            />
+
+            <OnCallEscalation
+              v-if="escalation"
+              :progress="escalation"
+              :events="events"
+              :deliveries="deliveries"
+              :deliveries-total="deliveriesTotal"
+              :responder-role="isImpacted ? 'impacted' : 'owner'"
+              :final-action="policy?.final_action ?? null"
+              :team-id="response.team_id"
+              @edit="openPolicy"
+            />
+
+            <OnCallAboutPage
+              :org-id="orgId"
+              :team-id="response.team_id"
+              :team-name="teamName"
+              :subject-type="response.subject.subject_type"
+              :source-id="response.subject.source_id"
+              :opened-at="response.opened_at"
+              :routing-reason="routingReason"
+              :subject-stream="subjectStream"
+              :acked-by="response.acked_by"
+              :incident-id="response.incident_id"
+              :cause="response.cause"
+              :cause-note="response.cause_note"
+              :prior-causes="priorCauses"
+              :prior-firings="firingHistory.length"
+            />
+          </div>
+        </div>
+      </OContent>
     </template>
 
     <OEmptyState
@@ -531,16 +520,18 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
+import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
 import OnCallEscalation from "@/components/oncall/OnCallEscalation.vue";
+import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
+import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
+import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
-import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -563,8 +554,10 @@ import type {
   DeliveryRecord,
   CauseGroup,
   EscalationProgress,
+  OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
+  OnCallSlot,
   PromoteSeverity,
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
@@ -695,7 +688,7 @@ const addingNote = ref(false);
 const handingOff = ref(false);
 const confirmResolve = ref(false);
 const showHandoff = ref(false);
-const tab = ref("overview");
+const escalatingNow = ref(false);
 
 // Local rather than imported from the SLO composable that also defines it:
 // on-call has no business depending on that module for an em dash.
@@ -713,6 +706,20 @@ const subjectAlert = ref<{
   stream_type?: string;
 } | null>(null);
 const escalation = ref<EscalationProgress | null>(null);
+/// Who a page to this team reaches right now, and where the pager goes next.
+const onCallSlots = ref<OnCallSlot[]>([]);
+const handoverAt = ref<number | null>(null);
+const handoverTo = ref<string | null>(null);
+/// The team's own policy, for the one thing progress cannot say: what the
+/// ladder does after its last rung.
+const policy = ref<OnCallPolicy | null>(null);
+/// `false` is the server's finding that no mail can leave this deployment —
+/// the usual reason every row of the ledger failed. `null` is "not answered",
+/// which is not the same thing and must never be rendered as a cause.
+const smtpConfigured = ref<boolean | null>(null);
+/// The alert's most recent evaluation, so the page can print the value that
+/// crossed the threshold rather than only the threshold.
+const latestEvaluation = ref<Record<string, unknown> | null>(null);
 const handoffMode = ref<"person" | "team">("person");
 const handoffPerson = ref("");
 const handoffTeam = ref("");
@@ -749,9 +756,30 @@ const canAcknowledge = computed(
   () => !!response.value && isEscalating(response.value.state),
 );
 
-const subtitle = computed(() =>
-  response.value ? raw(`${response.value.subject.source_id} · ${teamName.value}`) : undefined,
-);
+/// Team, which firing this is, and whether the subject has form. The id used
+/// to sit here, where it told a woken responder nothing they could act on; it
+/// is now a copyable row in the rail.
+const subtitle = computed(() => {
+  const r = response.value;
+  if (!r) return undefined;
+  const history = firingHistory.value.length
+    ? t("oncall.historyFirings", { count: firingHistory.value.length }, firingHistory.value.length)
+    : t("oncall.historyFirstPage");
+  return t("oncall.responseSubtitle", {
+    team: teamName.value,
+    firing: r.subject.firing,
+    history,
+  });
+});
+
+/// How long this has been somebody's problem. An open page reads as elapsed;
+/// a closed one stops at the moment it closed, rather than counting forever.
+const elapsedLabel = computed(() => {
+  const r = response.value;
+  if (!r) return "";
+  const end = r.closed_at ?? nowMicros.value;
+  return formatMicrosDuration(end - r.opened_at);
+});
 
 /// The headline is "when does this wake somebody else" — the question a
 /// responder actually has, previously buried mid-page.
@@ -796,12 +824,6 @@ const summaryStats = computed<StatItem[]>(() => {
 });
 
 const routingReason = computed(() => routingReasonOf(events.value));
-
-/// The producer sends the rule's name as the record title, so the name is
-/// known without the alert; the fetch below only adds what it cannot carry.
-const subjectName = computed(
-  () => subjectAlert.value?.name || response.value?.title || response.value?.subject.source_id,
-);
 
 /// Which stream the rule watches — context the record does not carry and the
 /// page had nowhere else to get.
@@ -854,6 +876,8 @@ async function fetchResponse() {
     await fetchPriorCauses();
     await fetchEscalation();
     await fetchDeliveries();
+    await fetchTeamContext();
+    await fetchLatestEvaluation();
   } catch (err: any) {
     toast({
       variant: "error",
@@ -1079,6 +1103,123 @@ async function fetchDeliveries() {
   } finally {
     deliveriesLoading.value = false;
   }
+}
+
+/**
+ * The rail's four answers — who is on, when the pager changes hands, what the
+ * ladder does at the end, and whether mail can leave this deployment.
+ *
+ * Every one is context. A page a responder can act on must render when all
+ * four fail, so nothing here is allowed to throw and none of it gates the
+ * record.
+ */
+async function fetchTeamContext() {
+  const r = response.value;
+  if (!r) return;
+  const [slots, policyRes, reach] = await Promise.allSettled([
+    oncallService.whoIsOnCall({ org_identifier: orgId.value, team_id: r.team_id }),
+    oncallService.getPolicy({ org_identifier: orgId.value, team_id: r.team_id }),
+    oncallService.teamReachability({ org_identifier: orgId.value, team_id: r.team_id }),
+  ]);
+  onCallSlots.value = slots.status === "fulfilled" ? (slots.value.data ?? []) : [];
+  policy.value = policyRes.status === "fulfilled" ? (policyRes.value.data ?? null) : null;
+  smtpConfigured.value =
+    reach.status === "fulfilled" ? (reach.value.data?.smtp_configured ?? null) : null;
+  await fetchHandover();
+}
+
+/// When the default slot's current span ends, and who inherits it. The
+/// on-call payload names the next person but not the hour, and a page still
+/// open at handover is one somebody inherits without being told.
+async function fetchHandover() {
+  handoverAt.value = null;
+  handoverTo.value = null;
+  const r = response.value;
+  if (!r) return;
+  const from = nowMicros.value;
+  const to = from + 7 * 24 * 60 * 60 * 1_000_000;
+  try {
+    const res = await oncallService.resolvedSchedule({
+      org_identifier: orgId.value,
+      team_id: r.team_id,
+      from,
+      to,
+    });
+    const segments = [...(res.data ?? [])].sort((a, b) => a.from - b.from);
+    const currentIndex = segments.findIndex((seg) => seg.from <= from && seg.to > from);
+    if (currentIndex < 0) return;
+    handoverAt.value = segments[currentIndex].to;
+    // A gap after the current shift is a real answer — the pager goes to
+    // nobody — so the name is left unset rather than skipped forward.
+    handoverTo.value = segments[currentIndex + 1]?.user_email ?? null;
+  } catch {
+    // A team with no resolved schedule simply has no handover row.
+  }
+}
+
+/// What the rule last observed. The record stores the threshold that fired but
+/// never the number, and "7.4% against a 2% threshold" is the first thing a
+/// responder wants to see.
+async function fetchLatestEvaluation() {
+  latestEvaluation.value = null;
+  const r = response.value;
+  if (r?.subject.subject_type !== "alert") return;
+  try {
+    const res = await alertsService.getHistory(orgId.value, {
+      alert_id: r.subject.source_id,
+      start_time: r.opened_at - 60 * 60 * 1_000_000,
+      end_time: r.opened_at + 60 * 1_000_000,
+      from: 0,
+      size: 1,
+      sort_by: "timestamp",
+      sort_order: "desc",
+    });
+    latestEvaluation.value = res.data?.hits?.[0] ?? null;
+  } catch {
+    latestEvaluation.value = null;
+  }
+}
+
+/// Wakes the next rung now instead of when the timer says so. Ownership does
+/// not move — this is asking for more hands, which is what separates it from
+/// a handoff.
+async function escalateNow() {
+  escalatingNow.value = true;
+  try {
+    await oncallService.escalateNow({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+    });
+    toast({ variant: "success", message: t("oncall.escalated", { team: teamName.value }) });
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.escalateFailed"),
+    });
+  } finally {
+    escalatingNow.value = false;
+  }
+}
+
+/// The two rail links out. Both land on the tab that answers the question the
+/// reader had when they clicked, rather than on the team's front page.
+function openReachability() {
+  if (!response.value) return;
+  router.push({
+    name: "onCallTeamDetail",
+    params: { teamId: response.value.team_id, tab: "members" },
+    query: { org_identifier: orgId.value },
+  });
+}
+
+function openPolicy() {
+  if (!response.value) return;
+  router.push({
+    name: "onCallTeamDetail",
+    params: { teamId: response.value.team_id, tab: "policy" },
+    query: { org_identifier: orgId.value },
+  });
 }
 
 async function fetchEscalation() {

@@ -39,11 +39,17 @@ vi.mock("@/services/oncall", () => ({
     resolveResponse: vi.fn(),
     promoteResponse: vi.fn(),
     escalationProgress: vi.fn(),
+    listDeliveries: vi.fn(),
+    whoIsOnCall: vi.fn(),
+    getPolicy: vi.fn(),
+    teamReachability: vi.fn(),
+    resolvedSchedule: vi.fn(),
+    escalateNow: vi.fn(),
   },
 }));
 
 vi.mock("@/services/alerts", () => ({
-  default: { get_by_alert_id: vi.fn() },
+  default: { get_by_alert_id: vi.fn(), getHistory: vi.fn() },
 }));
 
 const push = vi.fn();
@@ -89,12 +95,55 @@ const stubs = {
   OContent: { name: "OContent", template: "<div><slot /></div>" },
   OStatStrip: { name: "OStatStrip", props: ["items"], template: "<div />" },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
-  OTabs: { name: "OTabs", template: "<div><slot /></div>" },
-  OTab: { name: "OTab", props: ["name", "label"], template: "<button />" },
-  // Panels render regardless of the active tab: the tests are about what the
-  // page can do, not about the tab widget's own behaviour.
-  OTabPanels: { name: "OTabPanels", template: "<div><slot /></div>" },
-  OTabPanel: { name: "OTabPanel", props: ["name"], template: "<div><slot /></div>" },
+  // Always open: the tests are about what the page holds, not about whether
+  // the disclosure widget animates.
+  OCollapsible: { name: "OCollapsible", props: ["label"], template: "<div><slot /></div>" },
+  OnCallFiringHistory: {
+    name: "OnCallFiringHistory",
+    props: ["firings"],
+    template: "<div />",
+  },
+  OnCallDeliveryLedger: {
+    name: "OnCallDeliveryLedger",
+    props: ["records", "total", "loading"],
+    template: "<div />",
+  },
+  OnCallVerdictCard: { name: "OnCallVerdictCard", props: ["events"], template: "<div />" },
+  OnCallReachAlarm: {
+    name: "OnCallReachAlarm",
+    props: ["state", "deliveries", "deliveriesTotal", "progress", "smtpConfigured"],
+    template: "<div />",
+  },
+  OnCallWhatFired: {
+    name: "OnCallWhatFired",
+    props: ["orgId", "subjectType", "sourceId", "alert", "runbookUrl", "observed", "openedAt"],
+    template: "<div />",
+  },
+  OnCallWhoIsOn: {
+    name: "OnCallWhoIsOn",
+    props: ["slots", "deliveries", "handoverAt", "handoverTo"],
+    template: "<div />",
+  },
+  OnCallAboutPage: {
+    name: "OnCallAboutPage",
+    props: [
+      "orgId",
+      "teamId",
+      "teamName",
+      "subjectType",
+      "sourceId",
+      "openedAt",
+      "routingReason",
+      "subjectStream",
+      "ackedBy",
+      "incidentId",
+      "cause",
+      "causeNote",
+      "priorCauses",
+      "priorFirings",
+    ],
+    template: "<div />",
+  },
   ODrawer: {
     name: "ODrawer",
     props: ["open", "title"],
@@ -189,6 +238,13 @@ describe("OnCallResponseDetail", () => {
         { id: "team_2", name: "Payments" },
       ],
     } as any);
+    service.listDeliveries.mockResolvedValue({ data: { total: 0, deliveries: [] } } as any);
+    service.escalationProgress.mockResolvedValue({ data: null } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    service.getPolicy.mockResolvedValue({ data: null } as any);
+    service.teamReachability.mockResolvedValue({ data: { smtp_configured: true } } as any);
+    service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
+    alerts.getHistory.mockResolvedValue({ data: { hits: [] } } as any);
   });
 
   /// "Why did this page me" was answerable only by scrolling the timeline.
@@ -210,15 +266,17 @@ describe("OnCallResponseDetail", () => {
     const wrapper = render();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="oncall-response-routing-reason"]').text()).toBe(
-      "routed to tm_pay by ownership rule k8s-namespace=payments",
-    );
+    expect(
+      wrapper.findComponent({ name: "OnCallAboutPage" }).props("routingReason"),
+    ).toBe("routed to tm_pay by ownership rule k8s-namespace=payments");
   });
 
   // No decision recorded must leave the row out rather than render an empty one.
   it("omits the routing row when no decision was recorded", async () => {
     const wrapper = await renderWith();
-    expect(wrapper.find('[data-test="oncall-response-routing-reason"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("routingReason")).toBe(
+      null,
+    );
   });
 
   it("loads the past firings alongside the causes", async () => {
@@ -252,10 +310,11 @@ describe("OnCallResponseDetail", () => {
   it("links the subject to the alert that fired", async () => {
     const wrapper = await renderWith();
 
-    const link = wrapper.find('[data-test="oncall-response-subject-link"]');
-    expect(link.exists()).toBe(true);
-    expect(link.text()).toBe("checkout_error_ratio");
-    expect(wrapper.find('[data-test="oncall-response-subject-stream"]').text()).toBe(
+    const fired = wrapper.findComponent({ name: "OnCallWhatFired" });
+    expect(fired.props("subjectType")).toBe("alert");
+    expect(fired.props("sourceId")).toBe("al_ckt");
+    expect(fired.props("alert")).toMatchObject({ name: "checkout_error_ratio" });
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("subjectStream")).toBe(
       "default (logs)",
     );
   });
@@ -266,8 +325,10 @@ describe("OnCallResponseDetail", () => {
     alerts.get_by_alert_id.mockRejectedValue({ response: { status: 404 } });
     const wrapper = await renderWith();
 
-    expect(wrapper.find('[data-test="oncall-response-subject-link"]').text()).toBe("al_ckt");
-    expect(wrapper.find('[data-test="oncall-response-subject-stream"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("alert")).toBe(null);
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("subjectStream")).toBe(
+      null,
+    );
   });
 
   // A synthetic has no alert to open, so it must not render a dead link.
@@ -276,7 +337,9 @@ describe("OnCallResponseDetail", () => {
       subject: { subject_type: "synthetic", source_id: "sy_login", firing: 1 },
     });
 
-    expect(wrapper.find('[data-test="oncall-response-subject-link"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("subjectType")).toBe(
+      "synthetic",
+    );
     expect(alerts.get_by_alert_id).not.toHaveBeenCalled();
   });
 
@@ -711,7 +774,9 @@ describe("OnCallResponseDetail", () => {
     it("stops offering the promotion once the record has an incident", async () => {
       const wrapper = await renderWith({ incident_id: "inc_9" });
       expect(wrapper.find('[data-test="oncall-response-promote-btn"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="oncall-response-incident-link"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("incidentId")).toBe(
+        "inc_9",
+      );
     });
 
     /// A firing is routinely recognised as part of something larger after it
@@ -720,6 +785,125 @@ describe("OnCallResponseDetail", () => {
       const wrapper = await renderWith({ state: "resolved", closed_at: 1_700_000_100_000_000 });
       expect(wrapper.find('[data-test="oncall-response-promote-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="oncall-response-resolve-btn"]').exists()).toBe(false);
+    });
+  });
+
+  /// §E.10 rated the missing verbs the costliest gap in the product. `escalate`
+  /// has existed server-side since the ladder did and nothing in `web/src`
+  /// called it: the only way to wake the next rung early was to wait.
+  describe("escalate now", () => {
+    it("wakes the next rung without moving ownership", async () => {
+      const wrapper = await renderWith();
+      service.escalateNow.mockResolvedValue({ data: {} } as any);
+
+      await wrapper.find('[data-test="oncall-response-escalate-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(service.escalateNow).toHaveBeenCalledWith({
+        org_identifier: store.state.selectedOrganization.identifier,
+        response_id: "resp_1",
+      });
+      // The refetch is the point: the new rung has to appear on the ladder.
+      expect(service.getResponse).toHaveBeenCalledTimes(2);
+    });
+
+    /// A ladder with no rungs left has nothing to escalate to, and the server
+    /// answers a 400. Refusing at the button is cheaper than a toast.
+    it("is disabled once the ladder is exhausted", async () => {
+      service.escalationProgress.mockResolvedValue({
+        data: { fired: [], next_targets: [], next_at: null, exhausted: true },
+      } as any);
+      const wrapper = await renderWith();
+
+      expect(
+        wrapper.find('[data-test="oncall-response-escalate-btn"]').attributes("disabled"),
+      ).toBeDefined();
+    });
+  });
+
+  /// The rail's four answers. Each is context: the record has to render when
+  /// every one of them fails, which is what these pin.
+  describe("team context", () => {
+    it("passes who is on call and the transport verdict to the rail", async () => {
+      service.whoIsOnCall.mockResolvedValue({
+        data: [{ slot: "primary", rotation: "weekly", user_email: "ana@o2.ai" }],
+      } as any);
+      service.teamReachability.mockResolvedValue({ data: { smtp_configured: false } } as any);
+      const wrapper = await renderWith();
+
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("slots")).toHaveLength(1);
+      expect(
+        wrapper.findComponent({ name: "OnCallReachAlarm" }).props("smtpConfigured"),
+      ).toBe(false);
+    });
+
+    /// `null` is "the check did not answer", which is not the same fact as a
+    /// working transport and must never be rendered as a cause.
+    it("leaves the transport verdict unknown when the check fails", async () => {
+      service.teamReachability.mockRejectedValue(new Error("boom"));
+      const wrapper = await renderWith();
+
+      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("smtpConfigured")).toBe(
+        null,
+      );
+      expect(wrapper.find('[data-test="oncall-response-ack-btn"]').exists()).toBe(true);
+    });
+
+    /// The on-call payload names who is next but not when. A page still open
+    /// at handover is one somebody inherits without being told.
+    it("derives the handover from the resolved schedule", async () => {
+      const now = Date.now() * 1000;
+      service.resolvedSchedule.mockResolvedValue({
+        data: [
+          { from: now - 1_000_000, to: now + 1_000_000, rotation: "weekly", user_email: "ana@o2.ai" },
+          { from: now + 1_000_000, to: now + 9_000_000, rotation: "weekly", user_email: "bo@o2.ai" },
+        ],
+      } as any);
+      const wrapper = await renderWith();
+
+      const who = wrapper.findComponent({ name: "OnCallWhoIsOn" });
+      expect(who.props("handoverAt")).toBe(now + 1_000_000);
+      expect(who.props("handoverTo")).toBe("bo@o2.ai");
+    });
+
+    /// A gap after the current shift is a real answer — the pager goes to
+    /// nobody — so the row must not skip forward to the next staffed span.
+    it("says nobody inherits when the next span is a gap", async () => {
+      const now = Date.now() * 1000;
+      service.resolvedSchedule.mockResolvedValue({
+        data: [
+          { from: now - 1_000_000, to: now + 1_000_000, rotation: "weekly", user_email: "ana@o2.ai" },
+          { from: now + 1_000_000, to: now + 9_000_000, rotation: "weekly" },
+        ],
+      } as any);
+      const wrapper = await renderWith();
+
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("handoverTo")).toBe(null);
+    });
+  });
+
+  /// `runbook_url` is hoisted onto the record by the API precisely so this
+  /// screen can show it, and it was read by nothing in `web/src`.
+  it("hands the runbook the API hoisted onto the record to the What-fired card", async () => {
+    const wrapper = await renderWith({ runbook_url: "https://wiki/checkout" });
+    expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("runbookUrl")).toBe(
+      "https://wiki/checkout",
+    );
+  });
+
+  /// The value that crossed the threshold lives on the alert's own history and
+  /// nowhere on the record, so it is fetched around the firing rather than
+  /// around now — by the time somebody opens this, now is not when it happened.
+  it("fetches the evaluation around the firing, not around now", async () => {
+    alerts.getHistory.mockResolvedValue({ data: { hits: [{ actual_value: 7.4 }] } } as any);
+    const wrapper = await renderWith();
+
+    expect(alerts.getHistory).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+      expect.objectContaining({ alert_id: "al_ckt", end_time: 1_700_000_060_000_000 }),
+    );
+    expect(wrapper.findComponent({ name: "OnCallWhatFired" }).props("observed")).toEqual({
+      actual_value: 7.4,
     });
   });
 });

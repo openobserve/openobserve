@@ -14,10 +14,29 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  Where the ladder has got to, as a ladder rather than a log.
+
+  A repeating policy fires the same rung five times, and printing five
+  near-identical lines buries the one fact worth reading — that the whole
+  repeat reached nobody. Consecutive rungs aiming at the same people are one
+  row with a count, which is also how a human describes it out loud.
+-->
 <template>
   <OCard data-test="oncall-escalation">
     <OCardSection>
-      <h2 class="text-text-heading text-lg">{{ t("oncall.escalation") }}</h2>
+      <span class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <OText variant="panel-title">{{ t("oncall.escalation") }}</OText>
+        <OButton
+          v-if="teamId"
+          variant="ghost"
+          size="xs"
+          data-test="oncall-escalation-edit"
+          @click="emit('edit')"
+        >
+          {{ t("oncall.edit") }}
+        </OButton>
+      </span>
 
       <!-- D-21: an impacted record is a liaison seat, and its ladder is
            deliberately two rungs — the opening page and one chase — with no
@@ -31,82 +50,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.ladderLiaisonNote") }}
       </p>
 
-      <!-- The headline. Mid-incident the question is not "who has been paged"
-           but "when does this wake somebody else", and it was answerable
-           nowhere in the product. -->
-      <p
-        v-if="progress.stopped_because"
-        class="text-text-secondary mb-3 text-sm"
-        data-test="oncall-escalation-stopped"
-      >
-        {{ t(`oncall.ladderStopped_${progress.stopped_because}`) }}
-      </p>
-      <!-- A liaison ladder that has run out has done its whole job. "Nobody
-           left to escalate to" is the owner team's emergency, not this one's,
-           and printing it here asks a team to chase an outage it cannot fix. -->
-      <p
-        v-else-if="progress.exhausted && isLiaison"
-        class="text-text-secondary mb-3 text-sm"
-        data-test="oncall-escalation-liaison-done"
-      >
-        {{ t("oncall.ladderLiaisonDone") }}
-      </p>
-      <p
-        v-else-if="progress.exhausted"
-        class="text-status-warning-text mb-3 text-sm"
-        data-test="oncall-escalation-exhausted"
-      >
-        {{ t("oncall.ladderExhausted") }}
-      </p>
-      <p
-        v-else-if="progress.next_at"
-        class="text-text-body mb-3 text-sm"
-        data-test="oncall-escalation-next"
-      >
-        {{ t("oncall.ladderNext", { who: nextWho, when: nextWhen }) }}
-      </p>
-
-      <ol v-if="progress.fired.length" class="flex flex-col gap-2">
+      <ol v-if="groups.length" class="flex flex-col gap-2">
         <li
-          v-for="rung in progress.fired"
-          :key="rung.after_micros"
-          class="flex flex-wrap items-center gap-2"
-          :data-test="`oncall-escalation-rung-${rung.after_micros}`"
+          v-for="group in groups"
+          :key="group.key"
+          class="flex flex-wrap items-baseline gap-x-2 gap-y-1"
+          :data-test="`oncall-escalation-rung-${group.firstMicros}`"
         >
-          <OTag variant="default-soft" size="sm">
-            {{ rung.after_micros === 0 ? t("oncall.rungImmediately") : offset(rung.after_micros) }}
+          <!-- The level, not the delay: "L2–6" is how a policy is talked
+               about, and the delay is already said by the timestamp. -->
+          <OTag variant="default-soft" size="sm" :data-test="`oncall-escalation-level-${group.key}`">
+            {{ group.levelLabel }}
           </OTag>
-          <span class="text-text-body text-sm">{{ raw(saidTargets(rung.targets)) }}</span>
-          <OTimeCell :value="rung.at" unit="us" />
+          <span class="text-text-body min-w-0 flex-1 text-sm">
+            {{ group.said }}
+            <span v-if="group.everyLabel" class="text-text-muted">{{ group.everyLabel }}</span>
+          </span>
+
           <!-- `/escalation` cannot say this (§G.9 #6): a fired rung that
                reached nobody looks exactly like one that landed. The timeline
                can — its page entry carries the whole-rung-lost marker — so the
                rail cross-references it rather than vouching for every rung. -->
           <OTag
-            v-if="unreachedRungs.has(rung.after_micros)"
+            v-if="group.lost"
             variant="error-soft"
             size="sm"
-            :data-test="`oncall-escalation-rung-lost-${rung.after_micros}`"
+            :data-test="`oncall-escalation-rung-lost-${group.firstMicros}`"
           >
-            {{ t("oncall.rungReachedNobodyRetrying") }}
+            {{ group.count > 1 ? t("oncall.rungLostTimes", { count: group.count }) : t("oncall.rungLost") }}
           </OTag>
           <!-- B9's other "nobody": a rung whose targets resolved to no one.
                The ladder does the OPPOSITE thing about it — an empty rung is
                consumed and advanced past at once, a lost rung is retried — so
                the two must not share a tag. -->
           <OTag
-            v-else-if="emptyRungs.has(rung.after_micros)"
+            v-else-if="group.empty"
             variant="warning-soft"
             size="sm"
-            :data-test="`oncall-escalation-rung-empty-${rung.after_micros}`"
+            :data-test="`oncall-escalation-rung-empty-${group.firstMicros}`"
           >
             {{ t("oncall.rungMatchedNobody") }}
           </OTag>
+          <OTimeCell v-else :value="group.lastAt" unit="us" />
         </li>
+
       </ol>
+
       <p v-else class="text-text-muted text-sm" data-test="oncall-escalation-none">
         {{ t("oncall.ladderNothingSent") }}
       </p>
+
+      <!-- The row every repeating ladder needs and none of them had: what is
+           still to come, or that nothing is. Outside the list, because a
+           ladder that has sent nothing yet still has a next rung. -->
+      <div
+        class="border-border-subtle mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t pt-2"
+        data-test="oncall-escalation-end"
+      >
+        <OTag variant="default-soft" size="sm">{{ t("oncall.ladderEnd") }}</OTag>
+        <span class="min-w-0 flex-1 text-sm" :class="endTone">{{ endLabel }}</span>
+        <OTimeCell v-if="endAt" :value="endAt" unit="us" />
+      </div>
     </OCardSection>
   </OCard>
 </template>
@@ -115,16 +119,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import type {
   DeliveryRecord,
   EscalationProgress,
   OnCallResponseEvent,
+  PolicyFinalAction,
   ResponderRole,
 } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { speakTarget } from "@/utils/oncall";
@@ -144,11 +151,25 @@ const props = withDefaults(
      * reading, which is the one that was correct before this prop existed.
      */
     responderRole?: ResponderRole;
+    /** The team's policy `final_action` — what happens when the rungs run out. */
+    finalAction?: PolicyFinalAction | null;
+    /** Set to offer the edit affordance; the caller owns where it goes. */
+    teamId?: string | null;
   }>(),
-  { events: () => [], deliveries: () => [], deliveriesTotal: null, responderRole: "owner" },
+  {
+    events: () => [],
+    deliveries: () => [],
+    deliveriesTotal: null,
+    responderRole: "owner",
+    finalAction: null,
+    teamId: null,
+  },
 );
 
+const emit = defineEmits<{ edit: [] }>();
+
 const { t } = useI18nTyped();
+const nowMicros = useOnCallClock();
 
 /// An impacted team is paged to contain the blast radius, never to fix the
 /// cause: `impacted_ladder` truncates its policy to two rungs, `tick` refuses
@@ -208,27 +229,107 @@ const emptyRungs = computed(() => {
       .map((e) => e.rung_micros ?? 0),
   );
 });
-const nowMicros = useOnCallClock();
-
-function offset(micros: number): string {
-  return `+${formatMicrosDuration(micros)}`;
-}
 
 /// The engine's own English, said the way the editor says it. Both used to
 /// render, one click apart, and the same rung read as two concepts.
 const saidTargets = (targets: string[]) =>
   targets.map((target) => speakTarget(target, t)).join(", ");
 
-const nextWho = computed(() => saidTargets(props.progress.next_targets));
+interface RungGroup {
+  key: string;
+  levelLabel: string;
+  said: string;
+  everyLabel: string;
+  count: number;
+  firstMicros: number;
+  lastAt: number;
+  lost: boolean;
+  empty: boolean;
+}
 
-// Relative, because "in 12 minutes" is what a responder is deciding against.
-// An absolute time makes them do the arithmetic themselves.
-const nextWhen = computed(() => {
+/// Consecutive rungs aiming at the same people fold into one row. A repeat
+/// pass is one decision the policy made, not five events a reader should count
+/// by hand.
+const groups = computed<RungGroup[]>(() => {
+  const rungs = [...props.progress.fired].sort((a, b) => a.after_micros - b.after_micros);
+  const out: RungGroup[] = [];
+  let level = 0;
+
+  for (const rung of rungs) {
+    level += 1;
+    const said = saidTargets(rung.targets);
+    const previous = out[out.length - 1];
+    const lost = unreachedRungs.value.has(rung.after_micros);
+    const empty = !lost && emptyRungs.value.has(rung.after_micros);
+
+    // Only fold rungs that share a verdict too: "failed ×5" must not swallow
+    // the one attempt in the middle that landed.
+    if (previous && previous.said === said && previous.lost === lost && previous.empty === empty) {
+      previous.count += 1;
+      previous.levelLabel = t("oncall.ladderLevelRange", {
+        from: level - previous.count + 1,
+        to: level,
+      });
+      previous.everyLabel = everyLabel(rung.at - previous.lastAt);
+      previous.lastAt = rung.at;
+      continue;
+    }
+
+    out.push({
+      key: `${rung.after_micros}`,
+      levelLabel: t("oncall.ladderLevel", { level }),
+      said,
+      everyLabel: "",
+      count: 1,
+      firstMicros: rung.after_micros,
+      lastAt: rung.at,
+      lost,
+      empty,
+    });
+  }
+  return out;
+});
+
+/// The cadence of a folded repeat, said once instead of five timestamps.
+function everyLabel(gapMicros: number): string {
+  return gapMicros > 0
+    ? t("oncall.ladderEvery", { duration: formatMicrosDuration(gapMicros) })
+    : "";
+}
+
+/// What is still due. The three endings are different emergencies: stopped
+/// because somebody owns it, still climbing, or finished with nobody left.
+const endLabel = computed(() => {
+  if (props.progress.stopped_because) {
+    return t(`oncall.ladderStopped_${props.progress.stopped_because}`);
+  }
+  if (props.progress.exhausted) {
+    if (isLiaison.value) return t("oncall.ladderLiaisonDone");
+    return props.finalAction === "notify_default_team"
+      ? t("oncall.ladderEndsDefaultTeam")
+      : t("oncall.ladderExhausted");
+  }
   const at = props.progress.next_at;
-  if (!at) return "";
+  if (!at) return t("oncall.ladderEndUnknown");
   const remaining = at - nowMicros.value;
-  return remaining <= 0
-    ? t("oncall.ladderImminent")
-    : t("oncall.ladderIn", { duration: formatMicrosDuration(remaining) });
+  const when =
+    remaining <= 0
+      ? t("oncall.ladderImminent")
+      : t("oncall.ladderIn", { duration: formatMicrosDuration(remaining) });
+  return t("oncall.ladderNext", { who: saidTargets(props.progress.next_targets), when });
+});
+
+const endTone = computed(() => {
+  if (props.progress.stopped_because) return "text-text-secondary";
+  if (props.progress.exhausted) return isLiaison.value ? "text-text-secondary" : "text-status-warning-text";
+  return "text-text-body";
+});
+
+/// The instant the ladder finished, taken from the last rung it fired — the
+/// progress payload has no field for it.
+const endAt = computed(() => {
+  if (!props.progress.exhausted) return null;
+  const last = groups.value[groups.value.length - 1];
+  return last ? last.lastAt : null;
 });
 </script>

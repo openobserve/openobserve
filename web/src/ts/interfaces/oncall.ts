@@ -446,6 +446,16 @@ export interface OnCallResponse {
   responder_role: ResponderRole;
   /** For an impacted record, the owner record it was opened alongside. */
   origin_response_id?: string | null;
+  /**
+   * Where the runbook is, hoisted onto the record by the API rather than left
+   * nested in the alert — this is the one screen where "where is the runbook"
+   * is asked, and it must not depend on the alert still existing.
+   */
+  runbook_url?: string | null;
+  /** How deep the ladder got, as the rung's delay from the record opening. */
+  reached_rung_micros?: number | null;
+  /** Server-computed, and only present on a record somebody answered. */
+  time_to_ack_micros?: number | null;
 }
 
 /**
