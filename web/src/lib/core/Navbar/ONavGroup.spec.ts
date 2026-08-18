@@ -297,6 +297,7 @@ describe("ONavGroup", () => {
 
   describe("query-tab navigation and active state", () => {
     const tracesChildren: SubnavChild[] = [
+      { titleKey: "traces.spansTab", icon: "layers", name: "traces", tab: "spans" },
       {
         titleKey: "menu.traces",
         icon: "account-tree",
@@ -304,7 +305,6 @@ describe("ONavGroup", () => {
         tab: "traces",
         defaultForRoute: true,
       },
-      { titleKey: "traces.spansTab", icon: "layers", name: "traces", tab: "spans" },
       {
         titleKey: "menu.serviceGraph",
         icon: "share",

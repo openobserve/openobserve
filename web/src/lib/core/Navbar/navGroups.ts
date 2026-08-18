@@ -221,6 +221,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
  */
 export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
   traces: [
+    { titleKey: "traces.spansTab", icon: "layers", name: "traces", tab: "spans" },
     {
       titleKey: "menu.traces",
       icon: "account-tree",
@@ -228,7 +229,6 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       tab: "traces",
       defaultForRoute: true,
     },
-    { titleKey: "traces.spansTab", icon: "layers", name: "traces", tab: "spans" },
     {
       titleKey: "menu.serviceGraph",
       icon: "share",
