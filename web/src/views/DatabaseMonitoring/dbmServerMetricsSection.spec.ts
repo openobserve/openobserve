@@ -172,16 +172,18 @@ describe("W6 server metrics section wiring", () => {
   /**
    * The off line carries the fix, not just the diagnosis: a "Set up" button
    * routed to the same setup destination as the list pages' empty states, with
-   * the env-var detail demoted to tooltip depth (operator detail, not headline
-   * copy).
+   * the collector detail demoted to tooltip depth (operator detail, not
+   * headline copy).
    */
   it("wires the off state's Set up action to the DBM setup route", () => {
     expect(page).toContain("dbm-detail-server-metrics-setup");
     expect(page).toContain("DBM_SETUP_ROUTE");
     expect(page).toContain("org_identifier");
-    // The env var survives, but as tooltip content on the one-liner.
-    expect(messages.dbm.detail.serverMetrics.offHint).toContain(
-      "ZO_DB_MONITORING_TOP_QUERY_ENABLED",
+    // No env var to name any more — the server accepts the feed whenever DBM
+    // is enabled, so the tooltip prescribes the collector recipe alone.
+    expect(messages.dbm.detail.serverMetrics.offHint).not.toContain("ZO_DB_MONITORING");
+    expect(messages.dbm.detail.serverMetrics.offHint.toLowerCase()).toContain(
+      "top query collection",
     );
     const offIdx = page.indexOf("dbm-detail-server-metrics-off");
     const offBlock = page.slice(offIdx, page.indexOf("</span>", offIdx));

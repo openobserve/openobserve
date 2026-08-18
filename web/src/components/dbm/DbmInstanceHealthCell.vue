@@ -227,9 +227,8 @@ const noLimitHint = computed<I18nText>(() =>
  * Each cause names a different fix, so none may collapse into a generic "no
  * data": a pooler is a topology fact, a loopback is a naming artifact of the
  * collector, a missing receiver is a setup step, an unreadable stream is a
- * permission, a matched instance with no reading is a metric nobody switched
- * on, and the join being off is a setting on THIS product rather than anything
- * wrong with the database at all.
+ * permission, and a matched instance with no reading is a metric nobody
+ * switched on.
  */
 // Resolved INSIDE the computed, not in a module-level table: `t()` captured at
 // setup freezes the string, so a locale change would leave this cell in the
@@ -248,37 +247,33 @@ const absence = computed<{ label: I18nText; hint: I18nText }>(() => {
     // missing its receiver (a config step away from data) and to Redis (no
     // receiver recipe exists — nothing to add). One is an instruction, the
     // other is a disclosure, and collapsing them sent Redis users hunting for
-    // a receiver they cannot install.
-    "no-receiver": SUPPORTED_METRIC_ENGINES.has(props.engine.toLowerCase())
-      ? {
-          label: t("dbm.instanceMetrics.unmatched.noReceiver", { engine: props.engine }),
-          hint: t("dbm.instanceMetrics.unmatched.noReceiverHint", { engine: props.engine }),
-        }
-      : {
-          label: t("dbm.instanceMetrics.unmatched.engineUnsupported", { engine: props.engine }),
-          hint: t("dbm.instanceMetrics.unmatched.engineUnsupportedHint", {
-            engine: props.engine,
-          }),
-        },
+    // a receiver they cannot install. MariaDB gets its own instruction: no
+    // mariadb receiver exists to add — the fix is pointing the MYSQL receiver
+    // at it, and "add the mariadb receiver" would send the reader hunting for
+    // a component that is not in the collector.
+    "no-receiver":
+      props.engine.toLowerCase() === "mariadb"
+        ? {
+            label: t("dbm.instanceMetrics.unmatched.noReceiver", { engine: props.engine }),
+            hint: t("dbm.instanceMetrics.unmatched.noReceiverMariadbHint"),
+          }
+        : SUPPORTED_METRIC_ENGINES.has(props.engine.toLowerCase())
+          ? {
+              label: t("dbm.instanceMetrics.unmatched.noReceiver", { engine: props.engine }),
+              hint: t("dbm.instanceMetrics.unmatched.noReceiverHint", { engine: props.engine }),
+            }
+          : {
+              label: t("dbm.instanceMetrics.unmatched.engineUnsupported", { engine: props.engine }),
+              hint: t("dbm.instanceMetrics.unmatched.engineUnsupportedHint", {
+                engine: props.engine,
+              }),
+            },
     unreadable: {
       label: t("dbm.instanceMetrics.unmatched.unreadable"),
       hint: t("dbm.instanceMetrics.unmatched.unreadableHint"),
     },
   };
   if (props.metrics.unmatchedReason) return copy[props.metrics.unmatchedReason];
-  // The join was never switched on, so nothing was read and there is nothing
-  // to blame. This is the state EVERY row is in on a fresh install — the knob
-  // is off by default — which is why the column stands here saying it rather
-  // than being hidden: a column that disappears reads as a feature nobody
-  // built, and an em dash with no sentence reads as one that is broken. The
-  // hint names the setting, because an empty state that cannot be acted on is
-  // just a nicer blank.
-  if (props.metrics.state === "disabled") {
-    return {
-      label: t("dbm.instanceMetrics.disabled"),
-      hint: t("dbm.instanceMetrics.disabledHint"),
-    };
-  }
   return {
     label: t("dbm.instanceMetrics.noReading"),
     hint: t("dbm.instanceMetrics.noReadingHint"),

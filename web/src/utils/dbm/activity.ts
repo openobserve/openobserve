@@ -544,9 +544,9 @@ export type ActivityEmptyCause = "healthy" | "not-collecting";
  *
  * That evidence is required because `not_collecting` alone cannot answer this.
  * The liveness probe counts records of ANY kind in the shared `dbm_server`
- * stream, so on the shipped default (`ZO_DB_MONITORING_ACTIVITY_ENABLED` off)
- * a cluster running the deadlock recipes reports `not_collecting: false` while
- * nothing has ever sampled a session — and reading only that flag would render
+ * stream, so a cluster running only the deadlock recipes — with no session
+ * sampler in its collector config — reports `not_collecting: false` while
+ * nothing has ever sampled a session, and reading only that flag would render
  * "no active sessions, all good" over a database nobody is watching.
  */
 export const activityEmptyCause = (input: {

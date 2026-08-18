@@ -122,13 +122,12 @@ export interface DbmSaturation {
 }
 
 /**
- * `disabled` is not a fifth flavour of "no data": it is the only state in which
- * NOTHING WAS ASKED. The other three all describe a read that happened —
- * matched, matched nothing, or returned nothing — so rendering a fresh install
- * as `no-data` tells a user their collector is silent when in fact the page
- * never opened a stream. That sends them to debug a receiver that is fine.
+ * Every state describes a read that happened — matched, matched nothing, or
+ * returned nothing. (A fourth `disabled` state existed while the join sat
+ * behind `ZO_DB_MONITORING_INSTANCE_METRICS`; that per-signal knob is gone —
+ * with DBM enabled the join always runs.)
  */
-export type DbmMetricsState = "matched" | "unmatched" | "no-data" | "disabled";
+export type DbmMetricsState = "matched" | "unmatched" | "no-data";
 
 export interface DbmReplicationLag {
   value: number;
@@ -139,16 +138,6 @@ export interface DbmReplicationLag {
 /** What the metrics read could not do, so the merge can name the right cause. */
 export interface DbmMergeContext {
   failedStreams?: string[];
-  /**
-   * Whether the read was performed at all. Only the caller knows — an empty
-   * result is identical on the wire whether the knob is off or the collector
-   * is silent, and those are opposite instructions to the reader.
-   *
-   * Unstated means ON, because every existing caller omits it and defaulting
-   * the other way would relabel every genuine no-data row as a settings
-   * problem.
-   */
-  enabled?: boolean;
 }
 
 export interface DbmRowMetrics {
@@ -167,6 +156,30 @@ export type DbmUnmatchedReason = "pooler" | "loopback" | "no-receiver" | "unread
 
 const PG = "postgresql";
 const MYSQL = "mysql";
+const MARIADB = "mariadb";
+
+/**
+ * Engines that RIDE another engine's metric streams.
+ *
+ * No mariadb receiver exists upstream — a MariaDB server is scraped by the
+ * MYSQL receiver pointed at it, so its readings land in the `mysql_*` streams
+ * under `mysql.*` metric names (verified against the capture rig's catalog,
+ * which holds no `mariadb_*` metric stream). The join must therefore look a
+ * `mariadb` client row up under the `mysql` identity, or the health column
+ * stays permanently empty for MariaDB.
+ *
+ * An ALIAS at the join, deliberately not duplicate `mariadb` catalog entries:
+ * duplicated specs would read every mysql stream a second time, and — because
+ * the receiver cannot say which engine an endpoint really is — would fabricate
+ * a second `mariadb` fleet row for every MySQL instance the metrics discover.
+ */
+const METRIC_SYSTEM_ALIASES: Readonly<Record<string, string>> = { [MARIADB]: MYSQL };
+
+/** The engine whose metric streams carry this system's readings, lowercased. */
+export const metricSystemFor = (system: string | null | undefined): string => {
+  const engine = (system ?? "").trim().toLowerCase();
+  return METRIC_SYSTEM_ALIASES[engine] ?? engine;
+};
 
 /** postgresqlreceiver writes its endpoint here; mysqlreceiver writes a UUID. */
 const PG_IDENTITY = "service_instance_id";
@@ -589,7 +602,10 @@ export const unmatchedReason = (
   host: string | null | undefined,
   knownKeys: string[],
 ): DbmUnmatchedReason => {
-  const engine = (system ?? "").trim().toLowerCase();
+  // The ALIASED engine: a MariaDB row's metrics live under the mysql keys, so
+  // "is this engine reported at all" must ask about mysql or every MariaDB
+  // miss blames a receiver that is running.
+  const engine = metricSystemFor(system);
   const resolved = normalizeInstanceHost(host);
   // Upstream swaps a loopback endpoint for the collector's own hostname, so a
   // client row pointing at localhost cannot match however healthy everything is.
@@ -602,8 +618,10 @@ export const unmatchedReason = (
 
 const EMPTY_SATURATION: DbmSaturation = { state: "absent", used: null, limit: null, ratio: null };
 
+// Aliased: MariaDB's lag rides `mysql.replica.time_behind_source`, which is
+// seconds behind the source — the mysql semantics, not Postgres's WAL bytes.
 const lagUnitFor = (system: string): "bytes" | "seconds" =>
-  (system ?? "").trim().toLowerCase() === MYSQL ? "seconds" : "bytes";
+  metricSystemFor(system) === MYSQL ? "seconds" : "bytes";
 
 /** The row-shaped view of one instance's metrics. */
 export const metricsForSet = (system: string, set: DbmInstanceMetricSet): DbmRowMetrics => {
@@ -637,7 +655,9 @@ export const absentMetrics = (
 
 /** Whether a stream we could not read was one this engine would have used. */
 const engineHadUnreadableStream = (system: string, failedStreams: string[]): boolean => {
-  const engine = (system ?? "").trim().toLowerCase();
+  // Aliased for the same reason as the key lookup: MariaDB's readings come
+  // from the mysql streams, so an unreadable mysql stream is ITS problem too.
+  const engine = metricSystemFor(system);
   const streams = new Set(
     DBM_INSTANCE_METRICS.filter((spec) => spec.system === engine).map((spec) => spec.stream),
   );
@@ -653,20 +673,15 @@ export const resolveRowMetrics = (
   metricsByKey: Map<string, DbmInstanceMetricSet>,
   context: DbmMergeContext = {},
 ): DbmRowMetrics => {
-  // Checked FIRST and before anything is inspected: with the join off there is
-  // no read to have matched, and no stream to have failed, so every other
-  // verdict below would be about a request that was never made. A stale
-  // `failedStreams` from a previous window must not turn "off" into "broken".
-  if (context.enabled === false) return absentMetrics("disabled", null);
-
   const failedStreams = context.failedStreams ?? [];
-  const key = instanceIdentityKey(system, instance);
+  // The ALIASED system: the fold keys every reading under the engine whose
+  // receiver produced it, so a MariaDB row must look itself up under mysql.
+  const key = instanceIdentityKey(metricSystemFor(system), instance);
   const set = key ? metricsByKey.get(key) : undefined;
   if (set) return metricsForSet(system, set);
 
   // Nothing was read at all — the page asked and got nothing back. That is not
-  // the same claim as "the receiver has never heard of this instance", and not
-  // the same as the join being switched off, which is handled above.
+  // the same claim as "the receiver has never heard of this instance".
   if (metricsByKey.size === 0 && failedStreams.length === 0) {
     return absentMetrics("no-data", null);
   }

@@ -143,23 +143,21 @@ describe("postgresCard builder", () => {
   });
 
   /**
-   * THE v0.148.0 EVENTS BLOCK, SHIPPED OFF TO MATCH THE SERVER.
+   * THE v0.148.0 EVENTS BLOCK, SHIPPED ON.
    *
-   * Both events are opt-in on BOTH sides. Upstream flipped
-   * `db.server.query_sample` / `db.server.top_query` to default-OFF at
-   * v0.148.0, and OpenObserve discards both feeds unless
-   * `ZO_DB_MONITORING_ACTIVITY_ENABLED` / `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
-   * are set — both of which also default false. Shipping the recipe at `true`
-   * made the customer's database pay full collection cost, the receiver's
-   * EXPLAIN pass included, for rows the server then threw away.
+   * Upstream flipped `db.server.query_sample` / `db.server.top_query` to
+   * default-OFF at v0.148.0, so the block is the switch that starts the
+   * collection — and OpenObserve accepts both feeds whenever Database
+   * Monitoring is enabled (the per-signal `ZO_DB_MONITORING_*_ENABLED` ingest
+   * knobs are gone, so a collected row can no longer be silently discarded
+   * server-side).
    *
-   * The block must still be PRESENT and correctly shaped: a TOP-LEVEL
-   * `events:` (a sibling of the collection settings, never nested inside them,
-   * where it is a fatal config error), with both keys spelled out so the
-   * setting is explicit and a user who wants a feed flips one visible line
-   * here and the matching server flag.
+   * The block must be PRESENT and correctly shaped: a TOP-LEVEL `events:` (a
+   * sibling of the collection settings, never nested inside them, where it is
+   * a fatal config error), with both keys spelled out so the setting is
+   * explicit and a user trimming collection cost flips one visible line.
    */
-  it("ships the receiver's activity and top-query events off, matching the server defaults", () => {
+  it("ships the receiver's activity and top-query events on, spelled out", () => {
     const card = postgresCard(SUBS);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
@@ -167,11 +165,10 @@ describe("postgresCard builder", () => {
     // The dedicated receiver instance (a same-named `postgresql:` would collide
     // with the metrics config when the two --config files merge).
     expect(config).toContain("postgresql/dbm_events:");
-    // Both event names, present and explicitly OFF — the server discards both
-    // by default, so collecting them would be pure waste on the user's DB.
-    expect(config).toContain("db.server.query_sample: { enabled: false }");
-    expect(config).toContain("db.server.top_query: { enabled: false }");
-    expect(config).not.toContain("enabled: true }");
+    // Both event names, present and explicitly ON — these are what fill the
+    // Activity tab and the server-side Top queries.
+    expect(config).toContain("db.server.query_sample: { enabled: true }");
+    expect(config).toContain("db.server.top_query: { enabled: true }");
     // Postgres spells it top_n_query (mysql says top_query_count) — verified
     // against v0.158.0, where an unknown key is a fatal config error.
     expect(config).toContain("top_n_query:");
@@ -190,16 +187,12 @@ describe("postgresCard builder", () => {
     const eventsProcessors = config.match(/logs\/dbm_events:[\s\S]*?processors: \[([^\]]+)\]/)![1];
     expect(eventsProcessors).not.toContain("filter/dbm");
 
-    // SHIPPING THE FEEDS OFF ONLY WORKS IF THE CARD SAYS SO. A user who wants
-    // activity or top queries has to flip TWO switches — the recipe line and
-    // the server env var — and a recipe silently off with no copy naming the
-    // pairing is a worse trap than the one this replaces. Both env var names
-    // must appear in the step's own note, next to the config that pairs with
-    // them; the YAML comment alone is not enough, since it is only read by
-    // someone already looking for it.
-    expect(configure.note).toContain("ZO_DB_MONITORING_ACTIVITY_ENABLED");
-    expect(configure.note).toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
-    expect(configure.note).toMatch(/enabled: false/);
+    // With the server always accepting the feeds, prescribing an environment
+    // variable would send the user to set a knob that no longer exists. The
+    // note states the block is the one switch, and names the cost trade.
+    expect(configure.note).not.toContain("ZO_DB_MONITORING_ACTIVITY_ENABLED");
+    expect(configure.note).not.toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
+    expect(configure.note).toMatch(/enabled: true/);
 
     // Prerequisites travel with the feature: top queries read
     // pg_stat_statements, which must be created AND preloaded (restart).
@@ -972,9 +965,10 @@ describe("postgresCard builder", () => {
     expect(step.note).toMatch(/sample_rate/);
     expect(step.note).toMatch(/log_min_duration/);
     expect(conf).toMatch(/pg_test_timing|clock/);
-    // And the server-side ingest knob, so "collector configured, page empty"
-    // has a stated cause.
-    expect(step.note).toContain("ZO_DB_MONITORING_EXPLAIN_ENABLED");
+    // No server-side knob to pair any more: the note must say ingest is
+    // always on with DBM enabled, not send the user to a removed env var.
+    expect(step.note).not.toContain("ZO_DB_MONITORING_EXPLAIN_ENABLED");
+    expect(step.note).toMatch(/whenever Database Monitoring is enabled/i);
   });
 
   it("offers psql / docker / GUI tabs to create the monitoring role", () => {

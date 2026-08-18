@@ -61,7 +61,8 @@ vi.mock("vuex", () => ({
 const { default: dbMonitoringService } = await import("@/services/db_monitoring");
 const service = dbMonitoringService as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
-const { useDbmTabCounts, clearDbmTabCounts } = await import("@/composables/dbm/useDbmTabCounts");
+const { useDbmTabCounts, clearDbmTabCounts, fetchDbmTabCounts } =
+  await import("@/composables/dbm/useDbmTabCounts");
 const { badgeCount, claimedCount } = await import("@/utils/dbm/format");
 
 /**
@@ -124,6 +125,89 @@ describe("a failed fan-out must not blank badges that were already answered", ()
     // Nothing was ever known, so nothing may be claimed.
     expect(badgeCount(counts.value.queryCount)).toBeNull();
     expect(badgeCount(counts.value.activityCount)).toBeNull();
+  });
+});
+
+// ── the Overview tile and the fallback badge count ONE list ──────────────────
+//
+// N1: on an OSS build `/blocking` is a 403 stub and there are no activity
+// sessions, so a tile derived from those two arrays alone read 0 while the
+// badge beside it counted the statement lists — working data one tab away,
+// denied on the Overview. Both now consume `serverInstanceRefs`, one deduped
+// derivation over every `dbm_server`-fed member of the envelope.
+describe("the databases fallback counts the same refs the fleet union renders", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearDbmTabCounts();
+  });
+
+  it("derives instance refs from the statement lists, not only sessions and blocking", async () => {
+    service.getBadges.mockResolvedValueOnce({
+      data: {
+        databases: { hits: [] },
+        queries: { total: 0, hits: [] },
+        activity: null,
+        deadlocks: null,
+        blocking: null,
+        table_health: null,
+        // The OSS shape: only the statement feeds answered. Their rows name
+        // the engine but no instance.
+        server_queries: {
+          hits: new Array(50).fill({ db_system: "postgresql", db_instance: null }),
+          truncated: true,
+        },
+        server_samples: { hits: [], truncated: false },
+      },
+    });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    // One engine, unnamed: one ref, and the badge is its length — never 0
+    // above a rendered row, never 50 (one row per statement).
+    expect(counts.serverInstanceRefs).toEqual([{ db_system: "postgresql", db_instance: null }]);
+    expect(counts.databaseCount).toBe(1);
+  });
+
+  it("folds every named source onto one identity list", async () => {
+    service.getBadges.mockResolvedValueOnce({
+      data: {
+        databases: { hits: [] },
+        queries: { total: 0, hits: [] },
+        activity: {
+          by_state: [],
+          hits: [{ db_system: "postgresql", db_instance: "pg-1" }],
+        },
+        deadlocks: null,
+        blocking: { hits: [{ db_system: "postgresql", db_instance: "PG-1:5432" }] },
+        table_health: null,
+        server_queries: {
+          // Engine-only rows collapse into the named pg-1 evidence.
+          hits: [{ db_system: "postgresql", db_instance: null }],
+          truncated: false,
+        },
+        server_samples: { hits: [{ db_system: "mysql", db_instance: "my-1" }], truncated: false },
+      },
+    });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(counts.serverInstanceRefs).toHaveLength(2);
+    expect(counts.databaseCount).toBe(2);
+  });
+
+  it("still derives refs outside the fallback, for the Overview union", async () => {
+    // A traced org: databases answered, so the fallback never fires — but the
+    // Overview still unions the server-known instances into its fleet.
+    service.getBadges.mockResolvedValueOnce({
+      data: {
+        databases: { hits: [{ db_system: "postgresql", db_instance: "pg-1" }] },
+        queries: { total: 3, hits: [] },
+        activity: { by_state: [], hits: [{ db_system: "mysql", db_instance: "my-1" }] },
+        deadlocks: null,
+        blocking: null,
+        table_health: null,
+      },
+    });
+    const counts = await fetchDbmTabCounts("acme", WINDOW);
+    expect(counts.serverInstanceRefs).toEqual([{ db_system: "mysql", db_instance: "my-1" }]);
+    // The client vantage answered 1; the fallback must not override it.
+    expect(counts.databaseCount).toBe(1);
   });
 });
 

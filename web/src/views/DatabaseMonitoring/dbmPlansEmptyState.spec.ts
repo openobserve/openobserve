@@ -151,7 +151,7 @@ describe("the Plans empty state means zero captures, not zero drift", () => {
     expect(guards.length, "the config hint must sit behind a guard").toBeGreaterThan(0);
     expect(
       guards[guards.length - 1][1],
-      "the ZO_DB_MONITORING_TOP_QUERY_ENABLED hint may only render when capture is OFF",
+      "the setup hint may only render when capture never ran",
     ).toContain("captureOff");
   });
 

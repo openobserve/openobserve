@@ -375,8 +375,12 @@ describe("the plans empty-state copy", () => {
     expect(hint.toLowerCase()).toMatch(/can't|cannot/);
   });
 
-  it("keeps the config hint on the capture-off sentence, where it is true", () => {
-    expect(t("dbm.detail.plans.noPlansHint")).toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
+  it("keeps the setup hint on the capture-off sentence, where it is true", () => {
+    // The fix lives in the collector recipe alone — the per-signal server
+    // knobs are gone, so no environment variable may be prescribed.
+    const hint = t("dbm.detail.plans.noPlansHint");
+    expect(hint.toLowerCase()).toContain("top query collection");
+    expect(hint).not.toContain("ZO_DB_MONITORING");
   });
 
   it("attaches no timing to either empty state", () => {
@@ -569,109 +573,25 @@ describe("estimate vs actual on plan nodes (W-E3)", () => {
   });
 });
 
-describe("the third empty reason (W-E3)", () => {
-  it("reports good news when explain ingest is on and nothing was slow enough", () => {
-    expect(planEmptyReason(response({ plan_capture: "on", explain_enabled: true }))).toBe(
-      "noExecutionCaptured",
-    );
-  });
-
-  it("keeps the unplannable copy when explain ingest is off", () => {
-    expect(planEmptyReason(response({ plan_capture: "on", explain_enabled: false }))).toBe(
-      "noPlanForQuery",
-    );
+describe("the collapsed empty reasons", () => {
+  // Two further states existed while plan ingest sat behind per-signal server
+  // knobs (`noExecutionCaptured`, `captureKnobOff`). With DBM enabled the
+  // server always accepts both producers' records, so schema presence is the
+  // whole distinction that remains: never captured vs no plan for THIS query.
+  it("reads a plan-bearing stream with no plan for this query as the query's own state", () => {
     expect(planEmptyReason(response({ plan_capture: "on" }))).toBe("noPlanForQuery");
   });
 
-  it("keeps capture-off first: an explain flag cannot outrank a stream that never captured", () => {
-    expect(planEmptyReason(response({ plan_capture: "off", explain_enabled: true }))).toBe(
-      "captureOff",
-    );
+  it("reads a stream that never carried a plan as capture never set up", () => {
+    expect(planEmptyReason(response({ plan_capture: "off" }))).toBe("captureOff");
+    // An older server that does not report the field degrades the same way —
+    // the pre-field copy, not an invented claim about this statement.
+    expect(planEmptyReason(response({}))).toBe("captureOff");
   });
 
-  it("phrases the third state as working capture, never as a config error", () => {
-    const text = t("dbm.detail.plans.noExecutionCapturedHint");
-    expect(text).toMatch(/on and working|working/);
-    expect(text).toMatch(/good news/);
-    expect(text, "must not send the user to a settings page").not.toMatch(/ZO_DB_MONITORING/);
-  });
-});
-
-/**
- * The fourth reason, and the defect it closes.
- *
- * `plan_capture` is derived from the stream SCHEMA — whether the
- * `o2_dbm_plan_hash` column is present — so it reads PAST TENSE and survives
- * the ingest knob being switched back off. The `noPlanForQuery` copy then
- * asserts "We're capturing plans for this database", which is affirmatively
- * false in that state: it blames the statement for an absent feed and sends a
- * DBA hunting a fault in a query that has none.
- */
-describe("the fourth empty reason: both plan producers switched off", () => {
-  it("names the switch when the estimated-plan knob is off and explain is too", () => {
-    expect(
-      planEmptyReason(response({ plan_capture: "on", explain_enabled: false }), {
-        topQueryEnabled: false,
-      }),
-    ).toBe("captureKnobOff");
-  });
-
-  it("keeps the unplannable copy while the estimated-plan knob is on", () => {
-    // Capture really is running, so this statement genuinely has no plan —
-    // the original sentence is true here and must survive.
-    expect(planEmptyReason(response({ plan_capture: "on" }), { topQueryEnabled: true })).toBe(
-      "noPlanForQuery",
-    );
-  });
-
-  it("treats an unreported knob as unknown, never as off", () => {
-    // An older server sends no flag. Asserting "switched off" on the strength
-    // of a field nobody sent would be the same class of lie in the other
-    // direction, so the previous sentence stands.
-    expect(planEmptyReason(response({ plan_capture: "on" }))).toBe("noPlanForQuery");
-    expect(planEmptyReason(response({ plan_capture: "on" }), {})).toBe("noPlanForQuery");
-  });
-
-  it("does not outrank working explain ingest", () => {
-    // Explain on means a producer IS running: that is good news about a live
-    // feed and must not be relabelled a config problem by the other knob.
-    expect(
-      planEmptyReason(response({ plan_capture: "on", explain_enabled: true }), {
-        topQueryEnabled: false,
-      }),
-    ).toBe("noExecutionCaptured");
-  });
-
-  it("does not outrank a stream that never captured at all", () => {
-    expect(planEmptyReason(response({ plan_capture: "off" }), { topQueryEnabled: false })).toBe(
-      "captureOff",
-    );
-  });
-
-  it("says nothing at all once plans exist, whatever the knob says", () => {
-    expect(
-      planEmptyReason(response({ hits: [plan()], plan_capture: "on" }), {
-        topQueryEnabled: false,
-      }),
-    ).toBeNull();
-  });
-
-  it("tells the truth about capture and names both halves of the pairing", () => {
-    const keys = ["dbm.detail.plans.captureSwitchedOff", "dbm.detail.plans.captureSwitchedOffHint"];
-    // A missing key resolves to the key itself, which would trivially satisfy
-    // every assertion below. Pin existence before asserting content.
-    for (const key of keys) expect(t(key), `${key} must be defined in en-US`).not.toBe(key);
-
-    const copy = keys.map(t).join(" ");
-    // The whole point: it must NOT claim capture is running.
-    expect(copy.toLowerCase()).not.toMatch(/we're capturing|we are capturing/);
-    // Both knobs, because either one would fill the section.
-    expect(copy).toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
-    expect(copy).toContain("ZO_DB_MONITORING_EXPLAIN_ENABLED");
-    // The pairing is the bug: a server flag alone collects nothing.
-    expect(copy.toLowerCase()).toMatch(/collector/);
-    // D-H: no empty state in this section may carry a duration.
-    expect(copy.toLowerCase()).not.toMatch(/\bms\b|latency|slower/);
+  it("says nothing at all once plans exist", () => {
+    expect(planEmptyReason(response({ hits: [plan()], plan_capture: "on" }))).toBeNull();
+    expect(planEmptyReason(response({ hits: [plan()] }))).toBeNull();
   });
 });
 

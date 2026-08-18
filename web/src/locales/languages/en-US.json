@@ -14823,6 +14823,8 @@
       "title": "Databases",
       "subtitle": "Query performance and health per database",
       "searchPlaceholder": "Search database or service…",
+      "unnamedInstance": "Instance not named",
+      "unnamedInstanceHint": "The database's own statement reports prove this engine is running, but they don't name a host. The row will show an address once a feed that carries one — session sampling or instance metrics — is set up.",
       "moreServices": "+{count}",
       "columns": {
         "instance": "Database",
@@ -15197,16 +15199,12 @@
         "executedTooltip": "This is the plan Postgres actually ran for a real execution, captured by auto_explain with the real parameter values. Row counts and durations on this row are measured, not estimated — but only executions slower than the auto_explain threshold are captured, so they describe the slow tail, not every run.",
         "capturedDurations": "avg {avg} · max {max} across {count} captured executions",
         "estVsAct": "est {est} → act {act} rows",
-        "noExecutionCaptured": "No execution was slow enough to capture",
-        "noExecutionCapturedHint": "Executed-plan capture is on and working. No run of this query crossed the auto_explain threshold in this window — which is good news — and the collector had no estimated plan for it either.",
         "driftCallout": "The plan shape changed in this window. {count} different shapes were captured, which usually means a schema or statistics change, such as an index being dropped or a table repartitioned.",
         "viewPlans": "View plans",
         "noPlans": "No plans captured",
-        "noPlansHint": "Plan capture is off by default. Turn on top query collection in your collector and set ZO_DB_MONITORING_TOP_QUERY_ENABLED to start capturing plans.",
+        "noPlansHint": "No collector has shipped a plan for this database yet. Turn on top query collection in your collector recipe to start capturing plans — the setup page walks through it.",
         "noPlanForQuery": "No plan for this query",
         "noPlanForQueryHint": "We're capturing plans for this database — this query just doesn't have one. That's normal for statements the database can't explain, like COMMIT, ROLLBACK and SHOW.",
-        "captureSwitchedOff": "Plan capture is switched off",
-        "captureSwitchedOffHint": "This stream has captured plans before, but plan collection is switched off now, so no new plan can arrive for any query. Set ZO_DB_MONITORING_TOP_QUERY_ENABLED for estimated plans, or ZO_DB_MONITORING_EXPLAIN_ENABLED for real executed plans, and enable the matching block in your collector recipe — both sides have to be on.",
         "planHash": "Plan",
         "firstSeen": "First seen",
         "lastSeen": "Last seen",
@@ -15231,7 +15229,7 @@
         "ambiguous": "More than one database could be this query",
         "ambiguousHint": "Several instances report a database with this name, so there is no way to tell which one ran this query. Showing numbers from the wrong instance would be worse than showing none. Candidates: {instances}.",
         "off": "No server-side metrics collected",
-        "offHint": "Your collector is not gathering per-statement metrics from the database yet. Turn on top query collection in your collector and set ZO_DB_MONITORING_TOP_QUERY_ENABLED — the setup page walks through both.",
+        "offHint": "Your collector is not gathering per-statement metrics from the database yet. Turn on top query collection in your collector recipe — the setup page walks through it.",
         "setUp": "Set up",
         "readFailed": "Server-side metrics could not be read",
         "readFailedHint": "The read failed, so this says nothing about whether your database is reporting statements. Everything above is still measured from your application."
@@ -15280,7 +15278,7 @@
       "subtitle": "The slowest individual database calls in this window, across every database and query — as their callers measured them, finished calls only",
       "subtitleServer": "The slowest statements your databases completed in this window, measured inside the database",
       "logOffTitle": "Your databases are not logging slow statements yet",
-      "logOffDescription": "Nothing traced these calls, so we asked the databases for their own slowest statements — and they log none. This list comes from the slow-query log, which is off by default (log_min_duration_statement in PostgreSQL, long_query_time in MySQL). Top queries can still show you what runs most, because it reads the counter tables instead.",
+      "logOffDescription": "Nothing traced these calls, so we asked the databases for their own slowest statements — and they log none. This list comes from PostgreSQL's statement log (log_min_duration_statement), which is off by default — the setup card's logging step turns it on. Per-statement capture is currently PostgreSQL-only, so MySQL and MariaDB can't feed this list yet. Top queries can still show you what runs most, because it reads the counter tables instead.",
       "searchPlaceholder": "Search query text, service or database…",
       "columns": {
         "query": "Query",
@@ -15306,7 +15304,7 @@
       },
       "serverList": {
         "title": "Slowest calls reported by your databases",
-        "subtitle": "Measured inside each database at the moment a statement finished — every client is counted, but network and connection wait are not. No traced application calls landed in this window, so the usual list is empty; which calls appear here is governed by the database's own logging threshold.",
+        "subtitle": "Measured inside each database at the moment a statement finished — every client is counted, but network and connection wait are not. No traced application calls landed in this window, so the usual list is empty; which calls appear here is governed by the database's own logging threshold. These per-statement reports currently come from PostgreSQL only — the collector recipes don't capture other engines' statement logs yet, so MySQL and MariaDB calls won't appear here.",
         "truncated": "The {count} slowest reported calls — more crossed the threshold than are shown here",
         "columns": {
           "query": "Query",
@@ -15700,16 +15698,14 @@
           },
           "sampling": {
             "no": "Nothing is sampling your databases' session tables",
-            "noDetail": "Session sampling is off by default because it adds meaningful ingest. Turn on ZO_DB_MONITORING_ACTIVITY_ENABLED and add the query sample collection block to your collector recipe.",
-            "ingestOff": "Session sampling is switched off in OpenObserve",
-            "ingestOffDetail": "ZO_DB_MONITORING_ACTIVITY_ENABLED is off here, so session samples are discarded even if your collector is sending them. Your collector is not the problem. Set it to true, and enable db.server.query_sample in your collector recipe — both sides have to be on. Sampling is off by default because it adds meaningful ingest."
+            "noDetail": "Session samples come from your collector: enable db.server.query_sample in the collector recipe on the database host — the setup page walks through it. OpenObserve accepts this feed whenever database monitoring is on, so the fix is on the collector side."
           }
         }
       }
     },
     "instanceMetrics": {
       "columnHeader": "Instance health",
-      "columnHint": "Connections against the limit, from the metrics your collector already sends. Blank until you enable instance metrics.",
+      "columnHint": "Connections against the limit, from the metrics your collector already sends. Blank until a receiver reports this instance.",
       "connectionsOf": "{used} of {limit} connections",
       "connectionsNoLimit": "{used} connections",
       "noLimitHint": "The receiver for this engine does not publish a connection limit on its own, so only the count is shown. The setup card's connection-limit recipe (sqlquery/mysql_limits) collects max_connections and turns this into a percentage.",
@@ -15727,16 +15723,15 @@
         "loopbackHint": "This row points at localhost. The collector rewrites a loopback endpoint to its own hostname, so the two names can never match even when both are healthy.",
         "noReceiver": "The {engine} receiver is not reporting",
         "noReceiverHint": "Your applications are querying this database, but no {engine} receiver is sending server metrics for it. Add the {engine} receiver to your collector to fill this column.",
+        "noReceiverMariadbHint": "Your applications are querying this MariaDB server, but nothing is sending server metrics for it. There is no separate MariaDB receiver — point a MySQL receiver at this instance and its metrics fill this column.",
         "engineUnsupported": "Not collected for {engine}",
-        "engineUnsupportedHint": "Instance metrics are collected for PostgreSQL and MySQL only — no receiver recipe exists for {engine} yet, so this column stays empty. That is a coverage note, not a health verdict.",
+        "engineUnsupportedHint": "Instance metrics are collected for PostgreSQL, MySQL and MariaDB only — no receiver recipe exists for {engine} yet, so this column stays empty. That is a coverage note, not a health verdict.",
         "unreadable": "Instance metrics could not be read",
         "unreadableHint": "The metrics streams exist but could not be read. This is usually a permission problem rather than anything wrong with the database."
       },
       "limitUnknownHint": "The connection count arrived but the limit did not, so no percentage can be shown. Check that the connection-limit metric is enabled on this collector.",
       "noReading": "No reading in this window",
       "noReadingHint": "Your collector reports this instance, but sent no connection metric during this window. The metric may be switched off on the receiver, or the instance may have stopped reporting.",
-      "disabled": "Instance health is turned off",
-      "disabledHint": "Instance health is switched off, so nothing was read for this column. Turn on ZO_DB_MONITORING_INSTANCE_METRICS to join the connection, replication and cache metrics your collector already sends — that same read is also what reveals instances with no application traffic, which this page cannot see otherwise.",
       "lagLabel": "Replica lag",
       "deadlockLabel": "deadlocks"
     },

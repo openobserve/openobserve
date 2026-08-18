@@ -778,8 +778,16 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => {
   // emptiness put the page in fallback, so dropping it silently would change
   // which list is shown. See the matching note on QueriesPage.
   if (!serverListShown.value) return [instance, env, system, service, namespace];
+  // Instance only when THIS list's rows carry one. The statement rows report
+  // no instance today, so a select over them offers nothing — and an instance
+  // carried in from another tab would silently filter every row out. A value
+  // already set stays visible as a removable chip, exactly like env/service.
   return [
-    instance,
+    ...(instance.options.length
+      ? [instance]
+      : instanceFilter.value
+        ? [{ ...instance, options: [] }]
+        : []),
     system,
     namespace,
     ...(envFilter.value ? [{ ...env, options: [] }] : []),
