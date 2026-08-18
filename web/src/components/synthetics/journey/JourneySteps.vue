@@ -467,26 +467,33 @@ function handleUpdateExpanded(ids: string[]) {
              rather than reflowing — a rule that nudged every row would jitter
              the whole table as the pointer crossed the action column. Last in
              the cell so it paints over the step content it straddles. -->
-        <template v-if="markerTone(row)">
+        <!-- Two segments with the label between them, not one rule behind it:
+             with no background to punch a hole, a continuous rule would run
+             straight through the words. Equal `flex-1` segments centre the
+             label without measuring anything. Tone sits on the container so the
+             segments and the label cannot disagree about it. -->
+        <span
+          v-if="markerTone(row)"
+          :class="[
+            'absolute inset-x-0 top-0 flex -translate-y-1/2 items-center gap-2',
+            markerTone(row) === 'hover' ? 'text-accent/50' : 'text-accent',
+          ]"
+          data-test="synthetics-journey-recording-marker"
+        >
           <span
-            :class="[
-              'absolute inset-x-0 top-0 h-0.5',
-              markerTone(row) === 'hover' ? 'bg-accent/50' : 'bg-accent',
-            ]"
+            class="h-0.5 flex-1 bg-current"
             data-test="synthetics-journey-recording-marker-rule"
             aria-hidden="true"
           />
-          <span
-            :class="[
-              'text-accent-foreground rounded-default text-2xs absolute top-0 left-0',
-              '-translate-y-1/2 px-1.5 py-0.5 font-semibold uppercase',
-              markerTone(row) === 'hover' ? 'bg-accent/50' : 'bg-accent',
-            ]"
-            data-test="synthetics-journey-recording-marker"
-          >
+          <span class="text-2xs shrink-0 font-semibold capitalize">
             {{ t("synthetics.journey.newStepsLandHere") }}
           </span>
-        </template>
+          <span
+            class="h-0.5 flex-1 bg-current"
+            data-test="synthetics-journey-recording-marker-rule"
+            aria-hidden="true"
+          />
+        </span>
       </div>
     </template>
 

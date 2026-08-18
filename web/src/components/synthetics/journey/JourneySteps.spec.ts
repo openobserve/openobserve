@@ -725,15 +725,20 @@ describe("JourneySteps", () => {
       });
       await flushPromises();
 
-      const labels = wrapper.findAll('[data-test="synthetics-journey-recording-marker"]');
-      expect(labels).toHaveLength(1);
-      expect(labels[0].text()).toBe(enUS.synthetics.journey.newStepsLandHere);
+      const markers = wrapper.findAll('[data-test="synthetics-journey-recording-marker"]');
+      expect(markers).toHaveLength(1);
+      expect(markers[0].text()).toBe(enUS.synthetics.journey.newStepsLandHere);
+      // Anchored, not hovered: the marker is solid. Tone lives on the container
+      // so the rule segments and the label cannot disagree about it.
+      expect(markers[0].classes()).toContain("text-accent");
+      expect(markers[0].classes()).not.toContain("text-accent/50");
 
+      // The label sits in a real gap between two segments rather than painting
+      // over one continuous rule — with no background, a single rule would run
+      // straight through the words.
       const rules = wrapper.findAll('[data-test="synthetics-journey-recording-marker-rule"]');
-      expect(rules).toHaveLength(1);
-      // Anchored, not hovered: the rule is solid.
-      expect(rules[0].classes()).toContain("bg-accent");
-      expect(rules[0].classes()).not.toContain("bg-accent/50");
+      expect(rules).toHaveLength(2);
+      expect(rules[0].classes()).toEqual(expect.arrayContaining(["h-0.5", "flex-1", "bg-current"]));
     });
 
     it("renders no marker when nothing is anchored", async () => {
@@ -785,10 +790,10 @@ describe("JourneySteps", () => {
 
       target.dispatchEvent(new MouseEvent("mouseenter"));
       await flushPromises();
-      const rule = wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]');
-      expect(rule.exists()).toBe(true);
+      const marker = wrapper.find('[data-test="synthetics-journey-recording-marker"]');
+      expect(marker.exists()).toBe(true);
       // A preview reads lighter than the committed anchor.
-      expect(rule.classes()).toContain("bg-accent/50");
+      expect(marker.classes()).toContain("text-accent/50");
 
       target.dispatchEvent(new MouseEvent("mouseleave"));
       await flushPromises();
@@ -854,10 +859,10 @@ describe("JourneySteps", () => {
       recordBeforeTarget(wrapper, 2).dispatchEvent(new MouseEvent("mouseenter"));
       await flushPromises();
 
-      const rules = wrapper.findAll('[data-test="synthetics-journey-recording-marker-rule"]');
-      expect(rules).toHaveLength(2);
-      expect(rules[0].classes()).toContain("bg-accent");
-      expect(rules[1].classes()).toContain("bg-accent/50");
+      const markers = wrapper.findAll('[data-test="synthetics-journey-recording-marker"]');
+      expect(markers).toHaveLength(2);
+      expect(markers[0].classes()).toContain("text-accent");
+      expect(markers[1].classes()).toContain("text-accent/50");
     });
 
     it("drops a stale preview once the control it belongs to is disabled", async () => {
@@ -918,17 +923,27 @@ describe("JourneySteps", () => {
       });
       await flushPromises();
 
-      const rule = wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]');
-      expect(rule.classes()).toEqual(
-        expect.arrayContaining(["absolute", "inset-x-0", "top-0", "h-0.5"]),
+      // The marker straddles the boundary, which is what makes it read as a
+      // position BETWEEN rows rather than a badge on one.
+      const marker = wrapper.find('[data-test="synthetics-journey-recording-marker"]');
+      expect(marker.classes()).toEqual(
+        expect.arrayContaining([
+          "absolute",
+          "inset-x-0",
+          "top-0",
+          "-translate-y-1/2",
+          "flex",
+          "items-center",
+        ]),
       );
 
-      // The label straddles the boundary, which is what makes it read as a
-      // position BETWEEN rows rather than a badge on one.
-      const label = wrapper.find('[data-test="synthetics-journey-recording-marker"]');
-      expect(label.classes()).toEqual(
-        expect.arrayContaining(["absolute", "top-0", "left-0", "-translate-y-1/2"]),
-      );
+      // Equal flex-1 segments either side are what centre the label — no
+      // width is measured and none is hardcoded.
+      const rules = wrapper.findAll('[data-test="synthetics-journey-recording-marker-rule"]');
+      expect(rules).toHaveLength(2);
+      for (const rule of rules) {
+        expect(rule.classes()).toContain("flex-1");
+      }
     });
 
     it("renders no marker in results mode", async () => {
