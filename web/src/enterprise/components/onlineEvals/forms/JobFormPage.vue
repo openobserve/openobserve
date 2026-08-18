@@ -470,16 +470,16 @@ const samplingValueHelp = computed<string>(() => {
 
 // Completion help echoes the entered window back in readable units, because a
 // bare `1800` in a seconds box says nothing about how long the user will wait.
-// Unit labels come from i18n (same `common.*` keys AutoRefreshInterval uses),
-// so the util hands back numbers and the wording is assembled here.
+// Each part is a whole `{count} unit` message rather than a number glued to a
+// translated unit — the number's position varies by language.
 function humanizeSecs(value: string | number): string | null {
   const parts = durationPartsFromSecs(value);
   if (!parts) return null;
 
   const words: string[] = [];
-  if (parts.hours) words.push(`${parts.hours} ${t("common.hr")}`);
-  if (parts.minutes) words.push(`${parts.minutes} ${t("common.min")}`);
-  if (parts.seconds) words.push(`${parts.seconds} ${t("common.sec")}`);
+  if (parts.hours) words.push(t("common.hrShort", { count: parts.hours }));
+  if (parts.minutes) words.push(t("common.minShort", { count: parts.minutes }));
+  if (parts.seconds) words.push(t("common.secShort", { count: parts.seconds }));
 
   return words.join(" ") || null;
 }

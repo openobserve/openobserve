@@ -140,7 +140,9 @@ const filteredFunctionOptions = computed(() => {
 
 const selectedFunctionTooltip = computed(() => {
   if (searchObj.data.selectedFunction?.name) {
-    return `${t("search.functionLabel")}: ${searchObj.data.selectedFunction.name}`;
+    return t("search.selectedFunctionTooltip", {
+      name: searchObj.data.selectedFunction.name,
+    });
   }
   return t("search.functionPlaceholder");
 });

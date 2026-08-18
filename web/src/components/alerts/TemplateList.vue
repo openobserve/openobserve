@@ -646,7 +646,7 @@ const bulkDeleteTemplates = () => {
       const errorMessage =
         err.response?.data?.message ||
         err?.message ||
-        "Error while deleting templates. Please try again.";
+        t("alerts.messages.bulkDeleteTemplatesFailed");
       if (err.response?.status != 403 || err?.status != 403) {
         toast({
           variant: "error",

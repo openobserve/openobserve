@@ -21,6 +21,7 @@ import { ref } from "vue";
 import Redis from "./Redis.vue";
 import redisCard from "@/components/ingestion/setupCard/content/redis";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -53,7 +54,7 @@ const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVz
 
 describe("redisCard builder", () => {
   it("builds metadata + step flow (no prepare step)", () => {
-    const card = redisCard(SUBS);
+    const card = redisCard(SUBS, gt);
     expect(card.provider.name).toBe("Redis");
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -65,7 +66,7 @@ describe("redisCard builder", () => {
   });
 
   it("writes a redis receiver config with the org's exporter", () => {
-    const configure = redisCard(SUBS).steps.find((s) => s.id === "configure")!;
+    const configure = redisCard(SUBS, gt).steps.find((s) => s.id === "configure")!;
     expect(configure.inputs?.map((i) => i.id)).toEqual(["host", "port"]);
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
     expect(config).toContain("redis:");
@@ -80,7 +81,7 @@ describe("Redis.vue", () => {
     if (wrapper) wrapper.unmount();
   });
   it("renders the shared card for the redis slug", () => {
-    expect(getDataSourceCard("redis", SUBS)?.provider.name).toBe("Redis");
+    expect(getDataSourceCard("redis", SUBS, gt)?.provider.name).toBe("Redis");
     wrapper = mount(Redis, { global: { plugins: [mockStore, mockI18n] } });
     expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });

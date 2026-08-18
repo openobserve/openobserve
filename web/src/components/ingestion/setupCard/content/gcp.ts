@@ -22,7 +22,7 @@
 // push endpoint URL and the live detection — the page can't end up watching a
 // different stream than the one GCP is writing to.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -31,16 +31,16 @@ import { applySubs, applySubsMasked } from "../subs";
 // {stream} is filled live by the renderer from the stream-name field.
 const PUSH_ENDPOINT = "{url}/gcp/{org}/{stream}/_sub?API-Key={token}";
 
-export default function gcpCard(subs: CardSubstitutions): RichCardContent {
+export default function gcpCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Google Cloud",
-      tagline: gt("ingestion.setupCard.taglineGcp"),
+      name: raw("Google Cloud"),
+      tagline: t("ingestion.setupCard.taglineGcp"),
       logo: getImageURL("images/ingestion/gcp.svg"),
       tone: "#4285f4",
-      runtime: "Google Cloud",
-      setupTime: "~5 min",
-      metaBadges: [gt("common.logs")],
+      runtime: raw("Google Cloud"),
+      setupTime: t("ingestion.setupCard.setupTime5Min"),
+      metaBadges: [t("common.logs")],
     },
     steps: [
       {
@@ -59,7 +59,7 @@ gcloud logging sinks create openobserve-sink \\
   pubsub.googleapis.com/projects/$(gcloud config get-value project)/topics/openobserve-logs \\
   --log-filter='severity >= "DEFAULT"'`,
         },
-        note: "Grant the sink's writer identity the Pub/Sub Publisher role on the topic, or it will silently publish nothing.",
+        note: t("ingestion.setupCard.gcpSinkWriterNote"),
       },
       {
         id: "subscription",
@@ -73,7 +73,7 @@ gcloud logging sinks create openobserve-sink \\
           raw: applySubs(PUSH_ENDPOINT, subs),
           masked: applySubsMasked(PUSH_ENDPOINT, subs),
         },
-        note: "Keep this URL secret — it embeds the ingestion key. Rotate it from this page's header if it leaks.",
+        note: t("ingestion.setupCard.gcpPushUrlNote"),
       },
       {
         id: "verify",
@@ -84,7 +84,7 @@ gcloud logging sinks create openobserve-sink \\
         detectionAnchor: true,
         // Everything after the first pill is a Google Cloud product name.
         pills: [
-          gt("ingestion.setupCard.pillAuditLogs"),
+          t("ingestion.setupCard.pillAuditLogs"),
           raw("Cloud Run"),
           raw("GKE"),
           raw("Cloud Functions"),
@@ -106,9 +106,8 @@ gcloud logging sinks create openobserve-sink \\
       filter: "_timestamp IS NOT NULL",
     },
     extras: {
-      fixTitle: "Check The Push Subscription",
-      fixBody:
-        "GCP reports delivery failures on the subscription itself. If the sink is publishing but nothing lands here, the push endpoint is usually rejecting the request:",
+      fixTitle: t("ingestion.setupCard.gcpFixTitle"),
+      fixBody: t("ingestion.setupCard.gcpFixBody"),
       fixLang: "bash",
       fixSnippet: `gcloud pubsub subscriptions describe openobserve-push \\
   --format='value(pushConfig.pushEndpoint)'
@@ -118,20 +117,20 @@ gcloud pubsub subscriptions describe openobserve-push \\
   --format='value(numUndeliveredMessages)'`,
       troubleshooting: [
         {
-          q: "The subscription shows delivery errors",
-          a: "A 401 means the `API-Key` in the URL is stale — re-copy the endpoint from this page. A 404 usually means the org or stream segment was edited by hand; the URL above is already correct for this organization.",
+          q: t("ingestion.setupCard.gcpTroubleDeliveryQ"),
+          a: t("ingestion.setupCard.gcpTroubleDeliveryA"),
         },
         {
-          q: "The sink exists but the topic receives nothing",
-          a: "The sink's **writer identity** needs the Pub/Sub Publisher role on the topic. GCP creates the sink successfully without it and then drops everything, silently.",
+          q: t("ingestion.setupCard.gcpTroubleTopicQ"),
+          a: t("ingestion.setupCard.gcpTroubleTopicA"),
         },
         {
-          q: "Only some logs arrive",
-          a: "That is the sink's inclusion filter, not OpenObserve. Widen the `--log-filter` on the sink to cover the services and severities you expect.",
+          q: t("ingestion.setupCard.gcpTroublePartialQ"),
+          a: t("ingestion.setupCard.gcpTroublePartialA"),
         },
         {
-          q: "Can I send Google Workspace audit logs too?",
-          a: "Yes — Workspace exports into Cloud Logging, so the same Log Router sink picks it up once the export is enabled. Open the **Google Workspace** guide linked at the bottom of this page for the export setup.",
+          q: t("ingestion.setupCard.gcpTroubleWorkspaceQ"),
+          a: t("ingestion.setupCard.gcpTroubleWorkspaceA"),
         },
       ],
     },
@@ -141,7 +140,7 @@ gcloud pubsub subscriptions describe openobserve-push \\
     // as a first-class link, not as prose.
     docLinks: [
       {
-        label: "Google Workspace",
+        label: raw("Google Workspace"),
         url: "https://short.openobserve.ai/security/google-workspace",
       },
     ],

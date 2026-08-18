@@ -35,6 +35,7 @@ import rumCard, { RUM_SDK_VERSION } from "./rum";
 import type { RumCardSubs } from "./rum";
 import type { RichCardContent } from "../types";
 import enLocale from "@/locales/languages/en-US.json";
+import { gt } from "@/types/i18n";
 
 // ── shared substitutions ──────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ const HTTP_SUBS: RumCardSubs = {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function buildCard(subs: RumCardSubs = BASE_SUBS): RichCardContent {
-  return rumCard(subs);
+  return rumCard(subs, gt);
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -302,7 +303,7 @@ describe("rumCard builder", () => {
         rumToken: "super-secret-token",
         rumTokenMasked: "supe-****-oken",
       };
-      const card = rumCard(subs);
+      const card = rumCard(subs, gt);
       const init = card.steps.find((s) => s.id === "init")!;
       const npm = init.variants!.find((v) => v.id === "npm")!;
 
@@ -316,7 +317,7 @@ describe("rumCard builder", () => {
         rumToken: "super-secret-token",
         rumTokenMasked: "supe-****-oken",
       };
-      const card = rumCard(subs);
+      const card = rumCard(subs, gt);
       const init = card.steps.find((s) => s.id === "init")!;
       const npm = init.variants!.find((v) => v.id === "npm")!;
 
@@ -338,14 +339,14 @@ describe("rumCard builder", () => {
     });
 
     it("raw code contains insecureHTTP: false when subs.insecureHTTP is false", () => {
-      const card = rumCard(BASE_SUBS); // insecureHTTP: false
+      const card = rumCard(BASE_SUBS, gt); // insecureHTTP: false
       const init = card.steps.find((s) => s.id === "init")!;
       const npm = init.variants!.find((v) => v.id === "npm")!;
       expect(npm.code.raw).toContain("insecureHTTP: false");
     });
 
     it("raw code contains insecureHTTP: true when subs.insecureHTTP is true", () => {
-      const card = rumCard(HTTP_SUBS); // insecureHTTP: true
+      const card = rumCard(HTTP_SUBS, gt); // insecureHTTP: true
       const init = card.steps.find((s) => s.id === "init")!;
       const npm = init.variants!.find((v) => v.id === "npm")!;
       expect(npm.code.raw).toContain("insecureHTTP: true");
@@ -403,7 +404,7 @@ describe("rumCard builder", () => {
         rumToken: "super-secret-token",
         rumTokenMasked: "supe-****-oken",
       };
-      const card = rumCard(subs);
+      const card = rumCard(subs, gt);
       const init = card.steps.find((s) => s.id === "init")!;
       const cdn = init.variants!.find((v) => v.id === "cdn")!;
 
@@ -433,7 +434,7 @@ describe("rumCard builder", () => {
     });
 
     it("cdn init raw code contains insecureHTTP: true for http subs", () => {
-      const card = rumCard(HTTP_SUBS);
+      const card = rumCard(HTTP_SUBS, gt);
       const init = card.steps.find((s) => s.id === "init")!;
       const cdn = init.variants!.find((v) => v.id === "cdn")!;
       expect(cdn.code.raw).toContain("insecureHTTP: true");
@@ -463,43 +464,49 @@ describe("rumCard builder", () => {
 
   describe("substitution edge cases", () => {
     it("empty org string is substituted verbatim", () => {
-      const card = rumCard({ ...BASE_SUBS, org: "" });
+      const card = rumCard({ ...BASE_SUBS, org: "" }, gt);
       const init = card.steps.find((s) => s.id === "init")!;
       const npm = init.variants!.find((v) => v.id === "npm")!;
       expect(npm.code.raw).toContain("organizationIdentifier: ''");
     });
 
     it("org with special characters is substituted verbatim", () => {
-      const card = rumCard({ ...BASE_SUBS, org: "my-org_2024" });
+      const card = rumCard({ ...BASE_SUBS, org: "my-org_2024" }, gt);
       const init = card.steps.find((s) => s.id === "init")!;
       const npm = init.variants!.find((v) => v.id === "npm")!;
       expect(npm.code.raw).toContain("organizationIdentifier: 'my-org_2024'");
     });
 
     it("empty rumToken produces empty clientToken in raw code", () => {
-      const card = rumCard({ ...BASE_SUBS, rumToken: "", rumTokenMasked: "" });
+      const card = rumCard({ ...BASE_SUBS, rumToken: "", rumTokenMasked: "" }, gt);
       const init = card.steps.find((s) => s.id === "init")!;
       const npm = init.variants!.find((v) => v.id === "npm")!;
       expect(npm.code.raw).toContain("clientToken: ''");
     });
 
     it("endpoint is used in CDN install preconnect regardless of subs.site", () => {
-      const card = rumCard({
-        ...BASE_SUBS,
-        site: "ingest.example.com",
-        endpoint: "https://different.endpoint.com",
-      });
+      const card = rumCard(
+        {
+          ...BASE_SUBS,
+          site: "ingest.example.com",
+          endpoint: "https://different.endpoint.com",
+        },
+        gt,
+      );
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
       expect(cdn.code.raw).toContain('href="https://different.endpoint.com"');
     });
 
     it("site is used in init options, not endpoint", () => {
-      const card = rumCard({
-        ...BASE_SUBS,
-        site: "custom-site.io",
-        endpoint: "https://custom-site.io",
-      });
+      const card = rumCard(
+        {
+          ...BASE_SUBS,
+          site: "custom-site.io",
+          endpoint: "https://custom-site.io",
+        },
+        gt,
+      );
       const init = card.steps.find((s) => s.id === "init")!;
       const npm = init.variants!.find((v) => v.id === "npm")!;
       expect(npm.code.raw).toContain("site: 'custom-site.io'");
@@ -550,7 +557,7 @@ describe("rumCard builder", () => {
     });
 
     it("insecureHTTP value appears in the troubleshooting answer about HTTP", () => {
-      const card = rumCard(HTTP_SUBS); // insecureHTTP: true
+      const card = rumCard(HTTP_SUBS, gt); // insecureHTTP: true
       const ts = card.extras!.troubleshooting as any[];
       const httpEntry = ts.find((e: any) => e.q.toLowerCase().includes("http"));
       expect(httpEntry).toBeDefined();
@@ -572,14 +579,14 @@ describe("rumCard builder", () => {
 
   describe("determinism", () => {
     it("calling rumCard twice with identical subs returns identical output", () => {
-      const card1 = rumCard(BASE_SUBS);
-      const card2 = rumCard(BASE_SUBS);
+      const card1 = rumCard(BASE_SUBS, gt);
+      const card2 = rumCard(BASE_SUBS, gt);
       expect(JSON.stringify(card1)).toBe(JSON.stringify(card2));
     });
 
     it("different rumToken values produce different raw init codes", () => {
-      const card1 = rumCard({ ...BASE_SUBS, rumToken: "token-a", rumTokenMasked: "tok-a" });
-      const card2 = rumCard({ ...BASE_SUBS, rumToken: "token-b", rumTokenMasked: "tok-b" });
+      const card1 = rumCard({ ...BASE_SUBS, rumToken: "token-a", rumTokenMasked: "tok-a" }, gt);
+      const card2 = rumCard({ ...BASE_SUBS, rumToken: "token-b", rumTokenMasked: "tok-b" }, gt);
       const raw1 = card1.steps.find((s) => s.id === "init")!.variants!.find((v) => v.id === "npm")!
         .code.raw;
       const raw2 = card2.steps.find((s) => s.id === "init")!.variants!.find((v) => v.id === "npm")!

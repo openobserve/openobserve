@@ -117,7 +117,7 @@ pub async fn search(
     let empty_exec = visitor.plan();
 
     // here need reset the option because when init ctx we don't know this information
-    if empty_exec.sorted_by_time() {
+    if empty_exec.sort_order().is_sorted() {
         ctx.state_ref().write().config_mut().options_mut().set(
             "datafusion.execution.split_file_groups_by_statistics",
             "true",
@@ -335,7 +335,7 @@ pub async fn search(
             query_params.clone(),
             latest_schema.clone(),
             &file_list,
-            empty_exec.sorted_by_time(),
+            empty_exec.sort_order(),
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
@@ -383,7 +383,7 @@ pub async fn search(
             query_params.clone(),
             latest_schema.clone(),
             &search_partition_keys,
-            empty_exec.sorted_by_time(),
+            empty_exec.sort_order(),
             index_condition.clone(),
             fst_fields.clone(),
         )
@@ -408,7 +408,7 @@ pub async fn search(
             query_params.clone(),
             latest_schema.clone(),
             &search_partition_keys,
-            empty_exec.sorted_by_time(),
+            empty_exec.sort_order(),
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),

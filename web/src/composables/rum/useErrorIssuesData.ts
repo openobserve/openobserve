@@ -355,7 +355,8 @@ const useErrorIssuesData = (t: TranslateFn) => {
         // A superseded/aborted run is our own cancellation, not a failure — no toast.
         if (!isAbortError(err)) {
           toast({
-            message: (err as any)?.response?.data?.message || "Error while fetching error events",
+            message:
+              (err as any)?.response?.data?.message || t("rum.errorWhileFetchingErrorEvents"),
             variant: "error",
           });
         }

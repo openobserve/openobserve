@@ -187,9 +187,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OFormSelect
                             :name="`dashboards[${index}].report_type`"
                             :options="[
-                              { label: raw('PDF (default)'), value: 'pdf' },
-                              { label: raw('PNG (Image)'), value: 'png' },
-                              { label: raw('CSV (Data)'), value: 'csv' },
+                              {
+                                label: t('reports.reportTypePdf', { format: raw('PDF') }),
+                                value: 'pdf',
+                              },
+                              {
+                                label: t('reports.reportTypePng', { format: raw('PNG') }),
+                                value: 'png',
+                              },
+                              {
+                                label: t('reports.reportTypeCsv', { format: raw('CSV') }),
+                                value: 'csv',
+                              },
                             ]"
                             :label="t('reports.reportType')"
                             color="input-border"
@@ -367,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           data-test="add-report-schedule-start-timezone-select"
                           name="timezone"
-                          :options="timezoneOptions"
+                          :options="timezoneSelectOptions"
                           :label="t('logStream.timezone')"
                           required
                           class="timezone-select showLabelOnTop"
@@ -462,7 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           data-test="add-report-schedule-start-timezone-select"
                           name="timezone"
-                          :options="timezoneOptions"
+                          :options="timezoneSelectOptions"
                           :label="t('logStream.timezone')"
                           required
                           class="timezone-select showLabelOnTop"
@@ -745,8 +754,9 @@ const { track } = useReo();
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
 
@@ -862,7 +872,7 @@ onBeforeMount(async () => {
         if (err?.response?.status != 403) {
           toast({
             variant: "error",
-            message: err?.response?.data?.message || "Error while fetching report!",
+            message: err?.response?.data?.message || t("reports.fetchReportError"),
           });
         }
       })
@@ -1127,11 +1137,25 @@ let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
-const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+// Not translated on purpose: utils/timezone.ts resolveBrowserTimezone() parses
+// this exact "Browser Time (<zone>)" shape back to an IANA zone before saving, and
+// existing records hold it verbatim. The LABEL is translated in timezoneSelectOptions.
+const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const browserTime = raw("Browser Time (" + browserTz + ")");
 
 // Add the UTC option
 timezoneOptions.unshift("UTC");
 timezoneOptions.unshift(browserTime);
+
+// The browser-time entry keeps its English VALUE (resolveBrowserTimezone parses that
+// exact shape and stored reports hold it) but renders translated copy.
+const timezoneSelectOptions = computed(() =>
+  timezoneOptions.map((tz: string) =>
+    tz === browserTime
+      ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
+      : { label: raw(tz), value: tz },
+  ),
+);
 
 const getDashboaordFolders = () => {
   return new Promise((resolve, reject) => {
@@ -1316,7 +1340,11 @@ const saveReport = async (value: CreateReportForm) => {
           variant: "error",
           message:
             error?.response?.data?.message ||
-            `Error while ${isEditingReport.value ? "updating" : "saving"} report.`,
+            t(
+              isEditingReport.value
+                ? "toastMessages.reports.errorWhileUpdating"
+                : "toastMessages.reports.errorWhileSaving",
+            ),
         });
       }
     })
@@ -1477,8 +1505,8 @@ const openCancelDialog = () => {
     return;
   }
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel report changes?";
+  dialog.value.title = t("common.discardChanges");
+  dialog.value.message = t("reports.cancelReportChangesConfirm");
   dialog.value.okCallback = goToReports;
 };
 </script>

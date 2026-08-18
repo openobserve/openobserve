@@ -76,7 +76,8 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   rowKey: "id",
   rowHeight: undefined,
   showGlobalFilter: true,
-  globalFilterPlaceholder: "Search...",
+  // no default here: a literal would ship untranslated. Resolved at render below.
+  globalFilterPlaceholder: undefined,
   filterMode: "client",
   defaultColumns: true,
   footerTitle: raw(""),
@@ -587,6 +588,10 @@ const {
   rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
+  // A delegated scroller can contain a histogram or other content before this
+  // table. Keep its raw offset stable when wrapped rows are remeasured so a
+  // query refresh cannot move the owning page's scrollbar.
+  preserveScrollOffsetOnRowResize: () => !!props.scrollEl && useDynamicRowHeight.value,
 });
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
@@ -1086,7 +1091,7 @@ defineExpose({
           <input
             :value="globalFilterLocal"
             type="text"
-            :placeholder="props.globalFilterPlaceholder"
+            :placeholder="props.globalFilterPlaceholder ?? t('common.searchEllipsis')"
             class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 pr-2 pl-7 text-sm outline-none"
             data-test="o2-table-global-filter-input"
             @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"

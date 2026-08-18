@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
@@ -341,19 +341,19 @@ export default defineComponent({
       { label: t("dashboard.min"), value: "min" },
       { label: t("dashboard.max"), value: "max" },
       {
-        label: t("dashboard.p50"),
+        label: raw("P50"),
         value: "p50",
       },
       {
-        label: t("dashboard.p90"),
+        label: raw("P90"),
         value: "p90",
       },
       {
-        label: t("dashboard.p95"),
+        label: raw("P95"),
         value: "p95",
       },
       {
-        label: t("dashboard.p99"),
+        label: raw("P99"),
         value: "p99",
       },
     ];

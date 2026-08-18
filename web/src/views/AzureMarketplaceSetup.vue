@@ -151,7 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="check-circle" style="width: 5rem; height: 5rem" />
         <h4 class="mt-3">{{ t("billing.azureMarketplace.subscriptionActivated") }}</h4>
         <p class="text-text-secondary">
-          {{ t("billing.azureMarketplace.activatedDescription") }}
+          {{
+            t("billing.azureMarketplace.activatedDescription", {
+              product: raw("Azure Marketplace"),
+            })
+          }}
         </p>
         <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard">{{
           t("billing.azureMarketplace.goToDashboard")
@@ -163,7 +167,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" style="width: 5rem; height: 5rem" />
         <h5 class="mt-3">{{ t("billing.azureMarketplace.paymentFailed") }}</h5>
         <p class="text-text-secondary">
-          {{ t("billing.azureMarketplace.paymentFailedDescription") }}
+          {{
+            t("billing.azureMarketplace.paymentFailedDescription", {
+              product: raw("Azure"),
+            })
+          }}
         </p>
         <OButton
           as="a"
@@ -185,7 +193,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import azureMarketplace from "@/services/azureMarketplace";
 import organizationsService from "@/services/organizations";
@@ -272,7 +280,8 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to create organization:", error);
         state.value = "error";
-        errorMessage.value = error.response?.data?.message || "Failed to create organization";
+        errorMessage.value =
+          error.response?.data?.message || t("billing.failedToCreateOrganization");
       }
     };
 
@@ -303,7 +312,8 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to link subscription:", error);
         state.value = "error";
-        errorMessage.value = error.response?.data?.message || "Failed to link Azure subscription";
+        errorMessage.value =
+          error.response?.data?.message || t("billing.failedToLinkAzureSubscription");
       }
     };
 
@@ -322,6 +332,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       isDark,
       state,

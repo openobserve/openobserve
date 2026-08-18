@@ -382,7 +382,7 @@ import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -609,7 +609,7 @@ export default defineComponent({
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.logs_metrics_traces,
       },
       {
-        name: t("about.enterprise_offer.core_features.rum.name"),
+        name: raw("RUM"),
         note: t("about.enterprise_offer.core_features.rum.note"),
         icon: "visibility",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rum,
@@ -634,7 +634,9 @@ export default defineComponent({
       },
       {
         name: t("about.enterprise_offer.core_features.vrl_functions.name"),
-        note: t("about.enterprise_offer.core_features.vrl_functions.note"),
+        note: t("about.enterprise_offer.core_features.vrl_functions.note", {
+          product: raw("Vector Remap Language"),
+        }),
         icon: "functions",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.vrl_functions,
       },
@@ -1149,13 +1151,17 @@ export default defineComponent({
                   return date.getDate() === parseInt(dayNum);
                 });
 
+                // The <br/> stays in code — each line is a whole translated
+                // sentence, so the markup never has to live in a message.
+                const usageLine = t("about.usageChartUsage", { value: formattedValue });
                 if (matchingEntry) {
                   const fullDate = new Date(matchingEntry.ts);
                   const monthName = fullDate.toLocaleString("default", { month: "short" });
-                  return `${monthName} ${dayNum}<br/>Usage: ${formattedValue}`;
+                  const dateLine = t("about.usageChartDate", { month: monthName, day: dayNum });
+                  return `${dateLine}<br/>${usageLine}`;
                 }
 
-                return `Day ${dayNum}<br/>Usage: ${formattedValue}`;
+                return `${t("about.usageChartDay", { day: dayNum })}<br/>${usageLine}`;
               },
             },
             animation: true,

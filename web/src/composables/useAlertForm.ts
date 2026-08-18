@@ -684,6 +684,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const sqlUtilsContext: SqlUtilsContext = {
       parser,
       sqlQueryErrorMsg,
+      t,
     };
     return getParserUtil(sqlQuery, sqlUtilsContext);
   };

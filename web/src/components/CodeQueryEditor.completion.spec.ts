@@ -994,7 +994,9 @@ describe("double-quote warnings reach the model", () => {
     const markers = await markersFor(`SELECT * FROM t WHERE level = "error"`, "dq-real");
     expect(markers, "the validation never ran at all").not.toBeNull();
     expect(markers.length).toBe(1);
-    expect(markers[0].message).toMatch(/single quotes/i);
+    // `useI18n` is stubbed to an identity `t` above, so the marker carries the
+    // key rather than the resolved copy ("… use single quotes instead").
+    expect(markers[0].message).toBe("sqlEditor.diagnostics.doubleQuotedValue");
   });
 
   it("publishes NOTHING for the same text inside a comment", { timeout: 30000 }, async () => {

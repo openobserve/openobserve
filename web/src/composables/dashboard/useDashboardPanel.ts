@@ -454,7 +454,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       const errorDetailValue =
         error.response?.data.error_detail ||
         error.response?.data.message ||
-        "Something went wrong!";
+        t("dashboard.somethingWentWrong");
       const trimmedErrorMessage =
         errorDetailValue.length > 300 ? errorDetailValue.slice(0, 300) + " ..." : errorDetailValue;
 
@@ -494,7 +494,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       const errorDetailValue =
         error.response?.data.error_detail ||
         error.response?.data.message ||
-        "Something went wrong!";
+        t("dashboard.somethingWentWrong");
       const trimmedErrorMessage =
         errorDetailValue.length > 300 ? errorDetailValue.slice(0, 300) + " ..." : errorDetailValue;
       showErrorNotification(trimmedErrorMessage);
@@ -990,6 +990,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
   // Replace the existing validatePanel function with a wrapper that calls the generic function
   const validatePanelWrapper = (errors: string[], isFieldsValidationRequired: boolean = true) => {
     validatePanel(
+      t,
       dashboardPanelData,
       errors,
       isFieldsValidationRequired,
@@ -1148,7 +1149,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
         // update the existing x and y axis fields
         updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);
       } else if (!shouldSkipCustomQueryFields) {
-        dashboardPanelData.meta.errors.queryErrors.push("Invalid Columns");
+        dashboardPanelData.meta.errors.queryErrors.push(t("dashboard.invalidColumns"));
       }
 
       const currentQuery =
@@ -1252,16 +1253,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
   const currentXLabel = computed(() => {
     if (dashboardPanelData.data.type == "table") {
-      return isPivotMode.value ? "Row Fields" : "First Column";
+      return isPivotMode.value ? t("panel.rowFields") : t("panel.firstColumn");
     }
-    return dashboardPanelData.data.type == "h-bar" ? "Y-Axis" : "X-Axis";
+    return dashboardPanelData.data.type == "h-bar" ? t("panel.yAxisShort") : t("panel.xAxisShort");
   });
 
   const currentYLabel = computed(() => {
     if (dashboardPanelData.data.type == "table") {
-      return isPivotMode.value ? "Value Fields" : "Other Columns";
+      return isPivotMode.value ? t("panel.valueFields") : t("panel.otherColumn");
     }
-    return dashboardPanelData.data.type == "h-bar" ? "X-Axis" : "Y-Axis";
+    return dashboardPanelData.data.type == "h-bar" ? t("panel.xAxisShort") : t("panel.yAxisShort");
   });
 
   // Function to get result schema

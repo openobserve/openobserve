@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="sidebar"
                 :model-value="sectionOpen.tcp"
                 @update:model-value="(v) => (sectionOpen.tcp = v)"
-                :label="t('nodes.tcpusage')"
+                :label="raw('TCP')"
               >
                 <div class="px-1 pb-2">
                   <OCheckbox
@@ -553,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, reactive, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1210,6 +1210,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       router,
       loading,

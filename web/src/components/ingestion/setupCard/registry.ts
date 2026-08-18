@@ -22,6 +22,8 @@
 // markdown pipeline (ai/content). This registry is only for data sources whose
 // content lives inside the openobserve repo.
 
+import type { TranslateFn } from "@/types/i18n";
+
 import type { CardSubstitutions, RichCardContent } from "./types";
 import sqlServer from "./content/sqlServer";
 import postgres from "./content/postgres";
@@ -42,8 +44,12 @@ import macos from "./content/macos";
 import gcp from "./content/gcp";
 import otlpTraces from "./content/otlpTraces";
 
-/** Given per-org substitutions, returns a data source's setup-card content. */
-export type DataSourceCardBuilder = (subs: CardSubstitutions) => RichCardContent;
+/**
+ * Given per-org substitutions and the caller's `t`, returns a data source's
+ * setup-card content. `t` is threaded from the rendering component rather than
+ * resolved globally so card copy stays reactive to the component's locale.
+ */
+export type DataSourceCardBuilder = (subs: CardSubstitutions, t: TranslateFn) => RichCardContent;
 
 const registry: Record<string, DataSourceCardBuilder> = {
   sqlServer,
@@ -75,7 +81,8 @@ export function hasDataSourceCard(slug: string | undefined): boolean {
 export function getDataSourceCard(
   slug: string | undefined,
   subs: CardSubstitutions,
+  t: TranslateFn,
 ): RichCardContent | undefined {
   if (!slug) return undefined;
-  return registry[slug]?.(subs);
+  return registry[slug]?.(subs, t);
 }

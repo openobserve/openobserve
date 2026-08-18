@@ -45,7 +45,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import config from "@/aws-exports";
@@ -461,7 +461,9 @@ function onChildMouseenter(event: MouseEvent) {
             <!-- Icon color is locked to the text color so it never picks up a
                  primary tint via currentColor inheritance. -->
             <OIcon :name="row.child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
-            <span class="leading-none">{{ t(row.child.titleKey) }}</span>
+            <span class="leading-none">{{
+              row.child.title ? raw(row.child.title) : t(row.child.titleKey)
+            }}</span>
           </router-link>
         </template>
       </div>

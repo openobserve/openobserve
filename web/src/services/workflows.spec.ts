@@ -127,6 +127,31 @@ describe("workflows service", () => {
         error,
       );
     });
+
+    it("appends ?draft=true when saving as a draft", async () => {
+      const data = { name: "wf", nodes: [], edges: [] };
+      mockHttpInstance.post.mockResolvedValue({ data: { id: "w1" } });
+
+      await workflows.createWorkflow({ org_identifier: "org123", data, draft: true });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/org123/workflows?draft=true", data);
+    });
+
+    it("omits the draft query when draft is false", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({ org_identifier: "o", data: {}, draft: false });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows", {});
+    });
+
+    it("defaults to a non-draft (published) create when draft is omitted", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({ org_identifier: "o", data: {} });
+
+      expect(mockHttpInstance.post.mock.calls[0][0]).toBe("/api/o/workflows");
+    });
   });
 
   describe("updateWorkflow", () => {
@@ -171,6 +196,23 @@ describe("workflows service", () => {
         workflows.updateWorkflow({ org_identifier: "o", id: "w1", data: {} }),
       ).rejects.toThrow("conflict");
     });
+
+    it("appends ?draft=true when updating a draft row", async () => {
+      const data = { name: "renamed" };
+      mockHttpInstance.put.mockResolvedValue({});
+
+      await workflows.updateWorkflow({ org_identifier: "o", id: "w1", data, draft: true });
+
+      expect(mockHttpInstance.put).toHaveBeenCalledWith("/api/o/workflows/w1?draft=true", data);
+    });
+
+    it("omits the draft query for a published-workflow update", async () => {
+      mockHttpInstance.put.mockResolvedValue({});
+
+      await workflows.updateWorkflow({ org_identifier: "o", id: "w1", data: {}, draft: false });
+
+      expect(mockHttpInstance.put).toHaveBeenCalledWith("/api/o/workflows/w1", {});
+    });
   });
 
   describe("deleteWorkflow", () => {
@@ -189,6 +231,63 @@ describe("workflows service", () => {
       await expect(
         workflows.deleteWorkflow({ org_identifier: "o", id: "missing" }),
       ).rejects.toThrow("not found");
+    });
+
+    it("appends ?draft=true when deleting a draft, still with no body", async () => {
+      mockHttpInstance.delete.mockResolvedValue({});
+
+      await workflows.deleteWorkflow({ org_identifier: "o", id: "w1", draft: true });
+
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith("/api/o/workflows/w1?draft=true");
+      expect(mockHttpInstance.delete.mock.calls[0]).toHaveLength(1);
+    });
+
+    it("omits the draft query when deleting a published workflow", async () => {
+      mockHttpInstance.delete.mockResolvedValue({});
+
+      await workflows.deleteWorkflow({ org_identifier: "o", id: "w1", draft: false });
+
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith("/api/o/workflows/w1");
+    });
+  });
+
+  describe("promoteWorkflow", () => {
+    it("POSTs to the promote endpoint with trigger_type and no body", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { code: 201 } });
+
+      await workflows.promoteWorkflow({
+        org_identifier: "org123",
+        id: "w1",
+        trigger_type: "AlertFired",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/org123/workflows/promote/w1?trigger_type=AlertFired",
+      );
+      expect(mockHttpInstance.post.mock.calls[0]).toHaveLength(1);
+    });
+
+    it("carries an IncidentEvent trigger_type through the query", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.promoteWorkflow({
+        org_identifier: "o",
+        id: "w1",
+        trigger_type: "IncidentEvent",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows/promote/w1?trigger_type=IncidentEvent",
+      );
+    });
+
+    it("propagates a 400 when the draft graph is still invalid", async () => {
+      const error = { response: { status: 400, data: { message: "A Trigger Is Required" } } };
+      mockHttpInstance.post.mockRejectedValue(error);
+
+      await expect(
+        workflows.promoteWorkflow({ org_identifier: "o", id: "w1", trigger_type: "AlertFired" }),
+      ).rejects.toEqual(error);
     });
   });
 
@@ -517,7 +616,7 @@ describe("workflows service", () => {
   });
 
   describe("service surface", () => {
-    it("exposes exactly the 9 workflow endpoints", () => {
+    it("exposes exactly the 10 workflow endpoints", () => {
       expect(Object.keys(workflows).sort()).toEqual([
         "createWorkflow",
         "deleteWorkflow",
@@ -525,6 +624,7 @@ describe("workflows service", () => {
         "getWorkflowHistory",
         "getWorkflowRun",
         "listWorkflows",
+        "promoteWorkflow",
         "retryWorkflow",
         "testWorkflow",
         "updateWorkflow",

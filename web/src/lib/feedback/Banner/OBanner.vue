@@ -4,7 +4,7 @@ import { computed, useSlots } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 interface Props {
-  variant?: "default" | "info" | "success" | "warning" | "error" | "error-soft";
+  variant?: "default" | "info" | "success" | "warning" | "error" | "error-soft" | "promo";
   content?: I18nText;
   icon?: string;
   dense?: boolean;
@@ -17,6 +17,18 @@ interface Props {
    * banners visibly ragged.
    */
   bar?: boolean;
+  /**
+   * Bar mode: centre the message and its actions as one group rather than
+   * pinning actions to the right edge. For a short promotional line, where a
+   * left-aligned message with the action stranded across the viewport reads as
+   * two unrelated things.
+   */
+  center?: boolean;
+  /**
+   * Overrides the role derived from `variant`. Only for a bar that is part of
+   * the page's furniture rather than a notification.
+   */
+  role?: "status" | "alert" | "banner";
   dataTest?: string;
 }
 
@@ -25,12 +37,14 @@ const props = withDefaults(defineProps<Props>(), {
   dense: false,
   inlineActions: false,
   bar: false,
+  center: false,
 });
 
 const slots = useSlots();
 
-const ariaRole = computed(() =>
-  props.variant === "error" || props.variant === "warning" ? "alert" : "status",
+const ariaRole = computed(
+  () =>
+    props.role ?? (props.variant === "error" || props.variant === "warning" ? "alert" : "status"),
 );
 
 const hasDefaultSlot = computed(() => !!slots.default);
@@ -49,6 +63,9 @@ const variantClass = computed(() => {
       return "bg-banner-warning-bg border border-banner-warning-border border-l-4 border-l-banner-warning-border text-banner-warning-text";
     case "error":
       return "bg-banner-error-bg text-banner-error-text";
+    // Marketing gold, shared with the standalone webinar bar so the two match.
+    case "promo":
+      return "bg-promo-webinar-accent text-promo-webinar-text";
     // Tinted error for hints/insights — solid `error` stays for hard failures.
     case "error-soft":
       return "bg-banner-error-soft-bg border border-banner-error-soft-border border-l-4 border-l-banner-error-soft-border text-banner-error-soft-text";
@@ -76,6 +93,8 @@ const barVariantClass = computed(() => {
       return "bg-banner-error-bg text-banner-error-text";
     case "error-soft":
       return "bg-banner-error-soft-bg text-banner-error-soft-text";
+    case "promo":
+      return "bg-promo-webinar-accent text-promo-webinar-text";
     default:
       return "bg-banner-default-bg text-banner-default-text";
   }
@@ -88,7 +107,9 @@ const barVariantClass = computed(() => {
     :data-test="dataTest"
     :class="[
       'flex',
-      bar ? 'w-full flex-row flex-wrap items-center justify-between gap-3 px-4 py-2' : '',
+      bar ? 'w-full flex-row flex-wrap items-center gap-3 px-4' : '',
+      bar ? (dense ? 'py-1' : 'py-2') : '',
+      bar ? (center ? 'justify-center' : 'justify-between') : '',
       bar ? '' : 'rounded-default',
       bar ? '' : inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
       bar ? '' : dense ? 'p-2' : 'p-4',
@@ -98,7 +119,7 @@ const barVariantClass = computed(() => {
     <div
       :class="[
         'flex flex-row gap-3',
-        bar ? 'min-w-0 flex-1 items-center' : 'items-start',
+        bar ? (center ? 'min-w-0 items-center' : 'min-w-0 flex-1 items-center') : 'items-start',
         inlineActions && !bar ? 'flex-1' : '',
       ]"
     >

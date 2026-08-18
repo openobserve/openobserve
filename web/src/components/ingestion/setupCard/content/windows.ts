@@ -18,13 +18,13 @@
 // comes from ./osAgent; this file holds the PowerShell command and the
 // Windows-specific collection list.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
   AGENTS_REPO,
-  EC2_IAM_NOTE,
+  EC2_IAM_NOTE_KEY,
   agentCode,
   agentUninstall,
   envIcons,
@@ -36,17 +36,17 @@ const install = (env: "" | "/ec2") =>
   `Invoke-WebRequest -Uri ${AGENTS_REPO}/windows${env}/install.ps1 -OutFile install.ps1
 .\\install.ps1 -URL {url}/api/{org}/ -AUTH_KEY {token}`;
 
-export default function windowsCard(subs: CardSubstitutions): RichCardContent {
+export default function windowsCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const icon = envIcons();
   return {
     provider: {
-      name: "Windows",
-      tagline: gt("ingestion.setupCard.taglineWindows"),
+      name: raw("Windows"),
+      tagline: t("ingestion.setupCard.taglineWindows"),
       logo: getImageURL("images/common/windows.svg"),
       tone: "#0078d4",
-      runtime: "Host",
-      setupTime: "~1 min",
-      metaBadges: [gt("common.logs"), gt("common.metrics")],
+      runtime: t("ingestion.setupCard.runtimeHost"),
+      setupTime: t("ingestion.setupCard.setupTime1Min"),
+      metaBadges: [t("common.logs"), t("common.metrics")],
     },
     steps: [
       {
@@ -62,14 +62,14 @@ export default function windowsCard(subs: CardSubstitutions): RichCardContent {
             labelKey: "ingestion.setupCard.genericWindowsVariant",
             icon: icon.windows,
             code: agentCode(install(""), subs, "powershell"),
-            note: "Any Windows server or VM.",
+            note: t("ingestion.setupCard.anyWindowsHostNote"),
           },
           {
             id: "ec2",
             label: raw("AWS EC2"),
             icon: icon.ec2,
             code: agentCode(install("/ec2"), subs, "powershell"),
-            note: EC2_IAM_NOTE,
+            note: t(EC2_IAM_NOTE_KEY),
           },
         ],
       },
@@ -83,29 +83,28 @@ export default function windowsCard(subs: CardSubstitutions): RichCardContent {
         // The four Windows Event Log channels, which the Event Viewer itself
         // localises — so they are translated rather than raw() tokens.
         pills: [
-          gt("ingestion.setupCard.pillApplication"),
-          gt("ingestion.setupCard.pillSecurity"),
-          gt("ingestion.setupCard.pillSetup"),
-          gt("ingestion.setupCard.pillSystem"),
-          gt("ingestion.setupCard.pillPerformanceCounters"),
-          gt("ingestion.setupCard.pillHostMetrics"),
+          t("ingestion.setupCard.pillApplication"),
+          t("ingestion.setupCard.pillSecurity"),
+          t("ingestion.setupCard.pillSetup"),
+          t("ingestion.setupCard.pillSystem"),
+          t("ingestion.setupCard.pillPerformanceCounters"),
+          t("ingestion.setupCard.pillHostMetrics"),
         ],
       },
     ],
     detect: hostMetricsDetect,
     extras: {
-      fixTitle: "Check The Agent Service",
-      fixBody:
-        "The installer registers the agent as a Windows service. If nothing arrives, confirm it is running and read the most recent entries from its log:",
+      fixTitle: t("ingestion.setupCard.agentServiceFixTitle"),
+      fixBody: t("ingestion.setupCard.windowsAgentFixBody"),
       fixLang: "powershell",
       fixSnippet: `Get-Service -Name openobserve-agent
 Get-Content -Tail 50 "$env:ProgramData\\openobserve-agent\\agent.log"`,
       troubleshooting: [
         {
-          q: "The script fails to run at all",
-          a: "PowerShell blocks unsigned scripts by default. Run the console **as Administrator** and, if needed, allow the script for that session with `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.",
+          q: t("ingestion.setupCard.windowsTroubleScriptQ"),
+          a: t("ingestion.setupCard.windowsTroubleScriptA"),
         },
-        ...sharedAgentTroubleshooting("`Get-Service -Name openobserve-agent`"),
+        ...sharedAgentTroubleshooting(t, "`Get-Service -Name openobserve-agent`"),
       ],
       uninstall: agentUninstall("windows"),
     },

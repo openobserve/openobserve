@@ -37,7 +37,7 @@
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
-import type { I18nText } from "@/types/i18n";
+import { gt, raw, type I18nText } from "@/types/i18n";
 
 export interface SqlErrorRange {
   startLine: number;
@@ -56,66 +56,153 @@ export interface SqlErrorRange {
 // ─── Message templates ────────────────────────────────────────────────────────
 // Keep messages here so they are easy to update in one place.
 
+// Memoised: these getters sit on the hot path (validateSql runs per keystroke and
+// per query in bulk callers), and vue-i18n resolution is not free. A locale change
+// triggers window.location.reload(), so a per-session cache can never go stale.
+const _msgCache = new Map<string, I18nText>();
+const m = (key: string): I18nText => {
+  let v = _msgCache.get(key);
+  if (v === undefined) {
+    v = gt(key);
+    _msgCache.set(key, v);
+  }
+  return v;
+};
+
+// Parameterised sibling of `m`, and it has to be memoised for the same reason:
+// a `gt` call costs ~0.2ms on this instance, and the messages below are built
+// on the classifier's main path — including for errors that are then
+// suppressed — so resolving one per call put the spec back over its 5s budget.
+//
+// The result varies with the values, so what is cached is the RESOLVED LAYOUT
+// rather than the text: `gt` runs once per key with every placeholder fed a
+// unique sentinel, and splitting on those sentinels recovers the literal
+// segments plus the order the placeholders appear in. vue-i18n still owns
+// lookup, fallback and compilation; only the substitution of the values is
+// ours, so a locale that reorders or repeats a placeholder is still honoured.
+//
+// Assumes a key is always called with the same set of placeholder names, which
+// is true by construction: each MSG entry below owns exactly one key.
+const SENTINEL = "\u0000";
+const _tmplCache = new Map<string, string[]>();
+
+const mi = (key: string, named: Record<string, unknown>): I18nText => {
+  let parts = _tmplCache.get(key);
+  if (parts === undefined) {
+    const probes: Record<string, string> = {};
+    for (const name of Object.keys(named)) probes[name] = `${SENTINEL}${name}${SENTINEL}`;
+    // Even indices are literal text, odd indices are placeholder names.
+    parts = gt(key, probes).split(SENTINEL);
+    _tmplCache.set(key, parts);
+  }
+  let text = "";
+  for (let i = 0; i < parts.length; i++) {
+    text += i % 2 === 0 ? parts[i] : String(named[parts[i]] ?? "");
+  }
+  // `raw` is used purely as the cast-free way to re-brand text that vue-i18n
+  // already resolved above — this is translated output, not an exemption.
+  return raw(text);
+};
+
 const MSG = {
   // EOF / incomplete
-  incompleteAnd: "Incomplete condition — expected an expression after AND",
-  incompleteOr: "Incomplete condition — expected an expression after OR",
-  incompleteNot: "Incomplete condition — expected an expression after NOT",
-  incompleteLike: "Incomplete LIKE — expected a pattern string, e.g. LIKE '%value%'",
-  incompleteIn: "Incomplete IN — expected a value list, e.g. IN (1, 2, 3) or IN (SELECT …)",
-  incompleteBetween: "Incomplete BETWEEN — expected a range, e.g. BETWEEN 1 AND 10",
-  incompleteIs: "Incomplete IS — expected NULL, NOT NULL, TRUE, or FALSE after IS",
-  incompleteOrderBy: "Incomplete ORDER BY — expected a column name or expression",
-  incompleteOrder: "Incomplete ORDER — expected BY after ORDER",
-  incompleteGroupBy: "Incomplete GROUP BY — expected a column name or expression",
-  incompleteGroup: "Incomplete GROUP — expected BY after GROUP",
-  incompleteHaving: "Incomplete HAVING — expected a condition after HAVING",
-  incompleteWhere: "Incomplete WHERE — expected a condition after WHERE",
-  incompleteFrom: "Incomplete FROM — expected a table or stream name",
-  incompleteSelect: "Incomplete SELECT — expected column names, expressions, or *",
-  incompleteComparison: (op: string) => `Incomplete comparison — expected a value after ${op}`,
-  incompleteLimit: "Incomplete LIMIT — expected a number",
-  incompleteOffset: "Incomplete OFFSET — expected a number",
-  incompleteOpenParen: "Unclosed parenthesis — expected an expression or closing )",
-  incompleteExpr: "Unexpected end of query — the expression is incomplete",
+  get incompleteAnd() {
+    return m("sqlEditor.diagnostics.incompleteAnd");
+  },
+  get incompleteOr() {
+    return m("sqlEditor.diagnostics.incompleteOr");
+  },
+  get incompleteNot() {
+    return m("sqlEditor.diagnostics.incompleteNot");
+  },
+  get incompleteLike() {
+    return m("sqlEditor.diagnostics.incompleteLike");
+  },
+  get incompleteIn() {
+    return m("sqlEditor.diagnostics.incompleteIn");
+  },
+  get incompleteBetween() {
+    return m("sqlEditor.diagnostics.incompleteBetween");
+  },
+  get incompleteIs() {
+    return m("sqlEditor.diagnostics.incompleteIs");
+  },
+  get incompleteOrderBy() {
+    return m("sqlEditor.diagnostics.incompleteOrderBy");
+  },
+  get incompleteOrder() {
+    return m("sqlEditor.diagnostics.incompleteOrder");
+  },
+  get incompleteGroupBy() {
+    return m("sqlEditor.diagnostics.incompleteGroupBy");
+  },
+  get incompleteGroup() {
+    return m("sqlEditor.diagnostics.incompleteGroup");
+  },
+  get incompleteHaving() {
+    return m("sqlEditor.diagnostics.incompleteHaving");
+  },
+  get incompleteWhere() {
+    return m("sqlEditor.diagnostics.incompleteWhere");
+  },
+  get incompleteFrom() {
+    return m("sqlEditor.diagnostics.incompleteFrom");
+  },
+  get incompleteSelect() {
+    return m("sqlEditor.diagnostics.incompleteSelect");
+  },
+  incompleteComparison: (op: string) => mi("sqlEditor.diagnostics.incompleteComparison", { op }),
+  get incompleteLimit() {
+    return m("sqlEditor.diagnostics.incompleteLimit");
+  },
+  get incompleteOffset() {
+    return m("sqlEditor.diagnostics.incompleteOffset");
+  },
+  get incompleteOpenParen() {
+    return m("sqlEditor.diagnostics.incompleteOpenParen");
+  },
+  get incompleteExpr() {
+    return m("sqlEditor.diagnostics.incompleteExpr");
+  },
 
   // UNION / JOIN / DISTINCT
-  incompleteUnion: "Incomplete UNION — expected SELECT after UNION or UNION ALL",
-  incompleteJoinOn: "Incomplete JOIN — expected a condition after ON",
-  incompleteDistinct: "Incomplete SELECT — expected column names after DISTINCT",
+  get incompleteUnion() {
+    return m("sqlEditor.diagnostics.incompleteUnion");
+  },
+  get incompleteJoinOn() {
+    return m("sqlEditor.diagnostics.incompleteJoinOn");
+  },
+  get incompleteDistinct() {
+    return m("sqlEditor.diagnostics.incompleteDistinct");
+  },
 
   // Unexpected token
-  missingWhere: (col: string) => `Missing WHERE keyword — did you mean: … FROM … WHERE ${col} = …?`,
-  missingWhereBefore: (expr: string) =>
-    `Missing WHERE keyword before '${expr}' — a filter condition must follow WHERE`,
-  missingOperator: (word: string) =>
-    `Missing operator before '${word}' — did you forget AND or OR?`,
-  unexpectedIdent: (word: string) =>
-    `Unexpected '${word}' — did you forget AND, OR, or an operator?`,
-  badLikePattern: "Invalid LIKE pattern — wrap the pattern in single quotes, e.g. LIKE '%value%'",
-  unexpectedClose: "Unexpected closing parenthesis ) — check that every ( has a matching )",
+  missingWhere: (col: string) => mi("sqlEditor.diagnostics.missingWhere", { col }),
+  missingWhereBefore: (expr: string) => mi("sqlEditor.diagnostics.missingWhereBefore", { expr }),
+  missingOperator: (word: string) => mi("sqlEditor.diagnostics.missingOperator", { word }),
+  unexpectedIdent: (word: string) => mi("sqlEditor.diagnostics.unexpectedIdent", { word }),
+  get badLikePattern() {
+    return m("sqlEditor.diagnostics.badLikePattern");
+  },
+  get unexpectedClose() {
+    return m("sqlEditor.diagnostics.unexpectedClose");
+  },
   unexpectedComma: (line: number, col: number) =>
-    `Unexpected comma at line ${line}, column ${col} — check your column list or function arguments`,
+    mi("sqlEditor.diagnostics.unexpectedComma", { line, col }),
   generic: (ch: string, line: number, col: number) =>
-    `Unexpected '${ch}' at line ${line}, column ${col}`,
+    mi("sqlEditor.diagnostics.generic", { ch, line, col }),
 
   // Semantic / schema errors (returned by the backend, not caught client-side).
   // These reference an identifier that we locate in the query text.
-  fieldNotFound: (field: string) =>
-    `Unknown field '${field}' — this column does not exist in the stream`,
-  functionNotFound: (fn: string) => `Unknown function '${fn}' — no such function is defined`,
-  incompatibleType: (field: string) =>
-    `Field '${field}' has an incompatible data type for this operation`,
-  streamNotFound: (stream: string) => `Unknown stream '${stream}' — this stream does not exist`,
-  groupByMissing: (col: string) =>
-    `'${col}' must appear in the GROUP BY clause or be used in an aggregate function`,
-  ambiguousColumn: (col: string) =>
-    `Column '${col}' is ambiguous — qualify it with its stream/table name`,
-  duplicateColumn: (col: string) =>
-    `Column '${col}' is defined more than once — remove or alias the duplicate`,
-  tableNotFound: (tbl: string) => `Unknown table '${tbl}' — this table or CTE does not exist`,
-  functionSignature: (fn: string) =>
-    `Function '${fn}' was called with the wrong argument type(s) — add an explicit cast`,
+  fieldNotFound: (field: string) => mi("sqlEditor.diagnostics.fieldNotFound", { field }),
+  functionNotFound: (fn: string) => mi("sqlEditor.diagnostics.functionNotFound", { fn }),
+  incompatibleType: (field: string) => mi("sqlEditor.diagnostics.incompatibleType", { field }),
+  streamNotFound: (stream: string) => mi("sqlEditor.diagnostics.streamNotFound", { stream }),
+  groupByMissing: (col: string) => mi("sqlEditor.diagnostics.groupByMissing", { col }),
+  ambiguousColumn: (col: string) => mi("sqlEditor.diagnostics.ambiguousColumn", { col }),
+  duplicateColumn: (col: string) => mi("sqlEditor.diagnostics.duplicateColumn", { col }),
+  tableNotFound: (tbl: string) => mi("sqlEditor.diagnostics.tableNotFound", { tbl }),
+  functionSignature: (fn: string) => mi("sqlEditor.diagnostics.functionSignature", { fn }),
 } as const;
 
 // ─── Backward context scanner ─────────────────────────────────────────────────
@@ -380,7 +467,7 @@ function filterExpressionAfterFrom(sql: string, offset: number): string | null {
  */
 export function buildContextualSqlMessage(sql: string, err: any): string | null {
   const loc = err?.location?.start;
-  if (!loc) return err?.message?.split("\n")[0] ?? "SQL syntax error";
+  if (!loc) return err?.message?.split("\n")[0] ?? m("sqlEditor.diagnostics.syntaxError");
 
   const offset: number = loc.offset;
   const found: string | null = err.found ?? null;
@@ -398,8 +485,7 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
 
   // ── EOF after OVER ( — expSize is moderate (PARTITION/ORDER/ROWS in expected) ─
   if (found === null && has(exp, "PARTITION", "ORDER", "ROWS") && !has(exp, "AND", "OR", "WHERE")) {
-    if (has(exp, "PARTITION"))
-      return "Incomplete OVER clause — expected PARTITION BY, ORDER BY, or closing )";
+    if (has(exp, "PARTITION")) return m("sqlEditor.diagnostics.incompleteOver");
   }
 
   // ── EOF inside nested constructs (CASE/COALESCE/OVER/subquery/CTE) ──────────
@@ -409,27 +495,27 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
     const construct = innermostConstruct(sql, offset);
     switch (construct) {
       case "CASE_WHEN":
-        return "Incomplete CASE — expected THEN after the WHEN condition";
+        return m("sqlEditor.diagnostics.incompleteCaseWhen");
       case "CASE_THEN":
-        return "Incomplete CASE — expected another WHEN, ELSE, or END";
+        return m("sqlEditor.diagnostics.incompleteCaseThen");
       case "CASE_ELSE":
-        return "Incomplete CASE — expected END to close the CASE expression";
+        return m("sqlEditor.diagnostics.incompleteCaseElse");
       case "CASE":
-        return "Incomplete CASE — expected WHEN after CASE";
+        return m("sqlEditor.diagnostics.incompleteCase");
       case "COALESCE":
-        return "Incomplete COALESCE — expected another argument or closing )";
+        return m("sqlEditor.diagnostics.incompleteCoalesce");
       case "NULLIF":
-        return "Incomplete NULLIF — expected a second argument, e.g. NULLIF(expr, 0)";
+        return m("sqlEditor.diagnostics.incompleteNullif");
       case "IIF":
-        return "Incomplete IIF — expected condition, true-value, and false-value";
+        return m("sqlEditor.diagnostics.incompleteIif");
       case "PARTITION":
-        return "Incomplete PARTITION BY — expected a column name or expression";
+        return m("sqlEditor.diagnostics.incompletePartitionBy");
       case "OVER":
-        return "Incomplete OVER clause — expected PARTITION BY, ORDER BY, or closing )";
+        return m("sqlEditor.diagnostics.incompleteOver");
       case "CTE":
-        return "Incomplete CTE — expected ) to close the WITH expression";
+        return m("sqlEditor.diagnostics.incompleteCte");
       case "SUBQUERY":
-        return "Incomplete subquery — expected SELECT or closing )";
+        return m("sqlEditor.diagnostics.incompleteSubquery");
       default: {
         // construct is "" or "PAREN" — scanner found no unclosed named construct.
         // Fall back to lastWord for keywords that produce large expSizes.

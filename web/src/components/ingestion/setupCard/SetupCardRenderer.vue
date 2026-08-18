@@ -84,9 +84,30 @@ const { isDark } = useTheme();
 const streamKind = computed(() => props.content.detect.streamType);
 const isLogsStream = computed(() => streamKind.value === "logs");
 const isMetricsStream = computed(() => streamKind.value === "metrics");
-// Plural noun for the "Checking for …" / "No … found" copy.
-const dataNoun = computed(() =>
-  isMetricsStream.value ? "metrics" : isLogsStream.value ? "logs" : "spans",
+// Status-bar copy that names the data ("Checking for metrics…" / "No spans
+// Found Yet"). The noun can't be appended to a translated fragment — word order
+// differs across languages — so, like countUnitKey below, we pick the KEY per
+// stream type and each message carries the whole sentence.
+const testForKey = computed<I18nKey>(() =>
+  isMetricsStream.value
+    ? "ingestion.setupCard.startIngestingTestForMetrics"
+    : isLogsStream.value
+      ? "ingestion.setupCard.startIngestingTestForLogs"
+      : "ingestion.setupCard.startIngestingTestForSpans",
+);
+const checkingForKey = computed<I18nKey>(() =>
+  isMetricsStream.value
+    ? "ingestion.setupCard.checkingForMetrics"
+    : isLogsStream.value
+      ? "ingestion.setupCard.checkingForLogs"
+      : "ingestion.setupCard.checkingForSpans",
+);
+const noneFoundKey = computed<I18nKey>(() =>
+  isMetricsStream.value
+    ? "ingestion.setupCard.noMetricsFoundYet"
+    : isLogsStream.value
+      ? "ingestion.setupCard.noLogsFoundYet"
+      : "ingestion.setupCard.noSpansFoundYet",
 );
 // Singular unit for the connected count ("3 metric streams" / "5 spans").
 // The count must live inside the translated string, and vue-i18n picks the
@@ -100,13 +121,17 @@ const countUnitKey = computed<I18nKey>(() =>
 );
 const connectedHeadline = computed(() =>
   isMetricsStream.value
-    ? "Connected — Metrics Are Flowing"
+    ? t("ingestion.setupCard.connectedMetricsHeadline")
     : isLogsStream.value
-      ? "Connected — Logs Are Flowing"
-      : "Connected — Traces Are Flowing",
+      ? t("ingestion.setupCard.connectedLogsHeadline")
+      : t("ingestion.setupCard.connectedTracesHeadline"),
 );
 const viewDataLabel = computed(() =>
-  isMetricsStream.value ? "View Streams" : isLogsStream.value ? "View Logs" : "View Traces",
+  isMetricsStream.value
+    ? t("ingestion.setupCard.viewStreams")
+    : isLogsStream.value
+      ? t("ingestion.setupCard.viewLogs")
+      : t("ingestion.setupCard.viewTraces"),
 );
 const viewDataIcon = computed(() =>
   isMetricsStream.value ? "list" : isLogsStream.value ? "article" : "timeline",
@@ -690,16 +715,13 @@ function fireConfetti() {
                 <span class="sb-dot" />
                 <span v-if="detect.idle.value" class="sb-txt"
                   >{{ t("ingestion.setupCard.notTestedYet")
-                  }}<span class="sb-sub"
-                    >{{ t("ingestion.setupCard.startIngestingTestFor") }} {{ dataNoun }}</span
-                  ></span
+                  }}<span class="sb-sub">{{ t(testForKey) }}</span></span
                 >
                 <span v-else-if="detect.checking.value" class="sb-txt"
-                  >{{ t("ingestion.setupCard.checkingFor") }} {{ dataNoun
-                  }}{{ t("ingestion.setupCard.ellipsis")
-                  }}<span class="sb-sub"
-                    >{{ t("ingestion.setupCard.on") }} {{ watchedStream }}</span
-                  ></span
+                  >{{ t(checkingForKey)
+                  }}<span class="sb-sub">{{
+                    t("ingestion.setupCard.onStream", { stream: watchedStream })
+                  }}</span></span
                 >
                 <span v-else-if="detect.connected.value" class="sb-txt"
                   >{{ connectedHeadline
@@ -711,12 +733,10 @@ function fireConfetti() {
                   ></span
                 >
                 <span v-else class="sb-txt sb-warn"
-                  >{{ t("ingestion.setupCard.no") }} {{ dataNoun }}
-                  {{ t("ingestion.setupCard.foundYet")
-                  }}<span class="sb-sub"
-                    >{{ t("ingestion.setupCard.nothingOn") }} {{ watchedStream }}
-                    {{ t("ingestion.setupCard.runAppAndTestAgain") }}</span
-                  ></span
+                  >{{ t(noneFoundKey)
+                  }}<span class="sb-sub">{{
+                    t("ingestion.setupCard.nothingOnStream", { stream: watchedStream })
+                  }}</span></span
                 >
 
                 <OButton
