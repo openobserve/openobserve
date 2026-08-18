@@ -16,17 +16,12 @@
 import { describe, it, expect } from "vitest";
 import {
   SPAN_COLOR_COUNT,
-  getSpanColor,
   getSpanColorHex,
-  getServiceColor,
   getServiceColorHex,
-  getSpanColorWithOpacity,
   getAllSpanColors,
-  generateServiceColorMap,
   getContrastTextColor,
   traceUIColors,
   statusColors,
-  spanKindColors,
 } from "./traceColors";
 import { chartColor } from "../chartTheme";
 
@@ -37,35 +32,6 @@ describe("traceColors", () => {
       // wrong set (renamed prefix, added/removed token) — the length assertions
       // elsewhere use SPAN_COLOR_COUNT on both sides and can't catch that.
       expect(SPAN_COLOR_COUNT).toBe(35);
-    });
-  });
-
-  describe("getSpanColor", () => {
-    it("should return a CSS variable string", () => {
-      const result = getSpanColor(1);
-      expect(result).toBe("var(--color-span-1)");
-    });
-
-    it("should return correct CSS variable for index 25", () => {
-      const result = getSpanColor(25);
-      expect(result).toBe("var(--color-span-25)");
-    });
-
-    it("should wrap around correctly for index 51 (wraps to 1)", () => {
-      const result = getSpanColor(51);
-      expect(result).toBe("var(--color-span-1)");
-    });
-
-    it("should wrap around correctly for index 50", () => {
-      const result = getSpanColor(50);
-      expect(result).toBe("var(--color-span-50)");
-    });
-
-    it("should handle index 100 wrapping", () => {
-      const result = getSpanColor(100);
-      expect(result).toMatch(/^var\(--color-span-\d+\)$/);
-      const colorIndex = ((100 - 1) % 50) + 1;
-      expect(result).toBe(`var(--color-span-${colorIndex})`);
     });
   });
 
@@ -94,32 +60,6 @@ describe("traceColors", () => {
     });
   });
 
-  describe("getServiceColor", () => {
-    it("should return a CSS variable string", () => {
-      const result = getServiceColor("my-service");
-      expect(result).toMatch(/^var\(--color-span-\d+\)$/);
-    });
-
-    it("should return consistent color for the same service name", () => {
-      const result1 = getServiceColor("my-service");
-      const result2 = getServiceColor("my-service");
-      expect(result1).toBe(result2);
-    });
-
-    it("should return different colors for different services (most of the time)", () => {
-      const color1 = getServiceColor("service-alpha");
-      const color2 = getServiceColor("service-beta-very-different");
-      // They should be valid CSS vars even if they happen to collide
-      expect(color1).toMatch(/^var\(--color-span-\d+\)$/);
-      expect(color2).toMatch(/^var\(--color-span-\d+\)$/);
-    });
-
-    it("should handle empty service name", () => {
-      const result = getServiceColor("");
-      expect(result).toMatch(/^var\(--color-span-\d+\)$/);
-    });
-  });
-
   describe("getServiceColorHex", () => {
     it("should return a hex color string", () => {
       const result = getServiceColorHex("my-service");
@@ -135,32 +75,6 @@ describe("traceColors", () => {
     it("should return hex for dark theme", () => {
       const result = getServiceColorHex("my-service", "dark");
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);
-    });
-  });
-
-  describe("getSpanColorWithOpacity", () => {
-    it("should return a color-mix string", () => {
-      const result = getSpanColorWithOpacity(1, 0.5);
-      expect(result).toContain("color-mix");
-      expect(result).toContain("transparent");
-      expect(result).toContain("50%");
-    });
-
-    it("should use full opacity by default", () => {
-      const result = getSpanColorWithOpacity(1);
-      expect(result).toContain("100%");
-    });
-
-    it("should wrap index around at 50", () => {
-      const result1 = getSpanColorWithOpacity(1, 1);
-      const result51 = getSpanColorWithOpacity(51, 1);
-      expect(result1).toBe(result51);
-    });
-
-    it("should use correct CSS variable", () => {
-      const result = getSpanColorWithOpacity(5, 0.8);
-      expect(result).toContain("var(--color-span-5)");
-      expect(result).toContain("80%");
     });
   });
 
@@ -191,45 +105,11 @@ describe("traceColors", () => {
     });
   });
 
-  describe("generateServiceColorMap", () => {
-    it("should return a Map", () => {
-      const result = generateServiceColorMap(["service-a", "service-b"]);
-      expect(result instanceof Map).toBe(true);
-    });
-
-    it("should have an entry for each service", () => {
-      const services = ["service-a", "service-b", "service-c"];
-      const result = generateServiceColorMap(services);
-      expect(result.size).toBe(services.length);
-      services.forEach((svc) => {
-        expect(result.has(svc)).toBe(true);
-      });
-    });
-
-    it("should assign CSS variable strings", () => {
-      const result = generateServiceColorMap(["service-a"]);
-      expect(result.get("service-a")).toMatch(/^var\(--color-span-\d+\)$/);
-    });
-
-    it("should handle empty array", () => {
-      const result = generateServiceColorMap([]);
-      expect(result.size).toBe(0);
-    });
-
-    it("should attempt to use distinct colors for different services", () => {
-      const services = ["a", "b", "c", "d", "e"];
-      const result = generateServiceColorMap(services);
-      const values = Array.from(result.values());
-      // At least some should be unique (hard to guarantee due to hashing)
-      expect(values.length).toBe(services.length);
-    });
-  });
-
   describe("getContrastTextColor", () => {
     // A value this cannot measure keeps the old always-white behaviour, so
     // existing callers passing a CSS var reference are unaffected.
     it("returns white for a value it cannot measure", () => {
-      expect(getContrastTextColor("var(--color-span-1)")).toBe("white");
+      expect(getContrastTextColor("var(--color-trace-span-1)")).toBe("white");
       expect(getContrastTextColor("")).toBe("white");
       expect(getContrastTextColor("not-a-colour")).toBe("white");
       expect(getContrastTextColor("#12345")).toBe("white");
@@ -288,22 +168,6 @@ describe("traceColors", () => {
       Object.values(statusColors).forEach((color) => {
         expect(color).toMatch(/^var\(--color-/);
       });
-    });
-  });
-
-  describe("spanKindColors", () => {
-    it("should have all span kind keys", () => {
-      expect(spanKindColors.client).toBeDefined();
-      expect(spanKindColors.server).toBeDefined();
-      expect(spanKindColors.producer).toBeDefined();
-      expect(spanKindColors.consumer).toBeDefined();
-      expect(spanKindColors.internal).toBeDefined();
-      expect(spanKindColors.unspecified).toBeDefined();
-    });
-
-    it("should use CSS variable strings for most kinds", () => {
-      expect(spanKindColors.client).toMatch(/^var\(--color-/);
-      expect(spanKindColors.server).toMatch(/^var\(--color-/);
     });
   });
 });

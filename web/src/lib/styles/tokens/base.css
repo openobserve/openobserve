@@ -211,60 +211,6 @@
   --color-indigo-800: #3730a3;
   --color-indigo-900: #312e81;
 
-  /* --- Trace span categorical palette (50 colors) ---
-     Theme-neutral (same in light/dark); consumed as --color-span-{n} by
-     utils/traces/traceColors.ts. */
-  --color-span-1: #3b82f6;
-  --color-span-2: #ef4444;
-  --color-span-3: #10b981;
-  --color-span-4: #a855f7;
-  --color-span-5: #f97316;
-  --color-span-6: #06b6d4;
-  --color-span-7: #ec4899;
-  --color-span-8: #84cc16;
-  --color-span-9: #6366f1;
-  --color-span-10: #f59e0b;
-  --color-span-11: #14b8a6;
-  --color-span-12: #d946ef;
-  --color-span-13: #16a34a;
-  --color-span-14: #7c3aed;
-  --color-span-15: #f59e0b;
-  --color-span-16: #0284c7;
-  --color-span-17: #e11d48;
-  --color-span-18: #84cc16;
-  --color-span-19: #6366f1;
-  --color-span-20: #ef4444;
-  --color-span-21: #10b981;
-  --color-span-22: #8b5cf6;
-  --color-span-23: #f97316;
-  --color-span-24: #06b6d4;
-  --color-span-25: #ec4899;
-  --color-span-26: #22c55e;
-  --color-span-27: #a855f7;
-  --color-span-28: #fbbf24;
-  --color-span-29: #3b82f6;
-  --color-span-30: #f43f5e;
-  --color-span-31: #14b8a6;
-  --color-span-32: #d946ef;
-  --color-span-33: #84cc16;
-  --color-span-34: #6366f1;
-  --color-span-35: #fb923c;
-  --color-span-36: #0ea5e9;
-  --color-span-37: #f472b6;
-  --color-span-38: #22d3ee;
-  --color-span-39: #a78bfa;
-  --color-span-40: #34d399;
-  --color-span-41: #fca5a5;
-  --color-span-42: #818cf8;
-  --color-span-43: #fcd34d;
-  --color-span-44: #2dd4bf;
-  --color-span-45: #f9a8d4;
-  --color-span-46: #67e8f9;
-  --color-span-47: #c4b5fd;
-  --color-span-48: #86efac;
-  --color-span-49: #fde68a;
-  --color-span-50: #fca5a5;
-
   /* --- Dashboard classic series palette — light values (dark overrides in dark.css).
      Read by utils/dashboard/colorPalette.ts getColorPalette() via chartColor(), so the
      light/dark swap lives in CSS instead of a `theme === "dark"` branch in JS. --- */
@@ -317,9 +263,10 @@
      dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
      empty value ECharts reads as its own "auto" default — preserving today's look. --- */
 
-  /* --- Trace span palette (35 colors, HEX/canvas variant) — light values; dark
-     overrides in dark.css. Read by traceColors.ts getSpanColorHex()/getAllSpanColors()
-     via chartColor(). Distinct from --color-span-* (the 50-colour var() palette). --- */
+  /* --- Trace span palette (35 colors) — light values; dark overrides in dark.css.
+     Read by traceColors.ts getSpanColorHex()/getAllSpanColors() via chartColor().
+     This is the only span-bar palette; a parallel 50-colour var() set used to sit
+     above and was deleted unused. --- */
   --color-trace-span-1: #10b981;
   --color-trace-span-2: #06b6d4;
   --color-trace-span-3: #84cc16;
