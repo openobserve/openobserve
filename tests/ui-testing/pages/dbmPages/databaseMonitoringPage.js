@@ -580,8 +580,33 @@ export class DatabaseMonitoringPage {
     return Boolean((queries.hits || []).length) || Number(queries.total) > 0;
   }
 
-  /** Shared reader for the DBM endpoints, with the suite's own credentials. */
-  async dbmApi(endpoint, periodSeconds = 3600) {
+  /**
+   * The instance AND engine this org's table-health rows actually carry.
+   *
+   * Both come from the data. Hardcoding the engine is what made the suite
+   * engine-specific: a test pinned to `system: 'postgresql'` sends
+   * `instance=my-prod-1&system=postgresql` against a MySQL org, which
+   * correctly matches nothing — and then reports a healthy page as "filtering
+   * emptied a populated table", i.e. it manufactures the exact defect the test
+   * exists to catch.
+   */
+  async firstScopeFromApi({ periodSeconds = 3600 } = {}) {
+    const body = await this.dbmApi('table_health', periodSeconds, { system: null });
+    const hit = (body?.hits || []).find((h) => h && h.instance);
+    return {
+      instance: hit ? String(hit.instance) : '',
+      engine: hit?.engine ? String(hit.engine) : '',
+    };
+  }
+
+  /**
+   * Shared reader for the DBM endpoints, with the suite's own credentials.
+   *
+   * `system` defaults to postgresql for callers that want it, but passing
+   * `{ system: null }` omits the filter entirely — required when the point of
+   * the call is to DISCOVER which engine this org holds.
+   */
+  async dbmApi(endpoint, periodSeconds = 3600, { system = 'postgresql' } = {}) {
     const org = process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
     const now = Date.now() * 1000;
@@ -590,7 +615,8 @@ export class DatabaseMonitoringPage {
     ).toString('base64');
     const url =
       `${baseUrl}/api/${org}/traces/db_monitoring/${endpoint}` +
-      `?start_time=${now - periodSeconds * 1e6}&end_time=${now}&system=postgresql`;
+      `?start_time=${now - periodSeconds * 1e6}&end_time=${now}` +
+      (system ? `&system=${encodeURIComponent(system)}` : '');
     try {
       const res = await this.page.request.get(url, {
         timeout: 30000,
