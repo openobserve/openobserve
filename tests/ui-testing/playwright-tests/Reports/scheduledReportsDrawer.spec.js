@@ -20,8 +20,9 @@ const {
  */
 
 const timestamp = Date.now();
-const DASHBOARD_A = `test_dash_sched_a_${timestamp}`;
-const DASHBOARD_B = `test_dash_sched_b_${timestamp}`;
+const DASH_PREFIX = 'test_dash_sched_';
+const DASHBOARD_A = `${DASH_PREFIX}a_${timestamp}`;
+const DASHBOARD_B = `${DASH_PREFIX}b_${timestamp}`;
 const REPORT_FOLDER = `test_folder_sched_${timestamp}`;
 const REPORT_DEFAULT_FOLDER = `test_report_sched_default_${timestamp}`;
 const REPORT_CUSTOM_FOLDER = `test_report_sched_custom_${timestamp}`;
@@ -276,7 +277,16 @@ test.describe("Dashboard Scheduled Reports Drawer", () => {
     }
 
     await pm.apiCleanup.cleanupReportFolders(['test_folder_sched_']);
-    await pm.apiCleanup.cleanupDashboards();
+    // Delete only the dashboards this spec created. cleanupDashboards() removes
+    // every dashboard owned by the automation user — under fullyParallel that is
+    // every other spec's too, and deleting a dashboard also makes any report
+    // bound to it vanish. Mirrors the scoped report/folder cleanups above.
+    const dashboards = await pm.apiCleanup.fetchDashboardsInFolder('default');
+    const ourDashboards = dashboards.filter(d => d.title && d.title.startsWith(DASH_PREFIX));
+    for (const dash of ourDashboards) {
+      await pm.apiCleanup.deleteDashboard(dash.dashboard_id, dash.folder_id || 'default');
+      testLogger.info(`Deleted test dashboard: ${dash.title}`);
+    }
 
     testLogger.info('Cleanup completed');
   });

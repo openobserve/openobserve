@@ -7,6 +7,14 @@ import prettier from "eslint-plugin-prettier";
 import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import cypress from "eslint-plugin-cypress";
 import vueI18n from "@intlify/eslint-plugin-vue-i18n";
+// Deep import: the plugin does not re-export its utils. It declares no `exports`
+// map so this resolves, and a path change in a future 4.x fails loudly at load.
+import {
+  getLocaleMessages,
+  isStaticLiteral,
+  getStaticLiteralValue,
+  skipTSAsExpression,
+} from "@intlify/eslint-plugin-vue-i18n/dist/utils/index.js";
 import fs from "fs";
 import css from "@eslint/css";
 // The parser behind @eslint/css. Used directly on .vue <style> blocks, which no ESLint
@@ -332,6 +340,18 @@ const BARE_STRING_DEFAULT_ALLOWLIST = [
 // otherwise the check is dodged by adding two braces. Bound PROPS are not checked
 // here; `I18nText` covers them, and rejects even a plain string variable.
 // Non-<template> files are a no-op.
+// Native attributes whose content is always text a user reads.
+const NATIVE_TEXT_ATTRS = new Set([
+  "placeholder",
+  "title",
+  "alt",
+  "aria-label",
+  "aria-placeholder",
+  "aria-description",
+  "aria-valuetext",
+  "aria-roledescription",
+]);
+
 noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
   meta: {
     type: "problem",
@@ -390,8 +410,19 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
         const text = bareText(node.value && node.value.expression);
         if (text == null) return;
         if (dir === "bind") {
-          // Component props → guarded by I18nText. Native `:title` / `:alt` are the
-          // residual gap: the built-in rule covers only their static form.
+          // Native only: component props are covered by the I18nText type, and the
+          // built-in rule sees only the STATIC form of these attributes.
+          const el = node.parent && node.parent.parent;
+          const tag = el && el.rawName;
+          // A dash or an uppercase letter means a component (OButton, q-btn).
+          const isNative = typeof tag === "string" && /^[a-z][a-z0-9]*$/.test(tag);
+          const attr = node.key.argument && node.key.argument.name;
+          if (isNative && NATIVE_TEXT_ATTRS.has(attr)) {
+            context.report({
+              node,
+              message: `Hardcoded text "${text}" in :${attr} — use t('...') with a key in en-US.json.`,
+            });
+          }
           return;
         } else if (dir === "text" || dir === "html") {
           context.report({
@@ -413,6 +444,39 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
         });
       },
     });
+  },
+};
+
+// @intlify's no-missing-keys hardcodes /^(\$t|t|\$tc|tc)$/ with `schema: []`, so it
+// cannot be told about gt(). A typo'd gt() key otherwise ships and renders its raw
+// path. Resolution is delegated to the plugin so both rules stay in step.
+noLegacyO2Tokens.rules["no-missing-gt-keys"] = {
+  meta: {
+    type: "problem",
+    docs: { description: "Check gt() keys exist in the configured locale messages" },
+    schema: [],
+    messages: {
+      missing: "gt(\"{{key}}\") is missing: '{{path}}' does not exist in localization messages.",
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        if (!node.callee || node.callee.type !== "Identifier" || node.callee.name !== "gt") return;
+        // Unwrap, or `gt("x" as I18nKey)` becomes a way to opt out of the check.
+        const arg = skipTSAsExpression(node.arguments[0]);
+        if (!isStaticLiteral(arg)) return; // dynamic keys are unresolvable here
+        const key = getStaticLiteralValue(arg);
+        if (!key) return;
+        // no-missing-keys owns the "localeDir unset" diagnostic; don't double-report.
+        const localeMessages = getLocaleMessages(context, { ignoreMissingSettingsError: true });
+        if (localeMessages.isEmpty()) return;
+        const missingPath = localeMessages.findMissingPath(String(key));
+        if (missingPath) {
+          context.report({ node: arg, messageId: "missing", data: { key, path: missingPath } });
+        }
+      },
+    };
   },
 };
 
@@ -515,6 +579,8 @@ export default [
         },
       ],
       "local/no-bare-bound-text-props": "error",
+      // The gt() half of the key contract; no-missing-keys above covers t().
+      "local/no-missing-gt-keys": "error",
       //
       // Vanilla useI18n().t() returns an unbranded `string`, which would silently
       // void every I18nText check in the file. useI18nTyped() is the same composer
@@ -667,19 +733,6 @@ export default [
     },
   },
   {
-    // Query-syntax cheat-sheets — the "text" is SQL/PromQL, not prose. Add a file
-    // here only when it is genuinely code, with a one-line reason.
-    files: [
-      "src/plugins/logs/SyntaxGuide.vue",
-      "src/plugins/traces/SyntaxGuide.vue",
-      "src/plugins/metrics/SyntaxGuideMetrics.vue",
-    ],
-    rules: {
-      "vue/no-bare-strings-in-template": "off",
-      "local/no-bare-bound-text-props": "off",
-    },
-  },
-  {
     // The ban can't forbid its own implementation: the wrapper has to import
     // useI18n to wrap it, and the bootstrap has to call createI18n.
     files: ["src/types/i18n.ts", "src/locales/**"],
@@ -695,6 +748,7 @@ export default [
     rules: {
       "no-restricted-imports": "off",
       "@intlify/vue-i18n/no-missing-keys": "off",
+      "local/no-missing-gt-keys": "off",
     },
   },
   {

@@ -13,10 +13,10 @@ import { z } from "zod";
 
 export const orgSettingsFieldNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
 
-const FIELD_FORMAT_MESSAGE = "Use alphanumeric and '+=,.@-_' characters only, without spaces.";
+export const makeOrganizationSettingsSchema = (t: (_key: string) => string) => {
+  const FIELD_FORMAT_MESSAGE = t("settings.organizationSettings.fieldNameHelp");
 
-export const makeOrganizationSettingsSchema = (t: (_key: string) => string) =>
-  z.object({
+  return z.object({
     // NO .trim(): OForm/TanStack validates with the schema but SAVES the raw value,
     // so .trim() would let "trace_id " pass yet persist the space (breaks field lookup).
     // Validate the raw value; the regex already rejects spaces.
@@ -35,5 +35,6 @@ export const makeOrganizationSettingsSchema = (t: (_key: string) => string) =>
     // submit; optional so it never blocks.
     crossLinks: z.array(z.any()).optional(),
   });
+};
 
 export type OrganizationSettingsForm = z.infer<ReturnType<typeof makeOrganizationSettingsSchema>>;

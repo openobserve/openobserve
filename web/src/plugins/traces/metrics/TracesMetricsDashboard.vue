@@ -109,7 +109,7 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 useStore();
 const { searchObj, tracesParser } = useTraces();
-useI18nTyped();
+const { t } = useI18nTyped();
 
 // Read filter and timeRange directly from the shared composable rather than via props.
 // The props go stale during synchronous call chains (e.g., auto_query_enabled
@@ -333,7 +333,7 @@ const loadDashboard = async () => {
     updateLayout();
   } catch (err: any) {
     console.error("Error loading dashboard:", err);
-    const message: string = err.message || "Failed to load metrics dashboard";
+    const message: string = err.message || t("traces.failedToLoadMetricsDashboard");
     error.value = message;
     showErrorNotification(raw(message));
   }

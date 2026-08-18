@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { gt } from "@/types/i18n";
 
 // --- mocks must be declared before imports that use them ---
 
@@ -75,7 +76,7 @@ describe("useLatencyInsightsAnalysis", () => {
   describe("return value structure", () => {
     it("exposes loading ref, error ref, analyzeDimension, and analyzeAllDimensions", () => {
       const { loading, error, analyzeDimension, analyzeAllDimensions } =
-        useLatencyInsightsAnalysis();
+        useLatencyInsightsAnalysis(gt);
 
       expect(loading.value).toBe(false);
       expect(error.value).toBeNull();
@@ -92,7 +93,7 @@ describe("useLatencyInsightsAnalysis", () => {
     it("includes COALESCE cast in distribution query SQL", async () => {
       mockSearch.mockResolvedValue(makeSearchResponse([{ value: "frontend", count: "10" }]));
 
-      await useLatencyInsightsAnalysis().analyzeDimension("service_name", makeConfig());
+      await useLatencyInsightsAnalysis(gt).analyzeDimension("service_name", makeConfig());
 
       const firstCall = mockSearch.mock.calls[0][0];
       expect(firstCall.query.query.sql).toContain("COALESCE");
@@ -111,7 +112,7 @@ describe("useLatencyInsightsAnalysis", () => {
         },
       });
 
-      await useLatencyInsightsAnalysis().analyzeDimension("service_name", config);
+      await useLatencyInsightsAnalysis(gt).analyzeDimension("service_name", config);
 
       // The selected distribution query (3rd call) should contain the duration filter
       const selectedDistCall = mockSearch.mock.calls[2][0];
@@ -131,7 +132,7 @@ describe("useLatencyInsightsAnalysis", () => {
         },
       });
 
-      await useLatencyInsightsAnalysis().analyzeDimension("service_name", config);
+      await useLatencyInsightsAnalysis(gt).analyzeDimension("service_name", config);
 
       // The first call is the baseline distribution — no duration filter
       const baselineDistCall = mockSearch.mock.calls[0][0];
@@ -145,7 +146,7 @@ describe("useLatencyInsightsAnalysis", () => {
         baseFilter: "env = 'production'",
       });
 
-      await useLatencyInsightsAnalysis().analyzeDimension("service_name", config);
+      await useLatencyInsightsAnalysis(gt).analyzeDimension("service_name", config);
 
       const baselineDistCall = mockSearch.mock.calls[0][0];
       expect(baselineDistCall.query.query.sql).toContain("env = 'production'");
@@ -154,7 +155,7 @@ describe("useLatencyInsightsAnalysis", () => {
     it("sends correct org_identifier and page_type to search service", async () => {
       mockSearch.mockResolvedValue(makeSearchResponse([]));
 
-      await useLatencyInsightsAnalysis().analyzeDimension("service_name", makeConfig());
+      await useLatencyInsightsAnalysis(gt).analyzeDimension("service_name", makeConfig());
 
       const call = mockSearch.mock.calls[0][0];
       expect(call.org_identifier).toBe("test-org");
@@ -164,7 +165,7 @@ describe("useLatencyInsightsAnalysis", () => {
     it("sets sql_mode to full and quick_mode to false in payload", async () => {
       mockSearch.mockResolvedValue(makeSearchResponse([]));
 
-      await useLatencyInsightsAnalysis().analyzeDimension("service_name", makeConfig());
+      await useLatencyInsightsAnalysis(gt).analyzeDimension("service_name", makeConfig());
 
       const { sql_mode, quick_mode } = mockSearch.mock.calls[0][0].query.query;
       expect(sql_mode).toBe("full");
@@ -181,7 +182,7 @@ describe("useLatencyInsightsAnalysis", () => {
         .mockResolvedValueOnce(makeSearchResponse([{ value: "frontend", count: "50" }]))
         .mockResolvedValueOnce(makeSearchResponse([{ total_count: 100, populated_count: 80 }]));
 
-      const result = await useLatencyInsightsAnalysis().analyzeDimension(
+      const result = await useLatencyInsightsAnalysis(gt).analyzeDimension(
         "service_name",
         makeConfig(),
       );
@@ -200,7 +201,7 @@ describe("useLatencyInsightsAnalysis", () => {
         .mockResolvedValueOnce(makeSearchResponse([{ value: "svc", count: "40" }]))
         .mockResolvedValueOnce(makeSearchResponse([{ total_count: 100, populated_count: 80 }]));
 
-      const { baselinePopulation } = await useLatencyInsightsAnalysis().analyzeDimension(
+      const { baselinePopulation } = await useLatencyInsightsAnalysis(gt).analyzeDimension(
         "service_name",
         makeConfig(),
       );
@@ -213,7 +214,7 @@ describe("useLatencyInsightsAnalysis", () => {
         .mockResolvedValueOnce(makeSearchResponse([]))
         .mockResolvedValueOnce(makeSearchResponse([{ total_count: 0, populated_count: 0 }]));
 
-      const { baselinePopulation } = await useLatencyInsightsAnalysis().analyzeDimension(
+      const { baselinePopulation } = await useLatencyInsightsAnalysis(gt).analyzeDimension(
         "service_name",
         makeConfig(),
       );
@@ -231,7 +232,7 @@ describe("useLatencyInsightsAnalysis", () => {
         )
         .mockResolvedValueOnce(makeSearchResponse([{ total_count: 100, populated_count: 100 }]));
 
-      const { data } = await useLatencyInsightsAnalysis().analyzeDimension(
+      const { data } = await useLatencyInsightsAnalysis(gt).analyzeDimension(
         "service_name",
         makeConfig(),
       );
@@ -269,7 +270,7 @@ describe("useLatencyInsightsAnalysis", () => {
         },
       });
 
-      await useLatencyInsightsAnalysis().analyzeDimension("service_name", config);
+      await useLatencyInsightsAnalysis(gt).analyzeDimension("service_name", config);
 
       expect(mockSearch).toHaveBeenCalledTimes(4);
     });
@@ -286,7 +287,7 @@ describe("useLatencyInsightsAnalysis", () => {
         },
       });
 
-      const { selectedPopulation } = await useLatencyInsightsAnalysis().analyzeDimension(
+      const { selectedPopulation } = await useLatencyInsightsAnalysis(gt).analyzeDimension(
         "service_name",
         config,
       );
@@ -306,7 +307,7 @@ describe("useLatencyInsightsAnalysis", () => {
         },
       });
 
-      const { differenceScore } = await useLatencyInsightsAnalysis().analyzeDimension(
+      const { differenceScore } = await useLatencyInsightsAnalysis(gt).analyzeDimension(
         "service_name",
         config,
       );
@@ -326,7 +327,10 @@ describe("useLatencyInsightsAnalysis", () => {
         },
       });
 
-      const { data } = await useLatencyInsightsAnalysis().analyzeDimension("service_name", config);
+      const { data } = await useLatencyInsightsAnalysis(gt).analyzeDimension(
+        "service_name",
+        config,
+      );
 
       // frontend comes from baseline, backend from selected
       const values = data.map((d) => d.value);
@@ -344,7 +348,7 @@ describe("useLatencyInsightsAnalysis", () => {
         return makeSearchResponse([]);
       });
 
-      const instance = useLatencyInsightsAnalysis();
+      const instance = useLatencyInsightsAnalysis(gt);
 
       // Need to add population mock too
       mockSearch.mockResolvedValue(makeSearchResponse([{ total_count: 0, populated_count: 0 }]));
@@ -356,7 +360,7 @@ describe("useLatencyInsightsAnalysis", () => {
     });
 
     it("returns empty array when dimensions list is empty", async () => {
-      const { analyzeAllDimensions } = useLatencyInsightsAnalysis();
+      const { analyzeAllDimensions } = useLatencyInsightsAnalysis(gt);
 
       const results = await analyzeAllDimensions(makeConfig({ dimensions: [] }));
 
@@ -371,7 +375,7 @@ describe("useLatencyInsightsAnalysis", () => {
       mockSearch.mockResolvedValue(makeSearchResponse([{ total_count: 10, populated_count: 5 }]));
 
       const config = makeConfig({ dimensions: ["service_name", "env"] });
-      const results = await useLatencyInsightsAnalysis().analyzeAllDimensions(config);
+      const results = await useLatencyInsightsAnalysis(gt).analyzeAllDimensions(config);
 
       expect(results.length).toBe(2);
       // In baseline-only mode all differenceScores are 0; order is stable
@@ -385,7 +389,7 @@ describe("useLatencyInsightsAnalysis", () => {
         .mockResolvedValue(makeSearchResponse([{ total_count: 10, populated_count: 5 }]));
 
       const config = makeConfig({ dimensions: ["service_name", "env"] });
-      const results = await useLatencyInsightsAnalysis().analyzeAllDimensions(config);
+      const results = await useLatencyInsightsAnalysis(gt).analyzeAllDimensions(config);
 
       // Only env should be present
       expect(results.length).toBe(1);
@@ -393,7 +397,7 @@ describe("useLatencyInsightsAnalysis", () => {
     });
 
     it("sets error.value and rethrows when top-level error occurs", async () => {
-      const { analyzeAllDimensions, error } = useLatencyInsightsAnalysis();
+      const { analyzeAllDimensions, error } = useLatencyInsightsAnalysis(gt);
 
       // Make the whole loop throw by making loading assignment fail — instead
       // we can just have the config trigger an issue at the outer try level.
@@ -408,7 +412,7 @@ describe("useLatencyInsightsAnalysis", () => {
     });
 
     it("clears error before a new run", async () => {
-      const instance = useLatencyInsightsAnalysis();
+      const instance = useLatencyInsightsAnalysis(gt);
       instance.error.value = "stale error";
 
       mockSearch.mockResolvedValue(makeSearchResponse([{ total_count: 0, populated_count: 0 }]));
@@ -427,12 +431,12 @@ describe("useLatencyInsightsAnalysis", () => {
       mockSearch.mockRejectedValue(new Error("search failed"));
 
       await expect(
-        useLatencyInsightsAnalysis().analyzeDimension("service_name", makeConfig()),
+        useLatencyInsightsAnalysis(gt).analyzeDimension("service_name", makeConfig()),
       ).rejects.toThrow("search failed");
     });
 
     it("loading is false after analyzeAllDimensions error propagation", async () => {
-      const instance = useLatencyInsightsAnalysis();
+      const instance = useLatencyInsightsAnalysis(gt);
 
       await expect(
         instance.analyzeAllDimensions({
@@ -452,7 +456,7 @@ describe("useLatencyInsightsAnalysis", () => {
     it("handles missing hits array in API response gracefully", async () => {
       mockSearch.mockResolvedValue({ data: {} }); // no hits
 
-      const result = await useLatencyInsightsAnalysis().analyzeDimension(
+      const result = await useLatencyInsightsAnalysis(gt).analyzeDimension(
         "service_name",
         makeConfig(),
       );
@@ -468,7 +472,7 @@ describe("useLatencyInsightsAnalysis", () => {
         )
         .mockResolvedValueOnce(makeSearchResponse([{ total_count: 10, populated_count: 5 }]));
 
-      const { data } = await useLatencyInsightsAnalysis().analyzeDimension(
+      const { data } = await useLatencyInsightsAnalysis(gt).analyzeDimension(
         "service_name",
         makeConfig(),
       );

@@ -1,5 +1,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from "vue";
 
+import type { TranslateFn } from "@/types/i18n";
+
 interface StreamField {
   name: string;
   ftsKey?: boolean;
@@ -48,6 +50,7 @@ export function useQueryPlaceholder(
   fieldValues: Ref<Record<string, FieldValuesState>>,
   sqlMode: Ref<boolean>,
   noStream: Ref<boolean>,
+  t: TranslateFn,
   options: Options = {},
 ) {
   const placeholder = ref("");
@@ -76,7 +79,7 @@ export function useQueryPlaceholder(
 
   // Build example query strings from available field+value data
   const examples = computed((): string[] => {
-    if (noStream.value) return [options.noStreamText ?? "Select a stream first"];
+    if (noStream.value) return [options.noStreamText ?? t("search.selectStreamFirst")];
 
     const f = fields.value;
     if (!f || f.length === 0) return [];

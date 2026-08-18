@@ -159,6 +159,7 @@ mod m20260731_000003_create_llm_dataset_tables;
 mod m20260802_000001_add_template_kind;
 mod m20260803_000001_add_destinations_to_incident_integrations;
 mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
+mod m20260804_000001_create_workflow_drafts_table;
 mod m20260809_000001_create_alert_eval_intervals_table;
 mod m20260812_000001_create_composite_alerts;
 
@@ -394,6 +395,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260802_000001_add_template_kind::Migration),
             Box::new(m20260803_000001_add_down_notified_at_to_synthetics_locations::Migration),
             Box::new(m20260803_000001_add_destinations_to_incident_integrations::Migration),
+            Box::new(m20260804_000001_create_workflow_drafts_table::Migration),
             Box::new(m20260809_000001_create_alert_eval_intervals_table::Migration),
             Box::new(m20260812_000001_create_composite_alerts::Migration),
         ]

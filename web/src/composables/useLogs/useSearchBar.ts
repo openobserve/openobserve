@@ -903,7 +903,9 @@ export const useSearchBar = (t: TranslateFn) => {
           .catch((error: any) => {
             toast({
               variant: "error",
-              message: error.response?.data?.message || "Failed to cancel running query",
+              message:
+                error.response?.data?.message ||
+                t("toastMessages.useLogs.failedToCancelRunningQuery"),
             });
           })
           .finally(() => {

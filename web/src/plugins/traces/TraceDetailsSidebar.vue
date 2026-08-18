@@ -885,7 +885,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
@@ -1052,7 +1052,10 @@ export default defineComponent({
       events: [],
     });
 
-    const { hasSpanError, hasExceptionEvents } = useTraceDetails(computed(() => props.span));
+    const { hasSpanError, hasExceptionEvents } = useTraceDetails(
+      computed(() => props.span),
+      t,
+    );
 
     const spanHttpResendCount = computed(() => {
       const attrs = props.span;
@@ -1223,14 +1226,14 @@ export default defineComponent({
     const tagColumns = [
       {
         name: "field",
-        label: "Field",
+        label: t("traces.traceDetailsSidebar.field"),
         field: "field",
         align: "left" as const,
         headerClasses: "text-left!",
       },
       {
         name: "value",
-        label: "Value",
+        label: t("traces.traceDetailsSidebar.value"),
         field: "value",
         align: "left" as const,
         headerClasses: "text-left!",
@@ -1311,7 +1314,7 @@ export default defineComponent({
             store.state.timezone,
             HUMAN_TZ_FORMAT,
           ),
-        label: "Timestamp",
+        label: t("traces.traceDetailsSidebar.timestamp"),
         align: "left" as const,
         sortable: true,
       },
@@ -1403,14 +1406,14 @@ export default defineComponent({
       {
         name: "traceId",
         prop: (row: any) => (row.context ? row?.context?.traceId : ""),
-        label: "TraceId",
+        label: raw("TraceId"),
         align: "left",
         sortable: true,
       },
       {
         name: "spanId",
         prop: (row: any) => (row.context ? row?.context?.spanId : ""),
-        label: "spanId",
+        label: raw("spanId"),
         align: "left",
         sortable: true,
       },
@@ -2024,7 +2027,7 @@ export default defineComponent({
 
     // Format model parameters for display
     const formatModelParams = (params: any) => {
-      return formatModelParameters(params);
+      return formatModelParameters(params, t);
     };
 
     const serviceIconUrl = computed(() =>

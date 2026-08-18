@@ -289,7 +289,7 @@ export default defineComponent({
 
     // Initialize or inject variables manager
     const injectedManager = inject("variablesManager", null);
-    const variablesManager = injectedManager || useVariablesManager();
+    const variablesManager = injectedManager || useVariablesManager(t);
 
     // Provide to child components
     if (!injectedManager) {

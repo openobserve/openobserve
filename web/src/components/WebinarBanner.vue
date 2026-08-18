@@ -16,16 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Header variant: w-full top bar above the toolbar -->
-  <div
+  <OBanner
     v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
-    class="webinar-top-bar bg-promo-webinar-accent text-promo-webinar-text w-full"
-    data-test="webinar-header-banner"
+    bar
+    dense
+    center
+    variant="promo"
     role="banner"
+    data-test="webinar-header-banner"
   >
-    <div
-      class="webinar-top-bar-content relative flex flex-wrap items-center justify-center gap-2 px-4 py-[0.2rem]"
-    >
-      <span class="webinar-top-bar-text text-compact text-promo-webinar-text text-center font-bold">
+    <div class="flex flex-wrap items-center justify-center gap-2">
+      <span class="webinar-top-bar-text text-center font-bold">
         <strong>{{ webinarData.tag }}:</strong> {{ webinarData.title }}
         <span v-if="webinarData.date" class="webinar-top-bar-date font-medium">
           {{ formattedDate }}
@@ -37,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
-        class="webinar-top-bar-link text-compact text-promo-webinar-link hover:text-promo-webinar-link-hover font-bold whitespace-nowrap underline"
+        class="webinar-top-bar-link text-promo-webinar-link hover:text-promo-webinar-link-hover font-bold whitespace-nowrap underline"
         data-test="webinar-top-bar-register-link"
       >
         {{ webinarData.primaryButton.text }}
@@ -58,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("components.webinarBanner.dismiss") }}
       </OButton>
     </div>
-  </div>
+  </OBanner>
 
   <!-- Home variant: larger banner -->
   <div
@@ -128,6 +129,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 const store = useStore();

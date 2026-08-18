@@ -20,15 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OEmptyState illustration="trace" size="hero" :hide-action="true">
-    <template #title>{{ t("traces.noData.title") }}</template>
+    <template #title>{{ t("traces.noData.title", { product: raw("OpenObserve") }) }}</template>
     <template #description><span v-html="description" /></template>
 
     <template #actions>
       <!-- OpenTelemetry OTLP — primary path for traces -->
       <EmptyStateIngestionCard
         icon="account-tree"
-        :label="t('traces.noData.otlp')"
-        :sublabel="t('traces.noData.otlpDesc')"
+        :label="t('traces.noData.otlp', { product: raw('OTLP') })"
+        :sublabel="
+          t('traces.noData.otlpDesc', {
+            product1: raw('Jaeger'),
+            product2: raw('Zipkin'),
+            product3: raw('OpenTelemetry'),
+          })
+        "
         icon-variant="purple"
         data-test="traces-no-data-otlp-card"
         @click="go('tracesOTLP')"
@@ -37,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OTel Collector / agent -->
       <EmptyStateIngestionCard
         icon="hub"
-        :label="t('traces.noData.otelCollector')"
-        :sublabel="t('traces.noData.otelCollectorDesc')"
+        :label="raw('OTel Collector / Agent')"
+        :sublabel="t('traces.noData.otelCollectorDesc', { product: raw('OTel Collector') })"
         icon-variant="blue"
         data-test="traces-no-data-otel-card"
         @click="go('ingestTracesFromOtel')"
@@ -59,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("traces.noData.kubernetes") }}
+          {{ raw("Kubernetes") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip data-test="traces-no-data-python-btn" @click="go('python')">
           <img
@@ -67,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("traces.noData.python") }}
+          {{ raw("Python") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip data-test="traces-no-data-nodejs-btn" @click="go('nodejs')">
           <img
@@ -75,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
-          {{ t("traces.noData.nodejs") }}
+          {{ raw("Node.js") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           v-if="aiEnabled"
@@ -93,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

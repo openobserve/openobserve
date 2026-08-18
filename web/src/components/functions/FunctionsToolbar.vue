@@ -105,7 +105,7 @@
                     <template #content>
                       <div class="flex flex-col">
                         <div class="mb-1 font-semibold">
-                          {{ t("function.javascript") }} {{ t("function.tipLabel") }}
+                          {{ raw("JavaScript") }} {{ t("function.tipLabel") }}
                         </div>
                         <div>{{ t("function.jsFunctionHint") }}</div>
                       </div>
@@ -129,7 +129,7 @@
               <template #content>
                 <div class="flex flex-col">
                   <div class="mb-1 font-semibold">
-                    {{ transTypeValue === "1" ? t("function.javascript") : t("function.vrl") }}
+                    {{ transTypeValue === "1" ? raw("JavaScript") : t("function.vrl") }}
                     {{ t("function.tipLabel") }}
                   </div>
                   <div>

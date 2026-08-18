@@ -15,21 +15,20 @@
 
 use std::sync::Arc;
 
-use arrow_schema::SortOptions;
-use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
     common::{Result, internal_err},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, LexOrdering, Partitioning, PhysicalSortExpr},
+    physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType, SchedulingType},
-        expressions::Column,
         memory::MemoryStream,
     },
     prelude::Expr,
 };
+
+use crate::datafusion::sort_order::FileSortOrder;
 
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
@@ -41,7 +40,7 @@ pub struct NewEmptyExec {
     projection: Option<Vec<usize>>,
     filters: Vec<Expr>,
     limit: Option<usize>,
-    sorted_by_time: bool,
+    sort_order: FileSortOrder,
     full_schema: SchemaRef, // The schema use for remove filter feature
 }
 
@@ -53,10 +52,10 @@ impl NewEmptyExec {
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,
-        sorted_by_time: bool,
+        sort_order: FileSortOrder,
         full_schema: SchemaRef,
     ) -> Self {
-        let cache = Self::compute_properties(Arc::clone(&schema), 1, sorted_by_time);
+        let cache = Self::compute_properties(Arc::clone(&schema), 1, sort_order);
         NewEmptyExec {
             name: name.to_string(),
             schema,
@@ -65,7 +64,7 @@ impl NewEmptyExec {
             projection: projection.cloned(),
             filters: filters.to_owned(),
             limit,
-            sorted_by_time,
+            sort_order,
             full_schema,
         }
     }
@@ -97,28 +96,12 @@ impl NewEmptyExec {
     fn compute_properties(
         schema: SchemaRef,
         n_partitions: usize,
-        sorted_by_time: bool,
+        sort_order: FileSortOrder,
     ) -> Arc<PlanProperties> {
-        let index = schema.index_of(TIMESTAMP_COL_NAME);
-        let eq_properties = if !sorted_by_time {
-            EquivalenceProperties::new(schema)
-        } else {
-            match index {
-                Ok(index) => {
-                    let orderings = vec![
-                        LexOrdering::new(vec![PhysicalSortExpr {
-                            expr: Arc::new(Column::new(TIMESTAMP_COL_NAME, index)),
-                            options: SortOptions {
-                                descending: true,
-                                nulls_first: false,
-                            },
-                        }])
-                        .unwrap(),
-                    ];
-                    EquivalenceProperties::new_with_orderings(schema, orderings)
-                }
-                Err(_) => EquivalenceProperties::new(schema),
-            }
+        // declare the ordering only when every sort column exists in the schema
+        let eq_properties = match sort_order.physical_ordering(&schema) {
+            Some(ordering) => EquivalenceProperties::new_with_orderings(schema, vec![ordering]),
+            None => EquivalenceProperties::new(schema),
         };
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
         Arc::new(
@@ -150,8 +133,8 @@ impl NewEmptyExec {
         self.limit
     }
 
-    pub fn sorted_by_time(&self) -> bool {
-        self.sorted_by_time
+    pub fn sort_order(&self) -> FileSortOrder {
+        self.sort_order
     }
 
     pub fn full_schema(&self) -> SchemaRef {
@@ -180,14 +163,14 @@ impl DisplayAs for NewEmptyExec {
         let limit = self
             .limit
             .map_or_else(|| "".to_string(), |l| format!(", limit={l}"));
-        let sorted_by_time = if self.sorted_by_time {
-            ", sorted_by_time=true"
+        let sort_order = if self.sort_order.is_sorted() {
+            format!(", sort_order={}", self.sort_order)
         } else {
-            ""
+            String::new()
         };
 
         write!(f, "NewEmptyExec: ")?;
-        write!(f, "{name}{projection}{filters}{limit}{sorted_by_time}")
+        write!(f, "{name}{projection}{filters}{limit}{sort_order}")
     }
 }
 
@@ -242,7 +225,15 @@ mod tests {
     #[test]
     fn test_new_empty_exec() {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        let exec = NewEmptyExec::new("test", schema.clone(), None, &[], None, false, schema);
+        let exec = NewEmptyExec::new(
+            "test",
+            schema.clone(),
+            None,
+            &[],
+            None,
+            FileSortOrder::None,
+            schema,
+        );
         assert_eq!(exec.name(), "test");
         assert_eq!(exec.projection(), None);
         assert_eq!(exec.filters().len(), 0);
@@ -263,28 +254,83 @@ mod tests {
             Some(&projection),
             &[],
             Some(100),
-            true,
+            FileSortOrder::TimestampDesc,
             full.clone(),
         );
         assert_eq!(exec.name(), "q");
         assert_eq!(exec.projection(), Some(&projection));
         assert_eq!(exec.limit(), Some(100));
-        assert!(exec.sorted_by_time());
+        assert_eq!(exec.sort_order(), FileSortOrder::TimestampDesc);
         assert_eq!(exec.full_schema().fields().len(), full.fields().len());
+    }
+
+    #[test]
+    fn test_output_ordering_follows_sort_order() {
+        use config::TIMESTAMP_COL_NAME;
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("k", DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("v", DataType::Float64, true),
+        ]));
+        let ordering = |order: FileSortOrder| {
+            NewEmptyExec::new("t", schema.clone(), None, &[], None, order, schema.clone())
+                .properties()
+                .output_ordering()
+                .map(|o| {
+                    o.iter()
+                        .map(|e| (e.expr.to_string(), e.options.descending))
+                        .collect::<Vec<_>>()
+                })
+        };
+        assert_eq!(ordering(FileSortOrder::None), None);
+        assert_eq!(
+            ordering(FileSortOrder::TimestampDesc),
+            Some(vec![("_timestamp@1".to_string(), true)])
+        );
+
+        // the sort column missing from the projected schema: no ordering is declared
+        let no_ts = Arc::new(Schema::new(vec![Field::new("v", DataType::Float64, true)]));
+        let exec = NewEmptyExec::new(
+            "t",
+            no_ts.clone(),
+            None,
+            &[],
+            None,
+            FileSortOrder::TimestampDesc,
+            no_ts,
+        );
+        assert!(exec.properties().output_ordering().is_none());
     }
 
     #[test]
     fn test_with_partitions() {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        let exec = NewEmptyExec::new("p", schema.clone(), None, &[], None, false, schema)
-            .with_partitions(4);
+        let exec = NewEmptyExec::new(
+            "p",
+            schema.clone(),
+            None,
+            &[],
+            None,
+            FileSortOrder::None,
+            schema,
+        )
+        .with_partitions(4);
         assert_eq!(exec.partitions, 4);
     }
 
     #[test]
     fn test_data_returns_empty() {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        let exec = NewEmptyExec::new(
+            "t",
+            schema.clone(),
+            None,
+            &[],
+            None,
+            FileSortOrder::None,
+            schema,
+        );
         let data = exec.data().unwrap();
         assert!(data.is_empty());
     }
@@ -294,7 +340,15 @@ mod tests {
         use datafusion::physical_plan::ExecutionPlan;
 
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        let exec = NewEmptyExec::new(
+            "t",
+            schema.clone(),
+            None,
+            &[],
+            None,
+            FileSortOrder::None,
+            schema,
+        );
         assert_eq!(ExecutionPlan::name(&exec), "NewEmptyExec");
     }
 
@@ -303,14 +357,30 @@ mod tests {
         use datafusion::physical_plan::ExecutionPlan;
 
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        let exec = NewEmptyExec::new(
+            "t",
+            schema.clone(),
+            None,
+            &[],
+            None,
+            FileSortOrder::None,
+            schema,
+        );
         assert!(exec.children().is_empty());
     }
 
     #[test]
     fn test_as_any_downcasts() {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        let exec = NewEmptyExec::new(
+            "t",
+            schema.clone(),
+            None,
+            &[],
+            None,
+            FileSortOrder::None,
+            schema,
+        );
         let exec_plan: &dyn ExecutionPlan = &exec;
         assert!(exec_plan.downcast_ref::<NewEmptyExec>().is_some());
     }
@@ -320,7 +390,15 @@ mod tests {
         use datafusion::physical_plan::{ExecutionPlan, execution_plan::Boundedness};
 
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        let exec = NewEmptyExec::new(
+            "t",
+            schema.clone(),
+            None,
+            &[],
+            None,
+            FileSortOrder::None,
+            schema,
+        );
         let props = exec.properties();
         assert!(matches!(props.boundedness, Boundedness::Bounded));
     }

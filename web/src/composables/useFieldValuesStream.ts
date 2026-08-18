@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, type Ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import store from "@/stores";
 import { generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
@@ -39,9 +40,9 @@ export interface FieldValuesState {
  *
  * Usage:
  *   const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
- *     useFieldValuesStream();
+ *     useFieldValuesStream(t);
  */
-const useFieldValuesStream = () => {
+const useFieldValuesStream = (t: TranslateFn) => {
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   // Public state: fieldName → { isLoading, values, hasMore, errMsg }
@@ -212,7 +213,7 @@ const useFieldValuesStream = () => {
       fieldValues.value[fieldName].isLoading = false;
     } catch {
       if (fieldValues.value[fieldName]) {
-        fieldValues.value[fieldName].errMsg = "Failed to fetch field values";
+        fieldValues.value[fieldName].errMsg = t("search.failedToFetchFieldValues");
         fieldValues.value[fieldName].isLoading = false;
       }
     }
@@ -222,7 +223,7 @@ const useFieldValuesStream = () => {
     const fieldName = payload?.queryReq?.fields[0];
     if (fieldName && fieldValues.value[fieldName]) {
       fieldValues.value[fieldName].isLoading = false;
-      fieldValues.value[fieldName].errMsg = "Failed to fetch field values";
+      fieldValues.value[fieldName].errMsg = t("search.failedToFetchFieldValues");
     }
     if (fieldName) removeTraceId(fieldName, payload.traceId);
   };

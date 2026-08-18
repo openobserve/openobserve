@@ -732,14 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="text-text-muted">
                           ·
-                          {{
-                            t(
-                              row.calls === 1
-                                ? "traces.sessionDetail.rail.call"
-                                : "traces.sessionDetail.rail.calls",
-                              { n: row.calls },
-                            )
-                          }}
+                          {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                         </span>
                       </span>
                       <OIcon name="chevron-right" size="xs" class="text-text-muted flex-shrink-0" />
@@ -752,14 +745,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
                           <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
                           <div class="text-3xs text-text-muted mb-1.75">
-                            {{
-                              t(
-                                row.calls === 1
-                                  ? "traces.sessionDetail.rail.call"
-                                  : "traces.sessionDetail.rail.calls",
-                                { n: row.calls },
-                              )
-                            }}
+                            {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                           </div>
                           <div
                             class="text-3xs text-text-secondary mb-1 font-bold tracking-[0.05em]"

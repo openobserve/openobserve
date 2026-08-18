@@ -296,7 +296,7 @@ const getTransformLabelTooltip = computed(() => {
 
   return searchObj.meta.showTransformEditor
     ? t("search.hide")
-    : `${t("search.show")} ${editorType} ${t("search.editor")}`;
+    : t("search.showEditor", { type: editorType });
 });
 </script>
 

@@ -13,8 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export const UNAUTHORIZED_MESSAGE =
-  "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.";
+import type { I18nKey } from "@/types/i18n";
+
+/**
+ * i18n KEY for the unauthorized-access message, not the resolved text.
+ *
+ * This module is evaluated at import, so resolving here would freeze the copy at
+ * the boot locale (and can run before loadLocaleMessages settles). Consumers are
+ * components with their own `t`, so they resolve it at use.
+ */
+export const UNAUTHORIZED_MESSAGE_KEY: I18nKey = "common.unauthorizedAccess";
 
 /**
  * Check whether an error message or error_type indicates an authorization failure.

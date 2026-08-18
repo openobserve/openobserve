@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+
 import type { ScoreConfig } from "@/services/online-evals.service";
+import { gt } from "@/types/i18n";
+
 import { qualitySummaryForConfig } from "./qualitySummary";
 
 function config(
@@ -26,7 +29,7 @@ const emptyAgg = {
 describe("qualitySummaryForConfig", () => {
   it("uses the overall average for numeric configs", () => {
     expect(
-      qualitySummaryForConfig(config("numeric"), { ...emptyAgg, avgNumeric: 0.82 }, []),
+      qualitySummaryForConfig(config("numeric"), { ...emptyAgg, avgNumeric: 0.82 }, [], gt),
     ).toEqual({
       qualityValue: 0.82,
       qualityFormat: "number",
@@ -45,6 +48,7 @@ describe("qualitySummaryForConfig", () => {
           numericUnhealthy: 2,
         },
         [],
+        gt,
       ),
     ).toEqual({
       qualityValue: 0.82,
@@ -59,6 +63,7 @@ describe("qualitySummaryForConfig", () => {
         config("boolean", { healthy_value: false }),
         { ...emptyAgg, trueScores: 2, falseScores: 8 },
         [],
+        gt,
       ).qualityValue,
     ).toBe(80);
   });
@@ -69,6 +74,7 @@ describe("qualitySummaryForConfig", () => {
         config("boolean"),
         { ...emptyAgg, trueScores: 3, falseScores: 1 },
         [],
+        gt,
       ),
     ).toEqual({
       qualityValue: 75,
@@ -87,16 +93,22 @@ describe("qualitySummaryForConfig", () => {
           { category: "great", count: 2 },
           { category: "bad", count: 3 },
         ],
+        gt,
       ).qualityValue,
     ).toBe(70);
   });
 
   it("uses the top category when no healthy set is configured", () => {
     expect(
-      qualitySummaryForConfig(config("categorical"), emptyAgg, [
-        { category: "neutral", count: 3 },
-        { category: "good", count: 6 },
-      ]),
+      qualitySummaryForConfig(
+        config("categorical"),
+        emptyAgg,
+        [
+          { category: "neutral", count: 3 },
+          { category: "good", count: 6 },
+        ],
+        gt,
+      ),
     ).toEqual({
       qualityValue: "good",
       qualityFormat: "text",

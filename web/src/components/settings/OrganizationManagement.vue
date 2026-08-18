@@ -322,9 +322,9 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import {
   makeContractSchema,
   aiCreditsDefaults,
-  aiCreditsSchema,
+  makeAiCreditsSchema,
   contractDefaults,
-  extendTrialSchema,
+  makeExtendTrialSchema,
   type AiCreditsForm,
   type ContractForm,
   type ExtendTrialForm,
@@ -373,7 +373,9 @@ export default defineComponent({
     //    resolves to undefined and validation silently no-ops). ───────────────
     // The contract message is mode-aware; the dialog body remounts on open
     // (reka-ui), so a freshly-mounted <OForm> always reads the current schema.
-    const contractSchema = computed(() => makeContractSchema(contractMode.value));
+    const contractSchema = computed(() => makeContractSchema(t, contractMode.value));
+    const extendTrialSchema = makeExtendTrialSchema(t);
+    const aiCreditsSchema = makeAiCreditsSchema(t);
 
     // Extend-trial week count is bridged from the pill grid into the form below.
     // Dynamic defaults (project the current pill value) → a typed computed.
@@ -614,7 +616,7 @@ export default defineComponent({
       } catch (error: any) {
         toast({
           variant: "error",
-          message: error.response?.data?.message || "Failed to update AI credits.",
+          message: error.response?.data?.message || t("settings.updateAiCreditsFailed"),
           timeout: 5000,
         });
       } finally {

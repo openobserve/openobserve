@@ -18,7 +18,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, prel
 use serde::{Deserialize, Serialize};
 
 use super::{
-    entity::{workflow_errors, workflow_run_data, workflows},
+    entity::{workflow_drafts, workflow_errors, workflow_run_data, workflows},
     get_lock,
 };
 use crate::{
@@ -33,6 +33,7 @@ pub struct Workflow {
     pub created_at: i64,
     pub updated_at: i64,
     pub created_by: String,
+    #[serde(default)]
     pub enabled: bool,
     pub name: String,
     pub description: String,
@@ -68,6 +69,25 @@ impl TryFrom<workflows::Model> for Workflow {
             updated_at: value.updated_at,
             created_by: value.created_by,
             enabled: value.enabled,
+            name: value.name,
+            description: value.description,
+            nodes: serde_json::from_str(&value.nodes)?,
+            edges: serde_json::from_str(&value.edges)?,
+        };
+        Ok(ret)
+    }
+}
+
+impl TryFrom<workflow_drafts::Model> for Workflow {
+    type Error = anyhow::Error;
+    fn try_from(value: workflow_drafts::Model) -> Result<Self, Self::Error> {
+        let ret = Self {
+            id: value.id,
+            org_id: value.org_id,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+            created_by: value.created_by,
+            enabled: true,
             name: value.name,
             description: value.description,
             nodes: serde_json::from_str(&value.nodes)?,
@@ -566,6 +586,23 @@ pub async fn delete_association_by_trigger(
     Ok(())
 }
 
+pub async fn delete_association_by_trigger_workflow(
+    org_id: &str,
+    trigger: &str,
+    workflow_id: &str,
+) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .filter(workflow_associations::Column::TriggerType.eq(trigger))
+        .filter(workflow_associations::Column::WorkflowId.eq(workflow_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 pub async fn delete_association_by_entity(org_id: &str, entity: &str) -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = get_lock().await;
@@ -575,5 +612,142 @@ pub async fn delete_association_by_entity(org_id: &str, entity: &str) -> Result<
         .filter(workflow_associations::Column::EntityId.eq(entity))
         .exec(client)
         .await?;
+    Ok(())
+}
+
+pub async fn list_drafts_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let entities = workflow_drafts::Entity::find()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .all(client)
+        .await?;
+    let mut ret = Vec::with_capacity(entities.len());
+    for e in entities {
+        ret.push(e.try_into()?);
+    }
+    Ok(ret)
+}
+
+pub async fn get_draft_by_org_draft_id(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<Workflow>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = workflow_drafts::Entity::find()
+        .filter(workflow_drafts::Column::Id.eq(id))
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?;
+
+    let ret = res.map(|v| v.try_into()).transpose()?;
+    Ok(ret)
+}
+
+pub async fn save_draft(draft: Workflow) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    let now = chrono::Utc::now().timestamp_millis();
+    let model = workflow_drafts::ActiveModel {
+        id: Set(draft.id),
+        org_id: Set(draft.org_id),
+        created_at: Set(now),
+        updated_at: Set(now),
+        created_by: Set(draft.created_by),
+        name: Set(draft.name),
+        description: Set(draft.description),
+        nodes: Set(serde_json::to_string(&draft.nodes)?),
+        edges: Set(serde_json::to_string(&draft.edges)?),
+    };
+    workflow_drafts::Entity::insert(model).exec(client).await?;
+    Ok(())
+}
+
+pub async fn update_draft(draft: Workflow) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    let now = chrono::Utc::now().timestamp_millis();
+    let model = workflow_drafts::ActiveModel {
+        updated_at: Set(now),
+        name: Set(draft.name),
+        description: Set(draft.description),
+        nodes: Set(serde_json::to_string(&draft.nodes)?),
+        edges: Set(serde_json::to_string(&draft.edges)?),
+        ..Default::default()
+    };
+    workflow_drafts::Entity::update_many()
+        .filter(workflow_drafts::Column::Id.eq(draft.id))
+        .set(model)
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_draft(id: &str) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::Id.eq(id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    let id = draft.id.clone();
+
+    let txn = client.begin().await?;
+    let existing = workflow_drafts::Entity::find()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::Id.eq(&id))
+        .one(&txn)
+        .await?;
+    if existing.is_none() {
+        txn.rollback().await?;
+        return Err(anyhow::anyhow!("could not find draft with given id"));
+    }
+
+    let now = chrono::Utc::now().timestamp_millis();
+    let model = workflows::ActiveModel {
+        id: Set(draft.id),
+        org_id: Set(draft.org_id),
+        created_at: Set(now),
+        updated_at: Set(now),
+        created_by: Set(draft.created_by),
+        enabled: Set(draft.enabled),
+        name: Set(draft.name),
+        description: Set(draft.description),
+        nodes: Set(serde_json::to_string(&draft.nodes)?),
+        edges: Set(serde_json::to_string(&draft.edges)?),
+    };
+    if let Err(e) = workflows::Entity::insert(model).exec(&txn).await {
+        log::error!("error in saving draft workflow as proper workflow for {org_id}/{id} : {e}");
+        txn.rollback().await?;
+        return Err(anyhow::anyhow!(e));
+    }
+
+    if let Err(e) = workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::Id.eq(&id))
+        .exec(&txn)
+        .await
+    {
+        log::error!(
+            "error deleting draft workflow after saving it has proper workflow for {org_id}/{id} : {e}"
+        );
+        txn.rollback().await?;
+        return Err(anyhow::anyhow!(e));
+    }
+
+    if let Err(e) = txn.commit().await {
+        log::error!("error committing draft promotion transaction to db for {org_id}/{id} : {e}");
+        return Err(anyhow::anyhow!(e));
+    }
+
     Ok(())
 }

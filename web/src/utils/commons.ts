@@ -20,6 +20,7 @@ import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
+import type { TranslateFn } from "@/types/i18n";
 import { foldersQuery } from "@/services/common";
 import type { Ref } from "vue";
 import { dashboardsByFolderQuery } from "@/services/dashboards";
@@ -334,6 +335,7 @@ export const addPanel = async (
 };
 
 export const addVariable = async (
+  t: TranslateFn,
   store: any,
   dashboardId: any,
   variableData: any,
@@ -351,7 +353,7 @@ export const addVariable = async (
   );
 
   if (variableExists.length) {
-    throw new Error("Variable with same name already exists");
+    throw new Error(t("dashboard.variableNameAlreadyExists"));
   }
 
   currentDashboard.variables.list.push(variableData);
@@ -428,6 +430,7 @@ export const deletePanel = async (
 };
 
 export const updateVariable = async (
+  t: TranslateFn,
   store: any,
   dashboardId: any,
   variableName: any,
@@ -449,7 +452,7 @@ export const updateVariable = async (
   );
 
   if (variableName != variableData.name && variableExists.length) {
-    throw new Error("Variable with same name already exists");
+    throw new Error(t("dashboard.variableNameAlreadyExists"));
   }
 
   // Update the variable data in the list

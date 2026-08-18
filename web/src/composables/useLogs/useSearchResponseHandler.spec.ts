@@ -278,7 +278,7 @@ describe("useSearchResponseHandler", () => {
       responseHandler.setCancelSearchError();
 
       expect(mockState.searchObj.data.histogram.errorMsg).toBe(
-        "Histogram search query was cancelled",
+        "search.histogramSearchQueryCancelled",
       );
     });
   });
@@ -369,7 +369,8 @@ describe("useSearchResponseHandler", () => {
       responseHandler.handleSearchError(request, error as any);
 
       expect(mockState.searchObj.data.countErrorMsg).toContain(
-        "Error while retrieving total events",
+        // `t` is mocked to echo its key, so assert the key the code now resolves
+        "search.errorWhileRetrievingTotalEvents",
       );
       expect(mockState.searchObj.data.countErrorMsg).toContain("TraceID: trace-pc");
     });

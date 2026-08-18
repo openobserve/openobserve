@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import { gt } from "@/types/i18n";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentTraceFilter } from "../llmAgentFilter";
@@ -158,7 +159,7 @@ export function useLLMInsights() {
               response?.message ||
               response?.error ||
               response?.error_detail ||
-              "Failed to fetch query data";
+              gt("traces.failedToFetchQueryData");
             const err: any = new Error(message);
             err.status = response?.status;
             err.code = response?.code;
@@ -353,7 +354,7 @@ export function useLLMInsights() {
         hasLoadedOnce.value = true;
       })
       .catch((e: any) => {
-        error.value = e?.message || "Failed to fetch LLM insights";
+        error.value = e?.message || gt("traces.failedToFetchLlmInsights");
         console.error("LLM Insights summary fetch error:", e);
       })
       .finally(() => {

@@ -461,7 +461,7 @@ const {
   fetchFieldValues,
   cancelFieldStream,
   resetFieldValues,
-} = useFieldValuesStream();
+} = useFieldValuesStream(t);
 
 const currentSizePerField: Ref<Record<string, number>> = ref({});
 const currentKeyword: Ref<Record<string, string>> = ref({});

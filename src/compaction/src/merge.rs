@@ -50,7 +50,8 @@ use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_ru
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
-    merge::{self, MergeParquetResult},
+    merge::{self, MergeParquetResult, MergedFile},
+    sort_order::FileSortOrder,
 };
 use search_service::file_list;
 use tantivy_utils::index_builder::create_tantivy_index;
@@ -846,7 +847,7 @@ pub async fn merge_files(
     };
 
     let tables = match TableBuilder::new()
-        .sorted_by_time(true)
+        .sort_order(FileSortOrder::TimestampDesc)
         .build(session, files.clone(), schema.clone())
         .await
     {
@@ -900,126 +901,71 @@ pub async fn merge_files(
         log::debug!("skip index generation for stream: {org_id}/{stream_type}/{stream_name}");
     }
 
-    let mut new_files = Vec::new();
-    match buf {
-        MergeParquetResult::Single {
-            buf,
-            file_meta: mut new_file_meta,
-            file_format,
-        } => {
-            if new_file_meta.compressed_size == 0 {
-                return Err(anyhow::anyhow!(
-                    "merge_parquet_files error: compressed_size is 0"
-                ));
-            }
-
-            let id = ider::generate_file_name();
-            let new_file_key = format!("{prefix}/{id}{}", file_format.extension());
-            log::info!(
-                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
-                retain_file_list.len(),
-                new_file_meta.original_size,
-                new_file_meta.compressed_size,
-                start.elapsed().as_millis(),
-            );
-
-            // upload file to storage
-            let buf = Bytes::from(buf);
-            if cfg.cache_latest_files.enabled
-                && cfg.cache_latest_files.cache_parquet
-                && cfg.cache_latest_files.download_from_node
-            {
-                infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
-                log::debug!("merge_files {new_file_key} file_data::disk::set success");
-            }
-
-            // TODO: check how compliance will interact with org storage
-            let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
-            if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
-                storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
-            } else {
-                storage::put(&account, &new_file_key, buf.clone()).await?;
-            }
-
-            if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
-                generate_inverted_index(
-                    org_id,
-                    &new_file_key,
-                    &full_text_search_fields,
-                    &index_fields,
-                    &retain_file_list,
-                    &mut new_file_meta,
-                    latest_schema.clone(),
-                    buf,
-                )
-                .await?;
-            }
-            new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
+    let MergeParquetResult {
+        files: merged_files,
+        file_format,
+    } = buf;
+    let mut new_files = Vec::with_capacity(merged_files.len());
+    for MergedFile {
+        buf,
+        meta: mut new_file_meta,
+    } in merged_files
+    {
+        new_file_meta.compressed_size = buf.len() as i64;
+        if new_file_meta.compressed_size == 0 {
+            return Err(anyhow::anyhow!(
+                "merge_parquet_files error: compressed_size is 0"
+            ));
         }
-        MergeParquetResult::Multiple {
-            bufs,
-            file_metas,
-            file_format,
-        } => {
-            for (buf, file_meta) in bufs.into_iter().zip(file_metas) {
-                let mut new_file_meta = file_meta;
-                new_file_meta.compressed_size = buf.len() as i64;
-                if new_file_meta.compressed_size == 0 {
-                    return Err(anyhow::anyhow!(
-                        "merge_parquet_files error: compressed_size is 0"
-                    ));
-                }
 
-                let id = ider::generate_file_name();
-                let new_file_key = format!("{prefix}/{id}{}", file_format.extension());
+        let id = ider::generate_file_name();
+        let new_file_key = format!("{prefix}/{id}{}", file_format.extension());
 
-                // upload file to storage
-                let buf = Bytes::from(buf);
-                if cfg.cache_latest_files.enabled
-                    && cfg.cache_latest_files.cache_parquet
-                    && cfg.cache_latest_files.download_from_node
-                {
-                    infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
-                    log::debug!("merge_files {new_file_key} file_data::disk::set success");
-                }
-
-                // TODO: check how compliance will interact with org storage
-                let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
-                if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
-                    storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
-                } else {
-                    storage::put(&account, &new_file_key, buf.clone()).await?;
-                }
-
-                if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
-                    generate_inverted_index(
-                        org_id,
-                        &new_file_key,
-                        &full_text_search_fields,
-                        &index_fields,
-                        &retain_file_list,
-                        &mut new_file_meta,
-                        latest_schema.clone(),
-                        buf,
-                    )
-                    .await?;
-                }
-
-                new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
-            }
-            log::info!(
-                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
-                retain_file_list.len(),
-                new_files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
-                new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
-                new_files
-                    .iter()
-                    .map(|f| f.meta.compressed_size)
-                    .sum::<i64>(),
-                start.elapsed().as_millis(),
-            );
+        // upload file to storage
+        let buf = Bytes::from(buf);
+        if cfg.cache_latest_files.enabled
+            && cfg.cache_latest_files.cache_parquet
+            && cfg.cache_latest_files.download_from_node
+        {
+            infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+            log::debug!("merge_files {new_file_key} file_data::disk::set success");
         }
-    };
+
+        // TODO: check how compliance will interact with org storage
+        let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
+        if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
+            storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
+        } else {
+            storage::put(&account, &new_file_key, buf.clone()).await?;
+        }
+
+        if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
+            generate_inverted_index(
+                org_id,
+                &new_file_key,
+                &full_text_search_fields,
+                &index_fields,
+                &retain_file_list,
+                &mut new_file_meta,
+                latest_schema.clone(),
+                buf,
+            )
+            .await?;
+        }
+        new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
+    }
+    log::info!(
+        "[COMPACTOR:WORKER:{thread_id}] merged {} files into {} new file(s): {:?}, original_size: {}, compressed_size: {}, took: {} ms",
+        retain_file_list.len(),
+        new_files.len(),
+        new_files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
+        new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
+        new_files
+            .iter()
+            .map(|f| f.meta.compressed_size)
+            .sum::<i64>(),
+        start.elapsed().as_millis(),
+    );
 
     Ok((new_files, retain_file_list))
 }

@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -50,6 +50,22 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+// Copyable JSON samples, kept out of the catalogue: the field names are the
+// backend's template variables, so a translated sample does not work when pasted.
+const SAMPLE = {
+  whyWithout: raw('"text": "Severity: high — owned by payments"'),
+  whyWith: raw('"text": "Severity: {severity} — owned by {team}"'),
+  variablesCode: raw(
+    '{\n  "text": "[{severity}] {alert_name} — {alert_count} events\\nOwned by {team}"\n}',
+  ),
+  variablesResult: raw('{ "text": "[high] High CPU — 42 events\\nOwned by payments" }'),
+  rowTemplateRow: raw("{pod}: {level} at {_timestamp}"),
+  rowTemplateMain: raw('{ "text": "{alert_count} matches:\\n{rows}" }'),
+  rowTemplateResult: raw(
+    '{ "text": "2 matches:\\nweb-1: ERROR at 14:02\\nweb-3: ERROR at 14:05" }',
+  ),
+};
 
 const title = computed(() => {
   switch (props.topic) {
@@ -199,29 +215,49 @@ const displayedVariables = computed(() => {
 // Built-in variables the server actually substitutes (source of truth:
 // process_dest_template in src/core/src/alerts/alert.rs). Each has a one-line
 // description shown on hover so the list teaches, not just lists.
-const builtInVars: { name: string; desc: string }[] = [
-  { name: "org_name", desc: "Your organization name" },
-  { name: "stream_type", desc: "Stream type (logs, metrics, traces)" },
-  { name: "stream_name", desc: "Name of the stream the alert watches" },
-  { name: "alert_name", desc: "The alert's name" },
-  { name: "alert_type", desc: "Alert type (e.g. scheduled, real-time)" },
-  { name: "alert_period", desc: "Evaluation window, in minutes" },
-  { name: "alert_operator", desc: "Threshold comparison operator (>, <, =)" },
-  { name: "alert_threshold", desc: "The configured threshold value" },
-  { name: "alert_count", desc: "Number of matching records" },
+// `name` is the server-side token pasted verbatim into a template — it stays
+// English. `desc` is the prose shown on hover, so it is translated.
+const builtInVars: { name: string; desc: I18nText }[] = [
+  { name: "org_name", desc: t("alerts.alertSettings.builtInVars.orgName") },
+  { name: "stream_type", desc: t("alerts.alertSettings.builtInVars.streamType") },
+  { name: "stream_name", desc: t("alerts.alertSettings.builtInVars.streamName") },
+  { name: "alert_name", desc: t("alerts.alertSettings.builtInVars.alertName") },
+  { name: "alert_type", desc: t("alerts.alertSettings.builtInVars.alertType") },
+  { name: "alert_period", desc: t("alerts.alertSettings.builtInVars.alertPeriod") },
+  { name: "alert_operator", desc: t("alerts.alertSettings.builtInVars.alertOperator") },
+  { name: "alert_threshold", desc: t("alerts.alertSettings.builtInVars.alertThreshold") },
+  { name: "alert_count", desc: t("alerts.alertSettings.builtInVars.alertCount") },
   {
     name: "alert_agg_value",
-    desc: "The evaluated aggregation value for the triggering group (empty when the alert has no aggregation value)",
+    desc: t("alerts.alertSettings.builtInVars.alertAggValue"),
   },
-  { name: "alert_description", desc: "The alert's description text" },
-  { name: "alert_start_time", desc: "Window start time (ISO 8601)" },
-  { name: "alert_end_time", desc: "Window end time (ISO 8601)" },
-  { name: "alert_url", desc: "Link back to OpenObserve to investigate" },
-  { name: "alert_trigger_time", desc: "When the alert fired (ISO 8601)" },
-  { name: "alert_trigger_time_millis", desc: "Trigger time in epoch millis" },
-  { name: "alert_trigger_time_seconds", desc: "Trigger time in epoch seconds" },
-  { name: "alert_trigger_time_str", desc: "Trigger time, human-readable" },
-  { name: "rows", desc: "All matching rows, formatted by the row template" },
+  {
+    name: "alert_description",
+    desc: t("alerts.alertSettings.builtInVars.alertDescription"),
+  },
+  {
+    name: "alert_start_time",
+    desc: t("alerts.alertSettings.builtInVars.alertStartTime"),
+  },
+  { name: "alert_end_time", desc: t("alerts.alertSettings.builtInVars.alertEndTime") },
+  { name: "alert_url", desc: t("alerts.alertSettings.builtInVars.alertUrl") },
+  {
+    name: "alert_trigger_time",
+    desc: t("alerts.alertSettings.builtInVars.alertTriggerTime"),
+  },
+  {
+    name: "alert_trigger_time_millis",
+    desc: t("alerts.alertSettings.builtInVars.alertTriggerTimeMillis"),
+  },
+  {
+    name: "alert_trigger_time_seconds",
+    desc: t("alerts.alertSettings.builtInVars.alertTriggerTimeSeconds"),
+  },
+  {
+    name: "alert_trigger_time_str",
+    desc: t("alerts.alertSettings.builtInVars.alertTriggerTimeStr"),
+  },
+  { name: "rows", desc: t("alerts.alertSettings.builtInVars.rows") },
 ];
 
 // Built-in reference is collapsed by default — a beginner shouldn't be hit
@@ -229,7 +265,9 @@ const builtInVars: { name: string; desc: string }[] = [
 const showBuiltIns = ref(false);
 
 function copyVar(name: string) {
-  copyToClipboard(`{${name}}`, t, { successMessage: `Copied {${name}}` });
+  copyToClipboard(`{${name}}`, t, {
+    successMessage: t("common.copiedVariable", { name: `{${name}}` }),
+  });
 }
 
 defineExpose({ applyTemplate, previewTemplate });
@@ -431,7 +469,7 @@ defineExpose({ applyTemplate, previewTemplate });
               <pre
                 data-test="help-preview-box"
                 class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
-                >{{ t("alerts.alertSettings.helpWhyWithoutCode") }}</pre>
+                >{{ SAMPLE.whyWithout }}</pre>
             </div>
             <div
               class="rounded-surface border-border-default border-l-primary-500 flex flex-col gap-1.5 border border-l-2 p-3"
@@ -446,7 +484,7 @@ defineExpose({ applyTemplate, previewTemplate });
               <pre
                 data-test="help-preview-box"
                 class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
-                >{{ t("alerts.alertSettings.helpWhyWithCode") }}</pre>
+                >{{ SAMPLE.whyWith }}</pre>
             </div>
           </div>
         </section>
@@ -464,7 +502,7 @@ defineExpose({ applyTemplate, previewTemplate });
           <pre
             data-test="help-preview-box"
             class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
-            >{{ t("alerts.alertSettings.helpVariablesExampleCode") }}</pre>
+            >{{ SAMPLE.variablesCode }}</pre>
           <span
             class="text-text-secondary text-2xs mx-0 mt-2.5 mb-1 block font-semibold tracking-[0.03em] uppercase"
             >{{ t("alerts.alertSettings.helpExampleResultLabel") }}</span
@@ -472,7 +510,7 @@ defineExpose({ applyTemplate, previewTemplate });
           <pre
             data-test="help-preview-box"
             class="rounded-surface border-border-default bg-surface-subtle text-text-body border-l-primary-500 m-0 border border-l-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
-            >{{ t("alerts.alertSettings.helpVariablesExampleResult") }}</pre>
+            >{{ SAMPLE.variablesResult }}</pre>
         </section>
 
         <OSeparator />
@@ -492,7 +530,7 @@ defineExpose({ applyTemplate, previewTemplate });
           </button>
           <template v-if="showBuiltIns">
             <p class="text-text-secondary mx-0 mt-0 mb-2 text-xs">
-              {{ t("alerts.alertSettings.helpBuiltInIntro") }}
+              {{ t("alerts.alertSettings.helpBuiltInIntro", { product: raw("OpenObserve") }) }}
             </p>
             <div class="flex flex-wrap gap-2" data-test="help-builtin-list">
               <button
@@ -578,14 +616,14 @@ defineExpose({ applyTemplate, previewTemplate });
             <pre
               data-test="help-preview-box"
               class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
-              >{{ t("alerts.alertSettings.helpRowTemplateExampleRowCode") }}</pre>
+              >{{ SAMPLE.rowTemplateRow }}</pre>
             <span class="text-text-secondary text-2xs font-semibold tracking-[0.03em] uppercase">{{
               t("alerts.alertSettings.helpRowTemplateExampleMainLabel")
             }}</span>
             <pre
               data-test="help-preview-box"
               class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
-              >{{ t("alerts.alertSettings.helpRowTemplateExampleMainCode") }}</pre>
+              >{{ SAMPLE.rowTemplateMain }}</pre>
             <span
               class="text-text-secondary text-2xs mx-0 mt-2.5 mb-1 block font-semibold tracking-[0.03em] uppercase"
               >{{ t("alerts.alertSettings.helpExampleResultLabel") }}</span
@@ -593,7 +631,7 @@ defineExpose({ applyTemplate, previewTemplate });
             <pre
               data-test="help-preview-box"
               class="rounded-surface border-border-default bg-surface-subtle text-text-body border-l-primary-500 m-0 border border-l-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
-              >{{ t("alerts.alertSettings.helpRowTemplateExampleResult") }}</pre>
+              >{{ SAMPLE.rowTemplateResult }}</pre>
           </div>
         </section>
 

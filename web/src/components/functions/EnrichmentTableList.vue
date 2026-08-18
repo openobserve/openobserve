@@ -725,7 +725,7 @@ export default defineComponent({
         if (err.response?.status != 403) {
           toast({
             variant: "error",
-            message: err.response?.data?.message || "Error while fetching functions.",
+            message: err.response?.data?.message || t("functions.fetchFunctionsError"),
           });
         }
       } finally {
@@ -838,7 +838,9 @@ export default defineComponent({
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message: err.response?.data?.message || "Error while deleting stream.",
+              message:
+                err.response?.data?.message ||
+                t("toastMessages.functions.errorWhileDeletingStream"),
               variant: "error",
             });
           }

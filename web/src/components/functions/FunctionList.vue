@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row?.transType === '1' ? 'amber-soft' : 'blue-soft'"
                 :data-test="`function-list-type-badge-${row?.transType === '1' ? 'js' : 'vrl'}`"
               >
-                {{ row?.transType === "1" ? t("function.javascript") : t("function.vrl") }}
+                {{ row?.transType === "1" ? raw("JavaScript") : t("function.vrl") }}
               </OBadge>
             </template>
 
@@ -536,9 +536,9 @@ export default defineComponent({
           if (err.response.status != 403) {
             toast({
               variant: "error",
-              message: raw(
-                JSON.stringify(err.response.data["message"]) || "Function deletion failed.",
-              ),
+              message:
+                raw(JSON.stringify(err.response.data["message"])) ||
+                t("functions.functionDeletionFailed"),
             });
           }
         });
@@ -705,7 +705,7 @@ export default defineComponent({
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting functions. Please try again.";
+          t("functions.bulkDeleteFunctionsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -742,6 +742,7 @@ export default defineComponent({
     ]);
     return {
       t,
+      raw,
       store,
       router,
       jsTransforms,

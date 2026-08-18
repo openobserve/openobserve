@@ -201,7 +201,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     parentLink: "/rum",
     absorbs: ["rum", "synthetics"],
     children: [
-      { titleKey: "menu.rum", icon: "devices", name: "RUM", requires: "rum" },
+      { titleKey: "menu.rum", title: "RUM", icon: "devices", name: "RUM", requires: "rum" },
       { titleKey: "menu.synthetic", icon: "radar", name: "synthetics", requires: "synthetics" },
     ],
   },

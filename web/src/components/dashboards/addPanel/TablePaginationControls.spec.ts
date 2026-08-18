@@ -27,6 +27,10 @@ const mockI18n = createI18n({
       },
       dashboard: {
         rowsPerPage: "Rows per page",
+        dashboards: {
+          paginationEmpty: "0 of 0",
+          paginationRange: "{start}-{end} of {total}",
+        },
       },
     },
   },

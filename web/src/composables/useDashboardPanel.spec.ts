@@ -8,8 +8,18 @@ import queryService from "@/services/search";
 import * as zincutils from "@/utils/zincutils";
 import * as sqlUtils from "@/utils/query/sqlUtils";
 import * as panelValidation from "@/utils/dashboard/panelValidation";
-import i18nInstance from "@/locales";
-const t = (i18nInstance.global as any).t;
+import enLocale from "@/locales/languages/en-US.json";
+
+// Resolve straight from the en-US catalogue rather than the vue-i18n composer.
+// vue-i18n instruments message resolution via window.performance under
+// NODE_ENV !== "production", which this file mock graph leaves unavailable, so
+// composer.t() throws here (it works in every other spec). Assertions still
+// check the real shipped copy.
+const t = ((key: string, named?: Record<string, unknown>) => {
+  const msg = key.split(".").reduce<any>((a, k) => (a == null ? a : a[k]), enLocale as any);
+  if (typeof msg !== "string") return key;
+  return named ? msg.replace(/{(\w+)}/g, (_m: string, k: string) => String(named[k] ?? "")) : msg;
+}) as any;
 
 // Mock Vue lifecycle hooks to avoid warnings
 vi.mock("vue", async () => {

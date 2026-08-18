@@ -244,7 +244,12 @@ const build = async () => {
   panel.data.queries[0].fields.stream = props.alert.stream_name;
   panel.data.queries[0].fields.stream_type = props.alert.stream_type;
   panel.data.queries[0].fields.x = [
-    { alias: "zo_sql_key", column: "zo_sql_key", color: null, label: "Time" },
+    {
+      alias: "zo_sql_key",
+      column: "zo_sql_key",
+      color: null,
+      label: t("alerts.timeLabel"),
+    },
   ];
 
   const fn = agg?.function || "";

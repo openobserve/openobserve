@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useGreeting } from "./useGreeting";
 import { getImageURL } from "@/utils/zincutils";
 import { useTheme } from "@/composables/useTheme";
@@ -72,7 +72,7 @@ const logoSrc = computed(() =>
       {{ t("common.and") }}
       <span
         class="welcome-hero__code welcome-hero__code--promql rounded-default text-lang-promql-text bg-lang-promql-bg px-1.5 py-px font-mono text-xs font-semibold tracking-[0.01em]"
-        >{{ t("aiAssistant.welcome.taglinePromql") }}</span
+        >{{ raw("PromQL") }}</span
       >
       {{ t("aiAssistant.welcome.taglineDash") }} {{ t("aiAssistant.welcome.taglineAnd") }}
     </div>

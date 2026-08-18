@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { gt } from "@/types/i18n";
 import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
@@ -149,7 +150,11 @@ import emailLogo from "@/assets/images/alerts/destinations/email.png";
 
 export const emailDestinationType: PrebuiltType = {
   id: "email",
-  name: "Email",
+  // Lazy: this object is module scope, so a resolved string would freeze at the
+  // boot locale. The getter runs when the destination picker renders.
+  get name() {
+    return gt("alerts.email");
+  },
   descriptionKey: "alert_destinations.prebuilt.emailDescription",
   icon: "email",
   image: emailLogo,

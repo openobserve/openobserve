@@ -289,7 +289,7 @@ const triggerClasses = computed<string>(() => {
       class="o-step-content w-full min-w-0"
       v-bind="$attrs"
       role="region"
-      :aria-label="`${title}`"
+      :aria-label="title"
     >
       <slot />
     </div>
@@ -308,7 +308,7 @@ const triggerClasses = computed<string>(() => {
           class="o-step-content w-full min-w-0"
           v-bind="$attrs"
           role="region"
-          :aria-label="`${title}`"
+          :aria-label="title"
         >
           <slot />
         </div>
@@ -318,7 +318,7 @@ const triggerClasses = computed<string>(() => {
         class="o-step-content w-full min-w-0"
         v-bind="$attrs"
         role="region"
-        :aria-label="`${title}`"
+        :aria-label="title"
       >
         <slot />
       </div>

@@ -781,7 +781,7 @@ const fetchAlertHistory = async (force = false) => {
     console.error("Error response:", error.response);
     toast({
       variant: "error",
-      message: error.response?.data?.message || error.message || "Failed to fetch alert history",
+      message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
     });
   } finally {
     loading.value = false;

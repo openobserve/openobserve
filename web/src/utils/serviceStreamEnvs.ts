@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw } from "@/types/i18n";
+
 /**
  * Primary platform environment segments.
  *
@@ -25,9 +27,9 @@
  * Shared between ServiceIdentitySetup.vue and ServiceGraphNodeSidePanel.vue.
  */
 export const ENV_SEGMENTS: Record<string, { key: string; label: string }> = {
-  k8s: { key: "k8s", label: "K8s" },
+  k8s: { key: "k8s", label: raw("K8s") },
   aws: { key: "aws", label: "AWS" },
-  azure: { key: "azure", label: "Azure" },
+  azure: { key: "azure", label: raw("Azure") },
   gcp: { key: "gcp", label: "GCP" },
 };
 

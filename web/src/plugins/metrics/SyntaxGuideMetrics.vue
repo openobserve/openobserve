@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- The prose is translated; the PromQL samples beside it are
                      NOT — they are syntax, and a translated `rate(...)` would be
                      a query that does not run. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
                   {{ t("metrics.syntaxGuide.instantVector") }}
                   <span class="bg-highlight-bg rounded-default px-1.25"
@@ -65,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("metrics.syntaxGuide.rate") }}
                   <span class="bg-highlight-bg rounded-default px-1.25">rate(metric_name[5m])</span>
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </ul>
             </div>
           </div>
@@ -82,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="ml-1.25 text-xs">
               <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
                 <!-- As above: prose translated, SQL samples left literal. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
                   {{ t("metrics.syntaxGuide.sqlFullText") }}
                   <span class="bg-highlight-bg rounded-default px-1.25"
@@ -114,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
                 <li>
                   {{ t("metrics.syntaxGuide.sqlMoreExamples") }}
                   <a

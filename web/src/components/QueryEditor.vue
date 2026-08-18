@@ -256,6 +256,7 @@ const currentAbortController = ref<AbortController | null>(null);
 const { saveToHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
+  t,
 );
 const currentChatId = ref<number | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
@@ -356,7 +357,10 @@ const handleAIGenerate = async () => {
   // Build the prompt based on whether there's an existing query
   let naturalLanguage = "";
   if (currentQuery && currentQuery.trim()) {
-    naturalLanguage = `Modify this ${currentLanguage.value.toUpperCase()} query to ${userInput}:\n\n${currentQuery}`;
+    // Model input, not screen copy — deliberately English.
+    naturalLanguage = raw(
+      `Modify this ${currentLanguage.value.toUpperCase()} query to ${userInput}:\n\n${currentQuery}`,
+    );
   } else {
     naturalLanguage = userInput;
   }

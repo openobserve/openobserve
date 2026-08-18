@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { getDataValue } from "./aliasUtils";
 
 /**
@@ -56,13 +58,13 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
 
     const queryField = queryResult?.forEach((item: any) => {
       if (isNaN(getDataValue(item, query.fields.latitude.alias))) {
-        throw new Error("All latitude values should be numeric value.");
+        throw new Error(gt("dashboard.utils.latitudeMustBeNumeric"));
       }
       if (isNaN(getDataValue(item, query.fields.longitude.alias))) {
-        throw new Error("All longitude values should be numeric value.");
+        throw new Error(gt("dashboard.utils.longitudeMustBeNumeric"));
       }
       if (query.fields.weight && isNaN(getDataValue(item, query.fields.weight.alias))) {
-        throw new Error("All weight values should be numeric value.");
+        throw new Error(gt("dashboard.utils.weightMustBeNumeric"));
       }
     });
     return queryField;
@@ -126,7 +128,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
           "#a50026",
         ],
       },
-      text: ["High", "Low"],
+      text: [gt("dashboard.utils.visualMapHigh"), gt("dashboard.utils.visualMapLow")],
       calculable: true,
     },
     toolbox: {
@@ -159,7 +161,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
 
   options.series = panelSchema.queries.map((query: any, index: any) => {
     return {
-      name: `Layer ${index + 1}`,
+      name: gt("dashboard.utils.mapLayerNameIndexed", { index: index + 1 }),
       type: query.config.layer_type,
       coordinateSystem: "lmap",
       emphasis: {

@@ -96,7 +96,7 @@ export default defineComponent({
         isValidJson.value = true;
 
         // Validate the dashboard JSON structure
-        validationErrors.value = validateDashboardJson(parsedJson);
+        validationErrors.value = validateDashboardJson(t, parsedJson);
 
         // Check if dashboardId has been changed
         if (parsedJson.dashboardId && parsedJson.dashboardId !== props.dashboardData.dashboardId) {
@@ -126,7 +126,7 @@ export default defineComponent({
       try {
         const updatedJson = JSON.parse(jsonContent.value);
         // Validate one more time before saving
-        const errors = validateDashboardJson(updatedJson);
+        const errors = validateDashboardJson(t, updatedJson);
 
         if (errors.length > 0) {
           // Show validation errors

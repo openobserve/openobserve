@@ -508,13 +508,20 @@ export default defineComponent({
       },
     ]);
 
+    // The rate unit the column headers are quoted in. Untranslated: "Req/s" is the
+    // conventional symbol for a rate, and it is interpolated INTO the header message
+    // (`quota.listLimit` = "List {unit}") rather than concatenated onto it, so a
+    // locale that wants it somewhere else in the phrase can move it.
     const getTimeUnitLabel = () => {
-      const unitMap: any = {
-        second: "(Req/s)",
-        minute: "(Req/m)",
-        hour: "(Req/h)",
+      // Translated: this lands inside `quota.*Limit` as {unit}, so it is user
+      // copy, not a token. Keeping it as a TS literal moved text out of the
+      // catalogue where no translator can reach it.
+      const unitMap: Record<string, string> = {
+        second: t("quota.unitPerSecond"),
+        minute: t("quota.unitPerMinute"),
+        hour: t("quota.unitPerHour"),
       };
-      return unitMap[activeTimeUnit.value] || "(Req/s)";
+      return unitMap[activeTimeUnit.value] || t("quota.unitPerSecond");
     };
 
     const apiLimitCrudColumnIds = computed(() =>
@@ -541,7 +548,7 @@ export default defineComponent({
         },
         {
           id: "list",
-          header: raw(`${t("quota.listLimit")} ${unitLabel}`),
+          header: t("quota.listLimit", { unit: unitLabel }),
           accessorKey: "list",
           sortable: true,
           resizable: true,
@@ -551,7 +558,7 @@ export default defineComponent({
         },
         {
           id: "get",
-          header: raw(`${t("quota.getLimit")} ${unitLabel}`),
+          header: t("quota.getLimit", { unit: unitLabel }),
           accessorKey: "get",
           sortable: true,
           resizable: true,
@@ -561,7 +568,7 @@ export default defineComponent({
         },
         {
           id: "create",
-          header: raw(`${t("quota.createLimit")} ${unitLabel}`),
+          header: t("quota.createLimit", { unit: unitLabel }),
           accessorKey: "create",
           sortable: true,
           resizable: true,
@@ -571,7 +578,7 @@ export default defineComponent({
         },
         {
           id: "update",
-          header: raw(`${t("quota.updateLimit")} ${unitLabel}`),
+          header: t("quota.updateLimit", { unit: unitLabel }),
           accessorKey: "update",
           sortable: true,
           resizable: true,
@@ -581,7 +588,7 @@ export default defineComponent({
         },
         {
           id: "delete",
-          header: raw(`${t("quota.deleteLimit")} ${unitLabel}`),
+          header: t("quota.deleteLimit", { unit: unitLabel }),
           accessorKey: "delete",
           sortable: true,
           resizable: true,
@@ -608,7 +615,7 @@ export default defineComponent({
         },
         {
           id: "list",
-          header: raw(`${t("quota.listLimit")} ${unitLabel}`),
+          header: t("quota.listLimit", { unit: unitLabel }),
           accessorKey: "list",
           sortable: true,
           resizable: true,
@@ -618,7 +625,7 @@ export default defineComponent({
         },
         {
           id: "get",
-          header: raw(`${t("quota.getLimit")} ${unitLabel}`),
+          header: t("quota.getLimit", { unit: unitLabel }),
           accessorKey: "get",
           sortable: true,
           resizable: true,
@@ -628,7 +635,7 @@ export default defineComponent({
         },
         {
           id: "create",
-          header: raw(`${t("quota.createLimit")} ${unitLabel}`),
+          header: t("quota.createLimit", { unit: unitLabel }),
           accessorKey: "create",
           sortable: true,
           resizable: true,
@@ -638,7 +645,7 @@ export default defineComponent({
         },
         {
           id: "update",
-          header: raw(`${t("quota.updateLimit")} ${unitLabel}`),
+          header: t("quota.updateLimit", { unit: unitLabel }),
           accessorKey: "update",
           sortable: true,
           resizable: true,
@@ -648,7 +655,7 @@ export default defineComponent({
         },
         {
           id: "delete",
-          header: raw(`${t("quota.deleteLimit")} ${unitLabel}`),
+          header: t("quota.deleteLimit", { unit: unitLabel }),
           accessorKey: "delete",
           sortable: true,
           resizable: true,

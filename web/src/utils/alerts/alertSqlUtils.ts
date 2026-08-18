@@ -3,21 +3,24 @@
  * Extracted from AddAlert.vue to reduce file complexity
  */
 
+import type { TranslateFn } from "@/types/i18n";
+
 export interface SqlUtilsContext {
   parser: any;
   sqlQueryErrorMsg: any;
+  t: TranslateFn;
 }
 type ComparisonOperator = ">=" | "<=" | ">" | "<" | "=" | "!=" | "<>";
 
 export const getParser = (sqlQuery: string, context: SqlUtilsContext): boolean => {
-  const { parser, sqlQueryErrorMsg } = context;
+  const { parser, sqlQueryErrorMsg, t } = context;
   try {
     // As default is a reserved keyword in sql-parser, we are replacing it with default1
     const regex = /\bdefault\b/g;
     const columns = parser.astify(sqlQuery.replace(regex, "default1")).columns;
     for (const column of columns) {
       if (column.expr.column === "*") {
-        sqlQueryErrorMsg.value = "Selecting all columns is not allowed";
+        sqlQueryErrorMsg.value = t("alerts.selectAllColumnsNotAllowed");
         return false;
       }
     }

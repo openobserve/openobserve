@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { gt } from "@/types/i18n";
 import { usePipelines } from "./usePipelines";
 import pipelines from "@/services/pipelines";
 import destinationService from "@/services/alert_destination";
@@ -65,7 +66,7 @@ describe("usePipelines", () => {
 
   // Test 1: Composable initialization
   it("should initialize composable correctly", () => {
-    const { getUsedStreamsList, getPipelineDestinations } = usePipelines();
+    const { getUsedStreamsList, getPipelineDestinations } = usePipelines(gt);
 
     expect(getUsedStreamsList).toBeDefined();
     expect(getPipelineDestinations).toBeDefined();
@@ -83,7 +84,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockResponse);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     const result = await getUsedStreamsList();
 
     expect(result).toEqual(["stream1", "stream2", "stream3"]);
@@ -101,7 +102,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockResponse);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     const result = await getUsedStreamsList();
 
     expect(result).toEqual([]);
@@ -121,7 +122,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     const result = await getUsedStreamsList();
 
     expect(result).toEqual([]);
@@ -141,7 +142,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     const result = await getUsedStreamsList();
 
     expect(result).toEqual([]);
@@ -162,7 +163,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     const result = await getUsedStreamsList();
 
     expect(result).toEqual([]);
@@ -182,7 +183,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     const result = await getUsedStreamsList();
 
     expect(result).toEqual([]);
@@ -204,7 +205,7 @@ describe("usePipelines", () => {
 
     mockDestinationService.list.mockResolvedValue(mockResponse);
 
-    const { getPipelineDestinations } = usePipelines();
+    const { getPipelineDestinations } = usePipelines(gt);
     const result = await getPipelineDestinations();
 
     expect(result).toEqual(["destination1", "destination2", "destination3"]);
@@ -226,7 +227,7 @@ describe("usePipelines", () => {
 
     mockDestinationService.list.mockResolvedValue(mockResponse);
 
-    const { getPipelineDestinations } = usePipelines();
+    const { getPipelineDestinations } = usePipelines(gt);
     const result = await getPipelineDestinations();
 
     expect(result).toEqual([]);
@@ -248,7 +249,7 @@ describe("usePipelines", () => {
 
     mockDestinationService.list.mockResolvedValue(mockResponse);
 
-    const { getPipelineDestinations } = usePipelines();
+    const { getPipelineDestinations } = usePipelines(gt);
     const result = await getPipelineDestinations();
 
     expect(result).toEqual(["single-destination"]);
@@ -271,7 +272,7 @@ describe("usePipelines", () => {
     const mockResponse = { data: { list: [] } };
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockResponse);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     await getUsedStreamsList();
 
     expect(mockPipelinesService.getPipelineStreams).toHaveBeenCalledWith("custom-org-123");
@@ -293,7 +294,7 @@ describe("usePipelines", () => {
     const mockResponse = { data: [] };
     mockDestinationService.list.mockResolvedValue(mockResponse);
 
-    const { getPipelineDestinations } = usePipelines();
+    const { getPipelineDestinations } = usePipelines(gt);
     await getPipelineDestinations();
 
     expect(mockDestinationService.list).toHaveBeenCalledWith({
@@ -319,7 +320,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     await getUsedStreamsList();
 
     expect(toast).toHaveBeenCalledTimes(1);
@@ -341,7 +342,7 @@ describe("usePipelines", () => {
 
     mockDestinationService.list.mockResolvedValue(mockResponse);
 
-    const { getPipelineDestinations } = usePipelines();
+    const { getPipelineDestinations } = usePipelines(gt);
     const result = await getPipelineDestinations();
 
     expect(result).toEqual(["webhook1", "email-dest", "slack-dest"]);
@@ -350,7 +351,7 @@ describe("usePipelines", () => {
 
   // Test 15: Return value structure validation
   it("should return object with correct function names", () => {
-    const result = usePipelines();
+    const result = usePipelines(gt);
 
     expect(result).toHaveProperty("getUsedStreamsList");
     expect(result).toHaveProperty("getPipelineDestinations");
@@ -365,7 +366,7 @@ describe("usePipelines", () => {
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockStreamResponse);
     mockDestinationService.list.mockResolvedValue(mockDestResponse);
 
-    const { getUsedStreamsList, getPipelineDestinations } = usePipelines();
+    const { getUsedStreamsList, getPipelineDestinations } = usePipelines(gt);
 
     const [streams, destinations] = await Promise.all([
       getUsedStreamsList(),
@@ -386,7 +387,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockRejectedValue(networkError);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     const result = await getUsedStreamsList();
 
     expect(result).toEqual([]);
@@ -397,7 +398,7 @@ describe("usePipelines", () => {
     const mockResponse = { data: { list: [] } };
     mockPipelinesService.getPipelineStreams.mockResolvedValue(mockResponse);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     await getUsedStreamsList();
 
     expect(mockPipelinesService.getPipelineStreams).toHaveBeenCalledWith("test-org");
@@ -409,7 +410,7 @@ describe("usePipelines", () => {
     const mockResponse = { data: [] };
     mockDestinationService.list.mockResolvedValue(mockResponse);
 
-    const { getPipelineDestinations } = usePipelines();
+    const { getPipelineDestinations } = usePipelines(gt);
     await getPipelineDestinations();
 
     const expectedParams = {
@@ -433,7 +434,7 @@ describe("usePipelines", () => {
     mockPipelinesService.getPipelineStreams.mockResolvedValue(streamResponse);
     mockDestinationService.list.mockResolvedValue(destResponse);
 
-    const { getUsedStreamsList, getPipelineDestinations } = usePipelines();
+    const { getUsedStreamsList, getPipelineDestinations } = usePipelines(gt);
 
     const streams1 = await getUsedStreamsList();
     const dest1 = await getPipelineDestinations();
@@ -460,7 +461,7 @@ describe("usePipelines", () => {
 
     mockDestinationService.list.mockResolvedValue(mockResponse);
 
-    const { getPipelineDestinations } = usePipelines();
+    const { getPipelineDestinations } = usePipelines(gt);
     const result = await getPipelineDestinations();
 
     // Should include all mapped values, even non-string ones
@@ -481,7 +482,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     const result = await getUsedStreamsList();
 
     expect(result).toEqual([]);
@@ -497,8 +498,8 @@ describe("usePipelines", () => {
 
   // Test 23: Composable reusability
   it("should create independent instances", () => {
-    const instance1 = usePipelines();
-    const instance2 = usePipelines();
+    const instance1 = usePipelines(gt);
+    const instance2 = usePipelines(gt);
 
     expect(instance1).not.toBe(instance2);
     expect(instance1.getUsedStreamsList).not.toBe(instance2.getUsedStreamsList);
@@ -507,7 +508,7 @@ describe("usePipelines", () => {
 
   // Test 24: Store integration validation
   it("should access store state correctly", async () => {
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
 
     expect(useStore).toHaveBeenCalled();
 
@@ -537,7 +538,7 @@ describe("usePipelines", () => {
 
     mockPipelinesService.getPipelineStreams.mockRejectedValue(completeError);
 
-    const { getUsedStreamsList } = usePipelines();
+    const { getUsedStreamsList } = usePipelines(gt);
     const result = await getUsedStreamsList();
 
     expect(result).toEqual([]);
