@@ -23,7 +23,7 @@ use openobserve_core::llm_evaluations::{
     experiments::{
         CreateExperiment, CreateExperimentResult, Experiment, ExperimentPreview,
         ExperimentScorerRef, ExperimentSlot, ExperimentSlotPage, ExperimentStatus,
-        ExperimentTaskConfig, PinnedExperimentScorer, PromptMessage,
+        ExperimentTaskConfig, PinnedExperimentScorer, PromptMessage, RemoteTaskOverrides,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -115,8 +115,10 @@ pub enum ExperimentTaskBody {
         params: Option<Value>,
     },
     Remote {
+        /// Pinned `name@version` of a published Remote Task. Never latest.
+        task_ref: String,
         #[serde(default)]
-        config: Value,
+        overrides: Option<RemoteTaskOverridesBody>,
     },
     Sdk {
         /// Immutable identity of the customer code under evaluation. Every
@@ -147,7 +149,13 @@ impl From<ExperimentTaskBody> for ExperimentTaskConfig {
                 model,
                 params,
             },
-            ExperimentTaskBody::Remote { config } => Self::Remote { config },
+            ExperimentTaskBody::Remote {
+                task_ref,
+                overrides,
+            } => Self::Remote {
+                task_ref,
+                overrides: overrides.map(Into::into),
+            },
             ExperimentTaskBody::Sdk {
                 task_fingerprint,
                 config,
@@ -179,7 +187,13 @@ impl From<ExperimentTaskConfig> for ExperimentTaskBody {
                 model,
                 params,
             },
-            ExperimentTaskConfig::Remote { config } => Self::Remote { config },
+            ExperimentTaskConfig::Remote {
+                task_ref,
+                overrides,
+            } => Self::Remote {
+                task_ref,
+                overrides: overrides.map(Into::into),
+            },
             ExperimentTaskConfig::Sdk {
                 task_fingerprint,
                 config,
@@ -187,6 +201,34 @@ impl From<ExperimentTaskConfig> for ExperimentTaskBody {
                 task_fingerprint,
                 config,
             },
+        }
+    }
+}
+
+/// The two runtime overrides an Experiment may set on a registered Remote Task.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RemoteTaskOverridesBody {
+    #[serde(default)]
+    pub max_concurrency: Option<u32>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
+}
+
+impl From<RemoteTaskOverridesBody> for RemoteTaskOverrides {
+    fn from(value: RemoteTaskOverridesBody) -> Self {
+        Self {
+            max_concurrency: value.max_concurrency,
+            timeout_ms: value.timeout_ms,
+        }
+    }
+}
+
+impl From<RemoteTaskOverrides> for RemoteTaskOverridesBody {
+    fn from(value: RemoteTaskOverrides) -> Self {
+        Self {
+            max_concurrency: value.max_concurrency,
+            timeout_ms: value.timeout_ms,
         }
     }
 }
