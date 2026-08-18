@@ -10680,19 +10680,19 @@
           "span": {
             "title": "Matched Spans",
             "hint": "Once you've picked a stream and filter, this panel will show how many spans your job will match.",
-            "matchedSuffix": "spans matched · last 24h",
+            "matchedSuffix": "spans matched · last 1h",
             "matchedLoading": "Counting matched spans…"
           },
           "trace": {
             "title": "Matched Traces",
             "hint": "Once you've picked a stream and filter, this panel will show how many traces your job will match.",
-            "matchedSuffix": "traces matched · last 24h",
+            "matchedSuffix": "traces matched · last 1h",
             "matchedLoading": "Counting matched traces…"
           },
           "session": {
             "title": "Matched Sessions",
             "hint": "Once you've picked a stream and filter, this panel will show how many sessions your job will match.",
-            "matchedSuffix": "sessions matched · last 24h",
+            "matchedSuffix": "sessions matched · last 1h",
             "matchedLoading": "Counting matched sessions…"
           }
         },
