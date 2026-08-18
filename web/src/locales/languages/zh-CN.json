@@ -820,7 +820,13 @@
     "backTo": "返回 {label}",
     "boolTrue": "真",
     "boolFalse": "假",
-    "browserTimeWithZone": "浏览器时间（{zone}）"
+    "browserTimeWithZone": "浏览器时间（{zone}）",
+    "download": "下载",
+    "openProviderOnRegistry": "OpenObserve provider 在 {registry} 上",
+    "exportTerraformTabTooltip": "相同的配置适用于 Terraform 或 OpenTofu。",
+    "exportTerraformEmpty": "该选择没有对应的 Terraform 资源。请改为导出为 JSON。",
+    "exportTerraformSkipped": "未包含：{names}。OpenObserve Terraform provider 没有对应的资源。",
+    "exportTerraformDropped": "已省略 — provider schema 无法承载这些字段：{fields}。"
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "条件类型",
     "sloLongWindow": "长窗口",
     "sloShortWindow": "短窗口",
-    "sloCloneDisabled": "SLO 警报是在其 SLO 页面上创建的，因此无法从此处克隆。"
+    "sloCloneDisabled": "SLO 警报是在其 SLO 页面上创建的，因此无法从此处克隆。",
+    "exportDialogTitle": "导出告警 | 导出 {count} 条告警",
+    "exportDialogSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform。"
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "告警保存成功。",
       "alertUpdatedSuccessfully": "告警更新成功。",
       "openingDedupConfig": "正在为 {name} 打开去重配置",
-      "editingAlert": "正在编辑告警：{name}"
+      "editingAlert": "正在编辑告警：{name}",
+      "someAlertsCouldNotBeExported": "无法读取 {names}。其余已准备好导出。"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "加密密钥更新成功",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "该告警已不在此 SLO 上。",
       "describeBurn": "燃烧速率 > {critical} 在 {long} 和 {short} 期间",
       "describeBudget": "错误预算消耗 > {critical}%"
-    }
+    },
+    "exportTitle": "导出 SLO | 导出 {count} 个 SLO",
+    "exportSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform 格式。",
+    "exportFailed": "无法读取 SLO 定义。请重试。",
+    "exportPartial": "无法读取 {names}。其余已准备好导出。",
+    "exportSucceeded": "已导出 {count} 个 SLO | 已导出 {count} 个 SLO"
   },
   "promql": {
     "operations": {

@@ -820,7 +820,13 @@
     "backTo": "{label}に戻る",
     "boolTrue": "真",
     "boolFalse": "偽",
-    "browserTimeWithZone": "ブラウザ時間（{zone}）"
+    "browserTimeWithZone": "ブラウザ時間（{zone}）",
+    "download": "ダウンロード",
+    "openProviderOnRegistry": "{registry} の OpenObserve プロバイダー",
+    "exportTerraformTabTooltip": "同じ設定は Terraform または OpenTofu でも適用されます。",
+    "exportTerraformEmpty": "この選択に対応する Terraform リソースはありません。代わりに JSON としてエクスポートしてください。",
+    "exportTerraformSkipped": "含まれていません: {names}。OpenObserve Terraform プロバイダーにはこれらに対応するリソースがありません。",
+    "exportTerraformDropped": "除外されました — プロバイダースキーマはこれらのフィールドを保持できないため: {fields}。"
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "条件タイプ",
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
-    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。"
+    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
+    "exportDialogTitle": "アラートをエクスポート | アラートを{count}件エクスポート",
+    "exportDialogSubtitle": "定義を確認して、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。"
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "アラートが正常に保存されました。",
       "alertUpdatedSuccessfully": "アラートが正常に更新されました。",
       "openingDedupConfig": "重複排除設定を開いています: {name}",
-      "editingAlert": "アラートを編集中: {name}"
+      "editingAlert": "アラートを編集中: {name}",
+      "someAlertsCouldNotBeExported": "{names} を読み込めませんでした。残りはエクスポートできます。"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "暗号鍵が正常に更新されました",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "そのアラートはこのSLOにはもうありません。",
       "describeBurn": "バーンレート > {critical}（{long} と {short} にわたって）",
       "describeBudget": "エラー予算消費 > {critical}%"
-    }
+    },
+    "exportTitle": "SLOをエクスポート | {count}個のSLOをエクスポート",
+    "exportSubtitle": "定義を確認し、JSONまたはOpenObserveプロバイダー用のTerraformとしてダウンロードしてください。",
+    "exportFailed": "SLO定義を読み取れませんでした。もう一度お試しください。",
+    "exportPartial": "{names}を読み取れませんでした。残りはエクスポートできます。",
+    "exportSucceeded": "{count}個のSLOをエクスポートしました | {count}個のSLOをエクスポートしました"
   },
   "promql": {
     "operations": {

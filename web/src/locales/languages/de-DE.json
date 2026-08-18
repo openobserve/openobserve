@@ -820,7 +820,13 @@
     "backTo": "Zurück zu {label}",
     "boolTrue": "Wahr",
     "boolFalse": "Falsch",
-    "browserTimeWithZone": "Browser-Zeit ({zone})"
+    "browserTimeWithZone": "Browser-Zeit ({zone})",
+    "download": "Herunterladen",
+    "openProviderOnRegistry": "OpenObserve-Provider auf {registry}",
+    "exportTerraformTabTooltip": "Die gleiche Konfiguration gilt für Terraform oder OpenTofu.",
+    "exportTerraformEmpty": "Für diese Auswahl existiert keine Terraform-Ressource. Exportieren Sie sie stattdessen als JSON.",
+    "exportTerraformSkipped": "Nicht enthalten: {names}. Der OpenObserve-Terraform-Provider hat keine Ressource für diese.",
+    "exportTerraformDropped": "Ausgelassen – das Provider-Schema kann diese Felder nicht abbilden: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "Bedingungstyp",
     "sloLongWindow": "Langes Zeitfenster",
     "sloShortWindow": "Kurzes Zeitfenster",
-    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden."
+    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
+    "exportDialogTitle": "Alert exportieren | {count} Alerts exportieren",
+    "exportDialogSubtitle": "Überprüfen Sie die Definition und laden Sie sie dann als JSON oder als Terraform für den OpenObserve-Provider herunter."
   },
   "alert_dependencies": {
     "actionOpen": "Öffnen",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "Alarm erfolgreich gespeichert.",
       "alertUpdatedSuccessfully": "Alarm erfolgreich aktualisiert.",
       "openingDedupConfig": "Dedup-Konfiguration für {name} wird geöffnet",
-      "editingAlert": "Alarm bearbeiten: {name}"
+      "editingAlert": "Alarm bearbeiten: {name}",
+      "someAlertsCouldNotBeExported": "{names} konnten nicht gelesen werden. Die restlichen sind für den Export bereit."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Cipher-Schlüssel erfolgreich aktualisiert",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "Dieser Alarm ist diesem SLO nicht mehr zugeordnet.",
       "describeBurn": "Burn-Rate > {critical} über {long} und {short}",
       "describeBudget": "Fehlerbudget verbraucht > {critical}%"
-    }
+    },
+    "exportTitle": "SLO exportieren | {count} SLOs exportieren",
+    "exportSubtitle": "Überprüfen Sie die Definition und laden Sie sie dann als JSON oder als Terraform für den OpenObserve-Provider herunter.",
+    "exportFailed": "Die SLO-Definition konnte nicht gelesen werden. Bitte versuchen Sie es erneut.",
+    "exportPartial": "Konnte {names} nicht lesen. Der Rest ist bereit für den Export.",
+    "exportSucceeded": "{count} SLO exportiert | {count} SLOs exportiert"
   },
   "promql": {
     "operations": {

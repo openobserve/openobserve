@@ -820,7 +820,13 @@
     "backTo": "Назад к {label}",
     "boolTrue": "Истина",
     "boolFalse": "Ложь",
-    "browserTimeWithZone": "Время браузера ({zone})"
+    "browserTimeWithZone": "Время браузера ({zone})",
+    "download": "Скачать",
+    "openProviderOnRegistry": "Провайдер OpenObserve в {registry}",
+    "exportTerraformTabTooltip": "Та же конфигурация применима с Terraform или OpenTofu.",
+    "exportTerraformEmpty": "Для этого выбора не существует ресурса Terraform. Экспортируйте его как JSON.",
+    "exportTerraformSkipped": "Не включено: {names}. Провайдер OpenObserve Terraform не имеет ресурса для них.",
+    "exportTerraformDropped": "Исключено — схема провайдера не может содержать эти поля: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "Тип условия",
     "sloLongWindow": "Длинное окно",
     "sloShortWindow": "Короткое окно",
-    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда."
+    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда.",
+    "exportDialogTitle": "Экспортировать оповещение | Экспортировать {count} оповещений",
+    "exportDialogSubtitle": "Проверьте определение, затем скачайте его в формате JSON или Terraform для провайдера OpenObserve."
   },
   "alert_dependencies": {
     "actionOpen": "Открыть",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "Оповещение успешно сохранено.",
       "alertUpdatedSuccessfully": "Оповещение успешно обновлено.",
       "openingDedupConfig": "Открытие конфигурации дедупликации для: {name}",
-      "editingAlert": "Редактирование оповещения: {name}"
+      "editingAlert": "Редактирование оповещения: {name}",
+      "someAlertsCouldNotBeExported": "Не удалось прочитать {names}. Остальные готовы к экспорту."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Ключ шифрования успешно обновлён",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "Это оповещение больше не относится к этому SLO.",
       "describeBurn": "Скорость выгорания > {critical} за {long} и {short}",
       "describeBudget": "Израсходовано бюджета ошибок > {critical}%"
-    }
+    },
+    "exportTitle": "Экспортировать SLO | Экспортировать {count} SLO",
+    "exportSubtitle": "Просмотрите определение, затем скачайте его как JSON или как Terraform для провайдера OpenObserve.",
+    "exportFailed": "Не удалось прочитать определение SLO. Пожалуйста, попробуйте снова.",
+    "exportPartial": "Не удалось прочитать {names}. Остальные готовы к экспорту.",
+    "exportSucceeded": "Экспортировано {count} SLO | Экспортировано {count} SLO"
   },
   "promql": {
     "operations": {

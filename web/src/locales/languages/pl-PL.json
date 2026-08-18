@@ -820,7 +820,13 @@
     "backTo": "Wróć do {label}",
     "boolTrue": "Prawda",
     "boolFalse": "Fałsz",
-    "browserTimeWithZone": "Czas przeglądarki ({zone})"
+    "browserTimeWithZone": "Czas przeglądarki ({zone})",
+    "download": "Pobierz",
+    "openProviderOnRegistry": "Dostawca OpenObserve w {registry}",
+    "exportTerraformTabTooltip": "Ta sama konfiguracja dotyczy Terraform lub OpenTofu.",
+    "exportTerraformEmpty": "Dla tego wyboru nie istnieje zasób Terraform. Wyeksportuj go jako JSON.",
+    "exportTerraformSkipped": "Nieuwzględnione: {names}. Dostawca Terraform OpenObserve nie ma zasobu dla tych elementów.",
+    "exportTerraformDropped": "Pominięto — schemat dostawcy nie może przenosić tych pól: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "Typ warunku",
     "sloLongWindow": "Długie okno",
     "sloShortWindow": "Krótkie okno",
-    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować."
+    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
+    "exportDialogTitle": "Eksportuj alert | Eksportuj {count} alertów",
+    "exportDialogSubtitle": "Przejrzyj definicję, a następnie pobierz ją jako JSON lub jako Terraform dla dostawcy OpenObserve."
   },
   "alert_dependencies": {
     "actionOpen": "Otwórz",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "Alert został zapisany.",
       "alertUpdatedSuccessfully": "Alert został zaktualizowany.",
       "openingDedupConfig": "Otwieranie konfiguracji deduplikacji dla: {name}",
-      "editingAlert": "Edytowanie alertu: {name}"
+      "editingAlert": "Edytowanie alertu: {name}",
+      "someAlertsCouldNotBeExported": "Nie można odczytać {names}. Pozostałe są gotowe do wyeksportowania."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Klucz szyfrowania został zaktualizowany",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "Ten alert nie jest już przypisany do tego SLO.",
       "describeBurn": "Wskaźnik wypalania > {critical} w ciągu {long} i {short}",
       "describeBudget": "Zużyty budżet błędów > {critical}%"
-    }
+    },
+    "exportTitle": "Eksportuj SLO | Eksportuj {count} SLO",
+    "exportSubtitle": "Przejrzyj definicję, a następnie pobierz ją jako JSON lub jako Terraform dla dostawcy OpenObserve.",
+    "exportFailed": "Nie można odczytać definicji SLO. Spróbuj ponownie.",
+    "exportPartial": "Nie można odczytać {names}. Pozostałe są gotowe do eksportu.",
+    "exportSucceeded": "Wyeksportowano {count} SLO | Wyeksportowano {count} SLO"
   },
   "promql": {
     "operations": {

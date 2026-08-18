@@ -820,7 +820,13 @@
     "backTo": "{label} sayfasına geri dön",
     "boolTrue": "Doğru",
     "boolFalse": "Yanlış",
-    "browserTimeWithZone": "Tarayıcı Zamanı ({zone})"
+    "browserTimeWithZone": "Tarayıcı Zamanı ({zone})",
+    "download": "İndir",
+    "openProviderOnRegistry": "{registry} üzerindeki OpenObserve sağlayıcısı",
+    "exportTerraformTabTooltip": "Aynı yapılandırma Terraform veya OpenTofu ile de geçerlidir.",
+    "exportTerraformEmpty": "Bu seçim için Terraform kaynağı mevcut değil. Bunun yerine JSON olarak dışa aktarın.",
+    "exportTerraformSkipped": "Dahil edilmedi: {names}. OpenObserve Terraform sağlayıcısında bunlar için kaynak bulunmuyor.",
+    "exportTerraformDropped": "Dışarıda bırakıldı — sağlayıcı şeması bu alanları taşıyamıyor: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "Koşul türü",
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
-    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz."
+    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
+    "exportDialogTitle": "Uyarıyı dışa aktar | {count} uyarıyı dışa aktar",
+    "exportDialogSubtitle": "Tanımı gözden geçirin, ardından JSON veya OpenObserve sağlayıcısı için Terraform olarak indirin."
   },
   "alert_dependencies": {
     "actionOpen": "Aç",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "Uyarı başarıyla kaydedildi.",
       "alertUpdatedSuccessfully": "Uyarı başarıyla güncellendi.",
       "openingDedupConfig": "{name} için tekilleştirme yapılandırması açılıyor",
-      "editingAlert": "Uyarı düzenleniyor: {name}"
+      "editingAlert": "Uyarı düzenleniyor: {name}",
+      "someAlertsCouldNotBeExported": "{names} okunamadı. Diğerleri dışa aktarılmaya hazır."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Şifre anahtarı başarıyla güncellendi",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "Bu uyarı artık bu SLO'da değil.",
       "describeBurn": "Tükenme oranı > {critical}, {long} ve {short} boyunca",
       "describeBudget": "Tüketilen hata bütçesi > {critical}%"
-    }
+    },
+    "exportTitle": "SLO Dışa Aktar | {count} SLO Dışa Aktar",
+    "exportSubtitle": "Tanımı gözden geçirin, ardından OpenObserve sağlayıcısı için JSON veya Terraform olarak indirin.",
+    "exportFailed": "SLO tanımı okunamadı. Lütfen tekrar deneyin.",
+    "exportPartial": "{names} okunamadı. Geri kalanlar dışa aktarılmaya hazır.",
+    "exportSucceeded": "{count} SLO dışa aktarıldı | {count} SLO dışa aktarıldı"
   },
   "promql": {
     "operations": {

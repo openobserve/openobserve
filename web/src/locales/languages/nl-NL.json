@@ -820,7 +820,13 @@
     "backTo": "Terug naar {label}",
     "boolTrue": "Waar",
     "boolFalse": "Onwaar",
-    "browserTimeWithZone": "Browsertijd ({zone})"
+    "browserTimeWithZone": "Browsertijd ({zone})",
+    "download": "Downloaden",
+    "openProviderOnRegistry": "OpenObserve-provider op de {registry}",
+    "exportTerraformTabTooltip": "Dezelfde configuratie is van toepassing met Terraform of OpenTofu.",
+    "exportTerraformEmpty": "Er bestaat geen Terraform-resource voor deze selectie. Exporteer het in plaats daarvan als JSON.",
+    "exportTerraformSkipped": "Niet inbegrepen: {names}. De OpenObserve Terraform-provider heeft hier geen resource voor.",
+    "exportTerraformDropped": "Weggelaten — het provider-schema kan deze velden niet bevatten: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "Conditietype",
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
-    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond."
+    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
+    "exportDialogTitle": "Exporteer alert | Exporteer {count} alerts",
+    "exportDialogSubtitle": "Bekijk de definitie en download deze als JSON of als Terraform voor de OpenObserve-provider."
   },
   "alert_dependencies": {
     "actionOpen": "Openen",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "Waarschuwing succesvol opgeslagen.",
       "alertUpdatedSuccessfully": "Waarschuwing succesvol bijgewerkt.",
       "openingDedupConfig": "Deduplicatieconfiguratie openen voor: {name}",
-      "editingAlert": "Waarschuwing bewerken: {name}"
+      "editingAlert": "Waarschuwing bewerken: {name}",
+      "someAlertsCouldNotBeExported": "Kon {names} niet lezen. De rest is klaar om te exporteren."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Coderingssleutel succesvol bijgewerkt",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "Die melding staat niet meer op deze SLO.",
       "describeBurn": "Verbrandingssnelheid > {critical} over {long} en {short}",
       "describeBudget": "Foutbudget verbruikt > {critical}%"
-    }
+    },
+    "exportTitle": "Exporteer SLO | Exporteer {count} SLO's",
+    "exportSubtitle": "Bekijk de definitie en download deze vervolgens als JSON of als Terraform voor de OpenObserve-provider.",
+    "exportFailed": "De SLO-definitie kon niet worden gelezen. Probeer het opnieuw.",
+    "exportPartial": "Kon {names} niet lezen. De rest is klaar om te exporteren.",
+    "exportSucceeded": "{count} SLO geëxporteerd | {count} SLO's geëxporteerd"
   },
   "promql": {
     "operations": {

@@ -820,7 +820,13 @@
     "backTo": "Quay lại {label}",
     "boolTrue": "Đúng",
     "boolFalse": "Sai",
-    "browserTimeWithZone": "Giờ trình duyệt ({zone})"
+    "browserTimeWithZone": "Giờ trình duyệt ({zone})",
+    "download": "Tải xuống",
+    "openProviderOnRegistry": "OpenObserve provider trên {registry}",
+    "exportTerraformTabTooltip": "Cấu hình tương tự áp dụng với Terraform hoặc OpenTofu.",
+    "exportTerraformEmpty": "Không có tài nguyên Terraform nào cho lựa chọn này. Hãy xuất nó dưới dạng JSON.",
+    "exportTerraformSkipped": "Không bao gồm: {names}. OpenObserve Terraform provider không có tài nguyên cho các mục này.",
+    "exportTerraformDropped": "Bỏ sót — lược đồ provider không thể chứa các trường này: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "Loại điều kiện",
     "sloLongWindow": "Cửa sổ dài",
     "sloShortWindow": "Cửa sổ ngắn",
-    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây."
+    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
+    "exportDialogTitle": "Xuất cảnh báo | Xuất {count} cảnh báo",
+    "exportDialogSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve."
   },
   "alert_dependencies": {
     "actionOpen": "Mở",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "Đã lưu cảnh báo thành công.",
       "alertUpdatedSuccessfully": "Đã cập nhật cảnh báo thành công.",
       "openingDedupConfig": "Đang mở cấu hình khử trùng lặp cho: {name}",
-      "editingAlert": "Đang chỉnh sửa cảnh báo: {name}"
+      "editingAlert": "Đang chỉnh sửa cảnh báo: {name}",
+      "someAlertsCouldNotBeExported": "Không thể đọc {names}. Phần còn lại đã sẵn sàng để xuất."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Đã cập nhật khóa mã hóa thành công",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "Cảnh báo đó không còn trên SLO này.",
       "describeBurn": "Tỷ lệ đốt > {critical} trong {long} và {short}",
       "describeBudget": "Ngân sách lỗi đã tiêu thụ > {critical}%"
-    }
+    },
+    "exportTitle": "Xuất SLO | Xuất {count} SLO",
+    "exportSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve.",
+    "exportFailed": "Không thể đọc định nghĩa SLO. Vui lòng thử lại.",
+    "exportPartial": "Không thể đọc {names}. Phần còn lại đã sẵn sàng để xuất.",
+    "exportSucceeded": "Đã xuất {count} SLO | Đã xuất {count} SLO"
   },
   "promql": {
     "operations": {

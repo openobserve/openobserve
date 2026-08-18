@@ -820,7 +820,13 @@
     "backTo": "{label}로 돌아가기",
     "boolTrue": "참",
     "boolFalse": "거짓",
-    "browserTimeWithZone": "브라우저 시간 ({zone})"
+    "browserTimeWithZone": "브라우저 시간 ({zone})",
+    "download": "다운로드",
+    "openProviderOnRegistry": "{registry}의 OpenObserve 프로바이더",
+    "exportTerraformTabTooltip": "동일한 구성이 Terraform 또는 OpenTofu에 적용됩니다.",
+    "exportTerraformEmpty": "이 선택에 대한 Terraform 리소스가 없습니다. 대신 JSON으로 내보내세요.",
+    "exportTerraformSkipped": "포함되지 않음: {names}. OpenObserve Terraform 프로바이더에는 이에 대한 리소스가 없습니다.",
+    "exportTerraformDropped": "제외됨 — 프로바이더 스키마가 다음 필드를 포함할 수 없습니다: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "조건 유형",
     "sloLongWindow": "긴 기간",
     "sloShortWindow": "짧은 기간",
-    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다."
+    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
+    "exportDialogTitle": "알림 내보내기 | 알림 {count}개 내보내기",
+    "exportDialogSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 프로바이더용 Terraform으로 다운로드하세요."
   },
   "alert_dependencies": {
     "actionOpen": "열기",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "알림이 성공적으로 저장되었습니다.",
       "alertUpdatedSuccessfully": "알림이 성공적으로 업데이트되었습니다.",
       "openingDedupConfig": "{name}에 대한 중복 제거 구성 열기",
-      "editingAlert": "알림 편집 중: {name}"
+      "editingAlert": "알림 편집 중: {name}",
+      "someAlertsCouldNotBeExported": "{names}을(를) 읽을 수 없습니다. 나머지는 내보낼 준비가 되었습니다."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "암호화 키가 성공적으로 업데이트되었습니다.",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "그 알림은 더 이상 이 SLO에 없습니다.",
       "describeBurn": "소진율 > {critical} ({long} 및 {short} 동안)",
       "describeBudget": "오류 예산 소비 > {critical}%"
-    }
+    },
+    "exportTitle": "SLO 내보내기 | {count} SLO 내보내기",
+    "exportSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 공급자용 Terraform으로 다운로드하세요.",
+    "exportFailed": "SLO 정의를 읽을 수 없습니다. 다시 시도하십시오.",
+    "exportPartial": "{names}을(를) 읽을 수 없습니다. 나머지는 내보낼 준비가 되었습니다.",
+    "exportSucceeded": "SLO {count}개 내보냈습니다 | SLO {count}개 내보냈습니다"
   },
   "promql": {
     "operations": {

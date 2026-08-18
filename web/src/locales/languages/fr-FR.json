@@ -820,7 +820,13 @@
     "backTo": "Retour à {label}",
     "boolTrue": "Vrai",
     "boolFalse": "Faux",
-    "browserTimeWithZone": "Heure du navigateur ({zone})"
+    "browserTimeWithZone": "Heure du navigateur ({zone})",
+    "download": "Télécharger",
+    "openProviderOnRegistry": "Fournisseur OpenObserve sur {registry}",
+    "exportTerraformTabTooltip": "La même configuration s'applique avec Terraform ou OpenTofu.",
+    "exportTerraformEmpty": "Aucune ressource Terraform n'existe pour cette sélection. Exportez-la en JSON à la place.",
+    "exportTerraformSkipped": "Non inclus : {names}. Le fournisseur Terraform OpenObserve n'a pas de ressource pour ceux-ci.",
+    "exportTerraformDropped": "Omis — le schéma du fournisseur ne peut pas contenir ces champs : {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -7364,7 +7370,9 @@
     "sloKind": "Type de condition",
     "sloLongWindow": "Fenêtre longue",
     "sloShortWindow": "Fenêtre courte",
-    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici."
+    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici.",
+    "exportDialogTitle": "Exporter l'alerte | Exporter {count} alertes",
+    "exportDialogSubtitle": "Examinez la définition, puis téléchargez-la au format JSON ou Terraform pour le fournisseur OpenObserve."
   },
   "alert_dependencies": {
     "actionOpen": "Ouvrir",
@@ -13740,7 +13748,8 @@
       "alertSavedSuccessfully": "Alerte enregistrée avec succès.",
       "alertUpdatedSuccessfully": "Alerte mise à jour avec succès.",
       "openingDedupConfig": "Ouverture de la configuration de déduplication pour : {name}",
-      "editingAlert": "Modification de l'alerte : {name}"
+      "editingAlert": "Modification de l'alerte : {name}",
+      "someAlertsCouldNotBeExported": "Impossible de lire {names}. Le reste est prêt à être exporté."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Clé de chiffrement mise à jour avec succès",
@@ -14309,7 +14318,12 @@
       "editTargetMissing": "Cette alerte ne fait plus partie de ce SLO.",
       "describeBurn": "Taux de combustion > {critical} sur {long} et {short}",
       "describeBudget": "Budget d'erreur consommé > {critical}%"
-    }
+    },
+    "exportTitle": "Exporter le SLO | Exporter {count} SLOs",
+    "exportSubtitle": "Passez en revue la définition, puis téléchargez-la en JSON ou en Terraform pour le fournisseur OpenObserve.",
+    "exportFailed": "Impossible de lire la définition du SLO. Veuillez réessayer.",
+    "exportPartial": "Impossible de lire {names}. Les autres sont prêts à être exportés.",
+    "exportSucceeded": "Exporté {count} SLO | Exportés {count} SLOs"
   },
   "promql": {
     "operations": {
