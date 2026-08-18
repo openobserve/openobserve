@@ -59,6 +59,36 @@ use tokio::{
 
 use super::worker::{MergeBatch, MergeSender};
 
+/// The time range one merge job covers: the hour of `offset` (aligned down),
+/// or the whole day for daily-partitioned streams.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct JobTimeRange {
+    /// `%Y/%m/%d/%H` bounds for the file_list query (inclusive)
+    date_start: String,
+    date_end: String,
+    /// Last microsecond of the range: no file of the job can be newer, so
+    /// "is the range old enough" is decided against this.
+    end_ts: i64,
+}
+
+fn job_time_range(offset: i64, partition_time_level: PartitionTimeLevel) -> JobTimeRange {
+    let offset = offset - offset % hour_micros(1);
+    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
+    if partition_time_level == PartitionTimeLevel::Daily {
+        JobTimeRange {
+            date_start: offset_time.format("%Y/%m/%d/00").to_string(),
+            date_end: offset_time.format("%Y/%m/%d/23").to_string(),
+            end_ts: offset - offset % day_micros(1) + day_micros(1) - 1,
+        }
+    } else {
+        JobTimeRange {
+            date_start: offset_time.format("%Y/%m/%d/%H").to_string(),
+            date_end: offset_time.format("%Y/%m/%d/%H").to_string(),
+            end_ts: offset + hour_micros(1) - 1,
+        }
+    }
+}
+
 /// Generate merging job by stream
 /// 1. get offset from db
 /// 2. check if other node is processing
@@ -308,6 +338,11 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // -- third period, we can do the merge, so, at least 3 times of
     // -- 1 day, downsampling is in day level
     // max_file_retention_time
+    // The job merges the hour of `offset` and decides the downsampling rule
+    // against the end of that hour (see merge_by_stream), so only enqueue it
+    // once the whole hour is older than the rule's offset; otherwise the job
+    // would run as a plain merge and the advanced offset would skip the hour.
+    let job_end_ts = job_time_range(offset, get_partition_time_level(stream_type)).end_ts;
     if offset >= time_now_day
         || time_now.timestamp_micros() - offset
             <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
@@ -316,7 +351,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
                 .unwrap()
                 * 3
                 + day_micros(1)
-        || time_now.timestamp_micros() - rule.0 * 1_000_000 < offset
+        || time_now.timestamp_micros() - rule.0 * 1_000_000 < job_end_ts
     {
         return Ok(()); // the time is future, just wait
     }
@@ -392,27 +427,14 @@ pub async fn merge_by_stream(
     let is_incremental = !super::is_past_hour(offset);
 
     // check offset
-    let partition_time_level = get_partition_time_level(stream_type);
-    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
-    let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
-        (
-            offset_time.format("%Y/%m/%d/00").to_string(),
-            offset_time.format("%Y/%m/%d/23").to_string(),
-        )
-    } else {
-        (
-            offset_time.format("%Y/%m/%d/%H").to_string(),
-            offset_time.format("%Y/%m/%d/%H").to_string(),
-        )
-    };
+    let JobTimeRange {
+        date_start,
+        date_end,
+        end_ts: range_end_ts,
+    } = job_time_range(offset, get_partition_time_level(stream_type));
     // What this hour of files turns into. Decided once here — the workers and
-    // the merge only read it — from the end of the date range, so a
-    // whole-hour mode applies to the hour as a unit.
-    let range_end_ts = if partition_time_level == PartitionTimeLevel::Daily {
-        offset - offset % day_micros(1) + day_micros(1) - 1
-    } else {
-        offset + hour_micros(1) - 1
-    };
+    // the merge only read it — from the end of the range, so a whole-hour
+    // mode applies to the hour as a unit.
     let mode = MergeMode::for_compactor(stream_type, stream_name, range_end_ts, !is_incremental);
     // a whole-hour merge needs every file of the hour, even those already
     // above the size target that a normal merge would leave alone
@@ -1202,6 +1224,36 @@ mod tests {
     use config::meta::stream::{FileKey, FileMeta};
 
     use super::*;
+
+    #[test]
+    fn test_job_time_range_hourly_and_daily() {
+        // 2026-08-18 10:10:00 UTC
+        let offset = Utc
+            .with_ymd_and_hms(2026, 8, 18, 10, 10, 0)
+            .unwrap()
+            .timestamp_micros();
+        let hourly = job_time_range(offset, PartitionTimeLevel::Hourly);
+        assert_eq!(hourly.date_start, "2026/08/18/10");
+        assert_eq!(hourly.date_end, "2026/08/18/10");
+        assert_eq!(
+            hourly.end_ts,
+            Utc.with_ymd_and_hms(2026, 8, 18, 11, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+                - 1
+        );
+
+        let daily = job_time_range(offset, PartitionTimeLevel::Daily);
+        assert_eq!(daily.date_start, "2026/08/18/00");
+        assert_eq!(daily.date_end, "2026/08/18/23");
+        assert_eq!(
+            daily.end_ts,
+            Utc.with_ymd_and_hms(2026, 8, 19, 0, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+                - 1
+        );
+    }
 
     // Helper function to create test FileKey
     fn create_file_key(key: &str, min_ts: i64, max_ts: i64, original_size: i64) -> FileKey {
