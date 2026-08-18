@@ -365,7 +365,16 @@
       </OTabPanel>
 
       <OTabPanel name="ownership">
-        <OnCallOwnership :team-id="teamId" :teams="teams" />
+        <!-- The list says what "it pages" MEANS, which needs the ladder and
+             whoever is holding it this instant — both already loaded here. -->
+        <OContent y>
+          <OnCallOwnership
+            :team-id="teamId"
+            :teams="teams"
+            :on-call-now="onCallNow"
+            :ladder="overview?.rungs ?? []"
+          />
+        </OContent>
       </OTabPanel>
     </OTabPanels>
     </template>
