@@ -19,13 +19,13 @@ use db::authz::{remove_ownership, set_ownership};
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
-use openobserve_core::llm_evaluations::remote_tasks::{PublishOutcome, RenderContext};
+use openobserve_core::llm_evaluations::remote_tasks::{PublishOutcome, RenderContext, bench};
 
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::remote_tasks::{
         ListRemoteTasksResponseBody, PublishRemoteTaskResponseBody, RemoteTaskRequestBody,
-        RemoteTaskResponseBody, TestConnectionRequestBody,
+        RemoteTaskResponseBody, TestConnectionRequestBody, TestRunRequestBody, TestRunResponseBody,
     },
     service::llm_evaluations::remote_tasks::{self, RemoteTaskError},
 };
@@ -426,6 +426,61 @@ pub async fn delete_remote_task(Path((org_id, entity_id)): Path<(String, String)
         Ok(()) => {
             remove_ownership(&org_id, "remote_tasks", Authz::new(&entity_id)).await;
             MetaHttpResponse::ok("Remote task deleted")
+        }
+        Err(err) => remote_task_error_response(err),
+    }
+}
+
+/// TestRunRemoteTask
+#[utoipa::path(
+    post,
+    path = "/{org_id}/remote_tasks/{entity_id}/test_run",
+    context_path = "/api",
+    tag = "RemoteTasks",
+    operation_id = "TestRunRemoteTask",
+    summary = "Try a remote task against a sample",
+    description = "Runs the task's latest published version against at most ten samples using \
+                   the registered contract, at concurrency min(4, max_concurrency). Volatile: \
+                   no Experiment, no execution records, no history. Idempotency keys are \
+                   `testrun-` prefixed.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("entity_id" = String, Path, description = "Remote task head id"),
+    ),
+    request_body(content = inline(TestRunRequestBody), description = "Samples to try"),
+    responses(
+        (status = 200, body = inline(TestRunResponseBody)),
+        (status = 400, description = "Bad Request", body = ()),
+        (status = 409, description = "Conflict", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RemoteTasks", "operation": "test_run"})),
+    ),
+)]
+pub async fn test_run_remote_task(
+    Path((org_id, entity_id)): Path<(String, String)>,
+    axum::Json(body): axum::Json<TestRunRequestBody>,
+) -> Response {
+    let samples = body
+        .samples
+        .into_iter()
+        .enumerate()
+        .map(|(index, sample)| bench::BenchSample {
+            row_id: sample
+                .row_id
+                .unwrap_or_else(|| format!("sample-{index}")),
+            input: sample.input,
+            metadata: sample.metadata,
+        })
+        .collect::<Vec<_>>();
+
+    match remote_tasks::bench::run(&org_id, &entity_id, samples).await {
+        Ok(results) => {
+            let body = TestRunResponseBody {
+                results: results.into_iter().map(Into::into).collect(),
+            };
+            MetaHttpResponse::json(body)
         }
         Err(err) => remote_task_error_response(err),
     }

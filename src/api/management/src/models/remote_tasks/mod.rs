@@ -443,3 +443,71 @@ mod tests {
         assert!(!spec.signing.enabled);
     }
 }
+
+// --- Test-run bench (#2442) ---
+
+/// One sample a test run should try: a hand-entered input or a Dataset row the
+/// caller already resolved.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TestRunSampleBody {
+    /// A stable handle to line a result back up with its input. A Dataset row
+    /// id, or a caller-chosen label for a hand-entered sample.
+    #[serde(default)]
+    pub row_id: Option<String>,
+    pub input: serde_json::Value,
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TestRunRequestBody {
+    /// At most ten samples. Enforced again server-side.
+    pub samples: Vec<TestRunSampleBody>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestRunRowResultBody {
+    pub row_id: String,
+    pub input: serde_json::Value,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parsed_output: Option<serde_json::Value>,
+    pub raw_request: String,
+    pub raw_response: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub http_status: Option<u16>,
+    pub latency_ms: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+impl From<openobserve_core::llm_evaluations::remote_tasks::bench::BenchRowResult>
+    for TestRunRowResultBody
+{
+    fn from(
+        result: openobserve_core::llm_evaluations::remote_tasks::bench::BenchRowResult,
+    ) -> Self {
+        Self {
+            row_id: result.row_id,
+            input: result.input,
+            status: result.status.as_str().to_string(),
+            parsed_output: result.parsed_output,
+            raw_request: result.raw_request,
+            raw_response: result.raw_response,
+            http_status: result.http_status,
+            latency_ms: result.latency_ms,
+            error: result.error,
+        }
+    }
+}
+
+/// The whole test-run result. Volatile: it is this response and nothing else —
+/// no Experiment, no execution records, no history.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestRunResponseBody {
+    pub results: Vec<TestRunRowResultBody>,
+}
