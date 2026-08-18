@@ -36,7 +36,8 @@ use crate::{
             ExperimentPreviewQuery, ExperimentPreviewResponseBody, ExperimentResponseBody,
             ExperimentResultPaginationBody, ExperimentResultsResponseBody,
             ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
-            ExperimentRowSnapshotBody, ListExperimentsResponseBody, RetryExperimentSlotRequestBody,
+            ExperimentRowSnapshotBody, ExperimentSlotPageQuery, ExperimentSlotPageResponseBody,
+            ListExperimentsResponseBody, RetryExperimentSlotRequestBody,
             SubmitExperimentRecordsRequestBody, SubmitExperimentRecordsResponseBody,
         },
     },
@@ -371,6 +372,10 @@ pub async fn get_experiment(
                     has_more: results.has_more,
                 },
                 task_progress: summary.task_progress.into(),
+                scoring_status: experiment_results::scoring_status(
+                    &summary.scoring_progress,
+                    &summary.score_summaries,
+                ),
                 scoring_progress: summary.scoring_progress.into(),
                 skip_summary: summary.skip_summary.into(),
                 score_summaries: summary
@@ -764,6 +769,57 @@ pub async fn clone_experiment(
             set_ownership(&org_id, "experiments", Authz::new(&experiment.id)).await;
             MetaHttpResponse::json(ExperimentResponseBody::from(experiment))
         }
+        Err(error) => experiment_error_response(error),
+    }
+}
+
+/// ListExperimentSlots
+#[utoipa::path(
+    get,
+    path = "/{org_id}/experiments/{experiment_id}/slots",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "ListExperimentSlots",
+    summary = "Page through the Experiment's immutable Slot set",
+    description = "Returns the exact Slots the Experiment pinned at creation, in cohort order, \
+                   with the Dataset input, expected output, and metadata each one carries. A \
+                   client-driven run iterates this rather than re-deriving the set from the \
+                   Dataset, where the snapshot filter could drift.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+        ExperimentSlotPageQuery,
+    ),
+    responses(
+        (status = 200, body = inline(ExperimentSlotPageResponseBody)),
+        (status = 400, description = "Invalid page size", body = ()),
+        (status = 404, description = "Experiment not found", body = ()),
+    ),
+)]
+pub async fn list_experiment_slots(
+    Path((org_id, experiment_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Query(query): Query<ExperimentSlotPageQuery>,
+) -> Response {
+    if let Err(response) =
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "GET").await
+    {
+        return response;
+    }
+    let experiment = match experiments::get(&org_id, &experiment_id).await {
+        Ok(experiment) => experiment,
+        Err(error) => return experiment_error_response(error),
+    };
+    match experiments::slot_page(
+        &org_id,
+        &experiment,
+        query.from.unwrap_or(0),
+        query.size.unwrap_or(experiments::DEFAULT_SLOT_PAGE_SIZE),
+    )
+    .await
+    {
+        Ok(page) => MetaHttpResponse::json(ExperimentSlotPageResponseBody::from(page)),
         Err(error) => experiment_error_response(error),
     }
 }

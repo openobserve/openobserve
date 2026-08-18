@@ -18,12 +18,12 @@ use openobserve_core::llm_evaluations::{
     experiment_results::{
         ExperimentAggregateSummary, ExperimentProgress, ExperimentResultScore,
         ExperimentResultScoreStatus, ExperimentResultSlot, ExperimentResultTaskStatus,
-        ExperimentScoreSummary, ExperimentSkipSummary,
+        ExperimentScoreSummary, ExperimentSkipSummary, ScoringStatus,
     },
     experiments::{
         CreateExperiment, CreateExperimentResult, Experiment, ExperimentPreview,
-        ExperimentScorerRef, ExperimentSlot, ExperimentStatus, ExperimentTaskConfig,
-        PinnedExperimentScorer, PromptMessage,
+        ExperimentScorerRef, ExperimentSlot, ExperimentSlotPage, ExperimentStatus,
+        ExperimentTaskConfig, PinnedExperimentScorer, PromptMessage,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -463,6 +463,44 @@ pub struct ExperimentSlotBody {
     pub trial_index: u32,
     pub input: Value,
     pub expected_output: Option<Value>,
+    /// Dataset Case metadata, so a client-side Task can branch on it without a
+    /// second read of the Dataset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentSlotPageQuery {
+    pub from: Option<usize>,
+    pub size: Option<usize>,
+}
+
+/// One page of the immutable Slot set, in pinned cohort order.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentSlotPageResponseBody {
+    pub slots: Vec<ExperimentSlotBody>,
+    pub total: u64,
+    pub from: usize,
+    pub size: usize,
+    pub has_more: bool,
+}
+
+impl From<ExperimentSlotPage> for ExperimentSlotPageResponseBody {
+    fn from(value: ExperimentSlotPage) -> Self {
+        Self {
+            slots: value
+                .slots
+                .into_iter()
+                .map(ExperimentSlotBody::from)
+                .collect(),
+            total: value.total,
+            from: value.from,
+            size: value.size,
+            has_more: value.has_more,
+        }
+    }
 }
 
 impl From<ExperimentSlot> for ExperimentSlotBody {
@@ -473,6 +511,7 @@ impl From<ExperimentSlot> for ExperimentSlotBody {
             trial_index: value.trial_index,
             input: value.input,
             expected_output: value.expected_output,
+            metadata: value.metadata,
         }
     }
 }
@@ -686,6 +725,10 @@ pub struct ExperimentResultsResponseBody {
     pub pagination: ExperimentResultPaginationBody,
     pub task_progress: ExperimentProgressBody,
     pub scoring_progress: ExperimentProgressBody,
+    /// Derived state of every applicable Score. A final comparison and every CI
+    /// assertion require this to be terminal.
+    #[schema(value_type = String)]
+    pub scoring_status: ScoringStatus,
     pub skip_summary: ExperimentSkipSummaryBody,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
     pub aggregate_summary: ExperimentAggregateSummaryBody,
