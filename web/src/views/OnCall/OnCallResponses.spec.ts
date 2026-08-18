@@ -35,6 +35,7 @@ vi.mock("@/services/oncall", () => ({
     getPolicy: vi.fn(),
     getSchedule: vi.fn(),
     escalationProgress: vi.fn(),
+    listDeliveries: vi.fn(),
     getResponse: vi.fn(),
   },
 }));
@@ -71,10 +72,30 @@ const stubs = {
       "sortBy",
       "sortOrder",
       "columnVisibility",
+      "rowSection",
+      "sectionOrder",
     ],
     emits: ["update:selectedIds"],
+    // Sections are resolved the way the real component resolves them, so these
+    // tests exercise the view's own `rowSection` rather than a stub's guess.
+    computed: {
+      sectionKeys(): string[] {
+        if (!this.rowSection) return [];
+        const seen: string[] = [];
+        for (const row of this.data || []) {
+          const key = this.rowSection(row);
+          if (key && !seen.includes(key)) seen.push(key);
+        }
+        const order: string[] = this.sectionOrder || [];
+        const rank = (k: string) => (order.indexOf(k) === -1 ? order.length : order.indexOf(k));
+        return seen.sort((a, b) => rank(a) - rank(b));
+      },
+    },
     template: `<div>
       <slot name='toolbar' /><slot name='toolbar-trailing' /><slot name='subheader' />
+      <div v-for="key in sectionKeys" :key="key" :data-test="'section-' + key">
+        <slot name='group-header' :section-key="key" :rows="[]" />
+      </div>
       <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
         <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
       </div>
@@ -106,6 +127,10 @@ const stubs = {
     emits: ["select"],
     template: "<button @click=\"$emit('select')\"><slot /></button>",
   },
+  // Stubbed like the rest of the family: unstubbed they pull reka-ui into every
+  // row's action cell, which pushed several mounts past the 5s test timeout.
+  ODropdownGroup: { name: "ODropdownGroup", props: ["label"], template: "<div><slot /></div>" },
+  ODropdownSeparator: { name: "ODropdownSeparator", template: "<hr />" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OEmptyState: {
     name: "OEmptyState",
@@ -158,6 +183,9 @@ describe("OnCallResponses", () => {
       data: { fired: [], next_targets: [], next_at: null, exhausted: false },
     } as any);
     service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
+    // Absent means "not read", never "delivered", so the empty ledger is the
+    // default and only the tests about a failure say otherwise.
+    service.listDeliveries.mockResolvedValue({ data: { total: 0, deliveries: [] } } as any);
   });
 
   function page(over: Record<string, unknown> = {}, source = "al_ckt") {
@@ -194,20 +222,51 @@ describe("OnCallResponses", () => {
       ]),
     );
 
-  /// The strip claims to describe the rows below it, so a snoozed page must
-  /// not also be counted as one nobody has picked up.
-  it("counts a snoozed page as snoozed, not as unacknowledged", async () => {
+  /// The state counts the section headings carry. State left the stat strip when
+  /// the list gained sections, so this is where "how many are ringing" is read.
+  const sections = (w: any) =>
+    Object.fromEntries(
+      ["ringing", "snoozed", "handled"]
+        .filter((key) => w.find(`[data-test='oncall-section-header-${key}']`).exists())
+        .map((key) => [
+          key,
+          Number(w.find(`[data-test='oncall-section-count-${key}']`).text()),
+        ]),
+    );
+
+  /// A snoozed page is still open, so it would otherwise sit in the run of
+  /// pages nobody has picked up — which is the one run that is still paging.
+  it("sections a snoozed page as snoozed, not as ringing", async () => {
     const wrapper = await withPages([
       page({ id: "a" }),
       page({ id: "b", snoozed_until: (Date.now() + 60_000) * 1000 }, "al_pay"),
     ]);
 
-    expect(stats(wrapper)).toMatchObject({ unacked: 1, snoozed: 1, all: 2 });
+    expect(sections(wrapper)).toEqual({ ringing: 1, snoozed: 1 });
   });
 
-  it("does not count an acknowledged page as unacknowledged", async () => {
+  it("sections an acknowledged page as handled", async () => {
     const wrapper = await withPages([page({ acked_by: "engineer@example.com" })]);
-    expect(stats(wrapper).unacked).toBe(0);
+    expect(sections(wrapper)).toEqual({ handled: 1 });
+  });
+
+  /// Ringing first: whoever opens this list needs the pages nobody has taken
+  /// before anything else, whatever order the server answered in.
+  it("orders the sections ringing, snoozed, handled", async () => {
+    const wrapper = await withPages([
+      page({ id: "a", acked_by: "engineer@example.com", state: "acknowledged" }),
+      page({ id: "b", snoozed_until: (Date.now() + 60_000) * 1000 }, "al_pay"),
+      page({ id: "c" }, "al_ord"),
+    ]);
+
+    const order = wrapper
+      .findAll("[data-test^='oncall-section-header-']")
+      .map((el) => el.attributes("data-test"));
+    expect(order).toEqual([
+      "oncall-section-header-ringing",
+      "oncall-section-header-snoozed",
+      "oncall-section-header-handled",
+    ]);
   });
 
   /// "What is on me" is the second question anybody opening this list has, and
@@ -267,23 +326,17 @@ describe("OnCallResponses", () => {
     expect(data[0].latest.id).toBe("b");
   });
 
-  /// Re-clicking the live tile clears the facet, and "All" only ever clears —
-  /// otherwise there is no way back to the full list.
-  it("toggles a facet off and lets All clear it", async () => {
+  /// Re-clicking the live tile is the only way back to the full list now that
+  /// the state tiles — and with them the "All" tile — belong to the sections.
+  it("toggles a facet off by re-clicking it", async () => {
     const wrapper = await withPages([page()]);
     const strip = wrapper.findComponent({ name: "OStatStrip" });
 
-    strip.vm.$emit("select", "unacked");
-    await flushPromises();
-    expect(strip.props("selectedKey")).toBe("unacked");
-
-    strip.vm.$emit("select", "unacked");
-    await flushPromises();
-    expect(strip.props("selectedKey")).toBe(null);
-
     strip.vm.$emit("select", "p1");
     await flushPromises();
-    strip.vm.$emit("select", "all");
+    expect(strip.props("selectedKey")).toBe("p1");
+
+    strip.vm.$emit("select", "p1");
     await flushPromises();
     expect(strip.props("selectedKey")).toBe(null);
   });
@@ -300,7 +353,7 @@ describe("OnCallResponses", () => {
     ]);
     const before = stats(wrapper);
 
-    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", "unacked");
+    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", "p1");
     await flushPromises();
 
     expect(stats(wrapper)).toEqual(before);
@@ -344,6 +397,7 @@ describe("OnCallResponses", () => {
       state: false,
       team: false,
       opened_at: false,
+      channels: false,
     });
     const ids = (table.props("columns") as any[]).map((c) => c.id);
     expect(ids).toContain("escalation");
@@ -393,9 +447,11 @@ describe("OnCallResponses", () => {
         page({ id: "resp_2", opened_at: oldest + 6 * 60_000_000 }, "al_b"),
       ]);
 
-      const card = wrapper.findComponent({ name: "OnCallAttentionCard" });
-      expect(card.props("unacked")).toBe(2);
-      expect(card.props("oldestOpenedAt")).toBe(oldest);
+      const banner = wrapper.findComponent({ name: "OnCallRingingBanner" });
+      expect(banner.props("ringing")).toBe(2);
+      expect(banner.props("oldestOpenedAt")).toBe(oldest);
+      // The second action goes to the record that has waited longest.
+      expect(banner.props("oldestId")).toBe("resp_1");
     });
 
     /// Records, not rows: a grouped row standing for ninety-five firings is
@@ -406,7 +462,7 @@ describe("OnCallResponses", () => {
         page({ id: "resp_2" }, "al_same"),
       ]);
 
-      expect(wrapper.findComponent({ name: "OnCallAttentionCard" }).props("unacked")).toBe(2);
+      expect(wrapper.findComponent({ name: "OnCallRingingBanner" }).props("ringing")).toBe(2);
     });
 
     it("leaves an acknowledged page out of the count", async () => {
@@ -414,7 +470,7 @@ describe("OnCallResponses", () => {
         page({ id: "resp_1", state: "acknowledged", acked_by: "ana@o2.ai" }),
       ]);
 
-      expect(wrapper.findComponent({ name: "OnCallAttentionCard" }).props("unacked")).toBe(0);
+      expect(wrapper.findComponent({ name: "OnCallRingingBanner" }).props("ringing")).toBe(0);
     });
 
     /// There is no assignee on a record. "Yours" is the team's rotation
@@ -425,19 +481,19 @@ describe("OnCallResponses", () => {
       } as any);
       const wrapper = await withPages([page()]);
 
-      expect(wrapper.findComponent({ name: "OnCallAttentionCard" }).props("assignedToMe")).toBe(
+      expect(wrapper.findComponent({ name: "OnCallRingingBanner" }).props("assignedToMe")).toBe(
         1,
       );
     });
 
-    it("hands the coverage card each team's rotation", async () => {
+    it("hands the on-call strip each team's rotation", async () => {
       service.whoIsOnCall.mockResolvedValue({
         data: [{ rotation: "Primary", user_email: "ana@o2.ai" }],
       } as any);
       const wrapper = await withPages([page()]);
 
-      const card = wrapper.findComponent({ name: "OnCallCoverageCard" });
-      expect(card.props("slotsByTeam")).toEqual({
+      const strip = wrapper.findComponent({ name: "OnCallNowStrip" });
+      expect(strip.props("slotsByTeam")).toEqual({
         team_1: [{ rotation: "Primary", user_email: "ana@o2.ai" }],
       });
     });
@@ -839,10 +895,10 @@ describe("OnCallResponses", () => {
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
 
-      expect(stats(wrapper).all).toBe(2);
+      expect(sections(wrapper)).toEqual({ ringing: 2 });
       await wrapper.find(mineBtn).trigger("click");
       await flushPromises();
-      expect(stats(wrapper).all).toBe(1);
+      expect(sections(wrapper)).toEqual({ ringing: 1 });
     });
 
     /// The acknowledgement outlives the shift: whoever claimed a page still
@@ -1071,15 +1127,151 @@ describe("OnCallResponses", () => {
       expect(data[0].latest.id).toBe("f3");
     });
 
-    /// The strip claims to describe the rows below it, so with grouping on it
-    /// has to count rows — "285 unacknowledged" above three rows is a lie.
+    /// A section heading claims to describe the rows below it, so with grouping
+    /// on it has to count rows — "285 ringing" above one row is a lie.
     it("counts rows, not records", async () => {
       const wrapper = await withPages([
         page({ id: "f2", opened_at: 200 }),
         page({ id: "f1", opened_at: 100 }),
       ]);
 
-      expect(stats(wrapper)).toMatchObject({ all: 1, unacked: 1 });
+      expect(sections(wrapper)).toEqual({ ringing: 1 });
+    });
+  });
+
+  describe("clearing the ringing set", () => {
+    /// The banner and the section heading both state a count, and the count they
+    /// state is the set they act on — so it cannot require selecting rows first.
+    it("acknowledges every ringing page from the banner", async () => {
+      service.acknowledgeResponse.mockResolvedValue({} as any);
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b" }, "al_pay"),
+        page({ id: "c", state: "acknowledged", acked_by: "someone@o2.ai" }, "al_ord"),
+      ]);
+
+      wrapper.findComponent({ name: "OnCallRingingBanner" }).vm.$emit("acknowledge-all");
+      await flushPromises();
+
+      // The acknowledged one is left alone.
+      expect(service.acknowledgeResponse).toHaveBeenCalledTimes(2);
+      const ids = service.acknowledgeResponse.mock.calls.map((c: any[]) => c[0].response_id);
+      expect(ids.sort()).toEqual(["a", "b"]);
+    });
+
+    it("acknowledges the ringing section from its own heading", async () => {
+      service.acknowledgeResponse.mockResolvedValue({} as any);
+      const wrapper = await withPages([page({ id: "a" })]);
+
+      await wrapper.find("[data-test='oncall-section-ack-all']").trigger("click");
+      await flushPromises();
+
+      expect(service.acknowledgeResponse).toHaveBeenCalledTimes(1);
+    });
+
+    /// A bulk handoff is not offered — the people a page can be handed to are
+    /// per team — so the second action opens the record that needs the decision.
+    it("opens the longest-ringing record", async () => {
+      const oldest = 1_700_000_000_000_000;
+      const wrapper = await withPages([
+        page({ id: "newer", opened_at: oldest + 60_000_000 }, "al_a"),
+        page({ id: "older", opened_at: oldest }, "al_b"),
+      ]);
+
+      wrapper.findComponent({ name: "OnCallRingingBanner" }).vm.$emit("open-oldest");
+      await flushPromises();
+
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "onCallResponseDetail",
+          params: { responseId: "older" },
+        }),
+      );
+    });
+  });
+
+  describe("recorded delivery failures", () => {
+    /// A ladder that fired into a broken transport looks identical to one that
+    /// reached a person, and only the ledger separates them.
+    it("names the failed channel, who it was for, and what did land", async () => {
+      service.listDeliveries.mockResolvedValue({
+        data: {
+          total: 2,
+          deliveries: [
+            { kind: "delivery", at: 20, actor: "o2-engine", body: "", recipient: "liam@o2.ai", channel: "webhook", delivered: false },
+            { kind: "delivery", at: 10, actor: "o2-engine", body: "", recipient: "liam@o2.ai", channel: "email", delivered: true },
+          ],
+        },
+      } as any);
+
+      const wrapper = await withPages([page({ id: "a" })]);
+      const cell = wrapper.findComponent({ name: "OnCallEscalationCell" });
+
+      expect(cell.props("deliveryFailure")).toBe(
+        "Chat / webhook delivery failed for liam@o2.ai — sent by Email only",
+      );
+    });
+
+    /// "Slack failed" alone reads as "they were not told". Whether anything else
+    /// reached them is the difference between re-paging and waiting.
+    it("says so when nothing else reached them", async () => {
+      service.listDeliveries.mockResolvedValue({
+        data: {
+          total: 1,
+          deliveries: [
+            { kind: "delivery", at: 10, actor: "o2-engine", body: "", recipient: "liam@o2.ai", channel: "webhook", delivered: false },
+          ],
+        },
+      } as any);
+
+      const wrapper = await withPages([page({ id: "a" })]);
+
+      expect(
+        wrapper.findComponent({ name: "OnCallEscalationCell" }).props("deliveryFailure"),
+      ).toBe("Chat / webhook delivery failed for liam@o2.ai — nothing else reached them");
+    });
+
+    /// An old failure the ladder already retried past is not the one explaining
+    /// the silence now.
+    it("reports the most recent failure", async () => {
+      service.listDeliveries.mockResolvedValue({
+        data: {
+          total: 2,
+          deliveries: [
+            { kind: "delivery", at: 10, actor: "o2-engine", body: "", recipient: "old@o2.ai", channel: "sms", delivered: false },
+            { kind: "delivery", at: 99, actor: "o2-engine", body: "", recipient: "new@o2.ai", channel: "webhook", delivered: false },
+          ],
+        },
+      } as any);
+
+      const wrapper = await withPages([page({ id: "a" })]);
+
+      expect(
+        wrapper.findComponent({ name: "OnCallEscalationCell" }).props("deliveryFailure"),
+      ).toContain("new@o2.ai");
+    });
+
+    /// A page somebody already owns has no silence to explain, so it is not
+    /// worth a request.
+    it("reads the ledger only for pages nobody has taken", async () => {
+      await withPages([
+        page({ id: "a" }),
+        page({ id: "b", state: "acknowledged", acked_by: "ana@o2.ai" }, "al_pay"),
+      ]);
+
+      expect(service.listDeliveries).toHaveBeenCalledTimes(1);
+      expect(service.listDeliveries.mock.calls[0][0].response_id).toBe("a");
+    });
+
+    /// Absent must never render as delivered — a page whose ledger could not be
+    /// read gets no line rather than an implied success.
+    it("shows no line when the ledger cannot be read", async () => {
+      service.listDeliveries.mockRejectedValue(new Error("boom"));
+      const wrapper = await withPages([page({ id: "a" })]);
+
+      expect(
+        wrapper.findComponent({ name: "OnCallEscalationCell" }).props("deliveryFailure"),
+      ).toBe("");
     });
   });
 });

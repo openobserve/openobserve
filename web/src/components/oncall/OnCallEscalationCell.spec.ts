@@ -23,6 +23,7 @@ import type { EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
 const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
   OProgressBar: { name: "OProgressBar", props: ["value", "variant"], template: "<div />" },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
 };
 
 function firedRungs(count: number) {
@@ -37,12 +38,14 @@ function render(
   state: ResponseState,
   progress: Partial<EscalationProgress> | null,
   totalRungs: number | null = 3,
+  deliveryFailure = "",
 ) {
   return mount(OnCallEscalationCell, {
     props: {
       responseId: "resp-1",
       state,
       totalRungs,
+      deliveryFailure,
       progress: progress && {
         fired: [],
         next_targets: [],
@@ -124,24 +127,104 @@ describe("OnCallEscalationCell", () => {
     );
   });
 
-  /// No progress loaded is not the same fact as "nothing has fired", so the bar
-  /// is withheld rather than drawn empty.
-  it("draws no bar when the ladder position is unknown", () => {
+  it("says nothing has been paged when the ladder position is unknown", () => {
     const wrapper = render("triggered", null);
-    expect(wrapper.find('[data-test="oncall-escalation-cell-bar"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').text()).toBe(
       "Not paged yet",
     );
   });
 
-  it("fills the bar in proportion to the rungs already fired", () => {
-    const wrapper = render("triggered", { fired: firedRungs(2) }, 4);
-    expect(wrapper.findComponent({ name: "OProgressBar" }).props("value")).toBe(0.5);
+  /// The bar and the state icon both restated the headline, and the row already
+  /// carries a priority rail — so neither is drawn any more.
+  it("draws neither a progress bar nor a state icon", () => {
+    const wrapper = render("triggered", { fired: firedRungs(2), exhausted: true }, 4);
+
+    expect(wrapper.find('[data-test="oncall-escalation-cell-bar"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OProgressBar" }).exists()).toBe(false);
+    // The only icon left belongs to the delivery-failure line, which is absent here.
+    expect(wrapper.findComponent({ name: "OIcon" }).exists()).toBe(false);
   });
 
-  /// An exhausted ladder has nobody left to wake — the loudest state there is.
-  it("marks an exhausted ladder as dangerous", () => {
-    const wrapper = render("triggered", { fired: firedRungs(3), exhausted: true });
-    expect(wrapper.findComponent({ name: "OProgressBar" }).props("variant")).toBe("danger");
+  /// Tone is the cell's only signal now, so every state has to carry one.
+  it.each([
+    ["triggered" as const, { fired: firedRungs(3), exhausted: true }, "text-status-error-text"],
+    ["triggered" as const, { fired: firedRungs(1) }, "text-status-error-text"],
+    ["acknowledged" as const, { fired: firedRungs(1) }, "text-status-success-text"],
+    ["triggered" as const, { stopped_because: "snoozed" }, "text-status-warning-text"],
+    ["resolved" as const, { fired: firedRungs(1) }, "text-text-secondary"],
+  ])("tones %s/%o as %s", (state, progress, expected) => {
+    const wrapper = render(state, progress);
+
+    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').classes()).toContain(
+      expected,
+    );
+  });
+
+  /// "Level 6 of 6" and "nobody is coming" are the same number and opposite
+  /// situations, so the finished ladder has to say so in words.
+  it("says the ladder finished rather than naming its last level", () => {
+    const wrapper = render("escalating", { fired: firedRungs(3), exhausted: true });
+
+    expect(wrapper.find("[data-test='oncall-escalation-cell-level']").text()).toBe(
+      "Ladder finished — nobody left",
+    );
+  });
+
+  /// "Exhausted" alone does not say whether the ladder reached three people or
+  /// nobody at all, and that is the difference between waiting and re-paging.
+  it("says how many people a finished ladder actually reached", () => {
+    const wrapper = render(
+      "escalating",
+      {
+        fired: [
+          { after_micros: 0, at: 1, targets: ["ana@o2.ai"] },
+          { after_micros: 60_000_000, at: 2, targets: ["ana@o2.ai", "liam@o2.ai"] },
+        ],
+        exhausted: true,
+      },
+      6,
+    );
+
+    // Two distinct people over two rungs — the repeat is not a second pair of hands.
+    expect(wrapper.find("[data-test='oncall-escalation-cell-detail']").text()).toBe(
+      "rung 2 people over 6 levels, no ack",
+    );
+  });
+
+  /// The name being woken right now is what a responder checks against their
+  /// own — a bare level number does not answer "is this me".
+  it("names who is being paged while the ladder climbs", () => {
+    const wrapper = render("escalating", {
+      fired: firedRungs(2),
+      next_targets: ["liam@o2.ai"],
+      next_at: Date.now() * 1000 + 60_000_000,
+    });
+
+    expect(wrapper.find("[data-test='oncall-escalation-cell-level']").text()).toBe(
+      "Escalating — level 2, paging liam@o2.ai",
+    );
+  });
+
+  /// A ladder that fired correctly into a broken transport looks identical to
+  /// one that reached a person.
+  it("shows a recorded delivery failure", () => {
+    const wrapper = render(
+      "escalating",
+      { fired: firedRungs(1) },
+      3,
+      "Slack delivery failed for liam@o2.ai — sent by Email only",
+    );
+
+    expect(wrapper.find("[data-test='oncall-escalation-cell-delivery']").text()).toContain(
+      "Slack delivery failed for liam@o2.ai",
+    );
+  });
+
+  /// Absent means "not read", never "delivered" — the cell must not imply a
+  /// success it was never told about.
+  it("shows no delivery line when none was resolved", () => {
+    const wrapper = render("escalating", { fired: firedRungs(1) });
+
+    expect(wrapper.find("[data-test='oncall-escalation-cell-delivery']").exists()).toBe(false);
   });
 });

@@ -13503,8 +13503,6 @@
     "ackAllShort": "Acknowledge all",
     "openOldestRinging": "Open the oldest",
     "allSchedules": "All schedules",
-    "allSchedulesMore": "All schedules (+{count} more)",
-    "coverageGapNamed": "{team} — nobody on call",
     "causesWindow": "Last {days} days: {causes}",
     "section_ringing": "Ringing",
     "section_snoozed": "Snoozed",
@@ -13519,6 +13517,11 @@
     "ladderFinishedDetail": "rung {people} person over {levels} levels, no ack | rung {people} people over {levels} levels, no ack",
     "escalationClimbing": "Escalating — level {level}, paging {who}",
     "deliveryFailedFallback": "{channel} delivery failed for {who} — sent by {landed} only",
-    "deliveryFailedNothing": "{channel} delivery failed for {who} — nothing else reached them"
+    "deliveryFailedNothing": "{channel} delivery failed for {who} — nothing else reached them",
+    "onCallNowCount": "On call now · {count} team | On call now · {count} teams",
+    "coverageGapCount": "{count} gap | {count} gaps",
+    "moreActions": "More actions",
+    "snoozeFor": "Snooze for",
+    "onCallNowNone": "On call now · nobody"
   }
 }

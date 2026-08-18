@@ -90,25 +90,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The two standing questions, above the list that answers them per row:
          is anything waiting on a person, and would a page reach anyone. Hidden
          while the checklist is up, because neither means anything on an org
-         that cannot page at all. -->
-    <OContent
-      v-if="!showChecklist && !unavailable"
-      class="grid grid-cols-1 gap-2 pt-2 pb-1 xl:grid-cols-3"
-    >
-      <OnCallAttentionCard
-        :unacked="attention.unacked"
-        :escalating="attention.escalating"
-        :next-escalation-at="attention.nextEscalationAt"
-        :assigned-to-me="attention.assignedToMe"
+         that cannot page at all.
+
+         These were three equal cards in a grid. A grid gives the same weight to
+         the one fact somebody has to act on and the two they check once, and it
+         spent a third of the first screen doing it — so the urgent one is a
+         banner with its own action and the standing two are a single line. -->
+    <OContent v-if="!showChecklist && !unavailable" class="flex flex-col gap-2 pt-2">
+      <OnCallRingingBanner
+        :ringing="attention.unacked"
+        :exhausted="attention.exhausted"
         :oldest-opened-at="attention.oldestOpenedAt"
+        :assigned-to-me="attention.assignedToMe"
+        :oldest-id="attention.oldestId"
+        :can-act="attention.unacked > 0"
+        :busy="bulkBusy"
+        @acknowledge-all="acknowledgeAllRinging"
+        @open-oldest="openOldestRinging"
       />
-      <OnCallCoverageCard
+      <OnCallNowStrip
         :teams="teams"
         :slots-by-team="slotsByTeam"
         :handover-by-team="handoverByTeam"
         :viewer-email="viewerEmail"
+        :analytics="causeAnalytics"
+        @view-schedules="goTo('onCallTeams')"
+        @view-team="openTeam"
       />
-      <OnCallCausesCard :analytics="causeAnalytics" />
     </OContent>
 
     <OTable
@@ -123,7 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size="20"
       sort-by="opened_at"
       sort-order="desc"
-      :column-visibility="{ firings: false, state: false, team: false, opened_at: false }"
+      :column-visibility="{
+        firings: false,
+        state: false,
+        team: false,
+        opened_at: false,
+        channels: false,
+      }"
       table-id="oncall-responses-list"
       :persist-columns="true"
       :show-global-filter="false"
@@ -131,6 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-responses-table"
       :row-rail-tone="rowRailTone"
       :row-tone="rowTone"
+      :row-section="rowSection"
+      :section-order="SECTION_ORDER"
       selection="multiple"
       v-model:selected-ids="selectedIds"
       :is-row-selectable="canAcknowledge"
@@ -269,6 +285,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
+      <!-- What each run of rows IS, in the words somebody would use out loud, so
+           the state is read once per section instead of once per row. The count
+           is taken from the filtered set rather than the page, because a heading
+           that said "3" on page one of five would be describing the pagination.
+
+           `sectionKey` rather than `key`: Vue reserves `key` on a slot outlet. -->
+      <template #group-header="{ sectionKey }">
+        <div
+          class="px-page-edge flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5"
+          :data-test="`oncall-section-header-${sectionKey}`"
+        >
+          <span class="text-2xs font-semibold tracking-wide uppercase" :class="sectionTone(sectionKey)">
+            {{ t(`oncall.section_${sectionKey}`) }}
+          </span>
+          <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
+            {{ raw(String(sectionCounts[sectionKey] ?? 0)) }}
+          </OTag>
+          <span class="text-text-secondary text-xs">
+            {{ t(`oncall.sectionHint_${sectionKey}`) }}
+          </span>
+
+          <!-- The one action the whole section shares, at its trailing edge. -->
+          <OButton
+            v-if="sectionKey === 'ringing' && sectionCounts.ringing"
+            variant="ghost-primary"
+            size="xs"
+            class="ms-auto"
+            :loading="bulkBusy"
+            data-test="oncall-section-ack-all"
+            @click="acknowledgeAllRinging"
+          >
+            {{ t("oncall.ackAllShort") }}
+          </OButton>
+        </div>
+      </template>
+
       <template #cell-priority="{ row }">
         <OTag type="alertPriority" :value="`p${row.latest.priority}`" size="sm" />
       </template>
@@ -339,6 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :progress="progressById[row.latest.id] ?? null"
           :total-rungs="totalRungsFor(row.latest)"
           :acked-in-micros="ackedInMicros(row.latest)"
+          :delivery-failure="deliveryFailureById[row.latest.id] ?? ''"
         />
       </template>
 
@@ -365,28 +418,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
-      <!-- Which channels this page went out on, and how long it has been open.
-           Channels come from the team's policy — they are what WOULD be used —
-           so one with no provider behind it is marked rather than implied. -->
+      <!-- How long this has been ringing, and when the ladder actually started.
+           A page opened an hour ago whose ladder waited thirty minutes has been
+           ringing for half as long as its age suggests, and that gap is the
+           difference between a slow responder and a slow policy. -->
       <template #cell-notified="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5">
-          <span class="flex flex-wrap items-center gap-1">
-            <OTag
-              v-for="channel in channelsFor(row.latest)"
-              :key="channel"
-              :variant="isDeliverableChannel(channel) ? 'success-soft' : 'default-soft'"
-              size="sm"
-              :data-test="`oncall-channel-${row.rowKey}-${channel}`"
+          <template v-if="isRinging(row)">
+            <span
+              class="text-status-error-text text-sm font-medium"
+              :data-test="`oncall-ringing-for-${row.rowKey}`"
             >
-              {{ t(`oncall.channel_${channel}`) }}
-              <OTooltip
-                v-if="!isDeliverableChannel(channel)"
-                side="top"
-                :content="t('oncall.channelUndeliverable', { channel: t(`oncall.channel_${channel}`) })"
-              />
-            </OTag>
-          </span>
-          <OTimeCell :value="row.latest.opened_at" unit="us" />
+              {{ ringingFor(row.latest) }}
+            </span>
+            <span
+              v-if="ladderStarted(row.latest)"
+              class="text-text-secondary text-xs"
+              :data-test="`oncall-ladder-started-${row.rowKey}`"
+            >
+              {{ ladderStarted(row.latest) }}
+            </span>
+          </template>
+          <OTimeCell v-else :value="row.latest.opened_at" unit="us" />
+        </span>
+      </template>
+
+      <!-- What the policy WOULD page on, as opposed to what a delivery actually
+           did — so a channel with no provider behind it is marked rather than
+           implied. Off by default now that a recorded failure is on the row. -->
+      <template #cell-channels="{ row }">
+        <span class="flex flex-wrap items-center gap-1">
+          <OTag
+            v-for="channel in channelsFor(row.latest)"
+            :key="channel"
+            :variant="isDeliverableChannel(channel) ? 'success-soft' : 'default-soft'"
+            size="sm"
+            :data-test="`oncall-channel-${row.rowKey}-${channel}`"
+          >
+            {{ t(`oncall.channel_${channel}`) }}
+            <OTooltip
+              v-if="!isDeliverableChannel(channel)"
+              side="top"
+              :content="t('oncall.channelUndeliverable', { channel: t(`oncall.channel_${channel}`) })"
+            />
+          </OTag>
         </span>
       </template>
 
@@ -420,10 +495,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            buttons everywhere: claiming is only offered while something is still
            escalating, and a page nobody owns is a routing fix, not a triage.
 
-           Dense, following the alerts list: the secondary actions are icon
-           buttons with tooltips, and only the one decision the row exists for
-           keeps its label — an icon-only "Acknowledge" is not something to
-           hunt for at 3am. -->
+           One decision keeps its label — an icon-only "Acknowledge" is not
+           something to hunt for at 3am — and everything else lives behind the
+           row's more-menu, which is how the alerts list and every other list in
+           the app spends its action column. -->
       <template #cell-actions="{ row }">
         <span class="flex items-center justify-center gap-0.5">
           <OButton
@@ -448,51 +523,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("oncall.acknowledge") }}
             </OButton>
-            <ODropdown v-if="canAcknowledge(row)">
+
+            <!-- Hidden proxies so the row-hover shortcuts still reach the
+                 actions that now live in the menu, which is teleported out of
+                 the row's DOM. Same device as the alerts list. -->
+            <button
+              v-if="canAcknowledge(row)"
+              type="button"
+              data-row-action="snooze"
+              class="hidden"
+              tabindex="-1"
+              aria-hidden="true"
+              @click.stop="snoozeRow(row, DEFAULT_SNOOZE_MINUTES)"
+            />
+            <button
+              v-if="row.firings.some((f) => f.state !== 'resolved')"
+              type="button"
+              data-row-action="resolve"
+              class="hidden"
+              tabindex="-1"
+              aria-hidden="true"
+              @click.stop="resolveRow(row)"
+            />
+
+            <ODropdown>
               <template #trigger>
                 <OButton
                   variant="ghost"
                   size="icon-sm"
-                  icon-left="pause-circle-filled"
+                  icon-left="more-vert"
                   :loading="busyId === row.rowKey"
-                  data-row-action="snooze"
-                  :data-test="`oncall-row-snooze-${row.rowKey}`"
+                  :data-test="`oncall-row-more-${row.rowKey}`"
+                  @click.stop
                 >
-                  <OTooltip side="bottom" :content="t('oncall.snooze')" />
+                  <OTooltip side="bottom" :content="t('oncall.moreActions')" />
                 </OButton>
               </template>
+
+              <!-- Grouped rather than four loose items: they are one decision
+                   ("quiet it") asked at four lengths. -->
+              <ODropdownGroup v-if="canAcknowledge(row)" :label="t('oncall.snoozeFor')">
+                <ODropdownItem
+                  v-for="option in snoozeOptions"
+                  :key="option.minutes"
+                  :data-test="`oncall-row-snooze-${row.rowKey}-${option.minutes}`"
+                  @select="snoozeRow(row, option.minutes)"
+                >
+                  <template #icon-left>
+                    <OIcon name="pause-circle-filled" size="sm" />
+                  </template>
+                  {{ option.label }}
+                </ODropdownItem>
+              </ODropdownGroup>
+
+              <ODropdownSeparator v-if="canAcknowledge(row)" />
+
               <ODropdownItem
-                v-for="option in snoozeOptions"
-                :key="option.minutes"
-                :data-test="`oncall-row-snooze-${row.rowKey}-${option.minutes}`"
-                @select="snoozeRow(row, option.minutes)"
+                v-if="row.firings.some((f) => f.state !== 'resolved')"
+                :data-test="`oncall-row-resolve-${row.rowKey}`"
+                @select="resolveRow(row)"
               >
-                {{ option.label }}
+                <template #icon-left>
+                  <OIcon name="task-alt" size="sm" />
+                </template>
+                {{ t("oncall.resolve") }}
+              </ODropdownItem>
+
+              <ODropdownItem
+                :data-test="`oncall-row-timeline-${row.rowKey}`"
+                @select="openResponse(row)"
+              >
+                <template #icon-left>
+                  <OIcon name="format-list-bulleted" size="sm" />
+                </template>
+                {{ t("oncall.timeline") }}
               </ODropdownItem>
             </ODropdown>
-            <OButton
-              v-if="row.firings.some((f) => f.state !== 'resolved')"
-              variant="ghost-success"
-              size="icon-sm"
-              icon-left="task-alt"
-              :loading="busyId === row.rowKey"
-              data-row-action="resolve"
-              :data-test="`oncall-row-resolve-${row.rowKey}`"
-              @click.stop="resolveRow(row)"
-            >
-              <OTooltip side="bottom" :content="t('oncall.resolve')" />
-            </OButton>
-            <OButton
-              v-else
-              variant="ghost"
-              size="icon-sm"
-              icon-left="format-list-bulleted"
-              data-row-action="timeline"
-              :data-test="`oncall-row-timeline-${row.rowKey}`"
-              @click.stop="openResponse(row)"
-            >
-              <OTooltip side="bottom" :content="t('oncall.timeline')" />
-            </OButton>
           </template>
         </span>
       </template>
@@ -558,18 +664,19 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import OnCallAttentionCard from "@/components/oncall/OnCallAttentionCard.vue";
-import OnCallCausesCard from "@/components/oncall/OnCallCausesCard.vue";
-import OnCallCoverageCard from "@/components/oncall/OnCallCoverageCard.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
+import OnCallNowStrip from "@/components/oncall/OnCallNowStrip.vue";
 import OnCallPageContext from "@/components/oncall/OnCallPageContext.vue";
+import OnCallRingingBanner from "@/components/oncall/OnCallRingingBanner.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
+import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -577,7 +684,9 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -593,6 +702,7 @@ import type {
   CauseGroup,
   Channel,
   CoverageGaps,
+  DeliveryRecord,
   EscalationProgress,
   OnCallPolicy,
   OnCallResponse,
@@ -605,6 +715,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { formatMicrosDuration } from "@/utils/formatters";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import {
   groupBySubject,
@@ -622,6 +733,7 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { canConfigure } = useOnCallPermissions();
+const nowMicros = useOnCallClock();
 
 /// A table row. Grouped or not, every row carries the same shape so the
 /// columns and the actions never have to branch on the mode.
@@ -643,6 +755,26 @@ const MAX_PAGES = 3;
  */
 const ESCALATION_DETAIL_LIMIT = 25;
 
+/**
+ * How many ringing pages get their delivery ledger read.
+ *
+ * One request per page, same as the ladder, and only worth spending on pages
+ * nobody has taken — a failed send is the explanation for silence, and a page
+ * somebody already owns has no silence to explain.
+ */
+const DELIVERY_DETAIL_LIMIT = 25;
+
+/**
+ * The three states a reader triages by, in the order they matter.
+ *
+ * These are not the wire's `ResponseState`: "ringing" is an escalating record
+ * that nobody has claimed and nothing is snoozing, which is three fields rather
+ * than one, and it is the only distinction that changes what somebody does next.
+ */
+const SECTION_ORDER = ["ringing", "snoozed", "handled"] as const;
+
+type SectionKey = (typeof SECTION_ORDER)[number];
+
 const responses = ref<OnCallResponse[]>([]);
 const teams = ref<OnCallTeam[]>([]);
 const policyByTeam = ref<Record<string, OnCallPolicy>>({});
@@ -650,6 +782,8 @@ const scheduleByTeam = ref<Record<string, OnCallSchedule>>({});
 const slotsByTeam = ref<Record<string, OnCallSlot[]>>({});
 const progressById = ref<Record<string, EscalationProgress>>({});
 const escalationCapped = ref(false);
+/// Phrased delivery failures per response id, for the ringing pages only.
+const deliveryFailureById = ref<Record<string, I18nText>>({});
 const expandedIds = ref<string[]>([]);
 const expandedEvents = ref<OnCallResponseEvent[]>([]);
 const expandedHistory = ref<OnCallResponse[]>([]);
@@ -710,6 +844,15 @@ const snoozeOptions = computed(() => [
   { minutes: 180, label: t("oncall.snooze3h") },
 ]);
 
+/**
+ * What the row-hover snooze shortcut uses.
+ *
+ * The four lengths live in a menu now, and a keyboard shortcut cannot open one
+ * and pick from it — so the shortcut takes the shortest length, which is the one
+ * that gives a page back soonest if it was the wrong call.
+ */
+const DEFAULT_SNOOZE_MINUTES = 15;
+
 const isFiltered = computed(
   () =>
     !!search.value ||
@@ -760,13 +903,24 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     sortable: true,
   },
   {
-    // Age, not the absolute instant: "6m 40s" is what a responder is deciding
-    // against. The channels beside it are what the policy WOULD use.
+    // Age, not the absolute instant: "1h 44m" is what a responder is deciding
+    // against, and on a ringing row it is the whole point of the column.
     id: "notified",
-    header: t("oncall.notifiedAge"),
-    size: 200,
+    header: t("oncall.ringingAge"),
+    size: 176,
     accessorFn: (row: PageRow) => row.latest.opened_at,
     sortable: true,
+  },
+  {
+    // What the policy would page on. Split out of the age cell and off by
+    // default: a recorded delivery failure now sits on the row, and that is
+    // better evidence than a channel that merely COULD have been used.
+    id: "channels",
+    header: t("oncall.channels"),
+    size: 160,
+    accessorFn: (row: PageRow) => channelsFor(row.latest).join(","),
+    sortable: false,
+    hideable: true,
   },
   {
     // State now reads off the escalation cell, so this is the redundant copy —
@@ -810,10 +964,10 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     header: t("oncall.actions"),
     isAction: true,
     sortable: false,
-    // One labelled button plus two icon buttons. `actionCount` is what OTable
+    // One labelled button plus the more-menu. `actionCount` is what OTable
     // sizes the hover rail from, so it counts the controls, not the width.
-    size: 148,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+    size: 128,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
 
@@ -866,18 +1020,19 @@ const scopedResponses = computed(() => {
   });
 });
 
-/// Asked of a ROW, not a record, so the strip counts the same things the
-/// table shows. A group is unacknowledged if any firing in it still is.
+/**
+ * Asked of a ROW, not a record, so the strip counts the same things the table
+ * shows.
+ *
+ * State is no longer among these. The section headings say which run a row is
+ * in and carry their own counts, so a tile that filtered to "snoozed" was a
+ * second way to say what the reader could already see. What is left are the
+ * slices that cut ACROSS the sections.
+ */
 function matchesStateFacet(row: PageRow, facet: string | null): boolean {
   switch (facet) {
-    case "unacked":
-      return row.escalating.some((r) => !r.acked_by && !isSnoozed(r));
     case "p1":
       return row.latest.priority === 1 && row.escalating.length > 0;
-    case "acked":
-      return row.firings.some((r) => r.state === "acknowledged");
-    case "snoozed":
-      return row.firings.some((r) => isSnoozed(r));
     // Whoever acknowledged it owns it: a handoff to a person acknowledges as
     // the new owner, so this is the same field either way.
     case "mine":
@@ -918,20 +1073,13 @@ const rows = computed(() =>
   scopedRows.value.filter((row) => matchesStateFacet(row, stateFilter.value)),
 );
 
-// Attention-first, with the total last: whoever opens this page needs the
-// pages nobody has taken before anything else.
+// The slices that cut across the sections, since the sections themselves now
+// carry the state counts. P1 first: a P1 in the handled run still outranks a P4
+// that is ringing.
 const summaryStats = computed<StatItem[]>(() => {
   const all = scopedRows.value;
   const count = (facet: string) => all.filter((r) => matchesStateFacet(r, facet)).length;
   const items: StatItem[] = [
-    {
-      key: "unacked",
-      label: t("oncall.statUnacked"),
-      value: count("unacked"),
-      icon: "notifications-active",
-      tone: "error",
-      dataTest: "oncall-stat-unacked",
-    },
     {
       key: "p1",
       label: t("oncall.statP1"),
@@ -949,38 +1097,12 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "oncall-stat-mine",
     },
     {
-      // Now reachable: an acknowledged page stays in the list, so it needs a
-      // way to be found.
-      key: "acked",
-      label: t("oncall.statAcked"),
-      value: count("acked"),
-      icon: "check-circle",
-      tone: "info",
-      dataTest: "oncall-stat-acked",
-    },
-    {
-      key: "snoozed",
-      label: t("oncall.statSnoozed"),
-      value: count("snoozed"),
-      icon: "pause-circle-filled",
-      tone: "warning",
-      dataTest: "oncall-stat-snoozed",
-    },
-    {
       key: "unrouted",
       label: t("oncall.statUnrouted"),
       value: count("unrouted"),
       icon: "help-outline",
       tone: "error",
       dataTest: "oncall-stat-unrouted",
-    },
-    {
-      key: "all",
-      label: t("oncall.statAll"),
-      value: all.length,
-      icon: "format-list-bulleted",
-      tone: "neutral",
-      dataTest: "oncall-stat-all",
     },
   ];
   // Dropped entirely when we do not know who is signed in, rather than left as
@@ -1048,12 +1170,24 @@ const attention = computed(() => {
     .map((r) => progressById.value[r.id]?.next_at ?? null)
     .filter((at): at is number => !!at && at > nowMicros);
 
+  // The ladder having finished is the fact that changes what to do: a ringing
+  // page with rungs left will wake somebody on its own, and one without never
+  // will. Counted only over the pages whose ladder we actually read.
+  const exhausted = open.filter((r) => progressById.value[r.id]?.exhausted).length;
+
+  const oldest = open.length
+    ? open.reduce((worst, r) => (r.opened_at < worst.opened_at ? r : worst))
+    : null;
+
   return {
     unacked: open.length,
     escalating: pending.length,
     nextEscalationAt: pending.length ? Math.min(...pending) : null,
     assignedToMe: mine,
-    oldestOpenedAt: open.length ? Math.min(...open.map((r) => r.opened_at)) : null,
+    oldestOpenedAt: oldest?.opened_at ?? null,
+    /// So the banner's second action can open the record that needs a decision.
+    oldestId: oldest?.id ?? null,
+    exhausted,
   };
 });
 
@@ -1232,9 +1366,93 @@ async function bulkResolve() {
   );
 }
 
-// Re-clicking the live tile clears it; "All" only ever clears.
+/**
+ * Acknowledges every ringing page, not just the selected ones.
+ *
+ * The selection-driven bulk action still exists for a chosen subset. This is the
+ * banner's and the section heading's action: the count they state is the set
+ * they act on, so claiming it cannot require selecting the rows first.
+ */
+async function acknowledgeAllRinging() {
+  const ids = rows.value
+    .filter((row) => rowSection(row) === "ringing")
+    .flatMap((row) => row.escalating.filter((r) => !r.acked_by).map((r) => r.id));
+  if (!ids.length) return;
+  await runBulk(
+    ids,
+    (id) => oncallService.acknowledgeResponse({ org_identifier: orgId.value, response_id: id }),
+    "bulkAckDone",
+    "bulkAckPartial",
+  );
+}
+
+/// The record that has waited longest, where handoff, escalate-now and promote
+/// live. A bulk handoff is not offered: the people a page can be handed to are
+/// per team, and the ringing pages need not share one.
+function openOldestRinging() {
+  const id = attention.value.oldestId;
+  if (!id) return;
+  router.push({
+    name: "onCallResponseDetail",
+    params: { responseId: id },
+    query: { org_identifier: orgId.value },
+  });
+}
+
+// Re-clicking the live tile clears it — there is no "All" tile to clear from
+// now that the sections carry the state counts.
 function onStatSelect(key: string) {
-  stateFilter.value = key === "all" || stateFilter.value === key ? null : key;
+  stateFilter.value = stateFilter.value === key ? null : key;
+}
+
+/// Which run a row belongs to. Asked of the row rather than the record so a
+/// group standing for ninety-five firings lands where its live ones do: a group
+/// with anything still ringing is ringing, whatever its latest firing says.
+function rowSection(row: PageRow): SectionKey {
+  if (row.escalating.some((r) => !r.acked_by && !isSnoozed(r))) return "ringing";
+  if (row.firings.some((r) => isSnoozed(r))) return "snoozed";
+  return "handled";
+}
+
+/// Counted over the filtered set, not the page: a heading reading "3" on page
+/// one of five would be describing the pagination rather than the state.
+const sectionCounts = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = { ringing: 0, snoozed: 0, handled: 0 };
+  for (const row of rows.value) counts[rowSection(row)] += 1;
+  return counts;
+});
+
+/// Only the run that needs somebody gets colour. Snoozed is deliberately inert
+/// and handled is finished, so both stay in the calm tone.
+function sectionTone(key: string): string {
+  if (key === "ringing") return "text-status-error-text";
+  if (key === "snoozed") return "text-status-warning-text";
+  return "text-text-secondary";
+}
+
+/// A ringing row is one nobody has claimed and nothing is snoozing — the only
+/// state where an age is worth shouting.
+function isRinging(row: PageRow): boolean {
+  return rowSection(row) === "ringing";
+}
+
+/// How long the page has gone unanswered. Relative, because that is the number
+/// being decided against.
+function ringingFor(record: OnCallResponse): I18nText {
+  return t("oncall.ringingFor", {
+    duration: formatMicrosDuration(nowMicros.value - record.opened_at),
+  });
+}
+
+/// When the ladder's first rung fired, as its delay from the page opening. A
+/// policy that waits before ringing anybody is a common and invisible cause of
+/// "nobody answered", and `after_micros` is the only place it is recorded.
+function ladderStarted(record: OnCallResponse): I18nText | "" {
+  const first = progressById.value[record.id]?.fired[0];
+  if (!first || first.after_micros <= 0) return "";
+  return t("oncall.ladderStartedAfter", {
+    duration: formatMicrosDuration(first.after_micros),
+  });
 }
 
 // The rail carries severity on every row. A closed record has no severity left
@@ -1409,6 +1627,75 @@ async function fetchEscalationProgress() {
   progressById.value = next;
 }
 
+/**
+ * Recorded delivery failures on the pages nobody has taken.
+ *
+ * `delivered === false` is a FACT the engine wrote down, which is why this is
+ * worth a request per page: a ladder that fired into a broken transport looks
+ * identical to one that reached a person, and only the ledger separates them.
+ * Absent means "not read" rather than "delivered" — a page past the cap gets no
+ * line rather than an implied success.
+ */
+async function fetchDeliveryFailures() {
+  const ringing = responses.value
+    .filter((r) => isEscalating(r.state) && !r.acked_by && !isSnoozed(r))
+    .sort((a, b) => a.opened_at - b.opened_at)
+    .slice(0, DELIVERY_DETAIL_LIMIT);
+
+  const results = await Promise.allSettled(
+    ringing.map((r) =>
+      oncallService.listDeliveries({ org_identifier: orgId.value, response_id: r.id }),
+    ),
+  );
+
+  const next: Record<string, I18nText> = {};
+  ringing.forEach((record, index) => {
+    const result = results[index];
+    if (result.status !== "fulfilled") return;
+    const phrased = describeDeliveryFailure(result.value.data?.deliveries ?? []);
+    if (phrased) next[record.id] = phrased;
+  });
+  // Replaced wholesale so a page that has since been answered drops its line
+  // instead of keeping a failure that no longer explains anything.
+  deliveryFailureById.value = next;
+}
+
+/**
+ * The most recent recorded failure, and what still reached that person.
+ *
+ * "Slack failed" alone reads as "they were not told". Naming the channels that
+ * DID land for the same recipient is the difference between re-paging them and
+ * waiting — so the line says which, or says nobody, rather than leaving it open.
+ */
+function describeDeliveryFailure(deliveries: DeliveryRecord[]): I18nText | null {
+  const failed = deliveries.filter((d) => d.delivered === false && !!d.channel);
+  if (!failed.length) return null;
+  // Latest first: an old failure the ladder already retried past is not the one
+  // explaining the silence now.
+  const worst = failed.reduce((latest, d) => (d.at > latest.at ? d : latest));
+
+  const landed = new Set(
+    deliveries
+      .filter(
+        (d) =>
+          d.delivered === true &&
+          !!d.channel &&
+          (d.recipient ?? "") === (worst.recipient ?? ""),
+      )
+      .map((d) => String(t(`oncall.channel_${d.channel as Channel}`))),
+  );
+
+  const channel = t(`oncall.channel_${worst.channel as Channel}`);
+  const who = raw(worst.recipient ?? "");
+  return landed.size
+    ? t("oncall.deliveryFailedFallback", {
+        channel,
+        who,
+        landed: raw([...landed].join(", ")),
+      })
+    : t("oncall.deliveryFailedNothing", { channel, who });
+}
+
 /// The expanded row's timeline plus what previous firings turned out to be.
 async function fetchExpandedEvents(responseId: string) {
   expandedLoading.value = true;
@@ -1452,7 +1739,11 @@ async function refreshAll() {
   if (unavailable.value) return;
   await fetchContext();
   await fetchTeamContext();
-  await Promise.allSettled([fetchEscalationProgress(), fetchCauseAnalytics()]);
+  await Promise.allSettled([
+    fetchEscalationProgress(),
+    fetchCauseAnalytics(),
+    fetchDeliveryFailures(),
+  ]);
 }
 
 // Expansion is single-mode, so there is at most one id to resolve. The table
@@ -1465,6 +1756,16 @@ watch(expandedIds, (ids) => {
 
 function goTo(name: string) {
   router.push({ name, query: { org_identifier: orgId.value } });
+}
+
+/// A rotation in the on-call menu is worth a click: whoever is reading "nobody on
+/// call for Search" wants Search's schedule, not the teams list.
+function openTeam(teamId: string) {
+  router.push({
+    name: "onCallTeamDetail",
+    params: { teamId },
+    query: { org_identifier: orgId.value },
+  });
 }
 
 function openResponse(row: PageRow) {

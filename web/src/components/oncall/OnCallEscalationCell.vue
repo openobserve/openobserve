@@ -19,27 +19,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   The list already said WHETHER a page was answered; the question a responder
   actually has at 3am is "how long until this wakes somebody else", and that was
-  only answerable by opening the record. The bar is the ladder, not a percentage:
-  each fired rung fills one more step of however many the policy defines.
+  only answerable by opening the record.
+
+  Words and tone, nothing else. A progress bar and a state icon both sat here and
+  both restated the headline — and on a list whose rows already carry a priority
+  rail, a third and fourth severity mark cost more attention than they returned.
 -->
 <template>
-  <div class="flex min-w-0 flex-col gap-1" :data-test="`oncall-escalation-cell-${responseId}`">
-    <span class="flex items-center gap-1.5">
-      <OIcon v-if="tone.icon" :name="tone.icon" size="xs" :class="tone.text" />
-      <span class="truncate text-sm" :class="tone.text" data-test="oncall-escalation-cell-level">
-        {{ headline }}
-      </span>
+  <div class="flex min-w-0 flex-col gap-0.5" :data-test="`oncall-escalation-cell-${responseId}`">
+    <!-- Tone alone, no icon and no bar. Both restated what the headline already
+         says in words, and three severity signals on one cell competed with the
+         row's own priority rail for the same glance. -->
+    <span class="truncate text-sm" :class="toneClass" data-test="oncall-escalation-cell-level">
+      {{ headline }}
     </span>
-
-    <!-- No progress loaded means the ladder position is unknown, and an empty
-         bar would read as "nothing has fired" — which is a different fact. -->
-    <OProgressBar
-      v-if="progress"
-      :value="fillRatio"
-      :variant="tone.bar"
-      size="xs"
-      data-test="oncall-escalation-cell-bar"
-    />
 
     <span
       v-if="detail"
@@ -48,6 +41,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ detail }}
     </span>
+
+    <!-- Why a page that "went out" may have reached nobody. A ladder that fired
+         correctly into a broken transport looks identical to one that reached a
+         person, and that is the difference between waiting and re-paging. -->
+    <span
+      v-if="deliveryFailure"
+      class="text-status-error-text flex min-w-0 items-center gap-1 text-xs"
+      data-test="oncall-escalation-cell-delivery"
+    >
+      <OIcon name="error-outline" size="xs" class="shrink-0" />
+      <span class="truncate">
+        {{ deliveryFailure }}
+        <OTooltip side="bottom" :content="deliveryFailure" />
+      </span>
+    </span>
   </div>
 </template>
 
@@ -55,10 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import { useOnCallClock } from "@/composables/useOnCallClock";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -78,44 +84,35 @@ const props = defineProps<{
   totalRungs?: number | null;
   /** `acked_at - opened_at`, so a settled row can say how fast it was answered. */
   ackedInMicros?: number | null;
+  /**
+   * A recorded delivery failure on this page, already phrased. Resolved by the
+   * caller from the delivery ledger, which is one request per page — the cell
+   * cannot fetch it and must not imply success when it is simply absent.
+   */
+  deliveryFailure?: I18nText | "";
 }>();
 
 const { t } = useI18nTyped();
 const nowMicros = useOnCallClock();
 
-interface CellTone {
-  text: string;
-  bar: ProgressBarVariant;
-  icon: IconName | null;
-}
-
 /// A page climbing the ladder is the only state worth shouting about; the three
-/// settled states recede so the escalating rows are what the eye lands on.
-const tone = computed<CellTone>(() => {
-  if (props.state === "resolved") {
-    return { text: "text-text-secondary", bar: "default", icon: "check-circle" };
-  }
-  if (props.progress?.stopped_because === "snoozed") {
-    return { text: "text-status-warning-text", bar: "warning", icon: "pause-circle-filled" };
-  }
-  if (props.state === "acknowledged") {
-    return { text: "text-status-success-text", bar: "default", icon: "check-circle" };
-  }
-  if (props.progress?.exhausted) {
-    return { text: "text-status-error-text", bar: "danger", icon: "warning-amber" };
-  }
-  return { text: "text-status-error-text", bar: "danger", icon: "arrow-upward" };
+/// settled states recede so the escalating rows are what the eye lands on. Tone
+/// is now the cell's ONLY signal, which is why every state still has to have one.
+const toneClass = computed(() => {
+  if (props.state === "resolved") return "text-text-secondary";
+  if (props.progress?.stopped_because === "snoozed") return "text-status-warning-text";
+  if (props.state === "acknowledged") return "text-status-success-text";
+  return "text-status-error-text";
 });
 
 const firedCount = computed(() => props.progress?.fired.length ?? 0);
 
-/// The ladder as a fraction of the rungs the policy defines. Without a total the
-/// bar still has to mean something, so a climbing ladder that knows only its own
-/// position reads as half full rather than as a hidden division by zero.
-const fillRatio = computed(() => {
-  const total = props.totalRungs ?? 0;
-  if (total <= 0) return firedCount.value > 0 ? 0.5 : 0;
-  return Math.min(1, firedCount.value / total);
+/// Distinct people the fired rungs reached. Deduplicated across rungs: a ladder
+/// that rang the same person twice reached one person, and counting two would
+/// promise a second pair of hands that never existed.
+const peopleRung = computed(() => {
+  const fired = props.progress?.fired ?? [];
+  return new Set(fired.flatMap((rung) => rung.targets)).size;
 });
 
 /// One or two words. The full sentences ("Escalation stopped — somebody owns
@@ -125,7 +122,19 @@ const headline = computed<I18nText>(() => {
   if (props.state === "resolved") return t("oncall.escalationResolvedShort");
   if (props.progress?.stopped_because === "snoozed") return t("oncall.escalationSnoozedShort");
   if (props.state === "acknowledged") return t("oncall.escalationAcked");
+  // "Level 6 of 6" and "nobody is coming" are the same number and opposite
+  // situations. A finished ladder says so in words.
+  if (props.progress?.exhausted) return t("oncall.ladderFinished");
   if (firedCount.value === 0) return t("oncall.escalationNotStarted");
+  // Who is being woken RIGHT NOW, not just how far up the ladder we are — that
+  // is the name a responder checks against their own.
+  const paging = props.progress?.next_targets ?? [];
+  if (paging.length) {
+    return t("oncall.escalationClimbing", {
+      level: firedCount.value,
+      who: raw(paging.join(", ")),
+    });
+  }
   return props.totalRungs
     ? t("oncall.escalationLevel", { level: firedCount.value, total: props.totalRungs })
     : t("oncall.escalationLevelOpen", { level: firedCount.value });
@@ -144,7 +153,17 @@ const detail = computed<I18nText | "">(() => {
   }
   if (!progress) return "";
   if (progress.stopped_because === "snoozed") return "";
-  if (progress.exhausted) return t("oncall.ladderExhausted");
+  // What the ladder spent before running out. "Exhausted" alone does not say
+  // whether it reached three people or nobody at all.
+  if (progress.exhausted) {
+    return peopleRung.value > 0
+      ? t(
+          "oncall.ladderFinishedDetail",
+          { people: peopleRung.value, levels: props.totalRungs ?? firedCount.value },
+          peopleRung.value,
+        )
+      : t("oncall.ladderExhausted");
+  }
   if (!progress.next_at || !progress.next_targets.length) return "";
 
   const remaining = progress.next_at - nowMicros.value;
