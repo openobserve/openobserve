@@ -4,7 +4,7 @@
  * `getSpanColorHex(i)` is the single source of span-bar colour. It returns a raw
  * hex from the `--color-trace-span-*` tokens (base/dark.css, theme-aware) via
  * `chartColor()`, which falls back to the FALLBACKS map in chartTheme.ts under
- * jsdom/SSR. There are 35 trace-span colours.
+ * jsdom/SSR. There are 16 trace-span colours — see base.css for why that number.
  *
  * A second palette used to live here: a `--color-span-*` set of 50 tokens with
  * `getSpanColor`, `getServiceColor`, `getSpanColorWithOpacity`,
