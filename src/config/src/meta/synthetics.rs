@@ -267,6 +267,48 @@ impl SyntheticType {
     }
 }
 
+/// Applies `f` to every secret-bearing string on a check, in one place.
+///
+/// The set of places a secret can hide is not obvious — `auth`, `variables`,
+/// `cookies`, the extracted `config_secrets` map, and legacy rows that still
+/// hold `AESenc:` values inline in `config` at
+/// [`SyntheticType::secret_config_paths`]. Three callers have to agree on that
+/// list: the synthetics service encrypting on write, the super-cluster producer
+/// decrypting for the wire, and the applier re-encrypting on arrival. Any one
+/// of them missing a field is a silent leak or a silently unreadable
+/// credential, so the list lives here and they share it.
+///
+/// `f` sees each value in place and replaces it. Errors propagate — a caller
+/// that cannot transform one secret must not be left with a half-transformed
+/// check.
+pub fn for_each_secret<E>(
+    check: &mut Synthetic,
+    f: &mut impl FnMut(&mut String) -> Result<(), E>,
+) -> Result<(), E> {
+    if let Some(auth) = check.auth.as_mut() {
+        match auth {
+            SyntheticAuth::Basic { password, .. } => f(password)?,
+            SyntheticAuth::Bearer { token } => f(token)?,
+            _ => {}
+        }
+    }
+    for var in &mut check.variables {
+        f(&mut var.value)?;
+    }
+    for cookie in &mut check.cookies {
+        f(&mut cookie.value)?;
+    }
+    for value in check.config_secrets.values_mut() {
+        f(value)?;
+    }
+    // Legacy rows: secrets never extracted into `config_secrets`.
+    let paths = check.check_type.secret_config_paths();
+    for path in paths {
+        for_each_string_at_path(&mut check.config, path, f)?;
+    }
+    Ok(())
+}
+
 /// Walks `value` along `path` (`/`-separated, `*` = every array element) and
 /// applies `f` to each string found at the end of the path. Missing segments
 /// are skipped silently. Non-string leaves are ignored.
@@ -2247,6 +2289,111 @@ fn validate_browser_devices_and_schedule(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod for_each_secret_tests {
+    use super::*;
+
+    fn ssh_check_with_every_secret_kind() -> Synthetic {
+        let mut c = Synthetic {
+            check_type: SyntheticType::Ssh,
+            ..Default::default()
+        };
+        c.auth = Some(SyntheticAuth::Basic {
+            username: "u".into(),
+            password: "pw".into(),
+        });
+        c.variables = vec![SyntheticVariable {
+            name: "V".into(),
+            value: "vv".into(),
+            secure: true,
+            example: String::new(),
+        }];
+        c.cookies = vec![SyntheticCookie {
+            name: "c".into(),
+            value: "cv".into(),
+            ..Default::default()
+        }];
+        c.config_secrets.insert("/auth/secret".into(), "cs".into());
+        c
+    }
+
+    /// Every secret-bearing field must be visited. A field missed here ships in
+    /// clear on one side or stays unreadable on the other, so the count is
+    /// asserted rather than trusted.
+    #[test]
+    fn visits_auth_variables_cookies_and_config_secrets() {
+        let mut c = ssh_check_with_every_secret_kind();
+        let mut seen = Vec::new();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            seen.push(v.clone());
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        seen.sort();
+        assert_eq!(seen, vec!["cs", "cv", "pw", "vv"]);
+    }
+
+    #[test]
+    fn replacements_are_written_back() {
+        let mut c = ssh_check_with_every_secret_kind();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            *v = format!("X{v}");
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        match c.auth.as_ref().unwrap() {
+            SyntheticAuth::Basic { password, .. } => assert_eq!(password, "Xpw"),
+            _ => panic!("auth shape changed"),
+        }
+        assert_eq!(c.variables[0].value, "Xvv");
+        assert_eq!(c.cookies[0].value, "Xcv");
+        assert_eq!(c.config_secrets["/auth/secret"], "Xcs");
+    }
+
+    /// A bearer token is a secret too — the other arm of the auth enum.
+    #[test]
+    fn visits_a_bearer_token() {
+        let mut c = Synthetic {
+            auth: Some(SyntheticAuth::Bearer { token: "t".into() }),
+            ..Default::default()
+        };
+        let mut seen = Vec::new();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            seen.push(v.clone());
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        assert_eq!(seen, vec!["t"]);
+    }
+
+    /// Legacy rows keep secrets inline in `config` rather than in the extracted
+    /// map, and those must be visited as well.
+    #[test]
+    fn visits_legacy_inline_config_secrets() {
+        let mut c = Synthetic {
+            check_type: SyntheticType::Ssh,
+            config: serde_json::json!({"auth": {"secret": "inline"}}),
+            ..Default::default()
+        };
+        let mut seen = Vec::new();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            seen.push(v.clone());
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        assert_eq!(seen, vec!["inline"]);
+    }
+
+    /// A partially transformed check must never be stored, so the error stops
+    /// the walk.
+    #[test]
+    fn an_error_propagates() {
+        let mut c = ssh_check_with_every_secret_kind();
+        let r = for_each_secret(&mut c, &mut |_v: &mut String| Err("nope"));
+        assert_eq!(r, Err("nope"));
+    }
 }
 
 #[cfg(test)]

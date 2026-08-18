@@ -82,10 +82,12 @@ pub async fn create_synthetic(
     {
         o2_enterprise::enterprise::super_cluster::queue::synthetics_check_create(
             org_id,
-            o2_enterprise::enterprise::super_cluster::queue::SyntheticsCheckPayload::new(
+            o2_enterprise::enterprise::super_cluster::queue::SyntheticsCheckPayload::for_wire(
+                org_id,
                 &result,
                 &stored_folder_slug,
-            ),
+            )
+            .await?,
         )
         .await?;
     }
@@ -199,10 +201,12 @@ pub async fn update_synthetic(
         o2_enterprise::enterprise::super_cluster::queue::synthetics_check_update(
             org_id,
             id,
-            o2_enterprise::enterprise::super_cluster::queue::SyntheticsCheckPayload::new(
+            o2_enterprise::enterprise::super_cluster::queue::SyntheticsCheckPayload::for_wire(
+                org_id,
                 &check,
                 &stored_folder_slug,
-            ),
+            )
+            .await?,
         )
         .await?;
     }

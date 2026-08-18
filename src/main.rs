@@ -530,14 +530,6 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
                 "composite alerts super-cluster startup preflight failed: {e:#}"
             ));
         }
-        // Without a shared encryption key this region would encrypt check
-        // secrets under a locally-minted DEK, so checks it creates could not
-        // run anywhere else — silently. Fail closed rather than serve that.
-        if let Err(e) = job::synthetics_super_cluster_preflight() {
-            return Err(anyhow::anyhow!(
-                "synthetics super-cluster startup preflight failed: {e}"
-            ));
-        }
     }
 
     // Initialize enterprise AI components (agent and evaluation clients).

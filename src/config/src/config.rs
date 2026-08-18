@@ -446,7 +446,6 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
-        encryption_key,
         lambda_browser: _,
         lambda_net: _,
         api_endpoint: _,
@@ -467,11 +466,6 @@ pub(crate) fn synthetics_restart_required_changes(
     // registration; honouring it at runtime would be a structural change.
     if old.enabled != *enabled {
         changed.push("ZO_SYNTHETICS_ENABLED");
-    }
-    // Swapping the key at runtime would orphan every secret already encrypted
-    // under the old one, so it is deliberately not carried by a reload.
-    if old.encryption_key != *encryption_key {
-        changed.push("ZO_SYNTHETICS_ENCRYPTION_KEY");
     }
     changed
 }
@@ -871,26 +865,6 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
-    /// Base64-encoded 64 bytes, the key material check secrets are encrypted
-    /// under in place of the per-org DEK. Rejected at first use if it is not
-    /// valid base64 or not exactly 64 bytes, rather than being used as-is.
-    ///
-    /// The per-org DEK is minted at random by whichever region needs it first,
-    /// so a check created in one region carries secrets no other region can
-    /// read: the row replicates, the key does not, and the agent's `resolve`
-    /// fails with `AES decrypt failed` while the run is silently lost
-    /// (o2-enterprise#2451). Setting the same value in every region makes the
-    /// derived key identical everywhere without putting key material on the
-    /// super-cluster queue.
-    ///
-    /// Leave empty for a single-region deployment — the per-org DEK is fine
-    /// when there is only one region to read it.
-    #[env_config(
-        name = "ZO_SYNTHETICS_ENCRYPTION_KEY",
-        default = "",
-        help = "Base64-encoded 64-byte key that synthetics check secrets are encrypted under. REQUIRED in a super cluster and must be identical in every region: without it, a check created in one region carries secrets no other region can decrypt. Generate with `openssl rand -base64 64 | tr -d '\\n'`. Changing it makes every secret already stored unreadable."
-    )]
-    pub encryption_key: String,
     /// Lambda function name for the browser probe (handles all engines:
     /// chromium, firefox, edge).
     #[env_config(

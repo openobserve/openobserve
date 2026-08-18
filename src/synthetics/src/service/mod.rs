@@ -26,15 +26,12 @@
 
 use std::collections::HashMap;
 
-use config::{
-    meta::{
-        folder::{DEFAULT_FOLDER, Folder, FolderType},
-        synthetics::{
-            ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticListItem,
-            SyntheticListResponse, for_each_string_at_path, take_strings_at_path,
-        },
+use config::meta::{
+    folder::{DEFAULT_FOLDER, Folder, FolderType},
+    synthetics::{
+        ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticListItem, SyntheticListResponse,
+        for_each_string_at_path, take_strings_at_path,
     },
-    utils::encryption::Algorithm,
 };
 use infra::{
     db::ORM_CLIENT,

@@ -1,86 +1,14 @@
 use super::*;
 
-/// The configured key, decoded and validated once at first use.
+/// The key this region encrypts check secrets with.
 ///
-/// `Ok(None)` means unset — callers fall back to the per-org DEK. `Err` means
-/// set but unusable, which is returned to the caller rather than swallowed: a
-/// key that cannot be parsed must not silently become "no key", because that
-/// would put the deployment back on the per-region DEK and reintroduce the very
-/// bug this exists to fix, with no signal that it had happened.
-///
-/// Read once and pinned at first use — which in a super cluster is startup,
-/// because [`crate::super_cluster_preflight`] resolves it there. `refresh_config`
-/// swaps the whole config and only
-/// *logs* that a key needs a restart, so re-reading would let a reload change
-/// the key underneath checks whose secrets were encrypted with the old one.
-/// Their credentials would then decrypt to empty
-/// (`decrypt_secret(..).unwrap_or_default()`) and the checks would fail with
-/// nothing to explain why.
-pub(crate) fn configured_key() -> &'static Result<Option<Vec<u8>>, String> {
-    static KEY: std::sync::OnceLock<Result<Option<Vec<u8>>, String>> = std::sync::OnceLock::new();
-    KEY.get_or_init(|| resolve_key(&config::get_config().synthetics.encryption_key))
-}
-
-/// The decode step, split out so it can be tested without the process-global
-/// cache above: once anything in the binary resolves the key, the cache is
-/// fixed, and a test asserting on the config would then pass without
-/// exercising anything.
-pub(crate) fn resolve_key(raw: &str) -> Result<Option<Vec<u8>>, String> {
-    if raw.is_empty() {
-        return Ok(None);
-    }
-    config::utils::encryption::decode_encryption_key(raw).map(Some)
-}
-
-/// Domain separator for [`synthetics_dek`]. Versioned rather than edited:
-/// changing it re-keys every check.
-const DEK_CONTEXT: &str = "openobserve/synthetics/dek/v1/";
-
-/// The key check secrets are encrypted under.
-///
-/// Prefers a key derived from `ZO_SYNTHETICS_ENCRYPTION_KEY`, because the
-/// per-org DEK is minted at random by whichever region needs it first: a check
-/// created in one region then carries secrets no other region can read. The row
-/// replicates, the key does not, and the agent's `resolve` fails with
-/// `AES decrypt failed` while the run is silently lost (o2-enterprise#2451).
-/// Deriving from a value every region already shares makes the key identical
-/// everywhere without putting key material on the super-cluster queue, and
-/// leaves nothing to converge on, so there is no race.
-///
-/// Falls back to the per-org DEK when the key is unset, which is correct for a
-/// single-region deployment and keeps existing checks readable there.
+/// Region-local by design. Secrets cross the super-cluster queue in clear and
+/// the applier re-encrypts them under the receiving region's own DEK, so no key
+/// has to be shared or replicated (o2-enterprise#2451, option B).
 pub(crate) async fn synthetics_dek(org_id: &str) -> anyhow::Result<Vec<u8>> {
-    match configured_key() {
-        Ok(Some(key)) => Ok(derive_dek(key, org_id)),
-        Ok(None) => cipher::get_dek(org_id)
-            .await
-            .map_err(|e| anyhow::anyhow!("DEK fetch failed: {e}")),
-        Err(e) => Err(anyhow::anyhow!(
-            "ZO_SYNTHETICS_ENCRYPTION_KEY is set but unusable ({e}); refusing to fall back to \
-             the per-region key, which would make this check unreadable in other regions"
-        )),
-    }
-}
-
-/// HKDF-Expand (RFC 5869). Two blocks because AES-256-SIV takes 64 bytes and
-/// HMAC-SHA256 emits 32.
-fn derive_dek(secret: &[u8], org_id: &str) -> Vec<u8> {
-    use hmac::Mac;
-    type Hmac256 = hmac::Hmac<sha2::Sha256>;
-
-    let info = format!("{DEK_CONTEXT}{org_id}");
-    let mut out = Vec::with_capacity(64);
-    let mut prev: Vec<u8> = Vec::new();
-    for counter in 1u8..=2 {
-        // HMAC accepts a key of any length, so this cannot fail.
-        let mut mac = Hmac256::new_from_slice(secret).expect("HMAC accepts any key length");
-        mac.update(&prev);
-        mac.update(info.as_bytes());
-        mac.update(&[counter]);
-        prev = mac.finalize().into_bytes().to_vec();
-        out.extend_from_slice(&prev);
-    }
-    out
+    cipher::get_dek(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("DEK fetch failed: {e}"))
 }
 
 // ── Auth encryption helpers ───────────────────────────────────────────────────
@@ -284,100 +212,31 @@ pub(crate) async fn decrypt_synthetic_secrets(
     Ok(())
 }
 
+// Thin wrappers over the shared implementation in `config::utils::encryption`,
+// which the super-cluster producer and applier also use. One prefix, one
+// double-wrap rule, one place — the applier cannot depend on this crate, so a
+// local copy here would be a second definition free to drift.
 pub(crate) fn decrypt_secret(dek: &[u8], stored: &str) -> anyhow::Result<String> {
-    let b64 = stored.strip_prefix("AESenc:").unwrap_or(stored);
-    Algorithm::Aes256Siv
-        .decrypt(dek, b64)
+    config::utils::encryption::decrypt_secret_value(dek, stored)
         .map_err(|e| anyhow::anyhow!("AES decrypt failed: {e}"))
 }
 
 pub(crate) fn encrypt_secret(dek: &[u8], value: &str) -> anyhow::Result<String> {
-    // Already encrypted — skip to avoid double-wrapping on updates.
-    if value.starts_with("AESenc:") {
-        return Ok(value.to_string());
-    }
-    let ciphertext = Algorithm::Aes256Siv
-        .encrypt(dek, value)
-        .map_err(|e| anyhow::anyhow!("AES encrypt failed: {e}"))?;
-    Ok(format!("AESenc:{ciphertext}"))
+    config::utils::encryption::encrypt_secret_value(dek, value)
+        .map_err(|e| anyhow::anyhow!("AES encrypt failed: {e}"))
 }
 
 #[cfg(test)]
 mod dek_tests {
     use super::*;
 
-    /// The whole point: two regions holding the same configured key must reach
-    /// the same DEK without exchanging anything.
-    /// The mirror of `orphan_detection_enabled_is_read_per_pass`: this one must
-    /// NOT follow a reload. `refresh_config` swaps the whole config and only
-    /// logs that a restart is needed, so if the key were re-read, a reload
-    /// would change it under checks already encrypted with the old one and
-    /// `configured_key` must cache, so a config reload cannot swap the key
-    /// under checks whose secrets were encrypted with the old one — their
-    /// credentials would fail to decrypt and, before the Gap 1 fix, would have
-    /// been silently blanked.
-    ///
-    /// Asserted by identity rather than by swapping the config: the cache is
-    /// process-global, so any earlier test that touched the encrypt path has
-    /// already fixed it, and a config-swap assertion would pass without
-    /// proving anything. The decode branches are covered on `resolve_key`.
-    #[test]
-    fn the_configured_key_is_resolved_once_and_cached() {
-        assert!(std::ptr::eq(configured_key(), configured_key()));
-    }
-
-    #[test]
-    fn resolve_key_treats_unset_as_no_key_rather_than_an_error() {
-        assert_eq!(resolve_key(""), Ok(None));
-    }
-
-    #[test]
-    fn resolve_key_rejects_a_malformed_value() {
-        assert!(resolve_key("hunter2").is_err());
-    }
-
-    #[test]
-    fn resolve_key_accepts_a_valid_key() {
-        use base64::{Engine, prelude::BASE64_STANDARD};
-        let good = BASE64_STANDARD.encode([7u8; 64]);
-        assert_eq!(resolve_key(&good), Ok(Some(vec![7u8; 64])));
-    }
-
-    /// A weak or malformed value must be refused, not quietly used as key
-    /// material — `hunter2` derived a perfectly valid-looking key before this.
-    #[test]
-    fn a_non_base64_key_is_rejected() {
-        assert!(config::utils::encryption::decode_encryption_key("hunter2").is_err());
-    }
-
-    /// Right alphabet, wrong length: 32 bytes is not enough for AES-256-SIV.
-    #[test]
-    fn a_base64_key_of_the_wrong_length_is_rejected() {
-        use base64::{Engine, prelude::BASE64_STANDARD};
-        let short = BASE64_STANDARD.encode([7u8; 32]);
-        assert!(config::utils::encryption::decode_encryption_key(&short).is_err());
-    }
-
-    #[test]
-    fn a_valid_key_decodes_to_64_bytes() {
-        use base64::{Engine, prelude::BASE64_STANDARD};
-        let good = BASE64_STANDARD.encode([7u8; 64]);
-        assert_eq!(
-            config::utils::encryption::decode_encryption_key(&good)
-                .unwrap()
-                .len(),
-            64
-        );
-    }
-
-    /// Gap 1: a wrong key must surface as an error. Defaulting to an empty
-    /// string let the edit form render blanks, and saving that form
-    /// re-encrypted them over ciphertext that was only unreadable — destroying
-    /// the secret. The read has to fail so the stored value survives.
+    /// Wrong key must surface as an error. Defaulting to an empty string let
+    /// the edit form render blanks, and saving that form re-encrypted them over
+    /// ciphertext that was only unreadable — destroying the secret.
     #[test]
     fn decrypting_with_the_wrong_key_is_an_error_not_a_blank() {
-        let right = derive_dek(&[1u8; 64], "acme");
-        let wrong = derive_dek(&[2u8; 64], "acme");
+        let right = vec![1u8; 64];
+        let wrong = vec![2u8; 64];
         let stored = encrypt_secret(&right, "hunter2").unwrap();
 
         assert_eq!(decrypt_secret(&right, &stored).unwrap(), "hunter2");
@@ -387,47 +246,11 @@ mod dek_tests {
         );
     }
 
-    /// The ciphertext must be readable by the same key on another region, which
-    /// is the entire point of deriving rather than minting.
     #[test]
-    fn a_secret_encrypted_under_a_derived_key_round_trips() {
-        let dek = derive_dek(&[9u8; 64], "acme");
+    fn a_secret_round_trips_through_one_regions_key() {
+        let dek = vec![9u8; 64];
         let stored = encrypt_secret(&dek, "s3cret").unwrap();
         assert!(stored.starts_with("AESenc:"));
-        // Same inputs, independently derived — as a second region would.
-        let elsewhere = derive_dek(&[9u8; 64], "acme");
-        assert_eq!(decrypt_secret(&elsewhere, &stored).unwrap(), "s3cret");
-    }
-
-    #[test]
-    fn derivation_is_deterministic() {
-        assert_eq!(
-            derive_dek(b"shared-secret", "acme"),
-            derive_dek(b"shared-secret", "acme")
-        );
-    }
-
-    #[test]
-    fn derivation_fills_the_64_bytes_aes_256_siv_needs() {
-        let out = derive_dek(b"shared-secret", "acme");
-        assert_eq!(out.len(), 64);
-        // Two HMAC-SHA256 blocks, so the halves must not be one block repeated.
-        assert_ne!(out[..32], out[32..]);
-    }
-
-    #[test]
-    fn each_org_gets_its_own_key() {
-        assert_ne!(
-            derive_dek(b"shared-secret", "acme"),
-            derive_dek(b"shared-secret", "other")
-        );
-    }
-
-    #[test]
-    fn a_different_configured_key_derives_a_different_dek() {
-        assert_ne!(
-            derive_dek(b"secret-a", "acme"),
-            derive_dek(b"secret-b", "acme")
-        );
+        assert_eq!(decrypt_secret(&dek, &stored).unwrap(), "s3cret");
     }
 }

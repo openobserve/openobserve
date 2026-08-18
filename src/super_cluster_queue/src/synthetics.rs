@@ -42,7 +42,10 @@
 //! fails `synthetics_folder_fk` here, forever. Messages carry the folder's
 //! public slug instead and it is resolved against this region's table below.
 
-use config::meta::folder::{DEFAULT_FOLDER, Folder, FolderType};
+use config::meta::{
+    folder::{DEFAULT_FOLDER, Folder, FolderType},
+    synthetics::Synthetic,
+};
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     errors::{Error, Result},
@@ -208,6 +211,54 @@ async fn apply_last_check_status<C: sea_orm::ConnectionTrait>(
     Ok(())
 }
 
+/// Re-encrypts an arriving check's secrets under THIS region's DEK.
+///
+/// Secrets cross the queue in clear (see `SyntheticsCheckPayload::for_wire`):
+/// the producing region's DEK is its own, so ciphertext made there is
+/// unreadable here. Encrypting on arrival is what makes the check runnable
+/// locally, and it is why every region can keep a DEK it minted itself —
+/// o2-enterprise#2451 is fixed at this boundary rather than by sharing keys.
+///
+/// Fails the message rather than storing anything partial: a half-encrypted
+/// check would leave real credentials in plaintext columns.
+async fn encrypt_for_this_region(org_id: &str, check: &mut Synthetic) -> Result<()> {
+    // `get_dek` mints and persists a key on first use, so skip it entirely for
+    // a check that carries nothing to encrypt.
+    if !has_secret_value(check) {
+        return Ok(());
+    }
+    let dek = infra::table::cipher::get_dek(org_id).await?;
+    encrypt_with(&dek, check)
+}
+
+/// Whether the check carries any non-empty secret.
+fn has_secret_value(check: &Synthetic) -> bool {
+    let mut found = false;
+    let mut probe = check.clone();
+    let _ = config::meta::synthetics::for_each_secret(&mut probe, &mut |value: &mut String| {
+        if !value.is_empty() {
+            found = true;
+        }
+        Ok::<(), ()>(())
+    });
+    found
+}
+
+/// The transformation itself, split from the DEK fetch so it can be tested
+/// without a database.
+fn encrypt_with(dek: &[u8], check: &mut Synthetic) -> Result<()> {
+    config::meta::synthetics::for_each_secret(check, &mut |value: &mut String| {
+        // Empty stays empty: a blank optional credential is not a secret, and
+        // encrypting it would turn "unset" into ciphertext that decrypts to "".
+        if value.is_empty() {
+            return Ok(());
+        }
+        *value = config::utils::encryption::encrypt_secret_value(dek, value)
+            .map_err(|e| Error::Message(format!("encrypt on apply failed: {e}")))?;
+        Ok::<(), Error>(())
+    })
+}
+
 async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match msg {
@@ -229,6 +280,7 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
             if !folder_slug.is_empty() {
                 check.folder_id = resolve_folder_pk(&org_id, &folder_slug).await?;
             }
+            encrypt_for_this_region(&org_id, &mut check).await?;
             // `use_given_id` — the origin region's primary key is the identity
             // every other region has to agree on. That applies to the CHECK's
             // id; the folder's does not travel at all.
@@ -247,10 +299,24 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
             if !folder_slug.is_empty() {
                 check.folder_id = resolve_folder_pk(&org_id, &folder_slug).await?;
             }
+            encrypt_for_this_region(&org_id, &mut check).await?;
             // Errors if the row is missing rather than creating it: an update
             // that outran its create is redelivered, and one that arrives after
             // a delete must not resurrect the check.
             table::synthetics_checks::update(conn, &org_id, &id, check).await?;
+        }
+        // Retired variants: the payload's secrets are ciphertext under the
+        // PRODUCING region's DEK and cannot be read here. Applying one would
+        // store an unreadable credential and, on update, overwrite a working
+        // one. Refuse so it redelivers until the producer is upgraded, rather
+        // than persisting something silently broken.
+        SyntheticsMessage::CreateEncrypted { org_id, .. }
+        | SyntheticsMessage::UpdateEncrypted { org_id, .. } => {
+            return Err(Error::Message(format!(
+                "[SUPER_CLUSTER:sync] refusing a synthetics message from a pre-plaintext-secret \
+                 producer for org {org_id}: its secrets are encrypted under the origin region's \
+                 DEK and are unreadable here. Upgrade the producing region."
+            )));
         }
         SyntheticsMessage::Delete { org_id, id } => {
             table::synthetics_checks::delete(conn, &org_id, &id).await?;
@@ -299,6 +365,89 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod encrypt_on_apply_tests {
+    use config::meta::synthetics::SyntheticAuth;
+
+    use super::*;
+
+    /// The other half of option B: what arrives in clear is stored encrypted
+    /// under THIS region's key, which is what makes the check runnable here.
+    #[test]
+    fn plaintext_from_the_wire_is_encrypted_locally() {
+        let dek = vec![5u8; 64];
+        let mut check = Synthetic {
+            auth: Some(SyntheticAuth::Bearer {
+                token: "hunter2".into(),
+            }),
+            ..Default::default()
+        };
+        check
+            .config_secrets
+            .insert("/auth/secret".into(), "s3".into());
+
+        encrypt_with(&dek, &mut check).unwrap();
+
+        let token = match check.auth.as_ref().unwrap() {
+            SyntheticAuth::Bearer { token } => token.clone(),
+            _ => panic!("auth shape changed"),
+        };
+        assert!(token.starts_with("AESenc:"));
+        assert_eq!(
+            config::utils::encryption::decrypt_secret_value(&dek, &token).unwrap(),
+            "hunter2"
+        );
+        assert_eq!(
+            config::utils::encryption::decrypt_secret_value(
+                &dek,
+                &check.config_secrets["/auth/secret"]
+            )
+            .unwrap(),
+            "s3"
+        );
+    }
+
+    /// A redelivered message re-encrypts an already-encrypted value; wrapping
+    /// it twice would make it undecryptable.
+    #[test]
+    fn re_applying_does_not_double_wrap() {
+        let dek = vec![5u8; 64];
+        let mut check = Synthetic {
+            auth: Some(SyntheticAuth::Bearer {
+                token: "hunter2".into(),
+            }),
+            ..Default::default()
+        };
+        encrypt_with(&dek, &mut check).unwrap();
+        let once = match check.auth.as_ref().unwrap() {
+            SyntheticAuth::Bearer { token } => token.clone(),
+            _ => unreachable!(),
+        };
+        encrypt_with(&dek, &mut check).unwrap();
+        match check.auth.as_ref().unwrap() {
+            SyntheticAuth::Bearer { token } => assert_eq!(token, &once),
+            _ => unreachable!(),
+        }
+    }
+
+    /// "Unset" must not become ciphertext that decrypts to an empty string.
+    #[test]
+    fn an_empty_secret_stays_empty() {
+        let mut check = Synthetic {
+            auth: Some(SyntheticAuth::Bearer {
+                token: String::new(),
+            }),
+            ..Default::default()
+        };
+        encrypt_with(&[5u8; 64], &mut check).unwrap();
+        match check.auth.as_ref().unwrap() {
+            SyntheticAuth::Bearer { token } => assert!(token.is_empty()),
+            _ => unreachable!(),
+        }
+        assert!(!has_secret_value(&check));
+    }
 }
 
 #[cfg(test)]
