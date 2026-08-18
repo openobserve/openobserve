@@ -1,5 +1,66 @@
 use super::*;
 
+/// Read once, at first use, and never re-read.
+///
+/// `refresh_config` swaps the whole config and only *logs* that a key needs a
+/// restart, so without this a reload would silently change the key underneath
+/// checks whose secrets were encrypted under the old one. Their credentials
+/// would then decrypt to empty (`decrypt_secret(..).unwrap_or_default()`) and
+/// the checks would fail with no indication why. Pinning the boot value is what
+/// makes the restart-required warning true.
+fn configured_key() -> &'static str {
+    static KEY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    KEY.get_or_init(|| config::get_config().synthetics.encryption_key.clone())
+}
+
+/// Domain separator for [`synthetics_dek`]. Versioned rather than edited:
+/// changing it re-keys every check.
+const DEK_CONTEXT: &str = "openobserve/synthetics/dek/v1/";
+
+/// The key check secrets are encrypted under.
+///
+/// Prefers a key derived from `ZO_SYNTHETICS_ENCRYPTION_KEY`, because the
+/// per-org DEK is minted at random by whichever region needs it first: a check
+/// created in one region then carries secrets no other region can read. The row
+/// replicates, the key does not, and the agent's `resolve` fails with
+/// `AES decrypt failed` while the run is silently lost (o2-enterprise#2451).
+/// Deriving from a value every region already shares makes the key identical
+/// everywhere without putting key material on the super-cluster queue, and
+/// leaves nothing to converge on, so there is no race.
+///
+/// Falls back to the per-org DEK when the key is unset, which is correct for a
+/// single-region deployment and keeps existing checks readable there.
+pub(crate) async fn synthetics_dek(org_id: &str) -> anyhow::Result<Vec<u8>> {
+    let configured = configured_key();
+    if !configured.is_empty() {
+        return Ok(derive_dek(configured.as_bytes(), org_id));
+    }
+    cipher::get_dek(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("DEK fetch failed: {e}"))
+}
+
+/// HKDF-Expand (RFC 5869). Two blocks because AES-256-SIV takes 64 bytes and
+/// HMAC-SHA256 emits 32.
+fn derive_dek(secret: &[u8], org_id: &str) -> Vec<u8> {
+    use hmac::Mac;
+    type Hmac256 = hmac::Hmac<sha2::Sha256>;
+
+    let info = format!("{DEK_CONTEXT}{org_id}");
+    let mut out = Vec::with_capacity(64);
+    let mut prev: Vec<u8> = Vec::new();
+    for counter in 1u8..=2 {
+        // HMAC accepts a key of any length, so this cannot fail.
+        let mut mac = Hmac256::new_from_slice(secret).expect("HMAC accepts any key length");
+        mac.update(&prev);
+        mac.update(info.as_bytes());
+        mac.update(&[counter]);
+        prev = mac.finalize().into_bytes().to_vec();
+        out.extend_from_slice(&prev);
+    }
+    out
+}
+
 // ── Auth encryption helpers ───────────────────────────────────────────────────
 
 /// Encrypts credential fields in `check.auth` with the org's AES-256-SIV DEK.
@@ -28,9 +89,7 @@ pub async fn encrypt_synthetic_auth(
         return Ok(check);
     }
 
-    let dek = cipher::get_dek(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("DEK fetch failed: {e}"))?;
+    let dek = synthetics_dek(org_id).await?;
 
     if let Some(auth) = check.auth.take() {
         check.auth = Some(match auth {
@@ -153,9 +212,7 @@ pub(crate) async fn decrypt_synthetic_secrets(
         return Ok(());
     }
 
-    let dek = cipher::get_dek(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("DEK fetch failed: {e}"))?;
+    let dek = synthetics_dek(org_id).await?;
 
     // Decrypt auth credential fields.
     check.auth = check.auth.take().map(|auth| match auth {
@@ -219,4 +276,71 @@ pub(crate) fn encrypt_secret(dek: &[u8], value: &str) -> anyhow::Result<String> 
         .encrypt(dek, value)
         .map_err(|e| anyhow::anyhow!("AES encrypt failed: {e}"))?;
     Ok(format!("AESenc:{ciphertext}"))
+}
+
+#[cfg(test)]
+mod dek_tests {
+    use super::*;
+
+    /// The whole point: two regions holding the same configured key must reach
+    /// the same DEK without exchanging anything.
+    /// The mirror of `orphan_detection_enabled_is_read_per_pass`: this one must
+    /// NOT follow a reload. `refresh_config` swaps the whole config and only
+    /// logs that a restart is needed, so if the key were re-read, a reload
+    /// would change it under checks already encrypted with the old one and
+    /// their credentials would silently decrypt to empty.
+    #[test]
+    fn the_configured_key_is_pinned_at_boot_and_survives_a_reload() {
+        let _guard = crate::CONFIG_SWAP_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let saved = config::CONFIG.load_full();
+
+        let install = |key: &str| {
+            let mut cfg = config::Config::init().unwrap();
+            cfg.synthetics.encryption_key = key.to_owned();
+            config::CONFIG.store(std::sync::Arc::new(cfg));
+        };
+
+        install("first-key");
+        let pinned = configured_key().to_owned();
+
+        // A reload lands a different key; the pinned one must not move.
+        install("second-key-after-reload");
+        assert_eq!(configured_key(), pinned);
+
+        config::CONFIG.store(saved);
+    }
+
+    #[test]
+    fn derivation_is_deterministic() {
+        assert_eq!(
+            derive_dek(b"shared-secret", "acme"),
+            derive_dek(b"shared-secret", "acme")
+        );
+    }
+
+    #[test]
+    fn derivation_fills_the_64_bytes_aes_256_siv_needs() {
+        let out = derive_dek(b"shared-secret", "acme");
+        assert_eq!(out.len(), 64);
+        // Two HMAC-SHA256 blocks, so the halves must not be one block repeated.
+        assert_ne!(out[..32], out[32..]);
+    }
+
+    #[test]
+    fn each_org_gets_its_own_key() {
+        assert_ne!(
+            derive_dek(b"shared-secret", "acme"),
+            derive_dek(b"shared-secret", "other")
+        );
+    }
+
+    #[test]
+    fn a_different_configured_key_derives_a_different_dek() {
+        assert_ne!(
+            derive_dek(b"secret-a", "acme"),
+            derive_dek(b"secret-b", "acme")
+        );
+    }
 }

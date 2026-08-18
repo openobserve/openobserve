@@ -29,7 +29,7 @@ use config::{
 use infra::{
     db::ORM_CLIENT,
     table::{
-        cipher, org_ingestion_tokens, synthetics_checks, synthetics_jobs, synthetics_locations,
+        org_ingestion_tokens, synthetics_checks, synthetics_jobs, synthetics_locations,
         synthetics_runs,
     },
 };
@@ -619,9 +619,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
     let mut env_inject = HashMap::new();
 
     if needs_dek {
-        let dek = cipher::get_dek(&check.org_id)
-            .await
-            .map_err(|e| anyhow::anyhow!("DEK fetch failed: {e}"))?;
+        let dek = crate::service::synthetics_dek(&check.org_id).await?;
 
         if let Some(ref auth) = synthetic.auth {
             env_inject.extend(build_env_map(auth, &dek)?);

@@ -23,6 +23,7 @@ aws-sdk-lambda.workspace = true
 chrono.workspace = true
 config.workspace = true
 dashmap.workspace = true
+hmac.workspace = true
 infra.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
@@ -30,6 +31,7 @@ o2_openfga = { workspace = true, optional = true }
 reqwest.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
+sha2.workspace = true
 serde_json.workspace = true
 svix-ksuid.workspace = true
 tokio.workspace = true
