@@ -2722,6 +2722,40 @@ describe("TraceDetails", () => {
 
       expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
     });
+
+    // Regression: the pending tab was only cleared inside the watcher's spanMap
+    // guard. Re-clicking a marker on the already-selected span does not change
+    // selectedSpanId, so the watcher never fired and the flag survived to
+    // hijack the next ordinary selection.
+    it("should not let a stale marker request hijack the next span click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const otherSpanId = tracesMockData.tracesDetails.traceSpans.hits[1].span_id;
+
+      // Select the span, then click a marker on that same span — no id change.
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.onSelectSpanEvent({ spanId, eventIndex: 0 });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.sidebarActiveTab).toBe("events");
+
+      // A later, unrelated span click must land on the default tab.
+      wrapper.vm.updateSelectedSpan(otherSpanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+
+    it("should drain a marker request aimed at a span that is not loaded", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.onSelectSpanEvent({ spanId: "span-not-in-map", eventIndex: 0 });
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
   });
 
   describe("effectiveSpanId", () => {

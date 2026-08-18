@@ -2095,7 +2095,11 @@ export default defineComponent({
 
     /**
      * A sidebar tab requested explicitly by an interaction, as opposed to the
-     * default the watcher below picks.
+     * default the watcher below picks. Keyed to the span it was requested for
+     * and drained on every watcher fire, so a request that is never consumed
+     * (e.g. re-clicking a marker on the already-selected span, which does not
+     * change `selectedSpanId` and so never reaches this watcher) cannot
+     * outlive the selection it belonged to and hijack a later, unrelated one.
      *
      * The watcher runs on the flush after `selectedSpanId` changes, i.e. after
      * the handler that changed it has returned — so a handler cannot simply
@@ -2103,22 +2107,37 @@ export default defineComponent({
      * here removes the ordering question entirely: whichever runs first, the
      * explicit tab wins and the default is skipped.
      */
-    const pendingSidebarTab = ref<string | null>(null);
+    const pendingSidebarTab = ref<{ spanId: string; tab: string } | null>(null);
 
     // Set the default sidebar tab on the first span selection,
     // and re-evaluate when the current tab no longer exists for the new span
     // (e.g. moving from LLM span with "preview" to a non-LLM span).
     watch(selectedSpanId, (newSpanId, oldSpanId) => {
-      if (newSpanId && spanMap.value[newSpanId]) {
-        if (pendingSidebarTab.value) {
-          sidebarActiveTab.value = pendingSidebarTab.value;
-          pendingSidebarTab.value = null;
-          return;
-        }
-        const canPreview = hasTracePreview(spanMap.value[newSpanId]);
-        if (!oldSpanId || (sidebarActiveTab.value === "preview" && !canPreview)) {
-          sidebarActiveTab.value = canPreview ? "preview" : "attributes";
-        }
+      // Drain first, always: a request that was never consumed must not
+      // survive to hijack the next selection.
+      const pending = pendingSidebarTab.value;
+      pendingSidebarTab.value = null;
+
+      if (!newSpanId || !spanMap.value[newSpanId]) return;
+
+      if (pending && pending.spanId === newSpanId) {
+        sidebarActiveTab.value = pending.tab;
+        return;
+      }
+
+      // "events" is only ever entered via an explicit marker click (routed
+      // through `pending` above) and is scoped to the span that triggered it
+      // — it is not a general-purpose tab like "attributes". So an ordinary
+      // navigation away from that span, with no new request for this span,
+      // must fall back to the default too, the same as leaving "preview" for
+      // a span that cannot preview.
+      const canPreview = hasTracePreview(spanMap.value[newSpanId]);
+      if (
+        !oldSpanId ||
+        sidebarActiveTab.value === "events" ||
+        (sidebarActiveTab.value === "preview" && !canPreview)
+      ) {
+        sidebarActiveTab.value = canPreview ? "preview" : "attributes";
       }
     });
 
@@ -2808,7 +2827,7 @@ export default defineComponent({
     const onSelectSpanEvent = (payload: { spanId: string; eventIndex: number }) => {
       // Record the tab before the selection, so the watcher this triggers sees
       // the request rather than overwriting it with the default.
-      pendingSidebarTab.value = "events";
+      pendingSidebarTab.value = { spanId: payload.spanId, tab: "events" };
       updateSelectedSpan(payload.spanId);
       sidebarActiveTab.value = "events";
       // Re-assign through null so clicking the same marker twice re-triggers
