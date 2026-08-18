@@ -33,12 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :ends-at="myShift.endsAt"
         :other-teams="myShift.otherTeams"
       />
+      <!-- A filter, not a destination. "What is mine" is this same list
+           narrowed; leaving for another screen to ask it threw away every other
+           filter the reader had set and answered from a different dataset.
+           Hidden when we do not know who is signed in, rather than left as a
+           toggle that can only ever empty the table. -->
       <OButton
+        v-if="viewerEmail"
         variant="outline"
         size="sm"
         icon-left="person"
+        :active="mineOnly"
+        :aria-pressed="mineOnly"
         data-test="oncall-responses-mine-btn"
-        @click="goTo('onCallMine')"
+        @click="mineOnly = !mineOnly"
       >
         {{ t("oncall.myOnCallNav") }}
       </OButton>
@@ -660,6 +668,7 @@ const search = ref("");
 const teamFilter = ref("all");
 const priorityFilter = ref("all");
 const stateFilter = ref<string | null>(null);
+const mineOnly = ref(false);
 const selectedIds = ref<string[]>([]);
 const grouped = ref(true);
 const includeResolved = ref(false);
@@ -704,7 +713,8 @@ const isFiltered = computed(
     !!search.value ||
     teamFilter.value !== "all" ||
     priorityFilter.value !== "all" ||
-    stateFilter.value !== null,
+    stateFilter.value !== null ||
+    mineScope.value,
 );
 
 const showChecklist = computed(
@@ -805,12 +815,42 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   },
 ]);
 
+/// Teams whose CURRENT rotation resolves to the viewer, from the same slots the
+/// engine would page. Membership is not the question: a member who is not on
+/// the rotation right now would not be rung, so their team's pages are not
+/// theirs to answer.
+const myTeamIds = computed(() => {
+  const ids = new Set<string>();
+  if (!viewerEmail.value) return ids;
+  for (const [teamId, slots] of Object.entries(slotsByTeam.value)) {
+    if (slots.some((slot) => slot.user_email.toLowerCase() === viewerEmail.value)) {
+      ids.add(teamId);
+    }
+  }
+  return ids;
+});
+
+/// Inert until we know who is signed in — otherwise a stale toggle would hide
+/// every row with no visible control to turn it off.
+const mineScope = computed(() => mineOnly.value && !!viewerEmail.value);
+
+/// A page is the viewer's if their shift would have taken it, or if they already
+/// did. The acknowledgement outlives the shift: whoever claimed it still owns it
+/// after handover.
+function isMine(record: OnCallResponse): boolean {
+  return (
+    myTeamIds.value.has(record.team_id) ||
+    (!!record.acked_by && record.acked_by.toLowerCase() === viewerEmail.value)
+  );
+}
+
 // Everything except the state facet, so the strip counts what the rest of the
 // filters allow — a tile that changed its own number as you clicked it would
 // be unreadable.
 const scopedResponses = computed(() => {
   const q = search.value.trim().toLowerCase();
   return responses.value.filter((row) => {
+    if (mineScope.value && !isMine(row)) return false;
     if (teamFilter.value !== "all" && row.team_id !== teamFilter.value) return false;
     if (priorityFilter.value !== "all" && String(row.priority) !== priorityFilter.value) {
       return false;
@@ -1457,6 +1497,7 @@ function onEmptyAction(id?: string) {
     teamFilter.value = "all";
     priorityFilter.value = "all";
     stateFilter.value = null;
+    mineOnly.value = false;
   }
 }
 

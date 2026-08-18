@@ -104,7 +104,11 @@ const stubs = {
     template: "<button @click=\"$emit('select')\"><slot /></button>",
   },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
-  OEmptyState: { name: "OEmptyState", props: ["preset"], template: "<div :data-preset='preset' />" },
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["preset", "filtered"],
+    template: "<div :data-preset='preset' />",
+  },
   OSelect: { name: "OSelect", props: ["options", "disabled", "width"], template: "<select />" },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
   OTooltip: { name: "OTooltip", template: "<span />" },
@@ -766,14 +770,116 @@ describe("OnCallResponses", () => {
     });
   });
 
-  it("always offers a route to Teams and to My on-call", async () => {
+  it("always offers a route to Teams", async () => {
     const wrapper = await withPages([page()]);
 
     await wrapper.find('[data-test="oncall-responses-teams-btn"]').trigger("click");
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallTeams" }));
+  });
 
-    await wrapper.find('[data-test="oncall-responses-mine-btn"]').trigger("click");
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallMine" }));
+  /// "My on-call" narrows THIS list. It used to navigate, which threw away
+  /// every other filter the reader had set and answered the question from a
+  /// different dataset on a different screen.
+  describe("my on-call", () => {
+    const mineBtn = '[data-test="oncall-responses-mine-btn"]';
+
+    async function withMyShift(rows: Record<string, unknown>[]) {
+      service.whoIsOnCall.mockImplementation(({ team_id }: any) =>
+        Promise.resolve({
+          data: team_id === "team_1" ? [{ rotation: "Primary", user_email: "example@gmail.com" }] : [],
+        } as any),
+      );
+      return withPages(rows);
+    }
+
+    it("filters in place instead of navigating", async () => {
+      const wrapper = await withMyShift([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_other" }, "al_pay"),
+      ]);
+
+      await wrapper.find(mineBtn).trigger("click");
+      await flushPromises();
+
+      expect(push).not.toHaveBeenCalled();
+      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+      expect(data.map((row) => row.latest.id)).toEqual(["a"]);
+    });
+
+    /// The strip sits above the rows and claims to describe them, so the scope
+    /// has to apply before the counts are taken.
+    it("counts the narrowed list, not the whole one", async () => {
+      const wrapper = await withMyShift([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_other" }, "al_pay"),
+      ]);
+
+      expect(stats(wrapper).all).toBe(2);
+      await wrapper.find(mineBtn).trigger("click");
+      await flushPromises();
+      expect(stats(wrapper).all).toBe(1);
+    });
+
+    /// The acknowledgement outlives the shift: whoever claimed a page still
+    /// owns it after handover, even on a team they are no longer on.
+    it("keeps a page the viewer acknowledged on another team", async () => {
+      const wrapper = await withMyShift([
+        page(
+          { id: "b", team_id: "team_other", acked_by: "example@gmail.com", state: "acknowledged" },
+          "al_pay",
+        ),
+      ]);
+
+      await wrapper.find(mineBtn).trigger("click");
+      await flushPromises();
+
+      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+      expect(data.map((row) => row.latest.id)).toEqual(["b"]);
+    });
+
+    it("is a toggle, so the second click gives the full list back", async () => {
+      const wrapper = await withMyShift([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_other" }, "al_pay"),
+      ]);
+      const rowIds = () =>
+        (wrapper.findComponent({ name: "OTable" }).props("data") as any[]).map(
+          (row) => row.latest.id,
+        );
+
+      await wrapper.find(mineBtn).trigger("click");
+      await flushPromises();
+      expect(rowIds()).toEqual(["a"]);
+
+      await wrapper.find(mineBtn).trigger("click");
+      await flushPromises();
+      expect(rowIds()).toEqual(["a", "b"]);
+    });
+
+    /// A toggle that can only ever empty the table is worse than no toggle.
+    it("is absent when we do not know who is signed in", async () => {
+      const original = store.state.userInfo;
+      store.state.userInfo = {};
+      try {
+        const wrapper = await withPages([page()]);
+        expect(wrapper.find(mineBtn).exists()).toBe(false);
+      } finally {
+        store.state.userInfo = original;
+      }
+    });
+
+    /// Nothing of yours open is a real answer; "no pages at all" is not.
+    it("offers to clear itself when it empties the list", async () => {
+      const wrapper = await withMyShift([page({ id: "b", team_id: "team_other" }, "al_pay")]);
+
+      await wrapper.find(mineBtn).trigger("click");
+      await flushPromises();
+
+      const empty = wrapper
+        .findAllComponents({ name: "OEmptyState" })
+        .find((node) => node.props("preset") === "no-oncall-responses");
+      expect(empty?.props("filtered")).toBe(true);
+    });
   });
 
   /// During an incident the list IS the work surface. Opening 200 pages one at
