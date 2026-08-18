@@ -1128,6 +1128,10 @@ pub fn service_routes() -> Router {
                     post(experiments::retry_experiment_slot),
                 )
                 .route(
+                    "/{org_id}/experiments/{experiment_id}/slots",
+                    get(experiments::list_experiment_slots),
+                )
+                .route(
                     "/{org_id}/experiments/{experiment_id}/records",
                     post(experiments::submit_experiment_records),
                 )
