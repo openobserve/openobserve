@@ -157,12 +157,81 @@ describe("OnCallTeamPulse", () => {
         ],
       },
     });
-    const text = wrapper.text();
-    expect(text).toContain("Next on call");
-    // cy holds the secondary SLOT and this rung does not name it, so cy must
-    // not appear as the backup.
-    expect(text).not.toContain("cy@o2.ai");
-    expect(text).toContain("bo@o2.ai");
+    // Both are true and they are different people, so both are shown — each
+    // labelled by what it is. What must never happen is one word covering
+    // both: the slot row says "secondary", the rung row says what it targets.
+    const slotRow = wrapper.find('[data-test="oncall-pulse-secondary-slot"]');
+    expect(slotRow.text()).toContain("cy@o2.ai");
+    expect(slotRow.text()).toContain("secondary");
+    const rungRow = wrapper.find('[data-test="oncall-pulse-next"]');
+    expect(wrapper.text()).toContain("Next on call");
+    expect(rungRow.exists()).toBe(true);
+    expect(wrapper.text()).toContain("bo@o2.ai");
+  });
+
+  /// The shipped default policy's second rung is `whole_team`, which names no
+  /// individual — and reading only that rung told EVERY stock team "Nobody
+  /// backs this rotation up" while `/on-call` was returning a staffed
+  /// secondary right underneath it.
+  it("reads the staffed secondary slot, not just the ladder rung", () => {
+    const wrapper = render({
+      slots: [
+        { slot: "primary", rotation: "Primary", user_email: "ana@o2.ai" },
+        { slot: "secondary", rotation: "Secondary", user_email: "cy@o2.ai" },
+      ],
+      policy: {
+        rungs: [
+          {
+            priority: 1,
+            steps: [
+              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "whole_team" }] },
+            ],
+            channels: [],
+          },
+        ],
+      },
+    });
+    expect(wrapper.find('[data-test="oncall-pulse-no-backup"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-pulse-secondary-slot"]').text()).toContain("cy@o2.ai");
+  });
+
+  /// A rung that wakes a pool is a backup with no single face. Naming the pool
+  /// is the answer; the empty state would be a lie.
+  it("names the pool when the rung reaches everybody", () => {
+    const wrapper = render({
+      slots: [{ slot: "primary", rotation: "Primary", user_email: "ana@o2.ai" }],
+      policy: {
+        rungs: [
+          {
+            priority: 1,
+            steps: [
+              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "whole_team" }] },
+            ],
+            channels: [],
+          },
+        ],
+      },
+    });
+    expect(wrapper.find('[data-test="oncall-pulse-no-backup"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-pulse-backup-group"]').text()).toContain(
+      "The whole team",
+    );
+  });
+
+  /// And when there really is nothing — one person, one rung — the warning
+  /// still fires. It was never wrong, only over-eager.
+  it("still warns when nothing backs the rotation", () => {
+    const wrapper = render({
+      slots: [{ slot: "primary", rotation: "Primary", user_email: "ana@o2.ai" }],
+      policy: {
+        rungs: [
+          { priority: 1, steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" }] }], channels: [] },
+        ],
+      },
+    });
+    expect(wrapper.find('[data-test="oncall-pulse-no-backup"]').exists()).toBe(true);
   });
 
   /// One member list; the secondary is DERIVED from it. The offset says which

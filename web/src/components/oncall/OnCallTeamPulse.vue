@@ -75,6 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="section">{{ t("oncall.teamBackingUp") }}</OText>
       </span>
 
+      <!-- A staffed second pool, on call at this instant. Named first because
+           it is a fact about the schedule, where the rung below it is a fact
+           about the ladder — and on a two-slot team they are different people. -->
+      <span
+        v-if="secondary"
+        class="flex flex-wrap items-center gap-2"
+        data-test="oncall-pulse-secondary-slot"
+      >
+        <OUserCell :value="secondary.user_email" />
+        <OTag variant="default-soft" size="sm">{{ raw(secondary.slot ?? "") }}</OTag>
+        <span class="text-text-secondary text-xs">{{ raw(secondary.rotation) }}</span>
+      </span>
+
       <template v-if="backupWho">
         <span class="flex flex-wrap items-center gap-2">
           <OUserCell :value="backupWho" />
@@ -96,9 +109,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ nextPrimaryLine }}
         </p>
       </template>
+      <!-- The rung wakes a pool, not a person. Saying which pool is the whole
+           answer; an avatar would misrepresent how many people it wakes. -->
+      <p
+        v-else-if="backupIsGroup"
+        class="text-text-body text-sm"
+        data-test="oncall-pulse-backup-group"
+      >
+        {{ backupLine }}
+      </p>
       <!-- A one-person rotation has no next: naming the same person as backup
            would suggest a second pair of hands that does not exist. -->
-      <p v-else class="text-status-warning-text text-sm" data-test="oncall-pulse-no-backup">
+      <p
+        v-else-if="nobodyBacking"
+        class="text-status-warning-text text-sm"
+        data-test="oncall-pulse-no-backup"
+      >
         {{ t("oncall.teamNobodyBacking") }}
       </p>
     </section>
@@ -396,11 +422,45 @@ const backupWho = computed<string | null>(() => {
   if (target.kind === "user") return target.email;
   if (target.kind === "next_on_call") return holder.value?.next_user_email ?? null;
   if (target.kind === "on_call_now") return holder.value?.user_email ?? null;
+  if (target.kind === "on_call_in_slot" || target.kind === "next_on_call_in_slot") {
+    const named = props.slots.find((slot) => sameSlot(slot.slot, target.slot));
+    return (
+      (target.kind === "on_call_in_slot" ? named?.user_email : named?.next_user_email) ?? null
+    );
+  }
   // whole_team / everyone_on_schedule reach a room, not a person — the ladder
   // on the Escalation tab names them, and one avatar here would misrepresent
   // how many people that rung wakes.
   return null;
 });
+
+/// A staffed **secondary slot** — a second pool that is on call right now,
+/// resolved by the same `/on-call` call that names the primary.
+///
+/// This is the fact the panel was missing. It read the P1 ladder's second rung
+/// and nothing else, and the shipped default policy's rung 2 is `whole_team`,
+/// which names no individual — so every team with the stock policy was told
+/// "Nobody backs this rotation up" while `/on-call` was plainly returning a
+/// staffed secondary underneath it.
+const secondary = computed<OnCallSlot | null>(
+  () =>
+    props.slots.find(
+      (slot) => !sameSlot(slot.slot, DEFAULT_SLOT) && !!slot.user_email,
+    ) ?? null,
+);
+
+/// The rung reaches a pool rather than a person — a real backup with no single
+/// face to put on it. Naming the target is honest; an empty state is not.
+const backupIsGroup = computed(() => {
+  const kind = backupTarget.value?.target?.kind;
+  return kind === "whole_team" || kind === "everyone_on_schedule" || kind === "everyone_in_slot";
+});
+
+/// Only when there is genuinely nothing: no second pool on call, and no second
+/// rung to wake anybody — a one-person rotation with a one-rung ladder.
+const nobodyBacking = computed(
+  () => !secondary.value && !backupWho.value && !backupIsGroup.value,
+);
 
 const nextPrimaryLine = computed<I18nText>(() => {
   const current = rotation.value;
