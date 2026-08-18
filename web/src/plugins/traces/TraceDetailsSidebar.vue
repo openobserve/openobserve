@@ -1444,12 +1444,51 @@ export default defineComponent({
         : t("traces.eventClusterAriaLabelPlural", { count, errors });
     };
 
+    /**
+     * Watcher armed only while a focus request is waiting for its table.
+     *
+     * The Events panel is `v-if` gated, so on a marker click the table does not
+     * exist yet and `getRow` returns nothing. Rather than guess how many ticks
+     * the mount takes, wait for the ref to fill in — and stop watching the
+     * moment it does, so no watcher exists while nothing is pending.
+     */
+    let stopFocusWatch: (() => void) | null = null;
+
+    const focusEvent = (index: number) => {
+      stopFocusWatch?.();
+      stopFocusWatch = null;
+      selectedEventIndex.value = index;
+
+      const apply = () => {
+        const row = eventsTableRef.value?.table?.getRow?.(String(index));
+        if (!row) return false;
+        row.toggleExpanded?.(true);
+        return true;
+      };
+
+      if (apply()) return;
+
+      stopFocusWatch = watch(
+        eventsTableRef,
+        () => {
+          if (!apply()) return;
+          stopFocusWatch?.();
+          stopFocusWatch = null;
+        },
+        { flush: "post" },
+      );
+    };
+
+    // The watcher above is created inside `focusEvent`, i.e. after setup's
+    // synchronous run, so Vue's effect scope does not dispose it for us.
+    onUnmounted(() => {
+      stopFocusWatch?.();
+    });
+
     // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
     // events keep that index, so a marker maps straight onto its table row.
     const onEventMarkerClick = (marker: SpanEventMarker) => {
-      selectedEventIndex.value = marker.index;
-      const row = eventsTableRef.value?.table?.getRow?.(String(marker.index));
-      row?.toggleExpanded?.(true);
+      focusEvent(marker.index);
     };
 
     // The highlight names a row of *this* span's events table. Carrying it to
@@ -1467,9 +1506,7 @@ export default defineComponent({
       () => props.focusEventIndex,
       (index) => {
         if (index === null || index === undefined) return;
-        selectedEventIndex.value = index;
-        const row = eventsTableRef.value?.table?.getRow?.(String(index));
-        row?.toggleExpanded?.(true);
+        focusEvent(index);
       },
     );
 
@@ -2198,6 +2235,7 @@ export default defineComponent({
       eventsTableColumns,
       eventsRowsWithKey,
       eventsTableRef,
+      focusEvent,
       spanEventMarkers,
       selectedEventIndex,
       eventMarkerLabel,
