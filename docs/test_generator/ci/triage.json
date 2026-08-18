@@ -1,0 +1,27 @@
+{
+  "feature_slug": "online-evals-preview-window",
+  "feature_title": "Online Evals Job Preview Window (24h → 1h)",
+  "area": "Traces",
+  "edition": "enterprise",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "onlineEvalsPreviewWindow.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/onlineEvalsPreviewWindow.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.ts",
+    "web/src/enterprise/components/onlineEvals/forms/job/JobPreviewPanel.spec.ts",
+    "web/src/locales/languages/en-US.json"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Three of four changed paths live under web/src/enterprise/components/onlineEvals/ (an enterprise-owned UI layer). The only non-enterprise path is the shared locale file web/src/locales/languages/en-US.json, but its changed strings are for the enterprise onlineEvals job-preview feature, not an OSS feature. No OSS backend or OSS-only UI paths are touched, so the change is classified enterprise.",
+    "skip": "Not skipping. The trigger comment is empty and no tests-added label was passed, so there is no explicit opt-out. The change is not docs-only or CI-only: it alters a user-facing preview (matched-targets count window changed from 24h to 1h, plus the visible 'last 1h' label), so it is a real user-facing behavior change.",
+    "e2e": "E2E is warranted because the online evals job form's JobPreviewPanel is a user-facing UI flow whose behavior changed: the matched-targets count now computes over a rolling one-hour window instead of 24 hours, and the displayed label changes from 'last 24h' to 'last 1h'. A user creating an online eval job will see and rely on this changed output.",
+    "area": "Online evals is LLM observability surfaced as a tab in Traces (per the docs/all-hands recap) and the changed composable imports from @/plugins/traces/. The closest existing product area with sibling specs is Traces, which the enterprise overlay (ci_matrix.ent.json) already appends to.",
+    "group": "The Traces matrix shard is the closest existing testfolder group for this feature. The enterprise overlay already appends a Traces spec (service-graph.spec.js), so a new online-evals spec naturally joins the same shard.",
+    "existing_tests": "No Playwright E2E specs under tests/ui-testing/playwright-tests/ are changed in the diff. The changed useJobMatchedTargets.spec.ts and JobPreviewPanel.spec.ts files are Vitest unit tests (web/src/**/*.spec.ts), which are not E2E coverage and do not count as existing coverage for the new behavior."
+  }
+}

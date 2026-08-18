@@ -1,0 +1,12 @@
+[
+  {
+    "title": "should show \"last 1h\" (not \"last 24h\") matched-span preview after selecting a stream",
+    "action": "new",
+    "verifies": "the job preview shows the span-scope 'last 1h' suffix (and never 'last 24h') after selecting the default stream"
+  },
+  {
+    "title": "should update matched-target terminology and \"last 1h\" suffix when switching target scope",
+    "action": "new",
+    "verifies": "switching target scope span→trace→session updates the preview title and 'last 1h' suffix per scope"
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "feature_slug": "online-evals-preview-window",
+  "feature_title": "Online Evals Job Preview Window (24h → 1h)",
+  "area": "Traces",
+  "edition": "enterprise",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "onlineEvalsPreviewWindow.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/onlineEvalsPreviewWindow.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.ts",
+    "web/src/enterprise/components/onlineEvals/forms/job/JobPreviewPanel.spec.ts",
+    "web/src/locales/languages/en-US.json"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

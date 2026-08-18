@@ -1,0 +1,107 @@
+===== COMPLETE LIST OF CHANGED FILES (4 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.spec.ts
+web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.ts
+web/src/enterprise/components/onlineEvals/forms/job/JobPreviewPanel.spec.ts
+web/src/locales/languages/en-US.json
+===== END CHANGED FILES =====
+
+diff --git a/web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.spec.ts b/web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.spec.ts
+index a609a455384..c02ec284eef 100644
+--- a/web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.spec.ts
++++ b/web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.spec.ts
+@@ -1,5 +1,16 @@
+ import { describe, expect, it } from "vitest";
+-import { buildJobMatchedTargetsSql } from "./useJobMatchedTargets";
++import { buildJobMatchedTargetsSql, buildJobMatchedTargetsTimeRange } from "./useJobMatchedTargets";
++
++describe("buildJobMatchedTargetsTimeRange", () => {
++  it("builds a rolling one-hour preview window", () => {
++    const nowMs = Date.UTC(2026, 7, 18, 8, 0, 0);
++
++    const range = buildJobMatchedTargetsTimeRange(nowMs);
++
++    expect(range.endUs - range.startUs).toBe(60 * 60 * 1_000_000);
++    expect(range.endUs).toBe(nowMs * 1000);
++  });
++});
+ 
+ describe("buildJobMatchedTargetsSql", () => {
+   it("counts matching rows for span scope", () => {
+diff --git a/web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.ts b/web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.ts
+index 3be0da945d6..2f88536af77 100644
+--- a/web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.ts
++++ b/web/src/enterprise/components/onlineEvals/composables/useJobMatchedTargets.ts
+@@ -7,9 +7,16 @@ import { ref, watch, onUnmounted, type Ref } from "vue";
+ import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
+ import type { EvalTargetScope } from "@/services/online-evals.service";
+ 
+-const WINDOW_MS = 24 * 60 * 60 * 1000;
++const WINDOW_MS = 60 * 60 * 1000;
+ const DEBOUNCE_MS = 400;
+ 
++export function buildJobMatchedTargetsTimeRange(nowMs = Date.now()) {
++  return {
++    startUs: (nowMs - WINDOW_MS) * 1000,
++    endUs: nowMs * 1000,
++  };
++}
++
+ /** Double-quote a SQL identifier so unusual stream names remain valid. */
+ function quoteIdent(name: string): string {
+   return `"${name.replace(/"/g, '""')}"`;
+@@ -68,8 +75,7 @@ export function useJobMatchedTargets(
+     }
+ 
+     const sql = buildJobMatchedTargetsSql(stream.value, whereClause.value, targetScope.value);
+-    const endUs = Date.now() * 1000;
+-    const startUs = (Date.now() - WINDOW_MS) * 1000;
++    const { startUs, endUs } = buildJobMatchedTargetsTimeRange();
+     isLoading.value = true;
+     try {
+       const hits = await executeQuery(sql, startUs, endUs, "traces");
+diff --git a/web/src/enterprise/components/onlineEvals/forms/job/JobPreviewPanel.spec.ts b/web/src/enterprise/components/onlineEvals/forms/job/JobPreviewPanel.spec.ts
+index b2f4ae47863..370ae28de02 100644
+--- a/web/src/enterprise/components/onlineEvals/forms/job/JobPreviewPanel.spec.ts
++++ b/web/src/enterprise/components/onlineEvals/forms/job/JobPreviewPanel.spec.ts
+@@ -39,9 +39,9 @@ function mountPreview(targetScope: EvalTargetScope) {
+ 
+ describe("JobPreviewPanel", () => {
+   it.each([
+-    ["span", "Matched Spans", "spans matched · last 24h"],
+-    ["trace", "Matched Traces", "traces matched · last 24h"],
+-    ["session", "Matched Sessions", "sessions matched · last 24h"],
++    ["span", "Matched Spans", "spans matched · last 1h"],
++    ["trace", "Matched Traces", "traces matched · last 1h"],
++    ["session", "Matched Sessions", "sessions matched · last 1h"],
+   ] as const)("uses %s target terminology", (targetScope, title, matchedSuffix) => {
+     const text = mountPreview(targetScope).find('[data-test="job-preview-matched-targets"]').text();
+ 
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 2a171164ed8..15a779d066c 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -11512,19 +11512,19 @@
+           "span": {
+             "title": "Matched Spans",
+             "hint": "Once you've picked a stream and filter, this panel will show how many spans your job will match.",
+-            "matchedSuffix": "spans matched · last 24h",
++            "matchedSuffix": "spans matched · last 1h",
+             "matchedLoading": "Counting matched spans…"
+           },
+           "trace": {
+             "title": "Matched Traces",
+             "hint": "Once you've picked a stream and filter, this panel will show how many traces your job will match.",
+-            "matchedSuffix": "traces matched · last 24h",
++            "matchedSuffix": "traces matched · last 1h",
+             "matchedLoading": "Counting matched traces…"
+           },
+           "session": {
+             "title": "Matched Sessions",
+             "hint": "Once you've picked a stream and filter, this panel will show how many sessions your job will match.",
+-            "matchedSuffix": "sessions matched · last 24h",
++            "matchedSuffix": "sessions matched · last 1h",
+             "matchedLoading": "Counting matched sessions…"
+           }
+         },
