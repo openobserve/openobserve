@@ -31,6 +31,7 @@ import {
   formatModelParameters,
   truncateSessionId,
 } from "./llmUtils";
+import { gt } from "@/types/i18n";
 
 // ---------------------------------------------------------------------------
 // isLLMTrace
@@ -652,26 +653,26 @@ describe("extractLLMData", () => {
 // ---------------------------------------------------------------------------
 describe("formatModelParameters", () => {
   it("returns 'No parameters' for null", () => {
-    expect(formatModelParameters(null as any)).toBe("No parameters");
+    expect(formatModelParameters(null as any, gt)).toBe("No parameters");
   });
 
   it("returns 'No parameters' for empty object", () => {
-    expect(formatModelParameters({})).toBe("No parameters");
+    expect(formatModelParameters({}, gt)).toBe("No parameters");
   });
 
   it("formats a single parameter", () => {
-    expect(formatModelParameters({ temperature: 0.7 })).toBe("temperature: 0.7");
+    expect(formatModelParameters({ temperature: 0.7 }, gt)).toBe("temperature: 0.7");
   });
 
   it("formats multiple parameters with newlines", () => {
-    const result = formatModelParameters({ temperature: 0.7, max_tokens: 256 });
+    const result = formatModelParameters({ temperature: 0.7, max_tokens: 256 }, gt);
     expect(result).toContain("temperature: 0.7");
     expect(result).toContain("max_tokens: 256");
     expect(result.split("\n")).toHaveLength(2);
   });
 
   it("JSON-serialises complex values", () => {
-    const result = formatModelParameters({ stop: ["STOP", "END"] });
+    const result = formatModelParameters({ stop: ["STOP", "END"] }, gt);
     expect(result).toContain('["STOP","END"]');
   });
 });

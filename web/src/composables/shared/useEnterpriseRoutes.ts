@@ -101,7 +101,7 @@ const useEnterpriseRoutes = () => {
           path: "users",
           name: "users",
           meta: {
-            title: "Users",
+            titleKey: "iam.basicUsers",
           },
           component: Users,
           beforeEnter(to: any, from: any, next: any) {
@@ -112,7 +112,7 @@ const useEnterpriseRoutes = () => {
           path: "ingestionTokens",
           name: "ingestionTokens",
           meta: {
-            title: "Ingestion Tokens",
+            titleKey: "iam.ingestionTokens",
           },
           component: () => import("@/components/iam/IngestionTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -123,7 +123,7 @@ const useEnterpriseRoutes = () => {
           path: "syntheticsTokens",
           name: "syntheticsTokens",
           meta: {
-            title: "Synthetics Tokens",
+            titleKey: "iam.syntheticsTokens",
           },
           component: () => import("@/components/iam/SyntheticsTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -134,7 +134,7 @@ const useEnterpriseRoutes = () => {
           path: "serviceAccounts",
           name: "serviceAccounts",
           meta: {
-            title: "Service Accounts",
+            titleKey: "iam.serviceAccounts",
           },
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
@@ -156,7 +156,7 @@ const useEnterpriseRoutes = () => {
           path: "organizations",
           name: "organizations",
           meta: {
-            title: "Organizations",
+            titleKey: "iam.organizations",
           },
           component: Organizations,
           beforeEnter(to: any, from: any, next: any) {
@@ -172,7 +172,7 @@ const useEnterpriseRoutes = () => {
         {
           path: "mcpServer",
           name: "mcpServer",
-          meta: { title: "MCP Server" },
+          meta: { titleKey: "iam.mcpServerLabel" },
           component: () => import("@/components/iam/McpServer.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -189,7 +189,7 @@ const useEnterpriseRoutes = () => {
       path: "synthetics",
       name: "synthetics",
       component: () => import("@/views/SyntheticMonitoring.vue"),
-      meta: { title: "Synthetics" },
+      meta: { titleKey: "menu.synthetic" },
       beforeEnter(to: any, from: any, next: any) {
         syntheticsRouteGuard(to, from, next);
       },
@@ -200,7 +200,7 @@ const useEnterpriseRoutes = () => {
         path: "synthetics/add",
         name: "synthetics-add",
         component: () => import("@/views/synthetics/CreateCheck.vue"),
-        meta: { title: "Add Check" },
+        meta: { titleKey: "routeTitles.addCheck" },
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },
@@ -209,7 +209,7 @@ const useEnterpriseRoutes = () => {
         path: "synthetics/edit/:id",
         name: "synthetics-edit",
         component: () => import("@/views/synthetics/CreateCheck.vue"),
-        meta: { title: "Edit Check" },
+        meta: { titleKey: "synthetics.results.editCheck" },
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },
@@ -218,7 +218,7 @@ const useEnterpriseRoutes = () => {
         path: "synthetic/private-locations/:id",
         name: "synthetic-private-location",
         component: () => import("@/views/synthetics/PrivateLocationDetail.vue"),
-        meta: { title: "Private Location" },
+        meta: { titleKey: "synthetics.privateLocations.detail.title" },
         beforeEnter(to: any, from: any, next: any) {
           privateLocationRouteGuard(to, from, next);
         },
@@ -227,7 +227,7 @@ const useEnterpriseRoutes = () => {
         path: "synthetics/:id/results",
         name: "synthetic-monitor-results",
         component: () => import("@/views/synthetics/MonitorResults.vue"),
-        meta: { title: "Monitor Results" },
+        meta: { titleKey: "synthetics.results.title" },
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },
@@ -236,7 +236,7 @@ const useEnterpriseRoutes = () => {
         path: "synthetics/:id/results/run/:runId/:executionId",
         name: "synthetics-run-detail",
         component: () => import("@/views/synthetics/RunDetail.vue"),
-        meta: { title: "Run Detail" },
+        meta: { titleKey: "synthetics.runDetail.title" },
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },
@@ -249,7 +249,7 @@ const useEnterpriseRoutes = () => {
         name: "incidentList",
         component: IncidentList,
         meta: {
-          title: "Incidents",
+          titleKey: "menu.incidents",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -260,7 +260,7 @@ const useEnterpriseRoutes = () => {
         name: "incidentDetail",
         component: () => import("@/components/alerts/IncidentDetailDrawer.vue"),
         meta: {
-          title: "Incident Detail",
+          titleKey: "routeTitles.incidentDetail",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -284,7 +284,7 @@ const useEnterpriseRoutes = () => {
       name: "workflows",
       component: WorkflowsList,
       meta: {
-        title: "Workflows",
+        titleKey: "menu.workflows",
       },
       beforeEnter(to: any, from: any, next: any) {
         workflowsRouteGuard(to, from, next);
@@ -294,7 +294,7 @@ const useEnterpriseRoutes = () => {
           path: "add",
           name: "createWorkflow",
           component: WorkflowEditor,
-          meta: { title: "New Workflow" },
+          meta: { titleKey: "workflow.create" },
           beforeEnter(to: any, from: any, next: any) {
             workflowsRouteGuard(to, from, next);
           },
@@ -303,7 +303,7 @@ const useEnterpriseRoutes = () => {
           path: "edit",
           name: "workflowEditor",
           component: WorkflowEditor,
-          meta: { title: "Edit Workflow" },
+          meta: { titleKey: "workflow.editMode" },
           beforeEnter(to: any, from: any, next: any) {
             workflowsRouteGuard(to, from, next);
           },
@@ -315,7 +315,7 @@ const useEnterpriseRoutes = () => {
           path: "runs",
           name: "workflowRuns",
           component: WorkflowRuns,
-          meta: { title: "Workflow Runs" },
+          meta: { titleKey: "workflow.runs.title" },
           beforeEnter(to: any, from: any, next: any) {
             workflowsRouteGuard(to, from, next);
           },
@@ -328,7 +328,7 @@ const useEnterpriseRoutes = () => {
           path: "groups",
           name: "groups",
           meta: {
-            title: "Groups",
+            titleKey: "routeTitles.groups",
           },
           component: AppGroups,
           beforeEnter(to: any, from: any, next: any) {
@@ -339,7 +339,7 @@ const useEnterpriseRoutes = () => {
           path: "groups/edit/:group_name",
           name: "editGroup",
           meta: {
-            title: "Edit Group",
+            titleKey: "routeTitles.editGroup",
           },
           component: EditGroup,
           beforeEnter(to: any, from: any, next: any) {
@@ -350,7 +350,7 @@ const useEnterpriseRoutes = () => {
           path: "roles",
           name: "roles",
           meta: {
-            title: "Roles",
+            titleKey: "iam.roles",
           },
           component: AppRoles,
           beforeEnter(to: any, from: any, next: any) {
@@ -361,7 +361,7 @@ const useEnterpriseRoutes = () => {
           path: "roles/edit/:role_name",
           name: "editRole",
           meta: {
-            title: "Edit Role",
+            titleKey: "routeTitles.editRole",
           },
           component: EditRole,
           beforeEnter(to: any, from: any, next: any) {

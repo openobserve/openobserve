@@ -696,28 +696,47 @@ describe("AlertList - row actions", () => {
     expect(call).toBeTruthy();
   });
 
-  it("exports a single alert to JSON (creates object URL)", async () => {
+  // Export fetches the definition and opens the format dialog; the file is
+  // written from there, once the user has picked JSON or Terraform.
+  it("opens the export dialog with the fetched alert definition", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     const row = wrapper.vm.filteredResults[0];
 
-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
     // Trigger export through method to avoid menu interaction
     await wrapper.vm.exportAlert(row);
-    expect(createURLSpy).toHaveBeenCalled();
+    await flushPromises();
+
+    expect(wrapper.vm.showExportDialog).toBe(true);
+    expect(wrapper.vm.alertsToExport).toHaveLength(1);
+    expect(wrapper.vm.alertsToExport[0].name).toBe(row.name);
+    // The exported id belongs to the source alert, not to what this creates.
+    expect(wrapper.vm.alertsToExport[0]).not.toHaveProperty("id");
   });
 
-  it("exports multiple selected alerts to JSON", async () => {
+  it("opens the export dialog with every selected alert", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    // Select two alerts
-    wrapper.vm.selectedAlerts = [wrapper.vm.filteredResults[0], wrapper.vm.filteredResults[1]];
+    // Select two alerts. selectedAlerts is a computed over selectedAlertIds whose
+    // setter only handles clearing, so selection has to go through the ids.
+    wrapper.vm.selectedAlertIds = [
+      wrapper.vm.filteredResults[0].alert_id,
+      wrapper.vm.filteredResults[1].alert_id,
+    ];
+    await flushPromises();
+    expect(wrapper.vm.selectedAlerts).toHaveLength(2);
+
+    await wrapper.vm.multipleExportAlert();
     await flushPromises();
 
-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
-    await wrapper.vm.multipleExportAlert();
-    expect(createURLSpy).toHaveBeenCalled();
+    expect(wrapper.vm.showExportDialog).toBe(true);
+    expect(wrapper.vm.alertsToExport).toHaveLength(2);
+
+    // The selection clears once the download actually happens.
+    expect(wrapper.vm.selectedAlerts.length).toBe(2);
+    wrapper.vm.onExportDownloaded({ format: "terraform", count: 2 });
+    await flushPromises();
     expect(wrapper.vm.selectedAlerts.length).toBe(0);
   });
 });

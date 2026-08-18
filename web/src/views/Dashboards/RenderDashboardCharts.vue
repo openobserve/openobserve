@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Panel Time Picker (NEW) -->
                       <div
                         v-if="hasPanelTime(item) && panelTimeValues[item.id]"
-                        class="panel-time-picker-wrapper mb-2"
+                        class="panel-time-picker-wrapper mt-1 mb-2"
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
@@ -462,7 +462,7 @@ export default defineComponent({
 
     // Create our own variables manager instead of injecting from parent
     // This makes RenderDashboardCharts self-contained and reusable
-    const variablesManager = useVariablesManager();
+    const variablesManager = useVariablesManager(t);
 
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);

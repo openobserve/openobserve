@@ -7,8 +7,8 @@ import { ref } from "vue";
 export interface ConfirmDialogOptions {
   title: I18nText;
   message: I18nText;
-  confirmLabel?: string;
-  cancelLabel?: string;
+  confirmLabel?: I18nText;
+  cancelLabel?: I18nText;
   persistent?: boolean;
 }
 

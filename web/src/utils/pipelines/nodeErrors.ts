@@ -36,6 +36,8 @@
  * agreed home for the fix.
  */
 
+import { gt } from "@/types/i18n";
+
 /** One entry as it can appear on the wire. */
 type RawNodeError = string | [string, unknown?] | unknown;
 
@@ -65,10 +67,14 @@ export const normalizeNodeErrorMessages = (errors: RawNodeError[] | null | undef
  * Join a node's errors into the block of text the tooltip/dialog renders,
  * appending the "… and N more" tail when the server truncated the list.
  * Returns null when there is nothing to show, so callers can `v-if` on it.
+ *
+ * `moreLabel` defaults to the global-instance translation of the same key a
+ * component would pass; components should still pass their own `t` so the label
+ * stays reactive to their i18n scope.
  */
 export const formatNodeErrorText = (
   nodeError: { errors?: RawNodeError[]; error_count?: number } | null | undefined,
-  moreLabel: (count: number) => string = (count) => `... and ${count} more errors`,
+  moreLabel: (count: number) => string = (count) => gt("pipeline.moreErrors", { count }),
 ): string | null => {
   const messages = normalizeNodeErrorMessages(nodeError?.errors);
   if (!messages.length) return null;

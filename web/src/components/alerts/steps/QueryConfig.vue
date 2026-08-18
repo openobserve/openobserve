@@ -838,7 +838,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="inline-block max-w-37.5 min-w-37.5">
                         <OFormSelect
                           name="trigger_condition.timezone"
-                          :options="filteredTimezones"
+                          :options="timezoneSelectOptions"
                           searchable
                           :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
                           class="max-w-37.5 min-w-37.5"
@@ -1251,7 +1251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="inline-block max-w-37.5 min-w-37.5">
                         <OFormSelect
                           name="trigger_condition.timezone"
-                          :options="filteredTimezones"
+                          :options="timezoneSelectOptions"
                           searchable
                           :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
                           class="max-w-37.5 min-w-37.5"
@@ -1960,6 +1960,7 @@ export default defineComponent({
       ref({}),
       isSqlModeForPlaceholder,
       noStreamForPlaceholder,
+      t,
       { noStreamText: t("pipeline.queryEditorPlaceholder") },
     );
 
@@ -2544,7 +2545,9 @@ export default defineComponent({
       set: (v) => setFV("trigger_condition.timezone", v ?? ""),
     });
     const cronError = ref("");
-    const cronDescription = computed(() => describeCron(cronExpression.value, cronTimezone.value));
+    const cronDescription = computed(() =>
+      describeCron(t, cronExpression.value, cronTimezone.value),
+    );
     const filteredTimezones = ref<string[]>([]);
 
     // Initialize timezone
@@ -2554,9 +2557,10 @@ export default defineComponent({
     // display ref, leaving the stored value untouched until the user entered cron
     // mode (onFrequencyUnitChange still seeds it there). defaultAlertValue()
     // already seeds `timezone: "UTC"`, so the control is never blank anyway.
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const browserTime = raw("Browser Time (" + browserTz + ")");
     const initTimezones = () => {
       try {
-        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
         // @ts-ignore
         const zones: string[] =
           typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function"
@@ -2565,12 +2569,20 @@ export default defineComponent({
             : [cronTimezone.value || "UTC"];
         // Convenience shortcuts first (matching the reports picker), then every
         // IANA zone. This only populates OPTIONS — it must not seed cronTimezone.
-        filteredTimezones.value = [`Browser Time (${browserTz})`, "UTC", ...zones];
+        filteredTimezones.value = [browserTime, "UTC", ...zones];
       } catch {
         filteredTimezones.value = ["UTC"];
       }
     };
     initTimezones();
+
+    const timezoneSelectOptions = computed(() =>
+      filteredTimezones.value.map((tz: string) =>
+        tz === browserTime
+          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
+          : { label: raw(tz), value: tz },
+      ),
+    );
 
     const validateCron = () => {
       cronError.value = "";
@@ -3544,6 +3556,7 @@ export default defineComponent({
       checkEveryError,
       havingValueError,
       filteredTimezones,
+      timezoneSelectOptions,
       onFrequencyUnitChange,
       frequencyUnitOptions,
       onCronExpressionChange,

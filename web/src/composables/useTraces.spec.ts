@@ -352,7 +352,7 @@ describe("useTraces", () => {
       expect(searchObj.data.searchAround.size).toBe(10);
     });
 
-    it("meta.searchMode defaults to traces", () => {
+    it("meta.searchMode defaults to spans", () => {
       const { searchObj } = useTraces();
       expect(searchObj.meta.searchMode).toBe("spans");
     });
@@ -442,27 +442,30 @@ describe("useTraces", () => {
       expect(params.span_id).toBe("span-xyz");
     });
 
-    it("includes search_mode=spans when searchMode is spans", () => {
+    it("includes tab=spans without the legacy search_mode parameter", () => {
       const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
       resetSearchObj();
       searchObj.meta.searchMode = "spans";
       const params = getUrlQueryParams(false);
-      expect(params.search_mode).toBe("spans");
+      expect(params.tab).toBe("spans");
+      expect(params.search_mode).toBeUndefined();
     });
 
-    it("does not include search_mode when searchMode is traces", () => {
+    it("includes tab=traces when searchMode is traces", () => {
       const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
       resetSearchObj();
       searchObj.meta.searchMode = "traces";
       const params = getUrlQueryParams(false);
+      expect(params.tab).toBe("traces");
       expect(params.search_mode).toBeUndefined();
     });
 
-    it("does not include search_mode when searchMode is service-graph", () => {
+    it("includes tab=service-graph when searchMode is service-graph", () => {
       const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
       resetSearchObj();
       searchObj.meta.searchMode = "service-graph";
       const params = getUrlQueryParams(false);
+      expect(params.tab).toBe("service-graph");
       expect(params.search_mode).toBeUndefined();
     });
 

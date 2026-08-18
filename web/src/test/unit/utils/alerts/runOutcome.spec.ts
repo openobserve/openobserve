@@ -10,7 +10,6 @@ import {
   isFiringLevel,
   mostSevereLevel,
   shouldShowLevel,
-  levelLabel,
   conditionSummary,
 } from "@/utils/alerts/runOutcome";
 
@@ -173,12 +172,6 @@ describe("alert level classification", () => {
     expect(shouldShowLevel(true, null)).toBe(false);
     expect(shouldShowLevel(true, "banana")).toBe(false);
     expect(shouldShowLevel(true, "critical")).toBe(true);
-  });
-
-  it("labels levels readably", () => {
-    expect(levelLabel("critical")).toBe("Critical");
-    expect(levelLabel("no_data")).toBe("No Data");
-    expect(levelLabel("")).toBe("Unknown");
   });
 });
 

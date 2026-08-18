@@ -17,7 +17,14 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } 
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
-import { aiCreditsSchema, extendTrialSchema } from "./OrganizationManagement.schema";
+import { makeAiCreditsSchema, makeExtendTrialSchema } from "./OrganizationManagement.schema";
+import i18nInstance from "@/locales";
+import type { TranslateFn } from "@/types/i18n";
+
+// Schemas are t-threaded factories; build them once with the real translator.
+const schemaT = (i18nInstance.global as any).t as TranslateFn;
+const extendTrialSchema = makeExtendTrialSchema(schemaT);
+const aiCreditsSchema = makeAiCreditsSchema(schemaT);
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import enLocaleFull from "@/locales/languages/en-US.json";

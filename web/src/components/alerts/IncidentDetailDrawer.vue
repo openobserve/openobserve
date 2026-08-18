@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               incidentDetails.first_alert_at,
                               incidentDetails.last_alert_at,
                             )
-                          : t("common.notAvailable")
+                          : raw("N/A")
                       }}
                     </div>
                   </div>
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{
                                   incidentDetails?.first_alert_at
                                     ? formatTimestampUTC(incidentDetails.first_alert_at)
-                                    : t("common.notAvailable")
+                                    : raw("N/A")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{ t("alerts.incidents.initialTrigger") }}</span>
@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{
                                   peakActivity.timestamp
                                     ? formatTimestampUTC(peakActivity.timestamp)
-                                    : t("common.notAvailable")
+                                    : raw("N/A")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{
                                   incidentDetails?.last_alert_at
                                     ? formatTimestampUTC(incidentDetails.last_alert_at)
-                                    : t("common.notAvailable")
+                                    : raw("N/A")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
                               <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.id || t("common.notAvailable")
+                                incidentDetails?.id || raw("N/A")
                               }}</span>
                               <OIcon
                                 :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
@@ -473,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
                               <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.title || t("common.notAvailable")
+                                incidentDetails?.title || raw("N/A")
                               }}</span>
                               <OIcon
                                 :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
@@ -528,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{
                                 incidentDetails?.created_at
                                   ? formatTimestamp(incidentDetails.created_at)
-                                  : t("common.notAvailable")
+                                  : raw("N/A")
                               }}
                             </div>
                           </div>
@@ -542,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{
                                 incidentDetails?.updated_at
                                   ? formatTimestamp(incidentDetails.updated_at)
-                                  : t("common.notAvailable")
+                                  : raw("N/A")
                               }}
                             </div>
                           </div>
@@ -884,7 +884,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
-                              {{ alerts[selectedAlertIndex]?.name || t("common.notAvailable") }}
+                              {{ alerts[selectedAlertIndex]?.name || raw("N/A") }}
                             </span>
                           </div>
 
@@ -913,10 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                               <OTag
                                 type="streamType"
-                                :value="
-                                  alerts[selectedAlertIndex]?.stream_type ||
-                                  t('common.notAvailable')
-                                "
+                                :value="alerts[selectedAlertIndex]?.stream_type || raw('N/A')"
                                 class="w-fit"
                               />
                             </div>
@@ -928,10 +925,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ t("alerts.stream_name") }}
                               </span>
                               <span :class="'text-text-body'" class="truncate text-sm font-medium">
-                                {{
-                                  alerts[selectedAlertIndex]?.stream_name ||
-                                  t("common.notAvailable")
-                                }}
+                                {{ alerts[selectedAlertIndex]?.stream_name || raw("N/A") }}
                               </span>
                             </div>
                           </div>
@@ -949,7 +943,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || "" }}
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.threshold ||
-                                  t("common.notAvailable")
+                                  raw("N/A")
                                 }}
                               </span>
                             </div>
@@ -982,7 +976,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.frequency ||
-                                  t("common.notAvailable")
+                                  raw("N/A")
                                 }}
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.frequency_type ||
@@ -1000,7 +994,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.silence ||
-                                  t("common.notAvailable")
+                                  raw("N/A")
                                 }}
                                 {{ t("common.min") }}
                               </span>
@@ -1723,24 +1717,24 @@ export default defineComponent({
     });
 
     const alertFrequency = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return t("common.notAvailable");
+      if (!incidentDetails.value || triggers.value.length === 0) return raw("N/A");
 
       const durationMs =
         (incidentDetails.value.last_alert_at - incidentDetails.value.first_alert_at) / 1000;
       const durationSeconds = Math.floor(durationMs / 1000);
 
-      if (durationSeconds === 0) return "Immediate";
+      if (durationSeconds === 0) return t("alerts.incidents.frequencyImmediate");
 
       const frequency = triggers.value.length / (durationSeconds / 60); // alerts per minute
 
       if (frequency >= 1) {
-        return `${frequency.toFixed(1)} per minute`;
+        return t("alerts.incidents.frequencyPerMinute", { rate: frequency.toFixed(1) });
       } else if (frequency >= 1 / 60) {
         const perHour = frequency * 60;
-        return `${perHour.toFixed(1)} per hour`;
+        return t("alerts.incidents.frequencyPerHour", { rate: perHour.toFixed(1) });
       } else {
         const minutesBetween = Math.floor(durationSeconds / triggers.value.length / 60);
-        return `1 Per ${minutesBetween} Mins`;
+        return t("alerts.incidents.frequencyOnePerMins", { minutes: minutesBetween });
       }
     });
 
@@ -1792,7 +1786,7 @@ export default defineComponent({
 
       triggers.value.forEach((trigger) => {
         const alertId = trigger.alert_id;
-        const alertName = trigger.alert_name || "Unknown";
+        const alertName = trigger.alert_name || t("common.unknown");
 
         if (alertsMap.has(alertId)) {
           alertsMap.get(alertId)!.count++;
@@ -1811,7 +1805,7 @@ export default defineComponent({
 
     // Peak Alert Rate - find the highest concentration of alerts
     const peakAlertRate = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return t("common.notAvailable");
+      if (!incidentDetails.value || triggers.value.length === 0) return raw("N/A");
 
       // Sort triggers by timestamp
       const sortedTriggers = [...triggers.value].sort(
@@ -1839,7 +1833,9 @@ export default defineComponent({
         maxCount = Math.max(maxCount, count);
       }
 
-      return maxCount > 1 ? `${maxCount} alerts in 5 min` : "1 alert";
+      return maxCount > 1
+        ? t("alerts.incidents.peakAlertRateMany", { count: maxCount })
+        : t("alerts.incidents.peakAlertRateOne");
     });
 
     // Peak activity details for timeline
@@ -1904,11 +1900,11 @@ export default defineComponent({
     const correlationTooltip = computed(() => {
       const type = correlationType.value;
       if (type === "Temporal") {
-        return "Alerts correlated by time - they occurred close together";
+        return t("alerts.incidents.correlationTooltipTemporal");
       } else if (type === "Spatial") {
-        return "Alerts correlated by common dimensions (same service, host, etc.)";
+        return t("alerts.incidents.correlationTooltipSpatial");
       }
-      return "Correlation type for this incident";
+      return t("alerts.incidents.correlationTooltipDefault");
     });
 
     // Fetch correlated telemetry streams
@@ -1926,6 +1922,7 @@ export default defineComponent({
         correlationData.value = await incidentsService.getCorrelatedStreams(
           org,
           incidentDetails.value,
+          t,
         );
 
         // Check if correlation failed (null response or no data) — try fallback
@@ -2220,7 +2217,7 @@ export default defineComponent({
 
         triggersByDay[dayKey].total++;
 
-        const alertName = trigger.alert_name || "Unknown";
+        const alertName = trigger.alert_name || t("common.unknown");
         triggersByDay[dayKey].byAlert[alertName] =
           (triggersByDay[dayKey].byAlert[alertName] || 0) + 1;
       });
@@ -2322,7 +2319,7 @@ export default defineComponent({
         },
         yAxis: {
           type: "value",
-          name: "Alert Count",
+          name: t("alerts.incidents.alertCountAxis"),
           nameTextStyle: {
             color: isDarkMode.value ? "#B7B7B7" : "#72777B",
           },
@@ -2587,7 +2584,7 @@ export default defineComponent({
         console.error("Failed to update title:", error);
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to update incident title",
+          message: error?.response?.data?.message || t("alerts.incidents.titleUpdateFailed"),
         });
         cancelTitleEdit();
       }
@@ -2622,19 +2619,19 @@ export default defineComponent({
     };
 
     const formatPeriod = (periodInSeconds: number | undefined) => {
-      if (!periodInSeconds) return t("common.notAvailable");
+      if (!periodInSeconds) return raw("N/A");
 
       // Convert seconds to minutes
       if (periodInSeconds >= 60) {
         const minutes = Math.floor(periodInSeconds / 60);
         const seconds = periodInSeconds % 60;
         if (seconds === 0) {
-          return `${minutes} min`;
+          return t("alerts.incidents.periodMinutes", { minutes });
         }
-        return `${minutes} min ${seconds} sec`;
+        return t("alerts.incidents.periodMinutesSeconds", { minutes, seconds });
       }
 
-      return `${periodInSeconds} sec`;
+      return t("alerts.incidents.periodSeconds", { seconds: periodInSeconds });
     };
 
     // Transform V1 format conditions (or/and structure) to readable expression
@@ -2738,7 +2735,7 @@ export default defineComponent({
         console.error("Failed to update status:", error);
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to update incident status",
+          message: error?.response?.data?.message || t("alerts.incidents.statusUpdateFailed"),
         });
         // Revert on error
         editableStatus.value = incidentDetails.value.status;
@@ -2807,7 +2804,8 @@ export default defineComponent({
               } catch (e: any) {
                 toast({
                   variant: "error",
-                  message: e?.response?.data?.message || "Failed to start reanalysis",
+                  message:
+                    e?.response?.data?.message || t("alerts.incidents.reanalysisStartFailed"),
                 });
               }
             }
@@ -2817,7 +2815,7 @@ export default defineComponent({
         console.error("Failed to update severity:", error);
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to update incident severity",
+          message: error?.response?.data?.message || t("alerts.incidents.severityUpdateFailed"),
         });
         // Revert on error
         editableSeverity.value = incidentDetails.value.severity;
@@ -3366,7 +3364,7 @@ export default defineComponent({
         case "alert_id":
           return t("alerts.incidents.correlatedByAlertId");
         default:
-          return keyType || "Unknown";
+          return keyType || t("common.unknown");
       }
     };
 

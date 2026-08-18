@@ -35,6 +35,7 @@ import {
   parseValueContext,
   buildValueEntries,
 } from "./editorProviders";
+import { gt } from "@/types/i18n";
 
 const fn = (name: string) => SQL_FUNCTIONS.find((f) => f.name === name)!;
 
@@ -297,18 +298,18 @@ describe("findFunctionEntry — call sites resolve to FUNCTIONS", () => {
 
 describe("buildHoverContents", () => {
   it("shows a function's signature as code", () => {
-    const [head] = buildHoverContents(fn("histogram"))!;
+    const [head] = buildHoverContents(gt, fn("histogram"))!;
     expect(head.value).toContain("histogram(field, interval)");
     expect(head.value).toContain("```");
   });
 
   it("shows the function's prose underneath", () => {
-    const contents = buildHoverContents(fn("histogram"))!;
+    const contents = buildHoverContents(gt, fn("histogram"))!;
     expect(contents.map((c) => c.value).join("\n")).toContain(fn("histogram").documentation);
   });
 
   it("shows a field's column type", () => {
-    const contents = buildHoverContents({
+    const contents = buildHoverContents(gt, {
       name: "host_name",
       label: "host_name",
       kind: "Field",
@@ -320,7 +321,7 @@ describe("buildHoverContents", () => {
   });
 
   it("does not claim a type for a field that has none", () => {
-    const contents = buildHoverContents({
+    const contents = buildHoverContents(gt, {
       name: "mystery",
       label: "mystery",
       kind: "Field",
@@ -334,7 +335,7 @@ describe("buildHoverContents", () => {
     // Using match_all_raw here would prove nothing: its documentation already
     // begins "Deprecated alias for...", so the assertion would pass even if the
     // `deprecated` flag were ignored entirely.
-    const contents = buildHoverContents({
+    const contents = buildHoverContents(gt, {
       name: "legacy_fn",
       label: "legacy_fn",
       kind: "Function",
@@ -352,7 +353,7 @@ describe("buildHoverContents", () => {
   });
 
   it("does not call a live function deprecated", () => {
-    const contents = buildHoverContents(fn("match_all"))!;
+    const contents = buildHoverContents(gt, fn("match_all"))!;
     expect(
       contents
         .map((c) => c.value)
@@ -362,7 +363,7 @@ describe("buildHoverContents", () => {
   });
 
   it("returns null when there is nothing to say", () => {
-    expect(buildHoverContents(null)).toBeNull();
+    expect(buildHoverContents(gt, null)).toBeNull();
   });
 });
 
@@ -412,7 +413,7 @@ describe("org VRL functions reach the providers", () => {
   });
 
   it("hovers without inventing a signature or a type", () => {
-    const contents = buildHoverContents(orgFn as any)!;
+    const contents = buildHoverContents(gt, orgFn as any)!;
     const text = contents.map((c) => c.value).join(" ");
     expect(text).toContain("my_org_fn");
     expect(text).not.toContain("undefined");

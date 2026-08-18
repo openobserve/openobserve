@@ -254,7 +254,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import dateTime from "@/components/DateTimePickerDashboard.vue";
 import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
@@ -481,7 +481,7 @@ const onDataZoom = (data: any) => {
 
   addRangeFilter({
     panelId,
-    panelTitle: "Alert Volume Over Time",
+    panelTitle: t("alerts.insights.alertVolumeOverTime"),
     start,
     end,
   });
@@ -528,7 +528,7 @@ const handleNativeContextMenu = (event: MouseEvent) => {
     contextMenu.y = event.clientY;
     contextMenu.value = alertName;
     contextMenu.panelId = dedupPanel?.id || "";
-    contextMenu.panelTitle = dedupPanel?.title || "Dedup Impact Analysis";
+    contextMenu.panelTitle = dedupPanel?.title || raw("Dedup Impact Analysis");
   }
   // If not first column or no alert name, let default context menu show
 };

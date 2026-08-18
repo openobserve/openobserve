@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, computed } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -117,7 +118,7 @@ const getDefaultDashboardPanelData: any = () => ({
 
 let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
 
-const useMetricsExplorer = () => {
+const useMetricsExplorer = (t: TranslateFn) => {
   const store = useStore();
 
   const cleanupDraggingFields = () => {
@@ -612,7 +613,7 @@ const useMetricsExplorer = () => {
         const errorDetailValue =
           error.response?.data.error_detail ||
           error.response?.data.message ||
-          "Something went wrong!";
+          t("dashboard.somethingWentWrong");
         const trimmedErrorMessage =
           errorDetailValue.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
@@ -654,7 +655,7 @@ const useMetricsExplorer = () => {
         const errorDetailValue =
           error.response?.data.error_detail ||
           error.response?.data.message ||
-          "Something went wrong!";
+          t("dashboard.somethingWentWrong");
         const trimmedErrorMessage =
           errorDetailValue.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."

@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="
               t('pipeline.processingChunk', {
                 done: job.chunks_completed || 0,
-                total: job.chunks_total || t('common.notAvailable'),
+                total: job.chunks_total || raw('N/A'),
               })
             "
             :subtitle="t('pipeline.inProgress')"
@@ -235,7 +235,7 @@ import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.type
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 interface Props {
   modelValue: boolean;
@@ -342,34 +342,34 @@ const cancelJob = async () => {
     console.error("Error canceling backfill job:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.error || "Failed to cancel backfill job",
+      message: error?.response?.data?.error || t("pipeline.cancelBackfillJobFailed"),
       timeout: 5000,
     });
   }
 };
 
 // Computed properties
-const getCurrentPhase = computed(() => {
-  if (!job.value) return "N/A";
+const getCurrentPhase = computed<I18nText>(() => {
+  if (!job.value) return raw("N/A");
 
   if (job.value.deletion_status) {
     const status = job.value.deletion_status;
     if (typeof status === "string" && ["pending", "in_progress"].includes(status)) {
-      return "Deleting Data";
+      return t("pipeline.backfillDetails.deletingData");
     }
     if (status === "completed") {
-      return "Backfilling Data";
+      return t("pipeline.backfillingData");
     }
     if (typeof status === "object" && "failed" in status) {
-      return "Deletion Failed";
+      return t("pipeline.backfillDetails.deletionFailed");
     }
   }
 
   if (job.value.progress_percent > 20) {
-    return "Backfilling Data";
+    return t("pipeline.backfillingData");
   }
 
-  return "Initializing";
+  return t("pipeline.backfillDetails.phaseInitializing");
 });
 
 const estimatedCompletion = computed(() => {
@@ -466,14 +466,14 @@ const getDeletionStatusLabel = (status?: any) => {
 };
 
 const formatTimestamp = (timestamp?: number) => {
-  if (!timestamp) return "N/A";
+  if (!timestamp) return raw("N/A");
   const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   // Convert from microseconds to milliseconds
   return timestampToTimezoneDate(timestamp / 1000, userTimezone, "MMM dd, yyyy HH:mm");
 };
 
 const formatTimestampFull = (timestamp?: number) => {
-  if (!timestamp) return "N/A";
+  if (!timestamp) return raw("N/A");
   const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const date = new Date(timestamp / 1000); // Convert from microseconds
   const formattedDate = timestampToTimezoneDate(

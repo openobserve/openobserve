@@ -32,6 +32,8 @@ const i18n = createI18n({
         lightMode: "Light Mode",
         darkMode: "Dark Mode",
         switchTo: "Switch to",
+        switchToLightMode: "Switch to Light Mode",
+        switchToDarkMode: "Switch to Dark Mode",
       },
     },
   },

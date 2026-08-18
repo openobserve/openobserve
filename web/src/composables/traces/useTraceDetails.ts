@@ -15,46 +15,50 @@
 
 import { computed, type ComputedRef, type Ref } from "vue";
 import { SpanStatus } from "@/ts/interfaces/traces/span.types";
+import { gt, raw, type TranslateFn } from "@/types/i18n";
 
 const GRPC_STATUS_MAP: Record<string, string> = {
-  "0": "OK",
-  "1": "Cancelled",
-  "2": "Unknown",
-  "3": "Invalid Argument",
-  "4": "Deadline Exceeded",
-  "5": "Not Found",
-  "6": "Already Exists",
-  "7": "Permission Denied",
-  "8": "Resource Exhausted",
-  "9": "Failed Precondition",
-  "10": "Aborted",
-  "11": "Out of Range",
-  "12": "Unimplemented",
-  "13": "Internal",
-  "14": "Unavailable",
-  "15": "Data Loss",
-  "16": "Unauthenticated",
+  "0": raw("OK"),
+  "1": raw("Cancelled"),
+  "2": raw("Unknown"),
+  "3": raw("Invalid Argument"),
+  "4": raw("Deadline Exceeded"),
+  "5": raw("Not Found"),
+  "6": raw("Already Exists"),
+  "7": raw("Permission Denied"),
+  "8": raw("Resource Exhausted"),
+  "9": raw("Failed Precondition"),
+  "10": raw("Aborted"),
+  "11": raw("Out of Range"),
+  "12": raw("Unimplemented"),
+  "13": raw("Internal"),
+  "14": raw("Unavailable"),
+  "15": raw("Data Loss"),
+  "16": raw("Unauthenticated"),
 };
 
 const HTTP_STATUS_MAP: Record<string, string> = {
-  "400": "Bad Request",
-  "401": "Unauthorized",
-  "402": "Payment Required",
-  "403": "Forbidden",
-  "404": "Not Found",
-  "405": "Method Not Allowed",
-  "408": "Request Timeout",
-  "409": "Conflict",
-  "410": "Gone",
-  "429": "Too Many Requests",
-  "500": "Internal Server Error",
-  "501": "Not Implemented",
-  "502": "Bad Gateway",
-  "503": "Service Unavailable",
-  "504": "Gateway Timeout",
+  "400": raw("Bad Request"),
+  "401": raw("Unauthorized"),
+  "402": raw("Payment Required"),
+  "403": raw("Forbidden"),
+  "404": raw("Not Found"),
+  "405": raw("Method Not Allowed"),
+  "408": raw("Request Timeout"),
+  "409": raw("Conflict"),
+  "410": raw("Gone"),
+  "429": raw("Too Many Requests"),
+  "500": raw("Internal Server Error"),
+  "501": raw("Not Implemented"),
+  "502": raw("Bad Gateway"),
+  "503": raw("Service Unavailable"),
+  "504": raw("Gateway Timeout"),
 };
 
-const useTraceDetails = (span: Ref<any> | ComputedRef<any>) => {
+// `t` defaults to gt() so the 80+ spec call sites keep their single-argument
+// form; the two production callers are .vue and pass their own translator, which
+// is what makes these strings follow a runtime language switch.
+const useTraceDetails = (span: Ref<any> | ComputedRef<any>, t: TranslateFn = gt) => {
   const parsedEvents = computed(() => {
     try {
       return JSON.parse(span.value?.events || "[]");
@@ -118,11 +122,11 @@ const useTraceDetails = (span: Ref<any> | ComputedRef<any>) => {
   const errorBannerTitle = computed(() => {
     if (hasExceptionEvents.value.length > 0) {
       const firstExc = hasExceptionEvents.value[0];
-      return firstExc["exception.type"] || "Exception";
+      return firstExc["exception.type"] || t("common.exception");
     }
     if (spanErrorType.value) return spanErrorType.value;
     if (spanGrpcErrorName.value) return spanGrpcErrorName.value;
-    return "Error";
+    return t("common.error");
   });
 
   const statusCodeTitle = computed(() => {

@@ -253,7 +253,7 @@ const saveStream = async (value: AddStreamForm) => {
     .catch((err) => {
       if (err.response.status != 403) {
         toast({
-          message: err.response?.data?.message || "Failed to create stream",
+          message: err.response?.data?.message || t("logStream.createStreamFailed"),
           variant: "error",
         });
       }

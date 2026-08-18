@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw } from "@/types/i18n";
+
 export const CURRENT_DASHBOARD_SCHEMA_VERSION = 8;
 
 const convertPanelSchemaVersion = (data: any) => {
@@ -190,7 +192,9 @@ export function convertDashboardSchemaVersion(data: any) {
       data.tabs = [
         {
           panels: data.panels,
-          name: "Default",
+          // Persisted into the saved dashboard document, not rendered copy —
+          // translating it would bake the migrating user's locale into the data.
+          name: raw("Default"),
           tabId: "default",
         },
       ];

@@ -212,23 +212,3 @@ export function conditionSummary(row: {
   }
   return parts.join(" ");
 }
-
-/** Human label for a level. */
-export function levelLabel(level: unknown): string {
-  switch (
-    String(level ?? "")
-      .trim()
-      .toLowerCase()
-  ) {
-    case "critical":
-      return "Critical";
-    case "warning":
-      return "Warning";
-    case "ok":
-      return "Ok";
-    case "no_data":
-      return "No Data";
-    default:
-      return "Unknown";
-  }
-}

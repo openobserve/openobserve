@@ -1957,10 +1957,10 @@ function errorPatterns(): string[] {
   ];
 }
 function fmtAge(min: number): string {
-  if (min < 60) return min + "m ago";
+  if (min < 60) return t("synthetics.minutesAgo", { count: min });
   const h = Math.floor(min / 60);
-  if (h < 24) return h + "h ago";
-  return Math.floor(h / 24) + "d ago";
+  if (h < 24) return t("synthetics.hoursAgo", { count: h });
+  return t("synthetics.daysAgo", { count: Math.floor(h / 24) });
 }
 interface MockRun {
   id: number;

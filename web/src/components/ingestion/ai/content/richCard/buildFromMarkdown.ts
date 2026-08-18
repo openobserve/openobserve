@@ -32,7 +32,7 @@ import type {
 import { parseFrontmatter } from "./parseFrontmatter";
 import { applySubs, applySubsMasked } from "@/components/ingestion/setupCard/subs";
 import { resolveAICardLogo } from "../index";
-import { raw, type I18nText } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 // Card copy is authored in the content repo's markdown, not in the locale files,
@@ -71,7 +71,7 @@ function buildStep(src: any, slug: string, i: number, subs: CardSubstitutions): 
     description: raw(str(src?.description) ?? ""),
     chip: src?.chip ? { kind: src.chip.kind, label: raw(String(src.chip.label)) } : undefined,
     code,
-    note: str(src?.note),
+    note: rawStr(src?.note),
     pills: Array.isArray(src?.pills) ? src.pills.map(String) : undefined,
     completeOn,
     required: !!src?.required,
@@ -84,6 +84,7 @@ export function buildFromMarkdown(
   slug: string,
   md: string,
   subs: CardSubstitutions,
+  t: TranslateFn,
 ): RichCardContent | null {
   const { data } = parseFrontmatter(md);
   // A `detect:` block is what marks an integration as rich-card-enabled.
@@ -107,13 +108,13 @@ export function buildFromMarkdown(
       logo: resolveAICardLogo(slug, str(card.logo)),
       logoDark: resolveAICardLogo(slug, str(card.logo_dark)) || undefined,
       tone: str(card.tone) ?? "#d97757",
-      runtime: str(card.runtime),
-      setupTime: str(card.setup_time),
+      runtime: rawStr(card.runtime),
+      setupTime: rawStr(card.setup_time),
     },
     steps: steps.map((s, i) => buildStep(s, slug, i, subs)),
     streamInput: si
       ? {
-          label: raw(str(si.label) ?? "Stream Name"),
+          label: rawStr(si.label) ?? t("ingestion.setupCard.streamNameLabel"),
           default: str(si.default) ?? "default",
           placeholder: rawStr(si.placeholder),
           help: rawStr(si.help),
@@ -133,11 +134,11 @@ export function buildFromMarkdown(
       installs: Array.isArray(extras.installs) ? extras.installs.map(String) : undefined,
       envVars: Array.isArray(extras.env_vars) ? extras.env_vars.map(String) : undefined,
       fixSnippet: str(data.fix_snippet),
-      fixTitle: str(data.fix_title),
-      fixBody: str(data.fix_body),
+      fixTitle: rawStr(data.fix_title),
+      fixBody: rawStr(data.fix_body),
       fixLang: str(data.fix_lang),
       troubleshooting: Array.isArray(data.troubleshooting)
-        ? data.troubleshooting.map((t: any) => ({ q: String(t.q), a: String(t.a) }))
+        ? data.troubleshooting.map((t: any) => ({ q: raw(String(t.q)), a: raw(String(t.a)) }))
         : undefined,
     },
     docUrl: str(data.doc_url),

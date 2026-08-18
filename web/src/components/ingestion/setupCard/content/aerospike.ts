@@ -17,7 +17,7 @@
 // https://openobserve.ai/blog/how-to-monitor-aerospike-database (aerospike
 // receiver). No monitoring user needed for the basic setup.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -40,17 +40,17 @@ service:
       receivers: [aerospike]
       exporters: [otlphttp/openobserve]`;
 
-export default function aerospikeCard(subs: CardSubstitutions): RichCardContent {
+export default function aerospikeCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Aerospike",
-      tagline: gt("ingestion.setupCard.aerospikeTagline"),
+      name: raw("Aerospike"),
+      tagline: t("ingestion.setupCard.aerospikeTagline"),
       logo: getImageURL("images/ingestion/aerospike.svg"),
       tone: "#C22127",
-      metaBadges: [gt("common.metrics")],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
-      collectorInstallStep(),
+      collectorInstallStep(t),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -93,8 +93,16 @@ export default function aerospikeCard(subs: CardSubstitutions): RichCardContent 
         completeOn: "detect",
         detectionAnchor: true,
         // aerospike receiver metric groups (aerospike.namespace.*, aerospike.node.*,
-        // …) — kept untranslated so the pills match the ingested metrics.
-        pills: [raw("Namespaces"), raw("Nodes"), raw("Memory"), raw("Storage"), raw("Connections")],
+        // …) — kept untranslated so the pills match the ingested metrics. "Memory" is
+        // the exception: it is a plain word, and the identical pill already has a
+        // shared key used by linux/macos/windows.
+        pills: [
+          t("ingestion.setupCard.pillNamespaces"),
+          t("ingestion.setupCard.pillNodes"),
+          t("ingestion.setupCard.pillMemory"),
+          t("ingestion.setupCard.pillStorage"),
+          t("ingestion.setupCard.pillConnections"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "aerospike", filter: "" },

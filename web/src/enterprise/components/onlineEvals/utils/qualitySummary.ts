@@ -1,3 +1,4 @@
+import type { TranslateFn } from "@/types/i18n";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf } from "./evalEntity";
 import { thresholdForConfig } from "./scoreThreshold";
@@ -46,6 +47,7 @@ export function qualitySummaryForConfig(
   config: ScoreConfig,
   aggregate: QualitySummaryAggregate,
   categoryCounts: CategoryCount[],
+  t: TranslateFn,
 ): QualitySummary {
   const type = dataTypeOf(config);
 
@@ -61,7 +63,11 @@ export function qualitySummaryForConfig(
       qualityValue: aggregate.avgNumeric,
       qualityFormat: "number",
       qualityLabel:
-        healthyRate == null ? "Average" : `Average · ${healthyRate.toFixed(1)}% healthy`,
+        healthyRate == null
+          ? t("onlineEvals.quality.detail.kpis.average")
+          : t("onlineEvals.quality.averageWithHealthyRate", {
+              rate: healthyRate.toFixed(1),
+            }),
     };
   }
 
@@ -77,7 +83,7 @@ export function qualitySummaryForConfig(
     return {
       qualityValue: total > 0 ? (numerator / total) * 100 : null,
       qualityFormat: "percent",
-      qualityLabel: expected == null ? "True rate" : "Healthy rate",
+      qualityLabel: expected == null ? t("onlineEvals.trueRate") : t("onlineEvals.healthyRate"),
     };
   }
 
@@ -93,7 +99,7 @@ export function qualitySummaryForConfig(
       return {
         qualityValue: total > 0 ? (healthyCount / total) * 100 : null,
         qualityFormat: "percent",
-        qualityLabel: "Healthy rate",
+        qualityLabel: t("onlineEvals.healthyRate"),
       };
     }
 
@@ -103,7 +109,7 @@ export function qualitySummaryForConfig(
     return {
       qualityValue: top?.category ?? null,
       qualityFormat: "text",
-      qualityLabel: "Top category",
+      qualityLabel: t("onlineEvals.topCategory"),
     };
   }
 

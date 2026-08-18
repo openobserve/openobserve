@@ -21,7 +21,7 @@
 // receiver connect, the single-receiver config exports, and `sqlserver_*` metric
 // streams land in OpenObserve. Reference: https://openobserve.ai/blog/monitor-sql-server-with-otel/
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -70,15 +70,15 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function sqlServerCard(subs: CardSubstitutions): RichCardContent {
+export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
   return {
     provider: {
-      name: "SQL Server",
-      tagline: gt("ingestion.setupCard.sqlServerTagline"),
+      name: raw("SQL Server"),
+      tagline: t("ingestion.setupCard.sqlServerTagline"),
       logo: getImageURL("images/ingestion/sqlserver.png"),
       tone: "#cc2927",
-      metaBadges: [gt("common.metrics")],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
       {
@@ -96,7 +96,7 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
               lang: "bash",
               raw: applyGrants('sqlcmd -S localhost,1433 -U sa -P "YOUR_SA_PASSWORD" -C'),
             },
-            note: "Replace YOUR_SA_PASSWORD.",
+            note: t("ingestion.setupCard.sqlServerPasswordNote"),
           },
           {
             id: "docker",
@@ -117,7 +117,7 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
           },
         ],
       },
-      collectorInstallStep(),
+      collectorInstallStep(t),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -161,15 +161,16 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // SQL Server performance-counter names (sqlserver.user.connection.count,
-        // sqlserver.batch.request.rate, …) — untranslated so the pills match the
-        // metric names that land in the streams.
+        // What the verify step will show, in prose. These are NOT the performance-counter
+        // names that land in the streams (those are sqlserver.user.connection.count,
+        // sqlserver.batch.request.rate, …) — they are a plain-English summary of them,
+        // so they are translated.
         pills: [
-          raw("User Connections"),
-          raw("Batch Request Rate"),
-          raw("SQL Compilation Rate"),
-          raw("Lock Wait Rate"),
-          raw("Buffer Cache Hit Ratio"),
+          t("ingestion.setupCard.pillUserConnections"),
+          t("ingestion.setupCard.pillBatchRequestRate"),
+          t("ingestion.setupCard.pillSqlCompilationRate"),
+          t("ingestion.setupCard.pillLockWaitRate"),
+          t("ingestion.setupCard.pillBufferCacheHitRatio"),
         ],
       },
     ],

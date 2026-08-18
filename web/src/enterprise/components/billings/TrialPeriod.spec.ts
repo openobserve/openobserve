@@ -203,7 +203,9 @@ describe("TrialPeriod.vue", () => {
     it("should return message with single day remaining when due days = 0", () => {
       vi.mocked(getDueDays).mockReturnValue(0);
       const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("0 Day remaining in your trial account");
+      // vue-i18n uses the standard English plural rule, so 0 takes the plural form —
+      // the previous `dueDays > 1` check produced the ungrammatical "0 Day".
+      expect(message).toBe("0 Days remaining in your trial account");
     });
 
     it("should return expired message when due days < 0", () => {
@@ -503,7 +505,9 @@ describe("TrialPeriod.vue", () => {
       vi.mocked(getDueDays).mockReturnValue(0);
       wrapper = createWrapper({}, mockStore);
       const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("0 Day remaining in your trial account");
+      // vue-i18n uses the standard English plural rule, so 0 takes the plural form —
+      // the previous `dueDays > 1` check produced the ungrammatical "0 Day".
+      expect(message).toBe("0 Days remaining in your trial account");
     });
 
     it("should handle getDueDays with decimal values by flooring", () => {

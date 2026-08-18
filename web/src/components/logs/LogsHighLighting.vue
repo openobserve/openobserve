@@ -46,6 +46,7 @@ Usage Examples:
 import { computed } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { useI18nTyped } from "@/types/i18n";
 
 /**
  * Component Props Interface
@@ -66,7 +67,8 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const { isDark } = useTheme();
-const { colorizeJson } = useLogsHighlighter();
+const { t } = useI18nTyped();
+const { colorizeJson } = useLogsHighlighter(t);
 
 /**
  * Main colorization logic with integrated highlighting

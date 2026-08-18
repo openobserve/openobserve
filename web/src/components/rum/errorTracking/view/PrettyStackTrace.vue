@@ -203,11 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- eslint-enable local/no-hardcoded-px -->
             <OIcon name="expand-more" size="xs" class="mr-1" />
             <span class="text-text-secondary text-xs">
-              {{
-                stackTrace.stack.length - 1 > 1
-                  ? t("rum.showMoreFrames", { count: stackTrace.stack.length - 1 })
-                  : t("rum.showMoreFrame", { count: stackTrace.stack.length - 1 })
-              }}
+              {{ t("rum.showMoreFrame", { count: stackTrace.stack.length - 1 }) }}
             </span>
           </div>
 

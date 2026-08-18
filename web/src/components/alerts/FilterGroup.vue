@@ -161,7 +161,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
@@ -273,9 +273,10 @@ const label = ref(props.group.logicalOperator?.toLowerCase() || "and");
 
 const confirmDialog = ref({
   show: false,
-  title: "",
-  message: "",
-  warningMessage: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
+  warningMessage: raw(""),
   okCallback: () => {},
 });
 

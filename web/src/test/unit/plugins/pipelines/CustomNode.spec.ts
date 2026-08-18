@@ -82,7 +82,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 vi.mock("@/utils/pipelines/constants", () => ({
-  defaultDestinationNodeWarningMessage: "Warning: This is a default destination node",
+  defaultDestinationNodeWarningKey: "pipeline.defaultDestinationNodeWarning",
 }));
 
 describe("CustomNode.vue", () => {

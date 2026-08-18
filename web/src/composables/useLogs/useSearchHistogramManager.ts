@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
+import type { TranslateFn } from "@/types/i18n";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
 import { convertDateToTimestamp } from "@/utils/date";
 
-export const useSearchHistogramManager = () => {
+export const useSearchHistogramManager = (t: TranslateFn) => {
   let histogramResults: any = [];
 
   const {
@@ -68,7 +69,7 @@ export const useSearchHistogramManager = () => {
     const parsedSQL: any = fnParsedSQL();
 
     if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
-      const errMsg = "Histogram is not available for multi-stream SQL mode search.";
+      const errMsg = t("search.histogramNotAvailableMultiStream");
       resetHistogramWithError(errMsg, 0);
     }
 
@@ -132,10 +133,7 @@ export const useSearchHistogramManager = () => {
         addTraceId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
-      resetHistogramWithError(
-        "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
-        -1,
-      );
+      resetHistogramWithError(t("search.histogramUnavailableForQueries"), -1);
       searchObj.meta.histogramDirtyFlag = false;
     } else if (
       searchObj.meta.sqlMode &&
@@ -156,16 +154,10 @@ export const useSearchHistogramManager = () => {
         }, 0);
       }
       if (isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
-        resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
-          -1,
-        );
+        resetHistogramWithError(t("search.histogramUnavailableForQueries"), -1);
         searchObj.meta.histogramDirtyFlag = false;
       } else {
-        resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
-          -1,
-        );
+        resetHistogramWithError(t("search.histogramUnavailableForQueries"), -1);
       }
       searchObj.meta.histogramDirtyFlag = false;
     } else {
