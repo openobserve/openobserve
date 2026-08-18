@@ -587,6 +587,10 @@ const {
   rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
+  // A delegated scroller can contain a histogram or other content before this
+  // table. Keep its raw offset stable when wrapped rows are remeasured so a
+  // query refresh cannot move the owning page's scrollbar.
+  preserveScrollOffsetOnRowResize: () => !!props.scrollEl && useDynamicRowHeight.value,
 });
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
