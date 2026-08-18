@@ -12,6 +12,9 @@ export const makeOnCallCoverSchema = (t: TranslateFn) =>
   z
     .object({
       user_email: z.string().min(1, t("oncall.coverWhoRequired")),
+      // Which rotation the cover lands on. Absent means the default slot,
+      // which is what every cover meant before slots existed.
+      slot: z.string().optional(),
       // Micros, matching every other instant on this API.
       start_at: z.number().int(),
       end_at: z.number().int(),

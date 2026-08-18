@@ -168,16 +168,53 @@ describe("OnCallCoverForm — swapping", () => {
     expect(swap).toBeTruthy();
     // Over ana's week, bo covers; over bo's week, ana does. Getting this
     // backwards writes a swap that changes nothing and reads as if it worked.
-    expect(swap.first).toEqual({
+    expect(swap.first).toMatchObject({
       user_email: "bo@o2.ai",
       start_at: SHIFTS[0].startMicros,
       end_at: SHIFTS[0].endMicros,
+      covering_for: "ana@o2.ai",
     });
-    expect(swap.second).toEqual({
+    expect(swap.second).toMatchObject({
       user_email: "ana@o2.ai",
       start_at: SHIFTS[1].startMicros,
       end_at: SHIFTS[1].endMicros,
+      covering_for: "bo@o2.ai",
     });
+  });
+
+  /// A cover with no slot lands on the default one. On a two-slot team that is
+  /// not "the rotation being traded" — it is the primary, whose holder the
+  /// swap then silently evicts.
+  it("writes each cover into the slot its shift came from", async () => {
+    const wrapper = render([
+      { ...shift("ana@o2.ai", 0), slot: "secondary" },
+      { ...shift("bo@o2.ai", 1), slot: "secondary" },
+    ]);
+    await intoSwapMode(wrapper);
+    await pick(wrapper, 0, 0);
+    await pick(wrapper, 1, 1);
+    await wrapper.find('[data-test="dialog-primary"]').trigger("click");
+
+    const swap = wrapper.emitted("swap")?.[0]?.[0] as any;
+    expect(swap.first.slot).toBe("secondary");
+    expect(swap.second.slot).toBe("secondary");
+  });
+
+  /// Slots do not compete — both are on call at the same instant — so trading
+  /// across them staffs one pool twice instead of exchanging anything.
+  it("refuses a swap across two slots", async () => {
+    const wrapper = render([
+      { ...shift("ana@o2.ai", 0), slot: "primary" },
+      { ...shift("bo@o2.ai", 1), slot: "secondary" },
+    ]);
+    await intoSwapMode(wrapper);
+    await pick(wrapper, 0, 0);
+    await pick(wrapper, 1, 1);
+
+    expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain(
+      "same rotation",
+    );
+    expect(wrapper.find('[data-test="oncall-swap-summary"]').exists()).toBe(false);
   });
 
   /// The summary names both directions, because "Ana and Bo swap" leaves the

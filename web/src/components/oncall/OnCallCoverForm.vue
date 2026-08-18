@@ -99,6 +99,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-cover-who"
       />
 
+      <!-- Only when there is a choice to make. A single-slot team has one
+           rotation, and a select with one option is a question with one
+           answer. -->
+      <OFormSelect
+        v-if="slotOptions.length > 1"
+        name="slot"
+        :label="t('oncall.coverSlot')"
+        :options="slotOptions"
+        :help-text="t('oncall.coverSlotHint')"
+        data-test="oncall-cover-slot"
+      />
+
       <!-- Presets first, because they are the answer almost every time. -->
       <div class="flex flex-col gap-2">
         <OText variant="label">{{ t("oncall.coverQuickRanges") }}</OText>
@@ -146,7 +158,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { OnCallTeamMember } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY, MICROS_PER_HOUR } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, MICROS_PER_DAY, MICROS_PER_HOUR, sameSlot } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Shift as UpcomingShift } from "@/utils/oncall";
@@ -174,6 +186,12 @@ const props = withDefaults(
      * rota has no weeks to exchange.
      */
     shifts?: UpcomingShift[];
+    /**
+     * The slots this team staffs, in display order. One slot needs no picker —
+     * a cover means the only rotation there is. Two do: a cover written with
+     * no slot lands on the default one and evicts whoever held it.
+     */
+    slots?: string[];
   }>(),
   {
     open: false,
@@ -184,12 +202,16 @@ const props = withDefaults(
     gap: null,
     defaultUser: "",
     shifts: () => [],
+    slots: () => [],
   },
 );
 
 const emit = defineEmits<{
   (e: "update:open", open: boolean): void;
-  (e: "save", value: { user_email: string; start_at: number; end_at: number }): void;
+  (
+    e: "save",
+    value: { user_email: string; start_at: number; end_at: number; slot?: string },
+  ): void;
   /**
    * Two covers, one each way — the caller writes both and owns what happens if
    * the second write fails after the first succeeded.
@@ -197,8 +219,8 @@ const emit = defineEmits<{
   (
     e: "swap",
     value: {
-      first: { user_email: string; start_at: number; end_at: number };
-      second: { user_email: string; start_at: number; end_at: number };
+      first: { user_email: string; start_at: number; end_at: number; slot?: string; covering_for?: string };
+      second: { user_email: string; start_at: number; end_at: number; slot?: string; covering_for?: string };
     },
   ): void;
 }>();
@@ -262,6 +284,7 @@ const prefilledUser = computed(() => {
 
 const defaultValues = computed(() => ({
   user_email: prefilledUser.value,
+  slot: props.slots[0] ?? DEFAULT_SLOT,
   window: windowValue.value ? { from: windowValue.value.from, to: windowValue.value.to } : undefined,
 }));
 
@@ -313,15 +336,27 @@ const summary = computed<I18nText | "">(() => {
 
 /// Keyed by instant, not by index: the list is recomputed from `now` every time
 /// the dialog opens, and an index would silently point at a different week.
+const shiftKey = (shift: UpcomingShift) => `${shift.slot ?? DEFAULT_SLOT}:${shift.startMicros}`;
+
+/// Keyed by slot AND instant: two slots hand over at the same moment, so the
+/// instant alone collapses a primary week and a secondary week onto one entry.
 const shiftByKey = computed(() => {
   const map = new Map<string, UpcomingShift>();
-  for (const shift of props.shifts) map.set(String(shift.startMicros), shift);
+  for (const shift of props.shifts) map.set(shiftKey(shift), shift);
   return map;
 });
 
+const slotOptions = computed(() =>
+  props.slots.map((slot) => ({ label: raw(slot), value: slot })),
+);
+
+/// The slot rides the label whenever the team staffs more than one: two weeks
+/// with the same dates and different pools are otherwise indistinguishable in
+/// the picker, and picking the wrong one writes a cover on the wrong rotation.
 const shiftLabel = (shift: UpcomingShift): I18nText =>
-  t("oncall.swapShiftOption", {
+  t(props.slots.length > 1 ? "oncall.swapShiftOptionInSlot" : "oncall.swapShiftOption", {
     name: raw(shift.member),
+    slot: raw(shift.slot ?? DEFAULT_SLOT),
     range: raw(
       `${formatInZone(shift.startMicros, props.timezone, {
         weekday: "short",
@@ -334,7 +369,7 @@ const shiftLabel = (shift: UpcomingShift): I18nText =>
 const shiftOptions = computed(() =>
   props.shifts.map((shift) => ({
     label: shiftLabel(shift),
-    value: String(shift.startMicros),
+    value: shiftKey(shift),
   })),
 );
 
@@ -349,7 +384,10 @@ const swapPair = computed(() => {
 const swapProblem = computed<I18nText | "">(() => {
   const pair = swapPair.value;
   if (!pair) return "";
-  if (pair.first.startMicros === pair.second.startMicros) return t("oncall.swapSameShift");
+  if (shiftKey(pair.first) === shiftKey(pair.second)) return t("oncall.swapSameShift");
+  // Trading across slots is not a swap: it moves the pager between two pools
+  // that are on call at the same time, leaving one of them staffed twice.
+  if (!sameSlot(pair.first.slot, pair.second.slot)) return t("oncall.swapCrossSlot");
   // Trading a week with yourself writes two covers that change nothing.
   if (pair.first.member === pair.second.member) return t("oncall.swapSamePerson");
   return "";
@@ -383,16 +421,22 @@ function submitSwap() {
   const pair = swapPair.value;
   if (!pair || swapProblem.value) return;
   emit("swap", {
-    // Each cover names the person taking the OTHER one's shift.
+    // Each cover names the person taking the OTHER one's shift, and lands in
+    // the slot that shift belongs to — a cover with no slot goes to the
+    // default one, which on a two-slot team evicts the primary holder.
     first: {
       user_email: pair.second.member,
       start_at: pair.first.startMicros,
       end_at: pair.first.endMicros,
+      slot: pair.first.slot,
+      covering_for: pair.first.member,
     },
     second: {
       user_email: pair.first.member,
       start_at: pair.second.startMicros,
       end_at: pair.second.endMicros,
+      slot: pair.second.slot,
+      covering_for: pair.second.member,
     },
   });
 }
@@ -410,6 +454,7 @@ function onSubmit(value: Record<string, unknown>) {
     user_email: String(value.user_email ?? ""),
     start_at: window.from,
     end_at: window.to,
+    slot: String(value.slot ?? "") || undefined,
   });
 }
 </script>

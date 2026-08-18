@@ -70,6 +70,8 @@ export interface Shift {
   startMicros: number;
   endMicros: number;
   member: string;
+  /** Which slot's rotation this shift belongs to. Absent means the default. */
+  slot?: string;
 }
 
 /**
@@ -98,6 +100,7 @@ export function upcomingShifts(
       startMicros,
       endMicros: startMicros + shift,
       member: members[wrapped],
+      slot: rotation.slot,
     });
   }
   return shifts;

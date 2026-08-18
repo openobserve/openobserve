@@ -710,13 +710,17 @@ const oncall = {
     /// the plural form with a 422. `end_at` is exclusive, so a cover ending
     /// exactly when the next begins does not overlap it.
     data: {
+      /** Which rotation slot is covered. Absent means the default one — which
+       *  on a two-slot team silently evicts whoever held `primary`. */
+      slot?: string;
       user_email: string;
       start_at: number;
       end_at: number;
       /** Whose shift is being covered. Optional — "cover tonight" is a real
        *  request even when nobody has worked out whose shift tonight is. */
       covering_for?: string;
-      note?: string;
+      /** The server's field is `reason`; a `note` key is dropped in silence. */
+      reason?: string;
     };
   }) =>
     http().post<Override>(

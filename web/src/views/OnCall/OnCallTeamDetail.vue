@@ -404,6 +404,7 @@
       :gap="coverGap"
       :default-user="coverDefaultUser"
       :shifts="swappableShifts"
+      :slots="staffedSlots"
       @save="saveCover"
       @swap="saveSwap"
     />
@@ -466,7 +467,7 @@ import type {
   TeamReachability,
   ScheduleEditorIntent,
 } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY, sameSlot } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, MICROS_PER_DAY, sameSlot } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable, upcomingShifts, winningRotation } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -957,13 +958,29 @@ function openTakeOverride() {
 /// an empty picker.
 const SWAPPABLE_SHIFTS = 8;
 
+/// Resolved **per slot**, because slots do not compete: a two-slot team has a
+/// primary and a secondary in force at the same instant. Feeding every
+/// rotation to one `winningRotation` picked whichever layer sorted highest —
+/// often the secondary — and the swap then offered the secondary's weeks while
+/// writing covers that landed on primary, evicting whoever was on call.
+/// The slots this team staffs, in the order the schedule lists them. The cover
+/// dialog needs it to ask which rotation is being covered — a cover written
+/// with no slot lands on the default one whatever the reader had in mind.
+const staffedSlots = computed(() => [
+  ...new Set((schedule.value?.rotations ?? []).map((r) => r.slot ?? DEFAULT_SLOT)),
+]);
+
 const swappableShifts = computed(() => {
   const rotations = schedule.value?.rotations ?? [];
   if (!rotations.length) return [];
   const now = Date.now() * 1000;
   const zone = schedule.value?.timezone || team.value?.timezone || "UTC";
-  const current = winningRotation(rotations, now, zone);
-  return current ? upcomingShifts(current, now, SWAPPABLE_SHIFTS) : [];
+  const slots = [...new Set(rotations.map((r) => r.slot ?? DEFAULT_SLOT))];
+  return slots.flatMap((slot) => {
+    const inSlot = rotations.filter((r) => sameSlot(r.slot, slot));
+    const current = winningRotation(inSlot, now, zone);
+    return current ? upcomingShifts(current, now, SWAPPABLE_SHIFTS) : [];
+  });
 });
 
 /// Two covers, one each way.
@@ -973,10 +990,15 @@ const swappableShifts = computed(() => {
 /// landed, and a half-done swap is worse than none. It is undone, and the
 /// reader is told which of the three things happened rather than being left to
 /// re-read the calendar and guess.
-async function saveSwap(value: {
-  first: { user_email: string; start_at: number; end_at: number };
-  second: { user_email: string; start_at: number; end_at: number };
-}) {
+type SwapCover = {
+  user_email: string;
+  start_at: number;
+  end_at: number;
+  slot?: string;
+  covering_for?: string;
+};
+
+async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
   coverSaving.value = true;
   let firstId: string | null = null;
   try {
@@ -1023,7 +1045,12 @@ async function saveSwap(value: {
 
 /// A cover takes a slot for a window; outside it the rotation resolves exactly
 /// as before, which is what makes taking one safe.
-async function saveCover(value: { user_email: string; start_at: number; end_at: number }) {
+async function saveCover(value: {
+  user_email: string;
+  start_at: number;
+  end_at: number;
+  slot?: string;
+}) {
   coverSaving.value = true;
   try {
     await oncallService.createOverride({
