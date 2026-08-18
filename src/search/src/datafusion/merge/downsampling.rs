@@ -19,7 +19,7 @@ use arrow::array::{Int64Array, RecordBatch};
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
+        promql::{DownsamplingRule, Function, HASH_LABEL, MetricsFileLayout, VALUE_LABEL},
         stream::FileMeta,
     },
     utils::parquet::new_parquet_writer,
@@ -43,7 +43,7 @@ use vortex::{
 
 use crate::datafusion::{
     exec::DataFusionContextBuilder,
-    merge::{MergeParquetResult, append_metadata},
+    merge::{MergeParquetResult, MergedFile, append_metadata},
     sort_order::FileSortOrder,
     table_provider::uniontable::NewUnionTable,
     vortex::{VORTEX_RUNTIME, vortex_write_strategy},
@@ -127,12 +127,17 @@ pub async fn merge_parquet_files_with_downsampling(
         start.elapsed().as_millis()
     );
 
-    Ok(MergeParquetResult::Multiple {
-        bufs,
-        file_metas,
-        series_indexes: None,
-        file_format,
-    })
+    let files = bufs
+        .into_iter()
+        .zip(file_metas)
+        .map(|(buf, meta)| MergedFile {
+            buf,
+            meta,
+            layout: MetricsFileLayout::Legacy,
+            series_index: None,
+        })
+        .collect();
+    Ok(MergeParquetResult { files, file_format })
 }
 
 async fn write_downsampled_parquet(

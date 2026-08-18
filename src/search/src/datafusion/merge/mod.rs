@@ -19,7 +19,7 @@ use arrow::array::RecordBatch;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::{HASH_LABEL, metrics_tsid_major_enabled},
+        promql::{HASH_LABEL, MetricsFileLayout, metrics_tsid_major_enabled},
         stream::{FileMeta, StreamType},
     },
     utils::{
@@ -64,27 +64,59 @@ use {
     o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule,
 };
 
-pub enum MergeParquetResult {
-    Single {
-        buf: Vec<u8>,
-        file_meta: FileMeta,
-        file_format: FileFormat,
-        /// Physical row order the file was written in.
-        sort_order: FileSortOrder,
-    },
-    #[allow(unused)]
-    Multiple {
-        bufs: Vec<Vec<u8>>,
-        file_metas: Vec<FileMeta>,
-        series_indexes: Option<Vec<Vec<u8>>>,
-        file_format: FileFormat,
-    },
+/// One file written by [`merge_parquet_files`].
+pub struct MergedFile {
+    pub buf: Vec<u8>,
+    pub meta: FileMeta,
+    /// Physical layout the file was written in; decides its file name.
+    pub layout: MetricsFileLayout,
+    /// `.sidx` series index of a [`MetricsFileLayout::TsidMajor`] file.
+    pub series_index: Option<Vec<u8>>,
 }
 
-/// Merge `tables` into one file (`MergeParquetResult::Single`), or — for the
-/// compactor's hour-end merge of a TSID-major metrics stream (`finalize`) —
-/// into size-bounded TSID-major files with `.sidx` sidecars
-/// (`MergeParquetResult::Multiple`).
+pub struct MergeParquetResult {
+    pub files: Vec<MergedFile>,
+    pub file_format: FileFormat,
+}
+
+impl MergeParquetResult {
+    fn single(
+        buf: Vec<u8>,
+        meta: FileMeta,
+        layout: MetricsFileLayout,
+        file_format: FileFormat,
+    ) -> Self {
+        Self {
+            files: vec![MergedFile {
+                buf,
+                meta,
+                layout,
+                series_index: None,
+            }],
+            file_format,
+        }
+    }
+
+    /// The merged file, for callers that always merge into exactly one file
+    /// (the ingester movers).
+    pub fn into_single(self) -> Result<(MergedFile, FileFormat)> {
+        let Self {
+            mut files,
+            file_format,
+        } = self;
+        if files.len() != 1 {
+            return Err(DataFusionError::Execution(format!(
+                "merge_parquet_files produced {} files, expected exactly one",
+                files.len()
+            )));
+        }
+        Ok((files.pop().unwrap(), file_format))
+    }
+}
+
+/// Merge `tables` into one file, or — for the compactor's hour-end merge of a
+/// TSID-major metrics stream (`finalize`) — into size-bounded TSID-major files
+/// with `.sidx` sidecars.
 #[allow(clippy::too_many_arguments)]
 pub async fn merge_parquet_files(
     stream_type: StreamType,
@@ -194,7 +226,7 @@ pub async fn merge_parquet_files(
     });
 
     if metrics_tsid_major {
-        let (bufs, file_metas, series_indexes) = tsid_major::write_files(
+        let files = tsid_major::write_files(
             &schema,
             bloom_filter_fields,
             &metadata,
@@ -205,15 +237,10 @@ pub async fn merge_parquet_files(
         .await?;
         log::debug!(
             "merge_parquet_files wrote {} size-bounded TSID-major files in {} ms",
-            bufs.len(),
+            files.len(),
             start.elapsed().as_millis()
         );
-        return Ok(MergeParquetResult::Multiple {
-            bufs,
-            file_metas,
-            series_indexes: Some(series_indexes),
-            file_format,
-        });
+        return Ok(MergeParquetResult { files, file_format });
     }
 
     let buf = match file_format {
@@ -237,12 +264,19 @@ pub async fn merge_parquet_files(
     );
 
     metadata.compressed_size = buf.len() as i64;
-    Ok(MergeParquetResult::Single {
+    // a hash-sorted single file is not finalized: the ingester and incremental
+    // compactor merges write it, the hour-end merge turns it into TSID-major
+    let layout = if sort_order == FileSortOrder::HashTimestampAsc {
+        MetricsFileLayout::HashSorted
+    } else {
+        MetricsFileLayout::Legacy
+    };
+    Ok(MergeParquetResult::single(
         buf,
-        file_meta: metadata,
+        metadata,
+        layout,
         file_format,
-        sort_order,
-    })
+    ))
 }
 
 /// Row order `merge_parquet_files` writes for the given stream.
@@ -502,10 +536,8 @@ mod tests {
         )
         .await
         .unwrap();
-        let MergeParquetResult::Single { buf, .. } = merged else {
-            panic!("trace time index merge must produce a single parquet file");
-        };
-        let batches = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(buf))
+        let (merged, _) = merged.into_single().unwrap();
+        let batches = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(merged.buf))
             .unwrap()
             .build()
             .unwrap()

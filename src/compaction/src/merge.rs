@@ -53,7 +53,7 @@ use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_ru
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
-    merge::{self, MergeParquetResult},
+    merge::{self, MergeParquetResult, MergedFile},
     sort_order::FileSortOrder,
 };
 use search_service::file_list;
@@ -995,181 +995,94 @@ pub async fn merge_files(
         log::debug!("skip index generation for stream: {org_id}/{stream_type}/{stream_name}");
     }
 
-    let mut new_files = Vec::new();
-    match buf {
-        MergeParquetResult::Single {
-            buf,
-            file_meta: mut new_file_meta,
-            file_format,
-            sort_order,
-        } => {
-            if new_file_meta.compressed_size == 0 {
-                return Err(anyhow::anyhow!(
-                    "merge_parquet_files error: compressed_size is 0"
-                ));
-            }
-
-            // incremental TSID-major merge: hash-sorted but not finalized, the
-            // hour-end pass merges it again into the final layout
-            let layout = if sort_order == FileSortOrder::HashTimestampAsc {
-                MetricsFileLayout::HashSorted
-            } else {
-                MetricsFileLayout::Legacy
-            };
-            let id = ider::generate_file_name();
-            let new_file_key = format!("{prefix}/{}", layout.file_name(&id, file_format));
-            log::info!(
-                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
-                retain_file_list.len(),
-                new_file_meta.original_size,
-                new_file_meta.compressed_size,
-                start.elapsed().as_millis(),
-            );
-
-            // upload file to storage
-            let buf = Bytes::from(buf);
-            if cfg.cache_latest_files.enabled
-                && cfg.cache_latest_files.cache_parquet
-                && cfg.cache_latest_files.download_from_node
-            {
-                infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
-                log::debug!("merge_files {new_file_key} file_data::disk::set success");
-            }
-
-            // TODO: check how compliance will interact with org storage
-            let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
-            if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
-                storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
-            } else {
-                storage::put(&account, &new_file_key, buf.clone()).await?;
-            }
-
-            if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
-                generate_inverted_index(
-                    org_id,
-                    &new_file_key,
-                    &full_text_search_fields,
-                    &index_fields,
-                    &retain_file_list,
-                    &mut new_file_meta,
-                    latest_schema.clone(),
-                    buf,
-                )
-                .await?;
-            }
-            new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
+    let MergeParquetResult {
+        files: merged_files,
+        file_format,
+    } = buf;
+    let mut new_files = Vec::with_capacity(merged_files.len());
+    for MergedFile {
+        buf,
+        meta: mut new_file_meta,
+        layout,
+        series_index,
+    } in merged_files
+    {
+        new_file_meta.compressed_size = buf.len() as i64;
+        if new_file_meta.compressed_size == 0 {
+            return Err(anyhow::anyhow!(
+                "merge_parquet_files error: compressed_size is 0"
+            ));
         }
-        MergeParquetResult::Multiple {
-            bufs,
-            file_metas,
-            mut series_indexes,
-            file_format,
-        } => {
-            if series_indexes
-                .as_ref()
-                .is_some_and(|indexes| indexes.len() != bufs.len())
-            {
-                return Err(anyhow::anyhow!(
-                    "merge_parquet_files returned mismatched TSID series indexes"
-                ));
-            }
-            for (index, (buf, file_meta)) in bufs.into_iter().zip(file_metas).enumerate() {
-                let mut new_file_meta = file_meta;
-                new_file_meta.compressed_size = buf.len() as i64;
-                if new_file_meta.compressed_size == 0 {
-                    return Err(anyhow::anyhow!(
-                        "merge_parquet_files error: compressed_size is 0"
-                    ));
-                }
 
-                let layout = if series_indexes.is_some() {
-                    if file_format != FileFormat::Parquet {
-                        return Err(anyhow::anyhow!(
-                            "TSID-major output must use Parquet, got {file_format}"
-                        ));
-                    }
-                    MetricsFileLayout::TsidMajor
-                } else {
-                    MetricsFileLayout::Legacy
-                };
-                let id = ider::generate_file_name();
-                let new_file_key = format!("{prefix}/{}", layout.file_name(&id, file_format));
+        let id = ider::generate_file_name();
+        let new_file_key = format!("{prefix}/{}", layout.file_name(&id, file_format));
 
-                // upload file to storage
-                let buf = Bytes::from(buf);
-                if cfg.cache_latest_files.enabled
-                    && cfg.cache_latest_files.cache_parquet
-                    && cfg.cache_latest_files.download_from_node
-                {
-                    infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
-                    log::debug!("merge_files {new_file_key} file_data::disk::set success");
-                }
+        // upload file to storage
+        let buf = Bytes::from(buf);
+        if cfg.cache_latest_files.enabled
+            && cfg.cache_latest_files.cache_parquet
+            && cfg.cache_latest_files.download_from_node
+        {
+            infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+            log::debug!("merge_files {new_file_key} file_data::disk::set success");
+        }
 
-                // TODO: check how compliance will interact with org storage
-                let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
-                if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
-                    storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
-                } else {
-                    storage::put(&account, &new_file_key, buf.clone()).await?;
-                }
+        // TODO: check how compliance will interact with org storage
+        let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
+        let compliance = cfg.s3.feature_force_infrequent_access && storage_type.is_compliance();
+        if compliance {
+            storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
+        } else {
+            storage::put(&account, &new_file_key, buf.clone()).await?;
+        }
 
-                if let Some(series_index) = series_indexes
-                    .as_mut()
-                    .and_then(|indexes| indexes.get_mut(index))
-                    .map(std::mem::take)
-                {
-                    let series_index_key = MetricsFileLayout::series_index_path(&new_file_key)
-                        .ok_or_else(|| {
-                            anyhow::anyhow!(
-                                "TSID series index has no indexed layout marker: {new_file_key}"
-                            )
-                        })?;
-                    let series_index = Bytes::from(series_index);
-                    if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
-                        storage::put_with_compliance(
-                            &account,
-                            &series_index_key,
-                            series_index.clone(),
-                        )
-                        .await?;
-                    } else {
-                        storage::put(&account, &series_index_key, series_index.clone()).await?;
-                    }
-                    log::debug!(
-                        "[COMPACTOR:WORKER:{thread_id}] wrote TSID series index {series_index_key}, size: {}",
-                        series_index.len()
-                    );
-                }
-
-                if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
-                    generate_inverted_index(
-                        org_id,
-                        &new_file_key,
-                        &full_text_search_fields,
-                        &index_fields,
-                        &retain_file_list,
-                        &mut new_file_meta,
-                        latest_schema.clone(),
-                        buf,
-                    )
+        // TSID-major files own a `.sidx` series index; it is not tracked in
+        // file_list and is deleted together with the data file
+        if let Some(series_index) = series_index {
+            let series_index_key =
+                MetricsFileLayout::series_index_path(&new_file_key).ok_or_else(|| {
+                    anyhow::anyhow!("TSID series index for a non TSID-major file: {new_file_key}")
+                })?;
+            let series_index = Bytes::from(series_index);
+            if compliance {
+                storage::put_with_compliance(&account, &series_index_key, series_index.clone())
                     .await?;
-                }
-
-                new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
+            } else {
+                storage::put(&account, &series_index_key, series_index.clone()).await?;
             }
-            log::info!(
-                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
-                retain_file_list.len(),
-                new_files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
-                new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
-                new_files
-                    .iter()
-                    .map(|f| f.meta.compressed_size)
-                    .sum::<i64>(),
-                start.elapsed().as_millis(),
+            log::debug!(
+                "[COMPACTOR:WORKER:{thread_id}] wrote TSID series index {series_index_key}, size: {}",
+                series_index.len()
             );
         }
-    };
+
+        if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
+            generate_inverted_index(
+                org_id,
+                &new_file_key,
+                &full_text_search_fields,
+                &index_fields,
+                &retain_file_list,
+                &mut new_file_meta,
+                latest_schema.clone(),
+                buf,
+            )
+            .await?;
+        }
+        new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
+    }
+    log::info!(
+        "[COMPACTOR:WORKER:{thread_id}] merged {} files into {} new file(s): {:?}, original_size: {}, compressed_size: {}, took: {} ms",
+        retain_file_list.len(),
+        new_files.len(),
+        new_files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
+        new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
+        new_files
+            .iter()
+            .map(|f| f.meta.compressed_size)
+            .sum::<i64>(),
+        start.elapsed().as_millis(),
+    );
 
     Ok((new_files, retain_file_list))
 }

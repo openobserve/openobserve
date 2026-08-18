@@ -28,8 +28,8 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         promql::{
-            EXEMPLARS_LABEL, HASH_LABEL, TSID_SERIES_INDEX_ROW_COUNT, TSID_SERIES_INDEX_ROW_START,
-            VALUE_LABEL,
+            EXEMPLARS_LABEL, HASH_LABEL, MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT,
+            TSID_SERIES_INDEX_ROW_START, VALUE_LABEL,
         },
         stream::FileMeta,
     },
@@ -41,7 +41,7 @@ use datafusion::{
 };
 use parquet::arrow::AsyncArrowWriter;
 
-use super::append_metadata;
+use super::{MergedFile, append_metadata};
 
 /// Write a globally hash-sorted metrics stream into size-bounded files.
 /// Rotation happens between input record batches. File and row-group
@@ -53,7 +53,7 @@ pub(super) async fn write_files(
     max_file_size: usize,
     rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
-) -> Result<(Vec<Vec<u8>>, Vec<FileMeta>, Vec<Vec<u8>>)> {
+) -> Result<Vec<MergedFile>> {
     let hash_index = schema.index_of(HASH_LABEL).map_err(|e| {
         DataFusionError::Plan(format!("TSID-major layout requires {HASH_LABEL}: {e}"))
     })?;
@@ -65,9 +65,7 @@ pub(super) async fn write_files(
     let max_file_size = max_file_size.max(1);
     let mut active: Option<ActiveSizeTsidWriter> = None;
     let mut previous_hash = None;
-    let mut bufs = Vec::new();
-    let mut file_metas = Vec::new();
-    let mut series_indexes = Vec::new();
+    let mut files: Vec<MergedFile> = Vec::new();
     let mut rows_written = 0_i64;
 
     while let Some(batch) = rx.recv().await {
@@ -117,13 +115,7 @@ pub(super) async fn write_files(
             .as_ref()
             .is_some_and(|writer| writer.estimated_original_size(metadata) >= max_file_size);
         if rotate {
-            finish_size_tsid_writer(
-                active.take().unwrap(),
-                &mut bufs,
-                &mut file_metas,
-                &mut series_indexes,
-            )
-            .await?;
+            files.push(active.take().unwrap().finish().await?);
         }
 
         if active.is_none() {
@@ -151,16 +143,16 @@ pub(super) async fn write_files(
         .await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
     if let Some(active) = active.take() {
-        finish_size_tsid_writer(active, &mut bufs, &mut file_metas, &mut series_indexes).await?;
+        files.push(active.finish().await?);
     }
-    if bufs.is_empty() {
+    if files.is_empty() {
         return Err(DataFusionError::Execution(
             "TSID-major merge produced no rows".to_string(),
         ));
     }
 
-    assign_tsid_file_sizes(metadata, rows_written, &bufs, &mut file_metas);
-    Ok((bufs, file_metas, series_indexes))
+    assign_tsid_file_sizes(metadata, rows_written, &mut files);
+    Ok(files)
 }
 
 async fn write_size_tsid_slice(
@@ -214,26 +206,22 @@ impl ActiveSizeTsidWriter {
             / i128::from(source_meta.records.max(1));
         usize::try_from(estimate).unwrap_or(usize::MAX)
     }
-}
 
-async fn finish_size_tsid_writer(
-    active: ActiveSizeTsidWriter,
-    bufs: &mut Vec<Vec<u8>>,
-    file_metas: &mut Vec<FileMeta>,
-    series_indexes: &mut Vec<Vec<u8>>,
-) -> Result<()> {
-    let ActiveSizeTsidWriter {
-        writer,
-        file_meta,
-        series_index,
-    } = active;
-    let mut writer = writer;
-    append_metadata(&mut writer, &file_meta)?;
-    writer.finish().await?;
-    bufs.push(writer.into_inner());
-    file_metas.push(file_meta);
-    series_indexes.push(series_index.finish()?);
-    Ok(())
+    async fn finish(self) -> Result<MergedFile> {
+        let Self {
+            mut writer,
+            file_meta,
+            series_index,
+        } = self;
+        append_metadata(&mut writer, &file_meta)?;
+        writer.finish().await?;
+        Ok(MergedFile {
+            buf: writer.into_inner(),
+            meta: file_meta,
+            layout: MetricsFileLayout::TsidMajor,
+            series_index: Some(series_index.finish()?),
+        })
+    }
 }
 
 fn empty_tsid_file_meta(metadata: &FileMeta) -> FileMeta {
@@ -270,24 +258,21 @@ fn update_tsid_file_meta(
     }
 }
 
-fn assign_tsid_file_sizes(
-    source_meta: &FileMeta,
-    rows_written: i64,
-    bufs: &[Vec<u8>],
-    file_metas: &mut [FileMeta],
-) {
+/// Split the logical `original_size` of the input over the output files by
+/// row count (the last file takes the remainder) and record the physical size.
+fn assign_tsid_file_sizes(source_meta: &FileMeta, rows_written: i64, files: &mut [MergedFile]) {
     let denominator = rows_written.max(1) as i128;
     let mut assigned_original_size = 0_i64;
-    let file_meta_count = file_metas.len();
-    for (index, file_meta) in file_metas.iter_mut().enumerate() {
-        file_meta.original_size = if index + 1 == file_meta_count {
+    let file_count = files.len();
+    for (index, file) in files.iter_mut().enumerate() {
+        file.meta.original_size = if index + 1 == file_count {
             source_meta.original_size - assigned_original_size
         } else {
-            ((i128::from(source_meta.original_size) * i128::from(file_meta.records)) / denominator)
+            ((i128::from(source_meta.original_size) * i128::from(file.meta.records)) / denominator)
                 as i64
         };
-        assigned_original_size += file_meta.original_size;
-        file_meta.compressed_size = bufs[index].len() as i64;
+        assigned_original_size += file.meta.original_size;
+        file.meta.compressed_size = file.buf.len() as i64;
     }
 }
 
@@ -479,7 +464,7 @@ mod tests {
         tx.send(batch3).await.unwrap();
         drop(tx);
 
-        let (bufs, file_metas, series_indexes) = write_files(
+        let files = write_files(
             &schema,
             &[],
             &metadata,
@@ -490,20 +475,24 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(bufs.len(), 3);
-        assert_eq!(file_metas.iter().map(|meta| meta.records).sum::<i64>(), 6);
+        assert_eq!(files.len(), 3);
+        assert_eq!(files.iter().map(|f| f.meta.records).sum::<i64>(), 6);
         assert_eq!(
-            file_metas
+            files
                 .iter()
-                .map(|meta| meta.original_size)
+                .map(|f| f.meta.original_size)
                 .collect::<Vec<_>>(),
             vec![200, 300, 100]
         );
-        assert_eq!(series_indexes.len(), bufs.len());
+        assert!(files.iter().all(|f| {
+            f.layout == MetricsFileLayout::TsidMajor
+                && f.series_index.is_some()
+                && f.meta.compressed_size == f.buf.len() as i64
+        }));
 
         let mut file_hashes = Vec::new();
-        for buf in bufs {
-            let reader = ParquetRecordBatchReaderBuilder::try_new(bytes::Bytes::from(buf))
+        for file in files {
+            let reader = ParquetRecordBatchReaderBuilder::try_new(bytes::Bytes::from(file.buf))
                 .unwrap()
                 .build()
                 .unwrap();

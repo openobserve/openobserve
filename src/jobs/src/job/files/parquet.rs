@@ -25,7 +25,6 @@ use chrono::{Duration, Utc};
 use config::{
     FxIndexMap, cluster, get_config,
     meta::{
-        promql::MetricsFileLayout,
         search::StorageType,
         stream::{FileKey, FileMeta, StreamType},
     },
@@ -48,11 +47,7 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::{
-    exec::TableBuilder,
-    merge::{self, MergeParquetResult},
-    sort_order::FileSortOrder,
-};
+use search::datafusion::{exec::TableBuilder, merge, sort_order::FileSortOrder};
 use tantivy_utils::index_builder::create_tantivy_index;
 use tokio::{
     fs::remove_file,
@@ -810,34 +805,22 @@ async fn merge_files(
         }
     };
 
-    let (buf, mut new_file_meta, file_format, sort_order) = match buf {
-        MergeParquetResult::Single {
-            buf,
-            file_meta,
-            file_format,
-            sort_order,
-        } => (buf, file_meta, file_format, sort_order),
-        MergeParquetResult::Multiple { .. } => {
-            // ingester should not support multiple files, it will be handled in compactor mode
-            panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
-        }
-    };
+    // the ingester always merges into exactly one file
+    let (merged, file_format) = buf.into_single()?;
+    let (buf, mut new_file_meta, layout) = (merged.buf, merged.meta, merged.layout);
 
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-    let mut new_file_key = super::generate_ingester_storage_file_key(
+    let new_file_key = layout.mark_file_key(&super::generate_ingester_storage_file_key(
         &org_id,
         stream_type,
         &stream_name,
         &file_name,
         file_format,
-    );
-    if sort_order == FileSortOrder::HashTimestampAsc {
-        new_file_key = MetricsFileLayout::HashSorted.mark_file_key(&new_file_key);
-    }
+    ));
     log::info!(
         "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
