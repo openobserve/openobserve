@@ -44,8 +44,8 @@
 //! - merge math: counts/totals add exactly; `traces` adds as an UPPER BOUND (§5.1 merge rule);
 //!   merged percentiles are request(calls)-weighted (the `aggregate_baselines` precedent) and
 //!   labeled `percentiles_estimated`;
-//! - `ZO_DB_MONITORING_LIVE_TAIL=false` skips the tail entirely — staleness then surfaces through
-//!   `data_through` alone.
+//! - the live tail is always on: DBM's only switch is `ZO_DB_MONITORING_ENABLED`, and a stalled
+//!   rollup job still surfaces through `data_through`.
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
@@ -396,12 +396,11 @@ pub(crate) fn build_stats_sql_projected(
 /// Rollup `_timestamp` is the window END, so a stats read wants the OPEN span
 /// `(start, end)` — BOTH edges exclusive, for the same reason at each end:
 ///
-/// * a window ending exactly on `start_time` finished before the range opened;
-///   it is the PREVIOUS range's last window.
-/// * a window ending exactly on `end_time` has not finished inside the range;
-///   it is the NEXT range's first window. The caller's `[start, end)` is a
-///   half-open span of wall clock, so its own last window is the one ending
-///   one grid step BEFORE `end_time`.
+/// * a window ending exactly on `start_time` finished before the range opened; it is the PREVIOUS
+///   range's last window.
+/// * a window ending exactly on `end_time` has not finished inside the range; it is the NEXT
+///   range's first window. The caller's `[start, end)` is a half-open span of wall clock, so its
+///   own last window is the one ending one grid step BEFORE `end_time`.
 ///
 /// Counting either edge makes two adjacent reads (paging, refresh, the Δ
 /// baseline) both claim the same window.
@@ -1144,13 +1143,9 @@ pub(crate) fn tail_ttl_micros(interval_secs: u64) -> i64 {
 /// function used to issue its own per-stream meta-DB round trip on every
 /// request.
 async fn get_or_compute_tail(org_id: &str, stream: &str, offset: i64) -> Option<Arc<TailData>> {
-    let cfg = get_config();
-    if !cfg.db_monitoring.live_tail {
-        return None;
-    }
     let now = now_micros();
-    let interval_micros = (cfg.db_monitoring.interval_secs as i64).max(1) * 1_000_000;
-    let ttl = tail_ttl_micros(cfg.db_monitoring.interval_secs);
+    let interval_micros = rollup::ROLLUP_INTERVAL_SECS as i64 * 1_000_000;
+    let ttl = tail_ttl_micros(rollup::ROLLUP_INTERVAL_SECS);
 
     if let Some(t) = TAIL_CACHE.get(org_id, stream, offset, now, ttl) {
         return Some(t);
@@ -1195,7 +1190,7 @@ async fn get_or_compute_tail(org_id: &str, stream: &str, offset: i64) -> Option<
 
     // The BOUNDED two-stage form (§5.2), reusing the rollup's own builders —
     // never the raw unbounded aggregate.
-    let rank_sql = rollup::build_rank_sql(stream, cfg.db_monitoring.top_n, has_rows_col);
+    let rank_sql = rollup::build_rank_sql(stream, rollup::ROLLUP_TOP_N, has_rows_col);
     let totals_sql = rollup::build_totals_sql(stream, has_rows_col);
 
     let mut data = TailData {
@@ -1436,7 +1431,6 @@ async fn collect_tails(
     start_time: i64,
     end_time: i64,
 ) -> CollectedTails {
-    let cfg = get_config();
     // ONE prefix read for every stream's offset — this used to be a meta-DB
     // round trip per stream here, plus a second one inside each tail
     // computation. A stream absent from the map is a fresh stream (offset 0),
@@ -1475,7 +1469,7 @@ async fn collect_tails(
     let mut tail_covers_from: Option<i64> = None;
     let mut tail_through: Option<i64> = None;
     let mut truncated = false;
-    if cfg.db_monitoring.live_tail && offsets.is_some() {
+    if offsets.is_some() {
         // Every stream's tail concurrently — each is its own bounded pair of
         // searches (or a cache hit), with no ordering between streams.
         let computed = join_all(
@@ -1721,7 +1715,6 @@ async fn read_databases_window(
     start_time: i64,
     end_time: i64,
 ) -> Result<DatabasesWindow, HttpResponse> {
-    let cfg = get_config();
     let filters = ScopeFilters {
         system: q.system.clone(),
         service: q.service.clone(),
@@ -1869,7 +1862,7 @@ async fn read_databases_window(
         !tails.iter().all(|t| t.totals_rows.is_empty()) || totals_pool.len() > hits.len();
     let freshness = Freshness {
         data_through: collected.data_through,
-        live_tail: cfg.db_monitoring.live_tail,
+        live_tail: true,
         tail_covers_from: collected.tail_covers_from,
         tail_through: collected.tail_through,
         tail_truncated: collected.tail_truncated,
@@ -2155,7 +2148,6 @@ async fn read_queries_window(
     start_time: i64,
     end_time: i64,
 ) -> Result<QueriesWindow, HttpResponse> {
-    let cfg = get_config();
     let filters = ScopeFilters {
         system: q.system.clone(),
         instance: q.instance.clone(),
@@ -2230,7 +2222,7 @@ async fn read_queries_window(
 
     let freshness = Freshness {
         data_through: collected.data_through,
-        live_tail: cfg.db_monitoring.live_tail,
+        live_tail: true,
         tail_covers_from: collected.tail_covers_from,
         tail_through: collected.tail_through,
         tail_truncated: collected.tail_truncated,
@@ -2481,7 +2473,7 @@ pub async fn get_dbm_query_history(
         (names.len() == 1).then(|| names.into_iter().next().unwrap())
     });
 
-    let interval_micros = (cfg.db_monitoring.interval_secs as i64).max(1) * 1_000_000;
+    let interval_micros = rollup::ROLLUP_INTERVAL_SECS as i64 * 1_000_000;
     let mut series: Vec<Value> = Vec::new();
     for (window_end, rows) in &fp_by_window {
         let mut point = merge_rows(rows.iter().copied());
@@ -2606,7 +2598,7 @@ pub async fn get_dbm_query_history(
 
     let freshness = Freshness {
         data_through: collected.data_through,
-        live_tail: cfg.db_monitoring.live_tail,
+        live_tail: true,
         tail_covers_from: collected.tail_covers_from,
         tail_through: collected.tail_through,
         tail_truncated: collected.tail_truncated,
@@ -3073,13 +3065,34 @@ const MAX_EVENTS_LIMIT: usize = 1000;
 /// Scope predicates shared by both server-vantage endpoints. Column names are a
 /// fixed whitelist; values are single-quote-escaped — user input can never name
 /// a column (same contract as [`ScopeFilters::sql_preds`]).
-fn dbm_event_preds(system: Option<&str>, instance: Option<&str>, database: Option<&str>) -> String {
+///
+/// **The instance predicate is presence-gated on the stream schema** (N5), the
+/// same rule the SELECT projections apply through `present_dbm_columns`. A
+/// stream whose rows never carried `o2_dbm_instance` — the statement/explain
+/// filelog feeds predate the instance stamp — would otherwise turn every
+/// `?instance=` request into a confident empty 200 (or a schema error when the
+/// column is absent outright). The documented decision: when the column is
+/// absent from the schema the predicate is SKIPPED, treating a single-instance
+/// stream as matching, which is preferable to silently matching nothing. The
+/// engine/database predicates stay unconditional: every canonicalizer stamps
+/// them, so their absence genuinely means "no such rows".
+fn dbm_event_preds(
+    system: Option<&str>,
+    instance: Option<&str>,
+    database: Option<&str>,
+    present: &HashSet<String>,
+) -> String {
     let mut out = String::new();
     for (col, val) in [
         (server_vantage::O2_DBM_ENGINE, system),
         (server_vantage::O2_DBM_INSTANCE, instance),
         (server_vantage::O2_DBM_DATABASE, database),
     ] {
+        if col == server_vantage::O2_DBM_INSTANCE && !present.contains(col) {
+            // Single-instance stream: nothing to narrow by, so the filter
+            // matches rather than silently excluding every row (N5).
+            continue;
+        }
         if let Some(v) = val.filter(|s| !s.is_empty()) {
             out.push_str("\n    AND ");
             out.push_str(col);
@@ -3318,10 +3331,9 @@ fn wire_alias_of(col: &str) -> &'static str {
 /// Returns `None` when the stream's schema lacks a grouping column. Naming an
 /// absent column in a `GROUP BY` fails the WHOLE query with a schema error
 /// rather than yielding nulls, and the exposed case is the common one: every
-/// stream that predates activity ingest, and every deployment leaving
-/// `ZO_DB_MONITORING_ACTIVITY_ENABLED` at its default of OFF, has none of these
-/// columns. The rows query degrades to `_timestamp` and returns empty there, so
-/// the breakdown must skip rather than 500 the endpoint.
+/// stream that predates activity ingest has none of these columns. The rows
+/// query degrades to `_timestamp` and returns empty there, so the breakdown
+/// must skip rather than 500 the endpoint.
 ///
 /// Deliberately UNBOUNDED: a `LIMIT` on an aggregate is the same truncation this
 /// function exists to avoid.
@@ -3771,8 +3783,7 @@ async fn deadlock_window_needs_fallback(
         // the widening to surface, and we did not even have to ask.
         return false;
     };
-    let canonical_sql =
-        build_earliest_canonical_sql(stream, server_vantage::KIND_DEADLOCK);
+    let canonical_sql = build_earliest_canonical_sql(stream, server_vantage::KIND_DEADLOCK);
     // Two independent bounded reads — the same `tokio::join!` shape
     // `probe_collection` already uses for its pair.
     let (canonical_rows, raw_rows) = tokio::join!(
@@ -4257,7 +4268,7 @@ impl BlockingScopeNarrowing {
 /// is" is not evidence that it is the one asked for — and it keeps this
 /// agreeing with the SQL predicate it replaces, since `AND o2_dbm_engine = 'x'`
 /// does not match a NULL column either. Without that agreement the same request
-/// would return different rows depending on the kill-switch.
+/// would return different rows depending on whether the fallback is active.
 #[cfg(feature = "enterprise")]
 struct ScopeNarrowing {
     system: Option<String>,
@@ -5041,8 +5052,6 @@ async fn read_deadlocks_body(
         .limit
         .unwrap_or(DEFAULT_EVENTS_LIMIT)
         .clamp(1, MAX_EVENTS_LIMIT);
-    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
-
     // Rows are read at the RAW-RECORD limit, then stitched. On MySQL that means
     // the event count after stitching is lower than the row count — which is
     // the point: the cap bounds the scan, not the answer.
@@ -5062,6 +5071,12 @@ async fn read_deadlocks_body(
             }
         },
     };
+    let preds = dbm_event_preds(
+        q.system.as_deref(),
+        q.instance.as_deref(),
+        q.database(),
+        &present,
+    );
     // A1 · the read-time fallback over OSS-ingested rows.
     //
     // An Open Source build stores a deadlock log line VERBATIM and canonicalizes
@@ -5087,30 +5102,24 @@ async fn read_deadlocks_body(
     // self-limiting: as the pre-upgrade window ages out of retention the
     // fallback stops doing any work, with no operator action and no date to set.
     // See `BoundaryProbe`.
-    let raw_fallback = if config::get_config().db_monitoring.deadlock_read_fallback {
-        match present_raw_deadlock_columns(org_id, stream).await {
-            // The kill-switch short-circuits BEFORE the boundary probe, so
-            // turning it off costs nothing at all — the probe never fires.
-            Ok(present) => {
-                let candidate = RawDeadlockFallback { present };
-                if deadlock_window_needs_fallback(org_id, stream, start_time, end_time, &candidate)
-                    .await
-                {
-                    Some(candidate)
-                } else {
-                    None
-                }
-            }
-            Err(e) => {
-                log::warn!(
-                    "[DbMonitoring] deadlocks raw-column read failed for {org_id}/{stream}, \
-                     serving canonical rows only: {e}"
-                );
+    let raw_fallback = match present_raw_deadlock_columns(org_id, stream).await {
+        Ok(present) => {
+            let candidate = RawDeadlockFallback { present };
+            if deadlock_window_needs_fallback(org_id, stream, start_time, end_time, &candidate)
+                .await
+            {
+                Some(candidate)
+            } else {
                 None
             }
         }
-    } else {
-        None
+        Err(e) => {
+            log::warn!(
+                "[DbMonitoring] deadlocks raw-column read failed for {org_id}/{stream}, \
+                 serving canonical rows only: {e}"
+            );
+            None
+        }
     };
 
     // SCOPE FILTERS MUST NOT REACH THE RAW ROWS' SQL.
@@ -5287,6 +5296,72 @@ fn blocking_sample_to_dto(s: &server_vantage::BlockingSample) -> Value {
     })
 }
 
+/// O1 · Collapse repeated poll observations of one wait into its final
+/// observation.
+///
+/// A blocking sample is a POLL SNAPSHOT of a wait, not an event: the sampler
+/// re-observes a still-blocked `(blocked_pid, blocking_pid)` pair on every
+/// poll for as long as the wait lasts, so a 5-minute wait at a 10 s interval
+/// lands ~30 rows. Counting rows counts polls — the badge reported ~30
+/// "blocked sessions" for ONE wait, and any duration sum re-added the same
+/// wait's growing `wait_seconds` once per poll.
+///
+/// The identity of one wait is `(engine, instance, database, blocked_pid,
+/// blocking_pid)` — pids are per-instance, and every snapshot of one wait
+/// carries the same engine/instance/database — split into EPISODES where
+/// `wait_seconds` DECREASES between time-ordered observations: within one wait
+/// the engine's reported wait time grows monotonically, so a drop means the
+/// pids were REUSED for a new wait later in the window. Per episode the LAST
+/// observation is kept — the one carrying the wait's maximum observed
+/// `wait_seconds` — so summing the kept rows' `wait_seconds` measures time
+/// lost without repeat-counting. Observations without `wait_seconds` cannot be
+/// episode-split and collapse to the latest observation per pair.
+///
+/// Output is ordered newest-first, matching the SQL's presentation order.
+#[cfg(feature = "enterprise")]
+fn dedupe_blocking_waits(
+    samples: Vec<server_vantage::BlockingSample>,
+) -> Vec<server_vantage::BlockingSample> {
+    type WaitKey = (String, String, String, Option<i64>, Option<i64>);
+    let mut groups: BTreeMap<WaitKey, Vec<server_vantage::BlockingSample>> = BTreeMap::new();
+    for s in samples {
+        let key = (
+            s.engine.clone().unwrap_or_default(),
+            s.instance.clone().unwrap_or_default(),
+            s.database.clone().unwrap_or_default(),
+            s.blocked_pid,
+            s.blocking_pid,
+        );
+        groups.entry(key).or_default().push(s);
+    }
+    let mut kept: Vec<server_vantage::BlockingSample> = Vec::new();
+    for (_key, mut obs) in groups {
+        obs.sort_by_key(|s| s.timestamp.unwrap_or(0));
+        let mut prev_wait = f64::MIN;
+        let mut episode_last: Option<server_vantage::BlockingSample> = None;
+        for s in obs {
+            // A small tolerance absorbs float noise in the engine's own
+            // wait computation; a genuine new wait restarts near zero.
+            let is_new_episode = match (s.wait_seconds, episode_last.is_some()) {
+                (Some(w), true) => w + 1e-3 < prev_wait,
+                _ => false,
+            };
+            if is_new_episode && let Some(done) = episode_last.take() {
+                kept.push(done);
+            }
+            if let Some(w) = s.wait_seconds {
+                prev_wait = w;
+            }
+            episode_last = Some(s);
+        }
+        if let Some(done) = episode_last {
+            kept.push(done);
+        }
+    }
+    kept.sort_by_key(|s| std::cmp::Reverse(s.timestamp.unwrap_or(0)));
+    kept
+}
+
 /// GET /{org_id}/traces/db_monitoring/blocking — FR-16 blocking chains.
 ///
 /// Returns the flat canonical samples AND server-assembled root-blocker
@@ -5348,6 +5423,10 @@ pub async fn get_dbm_blocking(Path(_org_id): Path<String>, _user_email: UserEmai
 /// tab renders; chain assembly and the probe reads are enrichment it never
 /// consumes. A callable, like [`server_metrics_envelope`], so the shape is
 /// tested for real instead of scraped out of the handler's source text.
+///
+/// `total` counts DISTINCT WAITS, not poll rows: the caller dedupes the
+/// samples through [`dedupe_blocking_waits`] before building either envelope
+/// (O1 — a 5-minute wait at 10 s polling is one wait, not ~30 sessions).
 #[cfg(feature = "enterprise")]
 pub(crate) fn blocking_badge_envelope(hits: &[Value], truncated: bool, stream: &str) -> Value {
     json!({
@@ -5428,8 +5507,6 @@ async fn read_blocking_body(
         .limit
         .unwrap_or(DEFAULT_EVENTS_LIMIT)
         .clamp(1, MAX_EVENTS_LIMIT);
-    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
-
     // Same contract as the deadlocks handler, and here the false verdict is the
     // loud one: an empty set drops the pid columns, `BlockingSample::from_record`
     // then filters out every row, and the page tells the operator
@@ -5446,6 +5523,12 @@ async fn read_blocking_body(
             }
         },
     };
+    let preds = dbm_event_preds(
+        q.system.as_deref(),
+        q.instance.as_deref(),
+        q.database(),
+        &present,
+    );
     // A1 phase 2a · the same read-time fallback deadlocks got in phase 1.
     //
     // An OSS build stores a blocking-chain row verbatim and canonicalizes
@@ -5460,30 +5543,25 @@ async fn read_blocking_body(
     // is a false verdict and must be a 500; the raw gate failing means only that
     // the fallback cannot run, and the canonical path is still correct.
     //
-    // TRANSITIONAL, via the same raw-presence probe. The kill-switch is read
-    // FIRST so turning it off costs zero searches.
-    let raw_fallback = if config::get_config().db_monitoring.blocking_read_fallback {
-        match present_raw_blocking_columns(org_id, stream).await {
-            Ok(present) => {
-                let candidate = RawBlockingFallback { present };
-                if blocking_window_needs_fallback(org_id, stream, start_time, end_time, &candidate)
-                    .await
-                {
-                    Some(candidate)
-                } else {
-                    None
-                }
-            }
-            Err(e) => {
-                log::warn!(
-                    "[DbMonitoring] blocking raw-column read failed for {org_id}/{stream}, \
-                     serving canonical rows only: {e}"
-                );
+    // TRANSITIONAL, via the same raw-presence probe.
+    let raw_fallback = match present_raw_blocking_columns(org_id, stream).await {
+        Ok(present) => {
+            let candidate = RawBlockingFallback { present };
+            if blocking_window_needs_fallback(org_id, stream, start_time, end_time, &candidate)
+                .await
+            {
+                Some(candidate)
+            } else {
                 None
             }
         }
-    } else {
-        None
+        Err(e) => {
+            log::warn!(
+                "[DbMonitoring] blocking raw-column read failed for {org_id}/{stream}, \
+                 serving canonical rows only: {e}"
+            );
+            None
+        }
     };
 
     // SCOPE FILTERS MUST NOT REACH THE RAW ROWS' SQL — see the deadlocks handler.
@@ -5526,6 +5604,12 @@ async fn read_blocking_body(
         .filter(|s| s.wait_seconds.unwrap_or(0.0) >= min_wait)
         .filter(|s| blocking_matches_search(s, &needle))
         .collect();
+    // O1 · one wait, one row. The rows above are POLL SNAPSHOTS — the sampler
+    // re-observes a still-blocked pair every poll — so both the badge and the
+    // list must count distinct waits, not polls. Applied BEFORE the DTO map so
+    // `hits`, `total`, chain assembly and the UI's time-lost sum all see the
+    // deduped population.
+    let samples = dedupe_blocking_waits(samples);
     let hits: Vec<Value> = samples.iter().map(blocking_sample_to_dto).collect();
 
     if badge_mode {
@@ -5719,8 +5803,6 @@ async fn read_activity_body(
         .limit
         .unwrap_or(DEFAULT_EVENTS_LIMIT)
         .clamp(1, MAX_EVENTS_LIMIT);
-    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
-
     // Same rule as `read_deadlocks_body`: a failed schema read is reported,
     // never absorbed into an empty set. See `present_dbm_columns`.
     let present = match shared_prologue {
@@ -5735,6 +5817,12 @@ async fn read_activity_body(
             }
         },
     };
+    let preds = dbm_event_preds(
+        q.system.as_deref(),
+        q.instance.as_deref(),
+        q.database(),
+        &present,
+    );
 
     let sql = build_dbm_events_sql(
         stream,
@@ -5923,15 +6011,15 @@ async fn read_activity_body(
 ///
 /// Returns `None` when the stream's schema has no plan hash column. Naming an
 /// absent column in a `GROUP BY` fails the WHOLE query with a schema error, and
-/// the exposed case is the common one — `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
-/// defaults OFF (D-G), so every stream that never ingested plans has none of
-/// these columns and must render an empty section rather than a 500.
+/// the exposed case is the common one — every stream that never ingested plans
+/// (no top-query producer pointed at it) has none of these columns and must
+/// render an empty section rather than a 500.
 /// Whether plan capture has EVER run against this stream — `"on"` or `"off"`.
 ///
 /// Zero plans has two causes and only one of them is the reader's to fix, so
 /// the response has to say which it is. `"off"`: the stream carries no plan
-/// hash column, meaning nothing was ever captured — `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
-/// defaults OFF (D-G), and the config hint is the right thing to show.
+/// hash column, meaning nothing was ever captured — no top-query producer has
+/// pointed at this stream, and the collector hint is the right thing to show.
 /// `"on"`: the column exists, the query ran, and this particular statement has
 /// no plan. That is a NORMAL state, not a gap — Postgres cannot `EXPLAIN` a
 /// `COMMIT`, `ROLLBACK` or `SHOW`, nor an already-`EXPLAIN`ed statement, and a
@@ -6146,11 +6234,10 @@ fn derived_plan_source(hits: &[Value]) -> &'static str {
 ///
 /// Zero server metrics has two causes and only one is the reader's to fix, so
 /// the response has to say which it is. `"off"`: the stream carries no counter
-/// column, meaning nothing was ever captured —
-/// `ZO_DB_MONITORING_TOP_QUERY_ENABLED` defaults OFF — and the config hint is
-/// the right thing to show. `"on"`: the columns exist, the query ran, and this
-/// particular statement has no server counterpart. That is a NORMAL state given
-/// the partial join above, not a gap.
+/// column, meaning nothing was ever captured — no top-query producer has
+/// pointed at this stream — and the collector hint is the right thing to show. `"on"`: the columns
+/// exist, the query ran, and this particular statement has no server counterpart. That is a NORMAL
+/// state given the partial join above, not a gap.
 ///
 /// Named for the CAPTURE PIPELINE rather than the result (`has_server_metrics`
 /// would restate `matched` the UI can already read) and kept a string rather
@@ -6589,8 +6676,8 @@ pub(crate) fn server_queries_capture_state(present: &HashSet<String>) -> &'stati
 /// mysql/mariadb feeds legitimately ship no database at all.
 ///
 /// `None` when the stream has never carried the counter or fingerprint columns
-/// — an empty section, not a 500 (`ZO_DB_MONITORING_TOP_QUERY_ENABLED`
-/// defaults OFF).
+/// — an empty section, not a 500 (streams without a top-query producer never
+/// acquire them).
 pub(crate) fn build_dbm_server_queries_sql(
     stream_name: &str,
     preds: &str,
@@ -6805,19 +6892,6 @@ async fn read_server_queries_body(
         .limit
         .unwrap_or(DEFAULT_SERVER_QUERIES_LIMIT)
         .clamp(1, MAX_SERVER_QUERIES_LIMIT);
-    let mut preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
-    // The fingerprint narrows to ONE statement. Safe to name unguarded: the
-    // SQL builder below already refuses to run at all unless the fingerprint
-    // column is present (it is the GROUP key), so this predicate can never
-    // name a column the stream lacks.
-    if let Some(fp) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) {
-        preds.push_str("\n    AND ");
-        preds.push_str(server_vantage::O2_DBM_FINGERPRINT);
-        preds.push_str(" = '");
-        preds.push_str(&escape_sq(fp));
-        preds.push('\'');
-    }
-
     // Same rule as `read_deadlocks_body` (see `present_dbm_columns`), and here
     // an absorbed error would report a healthy capture pipeline as `off`.
     let present = match present_dbm_columns(org_id, stream).await {
@@ -6829,6 +6903,23 @@ async fn read_server_queries_body(
             return Err(MetaHttpResponse::internal_error(e));
         }
     };
+    let mut preds = dbm_event_preds(
+        q.system.as_deref(),
+        q.instance.as_deref(),
+        q.database(),
+        &present,
+    );
+    // The fingerprint narrows to ONE statement. Safe to name unguarded: the
+    // SQL builder below already refuses to run at all unless the fingerprint
+    // column is present (it is the GROUP key), so this predicate can never
+    // name a column the stream lacks.
+    if let Some(fp) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) {
+        preds.push_str("\n    AND ");
+        preds.push_str(server_vantage::O2_DBM_FINGERPRINT);
+        preds.push_str(" = '");
+        preds.push_str(&escape_sq(fp));
+        preds.push('\'');
+    }
 
     let rows = match build_dbm_server_queries_sql(stream, &preds, limit, &present) {
         Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
@@ -7192,13 +7283,13 @@ async fn read_server_samples_body(
         .limit
         .unwrap_or(DEFAULT_SAMPLES_LIMIT)
         .clamp(1, MAX_SAMPLES_LIMIT);
-    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
-
     // The two default streams are processed CONCURRENTLY (schema read, then
     // ranked search, per stream); results are folded in stream order so the
     // first failing stream's error is the one reported, as the serial loop
-    // did.
-    let preds = preds.as_str();
+    // did. The scope predicates are built PER STREAM, after that stream's
+    // schema read: the instance predicate is presence-gated (N5), so one
+    // stream's single-instance shape must not decide another's filter.
+    let q = &q;
     let per_stream = join_all(streams.iter().map(|stream| async move {
         // Reported, never absorbed — see `present_dbm_columns`.
         let present = match present_dbm_columns(org_id, stream).await {
@@ -7210,9 +7301,15 @@ async fn read_server_samples_body(
                 return Err(MetaHttpResponse::internal_error(e));
             }
         };
+        let preds = dbm_event_preds(
+            q.system.as_deref(),
+            q.instance.as_deref(),
+            q.database(),
+            &present,
+        );
         let capture_on = server_samples_capture_state(&present) == "on";
         // A stream that never captured contributes nothing — not an error.
-        let stream_rows = match build_dbm_server_samples_sql(stream, preds, limit, &present) {
+        let stream_rows = match build_dbm_server_samples_sql(stream, &preds, limit, &present) {
             Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
                 Ok(stream_rows) => stream_rows,
                 Err(e) => {
@@ -7319,7 +7416,6 @@ async fn read_plans_body(
     q: &PlansQuery,
     prologue: Option<&DbmServerPrologue>,
 ) -> Result<Value, HttpResponse> {
-    let cfg = get_config();
     let Some(fingerprint) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) else {
         return Err(MetaHttpResponse::bad_request("fingerprint is required"));
     };
@@ -7390,7 +7486,10 @@ async fn read_plans_body(
         &hits,
         stream,
         plan_capture_state(&present),
-        cfg.db_monitoring.explain_enabled,
+        // auto_explain ingest has no gate of its own any more — DBM enabled
+        // (checked by the handler) means it is on. The envelope keeps the
+        // field so the UI's empty-state contract is unchanged.
+        true,
     ))
 }
 
@@ -8035,8 +8134,6 @@ async fn read_table_health_body(
     // No `database` filter: this feed carries no database (see
     // `server_vantage::O2_DBM_SCHEMA`), so accepting one would silently return
     // nothing for every value a user could pass.
-    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), None);
-
     // Same rule as `read_deadlocks_body`: a failed schema read is reported,
     // never absorbed into an empty set. See `present_dbm_columns`.
     let present = match present_dbm_columns(org_id, stream).await {
@@ -8048,6 +8145,7 @@ async fn read_table_health_body(
             return Err(MetaHttpResponse::internal_error(e));
         }
     };
+    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), None, &present);
 
     // The two sections are two searches over the same stream, run CONCURRENTLY
     // when both are wanted — they used to be two endpoints, which the page
@@ -9049,7 +9147,7 @@ mod tests {
     /// rollup of the live check that is 4 windows counted where 3 belong.
     #[test]
     fn test_stats_read_range_excludes_window_ending_at_end_time() {
-        let w = 900_i64 * 1_000_000; // ZO_DB_MONITORING_INTERVAL_SECS default
+        let w = 900_i64 * 1_000_000; // rollup::ROLLUP_INTERVAL_SECS
         let start = 1_786_512_485_424_263_i64;
         let end = start + 4 * w; // exactly 4 windows wide, grid-phase-aligned
         let (lo, hi) = stats_read_range(start, end);
@@ -11254,17 +11352,16 @@ mod tests {
         );
     }
 
-    /// THE KILL-SWITCH CONTRACT: off ⇒ byte-identical SQL to today.
+    /// THE FAST-PATH CONTRACT: fallback off ⇒ byte-identical SQL to today.
     ///
-    /// `ZO_DB_MONITORING_DEADLOCK_READ_FALLBACK=false` is an escape hatch for a
-    /// deployment whose OSS history makes the widened scan too expensive. An
-    /// escape hatch that still emits the wider query buys nothing, so "off"
-    /// must reach all the way to the emitted bytes — expressed here as the
-    /// `None` opts the disabled path passes.
+    /// When the boundary probe answers NO (the window is fully canonicalized),
+    /// the read must take the fast path for real: a "no" that still emits the
+    /// wider query buys nothing, so it must reach all the way to the emitted
+    /// bytes — expressed here as the `None` opts the fast path passes.
     #[cfg(feature = "enterprise")]
     #[test]
-    fn test_the_kill_switch_restores_byte_identical_sql() {
-        let preds = dbm_event_preds(Some("mysql"), Some("db-1"), Some("shop"));
+    fn test_a_probe_no_restores_byte_identical_sql() {
+        let preds = dbm_event_preds(Some("mysql"), Some("db-1"), Some("shop"), &all_cols());
         let off = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
@@ -11298,9 +11395,9 @@ mod tests {
                 "raw column {raw} must not be projected with the fallback off:\n{off}"
             );
         }
-        // ...and the guarantee that makes it a real kill-switch: turning it ON
-        // over the SAME stream must produce a DIFFERENT query, so "off" is
-        // demonstrably doing something.
+        // ...and the guarantee that makes the fast path real: turning the
+        // fallback ON over the SAME stream must produce a DIFFERENT query, so
+        // "off" is demonstrably doing something.
         let on = build_dbm_events_sql(
             "dbm_server",
             "deadlock",
@@ -11646,7 +11743,7 @@ mod tests {
     /// binding itself, which is the only thing that catches that class.
     #[cfg(feature = "enterprise")]
     #[test]
-    fn test_the_blocking_read_consults_the_probe_and_the_kill_switch() {
+    fn test_the_blocking_read_consults_the_probe() {
         let src = include_str!("api.rs");
         let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
         let body = {
@@ -11664,23 +11761,6 @@ mod tests {
             body.contains("blocking_window_needs_fallback"),
             "the blocking read must consult the transitional probe; without it the \
              widening is ALWAYS-ON and every steady-state read pays for it"
-        );
-        assert!(
-            body.contains("blocking_read_fallback"),
-            "the kill-switch must be consulted in the blocking read"
-        );
-        // The kill-switch must be tested BEFORE the probe, so `=false` costs zero
-        // searches. Phase 1 pins the same ordering for deadlocks.
-        let switch = body
-            .find("blocking_read_fallback")
-            .expect("kill-switch is read");
-        let probe = body
-            .find("blocking_window_needs_fallback")
-            .expect("probe is called");
-        assert!(
-            switch < probe,
-            "the kill-switch must short-circuit BEFORE the probe runs, or turning the \
-             feature off still costs two searches per read"
         );
         assert!(
             body.contains("raw: raw_fallback.as_ref()") || body.contains("raw_fallback.as_ref()"),
@@ -12121,7 +12201,7 @@ mod tests {
     ///
     /// The canonical path keeps its SQL predicates when the fallback is off, and
     /// moves to the Rust filter when it is on. If the two disagree, the same
-    /// request returns different rows depending on a kill-switch — so the
+    /// request returns different rows depending on the fallback — so the
     /// narrowing is checked against a canonical event built the way a
     /// SQL-filtered row would be.
     #[cfg(feature = "enterprise")]
@@ -12137,7 +12217,12 @@ mod tests {
         .expect("event");
 
         // The SQL form of the same three filters, for the record.
-        let preds = dbm_event_preds(Some("postgresql"), Some("db-1"), Some("dbmlab"));
+        let preds = dbm_event_preds(
+            Some("postgresql"),
+            Some("db-1"),
+            Some("dbmlab"),
+            &all_cols(),
+        );
         assert!(preds.contains("o2_dbm_engine = 'postgresql'"));
 
         assert!(
@@ -12209,19 +12294,6 @@ mod tests {
             bind.contains("None"),
             "the boundary gate must have a `None` arm, or it can never turn the \
              widening off and the probe is pure cost:\n{bind}"
-        );
-        // The kill-switch must still short-circuit BEFORE the probe, so turning
-        // it off costs nothing rather than costing two extra searches.
-        let switch_at = bind
-            .find("deadlock_read_fallback")
-            .expect("the kill-switch must still gate the whole branch");
-        let probe_at = bind
-            .find("deadlock_window_needs_fallback(")
-            .expect("checked above");
-        assert!(
-            switch_at < probe_at,
-            "the kill-switch must be tested BEFORE the boundary probe runs, or \
-             `=false` still pays for two searches per read:\n{bind}"
         );
     }
 
@@ -12378,7 +12450,7 @@ mod tests {
     /// or filter value can never break out of its literal/identifier.
     #[test]
     fn test_dbm_events_sql_injection_is_escaped() {
-        let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None);
+        let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None, &all_cols());
         assert!(preds.contains("'pg'' OR ''1''=''1'"));
         assert!(!preds.contains("OR '1'='1'"));
 
@@ -12388,14 +12460,38 @@ mod tests {
 
     #[test]
     fn test_dbm_event_preds_only_whitelisted_columns() {
-        let preds = dbm_event_preds(Some("postgresql"), Some("db1"), Some("dbmlab"));
+        let preds = dbm_event_preds(Some("postgresql"), Some("db1"), Some("dbmlab"), &all_cols());
         assert_eq!(
             preds,
             "\n    AND o2_dbm_engine = 'postgresql'\n    AND o2_dbm_instance = 'db1'\n    AND o2_dbm_database = 'dbmlab'"
         );
-        assert_eq!(dbm_event_preds(None, None, None), "");
+        assert_eq!(dbm_event_preds(None, None, None, &all_cols()), "");
         // Empty strings are not filters.
-        assert_eq!(dbm_event_preds(Some(""), None, None), "");
+        assert_eq!(dbm_event_preds(Some(""), None, None, &all_cols()), "");
+    }
+
+    /// N5: the instance predicate is presence-gated on the stream schema.
+    ///
+    /// A stream whose rows never carried `o2_dbm_instance` (the
+    /// statement/explain filelog feeds predate the instance stamp) must treat
+    /// `?instance=` as matching — a single-instance stream — rather than
+    /// silently matching nothing. Engine/database predicates are NOT gated:
+    /// every canonicalizer stamps them, so their absence genuinely means "no
+    /// such rows".
+    #[test]
+    fn test_dbm_event_preds_instance_filter_is_presence_gated() {
+        let mut present = all_cols();
+        present.remove(server_vantage::O2_DBM_INSTANCE);
+        let preds = dbm_event_preds(Some("postgresql"), Some("db1"), Some("dbmlab"), &present);
+        assert_eq!(
+            preds, "\n    AND o2_dbm_engine = 'postgresql'\n    AND o2_dbm_database = 'dbmlab'",
+            "with the column absent from the schema the instance predicate must \
+             be skipped, and the other two must survive untouched"
+        );
+        // And with the column present, the filter is real — the gate must not
+        // decay into never filtering.
+        let gated = dbm_event_preds(None, Some("db1"), None, &all_cols());
+        assert_eq!(gated, "\n    AND o2_dbm_instance = 'db1'");
     }
     // ── Deadlock / blocking read path — ENTERPRISE ONLY ────────────────────
     //
@@ -12970,6 +13066,98 @@ mod tests {
         assert!(!blocking_matches_search(&s, "shipping"));
     }
 
+    /// O1 fixture: one poll observation of a wait.
+    #[cfg(feature = "enterprise")]
+    fn wait_obs(
+        instance: &str,
+        blocked: i64,
+        blocking: i64,
+        ts: i64,
+        wait: Option<f64>,
+    ) -> server_vantage::BlockingSample {
+        server_vantage::BlockingSample {
+            engine: Some("postgresql".into()),
+            instance: Some(instance.into()),
+            database: Some("dbmlab".into()),
+            timestamp: Some(ts),
+            blocked_pid: Some(blocked),
+            blocking_pid: Some(blocking),
+            wait_seconds: wait,
+            ..Default::default()
+        }
+    }
+
+    /// O1 · a wait polled N times is ONE wait, reported at its final (maximal)
+    /// observation — so `total` counts waits and summing `wait_seconds` over
+    /// the hits measures time lost exactly once.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_dedupe_blocking_waits_collapses_polls_to_the_final_observation() {
+        // One 30 s wait observed at 10 s polling: three snapshots, growing wait.
+        let polls = vec![
+            wait_obs("pg1", 101, 202, 1_000, Some(10.0)),
+            wait_obs("pg1", 101, 202, 11_000, Some(20.0)),
+            wait_obs("pg1", 101, 202, 21_000, Some(30.0)),
+            // A different pair on the same instance is its own wait.
+            wait_obs("pg1", 333, 444, 5_000, Some(2.0)),
+            // The same pids on ANOTHER instance are unrelated sessions.
+            wait_obs("pg2", 101, 202, 9_000, Some(7.0)),
+        ];
+        let deduped = dedupe_blocking_waits(polls);
+        assert_eq!(deduped.len(), 3, "three distinct waits, not five polls");
+        let final_obs = deduped
+            .iter()
+            .find(|s| s.instance.as_deref() == Some("pg1") && s.blocked_pid == Some(101))
+            .expect("the polled wait survives");
+        assert_eq!(
+            (final_obs.timestamp, final_obs.wait_seconds),
+            (Some(21_000), Some(30.0)),
+            "the kept row is the LAST observation, carrying the max wait"
+        );
+        let time_lost: f64 = deduped.iter().filter_map(|s| s.wait_seconds).sum();
+        assert_eq!(
+            time_lost, 39.0,
+            "30 + 2 + 7 — never 10+20+30 summed across polls of one wait"
+        );
+    }
+
+    /// O1 · pid reuse: the same pair appearing later with a RESTARTED (smaller)
+    /// wait is a NEW wait, split into its own episode rather than collapsed.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_dedupe_blocking_waits_splits_episodes_on_wait_restart() {
+        let polls = vec![
+            wait_obs("pg1", 101, 202, 1_000, Some(10.0)),
+            wait_obs("pg1", 101, 202, 11_000, Some(20.0)),
+            // Hours later the pids recur with a small wait: a fresh wait.
+            wait_obs("pg1", 101, 202, 7_200_000, Some(3.0)),
+            wait_obs("pg1", 101, 202, 7_210_000, Some(13.0)),
+        ];
+        let deduped = dedupe_blocking_waits(polls);
+        assert_eq!(deduped.len(), 2, "two episodes of the same pid pair");
+        // Newest-first ordering, each episode at its own final observation.
+        assert_eq!(deduped[0].timestamp, Some(7_210_000));
+        assert_eq!(deduped[0].wait_seconds, Some(13.0));
+        assert_eq!(deduped[1].timestamp, Some(11_000));
+        assert_eq!(deduped[1].wait_seconds, Some(20.0));
+    }
+
+    /// O1 · observations without `wait_seconds` cannot be episode-split, so
+    /// they collapse to the latest observation per pair — one wait, never one
+    /// row per poll.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_dedupe_blocking_waits_without_wait_seconds_keeps_latest() {
+        let polls = vec![
+            wait_obs("pg1", 101, 202, 1_000, None),
+            wait_obs("pg1", 101, 202, 11_000, None),
+            wait_obs("pg1", 101, 202, 21_000, None),
+        ];
+        let deduped = dedupe_blocking_waits(polls);
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(deduped[0].timestamp, Some(21_000));
+    }
+
     /// `namespace` is the spelling the rollup endpoints use; both must reach
     /// the same filter or the UI's one vocabulary silently drops the filter.
     #[cfg(feature = "enterprise")]
@@ -13145,7 +13333,7 @@ mod tests {
     /// Scope filters carry into the lookback, and stay injection-safe.
     #[test]
     fn test_build_last_seen_sql_applies_and_escapes_scope() {
-        let preds = dbm_event_preds(Some("mysql"), None, Some("d'b"));
+        let preds = dbm_event_preds(Some("mysql"), None, Some("d'b"), &all_cols());
         let sql = build_last_seen_sql("dbm_server", "deadlock", &preds);
         assert!(sql.contains("o2_dbm_kind = 'deadlock'"));
         assert!(sql.contains("ORDER BY _timestamp DESC"));
@@ -13336,7 +13524,7 @@ mod tests {
     /// different population than the table beneath it.
     #[test]
     fn test_activity_breakdown_honours_scope_filters_and_escapes_them() {
-        let preds = dbm_event_preds(Some("pg' OR '1'='1"), Some("pg1"), None);
+        let preds = dbm_event_preds(Some("pg' OR '1'='1"), Some("pg1"), None, &all_cols());
         let sql = build_dbm_activity_breakdown_sql(
             "ev\"il",
             server_vantage::O2_DBM_SESSION_STATE,
@@ -13584,7 +13772,7 @@ mod tests {
     /// Scope filters reach the aggregate, and injection is neutralized.
     #[test]
     fn test_index_health_sql_honours_scope_filters_and_escapes_them() {
-        let preds = dbm_event_preds(Some("pg' OR '1'='1"), Some("pg1"), None);
+        let preds = dbm_event_preds(Some("pg' OR '1'='1"), Some("pg1"), None, &all_cols());
         let sql = build_dbm_index_health_sql("ev\"il", &preds, 10, &all_cols())
             .expect("index health sql");
         assert!(sql.contains("o2_dbm_instance = 'pg1'"), "{sql}");
@@ -13915,9 +14103,8 @@ mod tests {
     /// projection fails the WHOLE query with a schema error rather than
     /// returning nulls. That applies to a `GROUP BY` column as much as to a
     /// `SELECT` one — and the exposed case is the common one, not an edge:
-    /// every `dbm_server` stream that predates activity ingest, and every
-    /// deployment leaving `ZO_DB_MONITORING_ACTIVITY_ENABLED` at its D-G default
-    /// of OFF, has no `o2_dbm_session_state` column at all.
+    /// every `dbm_server` stream that predates activity ingest has no
+    /// `o2_dbm_session_state` column at all.
     ///
     /// The rows query degrades gracefully there (the projection intersects to
     /// `_timestamp`) and returns empty. An ungated breakdown instead errors, so
@@ -14164,7 +14351,7 @@ mod tests {
         );
 
         // Injection-safe like every other builder here.
-        let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None);
+        let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None, &all_cols());
         let sql = build_dbm_sample_times_sql("ev\"il", "activity", &preds);
         assert!(sql.contains("'pg'' OR ''1''=''1'"));
         assert!(sql.contains("\"ev\"\"il\""));
@@ -14273,9 +14460,8 @@ mod tests {
     /// The query degrades rather than 500s when the stream predates plan ingest.
     ///
     /// Naming an absent column in a `GROUP BY` fails the WHOLE query with a
-    /// schema error, and the exposed case is the common one: every deployment
-    /// leaving `ZO_DB_MONITORING_TOP_QUERY_ENABLED` at its default of OFF has
-    /// none of these columns.
+    /// schema error, and the exposed case is the common one: every stream that
+    /// never ingested plans has none of these columns.
     #[test]
     fn test_plans_sql_skips_when_the_plan_columns_are_absent() {
         let mut without = all_cols();
@@ -14574,8 +14760,7 @@ mod tests {
     ///
     /// Both produce `hits: []`. Without this field the UI can only render one
     /// sentence for both and tells a DBA whose capture is already ON to go
-    /// switch on `ZO_DB_MONITORING_TOP_QUERY_ENABLED` — sending them to fix a
-    /// non-problem.
+    /// reconfigure their collector — sending them to fix a non-problem.
     #[test]
     fn test_plan_capture_state_reports_off_only_when_the_column_is_absent() {
         assert_eq!(
@@ -14785,9 +14970,9 @@ mod tests {
     /// Degrades rather than 500s when the stream predates top-query ingest.
     ///
     /// Naming an absent column fails the WHOLE query with a schema error, and
-    /// the exposed case is the common one: `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
-    /// defaults OFF, so a stream that never ingested top queries has none of
-    /// these columns and must render an empty section rather than a 500.
+    /// the exposed case is the common one: a stream that never ingested top
+    /// queries has none of these columns and must render an empty section
+    /// rather than a 500.
     #[test]
     fn test_server_metrics_sql_skips_when_the_counter_columns_are_absent() {
         let mut without = all_cols();
@@ -15098,7 +15283,7 @@ mod tests {
     /// Injection-safe, like every other builder here.
     #[test]
     fn test_table_health_sql_escapes_its_inputs() {
-        let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None);
+        let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None, &all_cols());
         let sql = build_dbm_table_health_sql("ev\"il", &preds, 10, &all_cols())
             .expect("table health sql");
         assert!(sql.contains("'pg'' OR ''1''=''1'"));

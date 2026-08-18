@@ -351,17 +351,20 @@ impl SpanAttrs for SpanWithResource<'_> {
     }
 }
 
-/// Runtime knobs for [`enrich_with_opts`], mirroring the `ZO_DB_MONITORING_*` config block
-/// (design §8). [`Default`] matches the config defaults.
+/// Options for [`enrich_with_opts`] (design §8). These are NOT configurable —
+/// the config knobs that used to feed them were removed when DBM collapsed to
+/// a single `enabled` switch — and every ingest call site uses [`Default`],
+/// which carries the values the old knobs defaulted to. The struct survives as
+/// a parameter so tests can exercise the non-default behaviors.
 #[derive(Debug, Clone)]
 pub struct EnrichOptions {
-    /// `ZO_DB_MONITORING_STORE_NORM_TEXT`: false stores the fingerprint only — no
-    /// `o2_db_query_norm` on the span (including the degraded-row fallback text).
+    /// false stores the fingerprint only — no `o2_db_query_norm` on the span
+    /// (including the degraded-row fallback text).
     pub store_norm_text: bool,
-    /// `ZO_DB_MONITORING_MAX_NORM_LEN`: cap (bytes) on the stored `o2_db_query_norm`. The
-    /// fingerprint is always computed over the full normalized text.
+    /// Cap (bytes) on the stored `o2_db_query_norm`. The fingerprint is always
+    /// computed over the full normalized text.
     pub max_norm_len: usize,
-    /// `ZO_DB_MONITORING_NORMALIZE_IDENTIFIERS`: digit/UUID/hex folding inside identifiers.
+    /// Digit/UUID/hex folding inside identifiers.
     pub normalize_identifiers: bool,
 }
 
@@ -394,8 +397,9 @@ pub fn enrich<A: SpanAttrs>(attrs: &A, span_kind: i32) -> Option<BTreeMap<String
     enrich_with_opts(attrs, span_kind, &EnrichOptions::default())
 }
 
-/// [`enrich`] with the runtime `ZO_DB_MONITORING_*` knobs applied (design §8) — the ingest call
-/// sites use this form with options built from live config.
+/// [`enrich`] with explicit [`EnrichOptions`] (design §8) — the ingest call
+/// sites pass `EnrichOptions::default()`; tests use this form to exercise the
+/// non-default behaviors.
 pub fn enrich_with_opts<A: SpanAttrs>(
     attrs: &A,
     span_kind: i32,
@@ -479,7 +483,7 @@ pub fn enrich_with_opts<A: SpanAttrs>(
     let operation = op_attr.or_else(|| ns.as_ref().and_then(|n| n.operation.clone()));
 
     let query_norm: Option<String> = if !opts.store_norm_text {
-        // `ZO_DB_MONITORING_STORE_NORM_TEXT=false`: fingerprint-only on spans (§3.2 storage
+        // `store_norm_text: false`: fingerprint-only on spans (§3.2 storage
         // trade-off) — also drops the degraded-row fallback text below.
         None
     } else if let Some(n) = &ns {

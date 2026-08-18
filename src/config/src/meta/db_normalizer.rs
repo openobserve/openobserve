@@ -149,10 +149,12 @@ pub fn normalize(text: &str, dialect: Dialect) -> Result<NormalizedStatement, No
     normalize_with_opts(text, dialect, true)
 }
 
-/// [`normalize`] with the `ZO_DB_MONITORING_NORMALIZE_IDENTIFIERS` knob exposed (design §3.2):
+/// [`normalize`] with identifier folding exposed as a parameter (design §3.2):
 /// `fold_identifiers=false` keeps digit/UUID/hex runs inside identifiers and Elasticsearch path
-/// segments verbatim. Literal/placeholder replacement is NOT affected — it is privacy-load-bearing
-/// and always on, as is the Redis high-entropy key folding (an NFR-2 guarantee, not cosmetics).
+/// segments verbatim. Ingest always folds (the config knob that used to feed this was removed when
+/// DBM collapsed to a single `enabled` switch); tests exercise both behaviors. Literal/placeholder
+/// replacement is NOT affected — it is privacy-load-bearing and always on, as is the Redis
+/// high-entropy key folding (an NFR-2 guarantee, not cosmetics).
 pub fn normalize_with_opts(
     text: &str,
     dialect: Dialect,

@@ -489,13 +489,11 @@ pub async fn handle_otlp_request(
         }
     }
 
-    // Database Monitoring enrichment knobs (design §8), resolved once per request.
+    // Database Monitoring enrichment options (design §8): the fixed defaults —
+    // the old per-option config knobs were removed when DBM collapsed to a
+    // single `enabled` switch.
     let mut has_db_spans = false;
-    let db_enrich_opts = db_monitoring::EnrichOptions {
-        store_norm_text: cfg.db_monitoring.store_norm_text,
-        max_norm_len: cfg.db_monitoring.max_norm_len,
-        normalize_identifiers: cfg.db_monitoring.normalize_identifiers,
-    };
+    let db_enrich_opts = db_monitoring::EnrichOptions::default();
 
     // Start retrieving associated pipeline and construct pipeline params
     let stream_param = StreamParams::new(org_id, &traces_stream_name, StreamType::Traces);
@@ -1203,13 +1201,11 @@ pub async fn ingest_json(
     let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
         .timestamp_micros();
 
-    // Database Monitoring enrichment knobs (design §8), resolved once per request.
+    // Database Monitoring enrichment options (design §8): the fixed defaults —
+    // the old per-option config knobs were removed when DBM collapsed to a
+    // single `enabled` switch.
     let mut has_db_spans = false;
-    let db_enrich_opts = db_monitoring::EnrichOptions {
-        store_norm_text: cfg.db_monitoring.store_norm_text,
-        max_norm_len: cfg.db_monitoring.max_norm_len,
-        normalize_identifiers: cfg.db_monitoring.normalize_identifiers,
-    };
+    let db_enrich_opts = db_monitoring::EnrichOptions::default();
 
     let json_values: Vec<json::Value> = json::from_slice(&body)?;
     let mut json_data_by_stream = HashMap::new();

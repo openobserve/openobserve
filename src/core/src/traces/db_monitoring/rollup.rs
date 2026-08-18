@@ -57,6 +57,17 @@ pub const O2_DB_STATS_STREAM: &str = "_o2_db_stats";
 /// exactly-the-cap rule to set `tail_truncated`.
 pub(crate) const SEARCH_SIZE: usize = 100000;
 
+/// Rollup window / job cadence in seconds. A fixed operational constant, not
+/// config: it was an env knob (same default) until the DBM config collapsed to
+/// the single `ZO_DB_MONITORING_ENABLED` switch. The read side sizes its
+/// live-tail cap and history backfill windows from this same value.
+pub const ROLLUP_INTERVAL_SECS: u64 = 900;
+
+/// Query fingerprints kept per (db system, instance) per rollup window; the
+/// rest folds into an 'other' bucket. Fixed for the same reason as
+/// [`ROLLUP_INTERVAL_SECS`], carrying the old knob's default.
+pub const ROLLUP_TOP_N: usize = 200;
+
 /// Catch-up cap: never scan more than this many windows per (stream, tick).
 const MAX_CATCHUP_WINDOWS: usize = 4;
 
@@ -504,7 +515,7 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
         return Ok(());
     }
     let now = now_micros();
-    let window_micros = (cfg.db_monitoring.interval_secs as i64).max(1) * 1_000_000;
+    let window_micros = ROLLUP_INTERVAL_SECS as i64 * 1_000_000;
 
     // Query the usage stream for recently-ingesting trace streams.
     let sql = r#"SELECT org_id, stream_name
@@ -752,10 +763,8 @@ async fn process_window(
     end_time: i64,
     has_rows_col: bool,
 ) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-
     // (1) stage-1 rank query: top-N fingerprints per (system, instance).
-    let rank_sql = build_rank_sql(stream_name, cfg.db_monitoring.top_n, has_rows_col);
+    let rank_sql = build_rank_sql(stream_name, ROLLUP_TOP_N, has_rows_col);
     let stage1_rows = run_dbm_search(org_id, rank_sql, start_time, end_time).await?;
     if stage1_rows.is_empty() {
         // Idle window — nothing to roll up, nothing to write.

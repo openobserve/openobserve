@@ -848,166 +848,21 @@ pub struct Config {
 }
 
 /// Database Monitoring (design: `docs/___databsepages/dbm-design-doc.md` §8) —
-/// ingest-time db span fingerprinting, the query-stats rollup job, and the DBM
-/// read APIs. OSS feature; runtime-gated on `enabled` only.
+/// ingest-time db span fingerprinting, server-vantage log canonicalization, the
+/// query-stats rollup job, and the DBM read APIs. OSS feature; runtime-gated on
+/// `enabled` ONLY: enabled means every DBM signal is canonicalized and served,
+/// disabled means none is. The operational tunables that used to sit beside
+/// this flag (rollup interval, top-N, normalization caps, per-signal gates)
+/// are deliberately NOT configurable — each lives as a `const` in its
+/// consuming module, carrying the same value the old knob defaulted to.
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct DatabaseMonitoring {
     #[env_config(
         name = "ZO_DB_MONITORING_ENABLED",
         default = true,
-        help = "Enable Database Monitoring: ingest-time db span fingerprinting, the query-stats rollup job, and the DBM read APIs"
+        help = "Enable Database Monitoring: ingest-time db span fingerprinting, server-vantage log canonicalization, the query-stats rollup job, and the DBM read APIs"
     )]
     pub enabled: bool,
-    #[env_config(
-        name = "ZO_DB_MONITORING_INTERVAL_SECS",
-        default = 900,
-        help = "Database Monitoring rollup job interval in seconds"
-    )]
-    pub interval_secs: u64,
-    #[env_config(
-        name = "ZO_DB_MONITORING_TOP_N",
-        default = 200,
-        help = "Query fingerprints kept per (db system, instance) per rollup window; the rest folds into an 'other' bucket"
-    )]
-    pub top_n: usize,
-    #[env_config(
-        name = "ZO_DB_MONITORING_MAX_NORM_LEN",
-        default = 4096,
-        help = "Maximum bytes of normalized query text stored on a span (o2_db_query_norm)"
-    )]
-    pub max_norm_len: usize,
-    #[env_config(
-        name = "ZO_DB_MONITORING_LIVE_TAIL",
-        default = true,
-        help = "Serve the not-yet-rolled-up tail of DBM reads live from raw traces (bounded to one rollup window)"
-    )]
-    pub live_tail: bool,
-    #[env_config(
-        name = "ZO_DB_MONITORING_STORE_NORM_TEXT",
-        default = true,
-        help = "Store normalized query text on every db span (o2_db_query_norm); false stores the fingerprint only"
-    )]
-    pub store_norm_text: bool,
-    #[env_config(
-        name = "ZO_DB_MONITORING_NORMALIZE_IDENTIFIERS",
-        default = true,
-        help = "Fold digit/UUID/hex runs inside identifiers when normalizing query text (events_20260807 -> events_?); off makes date/shard-partitioned tables splinter into per-day fingerprints"
-    )]
-    pub normalize_identifiers: bool,
-    /// Active-session sampling (`db.server.query_sample` ingest).
-    ///
-    /// Defaults OFF, unlike the knobs above it: this is the highest-volume
-    /// signal DBM has — roughly (active sessions) x (instances) / (collection
-    /// interval) rows per second, so ~200/sec for one busy instance — and a user
-    /// upgrading must not silently acquire that ingest cost.
-    #[env_config(
-        name = "ZO_DB_MONITORING_ACTIVITY_ENABLED",
-        default = false,
-        help = "Ingest sampled active sessions (db.server.query_sample) into activity records; high volume, off by default"
-    )]
-    pub activity_enabled: bool,
-    /// Top-query + plan ingest (`db.server.top_query`).
-    ///
-    /// Defaults OFF (D-G). Plan documents are large — the captured Postgres
-    /// plans run to 2.4 KB each — and a user upgrading must not silently
-    /// acquire that ingest cost.
-    #[env_config(
-        name = "ZO_DB_MONITORING_TOP_QUERY_ENABLED",
-        default = false,
-        help = "Ingest per-statement top queries and their EXPLAIN plans (db.server.top_query); off by default"
-    )]
-    pub top_query_enabled: bool,
-    /// Real executed-plan ingest (Postgres `auto_explain` filelog records).
-    ///
-    /// Defaults OFF (D-G). auto_explain documents are LARGER than the generic
-    /// top_query plans — they carry actual row counts, buffer counters and the
-    /// full query text — and the producer only exists for users who opted into
-    /// executor instrumentation on their database, so ingest must be opted
-    /// into the same way.
-    #[env_config(
-        name = "ZO_DB_MONITORING_EXPLAIN_ENABLED",
-        default = false,
-        help = "Ingest real executed Postgres plans captured by auto_explain (o2_pg_event=explain filelog records); off by default"
-    )]
-    pub explain_enabled: bool,
-    /// Completed-statement duration ingest (Postgres
-    /// `log_min_duration_statement` filelog records, `o2_pg_event =
-    /// statement_duration`).
-    ///
-    /// Defaults ON, unlike activity/top_query/explain — deliberately. Those
-    /// knobs gate whether a NEW data feed starts costing storage on upgrade.
-    /// These rows are different: the collector is already shipping them (the
-    /// tailed database log arrives whether or not we canonicalize it), so the
-    /// knob cannot avoid the ingest cost of the line itself — it only gates a
-    /// bounded set of extra columns (a normalized copy of the statement plus a
-    /// few scalars) and the normalizer CPU. The real volume control is the
-    /// database's own `log_min_duration_statement` threshold, set where the
-    /// volume is produced. A knob whose only effect would be to hide a signal
-    /// already paid for defaults to visible.
-    #[env_config(
-        name = "ZO_DB_MONITORING_STATEMENT_ENABLED",
-        default = true,
-        help = "Canonicalize completed-statement duration log lines (Postgres log_min_duration_statement, o2_pg_event=statement_duration) into per-execution records; on by default — the lines are already being ingested, this only adds the canonical columns"
-    )]
-    pub statement_enabled: bool,
-    /// Instance metrics on the Databases page (design D-E, D-G).
-    ///
-    /// Ingests nothing — the page reads the `postgresql.*`/`mysql.*` metric
-    /// streams the user's collector already writes and joins them by instance.
-    /// Defaults OFF anyway: it adds a second read per page load across up to
-    /// eight streams, and a user upgrading should not silently acquire that.
-    #[env_config(
-        name = "ZO_DB_MONITORING_INSTANCE_METRICS",
-        default = false,
-        help = "Join OTel receiver instance metrics (connections, replication lag, cache hit) into the Databases page at read time; off by default"
-    )]
-    pub instance_metrics: bool,
-    /// Read-time canonicalization of OSS-ingested deadlock rows (A1).
-    ///
-    /// An Open Source build stores a deadlock log line VERBATIM and
-    /// canonicalizes nothing — deadlocks are an Enterprise capability — so an
-    /// enterprise build reading that history finds no `o2_dbm_kind = 'deadlock'`
-    /// row and shows an empty page over real deadlocks. Measured on a real
-    /// stream: 239 deadlock rows, 0 visible. With this on, the deadlocks read
-    /// also projects the raw vendor columns and canonicalizes those rows in
-    /// Rust, using the same canonicalizers the ingest path uses.
-    ///
-    /// Defaults ON, unlike `activity_enabled`/`top_query_enabled`/
-    /// `explain_enabled`/`instance_metrics`. Those gate whether a NEW feed
-    /// starts costing ingest or an extra read; this gates neither. It adds no
-    /// column, no stream, no response field and no storage — it is pure
-    /// interpretation of rows the user already paid for, bounded by the same
-    /// `limit` the read already clamps to 1000. A knob defaulting OFF would
-    /// leave the customer who upgrades still staring at an empty page with no
-    /// way to learn a setting would fill it.
-    ///
-    /// It exists ONLY as a performance escape hatch: on a deployment with a long
-    /// OSS-only history the widened predicate matches many more rows inside the
-    /// requested window, and an operator needs a way to take that back without
-    /// waiting for a release. Same shape as `statement_enabled` — a knob that
-    /// defaults ON because it gates columns, not a feed.
-    #[env_config(
-        name = "ZO_DB_MONITORING_DEADLOCK_READ_FALLBACK",
-        default = true,
-        help = "Canonicalize OSS-ingested (raw) deadlock rows at READ time so they appear on the Deadlocks page; on by default — a performance kill-switch for deployments with a long OSS-only history, not an opt-in"
-    )]
-    pub deadlock_read_fallback: bool,
-
-    /// The same read-time fallback for the Blocked Queries page (A1 phase 2a).
-    ///
-    /// Separate from `deadlock_read_fallback` rather than one shared switch: the
-    /// two pages have different scan profiles, and the escape hatch exists to
-    /// take back the cost of ONE widened read on a deployment where it hurts. A
-    /// single knob would force an operator throttling blocking to give up
-    /// deadlocks too.
-    ///
-    /// Defaults ON, for the reasons its deadlock twin documents above.
-    #[env_config(
-        name = "ZO_DB_MONITORING_BLOCKING_READ_FALLBACK",
-        default = true,
-        help = "Canonicalize OSS-ingested (raw) blocking-chain rows at READ time so they appear on the Blocked Queries page; on by default — a performance kill-switch, not an opt-in"
-    )]
-    pub blocking_read_fallback: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -5558,124 +5413,41 @@ mod tests {
 
     #[test]
     fn test_db_monitoring_config_defaults() {
-        // Design §8: the DBM config block ships enabled with these defaults.
+        // The DBM backend config is a SINGLE feature flag (product decision):
+        // enabled means every DBM signal is canonicalized and served, disabled
+        // means none is. The old per-signal knobs and operational tunables are
+        // consts in their consuming modules now, so `enabled` is the whole
+        // config surface — and it ships ON.
         let cfg = Config::init().unwrap();
         assert!(cfg.db_monitoring.enabled);
-        assert_eq!(cfg.db_monitoring.interval_secs, 900);
-        assert_eq!(cfg.db_monitoring.top_n, 200);
-        assert_eq!(cfg.db_monitoring.max_norm_len, 4096);
-        assert!(cfg.db_monitoring.live_tail);
-        assert!(cfg.db_monitoring.store_norm_text);
-        assert!(cfg.db_monitoring.normalize_identifiers);
-        // D-G: knobs added after the original block default OFF, so an upgrade
-        // never silently acquires new ingest cost. Activity sampling is the
-        // highest-volume signal DBM has (~200 rows/sec/instance), which is
-        // exactly why it must be opted into.
-        assert!(
-            !cfg.db_monitoring.activity_enabled,
-            "ZO_DB_MONITORING_ACTIVITY_ENABLED must default OFF (design D-G)"
-        );
-        assert!(
-            !cfg.db_monitoring.top_query_enabled,
-            "ZO_DB_MONITORING_TOP_QUERY_ENABLED must default OFF (design D-G)"
-        );
-        assert!(
-            !cfg.db_monitoring.explain_enabled,
-            "ZO_DB_MONITORING_EXPLAIN_ENABLED must default OFF (design D-G): \
-             auto_explain documents are larger than the generic plans, and an \
-             upgrade must not silently acquire that ingest cost"
-        );
-        // Statement durations default ON, deliberately unlike the three above:
-        // the tailed log lines are already being ingested whether or not we
-        // canonicalize them, so this knob gates no new feed — only the
-        // canonical columns on rows already paid for. The volume control is
-        // the database's own log_min_duration_statement threshold.
-        assert!(
-            cfg.db_monitoring.statement_enabled,
-            "ZO_DB_MONITORING_STATEMENT_ENABLED must default ON: it adds columns \
-             to rows the collector already ships, not a new ingest feed"
-        );
-        // W4 reads metrics streams the user already has, so it adds no ingest —
-        // but it does add a second read per Databases load against streams that
-        // may be large, so it is opted into like its siblings.
-        assert!(
-            !cfg.db_monitoring.instance_metrics,
-            "ZO_DB_MONITORING_INSTANCE_METRICS must default OFF (design D-G)"
-        );
-        // A1 · the deadlock read-time fallback. Defaults ON, deliberately unlike
-        // activity/top_query/explain/instance_metrics: those gate whether a new
-        // FEED starts costing ingest or an extra read. This one gates pure
-        // interpretation of rows the user has already paid to store — it adds no
-        // column, no stream and no response field, and is bounded by the same
-        // `limit` the read already clamps.
-        //
-        // Defaulting it OFF would leave the enterprise customer who upgrades
-        // still looking at an empty Deadlocks page, with no way to learn that a
-        // setting would fill it. That is the bug unfixed for everyone who does
-        // not read release notes, which is the majority. It exists as a knob at
-        // all only as a performance escape hatch for a deployment with a long
-        // OSS-only history, where the widened predicate scans more rows.
-        assert!(
-            cfg.db_monitoring.deadlock_read_fallback,
-            "ZO_DB_MONITORING_DEADLOCK_READ_FALLBACK must default ON: it is a \
-             kill-switch for a fix, not an opt-in for a cost"
-        );
-        assert!(
-            cfg.db_monitoring.blocking_read_fallback,
-            "ZO_DB_MONITORING_BLOCKING_READ_FALLBACK must default ON, for the same \
-             reason: an empty Blocked Queries page over real contention is the bug, \
-             and a knob defaulting off leaves it unfixed"
-        );
     }
 
-    /// The instance-metrics read happens in the BROWSER, so the knob only does
-    /// anything if it reaches `zoConfig`. A knob the UI cannot see is a knob
-    /// that silently does nothing — and nothing else in the workspace fails
-    /// when the wiring is missing, because both halves compile fine alone.
+    /// The UI gates the whole DBM menu/route surface on this flag, so it only
+    /// does anything if it reaches `zoConfig`. A flag the UI cannot see is a
+    /// flag that silently does nothing — and nothing else in the workspace
+    /// fails when the wiring is missing, because both halves compile fine
+    /// alone. It is also the ONLY `database_monitoring_*` field the /config
+    /// payload may carry: the per-signal flags were removed with their knobs,
+    /// and re-adding one here would silently resurrect a config surface the
+    /// product decided away.
     #[test]
-    fn test_instance_metrics_knob_reaches_the_frontend() {
+    fn test_db_monitoring_flag_reaches_the_frontend_and_is_the_only_one() {
         let status = include_str!("../../api/management/src/request/status/mod.rs");
         assert!(
-            status.contains("database_monitoring_instance_metrics"),
-            "the knob must be exposed on the config payload the UI reads"
+            status.contains("database_monitoring_enabled"),
+            "the flag must be exposed on the config payload the UI reads"
         );
         assert!(
-            status.contains("cfg.db_monitoring.instance_metrics"),
-            "the exposed field must be fed from the config knob, not hardcoded"
+            status.contains("cfg.db_monitoring.enabled"),
+            "the exposed field must be fed from the config flag, not hardcoded"
         );
-    }
-
-    /// Same wiring check, same reason, for the two feed knobs — and here the
-    /// cost of missing wiring is worse than a blank column. Both default OFF,
-    /// so on a fresh install the Activity page and the Plans section are empty
-    /// for a SERVER-SIDE reason; without the flags in `zoConfig` the UI can
-    /// only guess, and it guessed wrong in both places: Activity blamed the
-    /// user's collector, and the Plans empty state asserted "we're capturing
-    /// plans for this database" over a feed that is switched off.
-    #[test]
-    fn test_activity_and_top_query_knobs_reach_the_frontend() {
-        let status = include_str!("../../api/management/src/request/status/mod.rs");
-        for (field, source) in [
-            (
-                "database_monitoring_activity_enabled",
-                "cfg.db_monitoring.activity_enabled",
-            ),
-            (
-                "database_monitoring_top_query_enabled",
-                "cfg.db_monitoring.top_query_enabled",
-            ),
-        ] {
-            assert!(
-                status.contains(field),
-                "{field} must be exposed on the config payload the UI reads: the \
-                 empty states it drives are otherwise unable to tell a knob that \
-                 is off from a collector that is broken"
-            );
-            assert!(
-                status.contains(source),
-                "{field} must be fed from {source}, not hardcoded"
-            );
-        }
+        assert_eq!(
+            status.matches("database_monitoring_").count(),
+            2, // one struct field + one construction site
+            "database_monitoring_enabled must be the ONLY database_monitoring_* \
+             field on the /config payload — the per-signal flags were removed \
+             when the config collapsed to a single switch"
+        );
     }
 
     #[test]
