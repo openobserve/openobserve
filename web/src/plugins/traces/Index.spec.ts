@@ -504,6 +504,74 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
+    it("should update URL with tab=spans when searchMode changes to spans", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "spans");
+      await flushPromises();
+
+      expect(routerReplaceSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ tab: "spans" }),
+        }),
+      );
+    });
+
+    it("should switch to spans when the tab query changes on the mounted Traces route", async () => {
+      const currentRoute = ref({
+        query: { tab: "traces" },
+        name: "traces",
+        path: "/traces",
+      }) as typeof router.currentRoute;
+      routerCurrentRouteSpy.mockReturnValue(currentRoute);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      currentRoute.value = {
+        ...currentRoute.value,
+        query: { tab: "spans" },
+      };
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(routerReplaceSpy).not.toHaveBeenCalled();
+    });
+
     it("should switch to service-graph tab from ?tab= on enterprise", async () => {
       routerCurrentRouteSpy.mockReturnValue({
         value: {

@@ -361,6 +361,15 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 const ServicesCatalog = defineAsyncComponent(() => import("./ServicesCatalog.vue"));
 
+const TRACE_SEARCH_MODES: readonly TraceSearchMode[] = [
+  "traces",
+  "spans",
+  "service-graph",
+  "services-catalog",
+];
+const isTraceSearchMode = (value: unknown): value is TraceSearchMode =>
+  typeof value === "string" && TRACE_SEARCH_MODES.some((mode) => mode === value);
+
 const store = useStore();
 const activeTab = computed(() => {
   if (searchObj.meta.searchMode === "service-graph") return "service-graph";
@@ -1393,15 +1402,10 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
-  const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
-  if (
-    tab !== undefined &&
-    (["service-graph", "traces", "spans", "services-catalog"] as const).includes(
-      tab as "service-graph" | "traces" | "spans" | "services-catalog",
-    )
-  ) {
+  const tab = queryParams.tab;
+  if (isTraceSearchMode(tab)) {
     if (tab === "service-graph" && config.isEnterprise !== "true") return;
-    searchObj.meta.searchMode = tab as TraceSearchMode;
+    searchObj.meta.searchMode = tab;
   }
 
   if (queryParams.stream && searchObj.data.stream.selectedStream.value !== queryParams.stream) {
@@ -1489,7 +1493,7 @@ const onErrorOnlyToggled = (value: boolean) => {
 };
 
 // Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
-const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "services-catalog") => {
+const onSearchModeChange = (mode: TraceSearchMode) => {
   searchObj.meta.searchMode = mode;
   if (mode === "service-graph" || mode === "services-catalog") return;
   if (
@@ -1510,6 +1514,16 @@ const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "servic
   };
   getQueryData();
 };
+
+watch(
+  () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
+  ([routeName, tab]) => {
+    if (routeName !== "traces") return;
+    if (!isTraceSearchMode(tab) || tab === searchObj.meta.searchMode) return;
+    if (tab === "service-graph" && config.isEnterprise !== "true") return;
+    onSearchModeChange(tab);
+  },
+);
 
 // Handler for Reset Filters button
 // Clears all filters including brush selections
@@ -2028,12 +2042,9 @@ const applyHandoffFilter = (): boolean => {
 watch(
   () => searchObj.meta.searchMode,
   (mode) => {
+    if (router.currentRoute.value.query.tab === mode) return;
     const query = { ...router.currentRoute.value.query };
-    if (mode !== "spans") {
-      query.tab = mode;
-    } else {
-      delete query.tab;
-    }
+    query.tab = mode;
     router.replace({ query });
   },
 );
