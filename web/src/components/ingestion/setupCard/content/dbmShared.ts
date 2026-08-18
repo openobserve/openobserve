@@ -457,13 +457,35 @@ const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
         parse_from: attributes.my_message
         # my_db is captured from the SCHEMA HALF of the qualified table name.
         # InnoDB writes the locked object as db.table (backtick-quoted), so the
-        # database the
-        # deadlock happened in is present in the log text and does NOT have to be
-        # left null -- this is the only place the MySQL error log states it.
-        # detect_database reads my_db, so this is what makes the ?database=
-        # filter work on the Deadlocks tab. The group is optional-safe: it sits
-        # inside the same alternation as the table name it comes from.
-        regex: '(?s)RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<my_lock_index>\\S+) of table (?P<my_lock_table>\`?(?P<my_db>[^\`. ]+)\`?\\.\\S+) trx id \\d+ (?P<my_lock_mode>lock_mode \\S+)'
+        # database the deadlock happened in is present in the log text and does
+        # NOT have to be left null -- this is the only place the MySQL error log
+        # states it. detect_database reads my_db.
+        #
+        # THIS IS A DIFFERENT RECORD FROM THE PARTICIPANT, and that is the whole
+        # reason for the two extra captures below. InnoDB writes each side as
+        # SEPARATE timestamped entries:
+        #
+        #   ...Z [MY-012469] *** (2) TRANSACTION:      <- participant: thread, query
+        #   TRANSACTION 66548, ACTIVE 0 sec ...
+        #   MySQL thread id 82, ... query id ...
+        #   UPDATE accounts SET balance = ...          <- record ENDS here
+        #   ...Z [MY-012469] *** (2) HOLDS THE LOCK(S):  <- new entry
+        #   RECORD LOCKS ... of table `dbmlab`.`accounts` trx id 66548 lock_mode X
+        #
+        # `line_start_pattern` splits on the timestamp, so the RECORD LOCKS line
+        # can never share a record with the `*** (N) TRANSACTION:` block above
+        # it. Measured on the rig: of 108 records carrying a participant, ZERO
+        # carried my_db, and of 252 carrying my_db, ZERO carried a participant.
+        # The consequence was that every stitched deadlock had `objects: []`,
+        # null lock_mode/lock_target, and -- because my_db is the ONLY MySQL
+        # source in `detect_database` -- a null database, so the Deadlocks tab's
+        # `?database=` filter could not work on MySQL or MariaDB at all.
+        #
+        # `my_lock_side` and `my_lock_trx_id` are what make the two joinable:
+        # both records name the same side number and the same transaction id, so
+        # the merge step can attach this lock detail to the participant it
+        # describes instead of throwing it away.
+        regex: '(?s)\\*\\*\\* \\((?P<my_lock_side>\\d+)\\) (?:HOLDS THE LOCK|WAITING FOR THIS LOCK).*?RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<my_lock_index>\\S+) of table (?P<my_lock_table>\`?(?P<my_db>[^\`. ]+)\`?\\.\\S+) trx id (?P<my_lock_trx_id>\\d+) (?P<my_lock_mode>lock_mode \\S+)'
         on_error: send
       - type: regex_parser
         parse_from: attributes.my_message
@@ -574,7 +596,18 @@ const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
         # detect_database reads my_db and has no maria_db alias, and the
         # engine is already distinguished by o2_maria_event / the maria_ prefix
         # scan, so this cannot make a MariaDB row look like MySQL.
-        regex: '(?s)RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<maria_lock_index>\\S+) of table (?P<maria_lock_table>\`?(?P<my_db>[^\`. ]+)\`?\\.\\S+) trx id \\d+ (?P<maria_lock_mode>lock_mode \\S+)'
+        #
+        # Side and transaction id are captured for the same reason as the MySQL
+        # recipe above: InnoDB writes the RECORD LOCKS line as a SEPARATE entry
+        # from the `*** (N) TRANSACTION:` block, so the two can never share a
+        # record and the lock detail has to be joined back by side + trx id.
+        # Confirmed on the checked-in capture
+        # (captures/mariadb-deadlock-v0158.jsonl): 8 records carry a
+        # participant, ZERO carry lock detail. MariaDB writing the deadlock as
+        # one log BLOCK does not make it one log RECORD -- each `*** (N) …`
+        # header is separately timestamped, and `line_start_pattern` splits
+        # there.
+        regex: '(?s)\\*\\*\\* \\((?P<maria_lock_side>\\d+)\\) (?:HOLDS THE LOCK|WAITING FOR THIS LOCK).*?RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<maria_lock_index>\\S+) of table (?P<maria_lock_table>\`?(?P<my_db>[^\`. ]+)\`?\\.\\S+) trx id (?P<maria_lock_trx_id>\\d+) (?P<maria_lock_mode>lock_mode \\S+)'
         on_error: send
       - type: regex_parser
         parse_from: attributes.maria_message
