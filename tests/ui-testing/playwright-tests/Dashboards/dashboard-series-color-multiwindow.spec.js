@@ -16,6 +16,8 @@ import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import testLogger from "../utils/test-logger.js";
 import { verifyColorOnCanvas, applyAndWaitForRender } from "./utils/canvasHelpers.js";
+import logsdata from "../../../test-data/logs_data.json";
+const { getAuthHeaders, getOrgIdentifier } = require("../utils/cloud-auth.js");
 
 // The comparison series label the 15m time shift produces. convertSQLData builds
 // it as `${seriesName} (${periodAsStr})`, and dateTimeUtils renders a 15-minute
@@ -30,6 +32,44 @@ const COMPARISON_SERIES_LABEL = "15 Minutes ago";
 // series — which is exactly how this spec used to pass without ever exercising
 // the multi-window fix it names.
 const QUERY_RANGE = { value: "6", unit: "d" };
+
+// Minutes into the past to stamp the seed batch. Must exceed the 15m shift.
+const SEED_MINUTES_AGO = 30;
+
+/**
+ * Seed rows that are older than the time shift, so the comparison window is
+ * populated regardless of how much history the target deployment happens to have.
+ *
+ * Verified locally: on a stream holding only just-ingested rows the dropdown
+ * offers just ["Kubernetes Container Name"] — the exact CI failure — and with
+ * this seed it also offers "Kubernetes Container Name (15 Minutes ago)".
+ *
+ * `_timestamp` is microseconds since epoch (same convention the Alerts specs use).
+ * CI sets ZO_INGEST_ALLOWED_UPTO=5 (hours), so 30 minutes is well inside the
+ * accepted back-dating window.
+ */
+async function seedAgedRows(streamName = "e2e_automate") {
+  const baseMicros = (Date.now() - SEED_MINUTES_AGO * 60 * 1000) * 1000;
+  // Reuse real records so every field the panel queries keeps its usual shape.
+  const rows = logsdata.slice(0, 200).map((record, i) => ({
+    ...record,
+    _timestamp: baseMicros + i * 300000,
+  }));
+
+  const response = await fetch(
+    `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
+    { method: "POST", headers: getAuthHeaders(), body: JSON.stringify(rows) }
+  );
+  if (!response.ok) {
+    throw new Error(
+      `seedAgedRows failed: HTTP ${response.status} ${(await response.text()).slice(0, 200)}`
+    );
+  }
+  testLogger.info("Seeded aged rows for the comparison window", {
+    streamName,
+    minutesAgo: SEED_MINUTES_AGO,
+  });
+}
 
 /**
  * Open the Color By Series popup and confirm the chart is actually offering the
@@ -86,6 +126,8 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     dashboardName = `SeriesColorMW_${suffix}`;
     await navigateToBase(page);
     await ingestion(page);
+    // The 15m comparison window only returns rows older than 15 minutes.
+    await seedAgedRows();
   });
 
   test("should apply custom series color correctly when time shift (compare against) is enabled", async ({
