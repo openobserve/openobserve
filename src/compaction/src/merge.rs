@@ -65,21 +65,15 @@ use tokio::{
 
 use super::worker::{MergeBatch, MergeSender};
 
+/// True when a TSID-major metrics stream still has files that are not in the
+/// final layout (legacy timestamp-major or hash-sorted): the hour-end merge
+/// must rewrite them. A closed hour made entirely of `tsid-major-v3-*` files is
+/// finalized and re-running the hour-end job leaves it alone.
 fn needs_tsid_layout_rewrite(stream_type: StreamType, files: &[FileKey]) -> bool {
     metrics_tsid_major_enabled(stream_type)
         && files
             .iter()
             .any(|file| MetricsFileLayout::of(&file.key) != MetricsFileLayout::TsidMajor)
-}
-
-/// Return true once a closed metrics hour already consists entirely of valid
-/// size-bounded TSID-major files. Re-running the hour-end job must not merge
-/// those files again: their record-batch boundaries already implement the
-/// configured logical original-size target.
-fn is_finalized_size_split_tsid_major(stream_type: StreamType, files: &[FileKey]) -> bool {
-    metrics_tsid_major_enabled(stream_type)
-        && !files.is_empty()
-        && !needs_tsid_layout_rewrite(stream_type, files)
 }
 
 /// Generate merging job by stream
@@ -499,7 +493,8 @@ pub async fn merge_by_stream(
                 metrics_tsid_major_enabled(stream_type) && !is_incremental && !skip_group_files;
 
             if finalize_tsid_major_hour
-                && is_finalized_size_split_tsid_major(stream_type, &files_with_size)
+                && !files_with_size.is_empty()
+                && !needs_tsid_layout_rewrite(stream_type, &files_with_size)
             {
                 return Ok(vec![]);
             }
@@ -560,11 +555,7 @@ pub async fn merge_by_stream(
                 // NOT seal this remainder: more files will arrive in the still-open hour, and
                 // sealing now would force re-merging it later (write amplification). Carry it
                 // to the next round; the scheduled hour-end pass seals whatever is left.
-                if !is_incremental
-                    && (new_file_list.len() > 1
-                        || (new_file_list.len() == 1
-                            && needs_tsid_layout_rewrite(stream_type, &new_file_list)))
-                {
+                if new_file_list.len() > 1 && !is_incremental {
                     batch_groups.push(MergeBatch {
                         batch_id: batch_groups.len(),
                         org_id: org_id.clone(),
@@ -739,15 +730,20 @@ pub async fn merge_files(
     #[cfg(not(feature = "enterprise"))]
     let is_match_downsampling_rule = false;
 
-    // TSID-major finalization: rewrite a lone legacy/hash-sorted file and merge
-    // the complete batch regardless of size. Incremental merges keep the
-    // regular size grouping and never rewrite a single file.
+    // TSID-major finalization: merge the complete batch regardless of size
+    // and rewrite even a lone legacy/hash-sorted file. Incremental merges keep
+    // the regular size grouping and never rewrite a single file.
     let finalize_tsid_major =
         finalize && metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
-    let rewrite_single_tsid_layout = finalize_tsid_major
-        && files_with_size.len() == 1
-        && needs_tsid_layout_rewrite(stream_type, files_with_size);
-    if files_with_size.len() <= 1 && !is_match_downsampling_rule && !rewrite_single_tsid_layout {
+    // nothing to do with 0/1 files, unless a rule forces the merge
+    let nothing_to_merge = |files: &[FileKey]| {
+        files.len() <= 1
+            && !is_match_downsampling_rule
+            && !(finalize_tsid_major
+                && files.len() == 1
+                && needs_tsid_layout_rewrite(stream_type, files))
+    };
+    if nothing_to_merge(files_with_size) {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -755,13 +751,12 @@ pub async fn merge_files(
     let mut new_compressed_file_size = 0;
     let mut new_file_list = Vec::new();
     let cfg = get_config();
-    let merge_complete_tsid_major_batch = finalize_tsid_major;
     for file in files_with_size.iter() {
         if (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
             || new_compressed_file_size + file.meta.compressed_size
                 > cfg.compact.max_file_size as i64)
             && !is_match_downsampling_rule
-            && !merge_complete_tsid_major_batch
+            && !finalize_tsid_major
         {
             break;
         }
@@ -777,10 +772,7 @@ pub async fn merge_files(
             .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge
-    let rewrite_single_tsid_layout = finalize_tsid_major
-        && new_file_list.len() == 1
-        && needs_tsid_layout_rewrite(stream_type, &new_file_list);
-    if new_file_list.len() <= 1 && !is_match_downsampling_rule && !rewrite_single_tsid_layout {
+    if nothing_to_merge(&new_file_list) {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -796,10 +788,7 @@ pub async fn merge_files(
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
-    let rewrite_single_tsid_layout = finalize_tsid_major
-        && new_file_list.len() == 1
-        && needs_tsid_layout_rewrite(stream_type, &new_file_list);
-    if new_file_list.len() <= 1 && !is_match_downsampling_rule && !rewrite_single_tsid_layout {
+    if nothing_to_merge(&new_file_list) {
         return Ok((Vec::new(), retain_file_list));
     }
 
@@ -909,16 +898,11 @@ pub async fn merge_files(
         target_partitions: 2,
     };
 
-    // Physical order of the input files, which is what the merge query may
-    // rely on:
-    // - every input is (__hash__, _timestamp) ordered (ingester `tsid-sorted-` files or compactor
-    //   `tsid-major-v3-` files) and the output is TSID-major too: declare that order so DataFusion
-    //   merges the pre-sorted files (SortPreservingMerge, one file per partition) instead of
-    //   materializing the whole batch in a SortExec;
-    // - a batch that mixes layouts (legacy timestamp-major, hash-sorted, TSID-major) or a
-    //   hash-sorted batch merged into the classic layout: declare nothing, the merge query supplies
-    //   the authoritative sort;
-    // - otherwise the classic `_timestamp DESC` layout.
+    // Physical order the merge query may rely on. All inputs (hash, ts)
+    // ordered and a TSID-major output: declare it, DataFusion then merges the
+    // pre-sorted files (SortPreservingMerge, one file per partition) instead
+    // of a full SortExec. Mixed layouts, or hash-ordered files merged into the
+    // classic layout: declare nothing. Otherwise the classic `_timestamp DESC`.
     let metrics_tsid_major_requested =
         metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
     let hash_ordered_files = files
