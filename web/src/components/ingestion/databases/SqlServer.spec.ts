@@ -121,7 +121,7 @@ describe("sqlServerCard builder", () => {
     // slows to a crawl. A processor that is defined but not listed in the
     // pipeline does nothing, so both are asserted.
     expect(config).toContain("filter/dbm:");
-    expect(config).toContain("processors: [filter/dbm, batch]");
+    expect(config).toContain("processors: [memory_limiter, filter/dbm, batch]");
 
     // Deadlocks ship too, but as a sqlquery receiver rather than a filelog one:
     // SQL Server keeps them in the system_health Extended Events ring buffer as

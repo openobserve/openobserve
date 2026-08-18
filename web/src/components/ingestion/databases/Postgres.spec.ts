@@ -126,7 +126,7 @@ describe("postgresCard builder", () => {
     // slows to a crawl. A processor that is defined but not listed in the
     // pipeline does nothing, so both are asserted.
     expect(config).toContain("filter/dbm:");
-    expect(config).toContain("processors: [filter/dbm, batch]");
+    expect(config).toContain("processors: [memory_limiter, filter/dbm, batch]");
 
     expect(config).toContain(`Basic ${SUBS.token}`);
 
@@ -143,14 +143,23 @@ describe("postgresCard builder", () => {
   });
 
   /**
-   * THE v0.148.0 EVENTS TRAP. Upstream flipped `db.server.query_sample` /
-   * `db.server.top_query` to default-OFF: without a TOP-LEVEL `events:` block
-   * (a sibling of the collection settings, never nested inside them) the
-   * receiver starts cleanly, reports healthy, and emits zero events with zero
-   * warnings. This is the worst failure shape the card can ship, so the block's
-   * presence and its shape are pinned here.
+   * THE v0.148.0 EVENTS BLOCK, SHIPPED OFF TO MATCH THE SERVER.
+   *
+   * Both events are opt-in on BOTH sides. Upstream flipped
+   * `db.server.query_sample` / `db.server.top_query` to default-OFF at
+   * v0.148.0, and OpenObserve discards both feeds unless
+   * `ZO_DB_MONITORING_ACTIVITY_ENABLED` / `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
+   * are set — both of which also default false. Shipping the recipe at `true`
+   * made the customer's database pay full collection cost, the receiver's
+   * EXPLAIN pass included, for rows the server then threw away.
+   *
+   * The block must still be PRESENT and correctly shaped: a TOP-LEVEL
+   * `events:` (a sibling of the collection settings, never nested inside them,
+   * where it is a fatal config error), with both keys spelled out so the
+   * setting is explicit and a user who wants a feed flips one visible line
+   * here and the matching server flag.
    */
-  it("enables the receiver's activity and top-query events via a top-level events: block", () => {
+  it("ships the receiver's activity and top-query events off, matching the server defaults", () => {
     const card = postgresCard(SUBS);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
@@ -158,9 +167,11 @@ describe("postgresCard builder", () => {
     // The dedicated receiver instance (a same-named `postgresql:` would collide
     // with the metrics config when the two --config files merge).
     expect(config).toContain("postgresql/dbm_events:");
-    // Both event names, explicitly enabled.
-    expect(config).toContain("db.server.query_sample: { enabled: true }");
-    expect(config).toContain("db.server.top_query: { enabled: true }");
+    // Both event names, present and explicitly OFF — the server discards both
+    // by default, so collecting them would be pure waste on the user's DB.
+    expect(config).toContain("db.server.query_sample: { enabled: false }");
+    expect(config).toContain("db.server.top_query: { enabled: false }");
+    expect(config).not.toContain("enabled: true }");
     // Postgres spells it top_n_query (mysql says top_query_count) — verified
     // against v0.158.0, where an unknown key is a fatal config error.
     expect(config).toContain("top_n_query:");
@@ -172,8 +183,23 @@ describe("postgresCard builder", () => {
 
     // The events pipeline must BYPASS filter/dbm: receiver-native events carry
     // no o2_recipe tag, so the filter would silently drop every one of them.
+    // It must still sit behind memory_limiter, and memory_limiter must be
+    // FIRST — a processor listed ahead of it runs outside the OOM guard.
     expect(config).toMatch(/logs\/dbm_events:\n\s+receivers: \[postgresql\/dbm_events\]/);
-    expect(config).toMatch(/logs\/dbm_events:[\s\S]*?processors: \[batch\]/);
+    expect(config).toMatch(/logs\/dbm_events:[\s\S]*?processors: \[memory_limiter, batch\]/);
+    const eventsProcessors = config.match(/logs\/dbm_events:[\s\S]*?processors: \[([^\]]+)\]/)![1];
+    expect(eventsProcessors).not.toContain("filter/dbm");
+
+    // SHIPPING THE FEEDS OFF ONLY WORKS IF THE CARD SAYS SO. A user who wants
+    // activity or top queries has to flip TWO switches — the recipe line and
+    // the server env var — and a recipe silently off with no copy naming the
+    // pairing is a worse trap than the one this replaces. Both env var names
+    // must appear in the step's own note, next to the config that pairs with
+    // them; the YAML comment alone is not enough, since it is only read by
+    // someone already looking for it.
+    expect(configure.note).toContain("ZO_DB_MONITORING_ACTIVITY_ENABLED");
+    expect(configure.note).toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
+    expect(configure.note).toMatch(/enabled: false/);
 
     // Prerequisites travel with the feature: top queries read
     // pg_stat_statements, which must be created AND preloaded (restart).
@@ -621,6 +647,247 @@ describe("postgresCard builder", () => {
     for (const line of datasources) {
       expect(line).toContain("sslmode=require");
     }
+  });
+
+  /**
+   * THE DATABASE-SIDE COST OF pg_blocking. `pg_blocking_pids()` takes exclusive
+   * access to the lock manager's shared state for each pid it is asked about,
+   * and the LATERAL join calls it once per row of `pg_stat_activity` — so
+   * without a predicate the call count scales with TOTAL CONNECTIONS rather
+   * than with contention, ten times a minute, and it is worst on the busiest
+   * server during exactly the lock storm the recipe exists to observe.
+   *
+   * `wait_event_type = 'Lock'` is OUTPUT-IDENTICAL, which is why this can be a
+   * pure work reduction rather than a sampling trade: a session that is not
+   * waiting on a lock has no blockers, so `pg_blocking_pids()` returns empty
+   * and `JOIN LATERAL … ON true` already dropped the row. The measured saving
+   * (3.20ms → 2.75ms mean under a 63-session convoy) is modest; the lock
+   * manager access it avoids is the point.
+   *
+   * Pinned together with the column contract, because the failure this guards
+   * is someone "simplifying" the WHERE clause away — or narrowing it further
+   * and silently dropping the blocking rows the tab is made of.
+   */
+  it("filters pg_blocking to lock waiters without losing a contract column", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    // Isolate the pg_blocking recipe: the config holds several sqlquery
+    // receivers and a config-wide match would pass on another one's text.
+    const blocking = config.slice(
+      config.indexOf("sqlquery/pg_blocking:"),
+      config.indexOf("filelog/pg_deadlocks:"),
+    );
+    expect(blocking).toContain("pg_blocking_pids(blocked.pid)");
+    expect(blocking).toContain("WHERE blocked.wait_event_type = 'Lock'");
+
+    // The predicate must not have cost the recipe its ingest contract:
+    // canonicalize_blocking reads these aliases verbatim, and both sides of
+    // the chain must survive.
+    for (const alias of [
+      "AS blocked_pid",
+      "AS blocked_query",
+      "AS wait_event_type",
+      "AS blocking_pid",
+      "AS blocking_query",
+      "AS server_address",
+      "AS o2_recipe",
+    ]) {
+      expect(blocking, `pg_blocking must still project ${alias}`).toContain(alias);
+    }
+    // Still both sides of the join — a WHERE that accidentally replaced the
+    // LATERAL would leave a query that returns waiters with no blockers.
+    expect(blocking).toContain("JOIN pg_stat_activity blocking ON blocking.pid = b.pid");
+  });
+
+  /**
+   * BOUNDING THE O(SCHEMA) RECIPES. `pg_total_relation_size()` sums heap, every
+   * index, TOAST and TOAST indexes per table per tick, and nothing bounded it:
+   * measured warm at 17ms / 500 tables, 161ms / 5,000, 3,037ms / 50,005 — a
+   * super-linear curve (9.4× then 18.9×) that is a function of the CUSTOMER's
+   * schema, not their workload. Live at 50k tables the collector recorded mean
+   * 30.7s against its 60s interval and was eventually OOM-killed.
+   *
+   * TWO BOUNDS, and the choice between them is the thing worth pinning.
+   * `LIMIT 1000` measured fastest (38ms, 80×) and is WRONG: with no stable
+   * ORDER BY it keeps whichever tables the catalog scan reached first, so the
+   * set of missing tables changes between ticks and the Table health tab gains
+   * and loses rows non-deterministically. `n_live_tup > 0` (250ms, 12×) drops
+   * only relations with no bloat, no vacuum debt and no meaningful size, and
+   * drops the SAME ones every tick. The 300s interval is a further 5× against
+   * schema state that moves hourly at most.
+   */
+  it("bounds the table and index stats recipes without a nondeterministic LIMIT", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const tableStats = config.slice(
+      config.indexOf("sqlquery/pg_table_stats:"),
+      config.indexOf("sqlquery/pg_index_stats:"),
+    );
+    // Bounded at the next receiver: an open-ended slice would swallow
+    // postgresql/dbm_events and make this test fail on that receiver's knobs.
+    const indexStats = config.slice(
+      config.indexOf("sqlquery/pg_index_stats:"),
+      config.indexOf("postgresql/dbm_events:"),
+    );
+
+    // The row bound, on the alias the recipe actually gives
+    // pg_stat_user_tables — it is a LEFT JOIN, so the coalesce is load-bearing
+    // for tables with no stat row at all.
+    expect(tableStats).toContain("LEFT JOIN pg_stat_user_tables s");
+    expect(tableStats).toContain("AND coalesce(s.n_live_tup, 0) > 0");
+
+    // NOT a LIMIT — the failure mode is a tab that flickers, which reads as
+    // data loss rather than as a bound. Checked on SQL lines only: the
+    // recipes' own comments name the rejected option, which is the point.
+    const sqlLines = (block: string) =>
+      block.split("\n").filter((l) => !l.trim().startsWith("#") && !l.trim().startsWith("--"));
+    expect(sqlLines(tableStats).join("\n")).not.toMatch(/\bLIMIT\b/);
+    expect(sqlLines(indexStats).join("\n")).not.toMatch(/\bLIMIT\b/);
+
+    // The interval, on both, and no 60s left behind on either.
+    expect(tableStats).toContain("collection_interval: 300s");
+    expect(indexStats).toContain("collection_interval: 300s");
+    expect(tableStats).not.toContain("collection_interval: 60s");
+    expect(indexStats).not.toContain("collection_interval: 60s");
+
+    // The bound must not have cost the recipe the columns the Table health tab
+    // is built from — the size functions are what got expensive, and dropping
+    // them would have been the other way to make the numbers look good.
+    expect(tableStats).toContain("pg_total_relation_size(c.oid)");
+    expect(tableStats).toContain("AS n_dead_tup");
+    expect(tableStats).toContain("AS dead_tup_pct");
+    expect(indexStats).toContain("pg_relation_size(s.indexrelid)");
+    expect(indexStats).toContain("AS idx_scan");
+  });
+
+  /**
+   * THE CONNECTION BUDGET. `sqlqueryreceiver`'s option is `max_open_conn`,
+   * SINGULAR, and it defaults to 0 = unlimited. The plural `max_open_conns` is
+   * not a key the receiver knows and is silently ignored, so the misspelling is
+   * the dangerous outcome: it reads like a bound in review and enforces
+   * nothing.
+   *
+   * The cap is defence in depth and the test says so rather than implying a
+   * bug was fixed: measured steady state on this rig is exactly 13 connections
+   * (7 sqlquery receivers + the postgresql receiver) across 30 samples, peaking
+   * at 14 under a 150s ACCESS EXCLUSIVE stall. Scrapes serialize; the
+   * unbounded growth this guards against did not reproduce.
+   */
+  it("caps every sqlquery receiver's connections with the singular option name", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    // One cap per sqlquery receiver — a receiver added later without one would
+    // be back to unlimited, and this count is what catches that.
+    const receivers = config.match(/^ {2}sqlquery\/\w+:/gm) ?? [];
+    expect(receivers.length).toBe(3);
+    expect(config.match(/^ {4}max_open_conn: 2$/gm)?.length).toBe(receivers.length);
+
+    // The plural spelling is not a key the receiver knows and is silently
+    // ignored, so it must never appear as a SETTING. (It is named in the
+    // config's own comment as the thing to avoid, which is why this looks at
+    // key lines rather than at the whole text.)
+    const keys = config.split("\n").filter((l) => /^\s+[a-z_]+:/.test(l));
+    expect(keys.some((l) => l.includes("max_open_conns"))).toBe(false);
+  });
+
+  /**
+   * COLLECTOR SELF-PROTECTION. This collector usually runs on the customer's
+   * DATABASE HOST, so an unbounded heap is a second failure on the machine
+   * already having the first one. Observed on this project's rig: a transient
+   * DNS failure to the backend produced 28,308 "sending queue is full" events
+   * and 2.06 GiB RSS on one collector while an identical sibling reaching a
+   * healthy backend sat at 95 MiB.
+   *
+   * All three parts are pinned because each covers a different unbounded
+   * thing: `memory_limiter` back-pressures the receivers instead of growing the
+   * heap, a bounded `sending_queue` stops the in-memory buffer being infinite,
+   * and `max_elapsed_time` stops a batch that will never succeed being retried
+   * forever. And memory_limiter must be FIRST in every pipeline — it guards
+   * only what is upstream of it, so a processor listed ahead of it is outside
+   * the guard entirely, which is the failure a plain "is it present" assertion
+   * would miss.
+   */
+  it("ships a collector that sheds rather than OOMs the database host", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    // Defined, with the limits measured stable on this project's own rig.
+    expect(config).toContain("memory_limiter:");
+    expect(config).toContain("check_interval: 1s");
+    expect(config).toContain("limit_mib: 768");
+    expect(config).toContain("spike_limit_mib: 192");
+
+    // FIRST in EVERY pipeline. A processor defined but not listed does nothing,
+    // and one listed after another does not guard it.
+    const pipelines = config.split("service:")[1]!.match(/processors: \[([^\]]+)\]/g) ?? [];
+    expect(pipelines.length).toBeGreaterThanOrEqual(2);
+    for (const list of pipelines) {
+      expect(list, `${list} must start with memory_limiter`).toMatch(
+        /processors: \[memory_limiter[,\]]/,
+      );
+    }
+
+    // The exporter's two bounds. Unset, both are effectively infinite — so
+    // these are checked as SETTING lines, not as text: the config's own
+    // comments discuss queue_size by name, and a toContain() over the whole
+    // document would keep passing after the setting itself was deleted.
+    const settings = config
+      .split("\n")
+      .filter((l) => /^\s+[a-z_]+:/.test(l))
+      .map((l) => l.trim());
+    expect(settings).toContain("sending_queue:");
+    expect(settings).toContain("queue_size: 500");
+    expect(settings).toContain("retry_on_failure:");
+    expect(settings).toContain("max_elapsed_time: 300s");
+  });
+
+  /**
+   * THE CADENCE / EXPLAIN-BUDGET RELATIONSHIP (spec §5.3). 15s is a deliberate
+   * 4× deviation from upstream's 60s default, bought to keep the Top queries
+   * page from feeling a minute stale. It multiplies every per-cycle cost,
+   * including the EXPLAIN pass — the ceiling is
+   * max_explain_each_interval × (3600 / collection_interval) = 48,000/hour.
+   *
+   * The ceiling is not the cost: measured on this rig the real rate is
+   * 1,775 EXPLAINs/hour (3.7% of it), because `isExplainableQuery()` and the
+   * plan cache gate it, and the whole EXPLAIN path costs 23.2ms of database
+   * time — 0.034% of exec time. So neither knob is a place to economize, and
+   * the comment is what stops an "align with upstream defaults" refactor from
+   * reverting the cadence and the budget as if they were independent.
+   *
+   * Pinned against the comment as well as the values, in the style of the
+   * auto_explain test above: the bug this class of test exists to catch is a
+   * config whose numbers and whose stated reasoning have drifted apart.
+   */
+  it("documents why the top-query cadence deviates from upstream, beside the value", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const events = config.slice(config.indexOf("postgresql/dbm_events:"));
+    // The values, unchanged — the measurement says the cost is negligible, so
+    // cutting the budget would lose plan fidelity for nothing.
+    expect(events).toContain("collection_interval: 15s");
+    expect(events).toContain("max_explain_each_interval: 200");
+
+    // The deviation is recorded as deliberate, with upstream's own default
+    // named so the reader knows what they would be "aligning" to.
+    expect(events).toMatch(/DELIBERATE DEVIATION FROM UPSTREAM/);
+    expect(events).toMatch(/60s/);
+    // The relationship the comment exists to protect.
+    expect(events).toMatch(/max_explain_each_interval/);
+    expect(events).toMatch(/48,000/);
+    expect(events).toMatch(/1,775/);
+    // And the two changes measurement ruled OUT, so neither is re-proposed.
+    expect(events).toMatch(/query_plan_cache_ttl/);
+    expect(events).toMatch(/do NOT/i);
   });
 
   /**

@@ -141,6 +141,9 @@ receivers:
       - sql: |
           SELECT
             blocked.pid::text                                          AS blocked_pid,
+            -- Per-session datname, not current_database(): sessions span more
+            -- than the scrape's own database. Mirrors PG_BLOCKING_RECEIVER.
+            coalesce(blocked.datname,'')                               AS pg_db,
             coalesce(blocked.usename,'')                               AS blocked_user,
             coalesce(blocked.application_name,'')                      AS blocked_app,
             coalesce(blocked.query,'')                                 AS blocked_query,
@@ -152,6 +155,7 @@ receivers:
             coalesce(blocking.application_name,'')                     AS blocking_app,
             coalesce(blocking.query,'')                                AS blocking_query,
             coalesce(round(EXTRACT(EPOCH FROM (now()-blocking.xact_start))::numeric,3),0)::text AS blocking_xact_age_s,
+            '${env:PGHOST}'                                            AS server_address,
             'pg_blocking_chain'                                        AS o2_recipe
           FROM pg_stat_activity blocked
           JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS b(pid) ON true
@@ -161,6 +165,7 @@ receivers:
             attribute_columns:
               [
                 blocked_pid,
+                pg_db,
                 blocked_user,
                 blocked_app,
                 wait_event_type,
@@ -171,6 +176,7 @@ receivers:
                 blocking_app,
                 blocking_query,
                 blocking_xact_age_s,
+                server_address,
                 o2_recipe,
               ]
 
@@ -369,6 +375,7 @@ receivers:
                  CASE WHEN coalesce(s.n_live_tup,0) > 0
                       THEN round(100.0*s.n_dead_tup/(s.n_live_tup+s.n_dead_tup),2)::text
                       ELSE '0' END                            AS dead_tup_pct,
+                 '${env:PGHOST}'                             AS server_address,
                  'pg_table_stats'                             AS o2_recipe
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -393,20 +400,25 @@ receivers:
                 autovacuum_count,
                 frozen_xid_age,
                 dead_tup_pct,
+                server_address,
                 o2_recipe,
               ]
       # R3b — indexes: definition + usage
       - sql: |
-          SELECT schemaname                          AS schema_name,
-                 relname                             AS table_name,
-                 indexrelname                        AS index_name,
-                 pg_relation_size(indexrelid)::text  AS index_bytes,
-                 idx_scan::text                      AS idx_scan,
-                 idx_tup_read::text                  AS idx_tup_read,
-                 idx_tup_fetch::text                 AS idx_tup_fetch,
-                 pg_get_indexdef(indexrelid)         AS index_def,
-                 'pg_index_stats'                    AS o2_recipe
-          FROM pg_stat_user_indexes
+          SELECT s.schemaname                                  AS schema_name,
+                 s.relname                                     AS table_name,
+                 s.indexrelname                                AS index_name,
+                 coalesce(s.idx_scan,0)::text                  AS idx_scan,
+                 coalesce(s.idx_tup_read,0)::text              AS idx_tup_read,
+                 coalesce(s.idx_tup_fetch,0)::text             AS idx_tup_fetch,
+                 pg_relation_size(s.indexrelid)::text          AS index_bytes,
+                 (i.indisunique OR i.indisprimary)::text       AS is_unique,
+                 coalesce(pg_get_indexdef(s.indexrelid),'')    AS index_def,
+                 '${env:PGHOST}'                               AS server_address,
+                 'pg_index_stats'                              AS o2_recipe
+          FROM pg_stat_user_indexes s
+          JOIN pg_index i ON i.indexrelid = s.indexrelid
+          WHERE s.schemaname NOT IN ('pg_catalog','information_schema')
         logs:
           - body_column: index_def
             attribute_columns:
@@ -418,6 +430,8 @@ receivers:
                 idx_scan,
                 idx_tup_read,
                 idx_tup_fetch,
+                is_unique,
+                server_address,
                 o2_recipe,
               ]
 
@@ -531,24 +545,32 @@ receivers:
                  COALESCE(rt.trx_state,'')                        AS waiting_state,
                  COALESCE(bt.trx_state,'')                        AS blocking_state,
                  CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
+                 -- innodb_trx has no database column; PROCESSLIST.DB is the
+                 -- only per-row database this source can supply.
+                 COALESCE(rp.DB, '')                              AS my_db,
+                 '${env:MYSQLHOST}'                               AS server_address,
                  'mysql_lock_waits'                               AS o2_recipe
           FROM performance_schema.data_lock_waits w
           LEFT JOIN information_schema.innodb_trx rt
                  ON rt.trx_id = w.REQUESTING_ENGINE_TRANSACTION_ID
           LEFT JOIN information_schema.innodb_trx bt
                  ON bt.trx_id = w.BLOCKING_ENGINE_TRANSACTION_ID
+          LEFT JOIN information_schema.PROCESSLIST rp
+                 ON rp.ID = rt.trx_mysql_thread_id
         logs:
           - body_column: waiting_query
             attribute_columns:
               [
                 waiting_trx,
                 blocking_trx,
+                my_db,
                 waiting_thread,
                 blocking_thread,
                 blocking_query,
                 waiting_state,
                 blocking_state,
                 wait_secs,
+                server_address,
                 o2_recipe,
               ]
 
@@ -580,18 +602,23 @@ receivers:
                  COALESCE(bt.trx_state,'')                        AS blocking_state,
                  CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
                  '${env:MARIAHOST}'                               AS server_address,
+                 -- See mysql_locks above.
+                 COALESCE(rp.DB, '')                              AS my_db,
                  'mariadb_lock_waits'                             AS o2_recipe
           FROM information_schema.INNODB_LOCK_WAITS w
           LEFT JOIN information_schema.INNODB_TRX rt
                  ON rt.trx_id = w.requesting_trx_id
           LEFT JOIN information_schema.INNODB_TRX bt
                  ON bt.trx_id = w.blocking_trx_id
+          LEFT JOIN information_schema.PROCESSLIST rp
+                 ON rp.ID = rt.trx_mysql_thread_id
         logs:
           - body_column: waiting_query
             attribute_columns:
               [
                 waiting_trx,
                 blocking_trx,
+                my_db,
                 waiting_thread,
                 blocking_thread,
                 blocking_query,
@@ -771,6 +798,9 @@ receivers:
     queries:
       - sql: |
           SELECT CAST(r.session_id AS VARCHAR(20))            AS blocked_pid,
+                 -- Per-request database: a chain can span databases.
+                 -- bracketed: `database` is a T-SQL reserved keyword.
+                 COALESCE(DB_NAME(r.database_id), '')         AS [database],
                  COALESCE(s.login_name, '')                   AS blocked_user,
                  COALESCE(s.program_name, '')                 AS blocked_app,
                  COALESCE(SUBSTRING(t.text, 1, 500), '')      AS blocked_query,
@@ -795,6 +825,7 @@ receivers:
             attribute_columns:
               [
                 blocked_pid,
+                database,
                 blocked_user,
                 blocked_app,
                 wait_event_type,
@@ -1149,7 +1180,7 @@ receivers:
       - type: regex_parser
         id: my_dl_lock
         parse_from: attributes.my_message
-        regex: '(?s)RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<my_lock_index>\S+) of table (?P<my_lock_table>\S+) trx id \d+ (?P<my_lock_mode>lock_mode \S+)'
+        regex: '(?s)RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<my_lock_index>\S+) of table (?P<my_lock_table>`?(?P<my_db>[^`. ]+)`?\.\S+) trx id \d+ (?P<my_lock_mode>lock_mode \S+)'
         on_error: send
       # MySQL names the ROLLED BACK transaction explicitly.
       - type: regex_parser
@@ -1224,7 +1255,7 @@ receivers:
         on_error: send
       - type: regex_parser
         parse_from: attributes.maria_message
-        regex: '(?s)RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<maria_lock_index>\S+) of table (?P<maria_lock_table>\S+) trx id \d+ (?P<maria_lock_mode>lock_mode \S+)'
+        regex: '(?s)RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<maria_lock_index>\S+) of table (?P<maria_lock_table>`?(?P<my_db>[^`. ]+)`?\.\S+) trx id \d+ (?P<maria_lock_mode>lock_mode \S+)'
         on_error: send
       - type: regex_parser
         parse_from: attributes.maria_message
