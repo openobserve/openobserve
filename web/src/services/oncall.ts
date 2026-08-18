@@ -826,16 +826,23 @@ const oncall = {
     team_id,
     from,
     to,
+    slot,
   }: {
     org_identifier: string;
     team_id: string;
     /** Micros. Both bounds or neither. */
     from: number;
     to: number;
+    /**
+     * Which slot to resolve. The endpoint answers for ONE at a time and
+     * defaults to the default slot, so a two-slot team needs a call each —
+     * without this the secondary lane was drawn and never filled.
+     */
+    slot?: string;
   }) =>
     http().get<ResolvedSegment[]>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/resolved-schedule`,
-      { params: { from, to } },
+      { params: slot ? { from, to, slot } : { from, to } },
     ),
 
   /// Everything the team header needs, in one call: membership, coverage, the

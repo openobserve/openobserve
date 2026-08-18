@@ -14,9 +14,10 @@
       {{ t("oncall.scheduleNeedsMembers") }}
     </p>
 
+    <!-- No second drawing of the week here. This one resolved who was on call
+         CLIENT-side, so it could not see overrides, absences or slots, and it
+         disagreed with the server-resolved timeline sitting on the same tab. -->
     <template v-else-if="!drawerOnly">
-      <OnCallScheduleCalendar :rotations="draft" :timezone="timezone" />
-
       <OTable
         :data="draft"
         :columns="columns"
@@ -347,7 +348,6 @@ import { useStore } from "vuex";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OnCallScheduleCalendar from "@/components/oncall/OnCallScheduleCalendar.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OText from "@/lib/core/Typography/OText.vue";

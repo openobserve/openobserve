@@ -666,4 +666,76 @@ describe("OnCallTeamDetail", () => {
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(true);
     expect(wrapper.findComponent({ name: "OnCallTeamPulse" }).exists()).toBe(false);
   });
+  /// `resolved-schedule` answers for ONE slot and defaults to the default one,
+  /// so a two-slot team was only ever asked about primary — and the timeline
+  /// drew a secondary lane it could never fill, then said so. The data was
+  /// there the whole time; nothing asked for it.
+  describe("the resolved timeline", () => {
+    const rotation = (slot: string, name: string) => ({
+      name,
+      slot,
+      members: ["ana@o2.ai"],
+      shift_micros: 604_800_000_000,
+      anchor_micros: 0,
+    });
+
+    /// The timeline owns the visible range and the fetch follows it, so
+    /// nothing is asked for until it has said which week it is showing.
+    async function showWeek(wrapper: any) {
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .vm.$emit("update:window", { from: 1_000, to: 2_000 });
+      await flushPromises();
+    }
+
+    it("asks once per staffed slot", async () => {
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: "UTC",
+          rotations: [rotation("primary", "Primary"), rotation("secondary", "Backup")],
+        },
+      } as any);
+
+      const wrapper = render();
+      await flushPromises();
+      await showWeek(wrapper);
+
+      const asked = service.resolvedSchedule.mock.calls.map((call: any) => call[0].slot);
+      expect(asked).toContain("primary");
+      expect(asked).toContain("secondary");
+    });
+
+    /// The default slot may answer without echoing its own name, and a lane
+    /// keyed on an absent field matches nothing.
+    it("stamps the slot it asked for onto the segments that come back", async () => {
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("secondary", "Backup")] },
+      } as any);
+      service.resolvedSchedule.mockResolvedValue({
+        data: [{ from: 0, to: 1, rotation: "Backup", user_email: "ana@o2.ai" }],
+      } as any);
+
+      const wrapper = render();
+      await flushPromises();
+      await showWeek(wrapper);
+
+      const drawn = wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .props("segments") as any[];
+      expect(drawn[0].slot).toBe("secondary");
+    });
+
+    /// A team with no schedule still has a primary to ask about.
+    it("falls back to the default slot when nothing is staffed", async () => {
+      const wrapper = render();
+      await flushPromises();
+      await showWeek(wrapper);
+
+      expect(service.resolvedSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({ slot: "primary" }),
+      );
+    });
+  });
 });

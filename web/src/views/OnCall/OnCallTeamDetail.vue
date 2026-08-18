@@ -849,18 +849,32 @@ async function sendTestPage() {
 
 /// The engine's own resolution of the visible window. Capped server-side at 31
 /// days and 2000 segments, and a 400 there is a message rather than a spinner.
+/// One call per staffed slot: the endpoint resolves ONE at a time and defaults
+/// to the default slot, so a two-slot team used to get primary segments only —
+/// and the timeline drew a secondary lane it could never fill, then said so.
+/// The data was there the whole time; nothing asked for it.
 async function fetchSegments() {
   const { from, to } = scheduleWindow.value;
   if (!from || !to) return;
   segmentsLoading.value = true;
+  const slots = staffedSlots.value.length ? staffedSlots.value : [DEFAULT_SLOT];
   try {
-    const res = await oncallService.resolvedSchedule({
-      org_identifier: orgId.value,
-      team_id: teamId.value,
-      from,
-      to,
-    });
-    segments.value = res.data ?? [];
+    const answers = await Promise.all(
+      slots.map((slot) =>
+        oncallService.resolvedSchedule({
+          org_identifier: orgId.value,
+          team_id: teamId.value,
+          from,
+          to,
+          slot,
+        }),
+      ),
+    );
+    // The default slot may answer without echoing its own name, so the lane
+    // lookup gets one it can match rather than an absent field.
+    segments.value = answers.flatMap((res, index) =>
+      (res.data ?? []).map((segment) => ({ ...segment, slot: segment.slot ?? slots[index] })),
+    );
   } catch (err: any) {
     segments.value = [];
     toast({
