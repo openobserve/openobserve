@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="template-list-tabs"
-          class="mr-2"
+          class="mr-2 max-md:hidden"
         >
           <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
             <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm-action"
+          class="max-md:hidden"
           @click="importTemplate"
           data-test="template-import"
           >{{ t(`dashboard.import`) }}</OButton
@@ -62,6 +63,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_templates.add`) }}</OButton
         >
       </template>
+      <!-- < md the filter tabs + Import move out of the header so it stays one
+           line; the header keeps only the primary New-template action. -->
+      <div
+        class="border-border-default flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5 md:hidden"
+      >
+        <OToggleGroup
+          :model-value="activeTab"
+          @update:model-value="
+            (v: any) => {
+              activeTab = v;
+            }
+          "
+          data-test="template-list-tabs-mobile"
+        >
+          <OToggleGroupItem value="all" size="sm" data-test="template-tab-all-mobile">
+            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+            {{ t("alert_templates.filterAll") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt-mobile">
+            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+            {{ t("alert_templates.filterPrebuilt") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom-mobile">
+            <template #icon-left><OIcon name="settings" size="sm" /></template>
+            {{ t("alert_templates.filterCustom") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="importTemplate"
+          data-test="template-import-mobile"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
+      </div>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           :frame="false"

@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onAlertSelected"
         :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
-        class="o2-search-input min-w-62.5"
+        class="o2-search-input min-w-62.5 max-md:hidden"
         clearable
         @clear="clearSearch"
       >
@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         icon-left="search"
         size="icon-sm"
+        class="max-md:hidden"
         @click="manualSearch"
         data-test="alert-history-manual-search-btn"
         :disabled="loading"
@@ -77,6 +78,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.refresh')" />
       </OButton>
     </template>
+    <!-- < md the alert filter leaves the header (its 250px select forces a
+         wrap there) and gets its own full-width row above the table. -->
+    <div
+      class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 md:hidden"
+    >
+      <OSelect
+        v-model="selectedAlert"
+        :options="filteredAlertOptions"
+        labelKey="label"
+        valueKey="value"
+        @update:model-value="onAlertSelected"
+        :placeholder="t('alerts.searcHistory')"
+        data-test="alert-history-search-select-mobile"
+        class="o2-search-input min-w-0 flex-1"
+        clearable
+        @clear="clearSearch"
+      >
+        <template #icon-left>
+          <OIcon class="o2-search-input-icon" name="search" size="sm" />
+        </template>
+        <template #empty>
+          <div class="text-muted-foreground px-3 py-2">
+            {{ t("alerts.noAlertsFound") }}
+          </div>
+        </template>
+      </OSelect>
+      <OButton
+        variant="ghost"
+        icon-left="search"
+        size="icon-sm"
+        @click="manualSearch"
+        data-test="alert-history-manual-search-btn-mobile"
+        :disabled="loading"
+      >
+        <OTooltip :content="t('common.search')" />
+      </OButton>
+    </div>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->

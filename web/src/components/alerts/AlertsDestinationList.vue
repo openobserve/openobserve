@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="destination-list-tabs"
+          class="max-md:hidden"
         >
           <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
             <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
@@ -50,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
+          class="max-md:hidden"
           @click="importDestination"
           data-test="destination-import"
           >{{ t(`dashboard.import`) }}</OButton
@@ -63,6 +65,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton
         >
       </template>
+      <!-- < md the filter tabs + Import move out of the header so it stays one
+           line; the header keeps only the primary New-destination action. -->
+      <div
+        class="border-border-default flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5 md:hidden"
+      >
+        <OToggleGroup
+          :model-value="activeTab"
+          @update:model-value="
+            (v) => {
+              activeTab = v as 'all' | 'prebuilt' | 'custom';
+            }
+          "
+          data-test="destination-list-tabs-mobile"
+        >
+          <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all-mobile">
+            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+            {{ t("alert_destinations.filterAll") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt-mobile">
+            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+            {{ t("alert_destinations.filterPrebuilt") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom-mobile">
+            <template #icon-left><OIcon name="settings" size="sm" /></template>
+            {{ t("alert_destinations.filterCustom") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="importDestination"
+          data-test="destination-import-mobile"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
+      </div>
       <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
           data-test="alert-destinations-list-table"
