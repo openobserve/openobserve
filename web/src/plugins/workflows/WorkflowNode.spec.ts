@@ -195,6 +195,29 @@ describe("WorkflowNode", () => {
     });
   });
 
+  describe("placeholder / incomplete badge", () => {
+    const INCOMPLETE_DEST = {
+      id: "d1",
+      data: { node_type: "destination", destination_id: "" },
+      meta: { incomplete: "true" },
+    };
+
+    it("shows the 'Set Up Later' badge when the node is a placeholder", () => {
+      setGraph([TRIGGER, INCOMPLETE_DEST], [{ source: "t1", target: "d1" }]);
+      wrapper = mountNode("d1", INCOMPLETE_DEST.data);
+      expect(
+        wrapper.find('[data-test="workflow-node-destination-incomplete-badge"]').exists(),
+      ).toBe(true);
+    });
+
+    it("hides the badge for a configured (non-placeholder) destination", () => {
+      wrapper = mountNode("d1", DESTINATION.data); // default graph: no meta.incomplete
+      expect(
+        wrapper.find('[data-test="workflow-node-destination-incomplete-badge"]').exists(),
+      ).toBe(false);
+    });
+  });
+
   describe("#body — node label", () => {
     it("shows the trigger's type title (never a config detail)", () => {
       wrapper = mountNode("t1", TRIGGER.data);
@@ -237,7 +260,7 @@ describe("WorkflowNode", () => {
       };
       wrapper = mountNode("c1", data);
       expect(wrapper.text()).toContain("...");
-      expect(wrapper.find(".whitespace-nowrap").text().length).toBe(31);
+      expect(wrapper.find('[data-test="workflow-node-detail"]').text().length).toBe(31);
     });
 
     it("falls back to the type title for a not-yet-configured condition", () => {
@@ -474,6 +497,8 @@ describe("WorkflowNode", () => {
         source: "c1",
         handle: "out",
         mode: "next",
+        // edgeId is only set in insert-on-edge mode (T7); empty here.
+        edgeId: "",
         position: null,
         anchor: { x: 120, y: 240 },
       });

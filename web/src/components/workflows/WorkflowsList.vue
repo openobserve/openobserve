@@ -113,8 +113,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
 
+            <template #cell-name="{ row }">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="truncate">{{ row.name }}</span>
+                <OTag
+                  v-if="row.is_draft"
+                  :value="t('workflow.draft')"
+                  variant="default-soft"
+                  data-test="workflow-list-draft-tag"
+                />
+              </div>
+            </template>
+
             <template #cell-trigger="{ row }">
               <OTag
+                v-if="row.trigger && row.trigger !== '—'"
                 :value="row.trigger"
                 variant="amber-soft"
                 data-test="workflow-list-trigger-tag"
@@ -123,7 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-actions="{ row }">
               <div class="actions-container flex items-center">
+                <!-- Drafts aren't runnable, so the pause/resume icon is simply
+                     omitted (no placeholder). -->
                 <OButton
+                  v-if="!row.is_draft"
                   :data-test="`workflow-list-${row.name}-pause-start-action`"
                   :data-row-action="row.enabled ? 'pause' : 'resume'"
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
@@ -387,9 +403,14 @@ const editWorkflow = (row: any) => {
 
 // Row click → the dedicated read-only Runs view (viewing runs is the common
 // case; editing is the explicit pencil action). Hydrate from the row so the
-// canvas renders immediately — no async re-fetch.
+// canvas renders immediately — no async re-fetch. DRAFTS have no run history by
+// design, so a draft row opens straight in the editor instead.
 const openRuns = (row: any) => {
   if (!row?.id) return;
+  if (row.is_draft) {
+    editWorkflow(row);
+    return;
+  }
   hydrateWorkflow(row);
   router.push({
     name: "workflowRuns",
@@ -454,7 +475,11 @@ const deleteWorkflow = async () => {
   const row = confirmDialogMeta.value.data;
   if (!row) return;
   try {
-    await workflowService.deleteWorkflow({ org_identifier: orgId.value, id: row.id });
+    await workflowService.deleteWorkflow({
+      org_identifier: orgId.value,
+      id: row.id,
+      draft: !!row.is_draft,
+    });
     toast({ message: t("workflow.deleteSuccess"), variant: "success" });
     await getWorkflows();
   } catch (error: any) {

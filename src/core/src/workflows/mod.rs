@@ -250,7 +250,7 @@ pub async fn get_error_input_data(errors: &WorkflowRunErrors) -> Result<String, 
     ))
 }
 
-async fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
+async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), anyhow::Error> {
     for node in &workflow.nodes {
         if !node.position.is_valid() {
             return Err(anyhow::anyhow!("node {} position is not valid", node.id));
@@ -262,53 +262,79 @@ async fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
                 node.id
             ));
         }
-        if let NodeData::Destination(ref destination) = node.data {
-            let (dest, _) = crate::alerts::destinations::get_with_template(
-                &workflow.org_id,
-                &destination.destination_id,
-            )
-            .await?;
-            if !dest.is_pipeline_destination() {
-                return Err(anyhow::anyhow!(
-                    "destination {} is not a workflow compatible destination",
-                    destination.destination_id
-                ));
+
+        // for draft we allow invalid destination or functions
+        if !is_draft {
+            if let NodeData::Destination(ref destination) = node.data {
+                let (dest, _) = crate::alerts::destinations::get_with_template(
+                    &workflow.org_id,
+                    &destination.destination_id,
+                )
+                .await?;
+                if !dest.is_pipeline_destination() {
+                    return Err(anyhow::anyhow!(
+                        "destination {} is not a workflow compatible destination",
+                        destination.destination_id
+                    ));
+                }
             }
-        }
 
-        if let NodeData::Function(function_params) = &node.data {
-            // Load the function to check its trans_type
-            let function = super::db::functions::get(&workflow.org_id, &function_params.name)
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!("Failed to load function '{}': {}", function_params.name, e)
-                })?;
+            if let NodeData::Function(function_params) = &node.data {
+                // Load the function to check its trans_type
+                let function = super::db::functions::get(&workflow.org_id, &function_params.name)
+                    .await
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to load function '{}': {}", function_params.name, e)
+                    })?;
 
-            if function.is_vrl() {
-                return Err(anyhow::anyhow!(
-                    "Vrl functions cannot be used in workflows. Function '{}' is a VRL function. Please use JS functions instead.",
-                    function_params.name
-                ));
+                if function.is_vrl() {
+                    return Err(anyhow::anyhow!(
+                        "Vrl functions cannot be used in workflows. Function '{}' is a VRL function. Please use JS functions instead.",
+                        function_params.name
+                    ));
+                }
             }
         }
     }
 
-    config::meta::pipeline::validate_nodes_edges(&workflow.nodes, &workflow.edges)?;
+    config::meta::pipeline::validate_nodes_edges(&workflow.nodes, &workflow.edges, is_draft)?;
     Ok(())
 }
 
 pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
-    validate_workflow(&workflow).await?;
+    validate_workflow(&workflow, false).await?;
     db::workflows::save_workflow_record(workflow.clone()).await?;
     set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
     db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
 }
 
+pub async fn save_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
+    db::workflows::save_draft_record(workflow.clone()).await?;
+    set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
+    db::workflows::notify_draft_upsert(&workflow).await?;
+    Ok(())
+}
+
 pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
-    validate_workflow(&workflow).await?;
+    validate_workflow(&workflow, false).await?;
     db::workflows::update_workflow_record(workflow.clone()).await?;
     db::workflows::notify_workflow_upsert(&workflow).await?;
+    Ok(())
+}
+
+pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
+    db::workflows::update_draft_record(workflow.clone()).await?;
+    db::workflows::notify_draft_upsert(&workflow).await?;
+    Ok(())
+}
+
+pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
+    validate_workflow(&workflow, false).await?;
+    let id = workflow.id.clone();
+    db::workflows::promote_draft(org_id, workflow.clone()).await?;
+    db::workflows::notify_workflow_upsert(&workflow).await?;
+    db::workflows::notify_draft_delete(&id).await?;
     Ok(())
 }
 
@@ -339,8 +365,25 @@ pub async fn list_workflows(
     Ok(ret)
 }
 
+pub async fn list_drafts(
+    org_id: &str,
+    permitted: Option<Vec<String>>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    let ret = workflows::list_drafts_by_org(org_id)
+        .await?
+        .into_iter()
+        .filter(|draft| is_permitted(&draft.id, org_id, permitted.as_ref()))
+        .collect();
+    Ok(ret)
+}
+
 pub async fn get_workflow_by_id(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
     let ret = db::workflows::get_workflow(org_id, id).await?;
+    Ok(ret)
+}
+
+pub async fn get_draft_by_id(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
+    let ret = db::workflows::get_draft(org_id, id).await?;
     Ok(ret)
 }
 
@@ -362,15 +405,6 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
 }
 
 pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    let associations = db::workflows::get_workflow_associations(org_id, id).await?;
-    if associations
-        .iter()
-        .any(|a| a.trigger_type != WorkflowTriggerType::IncidentEvent.to_string())
-    {
-        return Err(anyhow::anyhow!(
-            "workflow is still associated with entities, must remove the connection first",
-        ));
-    }
     let associations = AssociationDeleteEvent::Workflow {
         org_id: org_id.to_string(),
         workflow_id: id.to_string(),
@@ -382,13 +416,21 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
+pub async fn delete_draft(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
+    db::workflows::delete_draft_record(id).await?;
+    remove_ownership(org_id, "workflows", Authz::new(id)).await;
+    db::workflows::notify_draft_delete(id).await?;
+    Ok(())
+}
+
 pub async fn test_workflow(
     org_id: &str,
     workflow: Workflow,
     inputs: Vec<serde_json::Value>,
     from_node: Option<String>,
+    is_draft: bool,
 ) -> Result<WorkflowResult, anyhow::Error> {
-    validate_workflow(&workflow).await?;
+    validate_workflow(&workflow, is_draft).await?;
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
     let res = executable
         .process_workflow(org_id, inputs, from_node)
