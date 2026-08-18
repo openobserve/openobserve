@@ -1360,6 +1360,17 @@ export default defineComponent({
     };
 
     const onSelectStream = () => {
+      // < md the stream selector lives inside the fields drawer — open it first,
+      // then focus the trigger once the drawer content has mounted.
+      if (isMobile.value) {
+        mobileFieldsOpen.value = true;
+        setTimeout(() => {
+          document
+            .querySelector<HTMLElement>('[data-test="log-search-index-list-select-stream"] button')
+            ?.click();
+        }, 300);
+        return;
+      }
       // Focus the stream selector trigger so the user can immediately pick a stream.
       const trigger = document.querySelector<HTMLElement>(
         '[data-test="log-search-index-list-select-stream"] button',
