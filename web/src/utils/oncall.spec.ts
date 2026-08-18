@@ -26,6 +26,7 @@ import {
   PRIORITY_TONE,
   colorIndexFor,
   compareRulePrecedence,
+  ruleClaimsDimensions,
   describeRestrictions,
   describeTarget,
   formatInZone,
@@ -1005,6 +1006,35 @@ describe("resolveLadder", () => {
       ],
     } as any;
     expect(resolveLadder(r, slots).map((s) => s.afterMicros)).toEqual([0, 600]);
+  });
+});
+
+describe("ruleClaimsDimensions", () => {
+  /// Replaying a draft rule before it is saved. A rule pins a SUBSET: the
+  /// signal is free to carry more, which is exactly why a one-condition rule
+  /// is the broad one.
+  it("claims a signal carrying more than the rule pins", () => {
+    expect(
+      ruleClaimsDimensions(
+        { "k8s-namespace": "risk" },
+        { "k8s-namespace": "risk", service: "fraud-scorer" },
+      ),
+    ).toBe(true);
+  });
+
+  it("does not claim a signal missing a pinned dimension", () => {
+    expect(ruleClaimsDimensions({ service: "api", host: "db-01" }, { service: "api" })).toBe(false);
+  });
+
+  it("matches a wildcard value by its literal prefix", () => {
+    expect(ruleClaimsDimensions({ host: "db-*" }, { host: "db-prod-01" })).toBe(true);
+    expect(ruleClaimsDimensions({ host: "db-*" }, { host: "web-01" })).toBe(false);
+  });
+
+  /// A rule with no conditions would claim everything, which is what the
+  /// catch-all row is for — never a rule.
+  it("claims nothing when the rule pins nothing", () => {
+    expect(ruleClaimsDimensions({}, { service: "api" })).toBe(false);
   });
 });
 

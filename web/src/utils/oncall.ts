@@ -908,6 +908,26 @@ export const IDENTITY_DIMENSION_IDS = new Set([
   "db-name",
 ]);
 
+/**
+ * Would a rule pinning these dimensions claim a signal carrying those?
+ *
+ * Mirrors the engine's match, not its precedence: every pinned dimension has to
+ * be present and equal, and a `*`-suffixed value matches by prefix. Used to
+ * replay a draft rule against the unrouted queue before it is saved.
+ */
+export function ruleClaimsDimensions(
+  ruleDimensions: Record<string, string>,
+  signalDimensions: Record<string, string>,
+): boolean {
+  const pinned = Object.entries(ruleDimensions ?? {});
+  if (!pinned.length) return false;
+  return pinned.every(([name, value]) => {
+    const actual = (signalDimensions ?? {})[name];
+    if (actual === undefined) return false;
+    return value.endsWith("*") ? actual.startsWith(value.slice(0, -1)) : actual === value;
+  });
+}
+
 /** The subset of a signal's dimensions a rule should be written against. */
 export function identityDimensions(dimensions: Record<string, string>): Record<string, string> {
   return Object.fromEntries(

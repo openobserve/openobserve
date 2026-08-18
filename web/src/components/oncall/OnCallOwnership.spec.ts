@@ -41,43 +41,35 @@ vi.mock("@/services/oncall", () => ({
 const service = vi.mocked(oncallService);
 const ORG = store.state.selectedOrganization.identifier;
 
-/// The three sections are stubbed so this file is about the WIRING between
-/// them and the API. Each one has its own spec for what it renders.
+/// The list and the tester are stubbed so this file is about the WIRING
+/// between them and the API. Each one has its own spec for what it renders.
 const stubs = {
+  OnCallRoutingList: {
+    name: "OnCallRoutingList",
+    props: [
+      "rules",
+      "signals",
+      "aliases",
+      "teamId",
+      "teamName",
+      "teams",
+      "defaultTeamId",
+      "onCallNow",
+      "ladder",
+      "loading",
+      "saving",
+      "savingDefault",
+      "claiming",
+      "testerOpen",
+    ],
+    template: "<div />",
+  },
   OnCallRoutingSimulator: {
     name: "OnCallRoutingSimulator",
     props: ["preview", "teamId", "teamName", "teams", "aliases", "loading", "sending"],
     template: "<div />",
   },
-  OnCallOwnershipRules: {
-    name: "OnCallOwnershipRules",
-    props: ["rules", "aliases", "loading"],
-    template: "<div />",
-  },
-  OnCallUnroutedQueue: {
-    name: "OnCallUnroutedQueue",
-    props: ["signals", "teamName", "loading", "claiming"],
-    template: "<div />",
-  },
-  ODialog: { name: "ODialog", props: ["open", "primaryButtonDisabled"], template: "<div><slot /></div>" },
   ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
-  OButton: {
-    name: "OButton",
-    props: ["disabled"],
-    template: `<button :disabled="disabled"><slot /></button>`,
-  },
-  OInput: {
-    name: "OInput",
-    props: ["modelValue"],
-    emits: ["update:modelValue"],
-    template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
-  },
-  OSelect: {
-    name: "OSelect",
-    props: ["modelValue", "options"],
-    emits: ["update:modelValue"],
-    template: `<select :value="modelValue" />`,
-  },
 };
 
 function render() {
@@ -95,26 +87,15 @@ function render() {
 
 type Wrapper = ReturnType<typeof render>;
 
+const list = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingList" });
 const simulator = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingSimulator" });
-const rulesPanel = (w: Wrapper) => w.findComponent({ name: "OnCallOwnershipRules" });
-const unrouted = (w: Wrapper) => w.findComponent({ name: "OnCallUnroutedQueue" });
-
-async function typePair(wrapper: Wrapper, name: string, value: string) {
-  // The name is chosen from the org's field vocabulary, not typed, so a rule
-  // cannot be written against a dimension nothing emits.
-  await wrapper
-    .findComponent('[data-test="oncall-ownership-dimension-name"]')
-    .vm.$emit("update:modelValue", name);
-  await wrapper.find('[data-test="oncall-ownership-dimension-value"]').setValue(value);
-  await wrapper.find('[data-test="oncall-ownership-add-dimension"]').trigger("click");
-}
 
 describe("OnCallOwnership", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     service.getRoutingConfig.mockResolvedValue({
       data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
     } as any);
-    vi.clearAllMocks();
     service.ownershipStats.mockResolvedValue({ data: { rules: [], total: 0 } } as any);
     service.unroutedSignals.mockResolvedValue({ data: [] } as any);
     service.createOwnershipRule.mockResolvedValue({ data: {} } as any);
@@ -131,74 +112,226 @@ describe("OnCallOwnership", () => {
     });
   });
 
-  it("hands the fetched rules to the table", async () => {
+  it("hands the fetched rules and signals to the list", async () => {
     service.ownershipStats.mockResolvedValue({
       data: { total: 1, rules: [{ rule_id: "r1", path: "service=api", health: "active" }] },
     } as any);
+    service.unroutedSignals.mockResolvedValue({ data: [{ id: "s1", dimensions: {} }] } as any);
     const wrapper = render();
     await flushPromises();
-    expect(rulesPanel(wrapper).props("rules")).toHaveLength(1);
+    expect(list(wrapper).props("rules")).toHaveLength(1);
+    expect(list(wrapper).props("signals")).toHaveLength(1);
   });
 
-  // The server lowercases rule values to match what the dimension extractor
-  // produces. If the UI showed the raw input, a user would type PROD, read
-  // back PROD, and get a rule that silently never matches.
-  it("normalises a dimension value the way the server will store it", async () => {
+  /// The catch-all is a row of the same list now, so the nomination has to
+  /// reach it from here rather than from a card that fetches its own copy.
+  it("passes the nominated catch-all down to the list", async () => {
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: "team_2", default_team_name: "Payments", updated_at: 1 },
+    } as any);
     const wrapper = render();
     await flushPromises();
-    await typePair(wrapper, "k8s-cluster", "  PROD ");
-    expect(wrapper.text()).toContain("k8s-cluster=prod");
-    expect(wrapper.text()).not.toContain("PROD");
+    expect(list(wrapper).props("defaultTeamId")).toBe("team_2");
   });
 
-  it("sends the normalised dimensions to the API", async () => {
+  it("creates a rule from the editor's draft", async () => {
     const wrapper = render();
     await flushPromises();
-    await typePair(wrapper, "k8s-cluster", "PROD");
-    await typePair(wrapper, "k8s-namespace", "Payments");
-    await wrapper.findComponent({ name: "ODialog" }).vm.$emit("click:primary");
+
+    list(wrapper).vm.$emit("save-rule", {
+      dimensions: { "k8s-cluster": "prod" },
+      team_id: "team_1",
+      rule: null,
+    });
     await flushPromises();
 
     expect(service.createOwnershipRule).toHaveBeenCalledWith({
       org_identifier: ORG,
-      data: {
-        team_id: "team_1",
-        dimensions: { "k8s-cluster": "prod", "k8s-namespace": "payments" },
-      },
+      data: { team_id: "team_1", dimensions: { "k8s-cluster": "prod" } },
+    });
+    expect(service.deleteOwnershipRule).not.toHaveBeenCalled();
+  });
+
+  /// A rule can be handed to another team from this screen — that is the
+  /// common correction, and the alternative is deleting and re-writing it.
+  it("honours a draft that routes to a different team", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    list(wrapper).vm.$emit("save-rule", {
+      dimensions: { service: "api" },
+      team_id: "team_2",
+      rule: null,
+    });
+    await flushPromises();
+
+    expect(service.createOwnershipRule).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      data: { team_id: "team_2", dimensions: { service: "api" } },
     });
   });
 
-  // A rule pinning the same dimension twice cannot mean anything, and the
-  // second value would silently win.
-  it("refuses a duplicate dimension name", async () => {
+  /// There is no update route: an edit creates the replacement FIRST, so a
+  /// failed create leaves the old rule standing rather than no rule at all.
+  it("edits by creating the replacement before deleting the original", async () => {
+    service.deleteOwnershipRule.mockResolvedValue({ data: {} } as any);
+    const order: string[] = [];
+    service.createOwnershipRule.mockImplementation(async () => {
+      order.push("create");
+      return { data: {} } as any;
+    });
+    service.deleteOwnershipRule.mockImplementation(async () => {
+      order.push("delete");
+      return { data: {} } as any;
+    });
+
     const wrapper = render();
     await flushPromises();
-    await typePair(wrapper, "k8s-cluster", "prod");
-    await wrapper
-      .findComponent('[data-test="oncall-ownership-dimension-name"]')
-      .vm.$emit("update:modelValue", "k8s-cluster");
-    await wrapper.find('[data-test="oncall-ownership-dimension-value"]').setValue("staging");
+    list(wrapper).vm.$emit("save-rule", {
+      dimensions: { service: "api" },
+      team_id: "team_1",
+      rule: { rule_id: "r9" },
+    });
+    await flushPromises();
 
-    expect(
-      wrapper.find('[data-test="oncall-ownership-add-dimension"]').attributes("disabled"),
-    ).toBeDefined();
+    expect(order).toEqual(["create", "delete"]);
+    expect(service.deleteOwnershipRule).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      rule_id: "r9",
+    });
   });
 
-  it("cannot save a rule with no dimensions", async () => {
+  it("deletes a rule by its rule id once confirmed", async () => {
+    service.deleteOwnershipRule.mockResolvedValue({ data: {} } as any);
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.findComponent({ name: "ODialog" }).props("primaryButtonDisabled")).toBe(true);
 
-    await typePair(wrapper, "k8s-cluster", "prod");
-    expect(wrapper.findComponent({ name: "ODialog" }).props("primaryButtonDisabled")).toBe(false);
+    list(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    await wrapper.vm.$nextTick();
+    await wrapper.findAllComponents({ name: "ConfirmDialog" })[0].vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(service.deleteOwnershipRule).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      rule_id: "r9",
+    });
   });
 
-  it("passes the routing preview back down to the simulator", async () => {
+  /// C10 — tier 4 of routing. Nothing auto-creates a default, and the picker's
+  /// empty string is a UI vocabulary the wire never sees.
+  describe("the catch-all team", () => {
+    it("nominates a team", async () => {
+      service.setRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: "team_1", default_team_name: "Platform", updated_at: 1 },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      list(wrapper).vm.$emit("set-default", "team_1");
+      await flushPromises();
+
+      expect(service.setRoutingConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { default_team_id: "team_1" } }),
+      );
+      expect(list(wrapper).props("defaultTeamId")).toBe("team_1");
+    });
+
+    it("clears by sending null", async () => {
+      service.setRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 2 },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      list(wrapper).vm.$emit("set-default", null);
+      await flushPromises();
+
+      expect(service.setRoutingConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { default_team_id: null } }),
+      );
+    });
+  });
+
+  /// One already-covered path must not abandon the rest of the queue.
+  it("keeps claiming after one path fails", async () => {
+    service.unroutedSignals.mockResolvedValue({
+      data: [
+        { id: "s1", dimensions: { service: "a" }, occurrences: 1 },
+        { id: "s2", dimensions: { service: "b" }, occurrences: 1 },
+      ],
+    } as any);
+    service.createOwnershipRule
+      .mockRejectedValueOnce(new Error("duplicate"))
+      .mockResolvedValueOnce({ data: {} } as any);
+
+    const wrapper = render();
+    await flushPromises();
+    list(wrapper).vm.$emit("claim-all");
+    await wrapper.vm.$nextTick();
+    await wrapper.findAllComponents({ name: "ConfirmDialog" })[1].vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(service.createOwnershipRule).toHaveBeenCalledTimes(2);
+  });
+
+  /// A dismissed row is the historical record, not the worklist — claiming
+  /// everything must not re-claim what somebody already ruled out.
+  it("leaves dismissed signals out of a bulk claim", async () => {
+    service.unroutedSignals.mockResolvedValue({
+      data: [
+        { id: "s1", dimensions: { service: "a" }, occurrences: 1 },
+        { id: "s2", dimensions: { service: "b" }, occurrences: 1, dismissed_at: 5 },
+      ],
+    } as any);
+
+    const wrapper = render();
+    await flushPromises();
+    list(wrapper).vm.$emit("claim-all");
+    await wrapper.vm.$nextTick();
+    await wrapper.findAllComponents({ name: "ConfirmDialog" })[1].vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(service.createOwnershipRule).toHaveBeenCalledTimes(1);
+    expect(service.createOwnershipRule).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      data: { team_id: "team_1", dimensions: { service: "a" } },
+    });
+  });
+
+  it("dismisses a signal by its id", async () => {
+    service.dismissUnroutedSignal.mockResolvedValue({ data: {} } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    list(wrapper).vm.$emit("dismiss", { id: "s7" });
+    await flushPromises();
+
+    expect(service.dismissUnroutedSignal).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      signal_id: "s7",
+    });
+  });
+
+  /// The tester no longer leads the screen: it asks the reader to describe a
+  /// hypothetical alert before they have seen a rule.
+  it("keeps the tester closed until it is asked for", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(simulator(wrapper).exists()).toBe(false);
+
+    list(wrapper).vm.$emit("toggle-tester");
+    await wrapper.vm.$nextTick();
+    expect(simulator(wrapper).exists()).toBe(true);
+  });
+
+  it("passes the routing preview back down to the tester", async () => {
     service.previewRouting.mockResolvedValue({
       data: { decision: { kind: "ownership" }, team_id: "team_2", reason: "routed" },
     } as any);
     const wrapper = render();
     await flushPromises();
+    list(wrapper).vm.$emit("toggle-tester");
+    await wrapper.vm.$nextTick();
 
     simulator(wrapper).vm.$emit("run", { dimensions: { service: "api" }, priority: "P1" });
     await flushPromises();
@@ -212,9 +345,13 @@ describe("OnCallOwnership", () => {
 
   /// The API takes a number; the simulator speaks in "P1".
   it("sends a real test page with the priority as a number", async () => {
-    service.testPage.mockResolvedValue({ data: { reached_anyone: true, recipients: ["a@o2.ai"] } } as any);
+    service.testPage.mockResolvedValue({
+      data: { reached_anyone: true, recipients: ["a@o2.ai"] },
+    } as any);
     const wrapper = render();
     await flushPromises();
+    list(wrapper).vm.$emit("toggle-tester");
+    await wrapper.vm.$nextTick();
 
     simulator(wrapper).vm.$emit("send-test", { team_id: "team_2", priority: "P3" });
     await flushPromises();
@@ -226,162 +363,12 @@ describe("OnCallOwnership", () => {
     });
   });
 
-  /// Claiming IS writing an ownership rule for the dimensions that went
-  /// unmatched — there is no separate claim endpoint.
-  it("claims an unrouted path by writing a rule for its exact dimensions", async () => {
-    const signal = { id: "s1", dimensions: { service: "disputes-api" } };
-    service.unroutedSignals.mockResolvedValue({ data: [signal] } as any);
-    const wrapper = render();
-    await flushPromises();
-
-    unrouted(wrapper).vm.$emit("claim", signal);
-    await flushPromises();
-
-    expect(service.createOwnershipRule).toHaveBeenCalledWith({
-      org_identifier: ORG,
-      data: { team_id: "team_1", dimensions: { service: "disputes-api" } },
-    });
-    // Both lists move: the rule appears and the signal stops being unrouted.
-    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
-    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
-  });
-
-  /// One already-covered path must not abandon the rest of the queue.
-  it("keeps claiming after one path fails", async () => {
-    service.unroutedSignals.mockResolvedValue({
-      data: [
-        { id: "s1", dimensions: { service: "a" } },
-        { id: "s2", dimensions: { service: "b" } },
-      ],
-    } as any);
-    service.createOwnershipRule
-      .mockRejectedValueOnce(new Error("duplicate"))
-      .mockResolvedValueOnce({ data: {} } as any);
-
-    const wrapper = render();
-    await flushPromises();
-    unrouted(wrapper).vm.$emit("claim-all");
-    await flushPromises();
-    await wrapper.findAllComponents({ name: "ConfirmDialog" })[1].vm.$emit("update:ok");
-    await flushPromises();
-
-    expect(service.createOwnershipRule).toHaveBeenCalledTimes(2);
-  });
-
-  it("deletes a rule by its rule id", async () => {
-    service.deleteOwnershipRule.mockResolvedValue({ data: {} } as any);
-    const wrapper = render();
-    await flushPromises();
-
-    rulesPanel(wrapper).vm.$emit("remove", { rule_id: "r9" });
-    await wrapper.vm.$nextTick();
-    await wrapper.findAllComponents({ name: "ConfirmDialog" })[0].vm.$emit("update:ok");
-    await flushPromises();
-
-    expect(service.deleteOwnershipRule).toHaveBeenCalledWith({
-      org_identifier: ORG,
-      rule_id: "r9",
-    });
-  });
-
   /// A team with no unrouted traffic and a server without the endpoint look
   /// identical from here, and neither deserves an error.
   it("survives an unrouted endpoint that is not there", async () => {
     service.unroutedSignals.mockRejectedValue(new Error("404"));
     const wrapper = render();
     await flushPromises();
-    expect(unrouted(wrapper).props("signals")).toEqual([]);
-  });
-  /// C10 — tier 4 of routing. Nothing auto-creates a default, so the unset
-  /// state IS the warning: without a nomination an unowned signal pages
-  /// nobody, and it lands in the queue this card sits directly above.
-  describe("the default team", () => {
-    async function renderLoaded() {
-      const wrapper = render();
-      await flushPromises();
-      return wrapper;
-    }
-
-    it("warns when no default team is nominated", async () => {
-      const wrapper = await renderLoaded();
-      expect(wrapper.find('[data-test="oncall-default-team-unset"]').exists()).toBe(true);
-    });
-
-    it("shows the nomination and stops warning once one exists", async () => {
-      service.getRoutingConfig.mockResolvedValue({
-        data: { org_id: "default", default_team_id: "team_1", default_team_name: "Platform", updated_at: 1 },
-      } as any);
-      const wrapper = await renderLoaded();
-      expect(wrapper.find('[data-test="oncall-default-team-unset"]').exists()).toBe(false);
-    });
-
-    it("nominates a team", async () => {
-      service.setRoutingConfig.mockResolvedValue({
-        data: { org_id: "default", default_team_id: "team_1", default_team_name: "Platform", updated_at: 1 },
-      } as any);
-      const wrapper = await renderLoaded();
-
-      wrapper
-        .findComponent('[data-test="oncall-default-team-select"]')
-        .vm.$emit("update:modelValue", "team_1");
-      await flushPromises();
-      await wrapper.find('[data-test="oncall-default-team-save"]').trigger("click");
-      await flushPromises();
-
-      expect(service.setRoutingConfig).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { default_team_id: "team_1" } }),
-      );
-    });
-
-    /// Clearing sends null, not "" — the picker's empty string is a UI
-    /// vocabulary the wire never sees.
-    it("clears by sending null", async () => {
-      service.getRoutingConfig.mockResolvedValue({
-        data: { org_id: "default", default_team_id: "team_1", default_team_name: "Platform", updated_at: 1 },
-      } as any);
-      service.setRoutingConfig.mockResolvedValue({
-        data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 2 },
-      } as any);
-      const wrapper = await renderLoaded();
-
-      wrapper
-        .findComponent('[data-test="oncall-default-team-select"]')
-        .vm.$emit("update:modelValue", "");
-      await flushPromises();
-      await wrapper.find('[data-test="oncall-default-team-save"]').trigger("click");
-      await flushPromises();
-
-      expect(service.setRoutingConfig).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { default_team_id: null } }),
-      );
-    });
-  });
-
-  /// The team tab's half of the same browser report: "add rule does nothing —
-  /// no save, no cancel". Every other test in this file stubs ODialog and so
-  /// could not see it; this one mounts the real component, where a wrong prop
-  /// NAME renders no footer rather than a wrong-looking one.
-  it("opens a real dialog with a working Save and Cancel", async () => {
-    const { default: ODialog } = await import("@/lib/overlay/Dialog/ODialog.vue");
-    const wrapper = mount(OnCallOwnership, {
-      props: {
-        teamId: "team_1",
-        teams: [
-          { id: "team_1", org_id: "default", name: "Platform", timezone: "UTC", created_at: 0, updated_at: 0 },
-        ],
-      },
-      global: { plugins: [i18n, store], stubs: { ...stubs, ODialog } },
-      attachTo: document.body,
-    });
-    await flushPromises();
-
-    wrapper.findComponent({ name: "OnCallOwnershipRules" }).vm.$emit("add");
-    await flushPromises();
-
-    const dialogHtml = document.body.innerHTML;
-    expect(dialogHtml).toContain("o-dialog-primary-btn");
-    expect(dialogHtml).toContain("o-dialog-secondary-btn");
-
-    wrapper.unmount();
+    expect(list(wrapper).props("signals")).toEqual([]);
   });
 });
