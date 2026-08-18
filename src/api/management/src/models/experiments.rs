@@ -11,6 +11,10 @@ use openobserve_core::llm_evaluations::{
     datasets::{DatasetItemSource, DatasetSnapshotFilter},
     experiment_dispersion::{DimensionDispersion, RowDispersion},
     experiment_evidence::{ExperimentApplicabilityPreview, ExperimentScorerApplicabilityPreview},
+    experiment_ingest::{
+        ClientExecutionRecord, ClientExecutionStatus, ClientScore, PartError, PartResult,
+        RecordBatch, RecordBatchResult,
+    },
     experiment_results::{
         ExperimentAggregateSummary, ExperimentProgress, ExperimentResultScore,
         ExperimentResultScoreStatus, ExperimentResultSlot, ExperimentResultTaskStatus,
@@ -115,6 +119,9 @@ pub enum ExperimentTaskBody {
         config: Value,
     },
     Sdk {
+        /// Immutable identity of the customer code under evaluation. Every
+        /// execution record reported for this Experiment must repeat it.
+        task_fingerprint: String,
         #[serde(default)]
         config: Value,
     },
@@ -141,7 +148,13 @@ impl From<ExperimentTaskBody> for ExperimentTaskConfig {
                 params,
             },
             ExperimentTaskBody::Remote { config } => Self::Remote { config },
-            ExperimentTaskBody::Sdk { config } => Self::Sdk { config },
+            ExperimentTaskBody::Sdk {
+                task_fingerprint,
+                config,
+            } => Self::Sdk {
+                task_fingerprint,
+                config,
+            },
         }
     }
 }
@@ -167,7 +180,13 @@ impl From<ExperimentTaskConfig> for ExperimentTaskBody {
                 params,
             },
             ExperimentTaskConfig::Remote { config } => Self::Remote { config },
-            ExperimentTaskConfig::Sdk { config } => Self::Sdk { config },
+            ExperimentTaskConfig::Sdk {
+                task_fingerprint,
+                config,
+            } => Self::Sdk {
+                task_fingerprint,
+                config,
+            },
         }
     }
 }
@@ -232,6 +251,172 @@ impl From<CreateExperimentRequestBody> for CreateExperiment {
             trial_count: value.trial_count,
             metadata: value.metadata,
             idempotency_key: value.idempotency_key,
+        }
+    }
+}
+
+/// One Slot result reported by the customer's own process.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ClientExecutionRecordBody {
+    pub row_id: String,
+    pub trial_index: u32,
+    #[schema(value_type = String)]
+    pub status: ClientExecutionStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_attempt_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens_in: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens_out: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
+    /// Must repeat the Experiment's pinned `taskFingerprint`.
+    pub task_fingerprint: String,
+    /// Client-reported event time. Informational only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executed_at: Option<i64>,
+}
+
+/// One Score the customer's own code produced.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ClientScoreBody {
+    pub row_id: String,
+    pub trial_index: u32,
+    /// Stable client-side identity for the local scorer that produced it.
+    pub client_scorer_key: String,
+    /// Score Config stable entity ID, or its name.
+    pub score_config: String,
+    pub value: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SubmitExperimentRecordsRequestBody {
+    #[serde(default)]
+    pub records: Vec<ClientExecutionRecordBody>,
+    #[serde(default)]
+    pub scores: Vec<ClientScoreBody>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PartErrorBody {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PartResultBody {
+    pub index: usize,
+    pub row_id: String,
+    pub trial_index: u32,
+    pub accepted: bool,
+    /// Accepted without writing: this part was already stored as submitted.
+    pub duplicate: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<PartErrorBody>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmitExperimentRecordsResponseBody {
+    pub records: Vec<PartResultBody>,
+    pub scores: Vec<PartResultBody>,
+    pub accepted_records: usize,
+    pub rejected_records: usize,
+    pub accepted_scores: usize,
+    pub rejected_scores: usize,
+}
+
+impl From<ClientExecutionRecordBody> for ClientExecutionRecord {
+    fn from(value: ClientExecutionRecordBody) -> Self {
+        Self {
+            row_id: value.row_id,
+            trial_index: value.trial_index,
+            status: value.status,
+            output: value.output,
+            error_message: value.error_message,
+            error_attempt_count: value.error_attempt_count,
+            latency_ms: value.latency_ms,
+            tokens_in: value.tokens_in,
+            tokens_out: value.tokens_out,
+            cost: value.cost,
+            trace_id: value.trace_id,
+            task_fingerprint: value.task_fingerprint,
+            executed_at: value.executed_at,
+        }
+    }
+}
+
+impl From<ClientScoreBody> for ClientScore {
+    fn from(value: ClientScoreBody) -> Self {
+        Self {
+            row_id: value.row_id,
+            trial_index: value.trial_index,
+            client_scorer_key: value.client_scorer_key,
+            score_config: value.score_config,
+            value: value.value,
+            reasoning: value.reasoning,
+            metadata: value.metadata,
+        }
+    }
+}
+
+impl From<SubmitExperimentRecordsRequestBody> for RecordBatch {
+    fn from(value: SubmitExperimentRecordsRequestBody) -> Self {
+        Self {
+            records: value.records.into_iter().map(Into::into).collect(),
+            scores: value.scores.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<PartError> for PartErrorBody {
+    fn from(value: PartError) -> Self {
+        Self {
+            code: value.code.to_string(),
+            message: value.message,
+        }
+    }
+}
+
+impl From<PartResult> for PartResultBody {
+    fn from(value: PartResult) -> Self {
+        Self {
+            index: value.index,
+            row_id: value.row_id,
+            trial_index: value.trial_index,
+            accepted: value.accepted,
+            duplicate: value.duplicate,
+            error: value.error.map(Into::into),
+        }
+    }
+}
+
+impl From<RecordBatchResult> for SubmitExperimentRecordsResponseBody {
+    fn from(value: RecordBatchResult) -> Self {
+        Self {
+            records: value.records.into_iter().map(Into::into).collect(),
+            scores: value.scores.into_iter().map(Into::into).collect(),
+            accepted_records: value.accepted_records,
+            rejected_records: value.rejected_records,
+            accepted_scores: value.accepted_scores,
+            rejected_scores: value.rejected_scores,
         }
     }
 }

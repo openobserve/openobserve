@@ -17,6 +17,7 @@ use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
     llm_evaluations::{
         experiment_dispersion::{self, NormalizationSpans},
+        experiment_ingest::{self, IngestError},
         experiment_results,
         experiments::{self, ExperimentError},
     },
@@ -36,6 +37,7 @@ use crate::{
             ExperimentResultPaginationBody, ExperimentResultsResponseBody,
             ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
             ExperimentRowSnapshotBody, ListExperimentsResponseBody, RetryExperimentSlotRequestBody,
+            SubmitExperimentRecordsRequestBody, SubmitExperimentRecordsResponseBody,
         },
     },
 };
@@ -50,7 +52,8 @@ fn experiment_error_response(error: ExperimentError) -> Response {
             log::error!("[Experiment] infrastructure error: {error}");
             MetaHttpResponse::internal_error("Internal server error")
         }
-        ExperimentError::MalformedStoredDefinition(error) => {
+        ExperimentError::MalformedStoredDefinition(error)
+        | ExperimentError::MalformedStoredResponse(error) => {
             log::error!("[Experiment] malformed stored definition: {error}");
             MetaHttpResponse::internal_error("Internal server error")
         }
@@ -62,6 +65,22 @@ fn experiment_error_response(error: ExperimentError) -> Response {
         | ExperimentError::InvalidLifecycleTransition { .. }
         | ExperimentError::ConcurrentLifecycleUpdate => MetaHttpResponse::conflict(error),
         error => MetaHttpResponse::bad_request(error.to_string()),
+    }
+}
+
+fn ingest_error_response(error: IngestError) -> Response {
+    match error {
+        IngestError::Experiment(error) => experiment_error_response(error),
+        IngestError::NotClientDriven | IngestError::BatchTooLarge => {
+            MetaHttpResponse::bad_request(error.to_string())
+        }
+        IngestError::Sealed | IngestError::IncompleteRun { .. } => {
+            MetaHttpResponse::conflict(error)
+        }
+        IngestError::Storage(error) => {
+            log::error!("[Experiment] ingest storage error: {error}");
+            MetaHttpResponse::internal_error("Internal server error")
+        }
     }
 }
 
@@ -164,7 +183,16 @@ pub async fn create_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CreateExperimentRequestBody>,
 ) -> Response {
-    match experiments::create(&org_id, &user.user_id, body.into()).await {
+    // Re-serialized rather than hashed from the raw bytes so two encodings of
+    // the same request agree on their canonical hash.
+    let canonical_request = match serde_json::to_value(&body) {
+        Ok(value) => value,
+        Err(error) => {
+            log::error!("[Experiment] failed to canonicalize create request: {error}");
+            return MetaHttpResponse::internal_error("Internal server error");
+        }
+    };
+    match experiments::create(&org_id, &user.user_id, body.into(), &canonical_request).await {
         Ok(result) => {
             set_ownership(&org_id, "experiments", Authz::new(&result.experiment.id)).await;
             MetaHttpResponse::json(CreateExperimentResponseBody::from(result))
@@ -737,6 +765,81 @@ pub async fn clone_experiment(
             MetaHttpResponse::json(ExperimentResponseBody::from(experiment))
         }
         Err(error) => experiment_error_response(error),
+    }
+}
+
+/// SubmitExperimentRecords
+#[utoipa::path(
+    post,
+    path = "/{org_id}/experiments/{experiment_id}/records",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "SubmitExperimentRecords",
+    summary = "Report client-executed Slot results and self-reported Scores",
+    description = "Each record and Score is validated on its own and reported on its own, so a \
+                   valid part succeeds when another part of the same batch fails. Every record \
+                   must repeat the Experiment's taskFingerprint. Re-sending an already accepted \
+                   part is harmless; after the Experiment is sealed only an exact duplicate is \
+                   accepted.",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+    ),
+    request_body(content = inline(SubmitExperimentRecordsRequestBody)),
+    responses(
+        (status = 200, body = inline(SubmitExperimentRecordsResponseBody)),
+        (status = 400, description = "Batch too large, or the Experiment does not run an SDK Task", body = ()),
+        (status = 404, description = "Experiment not found", body = ()),
+    ),
+)]
+pub async fn submit_experiment_records(
+    Path((org_id, experiment_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    axum::Json(body): axum::Json<SubmitExperimentRecordsRequestBody>,
+) -> Response {
+    if let Err(response) =
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
+    {
+        return response;
+    }
+    match experiment_ingest::submit_records(&org_id, &experiment_id, body.into()).await {
+        Ok(result) => MetaHttpResponse::json(SubmitExperimentRecordsResponseBody::from(result)),
+        Err(error) => ingest_error_response(error),
+    }
+}
+
+/// FinalizeExperiment
+#[utoipa::path(
+    post,
+    path = "/{org_id}/experiments/{experiment_id}/finalize",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "FinalizeExperiment",
+    summary = "Conclude a client-driven Experiment",
+    description = "Sets the Experiment completed only when every Slot has a terminal execution \
+                   record. Otherwise it returns 409 naming how many Slots are still missing.",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+    ),
+    responses(
+        (status = 200, body = inline(ExperimentResponseBody)),
+        (status = 404, description = "Experiment not found", body = ()),
+        (status = 409, description = "Slots are still missing a terminal execution record", body = ()),
+    ),
+)]
+pub async fn finalize_experiment(
+    Path((org_id, experiment_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Err(response) =
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
+    {
+        return response;
+    }
+    match experiment_ingest::finalize(&org_id, &experiment_id).await {
+        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Err(error) => ingest_error_response(error),
     }
 }
 

@@ -13,7 +13,7 @@ use db::authz::{remove_ownership, set_ownership};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
-    llm_evaluations::datasets::{self, DatasetError, ImportDatasetItem},
+    llm_evaluations::datasets::{self, DatasetError, ImportDatasetItem, UpsertDatasetItems},
 };
 
 use crate::{
@@ -24,6 +24,7 @@ use crate::{
         ListDatasetItemsResponseBody, ListDatasetsResponseBody,
         PushAnnotationQueueItemToDatasetRequestBody, PushDatasetItemRequestBody,
         PushDatasetItemResponseBody, UpdateDatasetItemRequestBody, UpdateDatasetRequestBody,
+        UpsertDatasetItemsRequestBody, UpsertDatasetItemsResponseBody,
     },
     request::annotation_queues::ensure_annotation_queue_score_configs_visible,
 };
@@ -68,6 +69,17 @@ fn dataset_error_response(value: DatasetError) -> Response {
         }
         error @ (DatasetError::QueueItemNotReviewed | DatasetError::InconsistentReviewSource) => {
             MetaHttpResponse::conflict(error)
+        }
+        error @ (DatasetError::StaleRevision(_)
+        | DatasetError::DeletedItem(_)
+        | DatasetError::IdempotencyConflict) => MetaHttpResponse::conflict(error),
+        error @ (DatasetError::MissingIfRowId(_)
+        | DatasetError::DuplicateLogicalId(_)
+        | DatasetError::EmptyUpsert
+        | DatasetError::UpsertTooLarge) => MetaHttpResponse::bad_request(error.to_string()),
+        error @ DatasetError::MalformedStoredResponse(_) => {
+            log::error!("[Dataset] internal error: {error}");
+            MetaHttpResponse::internal_error("Internal server error")
         }
     }
 }
@@ -300,6 +312,65 @@ pub async fn push_dataset_item(
 ) -> Response {
     match datasets::push_item(&org_id, &dataset_id, &user.user_id, body.into()).await {
         Ok(result) => MetaHttpResponse::json(PushDatasetItemResponseBody::from(result)),
+        Err(err) => dataset_error_response(err),
+    }
+}
+
+/// UpsertDatasetItems
+#[utoipa::path(
+    put,
+    path = "/{org_id}/datasets/{dataset_id}/items",
+    context_path = "/api",
+    tag = "Datasets",
+    operation_id = "UpsertDatasetItems",
+    summary = "Create or update Dataset Cases under client-supplied identity",
+    description = "Identity comes from `logicalId` alone and is never inferred from content. \
+                   An item that names an existing Case must carry the `ifRowId` it read; a \
+                   superseded revision returns 409 and writes nothing. A deleted Case returns \
+                   409 unless the item sets `restore`. The whole batch and its idempotency \
+                   record commit together.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dataset_id" = String, Path, description = "Dataset ID"),
+    ),
+    request_body(content = inline(UpsertDatasetItemsRequestBody), description = "Dataset Cases to ensure"),
+    responses(
+        (status = 200, body = inline(UpsertDatasetItemsResponseBody)),
+        (status = 400, description = "Invalid upsert request", body = ()),
+        (status = 404, description = "Dataset not found", body = ()),
+        (status = 409, description = "Stale revision, deleted Case, or idempotency conflict", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
+)]
+pub async fn upsert_dataset_items(
+    Path((org_id, dataset_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    axum::Json(body): axum::Json<UpsertDatasetItemsRequestBody>,
+) -> Response {
+    // The body is re-serialized rather than hashed from the raw bytes so two
+    // encodings of the same request agree on their canonical hash.
+    let canonical_request = match serde_json::to_value(&body) {
+        Ok(value) => value,
+        Err(error) => {
+            log::error!("[Dataset] failed to canonicalize upsert request: {error}");
+            return MetaHttpResponse::internal_error("Internal server error");
+        }
+    };
+    let request = UpsertDatasetItems {
+        items: body.items.into_iter().map(Into::into).collect(),
+        idempotency_key: body.idempotency_key,
+    };
+    match datasets::upsert_items(
+        &org_id,
+        &dataset_id,
+        &user.user_id,
+        request,
+        &canonical_request,
+    )
+    .await
+    {
+        Ok(result) => MetaHttpResponse::json(UpsertDatasetItemsResponseBody::from(result)),
         Err(err) => dataset_error_response(err),
     }
 }

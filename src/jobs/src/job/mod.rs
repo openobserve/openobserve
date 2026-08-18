@@ -41,6 +41,8 @@ mod flatten_compactor;
 #[cfg(feature = "enterprise")]
 mod incidents;
 #[cfg(feature = "enterprise")]
+mod llm_idempotency_purge;
+#[cfg(feature = "enterprise")]
 mod llm_review_reconciliation;
 pub mod metrics;
 mod mmdb_downloader;
@@ -1151,6 +1153,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // failure window where ingestion succeeded but QueueItem status did not.
     #[cfg(feature = "enterprise")]
     llm_review_reconciliation::run();
+    // Replayable SDK requests are retained for 24h; reclaim the lapsed ones.
+    #[cfg(feature = "enterprise")]
+    llm_idempotency_purge::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

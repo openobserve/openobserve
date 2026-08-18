@@ -26,6 +26,7 @@ use openobserve_core::llm_evaluations::datasets::{
     CreateDataset, CreateDatasetItem, Dataset, DatasetItem, DatasetItemPage, DatasetItemSource,
     ListDatasetItems, PushDatasetItemResult, PushQueueItemToDataset,
     TelemetryDatasetItemRefType as ServiceRefType, UpdateDataset, UpdateDatasetItem,
+    UpsertDatasetItem, UpsertDatasetItemsResult, UpsertOutcome, UpsertedDatasetItem,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -217,6 +218,120 @@ pub struct PushDatasetItemResponseBody {
     /// False when an idempotent trace/annotation push returns the existing item.
     pub created: bool,
     pub item: DatasetItemResponseBody,
+}
+
+/// One Dataset Case a client declares should exist.
+///
+/// The body is serialized back for the idempotency request hash, so every field
+/// a client can vary has to round-trip through it.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UpsertDatasetItemBody {
+    /// Stable Dataset Case identity. Omit to append a new Case with a
+    /// server-generated identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logical_id: Option<String>,
+    pub input: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_output: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// The `rowId` the client read. Required when `logicalId` names an existing
+    /// Case.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub if_row_id: Option<String>,
+    /// Bring a soft-deleted Case back instead of conflicting on it.
+    #[serde(default)]
+    pub restore: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UpsertDatasetItemsRequestBody {
+    /// Client-generated key, scoped to this organization and Dataset. Repeating
+    /// it with identical content replays the first response.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idempotency_key: Option<String>,
+    pub items: Vec<UpsertDatasetItemBody>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UpsertOutcomeBody {
+    Created,
+    Updated,
+    Restored,
+    Unchanged,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertedDatasetItemBody {
+    pub logical_id: String,
+    pub row_id: String,
+    pub global_version: i64,
+    pub outcome: UpsertOutcomeBody,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertDatasetItemsResponseBody {
+    pub items: Vec<UpsertedDatasetItemBody>,
+    pub dataset_version: i64,
+    /// True when the response was replayed from a stored idempotency record.
+    pub replayed: bool,
+}
+
+impl From<UpsertDatasetItemBody> for UpsertDatasetItem {
+    fn from(value: UpsertDatasetItemBody) -> Self {
+        Self {
+            logical_id: value.logical_id,
+            input: value.input,
+            expected_output: value.expected_output,
+            metadata: value.metadata,
+            tags: value.tags,
+            if_row_id: value.if_row_id,
+            restore: value.restore,
+        }
+    }
+}
+
+impl From<UpsertOutcome> for UpsertOutcomeBody {
+    fn from(value: UpsertOutcome) -> Self {
+        match value {
+            UpsertOutcome::Created => Self::Created,
+            UpsertOutcome::Updated => Self::Updated,
+            UpsertOutcome::Restored => Self::Restored,
+            UpsertOutcome::Unchanged => Self::Unchanged,
+        }
+    }
+}
+
+impl From<UpsertedDatasetItem> for UpsertedDatasetItemBody {
+    fn from(value: UpsertedDatasetItem) -> Self {
+        Self {
+            logical_id: value.logical_id,
+            row_id: value.row_id,
+            global_version: value.global_version,
+            outcome: value.outcome.into(),
+        }
+    }
+}
+
+impl From<UpsertDatasetItemsResult> for UpsertDatasetItemsResponseBody {
+    fn from(value: UpsertDatasetItemsResult) -> Self {
+        Self {
+            items: value
+                .items
+                .into_iter()
+                .map(UpsertedDatasetItemBody::from)
+                .collect(),
+            dataset_version: value.dataset_version,
+            replayed: value.replayed,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
