@@ -861,7 +861,8 @@ describe("TraceDetailsSidebar", async () => {
       });
 
       // Regression: the highlight named a row index, not an event, so selecting
-      // a different span left the same index lit on an unrelated row.
+      // a different span left the same index lit on an unrelated row — and, for
+      // the same reason, left it expanded on the new span's table too.
       it("clears the selected event when the span changes", async () => {
         await setSpanEvents([
           { name: "first", _timestamp: eventNsAt(0.25) },
@@ -869,6 +870,7 @@ describe("TraceDetailsSidebar", async () => {
         ]);
         await timelineMarkers()[1].trigger("click");
         expect((wrapper.vm as any).selectedEventIndex).toBe(1);
+        expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
 
         await wrapper.setProps({
           span: {
@@ -883,6 +885,7 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
 
         expect((wrapper.vm as any).selectedEventIndex).toBeNull();
+        expect((wrapper.vm as any).expandedEventIds).toEqual([]);
       });
 
       // Regression: `duration` is truncated integer microseconds, so an event
@@ -895,129 +898,36 @@ describe("TraceDetailsSidebar", async () => {
         expect(timelineMarkers()).toHaveLength(1);
       });
 
-      // Regression: this watcher read eventsTableRef with the default
-      // flush: "pre", so it ran before the v-if-gated Events panel mounted and
-      // getRow() returned undefined. The old test hid that by stubbing the ref
-      // before the assertion; this one starts with no table, as the real
-      // marker-click path does.
-      //
-      // OTable is stubbed on this one mount so its own template ref doesn't
-      // win the race against the fake table injected below: the real OTable
-      // re-asserts eventsTableRef on every render (Vue keeps template refs in
-      // sync with the live component), which would satisfy the watcher with a
-      // real-but-irrelevant row before the test gets to swap in its spy. The
-      // real OTable is still exercised by the "When events exist" tests above.
-      it("expands the row once the events table appears", async () => {
-        const toggleExpanded = vi.fn();
-        const localWrapper = mount(TraceDetailsSidebar, {
-          attachTo: "#app",
-          props: {
-            span: {
-              ...mockSpan,
-              events: JSON.stringify([
-                { name: "first", _timestamp: eventNsAt(0.25) },
-                { name: "second", _timestamp: eventNsAt(0.75) },
-              ]),
-            },
-            baseTracePosition: mockBaseTracePosition,
-            searchQuery: "",
-            activeTab: "events",
-          },
-          global: {
-            plugins: [i18n, router, mockStore],
-            stubs: { ...baseStubs, OTable: true },
-          },
-        });
-        const vm = localWrapper.vm as any;
-
-        // No table yet — exactly the state a cold marker click lands in.
-        expect(vm.eventsTableRef?.table).toBeFalsy();
-        await localWrapper.setProps({ focusEventIndex: 1 });
-        await flushPromises();
-        expect(toggleExpanded).not.toHaveBeenCalled();
-        expect(vm.selectedEventIndex).toBe(1);
-
-        // The panel mounts and the ref fills in.
-        vm.eventsTableRef = { table: { getRow: () => ({ toggleExpanded }) } };
-        await flushPromises();
-
-        expect(toggleExpanded).toHaveBeenCalledWith(true);
-        localWrapper.unmount();
-      });
-
-      it("expands immediately when the table is already mounted", async () => {
-        await setSpanEvents([{ name: "only", _timestamp: eventNsAt(0.25) }]);
-        const toggleExpanded = vi.fn();
+      // Regression: OTable does not read TanStack's expansion state at all —
+      // it keeps its own private Set, synced from the `expandedIds` prop
+      // (see useTableExpansion). Calling `row.toggleExpanded()` on the table
+      // instance was always a no-op, including from the sidebar's own
+      // mini-timeline click. Driving expansion through the prop instead needs
+      // no table ref, so there's no mount-timing race to arm a watcher for.
+      it("expands the row named by focusEvent", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
         const vm = wrapper.vm as any;
-        vm.eventsTableRef = { table: { getRow: () => ({ toggleExpanded }) } };
 
-        await wrapper.setProps({ focusEventIndex: 0 });
-        await flushPromises();
+        vm.focusEvent(1);
 
-        expect(toggleExpanded).toHaveBeenCalledWith(true);
+        expect(vm.expandedEventIds).toEqual(["1"]);
+        expect(vm.selectedEventIndex).toBe(1);
       });
 
-      // Regression: a focus request waiting for its table outlived the span it
-      // was made for. When the table finally resolved — for a different span —
-      // the stale index expanded an unrelated row.
-      //
-      // Isolated the same way, and for the same reason, as "expands the row
-      // once the events table appears" above: on the shared wrapper the real
-      // OTable is already mounted (Events tab active), and it reasserts
-      // eventsTableRef with a real, successful getRow(1) on the very first
-      // render `focusEvent(1)` triggers — which would disarm the watcher for
-      // the *right* row before the span even has a chance to change, making
-      // the final assertion pass for the wrong reason regardless of whether
-      // the span-change guard exists. Confirmed empirically: run verbatim
-      // against the shared wrapper, this test passes even without the fix.
-      it("drops a pending focus request when the span changes", async () => {
-        const toggleExpanded = vi.fn();
-        const localWrapper = mount(TraceDetailsSidebar, {
-          attachTo: "#app",
-          props: {
-            span: {
-              ...mockSpan,
-              events: JSON.stringify([
-                { name: "first", _timestamp: eventNsAt(0.25) },
-                { name: "second", _timestamp: eventNsAt(0.75) },
-              ]),
-            },
-            baseTracePosition: mockBaseTracePosition,
-            searchQuery: "",
-            activeTab: "events",
-          },
-          global: {
-            plugins: [i18n, router, mockStore],
-            stubs: { ...baseStubs, OTable: true },
-          },
-        });
-        const vm = localWrapper.vm as any;
+      it("expands the row named by focusEventIndex", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
 
-        // Arm a pending request: no usable table yet.
-        expect(vm.eventsTableRef?.table).toBeFalsy();
-        vm.focusEvent(1);
-        await flushPromises();
-        expect(toggleExpanded).not.toHaveBeenCalled();
-
-        // The span changes while the request is still waiting.
-        await localWrapper.setProps({
-          span: {
-            ...mockSpan,
-            span_id: "a-different-span",
-            events: JSON.stringify([
-              { name: "other first", _timestamp: eventNsAt(0.25) },
-              { name: "other second", _timestamp: eventNsAt(0.75) },
-            ]),
-          },
-        });
+        await wrapper.setProps({ focusEventIndex: 1 });
         await flushPromises();
 
-        // The table for the new span resolves — the stale request must be gone.
-        vm.eventsTableRef = { table: { getRow: () => ({ toggleExpanded }) } };
-        await flushPromises();
-
-        expect(toggleExpanded).not.toHaveBeenCalled();
-        localWrapper.unmount();
+        expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
+        expect((wrapper.vm as any).selectedEventIndex).toBe(1);
       });
 
       it("ignores a null focusEventIndex", async () => {
@@ -1037,7 +947,7 @@ describe("TraceDetailsSidebar", async () => {
         expect(timelineMarkers()[0].attributes("style")).toContain("left: 25%");
       });
 
-      it("selects the matching table row when a marker is clicked", async () => {
+      it("selects and expands the matching row when a marker is clicked", async () => {
         await setSpanEvents([
           { name: "first", _timestamp: eventNsAt(0.25) },
           { name: "second", _timestamp: eventNsAt(0.75) },
@@ -1046,6 +956,7 @@ describe("TraceDetailsSidebar", async () => {
         await timelineMarkers()[1].trigger("click");
 
         expect(wrapper.vm.selectedEventIndex).toBe(1);
+        expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
       });
 
       it("drops events that fall outside the span window", async () => {

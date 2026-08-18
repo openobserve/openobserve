@@ -718,6 +718,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :enable-column-resize="true"
                 persist-columns
                 table-id="trace-details-events"
+                :expanded-ids="expandedEventIds"
+                @update:expanded-ids="expandedEventIds = $event"
               >
                 <template #expansion="{ row }">
                   <JsonPreview
@@ -1376,6 +1378,17 @@ export default defineComponent({
     const eventsTableRef = ref<any>(null);
     const selectedEventIndex = ref<number | null>(null);
 
+    /**
+     * Row keys expanded in the events table.
+     *
+     * OTable drives expansion from this prop through `useTableExpansion`, which
+     * keeps its own Set — it does not read TanStack's expansion state, so
+     * `row.toggleExpanded()` on the table instance has no visible effect. Rows
+     * are keyed by `__rowId` (the array index, see `eventsRowsWithKey`), and a
+     * normalized event keeps that index, so a marker maps straight onto its row.
+     */
+    const expandedEventIds = ref<string[]>([]);
+
     // Mini-timeline window is this span, not the trace: start_time is
     // nanoseconds (see getTTFT above) and duration is already microseconds.
     const spanEventMarkers = useSpanEventMarkers(
@@ -1444,49 +1457,13 @@ export default defineComponent({
         : t("traces.eventClusterAriaLabelPlural", { count, errors });
     };
 
-    /**
-     * Watcher armed only while a focus request is waiting for its table.
-     *
-     * The Events panel is `v-if` gated, so on a marker click the table does not
-     * exist yet and `getRow` returns nothing. Rather than guess how many ticks
-     * the mount takes, wait for the ref to fill in — and stop watching the
-     * moment it does, so no watcher exists while nothing is pending.
-     */
-    let stopFocusWatch: (() => void) | null = null;
-
-    const focusEvent = (index: number) => {
-      stopFocusWatch?.();
-      stopFocusWatch = null;
-      selectedEventIndex.value = index;
-
-      const apply = () => {
-        const row = eventsTableRef.value?.table?.getRow?.(String(index));
-        if (!row) return false;
-        row.toggleExpanded?.(true);
-        return true;
-      };
-
-      if (apply()) return;
-
-      stopFocusWatch = watch(
-        eventsTableRef,
-        () => {
-          if (!apply()) return;
-          stopFocusWatch?.();
-          stopFocusWatch = null;
-        },
-        { flush: "post" },
-      );
-    };
-
-    // The watcher above is created inside `focusEvent`, i.e. after setup's
-    // synchronous run, so Vue's effect scope does not dispose it for us.
-    onUnmounted(() => {
-      stopFocusWatch?.();
-    });
-
     // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
     // events keep that index, so a marker maps straight onto its table row.
+    const focusEvent = (index: number) => {
+      selectedEventIndex.value = index;
+      expandedEventIds.value = [String(index)];
+    };
+
     const onEventMarkerClick = (marker: SpanEventMarker) => {
       focusEvent(marker.index);
     };
@@ -1495,16 +1472,11 @@ export default defineComponent({
     // the next span highlights an unrelated row that happens to share the index.
     // `focusEventIndex` arrives a tick later (see TraceDetails.onSelectSpanEvent),
     // so a marker-driven span change still lands on its event.
-    //
-    // A focus request still waiting for its table belongs to the old span too:
-    // if it survived, it would resolve against the new span's table and expand
-    // whatever happens to sit at that index.
     watch(
       () => props.span?.span_id,
       () => {
         selectedEventIndex.value = null;
-        stopFocusWatch?.();
-        stopFocusWatch = null;
+        expandedEventIds.value = [];
       },
     );
 
@@ -2242,6 +2214,7 @@ export default defineComponent({
       eventsRowsWithKey,
       eventsTableRef,
       focusEvent,
+      expandedEventIds,
       spanEventMarkers,
       selectedEventIndex,
       eventMarkerLabel,
