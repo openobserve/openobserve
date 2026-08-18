@@ -11516,19 +11516,19 @@
           "span": {
             "title": "Dopasowane spany",
             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile spanów dopasuje Twoje zadanie.",
-            "matchedSuffix": "dopasowane spany · ostatnie 24h",
+            "matchedSuffix": "dopasowane spany · ostatnia 1h",
             "matchedLoading": "Liczenie dopasowanych spanów..."
           },
           "trace": {
             "title": "Dopasowane trace'y",
             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile trace'y dopasuje Twoje zadanie.",
-            "matchedSuffix": "dopasowane trace'y · ostatnie 24h",
+            "matchedSuffix": "dopasowane trace'e · ostatnia 1h",
             "matchedLoading": "Liczenie dopasowanych trace'ów..."
           },
           "session": {
             "title": "Dopasowane sesje",
             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile sesji dopasuje Twoje zadanie.",
-            "matchedSuffix": "dopasowane sesje · ostatnie 24h",
+            "matchedSuffix": "dopasowane sesje · ostatnia 1h",
             "matchedLoading": "Liczenie dopasowanych sesji..."
           }
         },

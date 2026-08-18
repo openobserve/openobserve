@@ -11516,19 +11516,19 @@
           "span": {
             "title": "Passende Spans",
             "hint": "Sobald Sie einen Stream und einen Filter ausgewählt haben, zeigt dieses Feld, wie viele Spans Ihr Job abgleicht.",
-            "matchedSuffix": "Spans abgeglichen · letzte 24h",
+            "matchedSuffix": "Spans gefunden · letzte 1h",
             "matchedLoading": "Passende Spans werden gezählt…"
           },
           "trace": {
             "title": "Passende Traces",
             "hint": "Sobald Sie einen Stream und einen Filter ausgewählt haben, zeigt dieses Feld, wie viele Traces Ihr Job abgleicht.",
-            "matchedSuffix": "Traces abgeglichen · letzte 24h",
+            "matchedSuffix": "Traces gefunden · letzte 1h",
             "matchedLoading": "Passende Traces werden gezählt…"
           },
           "session": {
             "title": "Passende Sitzungen",
             "hint": "Sobald Sie einen Stream und einen Filter ausgewählt haben, zeigt dieses Feld, wie viele Sitzungen Ihr Job abgleicht.",
-            "matchedSuffix": "Sitzungen abgeglichen · letzte 24h",
+            "matchedSuffix": "Sessions gefunden · letzte 1h",
             "matchedLoading": "Passende Sitzungen werden gezählt…"
           }
         },

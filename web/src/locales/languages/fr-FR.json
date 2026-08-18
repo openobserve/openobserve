@@ -11516,19 +11516,19 @@
           "span": {
             "title": "Spans correspondants",
             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de spans que votre job correspondra.",
-            "matchedSuffix": "spans correspondants · dernières 24h",
+            "matchedSuffix": "spans correspondants · dernière 1h",
             "matchedLoading": "Comptage des spans correspondants…"
           },
           "trace": {
             "title": "Traces correspondantes",
             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de traces que votre job correspondra.",
-            "matchedSuffix": "traces correspondantes · dernières 24h",
+            "matchedSuffix": "traces correspondantes · dernière 1h",
             "matchedLoading": "Comptage des traces correspondantes…"
           },
           "session": {
             "title": "Sessions correspondantes",
             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de sessions que votre job correspondra.",
-            "matchedSuffix": "sessions correspondantes · dernières 24h",
+            "matchedSuffix": "sessions correspondantes · dernière 1h",
             "matchedLoading": "Comptage des sessions correspondantes…"
           }
         },

@@ -11516,19 +11516,19 @@
           "span": {
             "title": "匹配的跨度数",
             "hint": "一旦您选择了流和过滤器，此面板将显示您的任务将匹配多少个跨度。",
-            "matchedSuffix": "匹配的跨度数 · 过去24小时",
+            "matchedSuffix": "匹配的跨度 · 最近 1 小时",
             "matchedLoading": "正在计算匹配的跨度数…"
           },
           "trace": {
             "title": "匹配的跟踪数",
             "hint": "一旦您选择了流和过滤器，此面板将显示您的任务将匹配多少个追踪。",
-            "matchedSuffix": "匹配的跟踪数 · 过去24小时",
+            "matchedSuffix": "匹配的追踪 · 最近 1 小时",
             "matchedLoading": "正在计算匹配的跟踪数…"
           },
           "session": {
             "title": "匹配的会话数",
             "hint": "一旦您选择了流和过滤器，此面板将显示您的任务将匹配多少个会话。",
-            "matchedSuffix": "匹配的会话数 · 过去24小时",
+            "matchedSuffix": "匹配的会话 · 最近 1 小时",
             "matchedLoading": "正在计算匹配的会话数…"
           }
         },

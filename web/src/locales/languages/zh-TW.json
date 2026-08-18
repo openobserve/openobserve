@@ -4339,7 +4339,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -11511,19 +11516,19 @@
           "span": {
             "title": "匹配的區間",
             "hint": "一旦選取了資料流和篩選條件，此面板將顯示您的作業會匹配多少個區間。",
-            "matchedSuffix": "匹配的區間 · 過去24小時",
+            "matchedSuffix": "匹配的 spans · 過去 1 小時",
             "matchedLoading": "正在計算匹配的區間…"
           },
           "trace": {
             "title": "匹配的追蹤",
             "hint": "一旦選取了資料流和篩選條件，此面板將顯示您的作業會匹配多少個追蹤。",
-            "matchedSuffix": "匹配的追蹤 · 過去24小時",
+            "matchedSuffix": "匹配的 traces · 過去 1 小時",
             "matchedLoading": "正在計算匹配的追蹤…"
           },
           "session": {
             "title": "匹配的工作階段",
             "hint": "一旦選取了資料流和篩選條件，此面板將顯示您的作業會匹配多少個工作階段。",
-            "matchedSuffix": "匹配的工作階段 · 過去24小時",
+            "matchedSuffix": "匹配的 sessions · 過去 1 小時",
             "matchedLoading": "正在計算匹配的工作階段…"
           }
         },

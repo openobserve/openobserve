@@ -11516,19 +11516,19 @@
           "span": {
             "title": "Spans coincidentes",
             "hint": "Una vez que hayas elegido un stream y un filtro, este panel mostrará cuántos spans coincidirá tu tarea.",
-            "matchedSuffix": "spans coincidentes · últimas 24h",
+            "matchedSuffix": "spans coincidentes · última 1h",
             "matchedLoading": "Contando spans coincidentes…"
           },
           "trace": {
             "title": "Traces coincidentes",
             "hint": "Una vez que hayas elegido un stream y un filtro, este panel mostrará cuántos traces coincidirá tu tarea.",
-            "matchedSuffix": "traces coincidentes · últimas 24h",
+            "matchedSuffix": "traces coincidentes · última 1h",
             "matchedLoading": "Contando traces coincidentes…"
           },
           "session": {
             "title": "Sesiones coincidentes",
             "hint": "Una vez que hayas elegido un stream y un filtro, este panel mostrará cuántas sesiones coincidirá tu tarea.",
-            "matchedSuffix": "sesiones coincidentes · últimas 24h",
+            "matchedSuffix": "sesiones coincidentes · última 1h",
             "matchedLoading": "Contando sesiones coincidentes…"
           }
         },

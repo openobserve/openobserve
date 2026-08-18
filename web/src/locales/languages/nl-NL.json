@@ -11516,19 +11516,19 @@
           "span": {
             "title": "Overeenkomende spans",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel spans uw taak zal matchen.",
-            "matchedSuffix": "spans gematcht · laatste 24 uur",
+            "matchedSuffix": "overeenkomende spans · laatste 1 uur",
             "matchedLoading": "Overeenkomende spans tellen…"
           },
           "trace": {
             "title": "Overeenkomende traces",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel traces uw taak zal matchen.",
-            "matchedSuffix": "traces gematcht · laatste 24 uur",
+            "matchedSuffix": "overeenkomende traces · laatste 1 uur",
             "matchedLoading": "Overeenkomende traces tellen…"
           },
           "session": {
             "title": "Overeenkomende sessies",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel sessies uw taak zal matchen.",
-            "matchedSuffix": "sessies gematcht · laatste 24 uur",
+            "matchedSuffix": "overeenkomende sessies · laatste 1 uur",
             "matchedLoading": "Overeenkomende sessies tellen…"
           }
         },

@@ -11516,19 +11516,19 @@
           "span": {
             "title": "Eşleşen Span'lar",
             "hint": "Bir akış ve filtre seçtikten sonra bu panel, işinizin kaç span ile eşleşeceğini gösterecektir.",
-            "matchedSuffix": "eşleşen span'lar · son 24s",
+            "matchedSuffix": "eşleşen spanlar · son 1 saat",
             "matchedLoading": "Eşleşen span'lar sayılıyor…"
           },
           "trace": {
             "title": "Eşleşen İzler",
             "hint": "Bir akış ve filtre seçtikten sonra bu panel, işinizin kaç iz ile eşleşeceğini gösterecektir.",
-            "matchedSuffix": "eşleşen izler · son 24s",
+            "matchedSuffix": "eşleşen izler · son 1 saat",
             "matchedLoading": "Eşleşen izler sayılıyor…"
           },
           "session": {
             "title": "Eşleşen Oturumlar",
             "hint": "Bir akış ve filtre seçtikten sonra bu panel, işinizin kaç oturum ile eşleşeceğini gösterecektir.",
-            "matchedSuffix": "eşleşen oturumlar · son 24s",
+            "matchedSuffix": "eşleşen oturumlar · son 1 saat",
             "matchedLoading": "Eşleşen oturumlar sayılıyor…"
           }
         },

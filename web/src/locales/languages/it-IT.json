@@ -11516,19 +11516,19 @@
           "span": {
             "title": "Span corrispondenti",
             "hint": "Dopo aver scelto uno stream e un filtro, questo pannello mostrerà quanti span il tuo job corrisponderà.",
-            "matchedSuffix": "span corrispondenti · ultime 24h",
+            "matchedSuffix": "span corrispondenti · ultima 1h",
             "matchedLoading": "Conteggio span corrispondenti…"
           },
           "trace": {
             "title": "Trace corrispondenti",
             "hint": "Dopo aver scelto uno stream e un filtro, questo pannello mostrerà quante trace il tuo job corrisponderà.",
-            "matchedSuffix": "trace corrispondenti · ultime 24h",
+            "matchedSuffix": "tracce corrispondenti · ultima 1h",
             "matchedLoading": "Conteggio trace corrispondenti…"
           },
           "session": {
             "title": "Sessioni corrispondenti",
             "hint": "Dopo aver scelto uno stream e un filtro, questo pannello mostrerà quante sessioni il tuo job corrisponderà.",
-            "matchedSuffix": "sessioni corrispondenti · ultime 24h",
+            "matchedSuffix": "sessioni corrispondenti · ultima 1h",
             "matchedLoading": "Conteggio sessioni corrispondenti…"
           }
         },

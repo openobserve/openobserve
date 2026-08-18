@@ -11516,19 +11516,19 @@
           "span": {
             "title": "일치하는 스팬",
             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 스팬 수가 표시됩니다.",
-            "matchedSuffix": "일치하는 스팬 · 지난 24시간",
+            "matchedSuffix": "일치된 스팬 · 최근 1h",
             "matchedLoading": "일치하는 스팬 계산 중…"
           },
           "trace": {
             "title": "일치하는 추적",
             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 추적 수가 표시됩니다.",
-            "matchedSuffix": "일치하는 추적 · 지난 24시간",
+            "matchedSuffix": "일치된 트레이스 · 최근 1h",
             "matchedLoading": "일치하는 추적 계산 중…"
           },
           "session": {
             "title": "일치하는 세션",
             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 세션 수가 표시됩니다.",
-            "matchedSuffix": "일치하는 세션 · 지난 24시간",
+            "matchedSuffix": "일치된 세션 · 최근 1h",
             "matchedLoading": "일치하는 세션 계산 중…"
           }
         },
