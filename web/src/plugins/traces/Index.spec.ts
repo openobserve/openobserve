@@ -470,8 +470,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should update URL with tab=traces when searchMode changes to traces", async () => {
-      // Start in service-graph mode so switching to traces is an actual change
-      mockSearchObj.meta.searchMode = "service-graph";
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -576,9 +577,9 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(routerReplaceSpy).not.toHaveBeenCalled();
     });
 
-    it("should restore the Spans default when the tab query is removed", async () => {
+    it("should restore the Traces default when the tab query is removed", async () => {
       const currentRoute = ref({
-        query: { tab: "traces" },
+        query: { tab: "spans" },
         name: "traces",
         path: "/traces",
       }) as typeof router.currentRoute;
@@ -609,8 +610,8 @@ describe("Index.vue (Main Traces Page)", () => {
       };
       await flushPromises();
 
-      expect(mockSearchObj.meta.searchMode).toBe("spans");
-      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
+      expect(mockSearchObj.meta.searchMode).toBe("traces");
+      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "traces" } });
     });
 
     it("should switch to service-graph tab from ?tab= on enterprise", async () => {

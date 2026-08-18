@@ -354,7 +354,7 @@ describe("useTraces", () => {
 
     it("meta.searchMode defaults to traces", () => {
       const { searchObj } = useTraces();
-      expect(searchObj.meta.searchMode).toBe("spans");
+      expect(searchObj.meta.searchMode).toBe("traces");
     });
   });
 

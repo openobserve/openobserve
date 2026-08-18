@@ -627,7 +627,7 @@ describe("useRoutes (router.ts)", () => {
       });
     });
 
-    it("redirects the standalone Service Graph path to Spans in OSS", () => {
+    it("redirects the standalone Service Graph path to Traces in OSS", () => {
       const { homeChildRoutes } = useRoutes();
       const route = homeChildRoutes.find((candidate) => candidate.path === "traces/service-graph");
       if (!route || typeof route.redirect !== "function") {
@@ -636,7 +636,7 @@ describe("useRoutes (router.ts)", () => {
 
       expect(route.redirect({ query: { org_identifier: "default", stream: "traces" } })).toEqual({
         name: "traces",
-        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+        query: { org_identifier: "default", stream: "traces", tab: "traces" },
       });
     });
 
@@ -689,7 +689,7 @@ describe("useRoutes (router.ts)", () => {
 
       expect(next).toHaveBeenCalledWith({
         name: "traces",
-        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+        query: { org_identifier: "default", stream: "traces", tab: "traces" },
         hash: "",
         replace: true,
       });
@@ -1657,7 +1657,7 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "traces");
 
-      const mockTo = { query: { tab: "spans" } };
+      const mockTo = { query: { tab: "traces" } };
       const mockFrom = {};
       const mockNext = vi.fn();
       route.beforeEnter(mockTo, mockFrom, mockNext);
