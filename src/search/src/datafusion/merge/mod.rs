@@ -51,6 +51,7 @@ use vortex::{
 use super::table_provider::uniontable::NewUnionTable;
 use crate::datafusion::{
     exec::DataFusionContextBuilder,
+    sort_order::FileSortOrder,
     vortex::{VORTEX_RUNTIME, vortex_write_strategy},
 };
 
@@ -133,7 +134,11 @@ pub async fn merge_parquet_files(
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files")
-        .sorted_by_time(!metrics_tsid_major)
+        .sort_order(if metrics_tsid_major {
+            FileSortOrder::None
+        } else {
+            FileSortOrder::TimestampDesc
+        })
         .build(get_config().limit.datafusion_min_partition_num)
         .await?;
     // register union table

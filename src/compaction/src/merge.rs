@@ -54,6 +54,7 @@ use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
     merge::{self, MergeParquetResult},
+    sort_order::FileSortOrder,
 };
 use search_service::file_list;
 use tantivy_utils::index_builder::create_tantivy_index;
@@ -910,7 +911,11 @@ pub async fn merge_files(
     let metrics_tsid_major_requested =
         metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
     let tables = match TableBuilder::new()
-        .sorted_by_time(!metrics_tsid_major_requested)
+        .sort_order(if metrics_tsid_major_requested {
+            FileSortOrder::None
+        } else {
+            FileSortOrder::TimestampDesc
+        })
         .build(session, files.clone(), schema.clone())
         .await
     {

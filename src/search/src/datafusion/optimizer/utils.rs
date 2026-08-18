@@ -30,7 +30,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use crate::datafusion::table_provider::empty_table::NewEmptyTable;
+use crate::datafusion::{sort_order::FileSortOrder, table_provider::empty_table::NewEmptyTable};
 
 // check if the plan is a complex query that we can't add sort _timestamp
 pub fn is_complex_query(plan: &LogicalPlan) -> bool {
@@ -290,7 +290,7 @@ fn generate_table_source_with_sorted_by_time(
     let source: &DefaultTableSource = table_source.downcast_ref::<DefaultTableSource>().unwrap();
     if let Some(table_provider) = source.table_provider.downcast_ref::<NewEmptyTable>() {
         let mut new_table_provider = (*table_provider).clone();
-        new_table_provider.sorted_by_time = true;
+        new_table_provider.sort_order = FileSortOrder::TimestampDesc;
         let new_source = DefaultTableSource::new(Arc::new(new_table_provider));
         Arc::new(new_source)
     } else {

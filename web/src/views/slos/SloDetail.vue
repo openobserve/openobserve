@@ -117,10 +117,31 @@
          from the tabs, and no horizontal padding either — a tab strip's first
          label self-aligns to the page-edge grid. -->
     <OTabs v-if="!notFound" v-model="tab" class="shrink-0" data-test="slos-slodetail-tabs">
-      <OTab name="trend" :label="t('slos.tab.trend')" icon="show-chart" />
-      <OTab name="groups" :label="t('slos.tab.groups')" icon="layers" v-if="isGrouped" />
-      <OTab name="alerts" :label="t('slos.alerts.title')" icon="shield" />
-      <OTab name="config" :label="t('slos.tab.configuration')" icon="settings" />
+      <OTab
+        name="trend"
+        :label="t('slos.tab.trend')"
+        icon="show-chart"
+        data-test="slos-slodetail-tab-trend"
+      />
+      <OTab
+        name="groups"
+        :label="t('slos.tab.groups')"
+        icon="layers"
+        v-if="isGrouped"
+        data-test="slos-slodetail-tab-groups"
+      />
+      <OTab
+        name="alerts"
+        :label="t('slos.alerts.title')"
+        icon="shield"
+        data-test="slos-slodetail-tab-alerts"
+      />
+      <OTab
+        name="config"
+        :label="t('slos.tab.configuration')"
+        icon="settings"
+        data-test="slos-slodetail-tab-config"
+      />
     </OTabs>
 
     <!-- The page body is a FIXED flex column (OPageLayout's default: no
@@ -472,36 +493,42 @@ const stats = computed<StatItem[]>(() => {
   return [
     {
       key: "sli",
+      dataTest: "slos-slodetail-stat-sli",
       label: t("slos.stat.status", { window: formatWindow(slo.value?.window_secs ?? 0) }),
       value: frozen ? ABSENT : formatSli(s!.sli),
       tone: frozen ? "neutral" : health.value === "meeting" ? "success" : "error",
     },
     {
       key: "target",
+      dataTest: "slos-slodetail-stat-target",
       label: t("slos.stat.target"),
       value: slo.value ? formatTarget(slo.value.target) : ABSENT,
       tone: "primary",
     },
     {
       key: "budget",
+      dataTest: "slos-slodetail-stat-budget",
       label: t("slos.stat.budgetRemaining"),
       value: frozen ? ABSENT : formatBudget(s!.error_budget_remaining),
       tone: frozen ? "neutral" : (s!.error_budget_remaining ?? 0) <= 0 ? "error" : "success",
     },
     {
       key: "burn",
+      dataTest: "slos-slodetail-stat-burn",
       label: t("slos.stat.burnRate"),
       value: frozen ? ABSENT : formatBurn(s!.burn_rate),
       tone: frozen ? "neutral" : (s!.burn_rate ?? 0) > 1 ? "error" : "success",
     },
     {
       key: "exhaust",
+      dataTest: "slos-slodetail-stat-exhaust",
       label: t("slos.stat.timeToExhaust"),
       value: frozen ? ABSENT : formatTimeToExhaust(s!.time_to_exhaust_secs),
       tone: "neutral",
     },
     {
       key: "coverage",
+      dataTest: "slos-slodetail-stat-coverage",
       label: t("slos.stat.coverage"),
       value: formatCoverage(s?.coverage),
       tone: frozen ? "warning" : "neutral",
