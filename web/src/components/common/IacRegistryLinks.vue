@@ -29,6 +29,7 @@ import opentofuLogo from "@/assets/images/common/opentofu.svg";
 import opentofuLogoDark from "@/assets/images/common/opentofu_dark.svg";
 import terraformLogo from "@/assets/images/common/terraform.svg";
 import { useTheme } from "@/composables/useTheme";
+import { OPENTOFU_REGISTRY_URL, TERRAFORM_REGISTRY_URL } from "@/utils/terraform/provider";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 withDefaults(defineProps<{ dataTest?: string }>(), { dataTest: "iac-registry-links" });
@@ -49,13 +50,13 @@ const REGISTRIES = computed(() => [
     key: "terraform",
     name: raw("Terraform Registry"),
     icon: `img:${terraformLogo}`,
-    url: "https://registry.terraform.io/providers/openobserve/openobserve/latest",
+    url: TERRAFORM_REGISTRY_URL,
   },
   {
     key: "opentofu",
     name: raw("OpenTofu Registry"),
     icon: `img:${isDark.value ? opentofuLogoDark : opentofuLogo}`,
-    url: "https://search.opentofu.org/provider/openobserve/openobserve/latest",
+    url: OPENTOFU_REGISTRY_URL,
   },
 ]);
 </script>

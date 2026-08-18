@@ -7,6 +7,8 @@
 // Output is `terraform fmt`-canonical, including `=` alignment, so what a user
 // copies out of the UI is already what fmt would produce.
 
+import { PROVIDER_SOURCE, PROVIDER_VERSION } from "./provider";
+
 /** Why a payload cannot be expressed as a Terraform resource. */
 export type TerraformUnsupportedReason = "anomaly" | "incomplete";
 
@@ -25,14 +27,6 @@ export interface TerraformExport {
 }
 
 export const INDENT = "  ";
-
-// The one place either value is written. `~> 1.0` is checked against what is
-// actually published: the registry lists 1.0.0, 0.0.4 and 0.0.3, so the
-// constraint resolves to 1.0.0 and `terraform init` succeeds. Raise it only when
-// a 1.x release is out, or an exported file will pin a version nobody can fetch.
-// https://registry.terraform.io/v1/providers/openobserve/openobserve/versions
-const PROVIDER_SOURCE = "openobserve/openobserve";
-const PROVIDER_VERSION = "~> 1.0";
 
 export type Node =
   { kind: "attr"; name: string; expr: string } | { kind: "block"; name: string; body: Node[] };
