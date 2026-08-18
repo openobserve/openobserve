@@ -111,22 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseenter="onHoverSpan((spans as any[])[virtualRow.index].spanId)"
               >
                 <div
-                  class="view-logs-container invisible absolute top-1 right-0"
-                  :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
-                >
-                  <div class="view-span-logs mx-1">
-                    <OButton
-                      variant="ghost"
-                      size="icon"
-                      :title="t('traces.viewLogs')"
-                      @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"
-                      :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
-                    >
-                      <OIcon name="search" size="xs" />
-                    </OButton>
-                  </div>
-                </div>
-                <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
                   class="span-count-box text-2xs border-card-glass-border! hover:bg-interactive-hover-bg relative mr-1 flex h-5 min-w-5 cursor-pointer items-center justify-center rounded-full border px-1 py-0 font-semibold transition-colors duration-200"
                   :style="{
@@ -235,6 +219,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div class="sticky right-0 flex items-center">
+                    <!-- Hidden at rest, not merely invisible: `invisible` would keep
+                         the box in layout and reserve a permanent gutter to the left
+                         of the badges, which is the thing this arrangement exists to
+                         avoid. `hidden` gives the operation name the full width until
+                         the row is hovered, and the button then takes its 1.5rem from
+                         the already-truncating name — never from the badges, which
+                         stay pinned to the right edge. The cost is that the text's
+                         truncation point shifts on hover; the reflow is one row wide.
+
+                         It sits before the status badge because it used to sit *on
+                         top of* it: the old `.view-logs-container` was an absolute
+                         overlay pinned to `right-0`, so hovering a row covered both
+                         the HTTP status and the event count — and the event count is
+                         the honest fallback for spans whose markers cannot be drawn,
+                         so hover hid the one channel that is always true. -->
+                    <div
+                      class="view-span-logs hidden"
+                      :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
+                    >
+                      <OButton
+                        variant="ghost"
+                        size="icon"
+                        :title="t('traces.viewLogs')"
+                        @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"
+                        :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                      >
+                        <OIcon name="search" size="xs" />
+                      </OButton>
+                    </div>
                     <span
                       v-if="getHttpStatusVars((spans as any[])[virtualRow.index])"
                       class="rounded-default mr-1 px-1 py-[0.4rem] text-xs leading-none font-semibold whitespace-nowrap"
@@ -881,8 +894,8 @@ export default defineComponent({
   background-color: transparent !important;
 }
 
-.span-row:hover .view-logs-container {
-  visibility: visible;
+.span-row:hover .view-span-logs {
+  display: flex;
 }
 
 .span-row.span-row-selected::before {
