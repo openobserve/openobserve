@@ -600,6 +600,57 @@ export class DatabaseMonitoringPage {
   }
 
   /**
+   * The NAMESPACE (the database a statement ran in) this org's data carries.
+   *
+   * Distinct from `instance`, and the distinction is the whole reason the DBM
+   * filters confuse people: the chip the UI labels "database" is the INSTANCE
+   * dimension, while the actual database is `namespace`. A matrix test has to
+   * exercise both, with real values, or it proves nothing about either.
+   *
+   * Read from the deadlocks feed, which names a database per event.
+   */
+  async firstNamespaceFromApi({ periodSeconds = 3600 } = {}) {
+    const body = await this.dbmApi('deadlocks', periodSeconds, { system: null });
+    const hit = (body?.hits || []).find((h) => h && h.db_namespace);
+    return hit ? String(hit.db_namespace) : '';
+  }
+
+  /**
+   * How many rows an endpoint returns under a scope, straight from the API.
+   *
+   * The matrix test compares the UI against this rather than against a pinned
+   * number: the rigs ingest continuously, so any hardcoded count is stale
+   * before the run finishes. `null` means the read failed — the caller must
+   * treat that as unknown, never as zero, or a broken backend reads as a
+   * correctly-empty tab.
+   */
+  async apiCount(endpoint, params = {}, { periodSeconds = 3600 } = {}) {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const now = Date.now() * 1000;
+    const qs = new URLSearchParams({
+      start_time: String(now - periodSeconds * 1e6),
+      end_time: String(now),
+      ...Object.fromEntries(Object.entries(params).filter(([, v]) => v)),
+    });
+    const auth = Buffer.from(
+      `${process.env['ZO_ROOT_USER_EMAIL'] || ''}:${process.env['ZO_ROOT_USER_PASSWORD'] || ''}`,
+    ).toString('base64');
+    try {
+      const res = await this.page.request.get(
+        `${baseUrl}/api/${org}/traces/db_monitoring/${endpoint}?${qs}`,
+        { timeout: 30000, headers: { Authorization: `Basic ${auth}` } },
+      );
+      if (!res.ok()) return null;
+      const body = await res.json();
+      if (typeof body.total === 'number') return body.total;
+      return Array.isArray(body.hits) ? body.hits.length : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Shared reader for the DBM endpoints, with the suite's own credentials.
    *
    * `system` defaults to postgresql for callers that want it, but passing
