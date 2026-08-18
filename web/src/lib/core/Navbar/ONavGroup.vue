@@ -44,7 +44,7 @@ const openGroupKey = moduleRef<string | null>(null);
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQueryRaw } from "vue-router";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
@@ -215,7 +215,8 @@ const isGroupActive = computed(() => activeChild.value !== null);
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
 function childTo(child: SubnavChild) {
-  const query: Record<string, string> = {};
+  const route = router.currentRoute.value;
+  const query: LocationQueryRaw = route.name === child.name ? { ...route.query } : {};
   if (orgIdentifier.value) query.org_identifier = orgIdentifier.value;
   if (child.tab) query.tab = child.tab;
   return { name: child.name, query };

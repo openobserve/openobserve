@@ -297,13 +297,18 @@ describe("ONavGroup", () => {
 
   describe("query-tab navigation and active state", () => {
     const tracesChildren: SubnavChild[] = [
-      { titleKey: "traces.spansTab", icon: "layers", name: "traces", tab: "spans" },
+      {
+        titleKey: "traces.spansTab",
+        icon: "layers",
+        name: "traces",
+        tab: "spans",
+        defaultForRoute: true,
+      },
       {
         titleKey: "menu.traces",
         icon: "account-tree",
         name: "traces",
         tab: "traces",
-        defaultForRoute: true,
       },
       {
         titleKey: "menu.serviceGraph",
@@ -364,9 +369,9 @@ describe("ONavGroup", () => {
         .map((el) => el.attributes("data-test")!.replace("nav-group-item-traces-", ""));
     }
 
-    it("marks Traces on plain /traces", async () => {
+    it("marks Spans on plain /traces", async () => {
       wrapper = await mountAt("/traces");
-      expect(activeTabs(wrapper)).toEqual(["traces"]);
+      expect(activeTabs(wrapper)).toEqual(["spans"]);
     });
 
     it("marks Traces on /traces?tab=traces", async () => {
@@ -404,6 +409,21 @@ describe("ONavGroup", () => {
       expect(
         wrapper.get('[data-test="nav-group-item-traces-services-catalog"]').attributes("href"),
       ).toBe("/traces?org_identifier=default&tab=services-catalog");
+    });
+
+    it("preserves the current Traces query when switching tabs", async () => {
+      wrapper = await mountAt(
+        "/traces?org_identifier=default&tab=traces&stream=default&period=15m&query=c2VydmljZQ%3D%3D",
+      );
+
+      const href = wrapper.get('[data-test="nav-group-item-traces-spans"]').attributes("href");
+      const query = new URL(href, "http://localhost").searchParams;
+
+      expect(query.get("org_identifier")).toBe("default");
+      expect(query.get("tab")).toBe("spans");
+      expect(query.get("stream")).toBe("default");
+      expect(query.get("period")).toBe("15m");
+      expect(query.get("query")).toBe("c2VydmljZQ==");
     });
   });
 });

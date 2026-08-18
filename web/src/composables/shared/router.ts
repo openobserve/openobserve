@@ -21,6 +21,7 @@ import {
 } from "@/utils/zincutils";
 import type { LocationQuery, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
+import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import About from "@/views/About.vue";
@@ -41,11 +42,14 @@ const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
 
+const supportedTraceTab = (tab: unknown): TraceSearchMode =>
+  resolveTraceSearchMode(tab, config.isEnterprise === "true");
+
 const redirectToTraceTab =
   (tab: "service-graph" | "services-catalog") =>
   (to: { query: LocationQuery }): RouteLocationRaw => ({
     name: "traces",
-    query: { ...to.query, tab },
+    query: { ...to.query, tab: supportedTraceTab(tab) },
   });
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
@@ -271,6 +275,16 @@ const useRoutes = () => {
         title: "Traces",
       },
       beforeEnter(to: any, from: any, next: any) {
+        const tab = supportedTraceTab(to.query?.tab);
+        if (to.query?.tab !== tab) {
+          next({
+            name: "traces",
+            query: { ...(to.query ?? {}), tab },
+            hash: to.hash,
+            replace: true,
+          });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
