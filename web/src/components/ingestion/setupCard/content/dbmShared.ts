@@ -470,18 +470,18 @@ const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
         #   MySQL thread id 82, ... query id ...
         #   UPDATE accounts SET balance = ...          <- record ENDS here
         #   ...Z [MY-012469] *** (2) HOLDS THE LOCK(S):  <- new entry
-        #   RECORD LOCKS ... of table `dbmlab`.`accounts` trx id 66548 lock_mode X
+        #   RECORD LOCKS ... of table \`dbmlab\`.\`accounts\` trx id 66548 lock_mode X
         #
-        # `line_start_pattern` splits on the timestamp, so the RECORD LOCKS line
-        # can never share a record with the `*** (N) TRANSACTION:` block above
+        # \`line_start_pattern\` splits on the timestamp, so the RECORD LOCKS line
+        # can never share a record with the \`*** (N) TRANSACTION:\` block above
         # it. Measured on the rig: of 108 records carrying a participant, ZERO
         # carried my_db, and of 252 carrying my_db, ZERO carried a participant.
-        # The consequence was that every stitched deadlock had `objects: []`,
+        # The consequence was that every stitched deadlock had \`objects: []\`,
         # null lock_mode/lock_target, and -- because my_db is the ONLY MySQL
-        # source in `detect_database` -- a null database, so the Deadlocks tab's
-        # `?database=` filter could not work on MySQL or MariaDB at all.
+        # source in \`detect_database\` -- a null database, so the Deadlocks tab's
+        # \`?database=\` filter could not work on MySQL or MariaDB at all.
         #
-        # `my_lock_side` and `my_lock_trx_id` are what make the two joinable:
+        # \`my_lock_side\` and \`my_lock_trx_id\` are what make the two joinable:
         # both records name the same side number and the same transaction id, so
         # the merge step can attach this lock detail to the participant it
         # describes instead of throwing it away.
@@ -599,13 +599,13 @@ const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
         #
         # Side and transaction id are captured for the same reason as the MySQL
         # recipe above: InnoDB writes the RECORD LOCKS line as a SEPARATE entry
-        # from the `*** (N) TRANSACTION:` block, so the two can never share a
+        # from the \`*** (N) TRANSACTION:\` block, so the two can never share a
         # record and the lock detail has to be joined back by side + trx id.
         # Confirmed on the checked-in capture
         # (captures/mariadb-deadlock-v0158.jsonl): 8 records carry a
         # participant, ZERO carry lock detail. MariaDB writing the deadlock as
-        # one log BLOCK does not make it one log RECORD -- each `*** (N) …`
-        # header is separately timestamped, and `line_start_pattern` splits
+        # one log BLOCK does not make it one log RECORD -- each \`*** (N) …\`
+        # header is separately timestamped, and \`line_start_pattern\` splits
         # there.
         regex: '(?s)\\*\\*\\* \\((?P<maria_lock_side>\\d+)\\) (?:HOLDS THE LOCK|WAITING FOR THIS LOCK).*?RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<maria_lock_index>\\S+) of table (?P<maria_lock_table>\`?(?P<my_db>[^\`. ]+)\`?\\.\\S+) trx id (?P<maria_lock_trx_id>\\d+) (?P<maria_lock_mode>lock_mode \\S+)'
         on_error: send
