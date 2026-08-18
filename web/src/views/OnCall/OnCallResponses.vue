@@ -555,7 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -620,6 +620,7 @@ import {
 
 const { t } = useI18nTyped();
 const store = useStore();
+const route = useRoute();
 const router = useRouter();
 const { canConfigure } = useOnCallPermissions();
 
@@ -668,6 +669,9 @@ const search = ref("");
 const teamFilter = ref("all");
 const priorityFilter = ref("all");
 const stateFilter = ref<string | null>(null);
+/// `?mine=1` opens the list already narrowed. It is what the retired
+/// `oncall/me` page now redirects to, so a bookmark from before still lands on
+/// the answer instead of a stub that told everybody they were on no team.
 const mineOnly = ref(false);
 const selectedIds = ref<string[]>([]);
 const grouped = ref(true);
@@ -1512,5 +1516,8 @@ useShortcuts([
   { id: "oncallSearch", handler: () => focusSearchInput("oncall-responses-search") },
 ]);
 
-onMounted(refreshAll);
+onMounted(() => {
+  mineOnly.value = route.query.mine === "1";
+  return refreshAll();
+});
 </script>

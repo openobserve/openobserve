@@ -47,7 +47,11 @@ vi.mock("@/services/users", () => ({
 }));
 
 const push = vi.fn();
-vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+const routeQuery: Record<string, string> = {};
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ push }),
+  useRoute: () => ({ query: routeQuery }),
+}));
 
 const service = vi.mocked(oncallService);
 
@@ -138,6 +142,7 @@ function render() {
 describe("OnCallResponses", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     service.listResponses.mockResolvedValue({ data: [] } as any);
     service.countResponses.mockResolvedValue({ data: { count: 0 } } as any);
     service.listTeams.mockResolvedValue({ data: [] } as any);
@@ -791,6 +796,21 @@ describe("OnCallResponses", () => {
       );
       return withPages(rows);
     }
+
+    /// `oncall/me` used to be a 59-line stub that told every reader they were
+    /// on no team without asking the server. It redirects here now, so the
+    /// query has to arrive already narrowed or the old link lands on a list
+    /// that answers a different question.
+    it("opens already narrowed when the retired page redirects here", async () => {
+      routeQuery.mine = "1";
+      const wrapper = await withMyShift([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_other" }, "al_pay"),
+      ]);
+
+      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+      expect(data.map((row) => row.latest.id)).toEqual(["a"]);
+    });
 
     it("filters in place instead of navigating", async () => {
       const wrapper = await withMyShift([

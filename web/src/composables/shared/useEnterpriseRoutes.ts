@@ -62,7 +62,6 @@ const OnCallTeams = () => import("@/views/OnCall/OnCallTeams.vue");
 const OnCallTeamDetail = () => import("@/views/OnCall/OnCallTeamDetail.vue");
 const OnCallResponses = () => import("@/views/OnCall/OnCallResponses.vue");
 const OnCallResponseDetail = () => import("@/views/OnCall/OnCallResponseDetail.vue");
-const OnCallMyOnCall = () => import("@/views/OnCall/OnCallMyOnCall.vue");
 const OnCallRouting = () => import("@/views/OnCall/OnCallRouting.vue");
 const OnCallPolicies = () => import("@/views/OnCall/OnCallPolicies.vue");
 
@@ -216,13 +215,17 @@ const useEnterpriseRoutes = () => {
         },
       },
       {
+        // Retired. It was a stub that answered "You are not on an on-call team
+        // yet" without asking the server anything, four centimetres from a
+        // banner saying the reader was on call. The Pages list answers the
+        // same question from data it already has, so the old path lands there
+        // narrowed rather than 404ing a link somebody has in a thread.
         path: "oncall/me",
         name: "onCallMine",
-        component: OnCallMyOnCall,
-        meta: { titleKey: "oncall.myOnCallTitle" },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
+        redirect: (to: any) => ({
+          name: "onCallResponses",
+          query: { ...to.query, mine: "1" },
+        }),
       },
       {
         path: "oncall/teams",
