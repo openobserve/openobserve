@@ -46,10 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Auto-size the input to its text via an invisible sizer sharing the
                input's grid cell, so the field is exactly as wide as the name.
                `size="1"` neutralises the input's default ~20ch intrinsic width so
-               the sizer alone drives the max-content column. -->
+               the sizer alone drives the max-content column. Keep that track a bare
+               `max-content`: a 0 min (`minmax(0,…)`) collapses it to 0px once the
+               tab strip overflows. -->
           <span
             v-if="editingTabId === tab.tabId"
-            class="grid grid-cols-[minmax(0,max-content)] items-center"
+            class="grid grid-cols-[max-content] items-center"
           >
             <span
               aria-hidden="true"
