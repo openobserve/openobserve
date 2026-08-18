@@ -97,6 +97,18 @@ pub fn metrics_tsid_major_enabled(stream_type: StreamType) -> bool {
         && cfg.common.file_format.for_stream(stream_type) == crate::FileFormat::Parquet
 }
 
+/// [`metrics_tsid_major_enabled`] narrowed to one stream: the layout also
+/// needs a `__hash__` column of type `UInt64` (remote-write / OTLP metrics).
+/// Streams whose `__hash__` is stored as a string (the JSON ingest path)
+/// keep the classic layout, otherwise the TSID-major writer would fail on
+/// every merge of that stream.
+pub fn metrics_tsid_major_stream(stream_type: StreamType, schema: &Schema) -> bool {
+    metrics_tsid_major_enabled(stream_type)
+        && schema
+            .field_with_name(HASH_LABEL)
+            .is_ok_and(|field| field.data_type() == &arrow_schema::DataType::UInt64)
+}
+
 /// Physical layout of a metrics data file, encoded in its file-name prefix so
 /// readers and later merges know the row order without opening the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

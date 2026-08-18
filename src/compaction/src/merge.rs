@@ -23,7 +23,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
-        promql::{HASH_LABEL, MetricsFileLayout, metrics_tsid_major_enabled},
+        promql::{MetricsFileLayout, metrics_tsid_major_stream},
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
             StreamType,
@@ -69,8 +69,8 @@ use super::worker::{MergeBatch, MergeSender};
 /// final layout (legacy timestamp-major or hash-sorted): the hour-end merge
 /// must rewrite them. A closed hour made entirely of `tsid-major-v3-*` files is
 /// finalized and re-running the hour-end job leaves it alone.
-fn needs_tsid_layout_rewrite(stream_type: StreamType, files: &[FileKey]) -> bool {
-    metrics_tsid_major_enabled(stream_type)
+fn needs_tsid_layout_rewrite(tsid_major_stream: bool, files: &[FileKey]) -> bool {
+    tsid_major_stream
         && files
             .iter()
             .any(|file| MetricsFileLayout::of(&file.key) != MetricsFileLayout::TsidMajor)
@@ -389,6 +389,7 @@ pub async fn merge_by_stream(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let tsid_major_stream = metrics_tsid_major_stream(stream_type, &schema);
     if schema == Schema::empty() {
         // the stream was deleted, mark the job as done
         if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
@@ -490,18 +491,18 @@ pub async fn merge_by_stream(
             // record-batch boundaries; using it here as an input-group limit
             // would sort only fragments.
             let finalize_tsid_major_hour =
-                metrics_tsid_major_enabled(stream_type) && !is_incremental && !skip_group_files;
+                tsid_major_stream && !is_incremental && !skip_group_files;
 
             if finalize_tsid_major_hour
                 && !files_with_size.is_empty()
-                && !needs_tsid_layout_rewrite(stream_type, &files_with_size)
+                && !needs_tsid_layout_rewrite(tsid_major_stream, &files_with_size)
             {
                 return Ok(vec![]);
             }
 
             let rewrite_single_tsid_layout = files_with_size.len() == 1
                 && !is_incremental
-                && needs_tsid_layout_rewrite(stream_type, &files_with_size);
+                && needs_tsid_layout_rewrite(tsid_major_stream, &files_with_size);
             if files_with_size.len() <= 1 && !skip_group_files && !rewrite_single_tsid_layout {
                 return Ok(vec![]);
             }
@@ -730,18 +731,22 @@ pub async fn merge_files(
     #[cfg(not(feature = "enterprise"))]
     let is_match_downsampling_rule = false;
 
+    // TSID-major layout applies to this stream (flag, Parquet, UInt64 __hash__)
+    let tsid_major_stream = metrics_tsid_major_stream(
+        stream_type,
+        &infra::schema::get(org_id, stream_name, stream_type).await?,
+    );
     // TSID-major finalization: merge the complete batch regardless of size
     // and rewrite even a lone legacy/hash-sorted file. Incremental merges keep
     // the regular size grouping and never rewrite a single file.
-    let finalize_tsid_major =
-        finalize && metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
+    let finalize_tsid_major = finalize && tsid_major_stream && !is_match_downsampling_rule;
     // nothing to do with 0/1 files, unless a rule forces the merge
     let nothing_to_merge = |files: &[FileKey]| {
         files.len() <= 1
             && !is_match_downsampling_rule
             && !(finalize_tsid_major
                 && files.len() == 1
-                && needs_tsid_layout_rewrite(stream_type, files))
+                && needs_tsid_layout_rewrite(tsid_major_stream, files))
     };
     if nothing_to_merge(files_with_size) {
         return Ok((Vec::new(), Vec::new()));
@@ -903,16 +908,12 @@ pub async fn merge_files(
     // pre-sorted files (SortPreservingMerge, one file per partition) instead
     // of a full SortExec. Mixed layouts, or hash-ordered files merged into the
     // classic layout: declare nothing. Otherwise the classic `_timestamp DESC`.
-    let metrics_tsid_major_requested =
-        metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
+    let metrics_tsid_major_requested = tsid_major_stream && !is_match_downsampling_rule;
     let hash_ordered_files = files
         .iter()
         .filter(|f| MetricsFileLayout::of(&f.key).is_hash_ordered())
         .count();
-    let input_sort_order = if metrics_tsid_major_requested
-        && hash_ordered_files == files.len()
-        && schema.field_with_name(HASH_LABEL).is_ok()
-    {
+    let input_sort_order = if metrics_tsid_major_requested && hash_ordered_files == files.len() {
         FileSortOrder::HashTimestampAsc
     } else if metrics_tsid_major_requested || hash_ordered_files > 0 {
         FileSortOrder::None

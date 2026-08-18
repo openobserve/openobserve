@@ -19,7 +19,7 @@ use arrow::array::RecordBatch;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::{HASH_LABEL, MetricsFileLayout, metrics_tsid_major_enabled},
+        promql::{MetricsFileLayout, metrics_tsid_major_stream},
         stream::{FileMeta, StreamType},
     },
     utils::{
@@ -298,10 +298,7 @@ fn merge_output_sort_order(
     file_format: FileFormat,
     schema: &Schema,
 ) -> FileSortOrder {
-    if file_format == FileFormat::Parquet
-        && metrics_tsid_major_enabled(stream_type)
-        && schema.field_with_name(HASH_LABEL).is_ok()
-    {
+    if file_format == FileFormat::Parquet && metrics_tsid_major_stream(stream_type, schema) {
         FileSortOrder::HashTimestampAsc
     } else {
         FileSortOrder::TimestampDesc

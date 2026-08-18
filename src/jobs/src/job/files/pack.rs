@@ -27,7 +27,7 @@ use chrono::Duration;
 use config::{
     FileFormat, cluster, get_config,
     meta::{
-        promql::{MetricsFileLayout, metrics_tsid_major_enabled},
+        promql::{MetricsFileLayout, metrics_tsid_major_stream},
         stream::{FileMeta, StreamType},
     },
     metrics,
@@ -393,7 +393,8 @@ async fn upload_chunk(
 
     // Segments are persisted in arrival order. The hash-sorted metrics layout
     // must be produced by the merge, so it never takes the as-is fast path.
-    let single_segment_as_is = chunk.len() == 1 && !metrics_tsid_major_enabled(stream_type);
+    let single_segment_as_is =
+        chunk.len() == 1 && !metrics_tsid_major_stream(stream_type, &latest_schema);
     let (buf, mut new_file_meta, file_format, layout) = if single_segment_as_is {
         // fast path: upload the parquet bytes as-is, no decode/re-encode
         let buf = Bytes::from(bufs.pop().unwrap());
