@@ -115,6 +115,28 @@
   --color-schedule-band-6-bg: var(--color-cyan-50);
   --color-schedule-band-6-text: var(--color-cyan-700);
 
+  /* The same six hues painted solid, plus a border for each.
+
+     `soft` says "a different row from the one above"; on a chart whose subject
+     is who is on call RIGHT NOW, a 50-tint says it too quietly — the band is
+     the answer, not a wash behind one. Solid is the rotation running normally;
+     the border is for a span somebody took FROM it, which keeps the lane's hue
+     while the hollow fill says the roster did not produce this. */
+  --color-schedule-band-1-solid-bg: var(--color-blue-600);
+  --color-schedule-band-1-border: var(--color-blue-500);
+  --color-schedule-band-2-solid-bg: var(--color-purple-600);
+  --color-schedule-band-2-border: var(--color-purple-500);
+  --color-schedule-band-3-solid-bg: var(--color-teal-600);
+  --color-schedule-band-3-border: var(--color-teal-500);
+  --color-schedule-band-4-solid-bg: var(--color-amber-600);
+  --color-schedule-band-4-border: var(--color-amber-500);
+  --color-schedule-band-5-solid-bg: var(--color-indigo-600);
+  --color-schedule-band-5-border: var(--color-indigo-500);
+  --color-schedule-band-6-solid-bg: var(--color-cyan-600);
+  --color-schedule-band-6-border: var(--color-cyan-500);
+  /* One foreground for all six: they are chosen to carry white. */
+  --color-schedule-band-solid-text: var(--color-white);
+
   /* Nobody on call — the one alarming thing on a schedule, so it is an error
      tint rather than a seventh band tone. */
   --color-schedule-gap-bg: var(--color-error-50);
@@ -228,6 +250,19 @@
   --color-schedule-band-5-text: var(--color-schedule-band-5-text);
   --color-schedule-band-6-bg: var(--color-schedule-band-6-bg);
   --color-schedule-band-6-text: var(--color-schedule-band-6-text);
+  --color-schedule-band-1-solid-bg: var(--color-schedule-band-1-solid-bg);
+  --color-schedule-band-2-solid-bg: var(--color-schedule-band-2-solid-bg);
+  --color-schedule-band-3-solid-bg: var(--color-schedule-band-3-solid-bg);
+  --color-schedule-band-4-solid-bg: var(--color-schedule-band-4-solid-bg);
+  --color-schedule-band-5-solid-bg: var(--color-schedule-band-5-solid-bg);
+  --color-schedule-band-6-solid-bg: var(--color-schedule-band-6-solid-bg);
+  --color-schedule-band-solid-text: var(--color-schedule-band-solid-text);
+  --color-schedule-band-1-border: var(--color-schedule-band-1-border);
+  --color-schedule-band-2-border: var(--color-schedule-band-2-border);
+  --color-schedule-band-3-border: var(--color-schedule-band-3-border);
+  --color-schedule-band-4-border: var(--color-schedule-band-4-border);
+  --color-schedule-band-5-border: var(--color-schedule-band-5-border);
+  --color-schedule-band-6-border: var(--color-schedule-band-6-border);
   --color-schedule-gap-bg: var(--color-schedule-gap-bg);
   --color-schedule-gap-border: var(--color-schedule-gap-border);
   --color-schedule-gap-text: var(--color-schedule-gap-text);

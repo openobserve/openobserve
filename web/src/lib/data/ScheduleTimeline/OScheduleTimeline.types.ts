@@ -28,6 +28,20 @@ export type ScheduleBandTone = 1 | 2 | 3 | 4 | 5 | 6 | "gap" | "covered" | "part
 /** Number of distinct decorative band tones, for callers hashing into the ramp. */
 export const SCHEDULE_BAND_TONE_COUNT = 6;
 
+/**
+ * How solidly a band is painted. The tone says WHICH rotation the span belongs
+ * to; the variant says what KIND of span it is.
+ *
+ * `solid` is the rotation running normally — the default reading of the chart,
+ * and solid because a 50-tint span against a white card is hard to tell from
+ * empty track. `outline` is a span somebody took FROM the rotation: it keeps the
+ * lane's hue, so it still reads as that rotation's time, but the hollow fill
+ * says the roster did not produce it. `soft` is the original pale ramp, kept for
+ * the coverage bar and the escalation ladder, which are read for their
+ * exceptions rather than for who is in them.
+ */
+export type ScheduleBandVariant = "soft" | "solid" | "outline";
+
 export interface ScheduleBand {
   /** Stable key for the v-for. */
   key: string;
@@ -43,6 +57,8 @@ export interface ScheduleBand {
    */
   ariaLabel: I18nText;
   tone: ScheduleBandTone;
+  /** Default `soft`. Ignored by `gap`, which has one dashed treatment. */
+  variant?: ScheduleBandVariant;
 }
 
 export interface ScheduleTrack {
@@ -66,6 +82,10 @@ export interface ScheduleAxisTick {
   /** Position as a share of the visible window (0–1). */
   offset: number;
   label: I18nText;
+  /** Second line under `label` — a weekday under a date, say. */
+  sublabel?: I18nText;
+  /** Draw this tick as the one the reader is standing on (today, now). */
+  emphasis?: boolean;
 }
 
 export interface ScheduleTimelineProps {
@@ -84,10 +104,40 @@ export interface ScheduleTimelineProps {
    * pages forward through a calendar.
    */
   nowOffset?: number | null;
-  /** Accessible name for the now marker. */
+  /**
+   * The now marker's label. Drawn as a pill on the axis in lane mode, and used
+   * as the marker's accessible name in both modes.
+   */
   nowLabel?: I18nText;
+  /**
+   * What the pointer is currently over, already worded by the caller.
+   *
+   * The component knows WHERE the pointer is (a share of the window); only the
+   * caller knows what that share MEANS, because only it knows the window. So
+   * the share goes out on `hover` and the sentence comes back here.
+   */
+  hoverLabel?: I18nText;
   /** Width of the left track-label gutter. Default `md`. */
   labelWidth?: "sm" | "md";
+  /**
+   * Drop the left gutter and let the caller draw a full-width header ABOVE each
+   * track, via the `track-header` slot.
+   *
+   * A gutter wide enough for "Weekend cover · Sat–Sun · 12h shifts · 2 people"
+   * is a gutter that leaves no chart. Once a row label carries a cadence, a
+   * status and its own controls it is a header, not a label, and it needs the
+   * width of the row rather than a column beside it.
+   */
+  laneHeaders?: boolean;
+}
+
+export interface ScheduleTimelineEmits {
+  /**
+   * Pointer position as a share of the visible window (0–1), or `null` when it
+   * leaves. Lane mode only — gutter mode has a label column the share would be
+   * measured across, which would make every reported instant wrong.
+   */
+  hover: [offset: number | null];
 }
 
 export interface ScheduleBandProps {
@@ -95,6 +145,20 @@ export interface ScheduleBandProps {
 }
 
 export interface ScheduleTimelineSlots {
+  /**
+   * Full-width header drawn above a track's strip. Only rendered under
+   * `laneHeaders`, which also removes the left gutter this replaces.
+   */
+  "track-header"?: (props: { track: ScheduleTrack }) => unknown;
+  /**
+   * What to draw in place of an empty strip.
+   *
+   * An empty track is an ANSWER — "nobody, all window" — and usually the most
+   * important one on the chart. This is the seam for saying what that costs and
+   * offering the one action that fixes it, rather than leaving blank track the
+   * reader has to interpret.
+   */
+  "track-empty"?: (props: { track: ScheduleTrack }) => unknown;
   /**
    * Replace how one band renders — the seam for wrapping it in an `OTooltip`
    * without the call site taking over positioning.
