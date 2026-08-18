@@ -247,6 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :value="cellDrawer.value"
         :start-time="cellDrawer.startTime"
         :end-time="cellDrawer.endTime"
+        :base-where="cellDrawer.baseWhere"
       />
     </ODrawer>
   </div>
@@ -1363,8 +1364,9 @@ export default defineComponent({
         const stype   = String(route.query.cell_stype ?? "logs");
         const t0      = Number(route.query.cell_t0 ?? 0);
         const t1      = Number(route.query.cell_t1 ?? 0);
+        const where   = String(route.query.cell_where ?? "");
         if (field && stream && t0 && t1) {
-          cellDrawer.value = { open: true, field, value, stream, streamType: stype, startTime: t0, endTime: t1 };
+          cellDrawer.value = { open: true, field, value, stream, streamType: stype, startTime: t0, endTime: t1, baseWhere: where };
         }
       }
     });
@@ -1636,6 +1638,7 @@ export default defineComponent({
       streamType: string;
       startTime: number;
       endTime: number;
+      baseWhere: string;
     }>({
       open: false,
       field: "",
@@ -1644,6 +1647,7 @@ export default defineComponent({
       streamType: "logs",
       startTime: 0,
       endTime: 0,
+      baseWhere: "",
     });
 
     function resolveAliasToColumn(alias: string, query: any): string {
@@ -1692,6 +1696,7 @@ export default defineComponent({
       streamType: string;
       startTime: number;
       endTime: number;
+      baseWhere: string;
     }) {
       cellDrawer.value = { open: true, ...params };
       // Sync to URL so the drawer state is shareable.
@@ -1705,6 +1710,7 @@ export default defineComponent({
           cell_stype: params.streamType,
           cell_t0: String(params.startTime),
           cell_t1: String(params.endTime),
+          ...(params.baseWhere ? { cell_where: params.baseWhere } : {}),
         },
       });
     }
@@ -1714,11 +1720,18 @@ export default defineComponent({
       if (!open) {
         // Clear cell-explorer URL params without touching other query params.
         const q = { ...route.query };
-        for (const k of ["cell_panel", "cell_field", "cell_value", "cell_stream", "cell_stype", "cell_t0", "cell_t1", "cell_event_ts"]) {
+        for (const k of ["cell_panel", "cell_field", "cell_value", "cell_stream", "cell_stype", "cell_t0", "cell_t1", "cell_where", "cell_event_ts"]) {
           delete (q as any)[k];
         }
         router.replace({ query: q });
       }
+    }
+
+    // Panel query's WHERE clause (between WHERE and GROUP/ORDER/LIMIT/HAVING/WINDOW).
+    function extractPanelWhere(sql: string): string {
+      if (!sql) return "";
+      const m = /\bwhere\b([\s\S]+?)(?:\bgroup\s+by\b|\border\s+by\b|\blimit\b|\bhaving\b|\bwindow\b|$)/i.exec(sql);
+      return m ? m[1].trim() : "";
     }
 
     // Called directly by the search icon so it works even with a panel drilldown config.
@@ -1727,6 +1740,9 @@ export default defineComponent({
       const stream = query?.fields?.stream ?? query?.stream ?? "";
       const streamType = query?.fields?.stream_type ?? query?.stream_type ?? "logs";
       const realField = resolveAliasToColumn(alias, query);
+      const baseWhere = extractPanelWhere(
+        String(metadata.value?.queries?.[0]?.query ?? query?.query ?? ""),
+      );
 
       const metaStartµs = Number(metadata.value?.queries?.[0]?.startTime ?? 0);
       const metaEndµs   = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
@@ -1740,6 +1756,7 @@ export default defineComponent({
         streamType,
         startTime: metaStartµs || selStartµs,
         endTime: metaEndµs || selEndµs || Date.now() * 1000,
+        baseWhere,
       });
     }
 

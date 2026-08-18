@@ -40,6 +40,7 @@ const props = defineProps<{
   value: string | number;
   startTime: number; // microseconds
   endTime: number;   // microseconds
+  baseWhere?: string; // panel's own WHERE, AND-combined with the clicked cell
 }>();
 
 const { t } = useI18nTyped();
@@ -91,8 +92,14 @@ function cellWhere(): string {
   if (typeof v === "number") return `${props.field} = ${v}`;
   return `${props.field} = '${escSql(v)}'`;
 }
+// Cell predicate AND-combined with the panel's own filter so the drilldown
+// matches the scoped data the panel actually shows.
+function effectiveWhere(): string {
+  const cell = cellWhere();
+  return props.baseWhere ? `(${props.baseWhere}) AND ${cell}` : cell;
+}
 function buildDefaultSql(): string {
-  return `SELECT * FROM "${props.stream}" WHERE ${cellWhere()} ORDER BY _timestamp DESC`;
+  return `SELECT * FROM "${props.stream}" WHERE ${effectiveWhere()} ORDER BY _timestamp DESC`;
 }
 function activeSql()  { return customSql.value || buildDefaultSql(); }
 
@@ -281,7 +288,7 @@ async function loadInsights(ev: Record<string, any>) {
   surroundEvents.value = [];
 
   const intv  = getTimeBucket();
-  const where = cellWhere();
+  const where = effectiveWhere();
 
   const [histR, patR] = await Promise.allSettled([
     // 1. Histogram — event count per time bucket over full range
