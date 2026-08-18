@@ -47,11 +47,7 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::{
-    exec::TableBuilder,
-    merge::{self, MergeParquetResult},
-    sort_order::FileSortOrder,
-};
+use search::datafusion::{exec::TableBuilder, merge, sort_order::FileSortOrder};
 use tantivy_utils::index_builder::create_tantivy_index;
 use tokio::{
     fs::remove_file,
@@ -808,17 +804,9 @@ async fn merge_files(
         }
     };
 
-    let (buf, mut new_file_meta, file_format) = match buf {
-        MergeParquetResult::Single {
-            buf,
-            file_meta,
-            file_format,
-        } => (buf, file_meta, file_format),
-        MergeParquetResult::Multiple { .. } => {
-            // ingester should not support multiple files, it will be handled in compactor mode
-            panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
-        }
-    };
+    // the ingester always merges into exactly one file
+    let (merged, file_format) = buf.into_single()?;
+    let (buf, mut new_file_meta) = (merged.buf, merged.meta);
 
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
