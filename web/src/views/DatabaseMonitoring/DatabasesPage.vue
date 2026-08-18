@@ -1623,12 +1623,35 @@ const defaultColumnVisibility = {};
 
 const clearScope = () => {
   systemFilter.value = null;
-  syncUrl();
+  // Clear the SEARCH too, the way every sibling tab's clear does
+  // (TableHealthPage, SamplesPage, QueriesPage). Leaving it set made "clear"
+  // mean two different things inside one section: on this tab the list stayed
+  // narrowed by a search box whose text the reader could no longer see a
+  // reason for, and the only way back to the full list was to find and empty
+  // that box by hand.
+  search.value = "";
+  // Clear the WHOLE section's scope, not just the one dimension this tab
+  // offers. The tabs do not share a store — each seeds its refs from
+  // `route.query` on activation (useDbmScopeFilters' `onActivated` re-seed) —
+  // so the URL IS the shared scope. `syncUrl` spreads `...route.query`, which
+  // faithfully preserved `instance` / `namespace` / `env` / `service` that
+  // this page has no control for: pressing "Clear all" here emptied the chip
+  // row in front of the reader, then Slowest calls or Deadlocks came back
+  // still filtered by a dimension nothing on screen had mentioned. Dropping
+  // them here is what makes one "Clear all" mean the whole section.
+  syncUrl({ clearAllScope: true });
   load();
 };
 
-/** Mirror the scope into the URL so it survives a tab switch and a reload. */
-const syncUrl = () => {
+/**
+ * Mirror the scope into the URL so it survives a tab switch and a reload.
+ *
+ * `clearAllScope` additionally strips the dimensions this page has no control
+ * for. They belong to the sibling tabs, and because every tab re-seeds itself
+ * from `route.query`, leaving them in the URL means a "cleared" section is
+ * still filtered the moment the reader switches tabs.
+ */
+const syncUrl = ({ clearAllScope = false }: { clearAllScope?: boolean } = {}) => {
   router
     .replace({
       name: route.name as string,
@@ -1636,6 +1659,15 @@ const syncUrl = () => {
         ...route.query,
         ...queryParams.value,
         system: systemFilter.value ?? undefined,
+        ...(clearAllScope
+          ? {
+              instance: undefined,
+              namespace: undefined,
+              env: undefined,
+              service: undefined,
+              search: undefined,
+            }
+          : {}),
       },
     })
     .catch(() => {});
