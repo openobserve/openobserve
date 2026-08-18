@@ -34,7 +34,7 @@ export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 </script>
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -275,9 +275,34 @@ function isAnchor(row: TData): boolean {
   return !!props.anchorId && (row as { id?: string }).id === props.anchorId;
 }
 
+/** The row whose record control is under the pointer or keyboard focus. */
+const hoverAnchorId = ref<string | null>(null);
+
+/**
+ * One rule for the control's `:disabled` and for its hover preview.
+ *
+ * They cannot be written twice: the button is what gets disabled, but the span
+ * around it is what reports the hover, so a second copy of the condition would
+ * preview a click that cannot happen.
+ */
+function recordBeforeDisabled(row: TData): boolean {
+  return isLocked.value || isFirstRow(row) || !props.canRecordFrom;
+}
+
+function onRecordBeforeEnter(row: TData) {
+  if (recordBeforeDisabled(row)) return;
+  hoverAnchorId.value = (row as { id?: string }).id ?? null;
+}
+
+function onRecordBeforeLeave() {
+  hoverAnchorId.value = null;
+}
+
 /** Which marker a row shows, if any. Hover is a preview; anchor is committed. */
 function markerTone(row: TData): "anchor" | "hover" | null {
-  return isAnchor(row) ? "anchor" : null;
+  if (isAnchor(row)) return "anchor";
+  const id = (row as { id?: string }).id;
+  return id && id === hoverAnchorId.value ? "hover" : null;
 }
 
 /**
@@ -495,14 +520,22 @@ function handleUpdateExpanded(ids: string[]) {
         <OTooltip v-if="!readonly" :content="recordBeforeTooltip">
           <!-- The span is the hover target, not the button: a disabled control
                dispatches no pointer events, so a tooltip bound straight to it would
-               stay shut in the one state that has something to explain. -->
-          <span class="inline-flex">
+               stay shut in the one state that has something to explain. The marker
+               preview rides the same span for the same reason, and focus is bound
+               alongside hover so the destination is not mouse-only. -->
+          <span
+            class="inline-flex"
+            @mouseenter="onRecordBeforeEnter(row)"
+            @mouseleave="onRecordBeforeLeave"
+            @focusin="onRecordBeforeEnter(row)"
+            @focusout="onRecordBeforeLeave"
+          >
             <OButton
               variant="ghost"
               size="xs"
               :aria-label="t('synthetics.journey.recordBeforeStep')"
               data-test="synthetics-journey-step-record-before-btn"
-              :disabled="isLocked || isFirstRow(row) || !canRecordFrom"
+              :disabled="recordBeforeDisabled(row)"
               @click="emit('record-before', row)"
             >
               <!-- The same icon as the toolbar's Record button: this row action starts a

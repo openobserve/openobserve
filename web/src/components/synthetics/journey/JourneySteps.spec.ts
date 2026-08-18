@@ -764,5 +764,100 @@ describe("JourneySteps", () => {
       const actions = wrapper.findAll('[data-test="o2-table-cell-actions"]');
       expect(actions[1].attributes("style") ?? "").not.toContain("overflow: visible");
     });
+
+    // The hover target is the span WRAPPING the button, not the button — a
+    // disabled control dispatches no pointer events, so the span is the only
+    // thing that can report a hover in the state that most needs explaining.
+    function recordBeforeTarget(w: VueWrapper, index: number): HTMLElement {
+      const btns = w.findAll('[data-test="synthetics-journey-step-record-before-btn"]');
+      return btns[index].element.parentElement as HTMLElement;
+    }
+
+    it("previews the marker while the record control is hovered", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      // Row 1 has no "before", so the second control belongs to step-2.
+      const target = recordBeforeTarget(wrapper, 1);
+
+      target.dispatchEvent(new MouseEvent("mouseenter"));
+      await flushPromises();
+      const rule = wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]');
+      expect(rule.exists()).toBe(true);
+      // A preview reads lighter than the committed anchor.
+      expect(rule.classes()).toContain("bg-accent/50");
+
+      target.dispatchEvent(new MouseEvent("mouseleave"));
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
+      ).toBe(false);
+    });
+
+    it("previews nothing where the control cannot be used", async () => {
+      // A preview of an action you cannot take is worse than no preview. The
+      // first row has no "before"; a locked table and an extension too old to
+      // restore both disable the control everywhere.
+      const cases: Array<[Record<string, unknown>, number]> = [
+        [{ data: makeSteps(3), mode: "editor" }, 0],
+        [{ data: makeSteps(3), mode: "editor", locked: true }, 1],
+        [{ data: makeSteps(3), mode: "editor", canRecordFrom: false }, 1],
+      ];
+
+      for (const [props, index] of cases) {
+        const w = mount(JourneySteps, { props: props as any, global: { stubs: STUBS } });
+        await flushPromises();
+
+        recordBeforeTarget(w, index).dispatchEvent(new MouseEvent("mouseenter"));
+        await flushPromises();
+
+        expect(
+          w.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
+          `a disabled control at index ${index} still previewed`,
+        ).toBe(false);
+        w.unmount();
+      }
+    });
+
+    it("previews on keyboard focus, so the control is not mouse-only", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const target = recordBeforeTarget(wrapper, 1);
+
+      target.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
+      ).toBe(true);
+
+      target.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
+      ).toBe(false);
+    });
+
+    it("keeps the committed anchor solid while another row is hovered", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(4), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      recordBeforeTarget(wrapper, 2).dispatchEvent(new MouseEvent("mouseenter"));
+      await flushPromises();
+
+      const rules = wrapper.findAll('[data-test="synthetics-journey-recording-marker-rule"]');
+      expect(rules).toHaveLength(2);
+      expect(rules[0].classes()).toContain("bg-accent");
+      expect(rules[1].classes()).toContain("bg-accent/50");
+    });
   });
 });
