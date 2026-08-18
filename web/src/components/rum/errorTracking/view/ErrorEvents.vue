@@ -33,9 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`error-events-timeline-item-${index}`"
       >
         <span
-          class="event-timeline__dot"
+          class="event-timeline__dot border-card-glass-border border"
           :class="
-            isErrorEvent(event) ? 'event-timeline__dot--error' : 'event-timeline__dot--default'
+            isErrorEvent(event)
+              ? 'bg-severity-error-color border-severity-error-color'
+              : 'bg-card-glass-bg'
           "
           aria-hidden="true"
         />
@@ -144,17 +146,6 @@ const getFormattedDate = (timestamp: number) =>
   width: 0.5625rem;
   height: 0.5625rem;
   border-radius: var(--radius-full);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel timeline dot border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-card-glass-border);
-}
-
-.event-timeline__dot--default {
-  background: var(--color-card-glass-bg, var(--color-card-glass-border));
-}
-
-.event-timeline__dot--error {
-  background: var(--color-severity-error-color);
-  border-color: var(--color-severity-error-color);
 }
 
 .event-timeline__item--error {

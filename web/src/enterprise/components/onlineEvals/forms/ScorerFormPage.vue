@@ -26,7 +26,9 @@
         <!-- Plain scroll column, no card chrome: the sections inside are the
            cards now, so a bordered wrapper would frame them twice. Matches
            JobFormPage's left column. -->
-        <div class="scorer-form__main flex min-h-0 min-w-0 flex-col gap-2 overflow-auto p-2">
+        <div
+          class="scorer-form__main [&_label:not(.o-input-label)]:text-text-heading flex min-h-0 min-w-0 flex-col gap-2 overflow-auto p-2"
+        >
           <!-- Identity -->
           <section
             class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
@@ -1319,12 +1321,12 @@ async function save(value: ScorerForm) {
 </script>
 
 <style scoped>
-/* keep(complex-state): the global `label:not(.o-input-label)` element rule
-   (unlayered) out-specifies the color/weight/size utilities on these field
-   labels, graying them out — this higher-specificity :not() selector restores
-   the primary color + weight/size. */
+/* keep(complex-state): the global `label:not(.o-input-label)` element rule sets
+   the weight/size these field labels must override, and the labels are rendered
+   by the O* form components — this file cannot put a class on each one. The
+   COLOUR is `[&_label:not(.o-input-label)]:text-text-heading` on the container
+   in the template; only the two non-colour declarations remain here. */
 .scorer-form__main label:not(.o-input-label) {
-  color: var(--color-text-heading, currentColor);
   font-weight: 600;
   font-size: var(--text-xs);
 }

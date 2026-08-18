@@ -434,14 +434,14 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <div
           v-if="data.node_type == 'function' && hasNodeError"
           data-test="pipeline-node-error-badge"
-          class="bg-status-negative error-badge absolute -top-3 -right-3 z-15 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200"
+          class="bg-status-negative error-badge shadow-status-negative/50 absolute -top-3 -right-3 z-15 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-sm transition-all duration-200"
           @click.stop="navigateToFunction(data.name)"
         >
           <OIcon name="error" size="sm" />
           <span
             data-test="pipeline-node-error-count"
             v-if="nodeErrorCount"
-            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-xs"
           >
             {{ nodeErrorCount }}
           </span>
@@ -517,7 +517,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
   border-radius: 50% !important;
   background: var(--color-grey-500);
-  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
+  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-black) 15%, transparent);
   transition: all 0.3s ease;
 }
 

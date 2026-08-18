@@ -372,6 +372,12 @@
       "action": "新しいレポート",
       "actionDesc": "ダッシュボードの配信をスケジュールする"
     },
+    "noVariables": {
+      "title": "まだ変数がありません",
+      "description": "変数を追加して、このダッシュボードをインタラクティブにします — namespace、pod などでパネルをフィルタリングできます。",
+      "action": "変数を追加",
+      "actionDesc": "ダッシュボード変数を作成"
+    },
     "noQueries": {
       "title": "実行中のクエリなし",
       "description": "現在、アクティブなクエリはありません。実行時間の長いクエリは、実行中もここに表示されます。"
@@ -437,7 +443,8 @@
       "pipelineHistory": "パイプライン履歴",
       "regexPatterns": "正規表現パターン",
       "monitors": "モニター",
-      "modelPricing": "モデルの価格設定"
+      "modelPricing": "モデルの価格設定",
+      "variables": "変数"
     },
     "demo": {
       "pageTitle": "空の状態 — レビュー用の完全セット",
@@ -3642,6 +3649,7 @@
     "variableScopeHelp": "グローバルが選択されている場合、変数はすべてのタブとパネルに適用されます。",
     "newTab": "タブを追加",
     "editTab": "タブを編集",
+    "tabPanelCount": "{count} パネル | {count} パネル",
     "generalSettingsTitle": "一般設定",
     "tabSettingsTitle": "タブ設定",
     "addGeneralSettings": "一般設定",
@@ -4665,6 +4673,7 @@
       "variables": "変数",
       "tabsCount": "{n} タブ",
       "panelsCount": "{n} パネル",
+      "dependsOn": "依存先: {names}",
       "variablesDependencyGraph": "変数依存関係グラフ",
       "scope": "スコープ",
       "deletedTab": "削除されたタブ",
@@ -4676,7 +4685,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "ダッシュボードが正常に更新されました。",
-      "updationFailed": "ダッシュボードの更新に失敗しました"
+      "updationFailed": "ダッシュボードの更新に失敗しました",
+      "dynamicFiltersHelp": "パネルの上にアドホックなフィルタ行を追加します。",
+      "appliesToEveryone": "これらの設定は、このダッシュボードにアクセスできるすべてのユーザーと共有されます。",
+      "saveChanges": "変更を保存"
     },
     "addDashboardPage": {
       "addedSuccessfully": "ダッシュボードが正常に追加されました。",

@@ -217,7 +217,7 @@ pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
+const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 2] = ["trace_id", "session_id"];
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let cfg = get_config();
     let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {

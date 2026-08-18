@@ -484,9 +484,7 @@ describe("SessionDetails — turn rows", () => {
 
     const wrapper = await mountComponent();
     const row = wrapper.find(turnRowSelector("err-trace"));
-    expect(row.classes()).toContain(
-      "bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))]",
-    );
+    expect(row.classes()).toContain("bg-surface-tint-error");
   });
 
   it("turn row uses default surface for ok traces", async () => {

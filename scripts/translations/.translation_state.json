@@ -4140,6 +4140,9 @@
     "gaugeMinValue": "a412a2fa60221199",
     "generalSettings": "c910d474dcd724bf",
     "generalSettingsPage": {
+      "appliesToEveryone": "124fcbb7dbdc79e5",
+      "dynamicFiltersHelp": "91c37cc4fdff5b4b",
+      "saveChanges": "dd0ae7a5cbcf2339",
       "updatedSuccessfully": "042a0687fa1547fb",
       "updationFailed": "5a2ca189da8984e1"
     },
@@ -4673,6 +4676,7 @@
     "subtitle": "f55401b437f83559",
     "sum": "a21d7df04c33f507",
     "symbolsize": "7eb7b23774725d6a",
+    "tabPanelCount": "31bbca679806b213",
     "tabRequired": "32ef8e40de851563",
     "tabSettings": "8e5ea509893e6dfd",
     "tabSettingsTitle": "d5feda8c8d79f555",
@@ -4770,6 +4774,7 @@
       "dashboardUpdatedSuccessfully": "042a0687fa1547fb",
       "deletedPanel": "3f856e7a890f1203",
       "deletedTab": "3c6b250c6585192e",
+      "dependsOn": "65c721346658538c",
       "panelsCount": "2f5c09590f8069a9",
       "scope": "b073f6c68ef87211",
       "tabsCount": "d5af8ab49807842a",
@@ -5215,6 +5220,12 @@
       "description": "88f642638f976bb9",
       "title": "eadb8912580ee6a3"
     },
+    "noVariables": {
+      "action": "e10f539e38e1a105",
+      "actionDesc": "a061f3bb6335b334",
+      "description": "b35d724ad4511b65",
+      "title": "5699e3a83585bdc8"
+    },
     "noWorkflows": {
       "action": "ce94908ac04cbd99",
       "actionDesc": "57f9a3e88bbc629a",
@@ -5265,6 +5276,7 @@
       "streams": "d5a08b6893ecd1aa",
       "traces": "b5ac69fc467c01f3",
       "users": "7dfb4cf67742cb06",
+      "variables": "7af0b3e47c35820f",
       "workflows": "45b34f16db605a06"
     }
   },

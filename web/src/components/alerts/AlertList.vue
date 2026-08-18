@@ -855,6 +855,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
+import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -1207,7 +1208,7 @@ export default defineComponent({
           : s === "paused"
             ? "var(--color-grey-400)"
             : "var(--color-success-500)";
-      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     // Type chip (the "left chip"): glyph + colour by alert type.
@@ -1512,7 +1513,7 @@ export default defineComponent({
           header: t("alerts.actions"),
           isAction: true,
           sortable: false,
-          size: 150,
+          size: 160,
           meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
         },
       ];
@@ -1668,6 +1669,10 @@ export default defineComponent({
       //for a moment also so we are not filtering the alerts by the activeTab
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
+      // The alerts list is refreshed after every alert mutation — drop the shared
+      // dependency-graph cache so the destination/template impact dialogs reflect
+      // the change on next open.
+      invalidateDependencyGraphCache();
       if (query) {
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
@@ -2755,6 +2760,10 @@ export default defineComponent({
       activeFolderToMove.value = activeFolderId.value;
     };
 
+    // A delete inside the dependency popover — reload the current folder's alerts
+    // so the table drops the removed row.
+    const onDependencyDeleted = () => getAlertsFn(store, activeFolderId.value);
+
     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
       if (selectedFolderId === activeFolderId) {
@@ -3221,6 +3230,7 @@ export default defineComponent({
       t,
       store,
       router,
+      onDependencyDeleted,
       columns,
       recencyLevel,
       alertRowClass,

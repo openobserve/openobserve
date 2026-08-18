@@ -44,6 +44,7 @@ const alerts = {
     folder_id?: string,
     query?: string,
     alert_type?: string,
+    include_dependencies?: boolean,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
     if (folder_id) {
@@ -54,6 +55,11 @@ const alerts = {
     }
     if (alert_type) {
       url += `&alert_type=${alert_type}`;
+    }
+    // Opt in to the destinations/template fields (dependency view only) — the
+    // backend keeps them off the default list response otherwise.
+    if (include_dependencies) {
+      url += `&include_dependencies=true`;
     }
     return http().get(url);
   },

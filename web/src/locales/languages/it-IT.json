@@ -372,6 +372,12 @@
       "action": "Nuovo report",
       "actionDesc": "Pianifica la consegna di una dashboard"
     },
+    "noVariables": {
+      "title": "Ancora nessuna variabile",
+      "description": "Aggiungi una variabile per rendere interattiva questa dashboard — filtra i pannelli per namespace, pod e altro.",
+      "action": "Aggiungi variabile",
+      "actionDesc": "Crea una variabile della dashboard"
+    },
     "noQueries": {
       "title": "Nessuna query in esecuzione",
       "description": "Al momento non ci sono domande attive. Le query di lunga durata verranno visualizzate qui durante l'esecuzione."
@@ -437,7 +443,8 @@
       "pipelineHistory": "cronologia della pipeline",
       "regexPatterns": "modelli regex",
       "monitors": "monitor",
-      "modelPricing": "definizioni di prezzo del modello"
+      "modelPricing": "definizioni di prezzo del modello",
+      "variables": "variabili"
     },
     "demo": {
       "pageTitle": "Stati vuoti — set completo per la revisione",
@@ -3642,6 +3649,7 @@
     "variableScopeHelp": "Le variabili verranno applicate a tutte le schede e i pannelli se è selezionato globale.",
     "newTab": "Aggiungi scheda",
     "editTab": "Modifica scheda",
+    "tabPanelCount": "{count} pannello | {count} pannelli",
     "generalSettingsTitle": "Impostazioni generali",
     "tabSettingsTitle": "Impostazioni delle schede",
     "addGeneralSettings": "Generale",
@@ -4665,6 +4673,7 @@
       "variables": "Variabili",
       "tabsCount": "{n} schede",
       "panelsCount": "{n} pannelli",
+      "dependsOn": "Dipende da: {names}",
       "variablesDependencyGraph": "Grafico delle dipendenze delle variabili",
       "scope": "Ambito",
       "deletedTab": "Scheda eliminata",
@@ -4676,7 +4685,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Dashboard aggiornata con successo.",
-      "updationFailed": "Aggiornamento dashboard fallito"
+      "updationFailed": "Aggiornamento dashboard fallito",
+      "dynamicFiltersHelp": "Aggiunge una riga di filtro ad hoc sopra i pannelli.",
+      "appliesToEveryone": "Queste impostazioni sono condivise con chiunque possa accedere a questa dashboard.",
+      "saveChanges": "Salva modifiche"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard aggiunta con successo.",

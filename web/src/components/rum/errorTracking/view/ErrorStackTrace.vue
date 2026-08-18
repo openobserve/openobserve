@@ -47,8 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="index"
                 data-test="error-stack-trace-line"
                 class="border-border-default text-compact border-r border-b border-l border-solid px-2 py-1.5"
+                :class="Number(index) === 1 ? 'border-t' : ''"
                 :style="{
-                  'border-top': Number(index) === 1 ? '1px solid var(--color-border-default)' : '',
                   'border-radius':
                     Number(index) === error_stack.length - 1
                       ? '0 0 0.25rem 0.25rem'

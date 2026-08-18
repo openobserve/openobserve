@@ -372,6 +372,12 @@
       "action": "新增報表",
       "actionDesc": "排程儀表板傳送"
     },
+    "noVariables": {
+      "title": "尚無變數",
+      "description": "新增變數以使此儀表板具互動性 — 依命名空間、Pod 等篩選面板。",
+      "action": "新增變數",
+      "actionDesc": "建立儀表板變數"
+    },
     "noQueries": {
       "title": "無執行中的查詢",
       "description": "目前沒有進行中的查詢。長時間執行的查詢會在執行期間顯示於此處。"
@@ -437,7 +443,8 @@
       "pipelineHistory": "管線歷史記錄",
       "regexPatterns": "正規表示式模式",
       "monitors": "監控器",
-      "modelPricing": "模型定價定義"
+      "modelPricing": "模型定價定義",
+      "variables": "變數"
     },
     "demo": {
       "pageTitle": "空狀態 — 完整組合供檢視",
@@ -3642,6 +3649,7 @@
     "variableScopeHelp": "若選擇全域，變數將套用至所有分頁與面板。",
     "newTab": "新增分頁",
     "editTab": "編輯分頁",
+    "tabPanelCount": "{count} 個面板 | {count} 個面板",
     "generalSettingsTitle": "一般設定",
     "tabSettingsTitle": "分頁設定",
     "addGeneralSettings": "一般",
@@ -4660,6 +4668,7 @@
       "variables": "變數",
       "tabsCount": "{n} 個分頁",
       "panelsCount": "{n} 個面板",
+      "dependsOn": "依賴於：{names}",
       "variablesDependencyGraph": "變數相依性圖表",
       "scope": "範圍",
       "deletedTab": "已刪除分頁",
@@ -4671,7 +4680,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "儀表板更新成功。",
-      "updationFailed": "儀表板更新失敗"
+      "updationFailed": "儀表板更新失敗",
+      "dynamicFiltersHelp": "在面板上方新增一個臨時篩選列。",
+      "appliesToEveryone": "這些設定會與所有可存取此儀表板的人共用。",
+      "saveChanges": "儲存變更"
     },
     "addDashboardPage": {
       "addedSuccessfully": "儀表板新增成功。",

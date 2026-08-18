@@ -1446,7 +1446,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
     <!-- Replay running banner -->
     <div
       v-if="replayPhase === 'running'"
-      class="rounded-default border-border-default mx-2 mb-3 flex items-center gap-2 border bg-[var(--color-badge-primary-soft-bg)] px-3 py-2"
+      class="rounded-default border-border-default bg-badge-primary-soft-bg mx-2 mb-3 flex items-center gap-2 border px-3 py-2"
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
@@ -1480,16 +1480,11 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
     <!-- Replay passed banner -->
     <div
       v-else-if="replayPhase === 'passed'"
-      class="rounded-default border-badge-success-ol-border/50 mx-2 mb-3 flex items-center gap-2 border bg-[var(--color-badge-success-soft-bg)] px-3 py-2"
+      class="rounded-default border-badge-success-ol-border/50 bg-badge-success-soft-bg mx-2 mb-3 flex items-center gap-2 border px-3 py-2"
       role="status"
       data-test="synthetics-journey-passed-banner"
     >
-      <OIcon
-        name="check-circle"
-        size="sm"
-        class="text-[var(--color-timeline-dot-success)]"
-        aria-hidden="true"
-      />
+      <OIcon name="check-circle" size="sm" class="text-timeline-dot-success" aria-hidden="true" />
       <span class="text-badge-success-ol-text font-semi-bold text-sm">{{
         t("synthetics.journey.replayPassed", { count: modelValue.length })
       }}</span>
@@ -1507,7 +1502,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
     <!-- Replay failed banner -->
     <div
       v-else-if="replayPhase === 'failed'"
-      class="rounded-default border-badge-error-ol-border/30 mx-2 mb-3 flex items-start gap-2 border bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
+      class="rounded-default border-badge-error-ol-border/30 bg-badge-error-soft-bg mx-2 mb-3 flex items-start gap-2 border px-3 py-2"
       role="alert"
       data-test="synthetics-journey-failed-banner"
     >

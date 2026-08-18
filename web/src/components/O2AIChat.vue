@@ -1346,7 +1346,7 @@
                 @click="sendMessage"
                 variant="primary"
                 size="icon-xs-circle"
-                class="send-button"
+                class="send-button hover:bg-gradient-ai!"
               >
                 <OIcon name="arrow-upward" size="sm" />
               </OButton>
@@ -1357,7 +1357,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-(image:--color-gradient-danger)! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
+                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -6061,13 +6061,19 @@ export default defineComponent({
    Tailwind's `enabled:` variant only covers the last two.
    ============================================================ */
 .send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  background: var(--color-gradient-ai) !important;
-  box-shadow: 0 0.375rem 1.25rem 0 color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
+  /* The hover gradient is `hover:bg-gradient-ai!` on the button itself. It used to
+     be restated here, then dropped when the template briefly carried the gradient
+     unconditionally — and main later moved the button back to variant="primary",
+     so between the two changes the gradient stopped painting at all. */
+  box-shadow: var(--shadow-glow-xl-geom) color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
   transform: translateY(-0.0625rem) !important;
 }
 .send-button:active:not(.disabled):not([disabled]):not(:disabled) {
   transform: translateY(0) !important;
-  box-shadow: 0 0.125rem 0.625rem 0 color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
+  /* Pressed keeps the accent, dimmer than hover — NOT --shadow-glow, which is a
+     neutral black ring and turns the press state grey. */
+  box-shadow: var(--shadow-glow-press-geom)
+    color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
 }
 
 /* ============================================================

@@ -47,7 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="hasFlappingZone"
           class="text-2xs text-badge-purple-ol-text flex items-center gap-1 font-semibold brightness-90"
         >
-          <span class="rounded-default o2-flap-swatch inline-block h-2 w-2" />
+          <span
+            class="rounded-default o2-flap-swatch bg-badge-purple-solid-bg inline-block h-2 w-2"
+          />
           {{ t("alerts.historyTimeline.flapping") }}
         </span>
       </div>
@@ -458,17 +460,15 @@ function formatDuration(ms: number): string {
 
 /* Hatched purple swatch used in the legend for the flapping key */
 .o2-flap-swatch {
-  background:
-    repeating-linear-gradient(
-      45deg,
-      color-mix(in srgb, var(--color-white) 40%, transparent) 0,
-      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel hatch stripe must not scale with text or it smears at fractional zoom */
-      color-mix(in srgb, var(--color-white) 40%, transparent) 1px,
-      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel hatch stripe must not scale with text or it smears at fractional zoom */
-      transparent 1px,
-      transparent 0.1875rem
-    ),
-    var(--color-badge-purple-solid-bg);
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--color-white) 40%, transparent) 0,
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel hatch stripe must not scale with text or it smears at fractional zoom */
+    color-mix(in srgb, var(--color-white) 40%, transparent) 1px,
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel hatch stripe must not scale with text or it smears at fractional zoom */
+    transparent 1px,
+    transparent 0.1875rem
+  );
 }
 
 /* Diagonal-hatch overlay for a flapping cell. The base colour is bound
@@ -481,8 +481,7 @@ function formatDuration(ms: number): string {
     transparent 0.125rem,
     transparent 0.375rem
   );
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel inset ring must not scale with text or it smears at fractional zoom */
-  box-shadow: inset 0 0 0 1px
+  box-shadow: var(--shadow-ring-hairline-inset-geom)
     color-mix(in srgb, var(--color-badge-purple-solid-bg) 55%, transparent);
 }
 

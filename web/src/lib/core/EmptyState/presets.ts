@@ -391,6 +391,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-variables": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noVariables.title",
+    descriptionKey: "emptyState.noVariables.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noVariables.action",
+        descriptionKey: "emptyState.noVariables.actionDesc",
+      },
+    ],
+  },
   "no-queries": {
     illustration: "query",
     variant: "neutral",
@@ -842,6 +856,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-search-jobs": "emptyState.nouns.searchJobs",
   "no-users": "emptyState.nouns.users",
   "no-reports": "emptyState.nouns.reports",
+  "no-variables": "emptyState.nouns.variables",
   "no-queries": "emptyState.nouns.queries",
   "no-service-accounts": "emptyState.nouns.serviceAccounts",
   "no-invitations": "emptyState.nouns.invitations",
