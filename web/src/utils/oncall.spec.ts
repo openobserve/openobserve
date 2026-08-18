@@ -34,6 +34,8 @@ import {
   groupBySubject,
   isEscalating,
   isOnCallUnavailable,
+  speakTarget,
+  speakTargetsInSentence,
   isRotationValid,
   isSnoozed,
   isStaffed,
@@ -292,6 +294,55 @@ describe("describeTarget", () => {
     expect(describeTarget({ kind: "user", email: "ana@o2.ai" }, t)).toBe("ana@o2.ai");
     expect(describeTarget({ kind: "on_call_now" }, t)).toBe("oncall.target_on_call_now");
     expect(describeTarget({ kind: "next_on_call" }, t)).toBe("oncall.target_next_on_call");
+  });
+});
+
+/// The read-only ladder printed the engine's rendering and the editor printed
+/// i18n for the same enum, one click apart, so a rung read as two concepts.
+describe("speakTarget", () => {
+  const t = ((k: string, params?: Record<string, unknown>) =>
+    params?.slot ? `${k}:${params.slot}` : k) as any;
+
+  it("says the engine's current wording in the product's keys", () => {
+    expect(speakTarget("the on-call", t)).toBe("oncall.target_on_call_now");
+    expect(speakTarget("the secondary", t)).toBe("oncall.target_next_on_call");
+    expect(speakTarget("everyone on the rotation", t)).toBe("oncall.target_everyone_on_schedule");
+    expect(speakTarget("the whole team", t)).toBe("oncall.target_whole_team");
+  });
+
+  /// An engine older than this bundle still sends the retired phrasing, and a
+  /// mixed-version deployment would otherwise put both vocabularies on one tab.
+  it("maps the retired wording onto the same key", () => {
+    expect(speakTarget("the next on-call", t)).toBe("oncall.target_next_on_call");
+    expect(speakTarget("the next database on-call", t)).toBe(
+      "oncall.target_next_on_call_in_slot:database",
+    );
+  });
+
+  it("carries the slot through", () => {
+    expect(speakTarget("the database on-call", t)).toBe("oncall.target_on_call_in_slot:database");
+    expect(speakTarget("the database secondary", t)).toBe(
+      "oncall.target_next_on_call_in_slot:database",
+    );
+    expect(speakTarget("everyone on the database rotation", t)).toBe(
+      "oncall.target_everyone_in_slot:database",
+    );
+  });
+
+  /// An email is a target too, and a phrasing added later must survive rather
+  /// than be guessed at.
+  it("passes anything it does not recognise straight through", () => {
+    expect(speakTarget("ana@o2.ai", t)).toBe("ana@o2.ai");
+    expect(speakTarget("the duty architect", t)).toBe("the duty architect");
+    expect(speakTarget("whoever answers", t)).toBe("whoever answers");
+  });
+
+  /// `config-risks` quotes the term in backticks, so it renders as an
+  /// identifier the reader is expected to already know.
+  it("unquotes the term inside a sentence the engine wrote", () => {
+    expect(
+      speakTargetsInSentence("rotation `Primary` has one member, so `the next on-call` resolves", t),
+    ).toBe("rotation `Primary` has one member, so oncall.target_next_on_call resolves");
   });
 });
 

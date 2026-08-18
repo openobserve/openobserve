@@ -163,9 +163,11 @@ describe("OnCallTeamPulse", () => {
     const slotRow = wrapper.find('[data-test="oncall-pulse-secondary-slot"]');
     expect(slotRow.text()).toContain("cy@o2.ai");
     expect(slotRow.text()).toContain("secondary");
-    const rungRow = wrapper.find('[data-test="oncall-pulse-next"]');
-    expect(wrapper.text()).toContain("Next on call");
-    expect(rungRow.exists()).toBe(true);
+    // `26111bd135` settled the word: the ladder owns "secondary", the calendar
+    // owns "next". So the rung says secondary and the SLOT row says which
+    // rotation — two labelled rows, not one word doing both jobs.
+    expect(wrapper.text()).toContain("The secondary");
+    expect(wrapper.find('[data-test="oncall-pulse-next"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("bo@o2.ai");
   });
 

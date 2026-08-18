@@ -66,7 +66,10 @@ describe("OnCallEscalation", () => {
     });
 
     const next = wrapper.find('[data-test="oncall-escalation-next"]');
-    expect(next.text()).toContain("the next on-call");
+    // The engine's word, not the engine's exact bytes: an older engine still
+    // sends the retired "the next on-call" and must not put a second
+    // vocabulary on the same tab as the editor.
+    expect(next.text()).toContain("The secondary");
     // Not an exact string: the countdown is computed against the real clock,
     // so the seconds have already ticked by the time it renders.
     expect(next.text()).toMatch(/1[12]m/);

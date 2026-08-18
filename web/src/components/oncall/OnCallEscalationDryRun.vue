@@ -103,11 +103,18 @@ import OText from "@/lib/core/Typography/OText.vue";
 import type { EscalationPreview, PreviewRung } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { speakTarget } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 withDefaults(defineProps<{ preview?: EscalationPreview | null }>(), { preview: null });
 
 const { t } = useI18nTyped();
+
+/// The engine's own English, said the way the editor says it — one vocabulary
+/// for one concept, rather than two a click apart.
+const saidTargets = (targets: string[]) =>
+  targets.map((target) => speakTarget(target, t)).join(", ");
+
 
 function delayLabel(afterMicros: number): I18nText {
   return afterMicros === 0 ? raw("0m") : raw(`+${formatMicrosDuration(afterMicros)}`);
@@ -115,7 +122,7 @@ function delayLabel(afterMicros: number): I18nText {
 
 /// One name reads better than a list of one; past that the count is the fact.
 function who(rung: PreviewRung): I18nText {
-  if (!rung.recipients.length) return raw(rung.targets.join(", "));
+  if (!rung.recipients.length) return raw(saidTargets(rung.targets));
   if (rung.recipients.length === 1) return raw(rung.recipients[0].user_email);
   return t("oncall.dryRunPeople", { count: rung.recipients.length });
 }

@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag variant="default-soft" size="sm">
             {{ rung.after_micros === 0 ? t("oncall.rungImmediately") : offset(rung.after_micros) }}
           </OTag>
-          <span class="text-text-body text-sm">{{ raw(rung.targets.join(", ")) }}</span>
+          <span class="text-text-body text-sm">{{ raw(saidTargets(rung.targets)) }}</span>
           <OTimeCell :value="rung.at" unit="us" />
           <!-- `/escalation` cannot say this (§G.9 #6): a fired rung that
                reached nobody looks exactly like one that landed. The timeline
@@ -127,6 +127,7 @@ import type {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { speakTarget } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -213,7 +214,12 @@ function offset(micros: number): string {
   return `+${formatMicrosDuration(micros)}`;
 }
 
-const nextWho = computed(() => props.progress.next_targets.join(", "));
+/// The engine's own English, said the way the editor says it. Both used to
+/// render, one click apart, and the same rung read as two concepts.
+const saidTargets = (targets: string[]) =>
+  targets.map((target) => speakTarget(target, t)).join(", ");
+
+const nextWho = computed(() => saidTargets(props.progress.next_targets));
 
 // Relative, because "in 12 minutes" is what a responder is deciding against.
 // An absolute time makes them do the arithmetic themselves.

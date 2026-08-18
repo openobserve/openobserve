@@ -127,7 +127,7 @@ describe("OnCallEscalationLadder", () => {
   it("names who the rung resolves to, and the channels that would carry it", () => {
     const text = render().find('[data-test="oncall-ladder-rung-0"]').text();
 
-    expect(text).toContain("the on-call");
+    expect(text).toContain("The on-call");
     expect(text).toContain("Right now that is");
     expect(text).toContain("ana@o2.ai");
     expect(text).toContain("Email");

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="rung in preview.rungs"
         :key="rung.after_micros"
         :label="delayLabel(rung.after_micros)"
-        :title="raw(rung.targets.join(', '))"
+        :title="raw(saidTargets(rung.targets))"
         :variant="rungVariant(rung)"
         framed
         :data-test="`oncall-ladder-rung-${rung.after_micros}`"
@@ -142,6 +142,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { speakTarget } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = withDefaults(
@@ -158,6 +159,12 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: "update:selected", priority: string): void; (e: "edit"): void }>();
 
 const { t } = useI18nTyped();
+
+/// The engine's own English, said the way the editor says it — one vocabulary
+/// for one concept, rather than two a click apart.
+const saidTargets = (targets: string[]) =>
+  targets.map((target) => speakTarget(target, t)).join(", ");
+
 
 /// "3 rungs · 20m", or the finding when the priority wakes nobody.
 function summaryFor(entry: TeamRungSummary): I18nText {

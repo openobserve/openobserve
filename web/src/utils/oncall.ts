@@ -333,6 +333,68 @@ export function describeTarget(
 }
 
 /**
+ * A target the engine already rendered, said in the product's one vocabulary.
+ *
+ * The read-only ladder printed `describe()`'s output and the editor printed
+ * i18n for the same enum, one click apart, so a rung read as two concepts.
+ * They are now the same words — the engine's, which `26111bd135` settled: the
+ * ladder owns "secondary", the calendar owns "next".
+ *
+ * This still earns its place, because an engine older than this bundle emits
+ * the retired phrasing, and a mixed-version deployment would put both on the
+ * same tab all over again. The set is closed, so it maps cleanly; an email or
+ * a phrasing added later is returned untouched rather than guessed at.
+ */
+export function speakTarget(
+  rendered: string,
+  t: (k: I18nKey, params?: Record<string, unknown>) => string,
+): string {
+  const said = rendered.trim();
+  const fixed: Record<string, I18nKey> = {
+    "the on-call": "oncall.target_on_call_now",
+    "the secondary": "oncall.target_next_on_call",
+    // Retired by `26111bd135`; still on the wire from an older engine.
+    "the next on-call": "oncall.target_next_on_call",
+    "everyone on the rotation": "oncall.target_everyone_on_schedule",
+    "the whole team": "oncall.target_whole_team",
+  };
+  const exact = fixed[said.toLowerCase()];
+  if (exact) return t(exact);
+
+  const slotted: [RegExp, I18nKey][] = [
+    // The retired form first: "the next X on-call" also matches the pattern
+    // below it, and would come back as the wrong target.
+    [/^the next (.+) on-call$/i, "oncall.target_next_on_call_in_slot"],
+    [/^the (.+) secondary$/i, "oncall.target_next_on_call_in_slot"],
+    [/^the (.+) on-call$/i, "oncall.target_on_call_in_slot"],
+    [/^everyone on the (.+) rotation$/i, "oncall.target_everyone_in_slot"],
+  ];
+  for (const [pattern, key] of slotted) {
+    const match = said.match(pattern);
+    if (match) return t(key, { slot: match[1] });
+  }
+  return rendered;
+}
+
+/**
+ * The same substitution inside a sentence the engine wrote.
+ *
+ * `config-risks` quotes the term in backticks, which renders as an identifier
+ * the reader is expected to already know. Unquoting it and saying it the way
+ * the rest of the product does is the difference between a finding and a
+ * riddle.
+ */
+export function speakTargetsInSentence(
+  sentence: string,
+  t: (k: I18nKey, params?: Record<string, unknown>) => string,
+): string {
+  return sentence.replace(/`([^`]+)`/g, (whole, term: string) => {
+    const said = speakTarget(term, t);
+    return said === term ? whole : said;
+  });
+}
+
+/**
  * Whether a page would reach anybody at all.
  *
  * The only coverage question left. There used to be six slots to leave empty,
