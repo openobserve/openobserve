@@ -635,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -699,7 +699,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -779,7 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -2109,6 +2109,17 @@ export default defineComponent({
      */
     const pendingSidebarTab = ref<{ spanId: string; tab: string } | null>(null);
 
+    /**
+     * The span whose Events tab was opened by a marker click.
+     *
+     * A marker-driven Events view belongs to one span — navigating to another
+     * span should fall back to that span's default tab. A manually chosen tab
+     * is different: like every other tab, it persists across span navigation.
+     * Comparing `sidebarActiveTab` to "events" cannot tell the two apart,
+     * because the Events tab is always present and always selectable by hand.
+     */
+    const markerEventsSpanId = ref<string | null>(null);
+
     // Set the default sidebar tab on the first span selection,
     // and re-evaluate when the current tab no longer exists for the new span
     // (e.g. moving from LLM span with "preview" to a non-LLM span).
@@ -2118,6 +2129,14 @@ export default defineComponent({
       const pending = pendingSidebarTab.value;
       pendingSidebarTab.value = null;
 
+      // A marker-driven Events view is scoped to its own span. Once the
+      // selection moves elsewhere it no longer applies, so retire it and let
+      // the default apply — but only for a view a marker opened, never for a
+      // tab the user chose by hand.
+      const leavingMarkerEvents =
+        markerEventsSpanId.value !== null && markerEventsSpanId.value !== newSpanId;
+      if (leavingMarkerEvents) markerEventsSpanId.value = null;
+
       if (!newSpanId || !spanMap.value[newSpanId]) return;
 
       if (pending && pending.spanId === newSpanId) {
@@ -2125,16 +2144,10 @@ export default defineComponent({
         return;
       }
 
-      // "events" is only ever entered via an explicit marker click (routed
-      // through `pending` above) and is scoped to the span that triggered it
-      // — it is not a general-purpose tab like "attributes". So an ordinary
-      // navigation away from that span, with no new request for this span,
-      // must fall back to the default too, the same as leaving "preview" for
-      // a span that cannot preview.
       const canPreview = hasTracePreview(spanMap.value[newSpanId]);
       if (
         !oldSpanId ||
-        sidebarActiveTab.value === "events" ||
+        leavingMarkerEvents ||
         (sidebarActiveTab.value === "preview" && !canPreview)
       ) {
         sidebarActiveTab.value = canPreview ? "preview" : "attributes";
@@ -2828,6 +2841,7 @@ export default defineComponent({
       // Record the tab before the selection, so the watcher this triggers sees
       // the request rather than overwriting it with the default.
       pendingSidebarTab.value = { spanId: payload.spanId, tab: "events" };
+      markerEventsSpanId.value = payload.spanId;
       updateSelectedSpan(payload.spanId);
       sidebarActiveTab.value = "events";
       // Re-assign through null so clicking the same marker twice re-triggers
@@ -2836,6 +2850,16 @@ export default defineComponent({
       nextTick(() => {
         focusedEventIndex.value = payload.eventIndex;
       });
+    };
+
+    /**
+     * An explicit tab choice from the sidebar. Clears marker provenance: once
+     * the user has picked a tab themselves, it persists across span
+     * navigation like any other.
+     */
+    const onSidebarTabChange = (tab: string) => {
+      sidebarActiveTab.value = tab;
+      markerEventsSpanId.value = null;
     };
 
     const updateSelectedSpan = (spanId: string, swichToWaterfall: boolean = false) => {
@@ -2978,6 +3002,7 @@ export default defineComponent({
       onTabReorder,
       sidebarActiveTab,
       pendingSidebarTab,
+      markerEventsSpanId,
       traceTree,
       collapseMapping,
       traceRootSpan,
@@ -3033,6 +3058,7 @@ export default defineComponent({
       traceDetails,
       updateSelectedSpan,
       onSelectSpanEvent,
+      onSidebarTabChange,
       focusedEventIndex,
       routeToTracesList,
       handleExpandToFullView,

@@ -2756,6 +2756,41 @@ describe("TraceDetails", () => {
 
       expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
     });
+
+    // Regression: the reset was keyed on the tab being named "events", which
+    // also caught a user who opened Events by hand. Every other tab persists
+    // across span navigation; a manually chosen Events tab must too.
+    it("should keep a manually chosen Events tab when navigating to another span", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const otherSpanId = tracesMockData.tracesDetails.traceSpans.hits[1].span_id;
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.onSidebarTabChange("events");
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.updateSelectedSpan(otherSpanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("events");
+    });
+
+    // A manual choice after a marker click clears the marker's provenance, so
+    // that choice persists too rather than being reset on the next navigation.
+    it("should keep a tab chosen by hand after a marker click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const otherSpanId = tracesMockData.tracesDetails.traceSpans.hits[1].span_id;
+
+      wrapper.vm.onSelectSpanEvent({ spanId, eventIndex: 0 });
+      await wrapper.vm.$nextTick();
+      wrapper.vm.onSidebarTabChange("links");
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.updateSelectedSpan(otherSpanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("links");
+    });
   });
 
   describe("effectiveSpanId", () => {
