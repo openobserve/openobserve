@@ -1495,10 +1495,16 @@ export default defineComponent({
     // the next span highlights an unrelated row that happens to share the index.
     // `focusEventIndex` arrives a tick later (see TraceDetails.onSelectSpanEvent),
     // so a marker-driven span change still lands on its event.
+    //
+    // A focus request still waiting for its table belongs to the old span too:
+    // if it survived, it would resolve against the new span's table and expand
+    // whatever happens to sit at that index.
     watch(
       () => props.span?.span_id,
       () => {
         selectedEventIndex.value = null;
+        stopFocusWatch?.();
+        stopFocusWatch = null;
       },
     );
 
