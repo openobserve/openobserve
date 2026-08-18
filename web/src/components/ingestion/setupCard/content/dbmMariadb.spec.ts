@@ -108,7 +108,7 @@ describe("MariaDB Database Monitoring config", () => {
     // while the pipeline still reports healthy.
     expect(config).toContain('attributes["o2_maria_event"]');
     expect(config).toContain("stream-name: dbm_server");
-    expect(config).toContain("processors: [filter/dbm, batch]");
+    expect(config).toContain("processors: [memory_limiter, filter/dbm, batch]");
   });
 
   // THE REGRESSION THIS BLOCK EXISTS FOR. The blocking query was a verbatim

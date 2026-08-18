@@ -108,7 +108,7 @@ describe("mysqlCard builder", () => {
     // slows to a crawl. A processor that is defined but not listed in the
     // pipeline does nothing, so both are asserted.
     expect(config).toContain("filter/dbm:");
-    expect(config).toContain("processors: [filter/dbm, batch]");
+    expect(config).toContain("processors: [memory_limiter, filter/dbm, batch]");
 
     const run = card.steps.find((s) => s.id === "dbm-run")!;
     expect(run.code!.raw).toContain("--config ./config.yaml");
@@ -116,18 +116,22 @@ describe("mysqlCard builder", () => {
   });
 
   /**
-   * THE v0.148.0 EVENTS TRAP — see the Postgres spec for the full story: both
-   * receiver events are default-OFF upstream, and a missing top-level `events:`
-   * block produces zero events with zero warnings.
+   * THE v0.148.0 EVENTS BLOCK, SHIPPED OFF — see the Postgres spec for the full
+   * story: both events are opt-in on both sides (default-OFF upstream since
+   * v0.148.0, and discarded by the server unless the matching
+   * `ZO_DB_MONITORING_*_ENABLED` flag is set), so the recipe ships them off and
+   * the card's copy names the pairing. The block itself must still be present
+   * and top-level, where nesting it deeper is a fatal config error.
    */
-  it("enables the receiver's activity and top-query events via a top-level events: block", () => {
+  it("ships the receiver's activity and top-query events off, matching the server defaults", () => {
     const card = mysqlCard(SUBS);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
     expect(config).toContain("mysql/dbm_events:");
-    expect(config).toContain("db.server.query_sample: { enabled: true }");
-    expect(config).toContain("db.server.top_query: { enabled: true }");
+    expect(config).toContain("db.server.query_sample: { enabled: false }");
+    expect(config).toContain("db.server.top_query: { enabled: false }");
+    expect(config).not.toContain("enabled: true }");
     // MySQL spells it top_query_count (postgres says top_n_query), and rejects
     // max_rows_per_query inside top_query_collection — verified at v0.158.0,
     // where an unknown key is a fatal config error.
@@ -140,8 +144,18 @@ describe("mysqlCard builder", () => {
 
     // The events pipeline must BYPASS filter/dbm: receiver-native events carry
     // no o2_recipe tag, so the filter would silently drop every one of them.
+    // It must still sit behind memory_limiter, and memory_limiter must be
+    // FIRST — a processor listed ahead of it runs outside the OOM guard.
     expect(config).toMatch(/logs\/dbm_events:\n\s+receivers: \[mysql\/dbm_events\]/);
-    expect(config).toMatch(/logs\/dbm_events:[\s\S]*?processors: \[batch\]/);
+    expect(config).toMatch(/logs\/dbm_events:[\s\S]*?processors: \[memory_limiter, batch\]/);
+    const eventsProcessors = config.match(/logs\/dbm_events:[\s\S]*?processors: \[([^\]]+)\]/)![1];
+    expect(eventsProcessors).not.toContain("filter/dbm");
+
+    // Same as the Postgres card: shipping the feeds off is only honest if the
+    // step's own note names BOTH switches a user has to flip to turn one on.
+    expect(configure.note).toContain("ZO_DB_MONITORING_ACTIVITY_ENABLED");
+    expect(configure.note).toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
+    expect(configure.note).toMatch(/enabled: false/);
 
     // The verify step now promises the Activity and Table health tabs too.
     const verify = card.steps.find((s) => s.id === "verify-dbm")!;
@@ -246,6 +260,89 @@ describe("mysqlCard builder", () => {
     ]) {
       expect(indexAttrs, `index alias ${alias} must ride as an attribute`).toContain(alias);
     }
+  });
+
+  /**
+   * `max_rows_per_query` IS NOT SHARED BETWEEN THE TWO RECEIVERS. Upstream's
+   * mysqlreceiver default is 100; postgresqlreceiver's is 1000. This block
+   * carried the Postgres number, which is a value that travelled across from
+   * PG_EVENTS_RECEIVER rather than one chosen for MySQL — and the file already
+   * documents, six lines from the value, that the two receivers diverge
+   * (mysql spells it `top_query_count` and REJECTS `max_rows_per_query` inside
+   * `top_query_collection`). The asymmetry was known; this value just did not
+   * follow it.
+   *
+   * It bounds rows read from `performance_schema` per sample, so the revert
+   * cuts both the activity ceiling and the per-tick read 10× (360,000 → 36,000
+   * rows/hour/instance at a 10s interval). The rig runs at ~0.5% of that
+   * ceiling, so a healthy fleet sees no change in what the Activity tab shows.
+   *
+   * Pinned against Postgres's own value too: the failure this guards is not a
+   * wrong number, it is the two receivers being edited as though they were one.
+   */
+  it("ships mysqlreceiver's own max_rows_per_query, not the Postgres receiver's", () => {
+    const card = mysqlCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const events = config.slice(config.indexOf("mysql/dbm_events:"));
+    expect(events).toContain("max_rows_per_query: 100");
+    // Postgres's default, and the value that was shipped here by mistake.
+    expect(events).not.toContain("max_rows_per_query: 1000");
+    // Still inside query_sample_collection, never top_query_collection — the
+    // mysql receiver rejects it there and an unknown key is a fatal error.
+    expect(events).toMatch(/query_sample_collection:\s*\n\s*(?:#[^\n]*\n\s*)*max_rows_per_query/);
+
+    // The cadence deviation is recorded here too (spec §5.3): it multiplies
+    // every per-cycle cost, so an "align with upstream" pass must not revert
+    // it silently alongside the block's other knobs.
+    expect(events).toContain("collection_interval: 15s");
+    expect(events).toMatch(/DELIBERATE DEVIATION FROM UPSTREAM/);
+    expect(events).toMatch(/60s/);
+  });
+
+  /**
+   * THE CONNECTION BUDGET and THE COLLECTOR SELF-PROTECTION — the MySQL side of
+   * two guards that live in the shared config generator, so the Postgres spec
+   * carries the full reasoning and this pins that MySQL's config got them too.
+   * They are worth asserting per engine because both are generated once but
+   * shipped four times, and an engine dropping out of the generator is exactly
+   * the kind of regression a single-engine test cannot see.
+   *
+   * `max_open_conn` is SINGULAR: the plural is not a key sqlqueryreceiver knows
+   * and is silently ignored, so it reads like a bound and enforces nothing.
+   * `memory_limiter` must be FIRST in every pipeline — it guards only what is
+   * upstream of it.
+   */
+  it("caps connections and protects the collector on the MySQL config too", () => {
+    const card = mysqlCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const receivers = config.match(/^ {2}sqlquery\/\w+:/gm) ?? [];
+    expect(receivers.length).toBe(3);
+    expect(config.match(/^ {4}max_open_conn: 2$/gm)?.length).toBe(receivers.length);
+    const keys = config.split("\n").filter((l) => /^\s+[a-z_]+:/.test(l));
+    expect(keys.some((l) => l.includes("max_open_conns"))).toBe(false);
+
+    expect(config).toContain("memory_limiter:");
+    expect(config).toContain("limit_mib: 768");
+    expect(config).toContain("spike_limit_mib: 192");
+    const pipelines = config.split("service:")[1]!.match(/processors: \[([^\]]+)\]/g) ?? [];
+    expect(pipelines.length).toBeGreaterThanOrEqual(2);
+    for (const list of pipelines) {
+      expect(list, `${list} must start with memory_limiter`).toMatch(
+        /processors: \[memory_limiter[,\]]/,
+      );
+    }
+    // Setting lines, not raw text: the config comments name queue_size, so a
+    // whole-document toContain() survives deleting the setting itself.
+    const settings = config
+      .split("\n")
+      .filter((l) => /^\s+[a-z_]+:/.test(l))
+      .map((l) => l.trim());
+    expect(settings).toContain("queue_size: 500");
+    expect(settings).toContain("max_elapsed_time: 300s");
   });
 
   /**

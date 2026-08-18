@@ -102,15 +102,66 @@ export const DBM_SERVER_STREAM = "dbm_server";
  * lock that comes and goes between two 10s ticks is invisible. That is inherent
  * to the source (Postgres emits no "blocked" event), and it is why the Blocked
  * queries tab states its sample interval rather than implying completeness.
+ *
+ * THE COST, and why the WHERE clause below is not an optimization detail.
+ * pg_blocking_pids() is not a column read: for each pid it is asked about it
+ * takes EXCLUSIVE access to the lock manager's shared state for a short time,
+ * which Postgres's own documentation warns against calling frequently. Without
+ * a predicate the LATERAL join calls it once for EVERY row of
+ * pg_stat_activity — every idle session, every background worker — ten times a
+ * minute, and the call count therefore grows with total connections rather
+ * than with contention. That is exactly backwards: the scan gets most
+ * expensive on the busiest server, and it fires hardest during the lock storm
+ * it exists to observe.
+ *
+ * blocked.wait_event_type = 'Lock' makes the call count scale with BLOCKED
+ * sessions (typically zero) instead of all sessions. It is OUTPUT-IDENTICAL,
+ * not a sampling trade: only a session waiting on a lock can have blockers, so
+ * for every row the predicate removes, pg_blocking_pids() returns an empty
+ * array and JOIN LATERAL ... ON true already drops the row. Nothing else in
+ * the query reads a non-lock-waiting session.
+ *
+ * Measured on this rig with an induced 63-session lock convoy: unfiltered
+ * 3.20ms mean / 6.36ms max per collection, filtered 2.75ms mean / 4.04ms max —
+ * a 14% saving. Modest, and it is deliberately not the argument: the reason to
+ * keep the predicate is the lock-manager access it avoids taking on every row.
  */
 const PG_BLOCKING_RECEIVER = `  sqlquery/pg_blocking:
     driver: postgres
     datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=require"
     collection_interval: 10s
+    # CONNECTION BUDGET, so a DBA sizing max_connections has a number rather
+    # than having to read the receiver's source. Every sqlquery receiver in
+    # this file carries max_open_conn: 2 -- SINGULAR. The plural spelling
+    # max_open_conns is not a key sqlqueryreceiver knows, and an unknown key
+    # here is silently ignored rather than rejected, so the misspelling reads
+    # like a bound and enforces nothing. Unset means 0, which means UNLIMITED.
+    #
+    # Measured on this rig, and stated honestly: the shipped Postgres config
+    # sits at exactly 13 connections in steady state (7 sqlquery receivers plus
+    # the postgresql receiver), stable across 30 samples, and peaked at 14
+    # during an induced 150s ACCESS EXCLUSIVE stall. Scrapes serialize, so one
+    # connection per receiver is the natural shape and the unbounded growth
+    # this cap was expected to prevent DID NOT reproduce. The cap is therefore
+    # defence in depth, not a fix for an observed problem: it is what stops a
+    # future slow query -- or a receiver added later -- turning a stall on the
+    # customer's primary into connection-slot pressure on the application.
+    # Two rather than one so a slow tick does not fully serialize the next.
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT
             blocked.pid::text                                          AS blocked_pid,
+            -- PER-SESSION datname, NOT current_database(). The scrape connects
+            -- to ONE database, but pg_stat_activity spans every database on the
+            -- cluster -- measured on this rig, current_database() reports only
+            -- 'dbmlab' while sessions are spread across 'dbmlab' AND 'postgres'.
+            -- current_database() would therefore stamp the scrape's own database
+            -- onto a lock convoy that happened in a different one, which is worse
+            -- than null: it silently misattributes rows to the wrong database and
+            -- the ?database= filter confidently returns the wrong set.
+            -- The blocked side names the database the contention is IN.
+            coalesce(blocked.datname,'')                               AS pg_db,
             coalesce(blocked.usename,'')                               AS blocked_user,
             coalesce(blocked.application_name,'')                      AS blocked_app,
             coalesce(blocked.query,'')                                 AS blocked_query,
@@ -126,10 +177,15 @@ const PG_BLOCKING_RECEIVER = `  sqlquery/pg_blocking:
           FROM pg_stat_activity blocked
           JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS b(pid) ON true
           JOIN pg_stat_activity blocking ON blocking.pid = b.pid
+          -- Output-identical work reduction: only a Lock waiter can have
+          -- blockers, so this removes only rows the LATERAL join drops anyway,
+          -- and stops pg_blocking_pids() taking lock-manager state for every
+          -- session on the server. See the note above this receiver.
+          WHERE blocked.wait_event_type = 'Lock'
         logs:
           - body_column: blocked_query
             attribute_columns:
-              [blocked_pid, blocked_user, blocked_app, wait_event_type, wait_event,
+              [blocked_pid, pg_db, blocked_user, blocked_app, wait_event_type, wait_event,
                blocked_wait_s, blocking_pid, blocking_state, blocking_app,
                blocking_query, server_address, o2_recipe]`;
 
@@ -256,9 +312,23 @@ const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
         parse_from: attributes.pg_message
         regex: '(?s)plan:\\s*(?P<ae_plan_json>\\{.*\\})\\s*$'
         on_error: send
-      - type: move
-        from: attributes.pg_message
-        to: attributes.o2_explain_raw
+      # DROP the message rather than keeping a second copy of it. This step used
+      # to move it to attributes.o2_explain_raw, which was pure weight: the
+      # regex_parser above has already lifted the plan document into
+      # ae_plan_json, and measured over 27,178 record pairs ae_plan_json was a
+      # substring of o2_explain_raw in 100.0% of them. o2_explain_raw averaged
+      # 1,704 bytes and accounted for ~36% of sampled DBM bytes to carry text
+      # nothing read -- canonicalize_pg_auto_explain reads ae_plan_json for the
+      # document and the record's own body for its raw evidence, so the log
+      # line is still retained either way.
+      #
+      # A remove operator, not a bare deletion of this step: the "output: emit"
+      # routing is load-bearing. Without it an explain entry falls through into
+      # the mark_duration branch below -- whose route expression ^duration:
+      # also matches an auto_explain line -- and every plan would be re-tagged
+      # statement_duration.
+      - type: remove
+        field: attributes.pg_message
         output: emit
       # ---- STATEMENT DURATION (log_min_duration_statement) ---------------
       # The tag value MUST NOT stay "other": filter/dbm drops on that value,
@@ -286,9 +356,22 @@ const MYSQL_BLOCKING_RECEIVER = `  sqlquery/mysql_locks:
     driver: mysql
     datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
     collection_interval: 10s
+    # Connection guard, same value and same reasoning as sqlquery/pg_blocking
+    # above: the key is max_open_conn (SINGULAR), unset means unlimited, and
+    # measured steady state is one connection per receiver.
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT CAST(w.REQUESTING_ENGINE_TRANSACTION_ID AS CHAR) AS waiting_trx,
+                 -- PER-SESSION database, from PROCESSLIST joined on the
+                 -- transaction's thread id. innodb_trx carries NO database
+                 -- column of its own -- trx_query is just statement text -- so
+                 -- the waiting session's current schema is the only per-row
+                 -- database this source can supply. Verified on this rig:
+                 -- the join returns 'dbmlab' for live lock waits.
+                 -- The WAITING side is used because it names the database the
+                 -- contention is being observed in, matching the Postgres recipe.
+                 COALESCE(rp.DB, '')                              AS my_db,
                  CAST(w.BLOCKING_ENGINE_TRANSACTION_ID AS CHAR)   AS blocking_trx,
                  COALESCE(rt.trx_mysql_thread_id, 0)              AS waiting_thread,
                  COALESCE(bt.trx_mysql_thread_id, 0)              AS blocking_thread,
@@ -304,10 +387,12 @@ const MYSQL_BLOCKING_RECEIVER = `  sqlquery/mysql_locks:
                  ON rt.trx_id = w.REQUESTING_ENGINE_TRANSACTION_ID
           LEFT JOIN information_schema.innodb_trx bt
                  ON bt.trx_id = w.BLOCKING_ENGINE_TRANSACTION_ID
+          LEFT JOIN information_schema.PROCESSLIST rp
+                 ON rp.ID = rt.trx_mysql_thread_id
         logs:
           - body_column: waiting_query
             attribute_columns:
-              [waiting_trx, blocking_trx, waiting_thread, blocking_thread,
+              [waiting_trx, blocking_trx, my_db, waiting_thread, blocking_thread,
                blocking_query, waiting_state, blocking_state, wait_secs, server_address, o2_recipe]`;
 
 /**
@@ -370,7 +455,15 @@ const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
         on_error: send
       - type: regex_parser
         parse_from: attributes.my_message
-        regex: '(?s)RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<my_lock_index>\\S+) of table (?P<my_lock_table>\\S+) trx id \\d+ (?P<my_lock_mode>lock_mode \\S+)'
+        # my_db is captured from the SCHEMA HALF of the qualified table name.
+        # InnoDB writes the locked object as db.table (backtick-quoted), so the
+        # database the
+        # deadlock happened in is present in the log text and does NOT have to be
+        # left null -- this is the only place the MySQL error log states it.
+        # detect_database reads my_db, so this is what makes the ?database=
+        # filter work on the Deadlocks tab. The group is optional-safe: it sits
+        # inside the same alternation as the table name it comes from.
+        regex: '(?s)RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<my_lock_index>\\S+) of table (?P<my_lock_table>\`?(?P<my_db>[^\`. ]+)\`?\\.\\S+) trx id \\d+ (?P<my_lock_mode>lock_mode \\S+)'
         on_error: send
       - type: regex_parser
         parse_from: attributes.my_message
@@ -475,7 +568,13 @@ const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
         on_error: send
       - type: regex_parser
         parse_from: attributes.maria_message
-        regex: '(?s)RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<maria_lock_index>\\S+) of table (?P<maria_lock_table>\\S+) trx id \\d+ (?P<maria_lock_mode>lock_mode \\S+)'
+        # See the MySQL receiver above: the schema half of the qualified table
+        # name is the database the deadlock occurred in. MariaDB tags its rows
+        # maria_*, but the DATABASE alias stays my_db on purpose --
+        # detect_database reads my_db and has no maria_db alias, and the
+        # engine is already distinguished by o2_maria_event / the maria_ prefix
+        # scan, so this cannot make a MariaDB row look like MySQL.
+        regex: '(?s)RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<maria_lock_index>\\S+) of table (?P<maria_lock_table>\`?(?P<my_db>[^\`. ]+)\`?\\.\\S+) trx id \\d+ (?P<maria_lock_mode>lock_mode \\S+)'
         on_error: send
       - type: regex_parser
         parse_from: attributes.maria_message
@@ -512,9 +611,22 @@ const MARIADB_BLOCKING_RECEIVER = `  sqlquery/mariadb_locks:
     driver: mysql
     datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
     collection_interval: 10s
+    # Connection guard, same value and same reasoning as sqlquery/pg_blocking
+    # above: the key is max_open_conn (SINGULAR), unset means unlimited, and
+    # measured steady state is one connection per receiver.
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT CAST(w.requesting_trx_id AS CHAR)                AS waiting_trx,
+                 -- PER-SESSION database, from PROCESSLIST joined on the
+                 -- transaction's thread id. innodb_trx carries NO database
+                 -- column of its own -- trx_query is just statement text -- so
+                 -- the waiting session's current schema is the only per-row
+                 -- database this source can supply. Verified on this rig:
+                 -- the join returns 'dbmlab' for live lock waits.
+                 -- The WAITING side is used because it names the database the
+                 -- contention is being observed in, matching the Postgres recipe.
+                 COALESCE(rp.DB, '')                              AS my_db,
                  CAST(w.blocking_trx_id AS CHAR)                  AS blocking_trx,
                  COALESCE(rt.trx_mysql_thread_id, 0)              AS waiting_thread,
                  COALESCE(bt.trx_mysql_thread_id, 0)              AS blocking_thread,
@@ -530,10 +642,12 @@ const MARIADB_BLOCKING_RECEIVER = `  sqlquery/mariadb_locks:
                  ON rt.trx_id = w.requesting_trx_id
           LEFT JOIN information_schema.INNODB_TRX bt
                  ON bt.trx_id = w.blocking_trx_id
+          LEFT JOIN information_schema.PROCESSLIST rp
+                 ON rp.ID = rt.trx_mysql_thread_id
         logs:
           - body_column: waiting_query
             attribute_columns:
-              [waiting_trx, blocking_trx, waiting_thread, blocking_thread,
+              [waiting_trx, blocking_trx, my_db, waiting_thread, blocking_thread,
                blocking_query, waiting_state, blocking_state, wait_secs, server_address, o2_recipe]`;
 
 /**
@@ -550,9 +664,30 @@ const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
     driver: sqlserver
     datasource: "sqlserver://\${env:MSSQL_USER}:\${env:MSSQL_PASSWORD}@{host}:{port}?database={database}"
     collection_interval: 10s
+    # Connection guard, same value and same reasoning as sqlquery/pg_blocking
+    # above: the key is max_open_conn (SINGULAR), unset means unlimited, and
+    # measured steady state is one connection per receiver.
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT CAST(r.session_id AS VARCHAR(20))            AS blocked_pid,
+                 -- PER-REQUEST database, from the request's own database_id
+                 -- rather than the connection's. A blocking chain on SQL Server
+                 -- can span databases -- the collector connects to one
+                 -- ({database} in the datasource above) while the blocked
+                 -- request executes in another -- so DB_NAME(r.database_id)
+                 -- names where the contention actually is. Aliased plainly as
+                 -- database, and BRACKETED because database is a RESERVED
+                 -- KEYWORD in T-SQL: written bare, the whole collection fails
+                 -- with "Incorrect syntax near the keyword 'database'" and the
+                 -- blocking receiver silently stops producing rows while the
+                 -- collector still looks healthy -- proved on the rig before
+                 -- this bracket was added. The brackets are quoting only: the
+                 -- emitted column name is still database, which is the last
+                 -- alias detect_database reads
+                 -- because that is the last alias detect_database reads, and it
+                 -- keeps this recipe engine-neutral like the rest of its columns.
+                 COALESCE(DB_NAME(r.database_id), '')         AS [database],
                  COALESCE(s.login_name, '')                   AS blocked_user,
                  COALESCE(s.program_name, '')                 AS blocked_app,
                  COALESCE(SUBSTRING(t.text, 1, 500), '')      AS blocked_query,
@@ -575,7 +710,7 @@ const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
         logs:
           - body_column: blocked_query
             attribute_columns:
-              [blocked_pid, blocked_user, blocked_app, wait_event_type, wait_event,
+              [blocked_pid, database, blocked_user, blocked_app, wait_event_type, wait_event,
                blocked_wait_s, blocking_pid, blocking_state, blocking_app,
                blocking_query, server_address, o2_recipe]`;
 
@@ -610,6 +745,10 @@ const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
     driver: sqlserver
     datasource: "sqlserver://\${env:MSSQL_USER}:\${env:MSSQL_PASSWORD}@{host}:{port}?database={database}"
     collection_interval: 30s
+    # Connection guard, same value and same reasoning as sqlquery/pg_blocking
+    # above: the key is max_open_conn (SINGULAR), unset means unlimited, and
+    # measured steady state is one connection per receiver.
+    max_open_conn: 2
     queries:
       - sql: |
           SET QUOTED_IDENTIFIER ON;
@@ -669,14 +808,55 @@ const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
  *    rather than exact counts. The API states both on its response envelope so
  *    the page cannot label a lifetime total as a per-window one.
  *
- * A 60s interval, not the 10s the lock recipes use: this is a slow-moving
+ * A 300s interval, not the 10s the lock recipes use: this is a slow-moving
  * snapshot of schema state, and one row PER TABLE per tick is the volume
  * driver. On a 500-table database 10s would write 50 rows/sec to no benefit.
+ *
+ * THE WORK ARGUMENT, which is separate from that volume one and is the reason
+ * for both the interval and the WHERE clause below. pg_total_relation_size()
+ * is not a stored number: it sums heap, every index, TOAST and TOAST indexes,
+ * walking the catalog and stat-ing the filesystem metadata for every fork of
+ * every relation involved — once per table per tick, with no ceiling of any
+ * kind. Cost is therefore a pure function of the CUSTOMER's schema size, and
+ * it grows without our involvement.
+ *
+ * Measured on this rig against a synthetic schema, warm, table stats alone
+ * then both stats recipes combined per 60s tick:
+ *     500 tables    17.1ms      28.1ms combined   0.05% of one core
+ *   5,000 tables   160.8ms     307.8ms combined   0.51% of one core
+ *  50,005 tables  3,037ms      3,849ms combined   6.42% of one core
+ * The curve is SUPER-linear: 9.4x for the first 10x of tables, 18.9x for the
+ * second. And that is the warm best case — the live collector at 50k tables
+ * recorded mean 30.7s and max 446s (7.4 minutes) against a 60s interval, with
+ * one scrape still running after 747s, its connection count collapsing from 13
+ * to 1, and the collector container finally OOM-killed. Schema-per-tenant
+ * multi-tenancy reaches 50k tables routinely, and those are exactly the
+ * instances whose table health is worth watching.
+ *
+ * THE BOUND IS A PREDICATE, NOT A LIMIT — deliberately. Measured at 50,005
+ * tables: dropping the size functions gives 178ms (17x), coalesce(n_live_tup,
+ * 0) > 0 gives 250ms (12x), LIMIT 1000 gives 38ms (80x). The LIMIT is the
+ * fastest and the wrong answer: with no stable ORDER BY it keeps whichever
+ * tables the catalog scan reached first, so WHICH tables vanish changes
+ * between ticks and the Table health tab would gain and lose rows
+ * non-deterministically. n_live_tup > 0 drops only relations with zero live
+ * tuples — no bloat to report, no vacuum debt, no meaningful size — and the
+ * same table is dropped on every tick, so the page stays stable.
+ *
+ * 60s to 300s on top of that is a further 5x, and it is nearly free: schema
+ * state changes hourly at most, so the extra staleness is below the resolution
+ * anything on the Table health tab claims.
  */
 const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
     driver: postgres
     datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=require"
-    collection_interval: 60s
+    # 300s, not 60s: pg_total_relation_size() walks the catalog and filesystem
+    # metadata for every fork of every relation, once per table per tick, and
+    # the cost is O(your schema). Measured warm: 17ms at 500 tables, 161ms at
+    # 5,000, 3.0s at 50,005 -- super-linear. Schema state moves hourly at most,
+    # so 5x fewer ticks costs nothing readable.
+    collection_interval: 300s
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT n.nspname                                    AS schema_name,
@@ -703,6 +883,16 @@ const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
           JOIN pg_namespace n ON n.oid = c.relnamespace
           LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
           WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog','information_schema')
+            -- The bound. A relation with zero live tuples has no bloat to
+            -- report, no vacuum debt and no meaningful size, so skipping it
+            -- costs the Table health tab nothing -- and it skips the two
+            -- pg_*_relation_size() walks above, which is where the time goes.
+            -- Measured at 50,005 tables: 3.0s -> 250ms, a 12x reduction.
+            -- Deliberately NOT a LIMIT: a LIMIT with no stable ORDER BY drops
+            -- whichever tables the catalog scan reached last, so the set of
+            -- missing tables would change between ticks and the tab would
+            -- flicker. This predicate drops the same tables every time.
+            AND coalesce(s.n_live_tup, 0) > 0
         logs:
           - body_column: table_name
             attribute_columns:
@@ -733,13 +923,35 @@ const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
  * uses, because `body` here carries the index DEFINITION — useful context, and
  * the thing a reader needs to judge whether a duplicate index is redundant.
  *
- * 60s, matching the table recipe: schema state moves slowly and one row per
+ * 300s, matching the table recipe: schema state moves slowly and one row per
  * index per tick is the volume driver.
+ *
+ * THE WORK ARGUMENT, the same one the table recipe carries. pg_relation_size()
+ * runs once per index per tick and pg_get_indexdef() reconstructs the
+ * definition from the catalog beside it, with no ceiling — cost is O(your
+ * schema), not O(your workload). Measured on this rig, this recipe's share of
+ * the combined per-tick cost: 11.0ms at 500 tables, 147ms at 5,000, 812ms at
+ * 50,005 (combined 28.1ms / 307.8ms / 3,849ms). 300s is a straight 5x
+ * reduction that costs nothing a reader of this tab can perceive.
+ *
+ * NO ROW PREDICATE HERE, unlike the table recipe, and that is a measurement
+ * gap rather than a judgement that one is unwanted. The table recipe's bound
+ * is coalesce(s.n_live_tup, 0) > 0, and pg_stat_user_indexes has no live-tuple
+ * column to reuse — bounding indexes would mean joining back to
+ * pg_stat_user_tables on s.relid, which is a new join whose cost has not been
+ * measured on this rig. Adding an unmeasured join to save unmeasured work is
+ * how the magic numbers this file complains about get in. It is the obvious
+ * next bound if the interval turns out not to be enough.
  */
 const PG_INDEX_STATS_RECEIVER = `  sqlquery/pg_index_stats:
     driver: postgres
     datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=require"
-    collection_interval: 60s
+    # 300s, matching pg_table_stats and for the same reason: one
+    # pg_relation_size() plus one pg_get_indexdef() per INDEX per tick, cost
+    # O(your schema). Measured combined with the table recipe: 28ms at 500
+    # tables, 308ms at 5,000, 3.8s at 50,005.
+    collection_interval: 300s
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT s.schemaname                                  AS schema_name,
@@ -796,6 +1008,10 @@ const MYSQL_TABLE_STATS_RECEIVER = `  sqlquery/mysql_table_stats:
     driver: mysql
     datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
     collection_interval: 60s
+    # Connection guard, same value and same reasoning as sqlquery/pg_blocking
+    # above: the key is max_open_conn (SINGULAR), unset means unlimited, and
+    # measured steady state is one connection per receiver.
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT t.TABLE_SCHEMA                                        AS schema_name,
@@ -854,6 +1070,10 @@ const MYSQL_INDEX_STATS_RECEIVER = `  sqlquery/mysql_index_stats:
     driver: mysql
     datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
     collection_interval: 60s
+    # Connection guard, same value and same reasoning as sqlquery/pg_blocking
+    # above: the key is max_open_conn (SINGULAR), unset means unlimited, and
+    # measured steady state is one connection per receiver.
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT st.TABLE_SCHEMA                                       AS schema_name,
@@ -902,6 +1122,10 @@ const MARIADB_TABLE_STATS_RECEIVER = `  sqlquery/mariadb_table_stats:
     driver: mysql
     datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
     collection_interval: 60s
+    # Connection guard, same value and same reasoning as sqlquery/pg_blocking
+    # above: the key is max_open_conn (SINGULAR), unset means unlimited, and
+    # measured steady state is one connection per receiver.
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT t.TABLE_SCHEMA                                        AS schema_name,
@@ -947,6 +1171,10 @@ const MARIADB_INDEX_STATS_RECEIVER = `  sqlquery/mariadb_index_stats:
     driver: mysql
     datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
     collection_interval: 60s
+    # Connection guard, same value and same reasoning as sqlquery/pg_blocking
+    # above: the key is max_open_conn (SINGULAR), unset means unlimited, and
+    # measured steady state is one connection per receiver.
+    max_open_conn: 2
     queries:
       - sql: |
           SELECT st.TABLE_SCHEMA                                       AS schema_name,
@@ -974,15 +1202,24 @@ const MARIADB_INDEX_STATS_RECEIVER = `  sqlquery/mariadb_index_stats:
  * Postgres activity samples + server top queries (with estimated plans), from
  * the stock `postgresqlreceiver`'s log events.
  *
- * THE `events:` BLOCK IS THE WHOLE TRAP. Upstream v0.148.0 flipped
- * `db.server.query_sample` and `db.server.top_query` from default-ON to
- * default-OFF. Without the block the receiver starts cleanly, reports healthy,
- * and emits ZERO events — no warning anywhere; with an older collector the
- * block is rejected as an unknown key, which is at least a loud failure.
+ * THE `events:` BLOCK SHIPS AT `false`, MATCHING THE SERVER. Both events are
+ * opt-in on both sides — the collector's own defaults have been OFF since
+ * upstream v0.148.0, and the server discards both feeds unless
+ * `ZO_DB_MONITORING_ACTIVITY_ENABLED` / `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
+ * are set (both default false, see `DatabaseMonitoring` in config.rs). Shipping
+ * the recipe at `true` made the customer's database pay full collection cost,
+ * the receiver's EXPLAIN pass included, for rows the server then threw away.
+ * The keys stay present rather than being deleted so the setting is explicit
+ * and a user who wants the feeds flips one visible line here and the matching
+ * server flag — the pairing is stated in the block's own comment and in each
+ * card's `dbm-configure` note.
+ *
  * `events:` is a TOP-LEVEL receiver key, a SIBLING of the collection blocks —
  * nesting an `enabled` inside query_sample_collection / top_query_collection
  * is a fatal config error. Subkeys verified against v0.158.0 via `validate`
- * (see tests/dbm-server-vantage/collector/config.yaml).
+ * (see tests/dbm-server-vantage/collector/config.yaml). On a collector older
+ * than v0.148.0 the block is rejected as an unknown key, which is at least a
+ * loud failure.
  *
  * A SEPARATE receiver instance (`postgresql/dbm_events`) rather than reusing
  * the metrics card's `postgresql:`: the two config files are merged by the two
@@ -1001,16 +1238,58 @@ const PG_EVENTS_RECEIVER = `  postgresql/dbm_events:
       max_rows_per_query: 1000
     top_query_collection:
       top_n_query: 200
+      # THE EXPLAIN BUDGET. Do not reduce this to "align with upstream" without
+      # reading the paragraph under collection_interval below -- the two knobs
+      # multiply, and this one has been measured.
       max_explain_each_interval: 200
       query_plan_cache_size: 1000
+      # DELIBERATE DEVIATION FROM UPSTREAM, WHICH DEFAULTS TO 60s. Recorded
+      # here because an uncommented 4x is indistinguishable from a mistake, and
+      # the obvious "align with upstream defaults" refactor would take
+      # max_explain_each_interval with it.
+      #
+      # WHAT IT BUYS: Top queries is a "what is heavy right now" page. At 60s
+      # it is up to a minute stale, which is the difference between a page an
+      # engineer watches during an incident and one they refresh and distrust.
+      #
+      # WHAT IT MULTIPLIES: everything in a top-query cycle, including the
+      # EXPLAIN pass that max_explain_each_interval bounds. The ceiling is
+      # (max_explain_each_interval) x (3600 / collection_interval) =
+      # 200 x 240 = 48,000 EXPLAINs/hour. Four knobs sit in that product:
+      # shortening this interval, raising the budget, shrinking
+      # query_plan_cache_size, or shortening query_plan_cache_ttl (unset here,
+      # so 1h) all push the same number up.
+      #
+      # WHY THE CEILING IS NOT THE COST. Measured on this rig: the real rate is
+      # 1,775 EXPLAINs/hour -- 3.7% of that ceiling -- because the receiver only
+      # explains statements isExplainableQuery() accepts and the plan cache
+      # absorbs the repeats. The entire EXPLAIN path cost 23.2ms of database
+      # time, 0.034% of exec time. So the budget is not what to cut: reducing
+      # max_explain_each_interval to 20-50 would lose plan fidelity to save a
+      # cost that was measured at three hundredths of a percent. And do NOT
+      # shorten query_plan_cache_ttl to catch plan regressions sooner -- a
+      # shorter TTL expires entries sooner, which puts more queries back
+      # through the cycle, and would multiply the one cost here that is real.
       collection_interval: 15s
-    # REQUIRED since collector v0.148.0 — both events are OFF by default, and
-    # without this block the collector looks healthy while sending nothing.
-    # events: must stay a TOP-LEVEL key on the receiver (a sibling of the
-    # collection settings above), never nested inside them.
+    # OFF, TO MATCH THE SERVER. Both events are opt-in on BOTH sides, and both
+    # sides must be switched on together or the work is wasted:
+    #   * here, enabled: true starts the collection on your database;
+    #   * on OpenObserve, ZO_DB_MONITORING_ACTIVITY_ENABLED=true (query_sample)
+    #     and ZO_DB_MONITORING_TOP_QUERY_ENABLED=true (top_query) are what let
+    #     the rows be read back. Both default to false.
+    # Collecting with the server flag off makes your database pay full
+    # collection cost -- including the receiver's EXPLAIN pass -- for rows that
+    # cross the wire and are then discarded, so leave these false until the
+    # matching server flag is set.
+    #
+    # The block itself must STAY, at true or false. Upstream v0.148.0 flipped
+    # both events from default-ON to default-OFF, so the keys are what makes
+    # the setting explicit and reviewable; and events: must stay a TOP-LEVEL
+    # key on the receiver (a sibling of the collection settings above), never
+    # nested inside them.
     events:
-      db.server.query_sample: { enabled: true }
-      db.server.top_query: { enabled: true }`;
+      db.server.query_sample: { enabled: false }
+      db.server.top_query: { enabled: false }`;
 
 /**
  * MySQL activity samples + server top queries, from the stock `mysqlreceiver`'s
@@ -1028,19 +1307,55 @@ const MYSQL_EVENTS_RECEIVER = `  mysql/dbm_events:
     database: {database}
     collection_interval: 10s
     query_sample_collection:
-      max_rows_per_query: 1000
+      # 100 is mysqlreceiver's OWN default. Postgres's default is 1000, and
+      # this block previously carried the Postgres number -- a value that
+      # travelled across from PG_EVENTS_RECEIVER, not one anybody chose for
+      # MySQL. The two receivers are known to diverge (see the spelling
+      # asymmetry noted above this receiver), so the asymmetry is the expected
+      # state and matching Postgres was the anomaly.
+      #
+      # It bounds rows read from performance_schema per sample, so the revert
+      # cuts both the activity-row ceiling and the per-tick read by 10x:
+      # 360,000 -> 36,000 rows/hour/instance at 10s. The rig runs at roughly
+      # 0.5% of that ceiling, so no healthy fleet should see a change in what
+      # the Activity tab shows -- the ceiling is what moves, not the data.
+      max_rows_per_query: 100
     top_query_collection:
       top_query_count: 200
+      # DELIBERATE DEVIATION FROM UPSTREAM, WHICH DEFAULTS TO 60s -- the same
+      # call the Postgres receiver makes, for the same reason, and recorded for
+      # the same reason: an uncommented 4x reads as an accident, and an "align
+      # with upstream" refactor would quietly take the rest of the block's
+      # per-cycle budget with it. It multiplies every per-cycle cost, plan
+      # capture included. Measured on the Postgres side (see PG_EVENTS_RECEIVER
+      # for the numbers), the plan path costs three hundredths of a percent of
+      # database exec time, so the freshness is cheap and the cadence stays.
+      #
+      # query_plan_cache_size and the receiver's plan TTL sit in the same
+      # product: shrinking either puts more statements back through plan
+      # capture, so neither is a safe place to economize.
       collection_interval: 15s
       lookback_time: 120
       query_plan_cache_size: 1000
-    # REQUIRED since collector v0.148.0 — both events are OFF by default, and
-    # without this block the collector looks healthy while sending nothing.
-    # events: must stay a TOP-LEVEL key on the receiver (a sibling of the
-    # collection settings above), never nested inside them.
+    # OFF, TO MATCH THE SERVER. Both events are opt-in on BOTH sides, and both
+    # sides must be switched on together or the work is wasted:
+    #   * here, enabled: true starts the collection on your database;
+    #   * on OpenObserve, ZO_DB_MONITORING_ACTIVITY_ENABLED=true (query_sample)
+    #     and ZO_DB_MONITORING_TOP_QUERY_ENABLED=true (top_query) are what let
+    #     the rows be read back. Both default to false.
+    # Collecting with the server flag off makes your database pay full
+    # collection cost -- including the receiver's EXPLAIN pass -- for rows that
+    # cross the wire and are then discarded, so leave these false until the
+    # matching server flag is set.
+    #
+    # The block itself must STAY, at true or false. Upstream v0.148.0 flipped
+    # both events from default-ON to default-OFF, so the keys are what makes
+    # the setting explicit and reviewable; and events: must stay a TOP-LEVEL
+    # key on the receiver (a sibling of the collection settings above), never
+    # nested inside them.
     events:
-      db.server.query_sample: { enabled: true }
-      db.server.top_query: { enabled: true }`;
+      db.server.query_sample: { enabled: false }
+      db.server.top_query: { enabled: false }`;
 
 /**
  * Assemble the full DBM config for an engine.
@@ -1124,7 +1439,7 @@ const dbmConfig = (engine: keyof typeof RECIPES) => {
     ? `
     logs/dbm_events:
       receivers: [${events.name}]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [otlphttp/openobserve_dbm]`
     : "";
 
@@ -1157,6 +1472,37 @@ processors:
         # o2_my_event by design (see MARIADB_DEADLOG_RECEIVER), so omitting it
         # would drop every MariaDB deadlock while the pipeline looked healthy.
         - 'attributes["o2_recipe"] == nil and (attributes["o2_pg_event"] == nil or attributes["o2_pg_event"] == "other") and (attributes["o2_my_event"] == nil or attributes["o2_my_event"] == "other") and (attributes["o2_maria_event"] == nil or attributes["o2_maria_event"] == "other")'
+  # SELF-PROTECTION. This collector usually runs on the CUSTOMER'S DATABASE
+  # HOST, so an unbounded collector heap is not our outage — it is a second
+  # failure on the machine already having the first one.
+  #
+  # THE FAILURE THIS PREVENTS, observed on this project's own rig rather than
+  # reasoned about: a transient DNS failure to the backend produced 28,308
+  # "sending queue is full" events on one collector, whose RSS grew to 2.06 GiB
+  # while an identical sibling reaching a healthy backend sat at 95 MiB. The
+  # filelog receivers read the database log as fast as it grows; batch buffers
+  # 512 records at a time; with nothing between them and a stalled exporter,
+  # the heap absorbs the difference until the OOM killer ends it. And the stall
+  # is most likely during exactly the fleet-wide incident that produced the
+  # volume — so without this, the monitoring dies at the moment it is needed.
+  #
+  # MUST BE FIRST in every pipeline's processors list, which is where the OTel
+  # docs place it and is not a style rule: memory_limiter applies back-pressure
+  # to whatever is UPSTREAM of it, so a processor listed before it is outside
+  # the guard. When over the soft limit it refuses batches, which propagates
+  # back into the receivers and makes the collector SHED rather than grow.
+  #
+  # 768/192 MiB is measured, not guessed: run for several minutes on this
+  # project's rig it held a steady 1.05-1.16 GiB RSS. Raising the limit moved
+  # the plateau up without stopping the shedding, which is the tell that a
+  # struggling collector is CPU-bound rather than memory-starved — so raising
+  # these numbers is not the fix if you see refusals. This is a single-exporter
+  # config on a database host; the rig's own matrix collector fans out to four
+  # backends and sizes itself higher for that reason.
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 768
+    spike_limit_mib: 192
   batch:
     timeout: 5s
     send_batch_size: 512
@@ -1167,12 +1513,39 @@ exporters:
     headers:
       Authorization: Basic {token}
       stream-name: ${DBM_SERVER_STREAM}
+    # THE OTHER HALF OF THE OOM GUARD (see memory_limiter above). Left at its
+    # defaults the sending queue is effectively an unbounded in-memory buffer,
+    # and retry_on_failure with no deadline re-queues batches that will never
+    # succeed — together they are what actually held the 2.06 GiB.
+    #
+    # queue_size: 500 batches of up to 512 records is roughly four minutes of
+    # this config's steady-state volume: enough to ride out a backend restart
+    # or a redeploy without losing anything, small enough that a backend which
+    # is genuinely gone costs bounded memory instead of the host. Beyond that
+    # the collector drops, and dropping is the correct behaviour here — DBM
+    # data is a rolling picture of a live server, so a gap in the Deadlocks
+    # timeline is a far better outcome than a dead collector on a database
+    # host, which loses everything from that point on rather than a window.
+    #
+    # This queue is IN MEMORY and deliberately not persistent: persistence
+    # needs a storage: extension, which would make DBM setup depend on a
+    # writable state directory on the database host. max_elapsed_time bounds
+    # the retry so a batch cannot be re-queued forever behind a backend that
+    # is not coming back.
+    sending_queue:
+      enabled: true
+      queue_size: 500
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 300s
 
 service:
   pipelines:
     logs:
       receivers: [${names}]
-      processors: [filter/dbm, batch]
+      # memory_limiter FIRST — it back-pressures what is upstream of it, so
+      # anything listed before it runs outside the guard.
+      processors: [memory_limiter, filter/dbm, batch]
       exporters: [otlphttp/openobserve_dbm]${eventsPipeline}`;
 };
 
