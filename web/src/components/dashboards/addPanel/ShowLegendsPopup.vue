@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon"
-                class="ml-1 shrink-0 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100"
+                class="ml-1 shrink-0 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100 max-md:opacity-100"
                 data-test="dashboard-legend-copy-btn"
                 :data-copied="isLegendCopied(Number(index)) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, Number(index))"

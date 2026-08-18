@@ -176,7 +176,7 @@ function formatTime(ts: string): string {
           </div>
         </div>
         <span
-          class="inline-flex shrink-0 items-center opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100"
+          class="inline-flex shrink-0 items-center opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 max-md:opacity-100"
         >
           <OButton
             variant="ghost-destructive"
