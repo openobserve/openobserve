@@ -21,7 +21,10 @@ use datafusion::{datasource::TableProvider, execution::cache::cache_manager::Fil
 use hashbrown::HashSet;
 use infra::errors::Result;
 
-use super::{datafusion::exec::TableBuilder, index::IndexCondition};
+use super::{
+    datafusion::{exec::TableBuilder, sort_order::FileSortOrder},
+    index::IndexCondition,
+};
 
 pub mod flight;
 pub mod storage;
@@ -39,7 +42,7 @@ pub async fn create_tables_from_files<F>(
     session: config::meta::search::Session,
     query: Arc<QueryParams>,
     schema_ref: Arc<Schema>,
-    sorted_by_time: bool,
+    sort_order: FileSortOrder,
     file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
@@ -69,7 +72,7 @@ where
 
         async move {
             let mut builder = TableBuilder::new()
-                .sorted_by_time(sorted_by_time)
+                .sort_order(sort_order)
                 .file_stat_cache(file_stat_cache)
                 .index_condition(index_condition)
                 .fst_fields(fst_fields);

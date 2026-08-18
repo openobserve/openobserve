@@ -45,6 +45,7 @@ use vortex::{
 use super::table_provider::uniontable::NewUnionTable;
 use crate::datafusion::{
     exec::DataFusionContextBuilder,
+    sort_order::FileSortOrder,
     vortex::{VORTEX_RUNTIME, vortex_write_strategy},
 };
 
@@ -112,13 +113,16 @@ pub async fn merge_parquet_files(
         // for file list we do not have timestamp, so we instead sort by min ts of entries
         "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
     } else {
-        format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
+        format!(
+            "SELECT * FROM tbl ORDER BY {}",
+            FileSortOrder::TimestampDesc.order_by_clause().unwrap()
+        )
     };
     log::debug!("merge_parquet_files sql: {sql}");
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files")
-        .sorted_by_time(true)
+        .sort_order(FileSortOrder::TimestampDesc)
         .build(get_config().limit.datafusion_min_partition_num)
         .await?;
     // register union table

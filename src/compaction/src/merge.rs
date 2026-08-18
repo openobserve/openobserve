@@ -51,6 +51,7 @@ use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
     merge::{self, MergeParquetResult},
+    sort_order::FileSortOrder,
 };
 use search_service::file_list;
 use tantivy_utils::index_builder::create_tantivy_index;
@@ -846,7 +847,7 @@ pub async fn merge_files(
     };
 
     let tables = match TableBuilder::new()
-        .sorted_by_time(true)
+        .sort_order(FileSortOrder::TimestampDesc)
         .build(session, files.clone(), schema.clone())
         .await
     {
