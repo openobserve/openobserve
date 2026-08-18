@@ -193,7 +193,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
       },
       // ── Database Monitoring (optional) ──────────────────────────────────
       // Everything above ingests METRICS. The steps below add the SERVER
-      // vantage that Traces → Databases needs for its Deadlocks, Blocked
+      // vantage that Infra → Databases needs for its Deadlocks, Blocked
       // queries and Activity tabs (plus server top queries with estimated
       // plans): a blocked query emits no client span while it is blocked, and
       // a deadlock's other participant may not be instrumented at all, so
@@ -314,7 +314,8 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
         },
         note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
       },
-      dbmVerifyStep("full", true),
+      // 300s: the pg table/index recipes tick every 5 minutes, not every 60s.
+      dbmVerifyStep("full", true, "300s"),
     ],
     detect: {
       streamType: "metrics",

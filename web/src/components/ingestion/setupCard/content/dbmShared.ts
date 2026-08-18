@@ -1651,7 +1651,16 @@ log_min_duration_statement = 100ms
 # Server top queries read pg_stat_statements, which must be PRELOADED — append
 # it if this line already lists other libraries. Takes effect only on RESTART
 # (not reloadable), same as the logging settings above.
-shared_preload_libraries = 'pg_stat_statements'`;
+shared_preload_libraries = 'pg_stat_statements'
+# NOT SET BY THIS INTEGRATION — listed because it is the setting that surprises.
+# OpenObserve does not collect temp-file lines at all: the collector's log parser
+# has no rule for them, so they arrive untagged and are dropped before export.
+# But Postgres still WRITES them, and log_temp_files = 0 writes one line per sort
+# spill — measured at 63% of all log volume on this project's rig, none of which
+# reaches this product. If it is 0 on your server, that is your disk and your log
+# shipper paying for lines nothing here reads. -1 (the default) is off; a size
+# like 1MB logs only the spills big enough to be worth investigating.
+# log_temp_files = -1`;
 
 /**
  * Both settings above need a RESTART, not a reload — `log_line_prefix` and
@@ -1663,7 +1672,33 @@ export const PG_DBM_LOGGING_VERIFY_SQL = `SHOW log_line_prefix;   -- must match 
 SHOW logging_collector; -- must be on
 SHOW deadlock_timeout;  -- 500ms
 SHOW log_min_duration_statement; -- 100ms (what governs the Slowest-calls page)
-SHOW shared_preload_libraries; -- must include pg_stat_statements`;
+SHOW shared_preload_libraries; -- must include pg_stat_statements
+-- THE VOLUME CHECK. The three settings below do not change WHETHER Database
+-- Monitoring works -- they change HOW MUCH it costs, by up to two orders of
+-- magnitude, and a wrong value here looks identical to a right one on every
+-- page in the product. That is why they are verified rather than trusted.
+--
+-- Each is a legitimate DIAGNOSIS setting at its aggressive end and a mistake
+-- as a standing one. Measured on this project's rig against the same workload:
+-- the diagnosis profile (both durations 0, sample_rate 1.0) emitted 2.83M
+-- rows/hour; the values this card sets emitted ~19K -- a 150x difference from
+-- three lines nothing else surfaces.
+-- current_setting(..., true) returns NULL instead of raising when auto_explain
+-- is not loaded -- the auto_explain step below is OPTIONAL, and a plain SHOW
+-- of auto_explain.log_min_duration ERRORS on a server that skipped it,
+-- turning a reassurance step into a failure. NULL here means "not loaded",
+-- which is a perfectly good answer.
+SELECT current_setting('auto_explain.log_min_duration', true) AS auto_explain_log_min_duration,
+       -- 2s expected. 0 = a plan for EVERY statement.
+       current_setting('auto_explain.sample_rate', true)      AS auto_explain_sample_rate;
+       -- 0.01 expected. 1 = every statement PAYS the executor cost,
+       -- whether or not it clears the threshold and gets logged.
+-- Not a setting this integration uses -- checked because it is the one that
+-- surprises. OpenObserve never collects temp-file lines (the collector's log
+-- parser has no rule for them, so they are dropped as untagged). At 0 Postgres
+-- logs EVERY sort spill, which on the rig was 63% of all log volume: your disk
+-- and your log shipper pay for it, and nothing in this product shows it to you.
+SHOW log_temp_files;                -- -1 (off) or a size like 1MB, not 0`;
 
 /**
  * OPTIONAL — real executed plans via `auto_explain` (Postgres only).
@@ -1755,17 +1790,38 @@ log_line_prefix = '%m [%p] %q%u@%d app=%a vxid=%v txid=%x line=%l qid=%Q '`;
  * rather than a fourth `pages` value because it is orthogonal to the
  * activity/deadlock axis: MariaDB has table health but no Activity, and SQL
  * Server has neither.
+ *
+ * `tableHealthWait` is how long that first snapshot ACTUALLY takes, and it
+ * differs 5x by engine: MySQL and MariaDB run the table/index recipes at 60s
+ * (`collection_interval: 60s`, MYSQL_/MARIADB_TABLE_STATS_RECEIVER), while
+ * Postgres runs them at 300s on purpose — `pg_total_relation_size` is O(schema)
+ * and measured 3.0s at 50k tables, so it ticks 5x less often. One hardcoded
+ * "60-second snapshot" sentence served both, which told a Postgres user to
+ * expect data four minutes before it can exist; watching an empty tab for that
+ * long reads as a broken collector, which is exactly the "collecting but empty"
+ * trap the rest of this step is written to avoid.
  */
 export function dbmVerifyStep(
   pages: "both" | "blocking" | "full" = "both",
   tableHealth = false,
+  tableHealthWait: "60s" | "300s" = "60s",
 ): RichCardStep {
+  // The table-health wait is baked into the key rather than interpolated:
+  // `descriptionKey` takes no params (SetupCardRenderer translates it with a
+  // bare `t(key)`), and this module has no `t` of its own — it returns keys,
+  // never sentences. Four keys is the honest cost of one true sentence per
+  // engine; the alternative was a single string that is wrong for Postgres.
+  const slowTableHealth = tableHealth && tableHealthWait === "300s";
   const descriptionKey =
     pages === "blocking"
       ? "ingestion.setupCard.dbmVerifyBlockingDesc"
       : pages === "full"
-        ? "ingestion.setupCard.dbmVerifyFullDesc"
-        : "ingestion.setupCard.dbmVerifyDesc";
+        ? slowTableHealth
+          ? "ingestion.setupCard.dbmVerifyFullSlowTableHealthDesc"
+          : "ingestion.setupCard.dbmVerifyFullDesc"
+        : tableHealth
+          ? "ingestion.setupCard.dbmVerifyTableHealthDesc"
+          : "ingestion.setupCard.dbmVerifyDesc";
   // Untranslated: these are the page names in the product's own navigation,
   // so a translated pill would stop matching what the user is looking for.
   const pills =
