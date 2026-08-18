@@ -13515,8 +13515,6 @@
     "ladderFinished": "Ladder finished — nobody left",
     "ladderFinishedDetail": "rung {people} person over {levels} levels, no ack | rung {people} people over {levels} levels, no ack",
     "escalationClimbing": "Escalating — level {level}, paging {who}",
-    "deliveryFailedFallback": "{channel} delivery failed for {who} — sent by {landed} only",
-    "deliveryFailedNothing": "{channel} delivery failed for {who} — nothing else reached them",
     "reachAlarmHeadline": "Nobody has seen this page.",
     "reachAlarmFailed": "{count} delivery failed. | All {count} deliveries failed.",
     "reachAlarmFailedTo": "{count} delivery to {who} failed. | All {count} deliveries to {who} failed.",

@@ -35,7 +35,6 @@ vi.mock("@/services/oncall", () => ({
     getPolicy: vi.fn(),
     getSchedule: vi.fn(),
     escalationProgress: vi.fn(),
-    listDeliveries: vi.fn(),
     getResponse: vi.fn(),
   },
 }));
@@ -183,9 +182,6 @@ describe("OnCallResponses", () => {
       data: { fired: [], next_targets: [], next_at: null, exhausted: false },
     } as any);
     service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
-    // Absent means "not read", never "delivered", so the empty ledger is the
-    // default and only the tests about a failure say otherwise.
-    service.listDeliveries.mockResolvedValue({ data: { total: 0, deliveries: [] } } as any);
   });
 
   function page(over: Record<string, unknown> = {}, source = "al_ckt") {
@@ -585,7 +581,7 @@ describe("OnCallResponses", () => {
     });
 
     /// A resolved row has nothing left to do to it, so the action becomes a
-    /// way to read what happened.
+    /// way to read what happened — and it is the LABELLED one, not a menu item.
     it("drops triage on a resolved row and offers the timeline", async () => {
       const wrapper = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
@@ -593,6 +589,47 @@ describe("OnCallResponses", () => {
 
       expect(wrapper.find('[data-test^="oncall-row-resolve-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(true);
+      // Nothing is left to put behind it, so the menu is not rendered at all.
+      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(false);
+    });
+
+    /// Every row shows the step it is actually on. "Acknowledge or nothing" left
+    /// a handled page — which still has to be closed — with its one visible
+    /// button pointing at a menu.
+    it("labels resolve on a row nobody can acknowledge any more", async () => {
+      const wrapper = await withPages([
+        page({ state: "acknowledged", acked_by: "engineer@example.com" }),
+      ]);
+
+      expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test^="oncall-row-resolve-"]').exists()).toBe(true);
+      // Timeline is what is left for the menu.
+      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(true);
+    });
+
+    /// The labelled action and the menu must never offer the same thing twice.
+    it("keeps the labelled action out of the menu", async () => {
+      const ringing = await withPages([page()]);
+      // Acknowledge is labelled, so resolve and timeline are the menu's.
+      expect(ringing.findAll('[data-test^="oncall-row-resolve-"]')).toHaveLength(1);
+      expect(ringing.findAll('[data-test^="oncall-row-timeline-"]')).toHaveLength(1);
+
+      const handled = await withPages([
+        page({ state: "acknowledged", acked_by: "engineer@example.com" }),
+      ]);
+      // Resolve is labelled now — it must not also appear as an item.
+      expect(handled.findAll('[data-test^="oncall-row-resolve-"]')).toHaveLength(1);
+    });
+
+    /// Snoozing only makes sense while the ladder is still climbing, so a
+    /// handled row's menu must not offer it.
+    it("offers no snooze once nothing is escalating", async () => {
+      const wrapper = await withPages([
+        page({ state: "acknowledged", acked_by: "engineer@example.com" }),
+      ]);
+
+      expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(false);
     });
 
     /// Deduplicated across rungs: a ladder that reached the same person twice
@@ -1190,88 +1227,4 @@ describe("OnCallResponses", () => {
     });
   });
 
-  describe("recorded delivery failures", () => {
-    /// A ladder that fired into a broken transport looks identical to one that
-    /// reached a person, and only the ledger separates them.
-    it("names the failed channel, who it was for, and what did land", async () => {
-      service.listDeliveries.mockResolvedValue({
-        data: {
-          total: 2,
-          deliveries: [
-            { kind: "delivery", at: 20, actor: "o2-engine", body: "", recipient: "liam@o2.ai", channel: "webhook", delivered: false },
-            { kind: "delivery", at: 10, actor: "o2-engine", body: "", recipient: "liam@o2.ai", channel: "email", delivered: true },
-          ],
-        },
-      } as any);
-
-      const wrapper = await withPages([page({ id: "a" })]);
-      const cell = wrapper.findComponent({ name: "OnCallEscalationCell" });
-
-      expect(cell.props("deliveryFailure")).toBe(
-        "Chat / webhook delivery failed for liam@o2.ai — sent by Email only",
-      );
-    });
-
-    /// "Slack failed" alone reads as "they were not told". Whether anything else
-    /// reached them is the difference between re-paging and waiting.
-    it("says so when nothing else reached them", async () => {
-      service.listDeliveries.mockResolvedValue({
-        data: {
-          total: 1,
-          deliveries: [
-            { kind: "delivery", at: 10, actor: "o2-engine", body: "", recipient: "liam@o2.ai", channel: "webhook", delivered: false },
-          ],
-        },
-      } as any);
-
-      const wrapper = await withPages([page({ id: "a" })]);
-
-      expect(
-        wrapper.findComponent({ name: "OnCallEscalationCell" }).props("deliveryFailure"),
-      ).toBe("Chat / webhook delivery failed for liam@o2.ai — nothing else reached them");
-    });
-
-    /// An old failure the ladder already retried past is not the one explaining
-    /// the silence now.
-    it("reports the most recent failure", async () => {
-      service.listDeliveries.mockResolvedValue({
-        data: {
-          total: 2,
-          deliveries: [
-            { kind: "delivery", at: 10, actor: "o2-engine", body: "", recipient: "old@o2.ai", channel: "sms", delivered: false },
-            { kind: "delivery", at: 99, actor: "o2-engine", body: "", recipient: "new@o2.ai", channel: "webhook", delivered: false },
-          ],
-        },
-      } as any);
-
-      const wrapper = await withPages([page({ id: "a" })]);
-
-      expect(
-        wrapper.findComponent({ name: "OnCallEscalationCell" }).props("deliveryFailure"),
-      ).toContain("new@o2.ai");
-    });
-
-    /// A page somebody already owns has no silence to explain, so it is not
-    /// worth a request.
-    it("reads the ledger only for pages nobody has taken", async () => {
-      await withPages([
-        page({ id: "a" }),
-        page({ id: "b", state: "acknowledged", acked_by: "ana@o2.ai" }, "al_pay"),
-      ]);
-
-      expect(service.listDeliveries).toHaveBeenCalledTimes(1);
-      expect(service.listDeliveries.mock.calls[0][0].response_id).toBe("a");
-    });
-
-    /// Absent must never render as delivered — a page whose ledger could not be
-    /// read gets no line rather than an implied success.
-    it("shows no line when the ledger cannot be read", async () => {
-      service.listDeliveries.mockRejectedValue(new Error("boom"));
-      const wrapper = await withPages([page({ id: "a" })]);
-
-      expect(
-        wrapper.findComponent({ name: "OnCallEscalationCell" }).props("deliveryFailure"),
-      ).toBe("");
-    });
-  });
 });

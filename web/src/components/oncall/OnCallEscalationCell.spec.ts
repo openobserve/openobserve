@@ -23,7 +23,6 @@ import type { EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
 const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
   OProgressBar: { name: "OProgressBar", props: ["value", "variant"], template: "<div />" },
-  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
 };
 
 function firedRungs(count: number) {
@@ -38,14 +37,12 @@ function render(
   state: ResponseState,
   progress: Partial<EscalationProgress> | null,
   totalRungs: number | null = 3,
-  deliveryFailure = "",
 ) {
   return mount(OnCallEscalationCell, {
     props: {
       responseId: "resp-1",
       state,
       totalRungs,
-      deliveryFailure,
       progress: progress && {
         fired: [],
         next_targets: [],
@@ -135,13 +132,12 @@ describe("OnCallEscalationCell", () => {
   });
 
   /// The bar and the state icon both restated the headline, and the row already
-  /// carries a priority rail — so neither is drawn any more.
-  it("draws neither a progress bar nor a state icon", () => {
+  /// carries a priority rail — so the cell is words and tone only.
+  it("draws no bar and no icon at all", () => {
     const wrapper = render("triggered", { fired: firedRungs(2), exhausted: true }, 4);
 
     expect(wrapper.find('[data-test="oncall-escalation-cell-bar"]').exists()).toBe(false);
     expect(wrapper.findComponent({ name: "OProgressBar" }).exists()).toBe(false);
-    // The only icon left belongs to the delivery-failure line, which is absent here.
     expect(wrapper.findComponent({ name: "OIcon" }).exists()).toBe(false);
   });
 
@@ -205,26 +201,4 @@ describe("OnCallEscalationCell", () => {
     );
   });
 
-  /// A ladder that fired correctly into a broken transport looks identical to
-  /// one that reached a person.
-  it("shows a recorded delivery failure", () => {
-    const wrapper = render(
-      "escalating",
-      { fired: firedRungs(1) },
-      3,
-      "Slack delivery failed for liam@o2.ai — sent by Email only",
-    );
-
-    expect(wrapper.find("[data-test='oncall-escalation-cell-delivery']").text()).toContain(
-      "Slack delivery failed for liam@o2.ai",
-    );
-  });
-
-  /// Absent means "not read", never "delivered" — the cell must not imply a
-  /// success it was never told about.
-  it("shows no delivery line when none was resolved", () => {
-    const wrapper = render("escalating", { fired: firedRungs(1) });
-
-    expect(wrapper.find("[data-test='oncall-escalation-cell-delivery']").exists()).toBe(false);
-  });
 });

@@ -21,9 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   actually has at 3am is "how long until this wakes somebody else", and that was
   only answerable by opening the record.
 
-  Words and tone, nothing else. A progress bar and a state icon both sat here and
-  both restated the headline — and on a list whose rows already carry a priority
-  rail, a third and fourth severity mark cost more attention than they returned.
+  Words and tone, nothing else. A progress bar, a state icon and a delivery-failure
+  line all sat here at various points; the first two restated the headline, and on
+  a list whose rows already carry a priority rail, extra severity marks cost more
+  attention than they returned.
 -->
 <template>
   <div class="flex min-w-0 flex-col gap-0.5" :data-test="`oncall-escalation-cell-${responseId}`">
@@ -41,21 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ detail }}
     </span>
-
-    <!-- Why a page that "went out" may have reached nobody. A ladder that fired
-         correctly into a broken transport looks identical to one that reached a
-         person, and that is the difference between waiting and re-paging. -->
-    <span
-      v-if="deliveryFailure"
-      class="text-status-error-text flex min-w-0 items-center gap-1 text-xs"
-      data-test="oncall-escalation-cell-delivery"
-    >
-      <OIcon name="error-outline" size="xs" class="shrink-0" />
-      <span class="truncate">
-        {{ deliveryFailure }}
-        <OTooltip side="bottom" :content="deliveryFailure" />
-      </span>
-    </span>
   </div>
 </template>
 
@@ -63,8 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import { useOnCallClock } from "@/composables/useOnCallClock";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -84,12 +68,6 @@ const props = defineProps<{
   totalRungs?: number | null;
   /** `acked_at - opened_at`, so a settled row can say how fast it was answered. */
   ackedInMicros?: number | null;
-  /**
-   * A recorded delivery failure on this page, already phrased. Resolved by the
-   * caller from the delivery ledger, which is one request per page — the cell
-   * cannot fetch it and must not imply success when it is simply absent.
-   */
-  deliveryFailure?: I18nText | "";
 }>();
 
 const { t } = useI18nTyped();

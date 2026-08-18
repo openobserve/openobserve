@@ -391,7 +391,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :progress="progressById[row.latest.id] ?? null"
           :total-rungs="totalRungsFor(row.latest)"
           :acked-in-micros="ackedInMicros(row.latest)"
-          :delivery-failure="deliveryFailureById[row.latest.id] ?? ''"
         />
       </template>
 
@@ -443,9 +442,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
-      <!-- What the policy WOULD page on, as opposed to what a delivery actually
-           did — so a channel with no provider behind it is marked rather than
-           implied. Off by default now that a recorded failure is on the row. -->
+      <!-- What the policy WOULD page on — a channel with no provider behind it
+           is marked rather than implied. Off by default: it describes the team's
+           policy, which is the same for every row of that team. -->
       <template #cell-channels="{ row }">
         <span class="flex flex-wrap items-center gap-1">
           <OTag
@@ -495,58 +494,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            buttons everywhere: claiming is only offered while something is still
            escalating, and a page nobody owns is a routing fix, not a triage.
 
-           One decision keeps its label — an icon-only "Acknowledge" is not
-           something to hunt for at 3am — and everything else lives behind the
-           row's more-menu, which is how the alerts list and every other list in
-           the app spends its action column. -->
+           Exactly one action carries a label, and it is whatever this row's next
+           step actually is — claim it, close it, or read it. Acknowledge or
+           nothing meant a handled page that still had to be closed offered its
+           one visible button to a menu. Everything else sits behind the
+           more-menu, as it does on every other list in the app. -->
       <template #cell-actions="{ row }">
         <span class="flex items-center justify-center gap-0.5">
           <OButton
             v-if="!row.latest.team_id"
             variant="outline"
             size="xs"
-            data-row-action="assign"
             :data-test="`oncall-row-assign-${row.rowKey}`"
             @click.stop="goTo('onCallRouting')"
           >
             {{ t("oncall.assignTeamShort") }}
           </OButton>
           <template v-else>
+            <!-- Primary is `primaryAction(row)`: claiming is loud because it is
+                 the one somebody is woken for; closing and reading are ordinary
+                 work, so they stay quiet. -->
             <OButton
-              v-if="canAcknowledge(row)"
+              v-if="primaryAction(row) === 'acknowledge'"
               variant="primary"
               size="xs"
               :loading="busyId === row.rowKey"
-              data-row-action="acknowledge"
               :data-test="`oncall-row-ack-${row.rowKey}`"
               @click.stop="acknowledgeRow(row)"
             >
               {{ t("oncall.acknowledge") }}
             </OButton>
-
-            <!-- Hidden proxies so the row-hover shortcuts still reach the
-                 actions that now live in the menu, which is teleported out of
-                 the row's DOM. Same device as the alerts list. -->
-            <button
-              v-if="canAcknowledge(row)"
-              type="button"
-              data-row-action="snooze"
-              class="hidden"
-              tabindex="-1"
-              aria-hidden="true"
-              @click.stop="snoozeRow(row, DEFAULT_SNOOZE_MINUTES)"
-            />
-            <button
-              v-if="row.firings.some((f) => f.state !== 'resolved')"
-              type="button"
-              data-row-action="resolve"
-              class="hidden"
-              tabindex="-1"
-              aria-hidden="true"
+            <OButton
+              v-else-if="primaryAction(row) === 'resolve'"
+              variant="outline"
+              size="xs"
+              :loading="busyId === row.rowKey"
+              :data-test="`oncall-row-resolve-${row.rowKey}`"
               @click.stop="resolveRow(row)"
-            />
+            >
+              {{ t("oncall.resolve") }}
+            </OButton>
+            <OButton
+              v-else
+              variant="outline"
+              size="xs"
+              :data-test="`oncall-row-timeline-${row.rowKey}`"
+              @click.stop="openResponse(row)"
+            >
+              {{ t("oncall.timeline") }}
+            </OButton>
 
-            <ODropdown>
+            <!-- Hidden when the row has nothing left to offer: a closed page's
+                 only action is already the button beside it, and a menu whose
+                 single item is the thing you just clicked is furniture. -->
+            <ODropdown v-if="canAcknowledge(row) || menuActions(row).length">
               <template #trigger>
                 <OButton
                   variant="ghost"
@@ -579,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownSeparator v-if="canAcknowledge(row)" />
 
               <ODropdownItem
-                v-if="row.firings.some((f) => f.state !== 'resolved')"
+                v-if="menuActions(row).includes('resolve')"
                 :data-test="`oncall-row-resolve-${row.rowKey}`"
                 @select="resolveRow(row)"
               >
@@ -590,6 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
 
               <ODropdownItem
+                v-if="menuActions(row).includes('timeline')"
                 :data-test="`oncall-row-timeline-${row.rowKey}`"
                 @select="openResponse(row)"
               >
@@ -702,7 +704,6 @@ import type {
   CauseGroup,
   Channel,
   CoverageGaps,
-  DeliveryRecord,
   EscalationProgress,
   OnCallPolicy,
   OnCallResponse,
@@ -756,15 +757,6 @@ const MAX_PAGES = 3;
 const ESCALATION_DETAIL_LIMIT = 25;
 
 /**
- * How many ringing pages get their delivery ledger read.
- *
- * One request per page, same as the ladder, and only worth spending on pages
- * nobody has taken — a failed send is the explanation for silence, and a page
- * somebody already owns has no silence to explain.
- */
-const DELIVERY_DETAIL_LIMIT = 25;
-
-/**
  * The three states a reader triages by, in the order they matter.
  *
  * These are not the wire's `ResponseState`: "ringing" is an escalating record
@@ -782,8 +774,6 @@ const scheduleByTeam = ref<Record<string, OnCallSchedule>>({});
 const slotsByTeam = ref<Record<string, OnCallSlot[]>>({});
 const progressById = ref<Record<string, EscalationProgress>>({});
 const escalationCapped = ref(false);
-/// Phrased delivery failures per response id, for the ringing pages only.
-const deliveryFailureById = ref<Record<string, I18nText>>({});
 const expandedIds = ref<string[]>([]);
 const expandedEvents = ref<OnCallResponseEvent[]>([]);
 const expandedHistory = ref<OnCallResponse[]>([]);
@@ -843,15 +833,6 @@ const snoozeOptions = computed(() => [
   { minutes: 60, label: t("oncall.snooze1h") },
   { minutes: 180, label: t("oncall.snooze3h") },
 ]);
-
-/**
- * What the row-hover snooze shortcut uses.
- *
- * The four lengths live in a menu now, and a keyboard shortcut cannot open one
- * and pick from it — so the shortcut takes the shortest length, which is the one
- * that gives a page back soonest if it was the wrong call.
- */
-const DEFAULT_SNOOZE_MINUTES = 15;
 
 const isFiltered = computed(
   () =>
@@ -913,8 +894,8 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   },
   {
     // What the policy would page on. Split out of the age cell and off by
-    // default: a recorded delivery failure now sits on the row, and that is
-    // better evidence than a channel that merely COULD have been used.
+    // default: it is a property of the team's policy rather than of this page,
+    // so it repeats down the list and earns its place only when asked for.
     id: "channels",
     header: t("oncall.channels"),
     size: 160,
@@ -1241,6 +1222,39 @@ const myShift = computed(() => {
 // offers no button rather than one that errors.
 function canAcknowledge(row: PageRow): boolean {
   return row.escalating.length > 0;
+}
+
+/// Anything under the row still open. A group stands for every firing beneath
+/// it, so one unresolved firing keeps the whole row closeable.
+function hasUnresolved(row: PageRow): boolean {
+  return row.firings.some((firing) => firing.state !== "resolved");
+}
+
+/** The three things a row can be asked to do, in the order they take priority. */
+type RowAction = "acknowledge" | "resolve" | "timeline";
+
+/**
+ * The one action that earns a label on the row.
+ *
+ * Precedence, not a mode: a ringing page is claimed first, an owned one still
+ * has to be closed, and a closed one is only there to be read. The point is that
+ * every row has a visible next step — "Acknowledge or nothing" left a handled
+ * page's actual next step buried in a menu.
+ */
+function primaryAction(row: PageRow): RowAction {
+  if (canAcknowledge(row)) return "acknowledge";
+  if (hasUnresolved(row)) return "resolve";
+  return "timeline";
+}
+
+/// What the more-menu carries: every action the row has EXCEPT the one already
+/// labelled beside it, so nothing is offered twice.
+function menuActions(row: PageRow): RowAction[] {
+  const primary = primaryAction(row);
+  const actions: RowAction[] = [];
+  if (hasUnresolved(row) && primary !== "resolve") actions.push("resolve");
+  if (primary !== "timeline") actions.push("timeline");
+  return actions;
 }
 
 /// Acts on every firing the row stands for. Acknowledging the latest of
@@ -1627,75 +1641,6 @@ async function fetchEscalationProgress() {
   progressById.value = next;
 }
 
-/**
- * Recorded delivery failures on the pages nobody has taken.
- *
- * `delivered === false` is a FACT the engine wrote down, which is why this is
- * worth a request per page: a ladder that fired into a broken transport looks
- * identical to one that reached a person, and only the ledger separates them.
- * Absent means "not read" rather than "delivered" — a page past the cap gets no
- * line rather than an implied success.
- */
-async function fetchDeliveryFailures() {
-  const ringing = responses.value
-    .filter((r) => isEscalating(r.state) && !r.acked_by && !isSnoozed(r))
-    .sort((a, b) => a.opened_at - b.opened_at)
-    .slice(0, DELIVERY_DETAIL_LIMIT);
-
-  const results = await Promise.allSettled(
-    ringing.map((r) =>
-      oncallService.listDeliveries({ org_identifier: orgId.value, response_id: r.id }),
-    ),
-  );
-
-  const next: Record<string, I18nText> = {};
-  ringing.forEach((record, index) => {
-    const result = results[index];
-    if (result.status !== "fulfilled") return;
-    const phrased = describeDeliveryFailure(result.value.data?.deliveries ?? []);
-    if (phrased) next[record.id] = phrased;
-  });
-  // Replaced wholesale so a page that has since been answered drops its line
-  // instead of keeping a failure that no longer explains anything.
-  deliveryFailureById.value = next;
-}
-
-/**
- * The most recent recorded failure, and what still reached that person.
- *
- * "Slack failed" alone reads as "they were not told". Naming the channels that
- * DID land for the same recipient is the difference between re-paging them and
- * waiting — so the line says which, or says nobody, rather than leaving it open.
- */
-function describeDeliveryFailure(deliveries: DeliveryRecord[]): I18nText | null {
-  const failed = deliveries.filter((d) => d.delivered === false && !!d.channel);
-  if (!failed.length) return null;
-  // Latest first: an old failure the ladder already retried past is not the one
-  // explaining the silence now.
-  const worst = failed.reduce((latest, d) => (d.at > latest.at ? d : latest));
-
-  const landed = new Set(
-    deliveries
-      .filter(
-        (d) =>
-          d.delivered === true &&
-          !!d.channel &&
-          (d.recipient ?? "") === (worst.recipient ?? ""),
-      )
-      .map((d) => String(t(`oncall.channel_${d.channel as Channel}`))),
-  );
-
-  const channel = t(`oncall.channel_${worst.channel as Channel}`);
-  const who = raw(worst.recipient ?? "");
-  return landed.size
-    ? t("oncall.deliveryFailedFallback", {
-        channel,
-        who,
-        landed: raw([...landed].join(", ")),
-      })
-    : t("oncall.deliveryFailedNothing", { channel, who });
-}
-
 /// The expanded row's timeline plus what previous firings turned out to be.
 async function fetchExpandedEvents(responseId: string) {
   expandedLoading.value = true;
@@ -1739,11 +1684,7 @@ async function refreshAll() {
   if (unavailable.value) return;
   await fetchContext();
   await fetchTeamContext();
-  await Promise.allSettled([
-    fetchEscalationProgress(),
-    fetchCauseAnalytics(),
-    fetchDeliveryFailures(),
-  ]);
+  await Promise.allSettled([fetchEscalationProgress(), fetchCauseAnalytics()]);
 }
 
 // Expansion is single-mode, so there is at most one id to resolve. The table
