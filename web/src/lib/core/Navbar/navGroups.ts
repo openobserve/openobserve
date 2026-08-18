@@ -226,13 +226,13 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       icon: "layers",
       name: "traces",
       tab: "spans",
+      defaultForRoute: true,
     },
     {
       titleKey: "menu.traces",
       icon: "account-tree",
       name: "traces",
       tab: "traces",
-      defaultForRoute: true,
     },
     {
       titleKey: "menu.serviceGraph",
