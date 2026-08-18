@@ -114,6 +114,14 @@ pub enum LlmScoreEvaluationSource<'a> {
         row_id: &'a str,
         trial_index: u32,
     },
+    /// A Score the customer's own code produced and reported. It has no Scorer
+    /// to identify it, so the client-supplied scorer key takes that place.
+    ClientExperiment {
+        experiment_id: &'a str,
+        client_scorer_key: &'a str,
+        row_id: &'a str,
+        trial_index: u32,
+    },
 }
 
 /// Build the stable JSON identity used to select the latest Score from one
@@ -157,6 +165,19 @@ pub fn evaluation_key(
             "source": "experiment",
             "experimentId": experiment_id,
             "scorerId": scorer_id,
+            "rowId": row_id,
+            "trialIndex": trial_index,
+        }),
+        LlmScoreEvaluationSource::ClientExperiment {
+            experiment_id,
+            client_scorer_key,
+            row_id,
+            trial_index,
+        } => serde_json::json!({
+            "orgId": org_id,
+            "source": "client_experiment",
+            "experimentId": experiment_id,
+            "clientScorerKey": client_scorer_key,
             "rowId": row_id,
             "trialIndex": trial_index,
         }),
@@ -214,6 +235,15 @@ pub struct LlmScoreRecord {
     pub scorer_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scorer_version: Option<String>,
+    /// True when the customer's own code produced this Score and reported it
+    /// through the SDK. A client Score never carries a Scorer reference, so
+    /// this is what separates it from a platform Score in every query.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_reported: Option<bool>,
+    /// Stable client-supplied identity for one local scorer. It separates
+    /// multiple client dimensions that bind the same Score Config.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_scorer_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score_config_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -301,6 +331,8 @@ impl Default for LlmScoreRecord {
             skip_reason: None,
             scorer_id: None,
             scorer_version: None,
+            client_reported: None,
+            client_scorer_key: None,
             score_config_id: None,
             score_config_version: None,
             score_config_row_id: None,
@@ -343,6 +375,8 @@ impl LlmScoreRecord {
             value_boolean: Some(false),
             scorer_id: Some(String::new()),
             scorer_version: Some(String::new()),
+            client_reported: Some(false),
+            client_scorer_key: Some(String::new()),
             score_config_id: Some(String::new()),
             score_config_version: Some(String::new()),
             score_config_row_id: Some(String::new()),
@@ -459,6 +493,8 @@ mod tests {
             skip_reason: None,
             scorer_id: Some("scorer-1".to_string()),
             scorer_version: Some("1".to_string()),
+            client_reported: None,
+            client_scorer_key: None,
             score_config_id: Some("cfg-1".to_string()),
             score_config_version: Some("1".to_string()),
             score_config_row_id: None,

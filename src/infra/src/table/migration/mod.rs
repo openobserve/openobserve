@@ -165,6 +165,7 @@ mod m20260811_000001_create_llm_experiments;
 mod m20260812_000001_add_provider_rate_limits;
 mod m20260812_000001_create_composite_alerts;
 mod m20260813_000001_add_llm_experiment_lifecycle;
+mod m20260818_000001_create_llm_idempotency_records;
 mod m20260820_000001_add_icon_to_folders;
 
 #[cfg(test)]
@@ -405,6 +406,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260812_000001_add_provider_rate_limits::Migration),
             Box::new(m20260812_000001_create_composite_alerts::Migration),
             Box::new(m20260813_000001_add_llm_experiment_lifecycle::Migration),
+            Box::new(m20260818_000001_create_llm_idempotency_records::Migration),
             Box::new(m20260820_000001_add_icon_to_folders::Migration),
         ]
     }

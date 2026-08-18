@@ -1138,7 +1138,9 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items",
-                    get(datasets::list_dataset_items).post(datasets::push_dataset_item),
+                    get(datasets::list_dataset_items)
+                        .post(datasets::push_dataset_item)
+                        .put(datasets::upsert_dataset_items),
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items/{item_id}",
@@ -1177,6 +1179,14 @@ pub fn service_routes() -> Router {
                     post(experiments::retry_experiment_slot),
                 )
                 .route(
+                    "/{org_id}/experiments/{experiment_id}/records",
+                    post(experiments::submit_experiment_records),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/finalize",
+                    post(experiments::finalize_experiment),
+                )
+                .route(
                     "/{org_id}/experiments/{experiment_id}/cancel",
                     post(experiments::cancel_experiment),
                 )
@@ -1202,7 +1212,7 @@ pub fn service_routes() -> Router {
 
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
-                .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config))
+                .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
