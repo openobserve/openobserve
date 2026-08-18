@@ -27,6 +27,7 @@ vi.mock("@/services/oncall", () => ({
     createTeam: vi.fn(),
     updateTeam: vi.fn(),
     addMembers: vi.fn(),
+    getSchedule: vi.fn(),
     setSchedule: vi.fn(),
   },
 }));
@@ -70,6 +71,7 @@ describe("OnCallTeamForm", () => {
     users.orgUsers.mockResolvedValue({ data: { data: ORG_USERS } } as any);
     oncall.createTeam.mockResolvedValue({ data: { id: "team_new" } } as any);
     oncall.addMembers.mockResolvedValue({ data: [] } as any);
+    oncall.getSchedule.mockResolvedValue({ data: null } as any);
     oncall.setSchedule.mockResolvedValue({ data: {} } as any);
   });
 
@@ -102,6 +104,57 @@ describe("OnCallTeamForm", () => {
     expect(schedule.data.rotations[0].anchor_micros).toBe(
       Date.parse("2026-08-17T10:00") * 1000,
     );
+  });
+
+  /// Adding members auto-staffs the team, and this PUT is a full replace: the
+  /// hand-built primary rotation used to delete the derived secondary, so a
+  /// team created here had one slot where the same team created by curl had
+  /// two. Every staffed rotation must come back, with only shift and anchor
+  /// changed to what the form asked for.
+  it("keeps the slots the server staffed instead of replacing them", async () => {
+    oncall.getSchedule.mockResolvedValue({
+      data: {
+        timezone: "UTC",
+        rotations: [
+          { name: "Primary", slot: "primary", members: ["ana@o2.ai", "bob@o2.ai"], shift_micros: 1, anchor_micros: 1 },
+          { name: "Secondary", slot: "secondary", members: ["bob@o2.ai", "ana@o2.ai"], shift_micros: 1, anchor_micros: 1 },
+        ],
+      },
+    } as any);
+
+    const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, {
+      name: "Payments",
+      members: ["ana@o2.ai", "bob@o2.ai"],
+      first_handover: "2026-08-17T10:00",
+    });
+    await submit(wrapper);
+    await flushPromises();
+
+    const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
+    expect(rotations.map((r: any) => r.slot)).toEqual(["primary", "secondary"]);
+    expect(rotations.every((r: any) => r.anchor_micros === Date.parse("2026-08-17T10:00") * 1000)).toBe(true);
+  });
+
+  /// A server that staffed nothing, or a read that failed, still gets the one
+  /// rotation the form describes — which is all such a team would have had.
+  it("falls back to the single rotation when the read-back fails", async () => {
+    oncall.getSchedule.mockRejectedValue(new Error("boom"));
+
+    const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, {
+      name: "Payments",
+      members: ["ana@o2.ai"],
+      first_handover: "2026-08-17T10:00",
+    });
+    await submit(wrapper);
+    await flushPromises();
+
+    const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
+    expect(rotations).toHaveLength(1);
+    expect(rotations[0].members).toEqual(["ana@o2.ai"]);
   });
 
   // Nobody picked is a legitimate way to create a team, and an empty rotation

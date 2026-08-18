@@ -118,7 +118,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
-import type { OnCallTeam } from "@/ts/interfaces/oncall";
+import type { OnCallTeam, Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { SHIFT_PRESETS } from "@/utils/oncall";
@@ -305,14 +305,7 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
       team_id: teamId,
       data: {
         timezone: values.timezone,
-        rotations: [
-          {
-            name: t("oncall.defaultRotationName"),
-            members: emails,
-            shift_micros: shift,
-            anchor_micros: anchor * 1000,
-          },
-        ],
+        rotations: await amendStaffedRotations(teamId, emails, shift, anchor * 1000),
       },
     });
   } catch (err: any) {
@@ -320,6 +313,46 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
       variant: "warning",
       message: raw(err?.response?.data?.message) || t("oncall.teamCreatedWithoutRotation"),
     });
+  }
+}
+
+/// Adding members auto-staffs the team, and this PUT is a **full replace** —
+/// so sending one hand-built primary rotation deleted whatever the server had
+/// just derived, most visibly the secondary slot. A team created by curl ended
+/// up with two slots and the same team created here with one.
+///
+/// So: read back what was staffed, carry every rotation through, and change
+/// only the two things this form actually asked for — shift length and first
+/// handover. Nothing staffed (or the read failed) falls back to the single
+/// rotation, which is what a team with no derived slots would have got anyway.
+async function amendStaffedRotations(
+  teamId: string,
+  emails: string[],
+  shift: number,
+  anchorMicros: number,
+): Promise<Rotation[]> {
+  const fallback: Rotation[] = [
+    {
+      name: t("oncall.defaultRotationName"),
+      members: emails,
+      shift_micros: shift,
+      anchor_micros: anchorMicros,
+    },
+  ];
+  try {
+    const res = await oncallService.getSchedule({
+      org_identifier: orgId.value,
+      team_id: teamId,
+    });
+    const staffed = res.data?.rotations ?? [];
+    if (!staffed.length) return fallback;
+    return staffed.map((rotation) => ({
+      ...rotation,
+      shift_micros: shift,
+      anchor_micros: anchorMicros,
+    }));
+  } catch {
+    return fallback;
   }
 }
 </script>
