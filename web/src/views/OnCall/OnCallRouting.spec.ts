@@ -51,7 +51,10 @@ const ORG = store.state.selectedOrganization.identifier;
 /// The sections are stubbed so this file is about the WIRING between them and
 /// the org-level API — each section has its own spec for what it renders.
 const stubs = {
-  OPageLayout: { name: "OPageLayout", template: "<div><slot /></div>" },
+  OPageLayout: {
+    name: "OPageLayout",
+    template: "<div><slot name='actions' /><slot /></div>",
+  },
   OnCallRoutingSimulator: {
     name: "OnCallRoutingSimulator",
     props: ["preview", "teams", "aliases", "loading", "sending"],
@@ -69,9 +72,21 @@ const stubs = {
   },
   OnCallDefaultTeamCard: {
     name: "OnCallDefaultTeamCard",
-    props: ["teams"],
+    props: ["teams", "dialog"],
     template: "<div />",
   },
+  OToggleGroup: {
+    name: "OToggleGroup",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: "<div><slot /></div>",
+  },
+  OToggleGroupItem: {
+    name: "OToggleGroupItem",
+    props: ["value"],
+    template: "<button><slot /></button>",
+  },
+  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
   OEmptyState: {
     name: "OEmptyState",
     props: ["title", "actionLabel"],
@@ -84,7 +99,11 @@ const stubs = {
     template: "<div><slot /></div>",
   },
   ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
-  OButton: { name: "OButton", props: ["disabled"], template: "<button><slot /></button>" },
+  OButton: {
+    name: "OButton",
+    props: ["disabled", "active"],
+    template: "<button><slot /></button>",
+  },
   OInput: {
     name: "OInput",
     props: ["modelValue"],
@@ -100,8 +119,22 @@ const stubs = {
 };
 
 const TEAMS = [
-  { id: "team_1", org_id: "default", name: "Platform", timezone: "UTC", created_at: 0, updated_at: 0 },
-  { id: "team_2", org_id: "default", name: "Payments", timezone: "UTC", created_at: 0, updated_at: 0 },
+  {
+    id: "team_1",
+    org_id: "default",
+    name: "Platform",
+    timezone: "UTC",
+    created_at: 0,
+    updated_at: 0,
+  },
+  {
+    id: "team_2",
+    org_id: "default",
+    name: "Payments",
+    timezone: "UTC",
+    created_at: 0,
+    updated_at: 0,
+  },
 ];
 
 function render() {
@@ -115,6 +148,14 @@ type Wrapper = ReturnType<typeof render>;
 const rulesPanel = (w: Wrapper) => w.findComponent({ name: "OnCallOwnershipRules" });
 const unrouted = (w: Wrapper) => w.findComponent({ name: "OnCallUnroutedQueue" });
 const dialog = (w: Wrapper) => w.findComponent({ name: "ODialog" });
+const simulator = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingSimulator" });
+
+/// The queue lives behind the second tab, so a test about it starts by asking
+/// for that list.
+async function showSignals(w: Wrapper) {
+  w.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "signals");
+  await flushPromises();
+}
 
 describe("OnCallRouting", () => {
   beforeEach(() => {
@@ -161,6 +202,7 @@ describe("OnCallRouting", () => {
     service.unroutedSignals.mockResolvedValue({ data: [signal] } as any);
     const wrapper = render();
     await flushPromises();
+    await showSignals(wrapper);
 
     unrouted(wrapper).vm.$emit("claim", signal);
     await flushPromises();
@@ -187,6 +229,58 @@ describe("OnCallRouting", () => {
     expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
   });
 
+  /// The tester answers a hypothetical; the rules answer what is configured.
+  /// Shipping it open costs the reader the top of the page every visit.
+  it("keeps the tester closed until the header asks for it", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(simulator(wrapper).exists()).toBe(false);
+
+    await wrapper.find('[data-test="oncall-routing-test-signal"]').trigger("click");
+    expect(simulator(wrapper).exists()).toBe(true);
+    // In a drawer, so opening it does not push the lists down the page.
+    expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(true);
+  });
+
+  /// Nominating a catch-all is a one-time act, but whether one exists is a
+  /// standing fact — so the trigger is in the header on both tabs.
+  it("carries the catch-all trigger on both tabs", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const card = () => wrapper.findComponent({ name: "OnCallDefaultTeamCard" });
+    expect(card().props("dialog")).toBe(true);
+
+    await showSignals(wrapper);
+    expect(card().exists()).toBe(true);
+  });
+
+  /// Add rule writes a rule, so it belongs to the tab that lists them — on the
+  /// queue the row's own "write the rule" is the pre-filled version of it.
+  it("offers Add rule on the rules list only, and opens the dialog", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(true);
+
+    await wrapper.find('[data-test="oncall-routing-add-rule"]').trigger("click");
+    expect(dialog(wrapper).props("open")).toBe(true);
+
+    await showSignals(wrapper);
+    expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(false);
+  });
+
+  /// One list at a time: rules are what the org owns, the queue is what it
+  /// does not.
+  it("switches between the rules and the queue", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(rulesPanel(wrapper).exists()).toBe(true);
+    expect(unrouted(wrapper).exists()).toBe(false);
+
+    await showSignals(wrapper);
+    expect(rulesPanel(wrapper).exists()).toBe(false);
+    expect(unrouted(wrapper).exists()).toBe(true);
+  });
+
   /// B8: a transient 500 is not "this org has no rules". The failure gets a
   /// named error state with a way back, never an empty-looking screen.
   it("renders a retryable error when the backbone fails, then recovers", async () => {
@@ -209,9 +303,12 @@ describe("OnCallRouting", () => {
     service.unroutedSignals.mockRejectedValue(new Error("500"));
     const wrapper = render();
     await flushPromises();
+    // The rules tab is what opens; the failure is on the list it names.
+    expect(rulesPanel(wrapper).exists()).toBe(true);
+
+    await showSignals(wrapper);
     expect(wrapper.find('[data-test="oncall-unrouted-error"]').exists()).toBe(true);
     expect(unrouted(wrapper).exists()).toBe(false);
-    expect(rulesPanel(wrapper).exists()).toBe(true);
   });
 
   /// §G.8.1: 404 = feature flag off, 403 "Not Supported" = OSS build. Both are
@@ -248,6 +345,7 @@ describe("OnCallRouting", () => {
   it("refetches the queue with the announced filters", async () => {
     const wrapper = render();
     await flushPromises();
+    await showSignals(wrapper);
 
     unrouted(wrapper).vm.$emit("change-filters", {
       landing: "nobody",
@@ -296,5 +394,21 @@ describe("OnCallRouting", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-routing-empty"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-routing-content"]').exists()).toBe(false);
+  });
+
+  /// Reported from the browser: neither header button appeared. Every other
+  /// test here stubs OPageLayout, so all of them stayed green while the real
+  /// one rendered nothing — a `v-if` ON the `<template #actions>` makes the
+  /// slot absent at first render, and OPageLayout's `useSlots()` check never
+  /// sees it arrive. The condition belongs INSIDE the slot.
+  it("renders the header actions through the real page layout", async () => {
+    const { OPageLayout: _stubbedLayout, ...realLayout } = stubs;
+    const wrapper = mount(OnCallRouting, {
+      global: { plugins: [i18n, store], stubs: realLayout },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-routing-test-signal"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(true);
   });
 });

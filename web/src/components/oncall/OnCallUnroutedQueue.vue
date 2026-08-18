@@ -28,7 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col gap-3" data-test="oncall-unrouted">
-    <span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    <span
+      v-if="showHeader"
+      class="flex flex-wrap items-baseline gap-x-2 gap-y-1"
+      data-test="oncall-unrouted-header"
+    >
       <OText variant="panel-title">{{ t("oncall.unroutedTitle") }}</OText>
       <OText variant="meta">{{ t("oncall.unroutedHint") }}</OText>
       <!-- Bulk claim needs a team to claim FOR, so it only renders where the
@@ -51,22 +55,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          queue worked (the org screen). `landing` splits the two emergencies
          the row tags name; `include_dismissed` swaps the outstanding worklist
          for the raw historical record. -->
-    <span v-if="filterable" class="flex flex-wrap items-center gap-3" data-test="oncall-unrouted-filters">
-      <OToggleGroup
-        :model-value="landing || 'both'"
-        @update:model-value="setLanding"
-      >
+    <span
+      v-if="filterable"
+      class="flex flex-wrap items-center gap-3"
+      data-test="oncall-unrouted-filters"
+    >
+      <OToggleGroup :model-value="landing || 'both'" @update:model-value="setLanding">
         <OToggleGroupItem value="both" size="sm" data-test="oncall-unrouted-filter-both">
           {{ t("oncall.unroutedFilterBoth") }}
         </OToggleGroupItem>
         <OToggleGroupItem value="nobody" size="sm" data-test="oncall-unrouted-filter-nobody">
           {{ t("oncall.unroutedPagedNobody") }}
         </OToggleGroupItem>
-        <OToggleGroupItem
-          value="default_team"
-          size="sm"
-          data-test="oncall-unrouted-filter-default"
-        >
+        <OToggleGroupItem value="default_team" size="sm" data-test="oncall-unrouted-filter-default">
           {{ t("oncall.unroutedFilterDefault") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -79,108 +80,127 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </span>
 
-    <OInnerLoading v-if="loading" showing />
-
-    <!-- Silence here is the good outcome, so it gets a sentence rather than an
-         empty panel somebody has to interpret. -->
-    <p v-else-if="!signals.length" class="text-text-secondary text-sm" data-test="oncall-unrouted-empty">
-      {{ t("oncall.unroutedNone") }}
-    </p>
-
-    <ul v-else class="flex flex-col">
-      <li
-        v-for="signal in signals"
-        :key="signal.id"
-        class="border-border-subtle flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-2 last:border-b-0"
-        :class="signal.dismissed_at ? 'opacity-60' : ''"
-        :data-test="`oncall-unrouted-row-${signal.id}`"
-      >
-        <!-- Dismissing stamps the field and keeps the row — the evidence that
-             a page fell through is worth more than a tidy table. -->
-        <OTag
-          v-if="signal.dismissed_at"
-          variant="default-soft"
-          size="sm"
-          class="shrink-0"
-          :data-test="`oncall-unrouted-dismissed-${signal.id}`"
-        >
-          {{ t("oncall.unroutedDismissedTag") }}
-        </OTag>
-        <span class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-text-heading truncate text-sm font-medium">{{ titleOf(signal) }}</span>
-          <!-- The dimensions a rule would be written against, and nothing
-               else. Pod names, node names and status codes are evidence about
-               ONE firing — showing them here made every row an unreadable dump
-               and implied the claim would pin to them. The full set stays a
-               hover away for whoever is identifying the alert. -->
-          <code class="text-text-secondary truncate text-xs" :title="pathOf(signal)">
-            {{ raw(routablePathOf(signal)) }}
-          </code>
+    <OTable
+      :data="signals"
+      :columns="columns"
+      row-key="id"
+      :frame="false"
+      :loading="loading"
+      :show-global-filter="false"
+      :row-class="rowClass"
+      table-id="oncall-unrouted-queue"
+      data-test="oncall-unrouted-table"
+    >
+      <template #cell-signal="{ row }">
+        <span class="flex min-w-0 items-center gap-2">
+          <!-- Dismissing stamps the field and keeps the row — the evidence that
+               a page fell through is worth more than a tidy table. -->
+          <OTag
+            v-if="row.dismissed_at"
+            variant="default-soft"
+            size="sm"
+            class="shrink-0"
+            :data-test="`oncall-unrouted-dismissed-${row.id}`"
+          >
+            {{ t("oncall.unroutedDismissedTag") }}
+          </OTag>
+          <span class="text-text-heading truncate">{{ titleOf(row) }}</span>
         </span>
+      </template>
 
-        <!-- §G.3: two different emergencies share this queue. A row the default
-             team absorbed is an ownership gap that PAGED somebody; a row with
-             no `defaulted_team_id` woke nobody at all. An operator triages
-             those in opposite orders, so the row must say which it is. -->
+      <!-- The dimensions a rule would be written against, and nothing else.
+           Pod names, node names and status codes are evidence about ONE
+           firing — showing them here made every row an unreadable dump and
+           implied the claim would pin to them. The full set stays a hover
+           away for whoever is identifying the alert. -->
+      <template #cell-path="{ row }">
+        <code
+          class="text-text-secondary truncate text-xs"
+          :title="pathOf(row)"
+          :data-test="`oncall-unrouted-path-${row.id}`"
+        >
+          {{ raw(routablePathOf(row)) }}
+        </code>
+      </template>
+
+      <template #cell-fires="{ row }">
+        <span class="flex flex-col">
+          <span class="text-text-body">
+            {{ t("oncall.unroutedFires", { count: row.occurrences }, row.occurrences) }}
+          </span>
+          <OTimeCell v-if="row.last_seen_at" :value="row.last_seen_at" unit="us" />
+        </span>
+      </template>
+
+      <!-- §G.3: two different emergencies share this queue. A row the default
+           team absorbed is an ownership gap that PAGED somebody; a row with no
+           `defaulted_team_id` woke nobody at all. An operator triages those in
+           opposite orders, so the row must say which it is. -->
+      <template #cell-outcome="{ row }">
         <OTag
-          v-if="signal.defaulted_team_id"
+          v-if="row.defaulted_team_id"
           variant="warning-soft"
           size="sm"
-          class="shrink-0"
-          :data-test="`oncall-unrouted-defaulted-${signal.id}`"
+          :data-test="`oncall-unrouted-defaulted-${row.id}`"
         >
-          {{ t("oncall.unroutedAbsorbedBy", { team: raw(teamNameOf(signal.defaulted_team_id)) }) }}
+          {{ t("oncall.unroutedAbsorbedBy", { team: raw(teamNameOf(row.defaulted_team_id)) }) }}
         </OTag>
-        <OTag
-          v-else
-          variant="error-soft"
-          size="sm"
-          class="shrink-0"
-          :data-test="`oncall-unrouted-nobody-${signal.id}`"
-        >
+        <OTag v-else variant="error-soft" size="sm" :data-test="`oncall-unrouted-nobody-${row.id}`">
           {{ t("oncall.unroutedPagedNobody") }}
         </OTag>
+      </template>
 
-        <span class="text-text-secondary ms-auto shrink-0 text-xs">
-          {{ t("oncall.unroutedFires", { count: signal.occurrences }, signal.occurrences) }}
+      <template #cell-actions="{ row }">
+        <span class="flex items-center justify-end gap-1">
+          <OButton
+            variant="outline"
+            size="xs"
+            :data-test="`oncall-unrouted-claim-${row.id}`"
+            @click.stop="emit('claim', row)"
+          >
+            {{
+              teamName
+                ? t("oncall.unroutedClaimFor", { team: raw(teamName) })
+                : t("oncall.unroutedWriteRule")
+            }}
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            icon-left="close"
+            :aria-label="t('oncall.unroutedDismiss')"
+            :data-test="`oncall-unrouted-dismiss-${row.id}`"
+            @click.stop="emit('dismiss', row)"
+          />
         </span>
+      </template>
 
-        <OButton
-          variant="outline"
-          size="xs"
-          class="shrink-0"
-          :data-test="`oncall-unrouted-claim-${signal.id}`"
-          @click="emit('claim', signal)"
-        >
-          {{
-            teamName
-              ? t("oncall.unroutedClaimFor", { team: raw(teamName) })
-              : t("oncall.unroutedWriteRule")
-          }}
-        </OButton>
-
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="close"
-          :aria-label="t('oncall.unroutedDismiss')"
-          :data-test="`oncall-unrouted-dismiss-${signal.id}`"
-          @click="emit('dismiss', signal)"
+      <!-- Silence here is the good outcome, so it gets a sentence rather than
+           an empty panel somebody has to interpret. -->
+      <template #empty>
+        <OEmptyState
+          size="inline"
+          preset="no-data"
+          :description="t('oncall.unroutedNone')"
+          data-test="oncall-unrouted-empty"
         />
-      </li>
-    </ul>
+      </template>
+    </OTable>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OText from "@/lib/core/Typography/OText.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
@@ -204,6 +224,9 @@ const props = withDefaults(
     filterable?: boolean;
     loading?: boolean;
     claiming?: boolean;
+    /** Hosts that already name the section — a tab strip, a page header — turn
+     *  the title row off rather than repeat themselves. */
+    showHeader?: boolean;
   }>(),
   {
     signals: () => [],
@@ -212,6 +235,7 @@ const props = withDefaults(
     filterable: false,
     loading: false,
     claiming: false,
+    showHeader: true,
   },
 );
 
@@ -223,6 +247,48 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
+  {
+    id: "signal",
+    header: t("oncall.unroutedSignal"),
+    accessorFn: (row: UnroutedSignal) => String(titleOf(row)),
+    meta: { isName: true },
+  },
+  {
+    id: "path",
+    header: t("oncall.unroutedPath"),
+    sortable: false,
+    accessorFn: (row: UnroutedSignal) => routablePathOf(row),
+  },
+  {
+    id: "fires",
+    header: t("oncall.unroutedFiresHeader"),
+    size: 150,
+    accessorFn: (row: UnroutedSignal) => row.occurrences,
+  },
+  {
+    id: "outcome",
+    header: t("oncall.unroutedOutcome"),
+    size: 170,
+    sortable: false,
+    accessorFn: (row: UnroutedSignal) => row.defaulted_team_id ?? "",
+  },
+  {
+    id: "actions",
+    header: t("oncall.actions"),
+    isAction: true,
+    sortable: false,
+    size: 170,
+    meta: { align: "right", cellClass: "actions-column", actionCount: 2 },
+  },
+]);
+
+/// A dismissed row stays in the table as the record, dimmed so the outstanding
+/// work still reads first.
+function rowClass(row: UnroutedSignal): string {
+  return row.dismissed_at ? "opacity-60" : "";
+}
 
 const landing = ref<"" | "default_team" | "nobody">("");
 const includeDismissed = ref(false);

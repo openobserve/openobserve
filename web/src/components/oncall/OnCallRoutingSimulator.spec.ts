@@ -51,7 +51,13 @@ function preview(over: Partial<RoutingPreview> = {}): RoutingPreview {
     team_id: "team_1",
     reason: "routed by ownership rule",
     ladder: [
-      { priority: "P1", rungs: 3, pages_anyone: true, nobody_after_micros: 1_200_000_000, ends_with_whole_team: true },
+      {
+        priority: "P1",
+        rungs: 3,
+        pages_anyone: true,
+        nobody_after_micros: 1_200_000_000,
+        ends_with_whole_team: true,
+      },
     ],
     current_responder: {
       user_email: "aarav@o2.ai",
@@ -92,7 +98,27 @@ async function addDimension(wrapper: Wrapper, name: string, value: string) {
   await wrapper.find('[data-test="oncall-simulator-dimension-confirm"]').trigger("click");
 }
 
+/// Priority is offered, never assumed — so a test about the ladder asks for
+/// one first, the way a reader does.
+async function pickPriority(wrapper: Wrapper, priority = "P1") {
+  await wrapper
+    .findComponent('[data-test="oncall-simulator-priority"]')
+    .vm.$emit("update:modelValue", priority);
+}
+
 describe("OnCallRoutingSimulator", () => {
+  /// A pre-filled P1 makes the tester answer a question nobody asked, and the
+  /// answer changes with the priority — so it starts empty.
+  it("assumes no priority until one is chosen", async () => {
+    const wrapper = render();
+    expect(wrapper.find('[data-test="oncall-simulator-chip-priority"]').exists()).toBe(false);
+
+    await pickPriority(wrapper);
+    expect(wrapper.find('[data-test="oncall-simulator-chip-priority"]').text()).toContain("P1");
+    // The picker gives way to the chip it created.
+    expect(wrapper.find('[data-test="oncall-simulator-priority"]').exists()).toBe(false);
+  });
+
   /// Nothing to test against means the button would ask the server "where does
   /// an alert with no facts go", which has no useful answer.
   it("cannot run with no dimensions", () => {
@@ -106,6 +132,7 @@ describe("OnCallRoutingSimulator", () => {
   it("normalises a dimension the way the server will match it", async () => {
     const wrapper = render();
     await addDimension(wrapper, "service", "  Payments-API ");
+    await pickPriority(wrapper);
     await wrapper.find('[data-test="oncall-simulator-run"]').trigger("click");
 
     expect(wrapper.emitted("run")?.[0][0]).toMatchObject({
@@ -123,14 +150,17 @@ describe("OnCallRoutingSimulator", () => {
     expect(wrapper.find('[data-test="oncall-simulator-chip-service"]').exists()).toBe(false);
   });
 
-  it("shows the whole path — rule, team, ladder, person", () => {
+  it("shows the whole path — rule, team, ladder, person", async () => {
     const wrapper = render({ preview: preview() });
+    await pickPriority(wrapper);
     const result = wrapper.find('[data-test="oncall-simulator-result"]');
 
     expect(result.text()).toContain("service = payments-api");
     expect(wrapper.find('[data-test="oncall-simulator-team"]').text()).toContain("Payments");
     expect(wrapper.find('[data-test="oncall-simulator-ladder"]').text()).toContain("P1 ladder");
-    expect(wrapper.find('[data-test="oncall-simulator-responder"]').text()).toContain("aarav@o2.ai");
+    expect(wrapper.find('[data-test="oncall-simulator-responder"]').text()).toContain(
+      "aarav@o2.ai",
+    );
   });
 
   /// "most specific of 1 match" is noise dressed as a finding.
@@ -204,17 +234,19 @@ describe("OnCallRoutingSimulator", () => {
     );
   });
 
-  it("marks a priority that would wake nobody", () => {
+  it("marks a priority that would wake nobody", async () => {
     const wrapper = render({
       preview: preview({
         ladder: [{ priority: "P1", rungs: 0, pages_anyone: false, ends_with_whole_team: false }],
       }),
     });
+    await pickPriority(wrapper);
     expect(wrapper.find('[data-test="oncall-simulator-ladder"]').text()).toContain("Pages nobody");
   });
 
   it("asks the parent to send a real page for the resolved team", async () => {
     const wrapper = render({ preview: preview() });
+    await pickPriority(wrapper);
     await wrapper.find('[data-test="oncall-simulator-send-test"]').trigger("click");
     expect(wrapper.emitted("send-test")?.[0][0]).toEqual({ team_id: "team_1", priority: "P1" });
   });

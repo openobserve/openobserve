@@ -69,9 +69,11 @@ function render(signals: UnroutedSignal[] = [signal()]) {
 
 describe("OnCallUnroutedQueue", () => {
   it("names the alert and the dimensions a rule would be written against", () => {
-    const row = render().find('[data-test="oncall-unrouted-row-s1"]');
-    expect(row.text()).toContain("Dispute webhook backlog");
-    expect(row.text()).toContain("k8s-namespace = payments-edge · service = disputes-api");
+    const wrapper = render();
+    expect(wrapper.text()).toContain("Dispute webhook backlog");
+    expect(wrapper.find('[data-test="oncall-unrouted-path-s1"]').text()).toContain(
+      "k8s-namespace = payments-edge · service = disputes-api",
+    );
   });
 
   /// The server's own sentence handles the empty-path case, which reads nothing
@@ -161,6 +163,17 @@ describe("OnCallUnroutedQueue", () => {
       landing: "nobody",
       include_dismissed: true,
     });
+  });
+
+  /// A tab strip already names this list; repeating the title inside it reads
+  /// as two sections.
+  it("drops its own title when the host names the section", () => {
+    const wrapper = mount(OnCallUnroutedQueue, {
+      props: { signals: [signal()], showHeader: false },
+      global: { plugins: [i18n, store], stubs },
+    });
+    expect(wrapper.find('[data-test="oncall-unrouted-header"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').exists()).toBe(true);
   });
 
   it("offers no filters unless the host asks for them", () => {

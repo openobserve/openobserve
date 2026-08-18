@@ -26,7 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col gap-3" data-test="oncall-ownership-rules">
-    <span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    <span
+      v-if="showHeader"
+      class="flex flex-wrap items-baseline gap-x-2 gap-y-1"
+      data-test="oncall-ownership-header"
+    >
       <OText variant="panel-title">{{ t("oncall.ownershipRules") }}</OText>
       <OText variant="meta">{{ t("oncall.ownershipRulesHint") }}</OText>
       <OButton
@@ -85,7 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The server's own verdict, never a recomputed one. "Shadowed" in
            particular is a claim about rules this screen never fetched. -->
       <template #cell-health="{ row }">
-        <OTag :variant="healthTone(row.health)" size="sm" :data-test="`oncall-rule-health-${row.rule_id}`">
+        <OTag
+          :variant="healthTone(row.health)"
+          size="sm"
+          :data-test="`oncall-rule-health-${row.rule_id}`"
+        >
           {{ healthLabel(row) }}
         </OTag>
       </template>
@@ -147,8 +155,17 @@ const props = withDefaults(
     loading?: boolean;
     /** Org-level view: rules span teams, so each row names where it routes. */
     showTeam?: boolean;
+    /** Hosts that already name the section — a tab strip, a page header — turn
+     *  the title row off rather than repeat themselves. */
+    showHeader?: boolean;
   }>(),
-  { rules: () => [], aliases: () => [], loading: false, showTeam: false },
+  {
+    rules: () => [],
+    aliases: () => [],
+    loading: false,
+    showTeam: false,
+    showHeader: true,
+  },
 );
 
 const emit = defineEmits<{

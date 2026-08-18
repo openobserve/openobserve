@@ -70,8 +70,7 @@ const rows = (w: Wrapper) => table(w).props("data") as OwnershipRuleStats[];
 const column = (w: Wrapper, id: string) =>
   (table(w).props("columns") as any[]).find((c) => c.id === id);
 /// By data-test, not "the first OTag" — the specificity column renders tags too.
-const health = (w: Wrapper, id = "r1") =>
-  w.findComponent(`[data-test="oncall-rule-health-${id}"]`);
+const health = (w: Wrapper, id = "r1") => w.findComponent(`[data-test="oncall-rule-health-${id}"]`);
 
 describe("OnCallOwnershipRules", () => {
   /// Precedence is the whole point of the table: the server breaks ties on
@@ -81,8 +80,16 @@ describe("OnCallOwnershipRules", () => {
     const wrapper = render([
       // The namespace path is the longer STRING but the weaker claim: sorting
       // on rendered text would put these the wrong way round.
-      rule({ rule_id: "short", path: "k8s-namespace=payments", dimensions: { "k8s-namespace": "payments" } }),
-      rule({ rule_id: "long", path: "service=payments-api", dimensions: { service: "payments-api" } }),
+      rule({
+        rule_id: "short",
+        path: "k8s-namespace=payments",
+        dimensions: { "k8s-namespace": "payments" },
+      }),
+      rule({
+        rule_id: "long",
+        path: "service=payments-api",
+        dimensions: { service: "payments-api" },
+      }),
     ]);
     expect(rows(wrapper).map((r) => r.rule_id)).toEqual(["long", "short"]);
   });
@@ -114,7 +121,13 @@ describe("OnCallOwnershipRules", () => {
       rule({
         health: "shadowed",
         shadowed_by: [
-          { rule_id: "r2", team_id: "team_2", team_name: "Ledger", path: "service=x", outcome: "takes it" },
+          {
+            rule_id: "r2",
+            team_id: "team_2",
+            team_name: "Ledger",
+            path: "service=x",
+            outcome: "takes it",
+          },
         ],
       }),
     ]);
@@ -122,7 +135,9 @@ describe("OnCallOwnershipRules", () => {
   });
 
   it("marks a rule that has never matched", () => {
-    const wrapper = render([rule({ health: "never_used", pages_caught: 0, last_matched_at: null })]);
+    const wrapper = render([
+      rule({ health: "never_used", pages_caught: 0, last_matched_at: null }),
+    ]);
     expect(health(wrapper).text()).toContain("Never used");
     expect(health(wrapper).props("variant")).toBe("default-soft");
   });
@@ -130,7 +145,10 @@ describe("OnCallOwnershipRules", () => {
   it("tones an active rule apart from a shadowed one", () => {
     expect(health(render([rule()])).props("variant")).toBe("success-soft");
     const shadowed = render([
-      rule({ health: "shadowed", shadowed_by: [{ rule_id: "r2", team_id: "t", path: "p", outcome: "o" }] }),
+      rule({
+        health: "shadowed",
+        shadowed_by: [{ rule_id: "r2", team_id: "t", path: "p", outcome: "o" }],
+      }),
     ]);
     expect(health(shadowed).props("variant")).toBe("warning-soft");
   });
@@ -162,5 +180,16 @@ describe("OnCallOwnershipRules", () => {
       global: { plugins: [i18n, store], stubs },
     });
     expect(column(wrapper, "team").accessorFn(rows(wrapper)[0])).toBe("team_1");
+  });
+
+  /// A tab strip already names this list; repeating the title inside it reads
+  /// as two sections, and the header's Add rule as two ways in.
+  it("drops its own title when the host names the section", () => {
+    const wrapper = mount(OnCallOwnershipRules, {
+      props: { rules: [rule()], showHeader: false },
+      global: { plugins: [i18n, store], stubs },
+    });
+    expect(wrapper.find('[data-test="oncall-ownership-header"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-ownership-add-rule"]').exists()).toBe(false);
   });
 });

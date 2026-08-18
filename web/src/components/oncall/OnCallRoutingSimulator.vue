@@ -26,10 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-3 border px-4 py-3"
+    :class="[
+      'flex flex-col gap-3',
+      embedded
+        ? ''
+        : 'card-container rounded-surface bg-surface-base border-border-default border px-4 py-3',
+    ]"
     data-test="oncall-routing-simulator"
   >
-    <span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    <span v-if="!embedded" class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
       <OText variant="panel-title">{{ t("oncall.simulatorTitle") }}</OText>
       <OText variant="meta">{{ t("oncall.simulatorHint") }}</OText>
     </span>
@@ -79,6 +84,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("oncall.addDimension") }}
       </OButton>
+
+      <!-- Priority is the one axis that is not a dimension: it picks which
+           ladder the winning team would run. Offered, never assumed — a
+           pre-filled P1 makes the tester answer a question nobody asked. -->
+      <OSelect
+        v-if="!priority"
+        :model-value="priority"
+        :options="priorityOptions"
+        :placeholder="t('oncall.priority')"
+        width="xs"
+        data-test="oncall-simulator-priority"
+        @update:model-value="(v: unknown) => (priority = String(v))"
+      />
 
       <OButton
         variant="primary"
@@ -137,7 +155,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <code class="text-text-body text-compact">{{ matchedPath }}</code>
       </span>
 
-      <OTag v-if="specificityNote" variant="primary-soft" size="sm" data-test="oncall-simulator-specificity">
+      <OTag
+        v-if="specificityNote"
+        variant="primary-soft"
+        size="sm"
+        data-test="oncall-simulator-specificity"
+      >
         {{ specificityNote }}
       </OTag>
 
@@ -154,8 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-heading text-sm font-medium">
             {{ t("oncall.simulatorLadder", { priority: raw(ladderEntry.priority) }) }}
           </span>
-          <span :class="ladderEntry.pages_anyone ? 'text-text-secondary' : 'text-status-error-text'"
-            class="text-xs">{{ ladderNote }}</span>
+          <span
+            :class="ladderEntry.pages_anyone ? 'text-text-secondary' : 'text-status-error-text'"
+            class="text-xs"
+            >{{ ladderNote }}</span
+          >
         </span>
       </template>
 
@@ -165,7 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OUserCell :value="responder.user_email" />
           <!-- Channels that would carry it, or the server's reason none can. -->
           <span
-            :class="responder.would_a_page_land ? 'text-status-success-text' : 'text-status-error-text'"
+            :class="
+              responder.would_a_page_land ? 'text-status-success-text' : 'text-status-error-text'
+            "
             class="text-xs"
           >
             {{ responderNote }}
@@ -242,6 +270,9 @@ const props = withDefaults(
     aliases?: { id: string; display?: string }[];
     loading?: boolean;
     sending?: boolean;
+    /** Hosted inside a surface that already frames and names it — a drawer, a
+     *  dialog — so it drops its own card and title. */
+    embedded?: boolean;
   }>(),
   {
     preview: null,
@@ -251,6 +282,7 @@ const props = withDefaults(
     aliases: () => [],
     loading: false,
     sending: false,
+    embedded: false,
   },
 );
 
@@ -262,7 +294,7 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const pairs = ref<{ name: string; value: string }[]>([]);
-const priority = ref("P1");
+const priority = ref("");
 const adding = ref(false);
 const draftName = ref("");
 const draftValue = ref("");
@@ -270,6 +302,13 @@ const draftValue = ref("");
 const query = computed<SimulatorQuery>(() => ({
   dimensions: Object.fromEntries(pairs.value.map((pair) => [pair.name, pair.value])),
   priority: priority.value,
+}));
+
+/// The five the ladder is defined over; `formatPriority` is the same vocabulary
+/// on the read side.
+const priorityOptions = ["P1", "P2", "P3", "P4", "P5"].map((value) => ({
+  label: raw(value),
+  value,
 }));
 
 const dimensionOptions = computed(() =>
@@ -316,7 +355,9 @@ const matchedPath = computed<I18nText>(() => {
 });
 
 const matchedLabel = computed<I18nText>(() =>
-  props.preview?.landed_on_default ? t("oncall.simulatorDefaultTeam") : t("oncall.simulatorMatchedRule"),
+  props.preview?.landed_on_default
+    ? t("oncall.simulatorDefaultTeam")
+    : t("oncall.simulatorMatchedRule"),
 );
 
 /// Only worth a badge when something else also matched — otherwise "most

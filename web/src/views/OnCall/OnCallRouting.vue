@@ -36,6 +36,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="account-tree"
     scroll
   >
+    <!-- All on demand: the page's own answer is the rule list, so the tester
+         opens in a drawer rather than pushing the lists down the screen, and
+         Add rule belongs to the tab that holds rules. The catch-all sits on
+         both tabs: setting one is rare, but knowing whether one exists is not. -->
+    <template #actions>
+      <OnCallDefaultTeamCard v-if="ready" :teams="teams" :dialog="true" />
+      <OButton
+        v-if="ready"
+        variant="outline"
+        size="sm-action"
+        icon-left="search"
+        :active="testerOpen"
+        data-test="oncall-routing-test-signal"
+        @click="testerOpen = !testerOpen"
+      >
+        {{ testerOpen ? t("oncall.routingHideTest") : t("oncall.routingTestSignal") }}
+      </OButton>
+      <OButton
+        v-if="ready && tab === 'rules'"
+        variant="primary"
+        size="sm-action"
+        data-test="oncall-routing-add-rule"
+        @click="openAdd"
+      >
+        {{ t("oncall.addRule") }}
+      </OButton>
+    </template>
+
     <!-- §G.8.1: the entry fetch is the capability probe. 404 (feature off) and
          403 "Not Supported" (OSS build) both mean on-call is not available
          here — a fact about the deployment, not a failure, so no error tone,
@@ -73,32 +101,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <div v-else class="flex flex-col gap-5 py-4" data-test="oncall-routing-content">
-      <OnCallRoutingSimulator
-        :preview="preview"
-        :teams="teams"
-        :aliases="aliases"
-        :loading="testing"
-        :sending="sendingTest"
-        @run="runPreview"
-        @send-test="sendTestPage"
-      />
+      <!-- Two lists, one question apart: what the org already owns, and what
+           nothing owns yet. The count on each is the reason to switch. -->
+      <OToggleGroup
+        :model-value="tab"
+        type="single"
+        class="self-start"
+        data-test="oncall-routing-tabs"
+        @update:model-value="setTab"
+      >
+        <OToggleGroupItem value="rules" size="sm" data-test="oncall-routing-tab-rules">
+          {{ t("oncall.ownershipRules") }}
+          <OTag variant="default-soft" size="sm">{{ rules.length }}</OTag>
+        </OToggleGroupItem>
+        <OToggleGroupItem value="signals" size="sm" data-test="oncall-routing-tab-signals">
+          {{ t("oncall.routingTabNeedsRule") }}
+          <OTag :variant="openSignalCount ? 'error-soft' : 'default-soft'" size="sm">
+            {{ openSignalCount }}
+          </OTag>
+        </OToggleGroupItem>
+      </OToggleGroup>
 
       <OnCallOwnershipRules
+        v-if="tab === 'rules'"
         :rules="rules"
         :aliases="aliases"
         :loading="loadingRules"
         :show-team="true"
+        :show-header="false"
         @add="openAdd"
         @edit="openEdit"
         @remove="(rule) => (ruleToDelete = rule)"
       />
 
-      <OnCallDefaultTeamCard :teams="teams" />
-
       <!-- The queue's own failure must not read as "nothing is unrouted" —
            that is this screen's core claim, and it has to be honest (B8). -->
       <OEmptyState
-        v-if="signalsError"
+        v-else-if="signalsError"
         size="inline"
         variant="error"
         :title="t('oncall.unroutedLoadFailed')"
@@ -112,11 +151,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :teams="teams"
         filterable
         :loading="loadingSignals"
+        :show-header="false"
         @claim="openClaim"
         @dismiss="dismissSignal"
         @change-filters="onFiltersChange"
       />
     </div>
+
+    <!-- The tester answers a hypothetical about the rules; it should not cost
+         the reader their place in them, so it slides over the page instead of
+         inserting a panel above it. -->
+    <ODrawer
+      :open="testerOpen"
+      size="lg"
+      :title="t('oncall.simulatorTitle')"
+      :sub-title="t('oncall.simulatorHint')"
+      data-test="oncall-routing-tester-drawer"
+      @update:open="(v: boolean) => (testerOpen = v)"
+    >
+      <OnCallRoutingSimulator
+        :preview="preview"
+        :teams="teams"
+        :aliases="aliases"
+        :loading="testing"
+        :sending="sendingTest"
+        :embedded="true"
+        @run="runPreview"
+        @send-test="sendTestPage"
+      />
+    </ODrawer>
 
     <!-- One dialog for add, edit and claim: a rule is dimensions plus the team
          they route to. A claim arrives with the dimensions already filled —
@@ -208,7 +271,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="t('oncall.removeRuleMessage')"
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
-      @update:model-value="(v: boolean) => { if (!v) ruleToDelete = null; }"
+      @update:model-value="
+        (v: boolean) => {
+          if (!v) ruleToDelete = null;
+        }
+      "
     />
   </OPageLayout>
 </template>
@@ -225,13 +292,17 @@ import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.v
 import type { SimulatorQuery } from "@/components/oncall/OnCallRoutingSimulator.vue";
 import OnCallUnroutedQueue from "@/components/oncall/OnCallUnroutedQueue.vue";
 import type { UnroutedFilters } from "@/components/oncall/OnCallUnroutedQueue.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import alertsService from "@/services/alerts";
 import oncallService from "@/services/oncall";
 import type {
@@ -271,6 +342,12 @@ const testing = ref(false);
 const sendingTest = ref(false);
 const saving = ref(false);
 
+/// Which list is on screen. `signals` is the queue of paths nothing claims.
+const tab = ref<"rules" | "signals">("rules");
+/// The tester is opened from the header rather than shipped open: it answers a
+/// hypothetical, and the rules below answer what is actually configured.
+const testerOpen = ref(false);
+
 const dialogOpen = ref(false);
 const editingRule = ref<OwnershipRuleStats | null>(null);
 const claimingSignal = ref<UnroutedSignal | null>(null);
@@ -279,6 +356,22 @@ const draftTeam = ref("");
 const draftPairs = ref<{ name: string; value: string }[]>([]);
 const draftName = ref("");
 const draftValue = ref("");
+
+/// The header actions only make sense once the page has something to act on —
+/// not over the unavailable, error or no-teams states.
+const ready = computed(() => loaded.value && !loadError.value && !!teams.value.length);
+
+/// Dismissed rows are the historical record, not the worklist, so the tab
+/// counts what is still outstanding.
+const openSignalCount = computed(
+  () => signals.value.filter((signal) => !signal.dismissed_at).length,
+);
+
+/// A single-select toggle group can deselect its active item; this screen
+/// always shows one of the two lists, so a null round-trip keeps the tab.
+function setTab(value: unknown) {
+  if (value === "rules" || value === "signals") tab.value = value;
+}
 
 const teamOptions = computed(() =>
   teams.value.map((team) => ({ label: raw(team.name), value: team.id })),
