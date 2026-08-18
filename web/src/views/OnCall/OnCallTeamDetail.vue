@@ -822,8 +822,9 @@ async function sendTestPage() {
       team_id: teamId.value,
     });
     const data = res.data;
-    const reached = data?.recipients?.length ?? 0;
-    if (data?.reached_anyone && reached) {
+    // `attempts`, not `recipients` — the latter never existed on the wire.
+    const reached = (data?.attempts ?? []).filter((attempt) => attempt.delivered).length;
+    if (data?.reached_anyone) {
       toast({
         variant: "success",
         message: t("oncall.testPageSent", { count: reached }, reached),

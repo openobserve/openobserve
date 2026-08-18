@@ -1072,6 +1072,39 @@ export interface Override {
   note?: string | null;
 }
 
+/**
+ * One `(recipient, channel)` a test page tried, in the order tried.
+ *
+ * `reason` is the other half of the answer: a test page that reached somebody
+ * who should not have been on the list has still found a misconfiguration.
+ */
+export interface TestPageAttempt {
+  channel: Channel;
+  recipient: string;
+  reason: string;
+  delivered: boolean;
+  /** The transport's own error, verbatim. Absent on success. */
+  detail?: string | null;
+}
+
+/**
+ * `POST /oncall/teams/{id}/test-page`. Always a 200 — a test page that found a
+ * team nobody is on call for has done its job; the endpoint worked and the
+ * configuration did not.
+ *
+ * There is no `recipients` field and never was. The UI invented one, read
+ * `undefined` from every 200, and reported a delivered page as "Nothing was
+ * sent — Nobody".
+ */
+export interface TestPageResult {
+  reached_anyone: boolean;
+  /** Why nothing was sent, when nothing was. Absent means it was attempted. */
+  not_sent_because?: string | null;
+  /** The channels this priority pages on, in fallback order. */
+  channels: Channel[];
+  attempts: TestPageAttempt[];
+}
+
 export const MICROS_PER_MINUTE = 60_000_000;
 export const MICROS_PER_HOUR = 60 * MICROS_PER_MINUTE;
 export const MICROS_PER_DAY = 24 * MICROS_PER_HOUR;

@@ -279,9 +279,18 @@ describe("OnCallTeams", () => {
 
     /// G6: "would a page actually land" cost a drill-in to ask. `test-page`
     /// runs the real transports and writes no record, so a list may offer it.
+    ///
+    /// The count comes from `attempts`. Reading a `recipients` field the wire
+    /// has never had made every delivered page report "Nothing was sent".
     it("sends a real test page from the row and says who it reached", async () => {
       service.testPage.mockResolvedValue({
-        data: { reached_anyone: true, recipients: ["engineer@example.com"] },
+        data: {
+          reached_anyone: true,
+          channels: ["email"],
+          attempts: [
+            { channel: "email", recipient: "engineer@example.com", reason: "on call now", delivered: true },
+          ],
+        },
       } as any);
       const wrapper = await rendered();
 
@@ -301,7 +310,12 @@ describe("OnCallTeams", () => {
     /// in the UI is how the two screens start disagreeing about the same team.
     it("reports reaching nobody without calling it a failure", async () => {
       service.testPage.mockResolvedValue({
-        data: { reached_anyone: false, recipients: [], not_sent_because: "no transport configured" },
+        data: {
+          reached_anyone: false,
+          channels: [],
+          attempts: [],
+          not_sent_because: "no transport configured",
+        },
       } as any);
       const wrapper = await rendered();
 

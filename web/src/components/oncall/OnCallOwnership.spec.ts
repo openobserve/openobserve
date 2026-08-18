@@ -346,7 +346,11 @@ describe("OnCallOwnership", () => {
   /// The API takes a number; the simulator speaks in "P1".
   it("sends a real test page with the priority as a number", async () => {
     service.testPage.mockResolvedValue({
-      data: { reached_anyone: true, recipients: ["a@o2.ai"] },
+      data: {
+        reached_anyone: true,
+        channels: ["email"],
+        attempts: [{ channel: "email", recipient: "a@o2.ai", reason: "on call now", delivered: true }],
+      },
     } as any);
     const wrapper = render();
     await flushPromises();

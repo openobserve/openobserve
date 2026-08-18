@@ -539,7 +539,8 @@ async function sendTestPage(value: { team_id: string; priority: string }) {
       team_id: value.team_id,
       priority: Number(value.priority.replace(/^P/i, "")) || undefined,
     });
-    const reached = res.data?.recipients?.length ?? 0;
+    // `attempts`, not `recipients` — the latter never existed on the wire.
+    const reached = (res.data?.attempts ?? []).filter((attempt) => attempt.delivered).length;
     toast({
       variant: res.data?.reached_anyone ? "success" : "warning",
       message: res.data?.reached_anyone

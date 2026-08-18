@@ -48,6 +48,7 @@ import type {
   Override,
   PromoteResult,
   PromoteSeverity,
+  TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 
@@ -774,11 +775,7 @@ const oncall = {
     team_id: string;
     priority?: number;
   }) =>
-    http().post<{
-      reached_anyone: boolean;
-      recipients?: string[] | null;
-      not_sent_because?: string | null;
-    }>(
+    http().post<TestPageResult>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/test-page`,
       priority === undefined ? {} : { priority },
     ),
