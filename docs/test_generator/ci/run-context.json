@@ -1,0 +1,29 @@
+{
+  "feature_slug": "traces-query-tabs",
+  "feature_title": "Traces Query Tab Navigation",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "tracesQueryTabs.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/tracesQueryTabs.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/composables/shared/router.ts",
+    "web/src/composables/useTraces.ts",
+    "web/src/ts/interfaces/traces/trace.types.ts",
+    "web/src/lib/core/Navbar/navGroups.ts",
+    "web/src/lib/core/Navbar/ONavGroup.vue",
+    "web/src/lib/core/Navbar/ONavbar.types.ts",
+    "web/src/plugins/traces/Index.vue",
+    "web/src/plugins/traces/viewTracesHandoff.ts",
+    "web/src/plugins/traces/views/ServiceGraphView.vue",
+    "web/src/plugins/traces/views/ServicesCatalogView.vue",
+    "web/src/plugins/traces/views/useServiceViewTimeRange.ts",
+    "web/src/views/slos/SloList.vue",
+    "web/src/composables/useSloFormat.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

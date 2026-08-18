@@ -1,0 +1,12 @@
+[
+  { "title": "P0: Tabless /traces defaults to Spans view", "action": "new", "verifies": "a tabless /traces URL is canonicalized to ?tab=spans, the Spans toggle is active, and the search view renders" },
+  { "title": "P0: Toolbar tab switch updates ?tab= and active state (Spans -> Traces -> Services Catalog -> Spans)", "action": "new", "verifies": "each in-page toolbar toggle rewrites the URL to ?tab=<mode> (never the legacy standalone path) and sets the matching toggle data-state=on" },
+  { "title": "P0: Rail flyout navigates to /traces?tab=services-catalog (same route)", "action": "new", "verifies": "the Traces rail flyout child navigates to the canonical ?tab=services-catalog URL instead of the removed /traces/services route, and the catalog view renders" },
+  { "title": "P1: Service Graph is gated out in OSS (flyout item and toolbar toggle absent)", "action": "new", "verifies": "in OSS the Service Graph flyout item and toolbar toggle are both absent (count 0) while Spans/Traces/Services Catalog items remain" },
+  { "title": "P1: Legacy /traces/services redirects to ?tab=services-catalog (query preserved)", "action": "new", "verifies": "the legacy /traces/services URL redirects to ?tab=services-catalog with period=30m preserved and search_mode absent" },
+  { "title": "P1: Service Graph URLs degrade to Spans in OSS (legacy route and direct ?tab=service-graph)", "action": "new", "verifies": "both /traces/service-graph and /traces?tab=service-graph degrade to ?tab=spans in OSS with the Spans toggle active" },
+  { "title": "P1: Invalid ?tab= canonicalized to spans and search_mode stripped", "action": "new", "verifies": "an unknown ?tab=bogus and the deprecated search_mode param are canonicalized to ?tab=spans with search_mode removed" },
+  { "title": "P1: ?tab= survives a cold reload", "action": "new", "verifies": "a full page reload restores the Services Catalog tab from ?tab=services-catalog" },
+  { "title": "P2: Flyout Spans and Traces items navigate to their ?tab=", "action": "new", "verifies": "the flyout Spans and Traces items navigate to ?tab=spans and ?tab=traces respectively with the matching toggle active" },
+  { "title": "P2: Search context (time range) preserved across a flyout tab switch", "action": "new", "verifies": "a non-default 30m time range carries into the Services Catalog tab across a same-route flyout switch" }
+]

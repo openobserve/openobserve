@@ -1,0 +1,37 @@
+{
+  "feature_slug": "traces-query-tabs",
+  "feature_title": "Traces Query Tab Navigation",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "tracesQueryTabs.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/tracesQueryTabs.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/composables/shared/router.ts",
+    "web/src/composables/useTraces.ts",
+    "web/src/ts/interfaces/traces/trace.types.ts",
+    "web/src/lib/core/Navbar/navGroups.ts",
+    "web/src/lib/core/Navbar/ONavGroup.vue",
+    "web/src/lib/core/Navbar/ONavbar.types.ts",
+    "web/src/plugins/traces/Index.vue",
+    "web/src/plugins/traces/viewTracesHandoff.ts",
+    "web/src/plugins/traces/views/ServiceGraphView.vue",
+    "web/src/plugins/traces/views/ServicesCatalogView.vue",
+    "web/src/plugins/traces/views/useServiceViewTimeRange.ts",
+    "web/src/views/slos/SloList.vue",
+    "web/src/composables/useSloFormat.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 37 changed paths live under web/src/** and scripts/translations/** — no enterprise/, o2_enterprise/, or src/enterprise/ directories are touched. The Service Graph feature carries an enterprise gate, but that gate is expressed inside OSS nav code (navGroups.ts uses gate: \"enterprise\", router.ts checks config.isEnterprise) rather than in any enterprise-owned file, so the change itself is OSS.",
+    "skip": "Not skipping: the change is user-facing. There is no tests-added label, no skip comment, and the change is not docs/CI-only — it alters live navigation routes, URL query semantics, the nav flyout, and the Traces page tabs.",
+    "e2e": "E2E is warranted. The change replaces the standalone /traces/service-graph and /traces/services routes with in-page /traces?tab=… tabs (spans/traces/service-graph/services-catalog), swaps the search_mode query param for tab, and reworks the nav flyout highlighting/links — all user-exercisable flows a test should verify, including the OSS fallback that resolves service-graph to spans when not enterprise.",
+    "area": "Traces. The bulk of the UI change lives in web/src/plugins/traces/** and web/src/composables/shared/router.ts plus the Traces nav items in web/src/lib/core/Navbar/**; sibling Playwright specs live under tests/ui-testing/playwright-tests/Traces/.",
+    "group": "Traces. The ci_matrix_cloud.json matrix already defines a Traces testfolder (actual_folder Traces) whose run_files include service-graph.spec.js, so a new tracesQueryTabs.spec.js belongs in that same shard.",
+    "existing_tests": "No E2E specs in the diff. The only test files changed are Vitest unit specs under web/src (router.spec.ts, useTraces.spec.ts, ONavGroup.spec.ts, navGroups.spec.ts, Index.spec.ts, viewTracesHandoff.spec.ts); none are under tests/ui-testing/playwright-tests/, so they do not count as Playwright E2E coverage of the new navigation behavior."
+  }
+}

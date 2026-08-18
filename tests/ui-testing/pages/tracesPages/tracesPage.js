@@ -26,6 +26,16 @@ export class TracesPage {
     this.servicesCatalogNavItem = '[data-test="nav-group-item-servicesCatalog"]';
     this.serviceGraphTabToggle = '[data-test="traces-service-graph-toggle"]';
     this.servicesCatalogTabToggle = '[data-test="traces-search-mode-services-catalog-btn"]';
+    // Reorganized flyout selectors (PR #13852): the Traces rail tile's hover
+    // flyout now targets the SAME /traces route via ?tab=<mode>. Children are
+    // derived as nav-group-item-<name>-<tab> (ONavGroup.vue childDataTest()).
+    // The legacy nav-group-item-serviceGraph / -servicesCatalog selectors
+    // (above) match nothing post-reorg.
+    this.tracesFlyout = '[data-test="nav-group-flyout-traces"]';
+    this.flyoutSpansItem = '[data-test="nav-group-item-traces-spans"]';
+    this.flyoutTracesItem = '[data-test="nav-group-item-traces-traces"]';
+    this.flyoutServiceGraphItem = '[data-test="nav-group-item-traces-service-graph"]';
+    this.flyoutServicesCatalogItem = '[data-test="nav-group-item-traces-services-catalog"]';
     // Inline-safe selectors (defined in the inner components, so they work for
     // both the in-page tabs and the standalone pages).
     this.servicesCatalogTable = '[data-test="services-catalog-table"]';
@@ -480,6 +490,75 @@ export class TracesPage {
   async expectServicesCatalogTabActive() {
     await expect(this.page.locator(this.servicesCatalogTabToggle))
       .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  // The Spans / Traces toolbar tab is the active mode (data-state="on").
+  // Reka ToggleGroupItem puts data-state on the same element as data-test.
+  async expectSpansTabActive() {
+    await expect(this.page.locator(this.spansToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  async expectTracesTabActive() {
+    await expect(this.page.locator(this.searchToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  // Search view (spans/traces) renders: field list + search bar.
+  async expectSearchViewVisible() {
+    await expect(this.page.locator(this.indexList)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.searchBar)).toBeVisible({ timeout: 10000 });
+  }
+
+  // In-page toolbar tab switches — click the OToggleGroupItem and wait for the
+  // canonical ?tab= URL (guards the switch before callers assert active state).
+  async switchToTracesTab() {
+    await this.page.locator(this.searchToggle).click();
+    await this.page.waitForURL(/\/traces\?.*tab=traces/, { timeout: 10000 });
+  }
+
+  async switchToSpansTab() {
+    await this.page.locator(this.spansToggle).click();
+    await this.page.waitForURL(/\/traces\?.*tab=spans/, { timeout: 10000 });
+  }
+
+  // Hover the Traces rail tile and wait for the flyout to open.
+  async openTracesFlyout() {
+    await this.page.locator(this.tracesRailTile).hover();
+    await this.page.locator(this.tracesFlyout).waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  // Click a flyout child (spans | traces | services-catalog | service-graph),
+  // which navigates to the SAME /traces route with ?tab=<mode>.
+  async navigateToTracesTabViaFlyout(tab) {
+    const itemSelectors = {
+      spans: this.flyoutSpansItem,
+      traces: this.flyoutTracesItem,
+      'services-catalog': this.flyoutServicesCatalogItem,
+      'service-graph': this.flyoutServiceGraphItem,
+    };
+    const selector = itemSelectors[tab];
+    if (!selector) throw new Error(`Unknown traces flyout tab: ${tab}`);
+    await this.openTracesFlyout();
+    await this.page.locator(selector).click();
+    await this.page.waitForURL(new RegExp(`\\/traces\\?.*tab=${tab}`), { timeout: 10000 });
+  }
+
+  // The flyout shows Spans, Traces and Services Catalog; in OSS the enterprise
+  // Service Graph item is filtered out entirely (count 0).
+  async expectFlyoutItemsVisible({ serviceGraphAbsent = true } = {}) {
+    await this.openTracesFlyout();
+    await expect(this.page.locator(this.flyoutSpansItem)).toBeVisible({ timeout: 5000 });
+    await expect(this.page.locator(this.flyoutTracesItem)).toBeVisible({ timeout: 5000 });
+    await expect(this.page.locator(this.flyoutServicesCatalogItem)).toBeVisible({ timeout: 5000 });
+    if (serviceGraphAbsent) {
+      await expect(this.page.locator(this.flyoutServiceGraphItem)).toHaveCount(0);
+    }
+  }
+
+  // In OSS the enterprise Service Graph toolbar toggle is not rendered.
+  async expectServiceGraphToggleAbsent() {
+    await expect(this.page.locator(this.serviceGraphTabToggle)).toHaveCount(0);
   }
 
   // Standalone Service Graph page rendered from the rail flyout route.

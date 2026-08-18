@@ -1,0 +1,3613 @@
+===== COMPLETE LIST OF CHANGED FILES (37 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+scripts/translations/main.py
+web/src/composables/shared/router.spec.ts
+web/src/composables/shared/router.ts
+web/src/composables/useSloFormat.ts
+web/src/composables/useTraces.spec.ts
+web/src/composables/useTraces.ts
+web/src/lib/core/Navbar/ONavGroup.spec.ts
+web/src/lib/core/Navbar/ONavGroup.vue
+web/src/lib/core/Navbar/ONavbar.types.ts
+web/src/lib/core/Navbar/navGroups.spec.ts
+web/src/lib/core/Navbar/navGroups.ts
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/plugins/traces/Index.spec.ts
+web/src/plugins/traces/Index.vue
+web/src/plugins/traces/viewTracesHandoff.spec.ts
+web/src/plugins/traces/viewTracesHandoff.ts
+web/src/plugins/traces/views/ServiceGraphView.vue
+web/src/plugins/traces/views/ServicesCatalogView.vue
+web/src/plugins/traces/views/useServiceViewTimeRange.ts
+web/src/ts/interfaces/traces/trace.types.ts
+web/src/views/slos/SloDetail.vue
+web/src/views/slos/SloList.vue
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index c6e698d59ea..3f41a09f0cf 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -8522,19 +8522,19 @@
+           "session": {
+             "hint": "5dd78622bba67659",
+             "matchedLoading": "5e682b66c73fc11f",
+-            "matchedSuffix": "cc385d31983dc8e4",
++            "matchedSuffix": "1b85c854164f36c6",
+             "title": "a562ae9c6cc190bf"
+           },
+           "span": {
+             "hint": "1686b1bce4ddff56",
+             "matchedLoading": "8f5aa303985bb824",
+-            "matchedSuffix": "c8173bda02c6adf6",
++            "matchedSuffix": "cc6adb6fc64fce6b",
+             "title": "513fc52b5a7950e5"
+           },
+           "trace": {
+             "hint": "ccea2e7bb0651d29",
+             "matchedLoading": "66e0117ac52557ac",
+-            "matchedSuffix": "f11d1f51b0f3725d",
++            "matchedSuffix": "897daa334a785b14",
+             "title": "7aafc281b2bfa887"
+           }
+         },
+@@ -11832,7 +11832,6 @@
+       "measuringSinceTitle": "6d6a0d811d87edc9",
+       "title": "79f8b7c08dc7209c"
+     },
+-    "generation": "20819513455acb7e",
+     "groupedSliceNote": "d524b474eb67a7f6",
+     "groups": {
+       "emptyDescription": "d7e0ad55453dc4ec",
+@@ -14352,7 +14351,14 @@
+   "workflow": {
+     "actions": "ff8059dc6752afdd",
+     "addStepRequired": "6792f09c3a1457f4",
++    "canvas": {
++      "deleteEdge": "b8d070f14e6a3f75",
++      "insertStep": "4920f14b3361eba2",
++      "tidyUp": "ccb75b518c626e67",
++      "undo": "a8283ade31856f71"
++    },
+     "chooseTrigger": "1cb8680317054630",
++    "comingSoon": "f0e658fab147026b",
+     "commonFieldsAbove": "a415bc3d5f48bcbf",
+     "connectAllNodes": "c720a933050980f9",
+     "create": "750c4da495f2d442",
+@@ -14367,9 +14373,11 @@
+     "deleteTitle": "634b3f7ad9161d42",
+     "description": "526e0087cc3f254d",
+     "descriptionPlaceholder": "c3524d9f7abeed88",
+-    "edgeDeleteHint": "286490c0abc7040d",
++    "draft": "ebf12ef47cf575b3",
++    "draftSaveSuccess": "9a8b645b5b805984",
+     "edit": "464c4ffd019e1e96",
+     "editMode": "e7945ee25eb63c57",
++    "finishStepsBeforePublish": "53e9da9d81f56b62",
+     "header": "e2073645cb0dbbdd",
+     "history": {
+       "button": "848f54e89660cea4",
+@@ -14413,6 +14421,9 @@
+     "namePlaceholder": "942ce282b041e034",
+     "nameRequired": "d9485c0343d2208f",
+     "node": {
++      "commentAdd": "e596e6256a50ea78",
++      "commentLabel": "0a64e30504e36b7b",
++      "commentPlaceholder": "fbe74995bbaf2eee",
+       "condition": "39b36d38d6eb03c8",
+       "conditionDesc": "a331fe355ae175a1",
+       "conditionExampleEmpty": "147d02888189ee10",
+@@ -14422,16 +14433,39 @@
+       "conditionNoteNull": "64f9a3ff16c7fba5",
+       "conditionNoteTitle": "7d8586fae4d38d7c",
+       "configComingSoon": "e9c492ac803738cf",
++      "destinationBody": "20d22a18784e613d",
++      "destinationBodySet": "73eca37bafa2bb0e",
++      "destinationCreateNew": "1d3633323c8f0077",
+       "destinationDesc": "f7ad83f91a0a610c",
++      "destinationLoadError": "71d36dc93bcbc3f2",
++      "destinationRequired": "c8e1c09e97aee2b2",
++      "destinationSelect": "293d404a500f5f9a",
++      "destinationSetUpLater": "eb5e104944c17e59",
++      "destinationSetUpLaterActive": "604d2ea3c5c6b18f",
++      "destinationSetUpLaterPrompt": "f7f6a34ee3238bc7",
++      "disable": "0dcb89a146396e1a",
++      "disabledBadge": "75081b593d15cf6e",
++      "enable": "2cb515be8c376129",
+       "function": "c803710302d5769d",
++      "functionBody": "cb8c99505128cf8e",
++      "functionBodySet": "5933fc01fb4ca2d0",
++      "functionCreateNew": "b608eeb53fcc68bd",
+       "functionDesc": "4ced4a80ca5617e7",
++      "functionLoadError": "8cdd38319d8c63f3",
++      "functionRequired": "fc91c369d3852cdb",
++      "functionSelect": "91e946d9c38e8cc0",
++      "functionSetUpLater": "eb5e104944c17e59",
++      "functionSetUpLaterActive": "9ddd8f4caa9a49b5",
++      "functionSetUpLaterPrompt": "c3862cfb10e9929e",
+       "incidentCommonTitle": "baa999e86c583ac2",
+       "incidentEventTypeLabel": "9c85b75fdf0bf48c",
+       "incidentNoExtraFields": "7a50b4db5cb51c41",
+       "incidentSpecificTitle": "6446aeb1773880b2",
++      "incompleteBadge": "eb5e104944c17e59",
+       "kindAction": "64cff1319d2fd2cb",
+       "kindLogic": "7c400199bada661a",
+       "kindTrigger": "8b9c643731c94119",
++      "namePlaceholder": "3720a3412d1a4864",
+       "sectionDestination": "293d404a500f5f9a",
+       "sectionTransform": "d2d68041b53daa75",
+       "sendToDestination": "293d404a500f5f9a",
+@@ -14441,14 +14475,26 @@
+       "triggerDataExampleNote": "85f8d73cb6774334"
+     },
+     "pauseSuccess": "91e07e6cc429f4b1",
++    "publish": "859390eb495b2ead",
++    "publishError": "4b816be09d0cb2c4",
++    "publishSuccess": "5ff58bc2772636ba",
+     "refresh": "4581d29a49da5afd",
+     "renameHint": "95cbf57b2d8459d5",
++    "results": {
++      "close": "9de7725d62abd9b7",
++      "collapse": "be6eb1fc3b05bf9d",
++      "empty": "7f201223918e9b11",
++      "expand": "07548c2c6511d4d1",
++      "nodesTitle": "1de3df70ddf4faab",
++      "title": "9930295f98218365"
++    },
+     "resumeSuccess": "e4002848f1307954",
+     "runs": {
+       "edit": "e7945ee25eb63c57",
+       "staleGraphWarning": "e954ce70f907b190",
+       "title": "a444842d2c72b82f"
+     },
++    "saveDraft": "6c462142d3681836",
+     "saveError": "2be35bc8ec574ba7",
+     "search": "a5b9f624c06b9981",
+     "subtitle": "42349f7319e8d8fe",
+@@ -14523,6 +14569,21 @@
+       "streamType": "5cfa35b7ace280bd"
+     },
+     "triggerRequired": "ea1031bff425bbed",
++    "triggerType": {
++      "comingSoon": "be10b2f905f868ed",
++      "cta": "2559bdedbc650146",
++      "dialogIntro": "90be3072d69fe5af",
++      "dialogTitle": "16de13b82016cb39",
++      "pick": "db8a308d0366e2e7",
++      "soon": "cf0ee3547a4e51a5",
++      "soonCta": "a8b84120dffd5946"
++    },
++    "unsaved": {
++      "discard": "e07e053c2e10b3f1",
++      "message": "65c7c19637954b61",
++      "stay": "624a83c761415dc9",
++      "title": "f507179bd454425e"
++    },
+     "updateSuccess": "caf9b77b6f154b7a",
+     "updated": "3a5ecca188c0579c",
+     "view": "dcc839a4015c4b7d"
+diff --git a/scripts/translations/main.py b/scripts/translations/main.py
+index 833c8ed4822..f8a73b4312a 100755
+--- a/scripts/translations/main.py
++++ b/scripts/translations/main.py
+@@ -122,10 +122,17 @@ def main():
+         translated = translate_pending(pending, locale) if pending else {}
+ 
+         target = build_locale(source, existing, state, translated, counters)
+-        # Flushed per locale (atomically), so a run that is cancelled or dies part
+-        # way through still leaves every completed locale on disk for CI to commit.
+-        write_json(get_language_file_path(locale), target)
+         locale_targets[locale] = target
++        # Only rewrite the file when it actually changed. `json.dumps(indent=2)`
++        # does not match prettier's formatting (short arrays are written
++        # multi-line), so an unconditional write would reformat an otherwise
++        # unchanged locale file and break the `format:check` gate. Skipping the
++        # write keeps the committed prettier formatting intact.
++        if target != existing:
++            # Flushed per locale (atomically), so a run that is cancelled or dies
++            # part way through still leaves every completed locale on disk for CI
++            # to commit.
++            write_json(get_language_file_path(locale), target)
+ 
+     # Advance shared state only on a full run, where every supported locale was
+     # processed and "present in all locales" is meaningful. Subset runs translate
+diff --git a/web/src/composables/shared/router.spec.ts b/web/src/composables/shared/router.spec.ts
+index 37631f175ff..1d5cd63cf84 100644
+--- a/web/src/composables/shared/router.spec.ts
++++ b/web/src/composables/shared/router.spec.ts
+@@ -613,11 +613,126 @@ describe("useRoutes (router.ts)", () => {
+       expect(route.path).toBe("traces/trace-details");
+     });
+ 
+-    it("should include service-graph redirect route", () => {
++    it("redirects the standalone Service Graph path to the canonical query tab", () => {
++      config.isEnterprise = "true";
+       const { homeChildRoutes } = useRoutes();
+-      const route = homeChildRoutes.find((r: any) => r.path === "service-graph");
+-      expect(route).toBeDefined();
+-      expect(route.redirect).toBe("/traces");
++      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/service-graph");
++      if (!route || typeof route.redirect !== "function") {
++        throw new Error("Missing Service Graph legacy redirect");
++      }
++
++      expect(
++        route.redirect({
++          query: { org_identifier: "default", period: "7d", search_mode: "spans" },
++        }),
++      ).toEqual({
++        name: "traces",
++        query: { org_identifier: "default", period: "7d", tab: "service-graph" },
++      });
++    });
++
++    it("redirects the standalone Service Graph path to Traces in OSS", () => {
++      const { homeChildRoutes } = useRoutes();
++      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/service-graph");
++      if (!route || typeof route.redirect !== "function") {
++        throw new Error("Missing Service Graph legacy redirect");
++      }
++
++      expect(route.redirect({ query: { org_identifier: "default", stream: "traces" } })).toEqual({
++        name: "traces",
++        query: { org_identifier: "default", stream: "traces", tab: "spans" },
++      });
++    });
++
++    it("redirects the standalone Service Catalog path to the canonical query tab", () => {
++      const { homeChildRoutes } = useRoutes();
++      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/services");
++      if (!route || typeof route.redirect !== "function") {
++        throw new Error("Missing Service Catalog legacy redirect");
++      }
++
++      expect(route.redirect({ query: { org_identifier: "default", from: "1", to: "2" } })).toEqual({
++        name: "traces",
++        query: {
++          org_identifier: "default",
++          from: "1",
++          to: "2",
++          tab: "services-catalog",
++        },
++      });
++    });
++
++    it("keeps the oldest Service Graph path as a query-preserving redirect", () => {
++      config.isEnterprise = "true";
++      const { homeChildRoutes } = useRoutes();
++      const route = homeChildRoutes.find((candidate) => candidate.path === "service-graph");
++      if (!route || typeof route.redirect !== "function") {
++        throw new Error("Missing oldest Service Graph redirect");
++      }
++
++      expect(route.redirect({ query: { org_identifier: "default" } })).toEqual({
++        name: "traces",
++        query: { org_identifier: "default", tab: "service-graph" },
++      });
++    });
++
++    it("normalizes an unsupported Service Graph tab before entering Traces in OSS", async () => {
++      const { routeGuard } = await import("@/utils/zincutils");
++      const { homeChildRoutes } = useRoutes();
++      const route = findRoute(homeChildRoutes, "traces");
++      const next = vi.fn();
++
++      route.beforeEnter(
++        {
++          query: { org_identifier: "default", stream: "traces", tab: "service-graph" },
++          hash: "",
++        },
++        {},
++        next,
++      );
++
++      expect(next).toHaveBeenCalledWith({
++        name: "traces",
++        query: { org_identifier: "default", stream: "traces", tab: "spans" },
++        hash: "",
++        replace: true,
++      });
++      expect(routeGuard).not.toHaveBeenCalled();
++    });
++
++    it("removes legacy search_mode from an otherwise valid Traces URL", async () => {
++      const { routeGuard } = await import("@/utils/zincutils");
++      const { homeChildRoutes } = useRoutes();
++      const route = findRoute(homeChildRoutes, "traces");
++      const next = vi.fn();
++
++      route.beforeEnter(
++        {
++          query: {
++            org_identifier: "default",
++            stream: "traces",
++            tab: "spans",
++            search_mode: "traces",
++          },
++          hash: "#results",
++        },
++        {},
++        next,
++      );
++
++      expect(next).toHaveBeenCalledWith({
++        name: "traces",
++        query: { org_identifier: "default", stream: "traces", tab: "spans" },
++        hash: "#results",
++        replace: true,
++      });
++      expect(routeGuard).not.toHaveBeenCalled();
++    });
++
++    it("does not expose standalone Service Graph or Service Catalog route names", () => {
++      const { homeChildRoutes } = useRoutes();
++      expect(findRoute(homeChildRoutes, "serviceGraph")).toBeUndefined();
++      expect(findRoute(homeChildRoutes, "servicesCatalog")).toBeUndefined();
+     });
+   });
+ 
+@@ -1575,7 +1690,7 @@ describe("useRoutes (router.ts)", () => {
+       const { homeChildRoutes } = useRoutes();
+       const route = findRoute(homeChildRoutes, "traces");
+ 
+-      const mockTo = {};
++      const mockTo = { query: { tab: "traces" } };
+       const mockFrom = {};
+       const mockNext = vi.fn();
+       route.beforeEnter(mockTo, mockFrom, mockNext);
+diff --git a/web/src/composables/shared/router.ts b/web/src/composables/shared/router.ts
+index f12548d7d8d..8db8b277580 100644
+--- a/web/src/composables/shared/router.ts
++++ b/web/src/composables/shared/router.ts
+@@ -19,7 +19,9 @@ import {
+   useLocalCurrentUser,
+   invalidateLoginData,
+ } from "@/utils/zincutils";
++import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
+ import config from "@/aws-exports";
++import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+ import Home from "@/views/HomeView.vue";
+ import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
+ import About from "@/views/About.vue";
+@@ -39,8 +41,25 @@ const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
+ 
+ const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
+ const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
+-const ServiceGraphView = () => import("@/plugins/traces/views/ServiceGraphView.vue");
+-const ServicesCatalogView = () => import("@/plugins/traces/views/ServicesCatalogView.vue");
++
++const supportedTraceTab = (tab: unknown): TraceSearchMode =>
++  resolveTraceSearchMode(tab, config.isEnterprise === "true");
++
++const canonicalTraceQuery = (
++  query: LocationQuery | undefined,
++  tab: TraceSearchMode,
++): LocationQueryRaw => {
++  const canonicalQuery: LocationQueryRaw = { ...(query ?? {}), tab };
++  delete canonicalQuery.search_mode;
++  return canonicalQuery;
++};
++
++const redirectToTraceTab =
++  (tab: "service-graph" | "services-catalog") =>
++  (to: { query: LocationQuery }): RouteLocationRaw => ({
++    name: "traces",
++    query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
++  });
+ 
+ const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
+ const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
+@@ -265,38 +284,26 @@ const useRoutes = () => {
+         titleKey: "menu.traces",
+       },
+       beforeEnter(to: any, from: any, next: any) {
++        const tab = supportedTraceTab(to.query?.tab);
++        if (to.query?.tab !== tab || to.query?.search_mode !== undefined) {
++          next({
++            name: "traces",
++            query: canonicalTraceQuery(to.query, tab),
++            hash: to.hash,
++            replace: true,
++          });
++          return;
++        }
+         routeGuard(to, from, next);
+       },
+     },
+     {
+       path: "traces/service-graph",
+-      name: "serviceGraph",
+-      component: ServiceGraphView,
+-      meta: {
+-        keepAlive: true,
+-        titleKey: "menu.serviceGraph",
+-      },
+-      beforeEnter(to: any, from: any, next: any) {
+-        // Enterprise-only, mirroring the nav flyout's `enterprise` gate. An OSS
+-        // build lands on Traces rather than an empty page.
+-        if (config.isEnterprise !== "true") {
+-          next({ name: "traces", query: to.query });
+-          return;
+-        }
+-        routeGuard(to, from, next);
+-      },
++      redirect: redirectToTraceTab("service-graph"),
+     },
+     {
+       path: "traces/services",
+-      name: "servicesCatalog",
+-      component: ServicesCatalogView,
+-      meta: {
+-        keepAlive: true,
+-        titleKey: "menu.services",
+-      },
+-      beforeEnter(to: any, from: any, next: any) {
+-        routeGuard(to, from, next);
+-      },
++      redirect: redirectToTraceTab("services-catalog"),
+     },
+     {
+       path: "traces/trace-details",
+@@ -321,9 +328,9 @@ const useRoutes = () => {
+       },
+     },
+     {
+-      // Redirect old service-graph route to traces page
++      // Redirect the oldest Service Graph URL to the canonical in-page tab.
+       path: "service-graph",
+-      redirect: "/traces",
++      redirect: redirectToTraceTab("service-graph"),
+     },
+     {
+       name: "streamExplorer",
+diff --git a/web/src/composables/useSloFormat.ts b/web/src/composables/useSloFormat.ts
+index 3ce5056d0b4..5aa71d7af6a 100644
+--- a/web/src/composables/useSloFormat.ts
++++ b/web/src/composables/useSloFormat.ts
+@@ -50,13 +50,13 @@ export function healthTone(health: SloHealth): string {
+ export function healthIcon(health: SloHealth): string {
+   switch (health) {
+     case "budget_blown":
+-      return "local_fire_department";
++      return "local-fire-department";
+     case "at_risk":
+-      return "trending_down";
++      return "trending-down";
+     case "meeting":
+-      return "check_circle";
++      return "check-circle";
+     default:
+-      return "help";
++      return "help-outline";
+   }
+ }
+ 
+diff --git a/web/src/composables/useTraces.spec.ts b/web/src/composables/useTraces.spec.ts
+index 294aff438ba..27a31a23414 100644
+--- a/web/src/composables/useTraces.spec.ts
++++ b/web/src/composables/useTraces.spec.ts
+@@ -352,7 +352,7 @@ describe("useTraces", () => {
+       expect(searchObj.data.searchAround.size).toBe(10);
+     });
+ 
+-    it("meta.searchMode defaults to traces", () => {
++    it("meta.searchMode defaults to spans", () => {
+       const { searchObj } = useTraces();
+       expect(searchObj.meta.searchMode).toBe("spans");
+     });
+@@ -442,27 +442,30 @@ describe("useTraces", () => {
+       expect(params.span_id).toBe("span-xyz");
+     });
+ 
+-    it("includes search_mode=spans when searchMode is spans", () => {
++    it("includes tab=spans without the legacy search_mode parameter", () => {
+       const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
+       resetSearchObj();
+       searchObj.meta.searchMode = "spans";
+       const params = getUrlQueryParams(false);
+-      expect(params.search_mode).toBe("spans");
++      expect(params.tab).toBe("spans");
++      expect(params.search_mode).toBeUndefined();
+     });
+ 
+-    it("does not include search_mode when searchMode is traces", () => {
++    it("includes tab=traces when searchMode is traces", () => {
+       const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
+       resetSearchObj();
+       searchObj.meta.searchMode = "traces";
+       const params = getUrlQueryParams(false);
++      expect(params.tab).toBe("traces");
+       expect(params.search_mode).toBeUndefined();
+     });
+ 
+-    it("does not include search_mode when searchMode is service-graph", () => {
++    it("includes tab=service-graph when searchMode is service-graph", () => {
+       const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
+       resetSearchObj();
+       searchObj.meta.searchMode = "service-graph";
+       const params = getUrlQueryParams(false);
++      expect(params.tab).toBe("service-graph");
+       expect(params.search_mode).toBeUndefined();
+     });
+ 
+diff --git a/web/src/composables/useTraces.ts b/web/src/composables/useTraces.ts
+index 1bcdaa5f633..d90cb1b8812 100644
+--- a/web/src/composables/useTraces.ts
++++ b/web/src/composables/useTraces.ts
+@@ -24,7 +24,7 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+ import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
+ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+-import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
++import { DEFAULT_TRACE_SEARCH_MODE } from "@/ts/interfaces/traces/trace.types";
+ const defaultObject = {
+   organizationIdentifier: "",
+   runQuery: false,
+@@ -88,7 +88,7 @@ const defaultObject = {
+     metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
+     queryEditorPlaceholderFlag: true,
+     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
+-    searchMode: "spans" as TraceSearchMode,
++    searchMode: DEFAULT_TRACE_SEARCH_MODE,
+     serviceGraphVisualizationType:
+       (localStorage.getItem("serviceGraph_visualizationType") as "tree" | "graph") || "tree",
+     serviceGraphLayoutType: localStorage.getItem("serviceGraph_layoutType") || "horizontal",
+@@ -292,9 +292,7 @@ const useTraces = () => {
+ 
+     query["trace_id"] = router.currentRoute.value.query.trace_id;
+ 
+-    if (searchObj.meta.searchMode === "spans") {
+-      query["search_mode"] = "spans";
+-    }
++    query["tab"] = searchObj.meta.searchMode;
+ 
+     if (router.currentRoute.value.query.span_id)
+       query["span_id"] = router.currentRoute.value.query.span_id;
+diff --git a/web/src/lib/core/Navbar/ONavGroup.spec.ts b/web/src/lib/core/Navbar/ONavGroup.spec.ts
+index 84f36a2c657..f30ad1f5b41 100644
+--- a/web/src/lib/core/Navbar/ONavGroup.spec.ts
++++ b/web/src/lib/core/Navbar/ONavGroup.spec.ts
+@@ -295,23 +295,32 @@ describe("ONavGroup", () => {
+     });
+   });
+ 
+-  // Traces: Service Graph / Service Catalog are standalone routes, but the same
+-  // views also render in-page on /traces?tab=… — `activeOnTab` makes the flyout
+-  // highlight follow what the user is looking at on either path.
+-  describe("tab-alias active state (activeOnTab)", () => {
++  describe("query-tab navigation and active state", () => {
+     const tracesChildren: SubnavChild[] = [
+-      { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
++      {
++        titleKey: "traces.spansTab",
++        icon: "layers",
++        name: "traces",
++        tab: "spans",
++      },
++      {
++        titleKey: "menu.traces",
++        icon: "account-tree",
++        name: "traces",
++        tab: "traces",
++        defaultForRoute: true,
++      },
+       {
+         titleKey: "menu.serviceGraph",
+         icon: "share",
+-        name: "serviceGraph",
+-        activeOnTab: { name: "traces", tab: "service-graph" },
++        name: "traces",
++        tab: "service-graph",
+       },
+       {
+         titleKey: "menu.services",
+         icon: "menu-book",
+-        name: "servicesCatalog",
+-        activeOnTab: { name: "traces", tab: "services-catalog" },
++        name: "traces",
++        tab: "services-catalog",
+       },
+     ];
+ 
+@@ -321,16 +330,6 @@ describe("ONavGroup", () => {
+         routes: [
+           { path: "/", name: "home", component: { template: "<div />" } },
+           { path: "/traces", name: "traces", component: { template: "<div />" } },
+-          {
+-            path: "/traces/service-graph",
+-            name: "serviceGraph",
+-            component: { template: "<div />" },
+-          },
+-          {
+-            path: "/traces/services",
+-            name: "servicesCatalog",
+-            component: { template: "<div />" },
+-          },
+         ],
+       });
+     }
+@@ -363,36 +362,69 @@ describe("ONavGroup", () => {
+       return w;
+     }
+ 
+-    function activeNames(w: VueWrapper): string[] {
++    function activeTabs(w: VueWrapper): string[] {
+       return w
+         .findAll('[data-test^="nav-group-item-"]')
+         .filter((el) => el.attributes("aria-current") === "page")
+-        .map((el) => el.attributes("data-test")!.replace("nav-group-item-", ""));
++        .map((el) => el.attributes("data-test")!.replace("nav-group-item-traces-", ""));
+     }
+ 
+     it("marks Traces on plain /traces", async () => {
+       wrapper = await mountAt("/traces");
+-      expect(activeNames(wrapper)).toEqual(["traces"]);
++      expect(activeTabs(wrapper)).toEqual(["traces"]);
++    });
++
++    it("marks Traces on /traces?tab=traces", async () => {
++      wrapper = await mountAt("/traces?tab=traces");
++      expect(activeTabs(wrapper)).toEqual(["traces"]);
+     });
+ 
+     it("marks Service Graph, not Traces, on /traces?tab=service-graph", async () => {
+       wrapper = await mountAt("/traces?tab=service-graph");
+-      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
++      expect(activeTabs(wrapper)).toEqual(["service-graph"]);
+     });
+ 
+     it("marks Service Catalog, not Traces, on /traces?tab=services-catalog", async () => {
+       wrapper = await mountAt("/traces?tab=services-catalog");
+-      expect(activeNames(wrapper)).toEqual(["servicesCatalog"]);
++      expect(activeTabs(wrapper)).toEqual(["services-catalog"]);
+     });
+ 
+-    it("marks Traces on the in-page granularity tabs (?tab=spans)", async () => {
++    it("marks Spans on /traces?tab=spans", async () => {
+       wrapper = await mountAt("/traces?tab=spans");
+-      expect(activeNames(wrapper)).toEqual(["traces"]);
++      expect(activeTabs(wrapper)).toEqual(["spans"]);
++    });
++
++    it("builds canonical Traces URLs for every flyout item", async () => {
++      wrapper = await mountAt("/traces");
++
++      expect(wrapper.get('[data-test="nav-group-item-traces-traces"]').attributes("href")).toBe(
++        "/traces?org_identifier=default&tab=traces",
++      );
++      expect(wrapper.get('[data-test="nav-group-item-traces-spans"]').attributes("href")).toBe(
++        "/traces?org_identifier=default&tab=spans",
++      );
++      expect(
++        wrapper.get('[data-test="nav-group-item-traces-service-graph"]').attributes("href"),
++      ).toBe("/traces?org_identifier=default&tab=service-graph");
++      expect(
++        wrapper.get('[data-test="nav-group-item-traces-services-catalog"]').attributes("href"),
++      ).toBe("/traces?org_identifier=default&tab=services-catalog");
+     });
+ 
+-    it("marks Service Graph on its standalone route", async () => {
+-      wrapper = await mountAt("/traces/service-graph");
+-      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
++    it("preserves the current Traces query when switching tabs", async () => {
++      wrapper = await mountAt(
++        "/traces?org_identifier=default&tab=traces&search_mode=spans&stream=default&period=15m&query=c2VydmljZQ%3D%3D",
++      );
++
++      const href = wrapper.get('[data-test="nav-group-item-traces-spans"]').attributes("href");
++      const query = new URL(href, "http://localhost").searchParams;
++
++      expect(query.get("org_identifier")).toBe("default");
++      expect(query.get("tab")).toBe("spans");
++      expect(query.has("search_mode")).toBe(false);
++      expect(query.get("stream")).toBe("default");
++      expect(query.get("period")).toBe("15m");
++      expect(query.get("query")).toBe("c2VydmljZQ==");
+     });
+   });
+ });
+diff --git a/web/src/lib/core/Navbar/ONavGroup.vue b/web/src/lib/core/Navbar/ONavGroup.vue
+index fcdbed8b517..41daf614798 100644
+--- a/web/src/lib/core/Navbar/ONavGroup.vue
++++ b/web/src/lib/core/Navbar/ONavGroup.vue
+@@ -44,7 +44,7 @@ const openGroupKey = moduleRef<string | null>(null);
+ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+ import { useStore } from "vuex";
+ import { useTheme } from "@/composables/useTheme";
+-import { useRouter } from "vue-router";
++import { useRouter, type LocationQueryRaw } from "vue-router";
+ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import MenuLink from "@/components/MenuLink.vue";
+@@ -160,7 +160,7 @@ function clearTimers() {
+ }
+ 
+ // ── Active state ──────────────────────────────────────────────────────────
+-// Active by route name (and tab, for query-param sub-views like AI evals).
++// Active by route name and tab for query-param sub-views.
+ // Resolve a child's route name to its canonical path (for sub-route matching).
+ function childPath(name: string): string | null {
+   if (!router.hasRoute(name)) return null;
+@@ -181,22 +181,17 @@ function childPath(name: string): string | null {
+ const activeChild = computed<SubnavChild | null>(() => {
+   const route = router.currentRoute.value;
+ 
+-  // A tab-alias match wins over everything: the child's own route is elsewhere,
+-  // but the CURRENT route is showing its view via a query tab (e.g.
+-  // /traces?tab=service-graph renders the Service Graph in-page). Checked
+-  // before the exact-name pass so the aliased route's own child (Traces)
+-  // doesn't claim the highlight.
+-  const tabAlias = props.children.find(
+-    (c) =>
+-      c.activeOnTab && route.name === c.activeOnTab.name && route.query.tab === c.activeOnTab.tab,
++  const exactTab = props.children.find(
++    (c) => c.tab && route.name === c.name && route.query.tab === c.tab,
+   );
+-  if (tabAlias) return tabAlias;
++  if (exactTab) return exactTab;
+ 
+-  const exact = props.children.find(
+-    (c) => route.name === c.name && (!c.tab || route.query.tab === c.tab),
+-  );
++  const exact = props.children.find((c) => route.name === c.name && !c.tab);
+   if (exact) return exact;
+ 
++  const routeDefault = props.children.find((c) => c.defaultForRoute && route.name === c.name);
++  if (routeDefault) return routeDefault;
++
+   let best: SubnavChild | null = null;
+   let bestLen = 0;
+   for (const child of props.children) {
+@@ -220,12 +215,20 @@ const isGroupActive = computed(() => activeChild.value !== null);
+ const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
+ 
+ function childTo(child: SubnavChild) {
+-  const query: Record<string, string> = {};
++  const route = router.currentRoute.value;
++  const query: LocationQueryRaw = route.name === child.name ? { ...route.query } : {};
+   if (orgIdentifier.value) query.org_identifier = orgIdentifier.value;
+-  if (child.tab) query.tab = child.tab;
++  if (child.tab) {
++    delete query.search_mode;
++    query.tab = child.tab;
++  }
+   return { name: child.name, query };
+ }
+ 
++function childDataTest(child: SubnavChild): string {
++  return `nav-group-item-${child.name}${child.tab ? `-${child.tab}` : ""}`;
++}
++
+ function focusTile() {
+   wrapperRef.value?.querySelector<HTMLElement>("a, button")?.focus();
+ }
+@@ -444,7 +447,7 @@ function onChildMouseenter(event: MouseEvent) {
+           </div>
+           <router-link
+             v-else
+-            :data-test="`nav-group-item-${row.child.name}`"
++            :data-test="childDataTest(row.child)"
+             role="menuitem"
+             :to="childTo(row.child)"
+             class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2"
+diff --git a/web/src/lib/core/Navbar/ONavbar.types.ts b/web/src/lib/core/Navbar/ONavbar.types.ts
+index d94bfd2489c..320bf51ff32 100644
+--- a/web/src/lib/core/Navbar/ONavbar.types.ts
++++ b/web/src/lib/core/Navbar/ONavbar.types.ts
+@@ -61,16 +61,10 @@ export interface SubnavChild {
+   name: string;
+   /** Section header this item sits under (mirrors the sub-page nav grouping). */
+   category?: string;
+-  /** Query `tab` for routes that switch sub-views via a query param (AI evals). */
++  /** Query `tab` for routes that switch sub-views via a query param. */
+   tab?: string;
+-  /**
+-   * Also mark this child active when ANOTHER route shows the same view via a
+-   * query tab. Traces: Service Graph / Service Catalog are standalone routes
+-   * (what this child navigates to) but the same views also render in-page on
+-   * `/traces?tab=…` — the flyout highlight should follow what the user is
+-   * looking at, matching every other submenu's behavior.
+-   */
+-  activeOnTab?: { name: string; tab: string };
++  /** Use this child as the active fallback when its route has no `tab` query. */
++  defaultForRoute?: boolean;
+   /** Group children only: include only when this top-level item is present. */
+   requires?: string;
+   /**
+diff --git a/web/src/lib/core/Navbar/navGroups.spec.ts b/web/src/lib/core/Navbar/navGroups.spec.ts
+index 5f3167d071e..f64c5db15a9 100644
+--- a/web/src/lib/core/Navbar/navGroups.spec.ts
++++ b/web/src/lib/core/Navbar/navGroups.spec.ts
+@@ -53,6 +53,15 @@ describe("groupNavLinks", () => {
+     ]);
+   });
+ 
++  it("routes every Traces flyout item through the canonical query tab", () => {
++    expect(NAV_SUBNAV.traces).toEqual([
++      expect.objectContaining({ name: "traces", tab: "spans", defaultForRoute: true }),
++      expect.objectContaining({ name: "traces", tab: "traces" }),
++      expect.objectContaining({ name: "traces", tab: "service-graph", gate: "enterprise" }),
++      expect.objectContaining({ name: "traces", tab: "services-catalog" }),
++    ]);
++  });
++
+   it("places the Data group right after the Reliability group it is anchored to", () => {
+     const entries = groupNavLinks([
+       link("home"),
+diff --git a/web/src/lib/core/Navbar/navGroups.ts b/web/src/lib/core/Navbar/navGroups.ts
+index c58a45ce2e4..30955cb1b1d 100644
+--- a/web/src/lib/core/Navbar/navGroups.ts
++++ b/web/src/lib/core/Navbar/navGroups.ts
+@@ -215,30 +215,37 @@ export const NAV_GROUPS: NavGroupDef[] = [
+  * in-page SectionRail is the place to switch sections. Re-add an entry here
+  * (mirroring the page's SectionRail) to restore a hover flyout.
+  *
+- * Traces: each flyout child is its own standalone route. The Traces page also
+- * offers Service Graph / Services Catalog as toolbar tabs (SearchBar.vue) that
+- * switch views in-page (`?tab=`) — dual access paths with different semantics.
+- * Spans is deliberately absent — it is
+- * a view-granularity toggle inside the Traces search page (it shares the
+- * query/stream/time context), not a destination. Service Graph carries the
+- * `enterprise` gate its route guard applies, so the rail never offers a link
+- * that would redirect straight back to Traces.
++ * Traces: every flyout child targets the Traces page's existing `?tab=` views,
++ * keeping one URL and one shared query/stream/time context for all four modes.
++ * Service Graph carries the same enterprise gate as its in-page tab.
+  */
+ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
+   traces: [
+-    { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
++    {
++      titleKey: "traces.spansTab",
++      icon: "layers",
++      name: "traces",
++      tab: "spans",
++      defaultForRoute: true,
++    },
++    {
++      titleKey: "menu.traces",
++      icon: "account-tree",
++      name: "traces",
++      tab: "traces",
++    },
+     {
+       titleKey: "menu.serviceGraph",
+       icon: "share",
+-      name: "serviceGraph",
++      name: "traces",
++      tab: "service-graph",
+       gate: "enterprise",
+-      activeOnTab: { name: "traces", tab: "service-graph" },
+     },
+     {
+       titleKey: "menu.services",
+       icon: "menu-book",
+-      name: "servicesCatalog",
+-      activeOnTab: { name: "traces", tab: "services-catalog" },
++      name: "traces",
++      tab: "services-catalog",
+     },
+   ],
+ };
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index cb7156ffb83..6d32f53d1a6 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "Ein Trigger ist erforderlich",
+     "addStepRequired": "Fügen Sie mindestens einen Schritt nach dem Trigger hinzu",
+     "connectAllNodes": "Verbinden Sie alle Knoten vor dem Speichern",
++    "finishStepsBeforePublish": "Schließe die Konfiguration aller Schritte ab, bevor du veröffentlichst",
++    "draft": "Entwurf",
++    "saveDraft": "Als Entwurf speichern",
++    "publish": "Veröffentlichen",
++    "draftSaveSuccess": "Entwurf erfolgreich gespeichert",
++    "publishSuccess": "Workflow erfolgreich veröffentlicht",
++    "publishError": "Fehler beim Veröffentlichen des Workflows",
++    "comingSoon": "Dies folgt in einem späteren Schritt",
++    "triggerType": {
++      "pick": "Wähle einen Trigger",
++      "dialogTitle": "Neuen Workflow erstellen",
++      "dialogIntro": "Wähle, wie dieser Workflow ausgelöst wird. Weitere Trigger-Typen folgen bald.",
++      "cta": "Workflow erstellen",
++      "soonCta": "Verfügbar in einer zukünftigen Version",
++      "comingSoon": "In Kürze",
++      "soon": "Bald"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Alert ausgelöst",
+@@ -2675,7 +2692,6 @@
+       "linkError": "Alarme konnten nicht verknüpft werden."
+     },
+     "chooseTrigger": "Trigger auswählen",
+-    "edgeDeleteHint": "Drücken Sie Backspace / Delete, um die Kante zu entfernen",
+     "node": {
+       "kindTrigger": "Auslöser",
+       "kindLogic": "Logik",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Um einen Null-Wert zu prüfen, verwenden Sie null. Beispiel:",
+       "conditionNoteCustom": "Um eine benutzerdefinierte Spalte hinzuzufügen, geben Sie ihren Namen ein und drücken Sie die Eingabetaste.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Payload mit einer Funktion umformen",
++      "functionBodySet": "Wendet {name} an",
++      "functionSelect": "Funktion auswählen",
++      "functionCreateNew": "Neue Funktion erstellen",
++      "functionRequired": "Funktion ist erforderlich",
++      "functionLoadError": "Funktionen konnten nicht geladen werden",
++      "destinationBody": "An ein Ziel senden",
++      "destinationBodySet": "Sendet an {name}",
++      "destinationSelect": "Ziel",
++      "destinationCreateNew": "Neues Ziel erstellen",
++      "destinationRequired": "Bitte wähle ein Ziel",
++      "destinationLoadError": "Ziele konnten nicht geladen werden",
++      "namePlaceholder": "Diesen Schritt benennen (optional)",
++      "commentLabel": "Kommentar (optional)",
++      "commentPlaceholder": "Füge eine Notiz zu diesem Schritt hinzu...",
++      "commentAdd": "Kommentar hinzufügen",
++      "disable": "Schritt deaktivieren",
++      "enable": "Schritt aktivieren",
++      "disabledBadge": "Deaktiviert",
++      "incompleteBadge": "Später einrichten",
++      "destinationSetUpLater": "Später einrichten",
++      "destinationSetUpLaterPrompt": "Noch kein Ziel? Aktiviere dies, um es später einzurichten — du kannst einen Entwurf speichern und jetzt testen.",
++      "destinationSetUpLaterActive": "Das Ziel wird vorerst übersprungen — Name und Kommentar werden weiterhin gespeichert. Du brauchst ein Ziel, bevor du veröffentlichst.",
++      "functionSetUpLater": "Später einrichten",
++      "functionSetUpLaterPrompt": "Noch keine Funktion? Aktiviere dies, um sie später einzurichten — du kannst einen Entwurf speichern und jetzt testen.",
++      "functionSetUpLaterActive": "Die Funktion wird vorerst übersprungen — Name und Kommentar werden weiterhin gespeichert. Du brauchst eine Funktion, bevor du veröffentlichst."
++    },
++    "commonFieldsAbove": "gemeinsame Felder oben",
++    "canvas": {
++      "undo": "Rückgängig machen",
++      "tidyUp": "Aufräumen",
++      "insertStep": "Schritt einfügen",
++      "deleteEdge": "Verbindung löschen"
++    },
++    "unsaved": {
++      "title": "Nicht gespeicherte Änderungen",
++      "message": "Du hast nicht gespeicherte Änderungen. Wenn du jetzt gehst, werden sie verworfen.",
++      "discard": "Änderungen verwerfen",
++      "stay": "Weiter bearbeiten"
+     },
+-    "commonFieldsAbove": "gemeinsame Felder oben"
++    "results": {
++      "title": "Schrittergebnisse",
++      "collapse": "Einklappen",
++      "expand": "Aufklappen",
++      "close": "Ergebnisse löschen und schließen",
++      "nodesTitle": "Schritte",
++      "empty": "Führen Sie einen Test aus, um hier die Schrittergebnisse zu sehen."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Passende Spans",
+             "hint": "Sobald Sie einen Stream und einen Filter ausgewählt haben, zeigt dieses Feld, wie viele Spans Ihr Job abgleicht.",
+-            "matchedSuffix": "Spans abgeglichen · letzte 24h",
++            "matchedSuffix": "Spans gefunden · letzte 1h",
+             "matchedLoading": "Passende Spans werden gezählt…"
+           },
+           "trace": {
+             "title": "Passende Traces",
+             "hint": "Sobald Sie einen Stream und einen Filter ausgewählt haben, zeigt dieses Feld, wie viele Traces Ihr Job abgleicht.",
+-            "matchedSuffix": "Traces abgeglichen · letzte 24h",
++            "matchedSuffix": "Traces gefunden · letzte 1h",
+             "matchedLoading": "Passende Traces werden gezählt…"
+           },
+           "session": {
+             "title": "Passende Sitzungen",
+             "hint": "Sobald Sie einen Stream und einen Filter ausgewählt haben, zeigt dieses Feld, wie viele Sitzungen Ihr Job abgleicht.",
+-            "matchedSuffix": "Sitzungen abgeglichen · letzte 24h",
++            "matchedSuffix": "Sessions gefunden · letzte 1h",
+             "matchedLoading": "Passende Sitzungen werden gezählt…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "gleitend",
+     "totalSlos": "SLOs gesamt",
+     "noGrouping": "Keine (eine einzelne Gesamtserie)",
+-    "generation": "Generation {n}",
+     "newAlert": "Neuer Alarm",
+     "overRolling": "über gleitende {window}",
+     "searchPlaceholder": "SLO oder Tag suchen, z. B. team:payments",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 15a779d066c..b81840ee359 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -14050,7 +14050,6 @@
+     "rolling": "rolling",
+     "totalSlos": "Total SLOs",
+     "noGrouping": "None (a single overall series)",
+-    "generation": "generation {n}",
+     "newAlert": "New alert",
+     "overRolling": "over rolling {window}",
+     "searchPlaceholder": "Search SLO or tag, e.g. team:payments",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 47bbd3164b6..ee60bb138f6 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "Se requiere un desencadenante",
+     "addStepRequired": "Agrega al menos un paso después del desencadenante",
+     "connectAllNodes": "Conecta todos los nodos antes de guardar",
++    "finishStepsBeforePublish": "Termina de configurar todos los pasos antes de publicar",
++    "draft": "Borrador",
++    "saveDraft": "Guardar como borrador",
++    "publish": "Publicar",
++    "draftSaveSuccess": "Borrador guardado correctamente",
++    "publishSuccess": "Flujo de trabajo publicado correctamente",
++    "publishError": "Error al publicar el flujo de trabajo",
++    "comingSoon": "Esto viene en un paso posterior",
++    "triggerType": {
++      "pick": "Elige un disparador",
++      "dialogTitle": "Crear un nuevo flujo de trabajo",
++      "dialogIntro": "Elige cómo se activa este flujo de trabajo. Pronto habrá más tipos de disparadores.",
++      "cta": "Crear flujo de trabajo",
++      "soonCta": "Disponible en una versión futura",
++      "comingSoon": "Próximamente",
++      "soon": "Pronto"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Alerta disparada",
+@@ -2675,7 +2692,6 @@
+       "linkError": "No se pueden vincular las alertas."
+     },
+     "chooseTrigger": "Elige un disparador",
+-    "edgeDeleteHint": "Presiona Retroceso / Suprimir para eliminar la conexión",
+     "node": {
+       "kindTrigger": "Disparador",
+       "kindLogic": "Lógica",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Para verificar un valor nulo, use null. Ejemplo:",
+       "conditionNoteCustom": "Para agregar una columna personalizada, escriba su nombre y presione Enter.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Reformatea el payload con una función",
++      "functionBodySet": "Aplica {name}",
++      "functionSelect": "Seleccionar función",
++      "functionCreateNew": "Crear nueva función",
++      "functionRequired": "La función es obligatoria",
++      "functionLoadError": "No se pudieron cargar las funciones",
++      "destinationBody": "Enviar a un destino",
++      "destinationBodySet": "Envía a {name}",
++      "destinationSelect": "Destino",
++      "destinationCreateNew": "Crear nuevo destino",
++      "destinationRequired": "Por favor, selecciona un destino",
++      "destinationLoadError": "No se pudieron cargar los destinos",
++      "namePlaceholder": "Nombra este paso (opcional)",
++      "commentLabel": "Comentario (opcional)",
++      "commentPlaceholder": "Añade una nota sobre este paso...",
++      "commentAdd": "Añadir comentario",
++      "disable": "Desactivar paso",
++      "enable": "Activar paso",
++      "disabledBadge": "Desactivado",
++      "incompleteBadge": "Configurar más tarde",
++      "destinationSetUpLater": "Configurar más tarde",
++      "destinationSetUpLaterPrompt": "¿Aún no tienes un destino? Activa esto para configurarlo más tarde — puedes guardar un borrador y probar ahora.",
++      "destinationSetUpLaterActive": "El destino se omite por ahora — el nombre y el comentario se guardan igualmente. Necesitarás un destino antes de publicar.",
++      "functionSetUpLater": "Configurar más tarde",
++      "functionSetUpLaterPrompt": "¿Aún no tienes una función? Activa esto para configurarla más tarde — puedes guardar un borrador y probar ahora.",
++      "functionSetUpLaterActive": "La función se omite por ahora — el nombre y el comentario se guardan igualmente. Necesitarás una función antes de publicar."
++    },
++    "commonFieldsAbove": "campos comunes arriba",
++    "canvas": {
++      "undo": "Deshacer",
++      "tidyUp": "Limpiar",
++      "insertStep": "Insertar paso",
++      "deleteEdge": "Eliminar conexión"
++    },
++    "unsaved": {
++      "title": "Cambios sin guardar",
++      "message": "Tienes cambios sin guardar. Si sales ahora, se descartarán.",
++      "discard": "Descartar cambios",
++      "stay": "Seguir editando"
+     },
+-    "commonFieldsAbove": "campos comunes arriba"
++    "results": {
++      "title": "Resultados del paso",
++      "collapse": "Contraer",
++      "expand": "Expandir",
++      "close": "Limpiar y cerrar resultados",
++      "nodesTitle": "Pasos",
++      "empty": "Ejecuta una prueba para ver los resultados de los pasos aquí."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Spans coincidentes",
+             "hint": "Una vez que hayas elegido un stream y un filtro, este panel mostrará cuántos spans coincidirá tu tarea.",
+-            "matchedSuffix": "spans coincidentes · últimas 24h",
++            "matchedSuffix": "spans coincidentes · última 1h",
+             "matchedLoading": "Contando spans coincidentes…"
+           },
+           "trace": {
+             "title": "Traces coincidentes",
+             "hint": "Una vez que hayas elegido un stream y un filtro, este panel mostrará cuántos traces coincidirá tu tarea.",
+-            "matchedSuffix": "traces coincidentes · últimas 24h",
++            "matchedSuffix": "traces coincidentes · última 1h",
+             "matchedLoading": "Contando traces coincidentes…"
+           },
+           "session": {
+             "title": "Sesiones coincidentes",
+             "hint": "Una vez que hayas elegido un stream y un filtro, este panel mostrará cuántas sesiones coincidirá tu tarea.",
+-            "matchedSuffix": "sesiones coincidentes · últimas 24h",
++            "matchedSuffix": "sesiones coincidentes · última 1h",
+             "matchedLoading": "Contando sesiones coincidentes…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "móvil",
+     "totalSlos": "Total de SLOs",
+     "noGrouping": "Ninguna (una sola serie general)",
+-    "generation": "generación {n}",
+     "newAlert": "Nueva alerta",
+     "overRolling": "sobre ventana móvil de {window}",
+     "searchPlaceholder": "Buscar SLO o etiqueta, p. ej. team:payments",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index 31c376245cf..bf26ca499aa 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "Un déclencheur est requis",
+     "addStepRequired": "Ajoutez au moins une étape après le déclencheur",
+     "connectAllNodes": "Connectez tous les nœuds avant d'enregistrer",
++    "finishStepsBeforePublish": "Terminez la configuration de toutes les étapes avant de publier",
++    "draft": "Brouillon",
++    "saveDraft": "Enregistrer comme brouillon",
++    "publish": "Publier",
++    "draftSaveSuccess": "Brouillon enregistré avec succès",
++    "publishSuccess": "Workflow publié avec succès",
++    "publishError": "Erreur lors de la publication du workflow",
++    "comingSoon": "Ceci arrivera dans une étape ultérieure",
++    "triggerType": {
++      "pick": "Choisissez un déclencheur",
++      "dialogTitle": "Créer un nouveau workflow",
++      "dialogIntro": "Choisissez comment ce workflow est déclenché. D'autres types de déclencheurs arrivent bientôt.",
++      "cta": "Créer un workflow",
++      "soonCta": "Disponible dans une version future",
++      "comingSoon": "Bientôt",
++      "soon": "Bientôt"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Alerte déclenchée",
+@@ -2675,7 +2692,6 @@
+       "linkError": "Impossible de lier les alertes."
+     },
+     "chooseTrigger": "Choisir un déclencheur",
+-    "edgeDeleteHint": "Appuyez sur Retour arrière / Suppr pour supprimer la connexion",
+     "node": {
+       "kindTrigger": "Déclencheur",
+       "kindLogic": "Logique",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Pour vérifier une valeur nulle, utilisez null. Exemple :",
+       "conditionNoteCustom": "Pour ajouter une colonne personnalisée, tapez son nom et appuyez sur Entrée.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Reformez la charge utile avec une fonction",
++      "functionBodySet": "Applique {name}",
++      "functionSelect": "Sélectionner une fonction",
++      "functionCreateNew": "Créer une nouvelle fonction",
++      "functionRequired": "Une fonction est requise",
++      "functionLoadError": "Impossible de charger les fonctions",
++      "destinationBody": "Envoyer vers une destination",
++      "destinationBodySet": "Envoie vers {name}",
++      "destinationSelect": "Destination",
++      "destinationCreateNew": "Créer une nouvelle destination",
++      "destinationRequired": "Veuillez sélectionner une destination",
++      "destinationLoadError": "Impossible de charger les destinations",
++      "namePlaceholder": "Nommer cette étape (facultatif)",
++      "commentLabel": "Commentaire (facultatif)",
++      "commentPlaceholder": "Ajouter une note à propos de cette étape...",
++      "commentAdd": "Ajouter un commentaire",
++      "disable": "Désactiver l'étape",
++      "enable": "Activer l'étape",
++      "disabledBadge": "Désactivé",
++      "incompleteBadge": "Configurer plus tard",
++      "destinationSetUpLater": "Configurer plus tard",
++      "destinationSetUpLaterPrompt": "Vous n'avez pas encore de destination ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
++      "destinationSetUpLaterActive": "La destination est ignorée pour le moment — le nom et le commentaire sont tout de même enregistrés. Vous aurez besoin d'une destination avant de publier.",
++      "functionSetUpLater": "Configurer plus tard",
++      "functionSetUpLaterPrompt": "Vous n'avez pas encore de fonction ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
++      "functionSetUpLaterActive": "La fonction est ignorée pour le moment — le nom et le commentaire sont tout de même enregistrés. Vous aurez besoin d'une fonction avant de publier."
++    },
++    "commonFieldsAbove": "champs communs ci-dessus",
++    "canvas": {
++      "undo": "Défaire",
++      "tidyUp": "Nettoyer",
++      "insertStep": "Insérer une étape",
++      "deleteEdge": "Supprimer la connexion"
++    },
++    "unsaved": {
++      "title": "Modifications non enregistrées",
++      "message": "Vous avez des modifications non enregistrées. Si vous quittez maintenant, elles seront perdues.",
++      "discard": "Ignorer les modifications",
++      "stay": "Continuer à modifier"
+     },
+-    "commonFieldsAbove": "champs communs ci-dessus"
++    "results": {
++      "title": "Résultats de l'étape",
++      "collapse": "Réduire",
++      "expand": "Développer",
++      "close": "Effacer et fermer les résultats",
++      "nodesTitle": "Étapes",
++      "empty": "Exécutez un test pour voir les résultats des étapes ici."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Spans correspondants",
+             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de spans que votre job correspondra.",
+-            "matchedSuffix": "spans correspondants · dernières 24h",
++            "matchedSuffix": "spans correspondants · dernière 1h",
+             "matchedLoading": "Comptage des spans correspondants…"
+           },
+           "trace": {
+             "title": "Traces correspondantes",
+             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de traces que votre job correspondra.",
+-            "matchedSuffix": "traces correspondantes · dernières 24h",
++            "matchedSuffix": "traces correspondantes · dernière 1h",
+             "matchedLoading": "Comptage des traces correspondantes…"
+           },
+           "session": {
+             "title": "Sessions correspondantes",
+             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de sessions que votre job correspondra.",
+-            "matchedSuffix": "sessions correspondantes · dernières 24h",
++            "matchedSuffix": "sessions correspondantes · dernière 1h",
+             "matchedLoading": "Comptage des sessions correspondantes…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "glissant",
+     "totalSlos": "Total des SLOs",
+     "noGrouping": "Aucun (une seule série globale)",
+-    "generation": "génération {n}",
+     "newAlert": "Nouvelle alerte",
+     "overRolling": "sur la période glissante {window}",
+     "searchPlaceholder": "Rechercher un SLO ou une étiquette, p. ex. team:payments",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index 2b950fc1726..776a1a68028 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "È richiesto un trigger",
+     "addStepRequired": "Aggiungi almeno un passo dopo il trigger",
+     "connectAllNodes": "Collega tutti i nodi prima di salvare",
++    "finishStepsBeforePublish": "Completa la configurazione di tutti i passaggi prima di pubblicare",
++    "draft": "Bozza",
++    "saveDraft": "Salva come bozza",
++    "publish": "Pubblica",
++    "draftSaveSuccess": "Bozza salvata correttamente",
++    "publishSuccess": "Workflow pubblicato correttamente",
++    "publishError": "Errore durante la pubblicazione del workflow",
++    "comingSoon": "Questa opzione è prevista in un passaggio successivo",
++    "triggerType": {
++      "pick": "Scegli un trigger",
++      "dialogTitle": "Crea un nuovo workflow",
++      "dialogIntro": "Scegli come viene attivato questo workflow. Altri tipi di trigger sono in arrivo.",
++      "cta": "Crea workflow",
++      "soonCta": "Disponibile in una futura versione",
++      "comingSoon": "Prossimamente",
++      "soon": "Presto"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Avviso scattato",
+@@ -2675,7 +2692,6 @@
+       "linkError": "Impossibile collegare gli avvisi."
+     },
+     "chooseTrigger": "Scegli un trigger",
+-    "edgeDeleteHint": "Premi Backspace / Canc per rimuovere il collegamento",
+     "node": {
+       "kindTrigger": "Trigger",
+       "kindLogic": "Logica",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Per controllare un valore nullo, usa null. Esempio:",
+       "conditionNoteCustom": "Per aggiungere una colonna personalizzata, digita il suo nome e premi Invio.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Rimodella il payload con una funzione",
++      "functionBodySet": "Applica {name}",
++      "functionSelect": "Seleziona funzione",
++      "functionCreateNew": "Crea nuova funzione",
++      "functionRequired": "La funzione è obbligatoria",
++      "functionLoadError": "Impossibile caricare le funzioni",
++      "destinationBody": "Invia a una destinazione",
++      "destinationBodySet": "Invia a {name}",
++      "destinationSelect": "Destinazione",
++      "destinationCreateNew": "Crea nuova destinazione",
++      "destinationRequired": "Seleziona una destinazione",
++      "destinationLoadError": "Impossibile caricare le destinazioni",
++      "namePlaceholder": "Assegna un nome a questo passaggio (facoltativo)",
++      "commentLabel": "Commento (facoltativo)",
++      "commentPlaceholder": "Aggiungi una nota su questo passaggio...",
++      "commentAdd": "Aggiungi commento",
++      "disable": "Disattiva passaggio",
++      "enable": "Attiva passaggio",
++      "disabledBadge": "Disattivato",
++      "incompleteBadge": "Configura più tardi",
++      "destinationSetUpLater": "Configura più tardi",
++      "destinationSetUpLaterPrompt": "Non hai ancora una destinazione? Attiva questa opzione per configurarla più tardi — puoi salvare una bozza e fare test subito.",
++      "destinationSetUpLaterActive": "La destinazione viene saltata per ora — nome e commento vengono comunque salvati. Ti servirà una destinazione prima di pubblicare.",
++      "functionSetUpLater": "Configura più tardi",
++      "functionSetUpLaterPrompt": "Non hai ancora una funzione? Attiva questa opzione per configurarla più tardi — puoi salvare una bozza e fare test subito.",
++      "functionSetUpLaterActive": "La funzione viene saltata per ora — nome e commento vengono comunque salvati. Ti servirà una funzione prima di pubblicare."
++    },
++    "commonFieldsAbove": "campi comuni qui sopra",
++    "canvas": {
++      "undo": "Annulla",
++      "tidyUp": "Riordina",
++      "insertStep": "Inserisci passaggio",
++      "deleteEdge": "Elimina connessione"
++    },
++    "unsaved": {
++      "title": "Modifiche non salvate",
++      "message": "Hai modifiche non salvate. Uscendo ora le perderai.",
++      "discard": "Scarta modifiche",
++      "stay": "Continua a modificare"
+     },
+-    "commonFieldsAbove": "campi comuni qui sopra"
++    "results": {
++      "title": "Risultati del passaggio",
++      "collapse": "Comprimi",
++      "expand": "Espandi",
++      "close": "Cancella e chiudi i risultati",
++      "nodesTitle": "Passaggi",
++      "empty": "Esegui un test per vedere i risultati dei passaggi qui."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Span corrispondenti",
+             "hint": "Dopo aver scelto uno stream e un filtro, questo pannello mostrerà quanti span il tuo job corrisponderà.",
+-            "matchedSuffix": "span corrispondenti · ultime 24h",
++            "matchedSuffix": "span corrispondenti · ultima 1h",
+             "matchedLoading": "Conteggio span corrispondenti…"
+           },
+           "trace": {
+             "title": "Trace corrispondenti",
+             "hint": "Dopo aver scelto uno stream e un filtro, questo pannello mostrerà quante trace il tuo job corrisponderà.",
+-            "matchedSuffix": "trace corrispondenti · ultime 24h",
++            "matchedSuffix": "tracce corrispondenti · ultima 1h",
+             "matchedLoading": "Conteggio trace corrispondenti…"
+           },
+           "session": {
+             "title": "Sessioni corrispondenti",
+             "hint": "Dopo aver scelto uno stream e un filtro, questo pannello mostrerà quante sessioni il tuo job corrisponderà.",
+-            "matchedSuffix": "sessioni corrispondenti · ultime 24h",
++            "matchedSuffix": "sessioni corrispondenti · ultima 1h",
+             "matchedLoading": "Conteggio sessioni corrispondenti…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "scorrevole",
+     "totalSlos": "Totale SLO",
+     "noGrouping": "Nessuna (una singola serie complessiva)",
+-    "generation": "generazione {n}",
+     "newAlert": "Nuovo avviso",
+     "overRolling": "su finestra scorrevole {window}",
+     "searchPlaceholder": "Cerca SLO o tag, ad es. team:payments",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index 9e82de4f3e8..95d634fc97c 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "トリガーが必要です",
+     "addStepRequired": "トリガーの後に少なくとも1つのステップを追加してください",
+     "connectAllNodes": "保存する前にすべてのノードを接続してください",
++    "finishStepsBeforePublish": "公開前にすべてのステップの設定を完了してください",
++    "draft": "下書き",
++    "saveDraft": "下書きとして保存",
++    "publish": "公開",
++    "draftSaveSuccess": "下書きが正常に保存されました",
++    "publishSuccess": "ワークフローが正常に公開されました",
++    "publishError": "ワークフローの公開中にエラーが発生しました",
++    "comingSoon": "これは後のステップで提供されます",
++    "triggerType": {
++      "pick": "トリガーを選択",
++      "dialogTitle": "新しいワークフローを作成",
++      "dialogIntro": "このワークフローのトリガー方法を選択してください。さらに多くのトリガータイプが近日公開予定です。",
++      "cta": "ワークフローを作成",
++      "soonCta": "将来のリリースで利用可能",
++      "comingSoon": "近日公開",
++      "soon": "まもなく"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "アラート発火",
+@@ -2675,7 +2692,6 @@
+       "linkError": "アラートをリンクできませんでした。"
+     },
+     "chooseTrigger": "トリガーを選択",
+-    "edgeDeleteHint": "Backspace / Delete を押してエッジを削除",
+     "node": {
+       "kindTrigger": "トリガー",
+       "kindLogic": "ロジック",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "null値を確認するには、null を使用します。例：",
+       "conditionNoteCustom": "カスタム列を追加するには、名前を入力してEnterキーを押します。",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "関数でペイロードを再形成する",
++      "functionBodySet": "{name} を適用",
++      "functionSelect": "関数を選択",
++      "functionCreateNew": "新しい関数を作成",
++      "functionRequired": "関数が必要です",
++      "functionLoadError": "関数を読み込めません",
++      "destinationBody": "送信先に送信",
++      "destinationBodySet": "{name} に送信",
++      "destinationSelect": "送信先",
++      "destinationCreateNew": "新しい送信先を作成",
++      "destinationRequired": "送信先を選択してください",
++      "destinationLoadError": "送信先を読み込めません",
++      "namePlaceholder": "ステップ名 (任意)",
++      "commentLabel": "コメント (任意)",
++      "commentPlaceholder": "このステップに関するメモを追加...",
++      "commentAdd": "コメントを追加",
++      "disable": "ステップを無効にする",
++      "enable": "ステップを有効にする",
++      "disabledBadge": "無効",
++      "incompleteBadge": "後で設定",
++      "destinationSetUpLater": "後で設定",
++      "destinationSetUpLaterPrompt": "まだ送信先がありませんか？これをオンにすると後で設定できます — 今すぐ下書きを保存してテストできます。",
++      "destinationSetUpLaterActive": "今のところ送信先はスキップされます — 名前とコメントは保存されます。公開前に送信先が必要です。",
++      "functionSetUpLater": "後で設定",
++      "functionSetUpLaterPrompt": "まだ関数がありませんか？これをオンにすると後で設定できます — 今すぐ下書きを保存してテストできます。",
++      "functionSetUpLaterActive": "今のところ関数はスキップされます — 名前とコメントは保存されます。公開前に関数が必要です。"
++    },
++    "commonFieldsAbove": "上記の共通フィールド",
++    "canvas": {
++      "undo": "元に戻す",
++      "tidyUp": "整理",
++      "insertStep": "ステップを挿入",
++      "deleteEdge": "接続を削除"
++    },
++    "unsaved": {
++      "title": "未保存の変更",
++      "message": "未保存の変更があります。今すぐ離れると変更は破棄されます。",
++      "discard": "変更を破棄",
++      "stay": "編集を続ける"
+     },
+-    "commonFieldsAbove": "上記の共通フィールド"
++    "results": {
++      "title": "ステップ結果",
++      "collapse": "折りたたむ",
++      "expand": "展開する",
++      "close": "結果をクリアして閉じる",
++      "nodesTitle": "ステップ",
++      "empty": "テストを実行すると、ここにステップ結果が表示されます。"
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "一致したスパン",
+             "hint": "ストリームとフィルターを選択すると、このパネルにジョブが一致するスパンの数が表示されます。",
+-            "matchedSuffix": "一致したスパン · 過去24時間",
++            "matchedSuffix": "スパン一致 · 過去1時間",
+             "matchedLoading": "一致したスパンをカウント中…"
+           },
+           "trace": {
+             "title": "一致したトレース",
+             "hint": "ストリームとフィルターを選択すると、このパネルにジョブが一致するトレースの数が表示されます。",
+-            "matchedSuffix": "一致したトレース · 過去24時間",
++            "matchedSuffix": "トレース一致 · 過去1時間",
+             "matchedLoading": "一致したトレースをカウント中…"
+           },
+           "session": {
+             "title": "一致したセッション",
+             "hint": "ストリームとフィルターを選択すると、このパネルにジョブが一致するセッションの数が表示されます。",
+-            "matchedSuffix": "一致したセッション · 過去24時間",
++            "matchedSuffix": "セッション一致 · 過去1時間",
+             "matchedLoading": "一致したセッションをカウント中…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "ローリング",
+     "totalSlos": "SLO総数",
+     "noGrouping": "なし (単一の全体シリーズ)",
+-    "generation": "世代 {n}",
+     "newAlert": "新しいアラート",
+     "overRolling": "ローリング {window} にわたる",
+     "searchPlaceholder": "SLOまたはタグを検索、例: team:payments",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index a5468db8e55..8545f945821 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "트리거가 필요합니다.",
+     "addStepRequired": "트리거 뒤에 최소 하나의 단계를 추가하세요.",
+     "connectAllNodes": "저장하기 전에 모든 노드를 연결하세요.",
++    "finishStepsBeforePublish": "게시하기 전에 모든 단계 구성을 완료하세요",
++    "draft": "초안",
++    "saveDraft": "초안으로 저장",
++    "publish": "게시",
++    "draftSaveSuccess": "초안이 성공적으로 저장되었습니다",
++    "publishSuccess": "워크플로가 성공적으로 게시되었습니다",
++    "publishError": "워크플로 게시 중 오류 발생",
++    "comingSoon": "이 기능은 이후 단계에서 제공됩니다",
++    "triggerType": {
++      "pick": "트리거 선택",
++      "dialogTitle": "새 워크플로 만들기",
++      "dialogIntro": "이 워크플로가 트리거되는 방식을 선택하세요. 더 많은 트리거 유형이 곧 제공됩니다.",
++      "cta": "워크플로 만들기",
++      "soonCta": "향후 릴리스에서 사용 가능",
++      "comingSoon": "곧 제공",
++      "soon": "곧"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "알림 발생",
+@@ -2675,7 +2692,6 @@
+       "linkError": "알림을 연결할 수 없습니다."
+     },
+     "chooseTrigger": "트리거 선택",
+-    "edgeDeleteHint": "엣지를 제거하려면 Backspace / Delete를 누르세요",
+     "node": {
+       "kindTrigger": "트리거",
+       "kindLogic": "로직",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "널 값을 확인하려면 null을 사용하세요. 예:",
+       "conditionNoteCustom": "사용자 정의 열을 추가하려면 이름을 입력하고 Enter를 누르세요.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "함수로 페이로드 변형",
++      "functionBodySet": "{name} 적용",
++      "functionSelect": "함수 선택",
++      "functionCreateNew": "새 함수 만들기",
++      "functionRequired": "함수가 필요합니다",
++      "functionLoadError": "함수를 불러올 수 없습니다",
++      "destinationBody": "대상으로 보내기",
++      "destinationBodySet": "{name}에게 전송",
++      "destinationSelect": "대상",
++      "destinationCreateNew": "새 대상 만들기",
++      "destinationRequired": "대상을 선택하세요",
++      "destinationLoadError": "대상을 불러올 수 없습니다",
++      "namePlaceholder": "이 단계 이름 지정(선택 사항)",
++      "commentLabel": "댓글(선택 사항)",
++      "commentPlaceholder": "이 단계에 대한 메모 추가...",
++      "commentAdd": "댓글 추가",
++      "disable": "단계 비활성화",
++      "enable": "단계 활성화",
++      "disabledBadge": "비활성화됨",
++      "incompleteBadge": "나중에 설정",
++      "destinationSetUpLater": "아직 대상이 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
++      "destinationSetUpLaterPrompt": "대상은 지금 건너뜁니다 — 이름과 댓글은 여전히 저장됩니다. 게시하기 전에 대상이 필요합니다.",
++      "destinationSetUpLaterActive": "나중에 설정",
++      "functionSetUpLater": "아직 함수가 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
++      "functionSetUpLaterPrompt": "함수는 지금 건너뜁니다 — 이름과 댓글은 여전히 저장됩니다. 게시하기 전에 함수가 필요합니다.",
++      "functionSetUpLaterActive": "나중에 설정"
++    },
++    "commonFieldsAbove": "위의 공통 필드",
++    "canvas": {
++      "undo": "실행 취소",
++      "tidyUp": "정리",
++      "insertStep": "단계 삽입",
++      "deleteEdge": "연결 삭제"
++    },
++    "unsaved": {
++      "title": "저장되지 않은 변경 사항",
++      "message": "저장되지 않은 변경 사항이 있습니다. 지금 나가면 변경 사항이 삭제됩니다.",
++      "discard": "변경 사항 삭제",
++      "stay": "계속 편집"
+     },
+-    "commonFieldsAbove": "위의 공통 필드"
++    "results": {
++      "title": "단계 결과",
++      "collapse": "접기",
++      "expand": "펼치기",
++      "close": "결과 지우기 및 닫기",
++      "nodesTitle": "단계",
++      "empty": "여기에서 테스트를 실행하여 단계 결과를 확인하세요."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "일치하는 스팬",
+             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 스팬 수가 표시됩니다.",
+-            "matchedSuffix": "일치하는 스팬 · 지난 24시간",
++            "matchedSuffix": "일치된 스팬 · 최근 1h",
+             "matchedLoading": "일치하는 스팬 계산 중…"
+           },
+           "trace": {
+             "title": "일치하는 추적",
+             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 추적 수가 표시됩니다.",
+-            "matchedSuffix": "일치하는 추적 · 지난 24시간",
++            "matchedSuffix": "일치된 트레이스 · 최근 1h",
+             "matchedLoading": "일치하는 추적 계산 중…"
+           },
+           "session": {
+             "title": "일치하는 세션",
+             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 세션 수가 표시됩니다.",
+-            "matchedSuffix": "일치하는 세션 · 지난 24시간",
++            "matchedSuffix": "일치된 세션 · 최근 1h",
+             "matchedLoading": "일치하는 세션 계산 중…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "롤링",
+     "totalSlos": "총 SLO",
+     "noGrouping": "없음 (단일 전체 시리즈)",
+-    "generation": "세대 {n}",
+     "newAlert": "새 알림",
+     "overRolling": "롤링 {window} 동안",
+     "searchPlaceholder": "SLO 또는 태그 검색, 예: team:payments",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index 2d733728a15..c9bf5f053c4 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "Een trigger is vereist",
+     "addStepRequired": "Voeg ten minste één stap toe na de trigger",
+     "connectAllNodes": "Verbind alle knooppunten voordat u opslaat",
++    "finishStepsBeforePublish": "Voltooi alle stappen voordat u publiceert.",
++    "draft": "Concept",
++    "saveDraft": "Opslaan als concept",
++    "publish": "Publiceren",
++    "draftSaveSuccess": "Concept succesvol opgeslagen",
++    "publishSuccess": "Workflow succesvol gepubliceerd",
++    "publishError": "Fout bij het publiceren van workflow",
++    "comingSoon": "Dit komt in een latere stap",
++    "triggerType": {
++      "pick": "Kies een trigger",
++      "dialogTitle": "Nieuwe workflow maken",
++      "dialogIntro": "Kies hoe deze workflow wordt geactiveerd. Meer triggertypen zijn binnenkort beschikbaar.",
++      "cta": "Workflow maken",
++      "soonCta": "Beschikbaar in een toekomstige release",
++      "comingSoon": "Binnenkort beschikbaar",
++      "soon": "Binnenkort"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Alert geactiveerd",
+@@ -2675,7 +2692,6 @@
+       "linkError": "Kan meldingen niet koppelen."
+     },
+     "chooseTrigger": "Kies een trigger",
+-    "edgeDeleteHint": "Druk op Backspace / Delete om de verbinding te verwijderen",
+     "node": {
+       "kindTrigger": "Trigger",
+       "kindLogic": "Logica",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Om een null-waarde te controleren, gebruik null. Voorbeeld:",
+       "conditionNoteCustom": "Om een aangepaste kolom toe te voegen, typt u de naam en drukt u op Enter.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Vorm de payload om met een functie",
++      "functionBodySet": "Past {name} toe",
++      "functionSelect": "Selecteer functie",
++      "functionCreateNew": "Nieuwe functie maken",
++      "functionRequired": "Functie is vereist",
++      "functionLoadError": "Kan functies niet laden",
++      "destinationBody": "Verzenden naar een bestemming",
++      "destinationBodySet": "Verzendt naar {name}",
++      "destinationSelect": "Bestemming",
++      "destinationCreateNew": "Nieuwe bestemming maken",
++      "destinationRequired": "Selecteer een bestemming",
++      "destinationLoadError": "Kan bestemmingen niet laden",
++      "namePlaceholder": "Geef deze stap een naam (optioneel)",
++      "commentLabel": "Opmerking (optioneel)",
++      "commentPlaceholder": "Voeg een notitie toe over deze stap...",
++      "commentAdd": "Opmerking toevoegen",
++      "disable": "Stap uitschakelen",
++      "enable": "Stap inschakelen",
++      "disabledBadge": "Uitgeschakeld",
++      "incompleteBadge": "Stel later in",
++      "destinationSetUpLater": "Stel later in",
++      "destinationSetUpLaterPrompt": "Nog geen bestemming? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
++      "destinationSetUpLaterActive": "De bestemming wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een bestemming nodig voordat u publiceert.",
++      "functionSetUpLater": "Stel later in",
++      "functionSetUpLaterPrompt": "Nog geen functie? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
++      "functionSetUpLaterActive": "De functie wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een functie nodig voordat u publiceert."
++    },
++    "commonFieldsAbove": "algemene velden hierboven",
++    "canvas": {
++      "undo": "Ongedaan maken",
++      "tidyUp": "Opruimen",
++      "insertStep": "Stap invoegen",
++      "deleteEdge": "Verbinding verwijderen"
++    },
++    "unsaved": {
++      "title": "Niet-opgeslagen wijzigingen",
++      "message": "U hebt niet-opgeslagen wijzigingen. Als u nu weggaat, worden ze verwijderd.",
++      "discard": "Wijzigingen verwerpen",
++      "stay": "Doorgaan met bewerken"
+     },
+-    "commonFieldsAbove": "algemene velden hierboven"
++    "results": {
++      "title": "Stapresultaten",
++      "collapse": "Inklappen",
++      "expand": "Uitklappen",
++      "close": "Resultaten wissen en sluiten",
++      "nodesTitle": "Stappen",
++      "empty": "Voer een test uit om hier de stapresultaten te zien."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Overeenkomende spans",
+             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel spans uw taak zal matchen.",
+-            "matchedSuffix": "spans gematcht · laatste 24 uur",
++            "matchedSuffix": "overeenkomende spans · laatste 1 uur",
+             "matchedLoading": "Overeenkomende spans tellen…"
+           },
+           "trace": {
+             "title": "Overeenkomende traces",
+             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel traces uw taak zal matchen.",
+-            "matchedSuffix": "traces gematcht · laatste 24 uur",
++            "matchedSuffix": "overeenkomende traces · laatste 1 uur",
+             "matchedLoading": "Overeenkomende traces tellen…"
+           },
+           "session": {
+             "title": "Overeenkomende sessies",
+             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel sessies uw taak zal matchen.",
+-            "matchedSuffix": "sessies gematcht · laatste 24 uur",
++            "matchedSuffix": "overeenkomende sessies · laatste 1 uur",
+             "matchedLoading": "Overeenkomende sessies tellen…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "rollend",
+     "totalSlos": "Totaal SLO's",
+     "noGrouping": "Geen (een enkele overkoepelende reeks)",
+-    "generation": "generatie {n}",
+     "newAlert": "Nieuw alarm",
+     "overRolling": "over rollend {window}",
+     "searchPlaceholder": "Zoek SLO of tag, bijv. team:payments",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 8703560778e..98a969738ff 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "Wymagany jest wyzwalacz",
+     "addStepRequired": "Dodaj co najmniej jeden krok po wyzwalaczu",
+     "connectAllNodes": "Połącz wszystkie węzły przed zapisaniem",
++    "finishStepsBeforePublish": "Skonfiguruj wszystkie kroki przed publikacją",
++    "draft": "Wersja robocza",
++    "saveDraft": "Zapisz jako wersję roboczą",
++    "publish": "Opublikuj",
++    "draftSaveSuccess": "Wersja robocza zapisana pomyślnie",
++    "publishSuccess": "Przepływ pracy opublikowany pomyślnie",
++    "publishError": "Błąd podczas publikowania przepływu pracy",
++    "comingSoon": "To pojawi się w późniejszym kroku",
++    "triggerType": {
++      "pick": "Wybierz wyzwalacz",
++      "dialogTitle": "Utwórz nowy przepływ pracy",
++      "dialogIntro": "Wybierz, jak ten przepływ pracy jest wyzwalany. Wkrótce pojawi się więcej typów wyzwalaczy.",
++      "cta": "Utwórz przepływ pracy",
++      "soonCta": "Dostępne w przyszłej wersji",
++      "comingSoon": "Wkrótce",
++      "soon": "Wkrótce"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Alert wyzwolony",
+@@ -2675,7 +2692,6 @@
+       "linkError": "Nie udało się połączyć alertów."
+     },
+     "chooseTrigger": "Wybierz wyzwalacz",
+-    "edgeDeleteHint": "Naciśnij Backspace / Delete, aby usunąć krawędź",
+     "node": {
+       "kindTrigger": "Wyzwalacz",
+       "kindLogic": "Logika",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Aby sprawdzić wartość null, użyj null. Przykład:",
+       "conditionNoteCustom": "Aby dodać niestandardową kolumnę, wpisz jej nazwę i naciśnij Enter.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Przekształć dane wejściowe za pomocą funkcji",
++      "functionBodySet": "Stosuje {name}",
++      "functionSelect": "Wybierz funkcję",
++      "functionCreateNew": "Utwórz nową funkcję",
++      "functionRequired": "Funkcja jest wymagana",
++      "functionLoadError": "Nie można wczytać funkcji",
++      "destinationBody": "Wyślij do miejsca docelowego",
++      "destinationBodySet": "Wysyła do {name}",
++      "destinationSelect": "Miejsce docelowe",
++      "destinationCreateNew": "Utwórz nowe miejsce docelowe",
++      "destinationRequired": "Wybierz miejsce docelowe",
++      "destinationLoadError": "Nie można wczytać miejsc docelowych",
++      "namePlaceholder": "Nazwij ten krok (opcjonalnie)",
++      "commentLabel": "Komentarz (opcjonalnie)",
++      "commentPlaceholder": "Dodaj notatkę o tym kroku...",
++      "commentAdd": "Dodaj komentarz",
++      "disable": "Wyłącz krok",
++      "enable": "Włącz krok",
++      "disabledBadge": "Wyłączony",
++      "incompleteBadge": "Skonfiguruj później",
++      "destinationSetUpLater": "Skonfiguruj później",
++      "destinationSetUpLaterPrompt": "Nie masz jeszcze miejsca docelowego? Włącz to, aby skonfigurować je później — możesz zapisać wersję roboczą i przetestować teraz.",
++      "destinationSetUpLaterActive": "Miejsce docelowe jest na razie pomijane — nazwa i komentarz nadal zostaną zapisane. Będziesz potrzebować miejsca docelowego przed publikacją.",
++      "functionSetUpLater": "Skonfiguruj później",
++      "functionSetUpLaterPrompt": "Nie masz jeszcze funkcji? Włącz to, aby skonfigurować ją później — możesz zapisać wersję roboczą i przetestować teraz.",
++      "functionSetUpLaterActive": "Funkcja jest na razie pomijana — nazwa i komentarz nadal zostaną zapisane. Będziesz potrzebować funkcji przed publikacją."
++    },
++    "commonFieldsAbove": "Wspólne pola powyżej",
++    "canvas": {
++      "undo": "Cofnij",
++      "tidyUp": "Uporządkuj",
++      "insertStep": "Wstaw krok",
++      "deleteEdge": "Usuń połączenie"
++    },
++    "unsaved": {
++      "title": "Niezapisane zmiany",
++      "message": "Masz niezapisane zmiany. Opuszczenie teraz spowoduje ich odrzucenie.",
++      "discard": "Odrzuć zmiany",
++      "stay": "Kontynuuj edycję"
+     },
+-    "commonFieldsAbove": "Wspólne pola powyżej"
++    "results": {
++      "title": "Wyniki kroków",
++      "collapse": "Zwiń",
++      "expand": "Rozwiń",
++      "close": "Wyczyść i zamknij wyniki",
++      "nodesTitle": "Kroki",
++      "empty": "Uruchom test, aby zobaczyć wyniki kroków tutaj."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Dopasowane spany",
+             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile spanów dopasuje Twoje zadanie.",
+-            "matchedSuffix": "dopasowane spany · ostatnie 24h",
++            "matchedSuffix": "dopasowane spany · ostatnia 1h",
+             "matchedLoading": "Liczenie dopasowanych spanów..."
+           },
+           "trace": {
+             "title": "Dopasowane trace'y",
+             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile trace'y dopasuje Twoje zadanie.",
+-            "matchedSuffix": "dopasowane trace'y · ostatnie 24h",
++            "matchedSuffix": "dopasowane trace'e · ostatnia 1h",
+             "matchedLoading": "Liczenie dopasowanych trace'ów..."
+           },
+           "session": {
+             "title": "Dopasowane sesje",
+             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile sesji dopasuje Twoje zadanie.",
+-            "matchedSuffix": "dopasowane sesje · ostatnie 24h",
++            "matchedSuffix": "dopasowane sesje · ostatnia 1h",
+             "matchedLoading": "Liczenie dopasowanych sesji..."
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "przesuwne",
+     "totalSlos": "Łączna liczba SLO",
+     "noGrouping": "Brak (pojedyncza seria ogólna)",
+-    "generation": "generacja {n}",
+     "newAlert": "Nowy alert",
+     "overRolling": "w przesuwnym oknie {window}",
+     "searchPlaceholder": "Szukaj SLO lub tagu, np. team:payments",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index 9964cb4dcdf..95a42cd1213 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "Um Acionador é Obrigatório",
+     "addStepRequired": "Adicione pelo Menos Uma Etapa Após o Acionador",
+     "connectAllNodes": "Conecte Todos os Nós Antes de Salvar",
++    "finishStepsBeforePublish": "Conclua a configuração de todas as etapas antes de publicar",
++    "draft": "Rascunho",
++    "saveDraft": "Salvar como rascunho",
++    "publish": "Publicar",
++    "draftSaveSuccess": "Rascunho salvo com sucesso",
++    "publishSuccess": "Fluxo de trabalho publicado com sucesso",
++    "publishError": "Erro ao publicar o fluxo de trabalho",
++    "comingSoon": "Isso virá em uma etapa posterior",
++    "triggerType": {
++      "pick": "Escolha um gatilho",
++      "dialogTitle": "Criar um novo fluxo de trabalho",
++      "dialogIntro": "Escolha como este fluxo de trabalho é acionado. Mais tipos de gatilho estão por vir.",
++      "cta": "Criar fluxo de trabalho",
++      "soonCta": "Disponível em uma versão futura",
++      "comingSoon": "Em breve",
++      "soon": "Em breve"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Alerta disparado",
+@@ -2675,7 +2692,6 @@
+       "linkError": "Não foi possível vincular os alertas."
+     },
+     "chooseTrigger": "Escolher um Gatilho",
+-    "edgeDeleteHint": "Pressione Backspace / Delete para remover a conexão",
+     "node": {
+       "kindTrigger": "Gatilho",
+       "kindLogic": "Lógica",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Para verificar um valor nulo, use null. Exemplo:",
+       "conditionNoteCustom": "Para adicionar uma coluna personalizada, digite seu nome e pressione Enter.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Reformate o payload com uma função",
++      "functionBodySet": "Aplica {name}",
++      "functionSelect": "Selecionar função",
++      "functionCreateNew": "Criar nova função",
++      "functionRequired": "A função é obrigatória",
++      "functionLoadError": "Não foi possível carregar funções",
++      "destinationBody": "Enviar para um destino",
++      "destinationBodySet": "Envia para {name}",
++      "destinationSelect": "Destino",
++      "destinationCreateNew": "Criar novo destino",
++      "destinationRequired": "Selecione um destino",
++      "destinationLoadError": "Não foi possível carregar destinos",
++      "namePlaceholder": "Nomeie esta etapa (opcional)",
++      "commentLabel": "Comentário (opcional)",
++      "commentPlaceholder": "Adicione uma nota sobre esta etapa...",
++      "commentAdd": "Adicionar comentário",
++      "disable": "Desativar etapa",
++      "enable": "Ativar etapa",
++      "disabledBadge": "Desativado",
++      "incompleteBadge": "Configurar depois",
++      "destinationSetUpLater": "Configurar depois",
++      "destinationSetUpLaterPrompt": "Ainda não tem um destino? Ative esta opção para configurá-lo depois — você pode salvar um rascunho e testar agora.",
++      "destinationSetUpLaterActive": "O destino é ignorado por enquanto — o nome e o comentário ainda são salvos. Você precisará de um destino antes de publicar.",
++      "functionSetUpLater": "Configurar depois",
++      "functionSetUpLaterPrompt": "Ainda não tem uma função? Ative esta opção para configurá-la depois — você pode salvar um rascunho e testar agora.",
++      "functionSetUpLaterActive": "A função é ignorada por enquanto — o nome e o comentário ainda são salvos. Você precisará de uma função antes de publicar."
++    },
++    "commonFieldsAbove": "campos comuns acima",
++    "canvas": {
++      "undo": "Desfazer",
++      "tidyUp": "Organizar",
++      "insertStep": "Inserir etapa",
++      "deleteEdge": "Excluir conexão"
++    },
++    "unsaved": {
++      "title": "Alterações não salvas",
++      "message": "Você tem alterações não salvas. Sair agora as descartará.",
++      "discard": "Descartar alterações",
++      "stay": "Continuar editando"
+     },
+-    "commonFieldsAbove": "campos comuns acima"
++    "results": {
++      "title": "Resultados da etapa",
++      "collapse": "Recolher",
++      "expand": "Expandir",
++      "close": "Limpar e Fechar Resultados",
++      "nodesTitle": "Etapas",
++      "empty": "Execute um teste para ver os resultados das etapas aqui."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Spans Correspondentes",
+             "hint": "Depois de escolher um stream e filtro, este painel mostrará quantos spans seu job corresponderá.",
+-            "matchedSuffix": "spans correspondidos · últimas 24h",
++            "matchedSuffix": "spans correspondentes · última 1h",
+             "matchedLoading": "Contando spans correspondidos…"
+           },
+           "trace": {
+             "title": "Traces Correspondentes",
+             "hint": "Depois de escolher um stream e filtro, este painel mostrará quantas traces seu job corresponderá.",
+-            "matchedSuffix": "traces correspondidas · últimas 24h",
++            "matchedSuffix": "traces correspondentes · última 1h",
+             "matchedLoading": "Contando traces correspondidas…"
+           },
+           "session": {
+             "title": "Sessões Correspondentes",
+             "hint": "Depois de escolher um stream e filtro, este painel mostrará quantas sessões seu job corresponderá.",
+-            "matchedSuffix": "sessões correspondidas · últimas 24h",
++            "matchedSuffix": "sessões correspondentes · última 1h",
+             "matchedLoading": "Contando sessões correspondidas…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "contínuo",
+     "totalSlos": "Total de SLOs",
+     "noGrouping": "Nenhum (uma única série geral)",
+-    "generation": "geração {n}",
+     "newAlert": "Novo alerta",
+     "overRolling": "em janela contínua de {window}",
+     "searchPlaceholder": "Pesquisar SLO ou tag, ex.: team:payments",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index 42c46e3134d..16e63922bd3 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "Требуется триггер",
+     "addStepRequired": "Добавьте хотя бы один шаг после триггера",
+     "connectAllNodes": "Соедините все узлы перед сохранением",
++    "finishStepsBeforePublish": "Завершите настройку всех шагов перед публикацией",
++    "draft": "Черновик",
++    "saveDraft": "Сохранить как черновик",
++    "publish": "Опубликовать",
++    "draftSaveSuccess": "Черновик успешно сохранён",
++    "publishSuccess": "Рабочий процесс успешно опубликован",
++    "publishError": "Ошибка при публикации рабочего процесса",
++    "comingSoon": "Это появится на более позднем шаге",
++    "triggerType": {
++      "pick": "Выберите триггер",
++      "dialogTitle": "Создать новый рабочий процесс",
++      "dialogIntro": "Выберите, как запускается этот рабочий процесс. Скоро появятся дополнительные типы триггеров.",
++      "cta": "Создать рабочий процесс",
++      "soonCta": "Доступно в будущем релизе",
++      "comingSoon": "Скоро",
++      "soon": "Скоро"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Оповещение сработало",
+@@ -2675,7 +2692,6 @@
+       "linkError": "Не удалось привязать оповещения."
+     },
+     "chooseTrigger": "Выберите триггер",
+-    "edgeDeleteHint": "Нажмите Backspace / Delete, чтобы удалить соединение",
+     "node": {
+       "kindTrigger": "Триггер",
+       "kindLogic": "Логика",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Чтобы проверить значение null, используйте null. Пример:",
+       "conditionNoteCustom": "Чтобы добавить пользовательский столбец, введите его имя и нажмите Enter.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Изменяйте полезную нагрузку с помощью функции",
++      "functionBodySet": "Применяет {name}",
++      "functionSelect": "Выберите функцию",
++      "functionCreateNew": "Создать новую функцию",
++      "functionRequired": "Функция обязательна",
++      "functionLoadError": "Не удалось загрузить функции",
++      "destinationBody": "Отправить в пункт назначения",
++      "destinationBodySet": "Отправляет в {name}",
++      "destinationSelect": "Пункт назначения",
++      "destinationCreateNew": "Создать новый пункт назначения",
++      "destinationRequired": "Пожалуйста, выберите пункт назначения",
++      "destinationLoadError": "Не удалось загрузить пункты назначения",
++      "namePlaceholder": "Назовите этот шаг (необязательно)",
++      "commentLabel": "Комментарий (необязательно)",
++      "commentPlaceholder": "Добавьте заметку об этом шаге...",
++      "commentAdd": "Добавить комментарий",
++      "disable": "Отключить шаг",
++      "enable": "Включить шаг",
++      "disabledBadge": "Отключено",
++      "incompleteBadge": "Настроить позже",
++      "destinationSetUpLater": "Настроить позже",
++      "destinationSetUpLaterPrompt": "Ещё нет пункта назначения? Включите это, чтобы настроить его позже — вы можете сохранить черновик и протестировать сейчас.",
++      "destinationSetUpLaterActive": "Пункт назначения пока пропускается — имя и комментарий всё равно сохраняются. Вам понадобится пункт назначения перед публикацией.",
++      "functionSetUpLater": "Настроить позже",
++      "functionSetUpLaterPrompt": "Ещё нет функции? Включите это, чтобы настроить её позже — вы можете сохранить черновик и протестировать сейчас.",
++      "functionSetUpLaterActive": "Функция пока пропускается — имя и комментарий всё равно сохраняются. Вам понадобится функция перед публикацией."
++    },
++    "commonFieldsAbove": "общие поля выше",
++    "canvas": {
++      "undo": "Отменить",
++      "tidyUp": "Упорядочить",
++      "insertStep": "Вставить шаг",
++      "deleteEdge": "Удалить соединение"
++    },
++    "unsaved": {
++      "title": "Несохранённые изменения",
++      "message": "У вас есть несохранённые изменения. Если вы уйдёте сейчас, они будут отброшены.",
++      "discard": "Отбросить изменения",
++      "stay": "Продолжить редактирование"
+     },
+-    "commonFieldsAbove": "общие поля выше"
++    "results": {
++      "title": "Результаты шага",
++      "collapse": "Свернуть",
++      "expand": "Развернуть",
++      "close": "Очистить и закрыть результаты",
++      "nodesTitle": "Шаги",
++      "empty": "Запустите тест, чтобы увидеть здесь результаты шагов."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Совпавшие спаны",
+             "hint": "После выбора потока и фильтра эта панель покажет, сколько спанов будет соответствовать вашей задаче.",
+-            "matchedSuffix": "спанов совпало · за последние 24 часа",
++            "matchedSuffix": "Совпавшие спаны · за последний 1h",
+             "matchedLoading": "Подсчёт совпавших спанов…"
+           },
+           "trace": {
+             "title": "Совпавшие трассировки",
+             "hint": "После выбора потока и фильтра эта панель покажет, сколько трассировок будет соответствовать вашей задаче.",
+-            "matchedSuffix": "трассировок совпало · за последние 24 часа",
++            "matchedSuffix": "Совпавшие трейсы · за последний 1h",
+             "matchedLoading": "Подсчёт совпавших трассировок…"
+           },
+           "session": {
+             "title": "Совпавшие сеансы",
+             "hint": "После выбора потока и фильтра эта панель покажет, сколько сеансов будет соответствовать вашей задаче.",
+-            "matchedSuffix": "сеансов совпало · за последние 24 часа",
++            "matchedSuffix": "Совпавшие сессии · за последний 1h",
+             "matchedLoading": "Подсчёт совпавших сеансов…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "скользящий",
+     "totalSlos": "Всего SLO",
+     "noGrouping": "Нет (один общий ряд)",
+-    "generation": "поколение {n}",
+     "newAlert": "Новое оповещение",
+     "overRolling": "за скользящее окно {window}",
+     "searchPlaceholder": "Поиск SLO или тега, напр. team:payments",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index c53c692bfb8..c6f8c69fdff 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "Bir Tetikleyici Gerekli",
+     "addStepRequired": "Tetikleyiciden Sonra En Az Bir Adım Ekleyin",
+     "connectAllNodes": "Kaydetmeden Önce Tüm Düğümleri Bağlayın",
++    "finishStepsBeforePublish": "Yayınlamadan önce tüm adımları yapılandırmayı bitirin",
++    "draft": "Taslak",
++    "saveDraft": "Taslak Olarak Kaydet",
++    "publish": "Yayınla",
++    "draftSaveSuccess": "Taslak Başarıyla Kaydedildi",
++    "publishSuccess": "İş Akışı Başarıyla Yayınlandı",
++    "publishError": "İş Akışı Yayınlanırken Hata",
++    "comingSoon": "Bu Daha Sonraki Bir Adımda Geliyor",
++    "triggerType": {
++      "pick": "Bir Tetikleyici Seçin",
++      "dialogTitle": "Yeni Bir İş Akışı Oluştur",
++      "dialogIntro": "Bu İş Akışının Nasıl Tetikleneceğini Seçin. Yakında Daha Fazla Tetikleyici Türü Gelecek.",
++      "cta": "İş Akışı Oluştur",
++      "soonCta": "Gelecekteki Bir Sürümde Kullanılabilir",
++      "comingSoon": "Çok Yakında",
++      "soon": "Yakında"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Uyarı tetiklendi",
+@@ -2675,7 +2692,6 @@
+       "linkError": "Uyarılar Bağlanamıyor."
+     },
+     "chooseTrigger": "Tetikleyici Seç",
+-    "edgeDeleteHint": "Bağlantıyı kaldırmak için Backspace / Delete tuşuna basın",
+     "node": {
+       "kindTrigger": "Tetikleyici",
+       "kindLogic": "Mantık",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Null Bir Değer Kontrol Etmek İçin null Kullanın. Örnek:",
+       "conditionNoteCustom": "Özel Bir Sütun Eklemek İçin Adını Yazın ve Enter'a Basın.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Bir Fonksiyonla Yükü Yeniden Şekillendirin",
++      "functionBodySet": "Uygular {name}",
++      "functionSelect": "Fonksiyon Seç",
++      "functionCreateNew": "Yeni Fonksiyon Oluştur",
++      "functionRequired": "Fonksiyon Gerekli",
++      "functionLoadError": "Fonksiyonlar Yüklenemiyor",
++      "destinationBody": "Bir Hedefe Gönder",
++      "destinationBodySet": "Hedef: {name}",
++      "destinationSelect": "Hedef",
++      "destinationCreateNew": "Yeni Hedef Oluştur",
++      "destinationRequired": "Lütfen Bir Hedef Seçin",
++      "destinationLoadError": "Hedefler Yüklenemiyor",
++      "namePlaceholder": "Bu Adımı Adlandırın (İsteğe Bağlı)",
++      "commentLabel": "Yorum (İsteğe Bağlı)",
++      "commentPlaceholder": "Bu Adım Hakkında Bir Not Ekleyin...",
++      "commentAdd": "Yorum Ekle",
++      "disable": "Adımı Devre Dışı Bırak",
++      "enable": "Adımı Etkinleştir",
++      "disabledBadge": "Devre Dışı",
++      "incompleteBadge": "Daha Sonra Kur",
++      "destinationSetUpLater": "Daha Sonra Kur",
++      "destinationSetUpLaterPrompt": "Henüz bir hedefiniz yok mu? Bunu açın ve daha sonra ayarlayın — şimdi taslak kaydedip test edebilirsiniz.",
++      "destinationSetUpLaterActive": "Hedef şimdilik atlanıyor — ad ve yorum yine de kaydedilir. Yayınlamadan önce bir hedefe ihtiyacınız olacak.",
++      "functionSetUpLater": "Daha Sonra Kur",
++      "functionSetUpLaterPrompt": "Henüz bir fonksiyonunuz yok mu? Bunu açın ve daha sonra ayarlayın — şimdi taslak kaydedip test edebilirsiniz.",
++      "functionSetUpLaterActive": "Fonksiyon şimdilik atlanıyor — ad ve yorum yine de kaydedilir. Yayınlamadan önce bir fonksiyona ihtiyacınız olacak."
++    },
++    "commonFieldsAbove": "yukarıdaki ortak alanlar",
++    "canvas": {
++      "undo": "Geri Al",
++      "tidyUp": "Toparla",
++      "insertStep": "Adım Ekle",
++      "deleteEdge": "Bağlantıyı Sil"
++    },
++    "unsaved": {
++      "title": "Kaydedilmemiş Değişiklikler",
++      "message": "Kaydedilmemiş değişiklikleriniz var. Şimdi ayrılırsanız bunlar kaybolacak.",
++      "discard": "Değişiklikleri At",
++      "stay": "Düzenlemeye Devam Et"
+     },
+-    "commonFieldsAbove": "yukarıdaki ortak alanlar"
++    "results": {
++      "title": "Adım Sonuçları",
++      "collapse": "Daralt",
++      "expand": "Genişlet",
++      "close": "Sonuçları Temizle ve Kapat",
++      "nodesTitle": "Adımlar",
++      "empty": "Burada adım sonuçlarını görmek için bir test çalıştırın."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Eşleşen Span'lar",
+             "hint": "Bir akış ve filtre seçtikten sonra bu panel, işinizin kaç span ile eşleşeceğini gösterecektir.",
+-            "matchedSuffix": "eşleşen span'lar · son 24s",
++            "matchedSuffix": "eşleşen spanlar · son 1 saat",
+             "matchedLoading": "Eşleşen span'lar sayılıyor…"
+           },
+           "trace": {
+             "title": "Eşleşen İzler",
+             "hint": "Bir akış ve filtre seçtikten sonra bu panel, işinizin kaç iz ile eşleşeceğini gösterecektir.",
+-            "matchedSuffix": "eşleşen izler · son 24s",
++            "matchedSuffix": "eşleşen izler · son 1 saat",
+             "matchedLoading": "Eşleşen izler sayılıyor…"
+           },
+           "session": {
+             "title": "Eşleşen Oturumlar",
+             "hint": "Bir akış ve filtre seçtikten sonra bu panel, işinizin kaç oturum ile eşleşeceğini gösterecektir.",
+-            "matchedSuffix": "eşleşen oturumlar · son 24s",
++            "matchedSuffix": "eşleşen oturumlar · son 1 saat",
+             "matchedLoading": "Eşleşen oturumlar sayılıyor…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "kayan",
+     "totalSlos": "Toplam SLO",
+     "noGrouping": "Yok (tek bir genel seri)",
+-    "generation": "nesil {n}",
+     "newAlert": "Yeni uyarı",
+     "overRolling": "kayan {window} üzerinde",
+     "searchPlaceholder": "SLO veya etiket ara, örn. takım:ödemeler",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 7d248f807e4..89c7587042a 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "Cần có một bộ kích hoạt",
+     "addStepRequired": "Thêm ít nhất một bước sau bộ kích hoạt",
+     "connectAllNodes": "Kết nối tất cả các nút trước khi lưu",
++    "finishStepsBeforePublish": "Hoàn tất cấu hình tất cả các bước trước khi xuất bản",
++    "draft": "Bản nháp",
++    "saveDraft": "Lưu thành bản nháp",
++    "publish": "Xuất bản",
++    "draftSaveSuccess": "Đã lưu bản nháp thành công",
++    "publishSuccess": "Đã xuất bản quy trình thành công",
++    "publishError": "Lỗi khi xuất bản quy trình",
++    "comingSoon": "Điều này sẽ có ở một bước sau",
++    "triggerType": {
++      "pick": "Chọn trình kích hoạt",
++      "dialogTitle": "Tạo quy trình mới",
++      "dialogIntro": "Chọn cách quy trình này được kích hoạt. Sắp có thêm nhiều loại trình kích hoạt.",
++      "cta": "Tạo quy trình",
++      "soonCta": "Khả dụng trong bản phát hành tương lai",
++      "comingSoon": "Sắp ra mắt",
++      "soon": "Sắp có"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "Cảnh báo đã kích hoạt",
+@@ -2675,7 +2692,6 @@
+       "linkError": "Không thể liên kết cảnh báo."
+     },
+     "chooseTrigger": "Chọn một trình kích hoạt",
+-    "edgeDeleteHint": "Nhấn Backspace / Delete để xóa cạnh",
+     "node": {
+       "kindTrigger": "Trình kích hoạt",
+       "kindLogic": "Logic",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "Để kiểm tra giá trị null, sử dụng null. Ví dụ:",
+       "conditionNoteCustom": "Để thêm cột tùy chỉnh, nhập tên của nó và nhấn Enter.",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "Định dạng lại payload bằng hàm",
++      "functionBodySet": "Áp dụng {name}",
++      "functionSelect": "Chọn hàm",
++      "functionCreateNew": "Tạo hàm mới",
++      "functionRequired": "Hàm là bắt buộc",
++      "functionLoadError": "Không thể tải danh sách hàm",
++      "destinationBody": "Gửi đến một đích",
++      "destinationBodySet": "Gửi đến {name}",
++      "destinationSelect": "Đích",
++      "destinationCreateNew": "Tạo đích mới",
++      "destinationRequired": "Vui lòng chọn một đích",
++      "destinationLoadError": "Không thể tải danh sách đích",
++      "namePlaceholder": "Tên bước này (Tùy chọn)",
++      "commentLabel": "Nhận xét (Tùy chọn)",
++      "commentPlaceholder": "Thêm ghi chú về bước này...",
++      "commentAdd": "Thêm nhận xét",
++      "disable": "Vô hiệu hóa bước",
++      "enable": "Kích hoạt bước",
++      "disabledBadge": "Đã tắt",
++      "incompleteBadge": "Thiết lập sau",
++      "destinationSetUpLater": "Thiết lập sau",
++      "destinationSetUpLaterPrompt": "Chưa có đích? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
++      "destinationSetUpLaterActive": "Đích sẽ được bỏ qua trong lúc này — tên và nhận xét vẫn được lưu. Bạn cần một đích trước khi xuất bản.",
++      "functionSetUpLater": "Thiết lập sau",
++      "functionSetUpLaterPrompt": "Chưa có hàm? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
++      "functionSetUpLaterActive": "Hàm sẽ được bỏ qua trong lúc này — tên và nhận xét vẫn được lưu. Bạn cần một hàm trước khi xuất bản."
++    },
++    "commonFieldsAbove": "các trường chung ở trên",
++    "canvas": {
++      "undo": "Hoàn tác",
++      "tidyUp": "Dọn dẹp",
++      "insertStep": "Chèn bước",
++      "deleteEdge": "Xóa kết nối"
++    },
++    "unsaved": {
++      "title": "Các thay đổi chưa lưu",
++      "message": "Bạn có các thay đổi chưa được lưu. Nếu rời khỏi bây giờ, các thay đổi này sẽ bị hủy.",
++      "discard": "Hủy bỏ thay đổi",
++      "stay": "Tiếp tục chỉnh sửa"
+     },
+-    "commonFieldsAbove": "các trường chung ở trên"
++    "results": {
++      "title": "Kết quả bước",
++      "collapse": "Thu gọn",
++      "expand": "Mở rộng",
++      "close": "Xóa & Đóng Kết Quả",
++      "nodesTitle": "Các bước",
++      "empty": "Chạy một bài kiểm tra để xem kết quả các bước tại đây."
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "Các Span Khớp",
+             "hint": "Khi bạn đã chọn một luồng và bộ lọc, bảng này sẽ hiển thị số lượng span mà công việc của bạn sẽ khớp.",
+-            "matchedSuffix": "các span khớp · 24h qua",
++            "matchedSuffix": "span khớp · 1h qua",
+             "matchedLoading": "Đang đếm các span khớp…"
+           },
+           "trace": {
+             "title": "Các Trace Khớp",
+             "hint": "Khi bạn đã chọn một luồng và bộ lọc, bảng này sẽ hiển thị số lượng trace mà công việc của bạn sẽ khớp.",
+-            "matchedSuffix": "các trace khớp · 24h qua",
++            "matchedSuffix": "trace khớp · 1h qua",
+             "matchedLoading": "Đang đếm các trace khớp…"
+           },
+           "session": {
+             "title": "Các Phiên Khớp",
+             "hint": "Khi bạn đã chọn một luồng và bộ lọc, bảng này sẽ hiển thị số lượng phiên mà công việc của bạn sẽ khớp.",
+-            "matchedSuffix": "các phiên khớp · 24h qua",
++            "matchedSuffix": "phiên khớp · 1h qua",
+             "matchedLoading": "Đang đếm các phiên khớp…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "trượt",
+     "totalSlos": "Tổng số SLO",
+     "noGrouping": "Không có (một chuỗi tổng thể duy nhất)",
+-    "generation": "thế hệ {n}",
+     "newAlert": "Cảnh báo mới",
+     "overRolling": "trong cửa sổ trượt {window}",
+     "searchPlaceholder": "Tìm kiếm SLO hoặc thẻ, ví dụ: team:payments",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index 9c1f0b108f7..e145c226a39 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "需要触发器",
+     "addStepRequired": "在触发器后至少添加一个步骤",
+     "connectAllNodes": "保存前连接所有节点",
++    "finishStepsBeforePublish": "完成所有步骤配置后再发布",
++    "draft": "草稿",
++    "saveDraft": "保存为草稿",
++    "publish": "发布",
++    "draftSaveSuccess": "草稿保存成功",
++    "publishSuccess": "工作流发布成功",
++    "publishError": "发布工作流时出错",
++    "comingSoon": "此功能将在后续步骤中提供",
++    "triggerType": {
++      "pick": "选择触发器",
++      "dialogTitle": "创建新工作流",
++      "dialogIntro": "选择此工作流的触发方式。更多触发器类型即将推出。",
++      "cta": "创建工作流",
++      "soonCta": "将在未来版本中提供",
++      "comingSoon": "即将推出",
++      "soon": "即将"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "告警触发",
+@@ -2675,7 +2692,6 @@
+       "linkError": "无法链接告警。"
+     },
+     "chooseTrigger": "选择触发器",
+-    "edgeDeleteHint": "按 Backspace / Delete 键以移除连线",
+     "node": {
+       "kindTrigger": "触发器",
+       "kindLogic": "逻辑",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "要检查空值，请使用 null。例如：",
+       "conditionNoteCustom": "要添加自定义列，请键入其名称并按回车。",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "使用函数重塑负载",
++      "functionBodySet": "应用 {name}",
++      "functionSelect": "选择函数",
++      "functionCreateNew": "创建新函数",
++      "functionRequired": "必须提供函数",
++      "functionLoadError": "无法加载函数",
++      "destinationBody": "发送到目标",
++      "destinationBodySet": "发送到 {name}",
++      "destinationSelect": "目标",
++      "destinationCreateNew": "创建新目标",
++      "destinationRequired": "请选择目标",
++      "destinationLoadError": "无法加载目标",
++      "namePlaceholder": "命名此步骤（可选）",
++      "commentLabel": "备注（可选）",
++      "commentPlaceholder": "添加关于此步骤的备注...",
++      "commentAdd": "添加备注",
++      "disable": "禁用步骤",
++      "enable": "启用步骤",
++      "disabledBadge": "已禁用",
++      "incompleteBadge": "稍后设置",
++      "destinationSetUpLater": "稍后设置",
++      "destinationSetUpLaterPrompt": "还没有目标？开启此项可稍后设置 — 现在即可保存草稿并测试。",
++      "destinationSetUpLaterActive": "目标暂时跳过 — 名称和备注仍会保存。发布前需要先提供目标。",
++      "functionSetUpLater": "稍后设置",
++      "functionSetUpLaterPrompt": "还没有函数？开启此项可稍后设置 — 现在即可保存草稿并测试。",
++      "functionSetUpLaterActive": "函数暂时跳过 — 名称和备注仍会保存。发布前需要先提供函数。"
++    },
++    "commonFieldsAbove": "以上为公共字段",
++    "canvas": {
++      "undo": "撤销",
++      "tidyUp": "整理",
++      "insertStep": "插入步骤",
++      "deleteEdge": "删除连接"
++    },
++    "unsaved": {
++      "title": "未保存的更改",
++      "message": "您有未保存的更改。现在离开将丢弃这些更改。",
++      "discard": "放弃更改",
++      "stay": "继续编辑"
+     },
+-    "commonFieldsAbove": "以上为公共字段"
++    "results": {
++      "title": "步骤结果",
++      "collapse": "折叠",
++      "expand": "展开",
++      "close": "清除并关闭结果",
++      "nodesTitle": "步骤",
++      "empty": "运行测试以在此处查看步骤结果。"
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11454,19 +11516,19 @@
+           "span": {
+             "title": "匹配的跨度数",
+             "hint": "一旦您选择了流和过滤器，此面板将显示您的任务将匹配多少个跨度。",
+-            "matchedSuffix": "匹配的跨度数 · 过去24小时",
++            "matchedSuffix": "匹配的跨度 · 最近 1 小时",
+             "matchedLoading": "正在计算匹配的跨度数…"
+           },
+           "trace": {
+             "title": "匹配的跟踪数",
+             "hint": "一旦您选择了流和过滤器，此面板将显示您的任务将匹配多少个追踪。",
+-            "matchedSuffix": "匹配的跟踪数 · 过去24小时",
++            "matchedSuffix": "匹配的追踪 · 最近 1 小时",
+             "matchedLoading": "正在计算匹配的跟踪数…"
+           },
+           "session": {
+             "title": "匹配的会话数",
+             "hint": "一旦您选择了流和过滤器，此面板将显示您的任务将匹配多少个会话。",
+-            "matchedSuffix": "匹配的会话数 · 过去24小时",
++            "matchedSuffix": "匹配的会话 · 最近 1 小时",
+             "matchedLoading": "正在计算匹配的会话数…"
+           }
+         },
+@@ -13992,7 +14054,6 @@
+     "rolling": "滚动",
+     "totalSlos": "SLO 总数",
+     "noGrouping": "无（单一整体序列）",
+-    "generation": "第 {n} 代",
+     "newAlert": "新建告警",
+     "overRolling": "在滚动 {window} 内",
+     "searchPlaceholder": "搜索 SLO 或标签，例如 team:payments",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 7224e2b2a69..01f222e78b0 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -2578,6 +2578,23 @@
+     "triggerRequired": "需要觸發器",
+     "addStepRequired": "在觸發器之後至少新增一個步驟",
+     "connectAllNodes": "儲存前連接所有節點",
++    "finishStepsBeforePublish": "完成所有步驟的設定後再發布",
++    "draft": "草稿",
++    "saveDraft": "儲存為草稿",
++    "publish": "發布",
++    "draftSaveSuccess": "草稿已成功儲存",
++    "publishSuccess": "工作流程已成功發布",
++    "publishError": "發布工作流程時發生錯誤",
++    "comingSoon": "這將在後續步驟中提供",
++    "triggerType": {
++      "pick": "選擇觸發器",
++      "dialogTitle": "建立新的工作流程",
++      "dialogIntro": "選擇此工作流程的觸發方式。更多觸發器類型即將推出。",
++      "cta": "建立工作流程",
++      "soonCta": "將於未來版本提供",
++      "comingSoon": "即將推出",
++      "soon": "即將"
++    },
+     "triggerKind": {
+       "alertFired": {
+         "label": "警示已觸發",
+@@ -2675,7 +2692,6 @@
+       "linkError": "無法連結警示。"
+     },
+     "chooseTrigger": "選擇觸發器",
+-    "edgeDeleteHint": "按 Backspace / Delete 以移除連線",
+     "node": {
+       "kindTrigger": "觸發器",
+       "kindLogic": "邏輯",
+@@ -2702,9 +2718,55 @@
+       "conditionNoteNull": "若要檢查 null 值，請使用 null。範例：",
+       "conditionNoteCustom": "若要新增自訂欄位，請輸入其名稱並按 Enter。",
+       "conditionExampleEmpty": "severity != \"\"",
+-      "conditionExampleNull": "severity != null"
++      "conditionExampleNull": "severity != null",
++      "functionBody": "使用函數重塑 Payload",
++      "functionBodySet": "套用 {name}",
++      "functionSelect": "選擇函數",
++      "functionCreateNew": "建立新函數",
++      "functionRequired": "必須提供函數",
++      "functionLoadError": "無法載入函數",
++      "destinationBody": "傳送至目的地",
++      "destinationBodySet": "傳送至 {name}",
++      "destinationSelect": "目的地",
++      "destinationCreateNew": "建立新目的地",
++      "destinationRequired": "請選擇目的地",
++      "destinationLoadError": "無法載入目的地",
++      "namePlaceholder": "命名此步驟（選填）",
++      "commentLabel": "備註（選填）",
++      "commentPlaceholder": "新增此步驟的備註...",
++      "commentAdd": "新增備註",
++      "disable": "停用步驟",
++      "enable": "啟用步驟",
++      "disabledBadge": "已停用",
++      "incompleteBadge": "稍後設定",
++      "destinationSetUpLater": "稍後設定",
++      "destinationSetUpLaterPrompt": "還沒有目的地？開啟此選項以稍後設定 — 您現在可以儲存草稿並進行測試。",
++      "destinationSetUpLaterActive": "目的地目前會略過 — 名稱和備註仍會儲存。發布前您需要設定目的地。",
++      "functionSetUpLater": "稍後設定",
++      "functionSetUpLaterPrompt": "還沒有函數？開啟此選項以稍後設定 — 您現在可以儲存草稿並進行測試。",
++      "functionSetUpLaterActive": "函數目前會略過 — 名稱和備註仍會儲存。發布前您需要設定函數。"
++    },
++    "commonFieldsAbove": "上方的通用欄位",
++    "canvas": {
++      "undo": "復原",
++      "tidyUp": "整理",
++      "insertStep": "插入步驟",
++      "deleteEdge": "刪除連線"
+     },
+-    "commonFieldsAbove": "上方的通用欄位"
++    "unsaved": {
++      "title": "未儲存的變更",
++      "message": "您有未儲存的變更。現在離開將捨棄這些變更。",
++      "discard": "捨棄變更",
++      "stay": "繼續編輯"
++    },
++    "results": {
++      "title": "步驟結果",
++      "collapse": "折叠",
++      "expand": "展开",
++      "close": "清除并关闭结果",
++      "nodesTitle": "步骤",
++      "empty": "运行测试以在此处查看步骤结果。"
++    }
+   },
+   "pipeline": {
+     "validation": {
+@@ -11449,19 +11511,19 @@
+           "span": {
+             "title": "匹配的區間",
+             "hint": "一旦選取了資料流和篩選條件，此面板將顯示您的作業會匹配多少個區間。",
+-            "matchedSuffix": "匹配的區間 · 過去24小時",
++            "matchedSuffix": "匹配的 spans · 過去 1 小時",
+             "matchedLoading": "正在計算匹配的區間…"
+           },
+           "trace": {
+             "title": "匹配的追蹤",
+             "hint": "一旦選取了資料流和篩選條件，此面板將顯示您的作業會匹配多少個追蹤。",
+-            "matchedSuffix": "匹配的追蹤 · 過去24小時",
++            "matchedSuffix": "匹配的 traces · 過去 1 小時",
+             "matchedLoading": "正在計算匹配的追蹤…"
+           },
+           "session": {
+             "title": "匹配的工作階段",
+             "hint": "一旦選取了資料流和篩選條件，此面板將顯示您的作業會匹配多少個工作階段。",
+-            "matchedSuffix": "匹配的工作階段 · 過去24小時",
++            "matchedSuffix": "匹配的 sessions · 過去 1 小時",
+             "matchedLoading": "正在計算匹配的工作階段…"
+           }
+         },
+@@ -13987,7 +14049,6 @@
+     "rolling": "滾動",
+     "totalSlos": "SLO 總數",
+     "noGrouping": "無（單一整體系列）",
+-    "generation": "第 {n} 代",
+     "newAlert": "新增警示",
+     "overRolling": "在滾動 {window} 內",
+     "searchPlaceholder": "搜尋 SLO 或標籤，例如 team:payments",
+diff --git a/web/src/plugins/traces/Index.spec.ts b/web/src/plugins/traces/Index.spec.ts
+index 0ba30c895ad..cfedfad0fff 100644
+--- a/web/src/plugins/traces/Index.spec.ts
++++ b/web/src/plugins/traces/Index.spec.ts
+@@ -470,8 +470,9 @@ describe("Index.vue (Main Traces Page)", () => {
+     });
+ 
+     it("should update URL with tab=traces when searchMode changes to traces", async () => {
+-      // Start in service-graph mode so switching to traces is an actual change
+-      mockSearchObj.meta.searchMode = "service-graph";
++      routerCurrentRouteSpy.mockReturnValue({
++        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
++      } as any);
+ 
+       wrapper = mount(Index, {
+         attachTo: node,
+@@ -504,6 +505,115 @@ describe("Index.vue (Main Traces Page)", () => {
+       );
+     });
+ 
++    it("should update URL with tab=spans when searchMode changes to spans", async () => {
++      routerCurrentRouteSpy.mockReturnValue({
++        value: {
++          query: { tab: "traces", search_mode: "spans" },
++          name: "traces",
++          path: "/traces",
++        },
++      } as any);
++
++      wrapper = mount(Index, {
++        attachTo: node,
++        global: {
++          plugins: [i18n, router],
++          provide: { store: store },
++          stubs: {
++            "search-bar": true,
++            "index-list": true,
++            "search-result": true,
++            "service-graph": true,
++            "services-catalog": true,
++            SanitizedHtmlRenderer: true,
++          },
++        },
++      });
++
++      await flushPromises();
++      routerReplaceSpy.mockClear();
++
++      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
++      await searchBarEl.vm.$emit("update:searchMode", "spans");
++      await flushPromises();
++
++      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
++    });
++
++    it("should switch to spans when the tab query changes on the mounted Traces route", async () => {
++      const currentRoute = ref({
++        query: { tab: "traces" },
++        name: "traces",
++        path: "/traces",
++      }) as typeof router.currentRoute;
++      routerCurrentRouteSpy.mockReturnValue(currentRoute);
++
++      wrapper = mount(Index, {
++        attachTo: node,
++        global: {
++          plugins: [i18n, router],
++          provide: { store: store },
++          stubs: {
++            "search-bar": true,
++            "index-list": true,
++            "search-result": true,
++            "service-graph": true,
++            "services-catalog": true,
++            SanitizedHtmlRenderer: true,
++          },
++        },
++      });
++
++      await flushPromises();
++      routerReplaceSpy.mockClear();
++
++      currentRoute.value = {
++        ...currentRoute.value,
++        query: { tab: "spans" },
++      };
++      await flushPromises();
++
++      expect(mockSearchObj.meta.searchMode).toBe("spans");
++      expect(routerReplaceSpy).not.toHaveBeenCalled();
++    });
++
++    it("should restore the spans default when the tab query is removed", async () => {
++      const currentRoute = ref({
++        query: { tab: "spans" },
++        name: "traces",
++        path: "/traces",
++      }) as typeof router.currentRoute;
++      routerCurrentRouteSpy.mockReturnValue(currentRoute);
++
++      wrapper = mount(Index, {
++        attachTo: node,
++        global: {
++          plugins: [i18n, router],
++          provide: { store: store },
++          stubs: {
++            "search-bar": true,
++            "index-list": true,
++            "search-result": true,
++            "service-graph": true,
++            "services-catalog": true,
++            SanitizedHtmlRenderer: true,
++          },
++        },
++      });
++
++      await flushPromises();
++      routerReplaceSpy.mockClear();
++
++      currentRoute.value = {
++        ...currentRoute.value,
++        query: {},
++      };
++      await flushPromises();
++
++      expect(mockSearchObj.meta.searchMode).toBe("spans");
++      expect(routerReplaceSpy).toHaveBeenCalledWith({ query: { tab: "spans" } });
++    });
++
+     it("should switch to service-graph tab from ?tab= on enterprise", async () => {
+       routerCurrentRouteSpy.mockReturnValue({
+         value: {
+@@ -556,7 +666,9 @@ describe("Index.vue (Main Traces Page)", () => {
+       });
+ 
+     it("should render the ServiceGraph stub inline in service-graph mode (enterprise)", async () => {
+-      mockSearchObj.meta.searchMode = "service-graph";
++      routerCurrentRouteSpy.mockReturnValue({
++        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
++      } as any);
+       wrapper = mountIndex();
+       await flushPromises();
+ 
+@@ -565,7 +677,9 @@ describe("Index.vue (Main Traces Page)", () => {
+     });
+ 
+     it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
+-      mockSearchObj.meta.searchMode = "services-catalog";
++      routerCurrentRouteSpy.mockReturnValue({
++        value: { query: { tab: "services-catalog" }, name: "traces", path: "/traces" },
++      } as any);
+       wrapper = mountIndex();
+       await flushPromises();
+ 
+@@ -574,7 +688,9 @@ describe("Index.vue (Main Traces Page)", () => {
+     });
+ 
+     it("should apply the built filter and switch mode on view-traces from the graph", async () => {
+-      mockSearchObj.meta.searchMode = "service-graph";
++      routerCurrentRouteSpy.mockReturnValue({
++        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
++      } as any);
+       wrapper = mountIndex();
+       await flushPromises();
+ 
+diff --git a/web/src/plugins/traces/Index.vue b/web/src/plugins/traces/Index.vue
+index 128d56b778b..5ddf5626409 100644
+--- a/web/src/plugins/traces/Index.vue
++++ b/web/src/plugins/traces/Index.vue
+@@ -337,7 +337,7 @@ import {
+ import { parseSpanKindWhereClause } from "@/utils/traces/constants";
+ import { logsUtils } from "@/composables/useLogs/logsUtils";
+ import { useTracesTableColumns } from "./composables/useTracesTableColumns";
+-import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
++import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+ import { isLLMTrace } from "@/utils/llmUtils";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+@@ -361,6 +361,9 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
+ const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
+ const ServicesCatalog = defineAsyncComponent(() => import("./ServicesCatalog.vue"));
+ 
++const supportedTraceSearchMode = (value: unknown): TraceSearchMode =>
++  resolveTraceSearchMode(value, config.isEnterprise === "true");
++
+ const store = useStore();
+ const activeTab = computed(() => {
+   if (searchObj.meta.searchMode === "service-graph") return "service-graph";
+@@ -1393,16 +1396,7 @@ function restoreUrlQueryParams() {
+     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+   }
+ 
+-  const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
+-  if (
+-    tab !== undefined &&
+-    (["service-graph", "traces", "spans", "services-catalog"] as const).includes(
+-      tab as "service-graph" | "traces" | "spans" | "services-catalog",
+-    )
+-  ) {
+-    if (tab === "service-graph" && config.isEnterprise !== "true") return;
+-    searchObj.meta.searchMode = tab as TraceSearchMode;
+-  }
++  searchObj.meta.searchMode = supportedTraceSearchMode(queryParams.tab);
+ 
+   if (queryParams.stream && searchObj.data.stream.selectedStream.value !== queryParams.stream) {
+     searchObj.data.stream.selectedStream = {
+@@ -1489,7 +1483,7 @@ const onErrorOnlyToggled = (value: boolean) => {
+ };
+ 
+ // Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
+-const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "services-catalog") => {
++const onSearchModeChange = (mode: TraceSearchMode) => {
+   searchObj.meta.searchMode = mode;
+   if (mode === "service-graph" || mode === "services-catalog") return;
+   if (
+@@ -1511,6 +1505,26 @@ const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "servic
+   getQueryData();
+ };
+ 
++watch(
++  () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
++  ([routeName, tab]) => {
++    if (routeName !== "traces") return;
++    const mode = supportedTraceSearchMode(tab);
++    if (mode !== searchObj.meta.searchMode) {
++      onSearchModeChange(mode);
++      return;
++    }
++    if (tab !== mode) {
++      const query = { ...router.currentRoute.value.query };
++      delete query.search_mode;
++      query.tab = mode;
++      router.replace({
++        query,
++      });
++    }
++  },
++);
++
+ // Handler for Reset Filters button
+ // Clears all filters including brush selections
+ const onFiltersReset = () => {
+@@ -1998,15 +2012,8 @@ const handleServicesCatalogViewTraces = (data: string | Record<string, any>) =>
+ };
+ 
+ /**
+- * Hydrate a handoff from the standalone Service Graph / Services Catalog routes.
+- *
+- * Those views navigate here with the filter, stream, mode and time range as
+- * query params (see `viewTracesQuery` in ./viewTracesHandoff), rather than
+- * mutating the shared search state from inside a sibling tab. Applying them
+- * here keeps the handoff URL bookmarkable and reload-safe.
+- *
+- * `restoreUrlQueryParams` already applies `stream`, `from`/`to` and `tab`, so
+- * this only adds the prebuilt filter and re-runs the query.
++ * Hydrate a bookmarkable filter handoff. `restoreUrlQueryParams` applies the
++ * stream, time range and tab; this restores the prebuilt filter.
+  */
+ const applyHandoffFilter = (): boolean => {
+   const filter = router.currentRoute.value.query.filter;
+@@ -2028,12 +2035,15 @@ const applyHandoffFilter = (): boolean => {
+ watch(
+   () => searchObj.meta.searchMode,
+   (mode) => {
+-    const query = { ...router.currentRoute.value.query };
+-    if (mode !== "spans") {
+-      query.tab = mode;
+-    } else {
+-      delete query.tab;
++    if (
++      router.currentRoute.value.query.tab === mode &&
++      router.currentRoute.value.query.search_mode === undefined
++    ) {
++      return;
+     }
++    const query = { ...router.currentRoute.value.query };
++    delete query.search_mode;
++    query.tab = mode;
+     router.replace({ query });
+   },
+ );
+diff --git a/web/src/plugins/traces/viewTracesHandoff.spec.ts b/web/src/plugins/traces/viewTracesHandoff.spec.ts
+index 5d4ef2f60fc..0058d74685d 100644
+--- a/web/src/plugins/traces/viewTracesHandoff.spec.ts
++++ b/web/src/plugins/traces/viewTracesHandoff.spec.ts
+@@ -14,17 +14,12 @@
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ import { describe, it, expect } from "vitest";
+-import {
+-  buildViewTracesFilter,
+-  normalizeViewTracesPayload,
+-  viewTracesQuery,
+-} from "./viewTracesHandoff";
++import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
+ 
+ /**
+  * These cases were previously asserted against Index.vue's in-page
+  * `handleServiceGraphViewTraces` / `handleServicesCatalogViewTraces`. The filter
+- * building moved verbatim into this module when Service Graph and Services
+- * Catalog became standalone routes, so the coverage moved with it.
++ * building is shared by the embedded Service Graph and Services Catalog tabs.
+  */
+ describe("buildViewTracesFilter", () => {
+   it("builds a service_name filter for a plain service", () => {
+@@ -144,38 +139,3 @@ describe("normalizeViewTracesPayload", () => {
+     expect(normalizeViewTracesPayload(payload)).toBe(payload);
+   });
+ });
+-
+-describe("viewTracesQuery", () => {
+-  it("carries the built filter, stream and mode", () => {
+-    const q = viewTracesQuery({ serviceName: "svc", stream: "default", mode: "traces" });
+-    expect(q.filter).toBe("service_name = 'svc'");
+-    expect(q.stream).toBe("default");
+-    expect(q.tab).toBe("traces");
+-  });
+-
+-  it("omits tab for spans — the canonical no-tab URL", () => {
+-    const q = viewTracesQuery({ serviceName: "svc", mode: "spans" });
+-    expect(q.tab).toBeUndefined();
+-  });
+-
+-  it("carries an absolute time range as from/to", () => {
+-    const q = viewTracesQuery({
+-      serviceName: "svc",
+-      timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-    });
+-    expect(q.from).toBe("1755853746625720");
+-    expect(q.to).toBe("1755853746725720");
+-  });
+-
+-  it("omits the filter key entirely when no service is named", () => {
+-    const q = viewTracesQuery({ stream: "default" });
+-    expect(q.filter).toBeUndefined();
+-    expect(q.stream).toBe("default");
+-  });
+-
+-  it("accepts the catalog's bare-string payload", () => {
+-    const q = viewTracesQuery("svc");
+-    expect(q.filter).toBe("service_name = 'svc'");
+-    expect(q.tab).toBe("traces");
+-  });
+-});
+diff --git a/web/src/plugins/traces/viewTracesHandoff.ts b/web/src/plugins/traces/viewTracesHandoff.ts
+index 177f7313464..45e14a51c4e 100644
+--- a/web/src/plugins/traces/viewTracesHandoff.ts
++++ b/web/src/plugins/traces/viewTracesHandoff.ts
+@@ -40,9 +40,8 @@ export interface ViewTracesPayload {
+  * Build the traces search-bar filter (a bare WHERE condition — no SELECT/ORDER
+  * BY, since the traces editor is not in SQL mode) from a `view-traces` payload.
+  *
+- * Extracted verbatim from the former in-page handler so Service Graph and
+- * Services Catalog, now on their own routes, build the same string and hand off
+- * to Traces through the URL instead of by mutating shared state.
++ * Shared by the embedded Service Graph and Services Catalog tabs so both build
++ * the same filter before returning to the traces search view.
+  *
+  * @returns the filter string, or "" when the payload names no service (there is
+  *          nothing to filter on without one).
+@@ -97,28 +96,3 @@ export function buildViewTracesFilter(data: ViewTracesPayload): string {
+ export function normalizeViewTracesPayload(data: string | ViewTracesPayload): ViewTracesPayload {
+   return typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
+ }
+-
+-/**
+- * Turn a `view-traces` payload into the query params the Traces route hydrates
+- * from. Mirrors the param names `restoreUrlQueryParams` already understands
+- * (`stream`, `from`/`to`) and adds `filter` for the prebuilt WHERE condition,
+- * so a handoff URL is bookmarkable and survives a reload.
+- */
+-export function viewTracesQuery(data: string | ViewTracesPayload): Record<string, string> {
+-  const payload = normalizeViewTracesPayload(data);
+-  const query: Record<string, string> = {};
+-
+-  const mode = payload.mode === "spans" ? "spans" : "traces";
+-  if (mode !== "spans") query.tab = mode;
+-
+-  if (payload.stream) query.stream = payload.stream;
+-
+-  const filter = buildViewTracesFilter(payload);
+-  if (filter) query.filter = filter;
+-
+-  if (payload.timeRange?.startTime && payload.timeRange?.endTime) {
+-    query.from = String(payload.timeRange.startTime);
+-    query.to = String(payload.timeRange.endTime);
+-  }
+-  return query;
+-}
+diff --git a/web/src/plugins/traces/views/ServiceGraphView.vue b/web/src/plugins/traces/views/ServiceGraphView.vue
+deleted file mode 100644
+index c0ac53f595d..00000000000
+--- a/web/src/plugins/traces/views/ServiceGraphView.vue
++++ /dev/null
+@@ -1,277 +0,0 @@
+-<!-- Copyright 2026 OpenObserve Inc.
+-
+-This program is free software: you can redistribute it and/or modify
+-it under the terms of the GNU Affero General Public License as published by
+-the Free Software Foundation, either version 3 of the License, or
+-(at your option) any later version.
+-
+-This program is distributed in the hope that it will be useful
+-but WITHOUT ANY WARRANTY; without even the implied warranty of
+-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-GNU Affero General Public License for more details.
+-
+-You should have received a copy of the GNU Affero General Public License
+-along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
+-
+-<!--
+-  Standalone Service Graph route (`/traces/service-graph`).
+-
+-  Header follows the Agent Graph page exactly — OPageLayout with
+-  title/subtitle/icon, a DateTime picker in #actions, and an ORefreshButton
+-  showing the last run time in the same bordered box (see
+-  enterprise/components/AIObservability/AiPageShell.vue). AiPageShell itself is
+-  not reused: it is bound to the AI section's `useAiDateRange` state, whereas
+-  the graph reads the shared traces datetime.
+-
+-  The graph-specific controls (view type, layout) sit right-aligned in the
+-  #subnav strip, matching the Agent Graph page's #trailing slot.
+--->
+-<template>
+-  <OPageLayout
+-    data-test="service-graph-page"
+-    :title="t('menu.serviceGraph')"
+-    :subtitle="t('traces.serviceGraphSubtitle')"
+-    icon="share"
+-    bleed
+-    :scroll="false"
+-  >
+-    <template #actions>
+-      <DateTime
+-        auto-apply
+-        menu-align="end"
+-        :default-type="searchObj.data.datetime.type"
+-        :default-absolute-time="{
+-          startTime: searchObj.data.datetime.startTime,
+-          endTime: searchObj.data.datetime.endTime,
+-        }"
+-        :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+-        data-test="service-graph-date-time-picker"
+-        class="h-8"
+-        @on:date-change="onDateChange"
+-      />
+-      <div
+-        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
+-      >
+-        <ORefreshButton
+-          :last-run-at="graphRef?.lastRunAt ?? null"
+-          :loading="graphRef?.loading ?? false"
+-          :disabled="graphRef?.loading ?? false"
+-          data-test="service-graph-refresh-btn"
+-          @click="graphRef?.refresh()"
+-        />
+-      </div>
+-    </template>
+-
+-    <!-- Subnav row — same shape as the Agent Graph page: page-scope controls on
+-         the left, view-type + layout pushed to the right corner with ml-auto. -->
+-    <template #subnav>
+-      <div class="px-page-edge flex items-center gap-2 py-1.5">
+-        <!-- Stream scope + search on the left. Both are hidden inside the graph
+-             (`hide-stream-selector` / `hide-search-input`) so each renders once,
+-             here on this row. -->
+-        <div data-test="service-graph-stream-selector" class="w-44 flex-shrink-0">
+-          <OSelect
+-            :model-value="selectedStream"
+-            :options="streamOptions"
+-            labelKey="label"
+-            valueKey="value"
+-            class="rounded-default w-full"
+-            :disabled="streamOptions.length === 0"
+-            @update:model-value="onStreamPick"
+-          />
+-        </div>
+-        <div data-test="service-graph-search-input" class="flex-shrink-0">
+-          <OSearchInput
+-            v-model="searchText"
+-            class="w-56!"
+-            :placeholder="t('traces.serviceGraph.searchPlaceholder')"
+-            :debounce="300"
+-            clearable
+-            @update:model-value="onSearchChange"
+-          />
+-        </div>
+-        <div class="ml-auto flex shrink-0 items-center gap-2">
+-          <OToggleGroup
+-            :model-value="searchObj.meta.serviceGraphVisualizationType"
+-            type="single"
+-            @update:model-value="onVisualizationChange($event as 'tree' | 'graph')"
+-          >
+-            <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree" size="sm">
+-              <template #icon-left><OIcon name="git-branch" size="sm" /></template>
+-              {{ t("traces.treeView") }}
+-            </OToggleGroupItem>
+-            <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph" size="sm">
+-              <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
+-              {{ t("traces.graphView") }}
+-            </OToggleGroupItem>
+-          </OToggleGroup>
+-          <OSelect
+-            v-model="searchObj.meta.serviceGraphLayoutType"
+-            :options="layoutOptions"
+-            :searchable="false"
+-            data-test="service-graph-layout-type"
+-            class="h-8! min-h-8! w-[7.5rem]"
+-            :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+-            @update:model-value="onLayoutChange"
+-          />
+-        </div>
+-      </div>
+-    </template>
+-
+-    <div class="h-full min-h-0">
+-      <ServiceGraph
+-        ref="graphRef"
+-        hide-stream-selector
+-        hide-search-input
+-        @view-traces="onViewTraces"
+-        @request:stream-change="onStreamChange"
+-        @jump-to-stream-data="onJumpToStreamData"
+-      />
+-    </div>
+-  </OPageLayout>
+-</template>
+-
+-<script setup lang="ts">
+-import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
+-import { useRouter } from "vue-router";
+-import { useStore } from "vuex";
+-import { raw, useI18nTyped } from "@/types/i18n";
+-import DateTime from "@/components/DateTime.vue";
+-import OIcon from "@/lib/core/Icon/OIcon.vue";
+-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+-import OSelect from "@/lib/forms/Select/OSelect.vue";
+-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+-import useStreams from "@/composables/useStreams";
+-import useTraces from "@/composables/useTraces";
+-import { viewTracesQuery, type ViewTracesPayload } from "../viewTracesHandoff";
+-import { applyUrlTimeRange } from "./useServiceViewTimeRange";
+-
+-const ServiceGraph = defineAsyncComponent(() => import("../ServiceGraph.vue"));
+-
+-const { t } = useI18nTyped();
+-const graphRef = ref<any>(null);
+-const router = useRouter();
+-const store = useStore();
+-const { searchObj } = useTraces();
+-const { getStreams } = useStreams(t);
+-
+-// Stream list is loaded here rather than read off the graph: `expose()` unwraps
+-// refs, so `graphRef.value.availableStreams` is a snapshot the template would
+-// never see update.
+-const availableStreams = ref<string[]>([]);
+-const selectedStream = ref("");
+-const streamOptions = computed(() =>
+-  availableStreams.value.map((s) => ({ label: raw(s), value: s })),
+-);
+-
+-// The Traces page sets this inside loadPageData(); on these standalone routes
+-// nothing else does, and an empty org produces requests to `/api//_search`.
+-searchObj.organizationIdentifier = store.state.selectedOrganization?.identifier ?? "";
+-watch(
+-  () => store.state.selectedOrganization?.identifier,
+-  (id) => {
+-    if (id) searchObj.organizationIdentifier = id;
+-  },
+-);
+-
+-// Honour ?period= / ?from=&to= before the graph queries (these routes are
+-// deep-linked by tests and by shared links).
+-applyUrlTimeRange(router, searchObj.data.datetime);
+-
+-onMounted(async () => {
+-  try {
+-    const res: any = await getStreams("traces", false, false);
+-    if (res?.list?.length) availableStreams.value = res.list.map((x: any) => x.name);
+-  } catch (e) {
+-    console.error("Error loading trace streams:", e);
+-  }
+-  // Resolve the same way ServiceGraph does internally, so the picker opens on
+-  // the stream that is actually drawn.
+-  selectedStream.value =
+-    searchObj.data.stream?.selectedStream?.value ||
+-    localStorage.getItem("serviceGraph_streamFilter") ||
+-    "default";
+-});
+-
+-const searchText = ref("");
+-function onSearchChange(value: any) {
+-  graphRef.value?.setSearchFilter(String(value ?? ""));
+-}
+-
+-function onStreamPick(stream: any) {
+-  const name = String(stream ?? "");
+-  if (!name) return;
+-  selectedStream.value = name;
+-  graphRef.value?.onStreamFilterChange(name);
+-}
+-
+-const layoutOptions = computed(() =>
+-  searchObj.meta.serviceGraphVisualizationType === "graph"
+-    ? [{ label: t("traces.layoutForce"), value: "force" }]
+-    : [
+-        { label: t("traces.layoutHorizontal"), value: "horizontal" },
+-        { label: t("traces.layoutVertical"), value: "vertical" },
+-      ],
+-);
+-
+-/**
+- * Hand off to the Traces route. The filter, stream, mode and time range travel
+- * as query params (see `viewTracesQuery`) rather than as a mutation of the
+- * shared store, so the resulting URL is bookmarkable and survives a reload.
+- */
+-function onViewTraces(data: string | ViewTracesPayload) {
+-  router.push({
+-    name: "traces",
+-    query: {
+-      org_identifier: router.currentRoute.value.query.org_identifier,
+-      ...viewTracesQuery(data),
+-    },
+-  });
+-}
+-
+-/**
+- * Write the picked range into the shared traces datetime; the graph watches it
+- * and reloads itself.
+- */
+-function onDateChange(value: any) {
+-  searchObj.data.datetime = {
+-    startTime: value.startTime,
+-    endTime: value.endTime,
+-    relativeTimePeriod: value.relativeTimePeriod
+-      ? value.relativeTimePeriod
+-      : searchObj.data.datetime.relativeTimePeriod,
+-    type: value.relativeTimePeriod ? "relative" : "absolute",
+-  };
+-}
+-
+-function onVisualizationChange(type: "tree" | "graph") {
+-  searchObj.meta.serviceGraphVisualizationType = type;
+-  localStorage.setItem("serviceGraph_visualizationType", type);
+-  const newLayout = type === "tree" ? "horizontal" : "force";
+-  searchObj.meta.serviceGraphLayoutType = newLayout;
+-  localStorage.setItem("serviceGraph_layoutType", newLayout);
+-}
+-
+-function onLayoutChange(type: any) {
+-  searchObj.meta.serviceGraphLayoutType = String(type);
+-  localStorage.setItem("serviceGraph_layoutType", String(type));
+-}
+-
+-/**
+- * On its own route there is no traces query editor to invalidate, so a stream
+- * change applies directly — no "you will lose your query" confirmation.
+- */
+-function onStreamChange(newStream: string) {
+-  searchObj.data.stream.selectedStream = { label: newStream, value: newStream };
+-}
+-
+-function onJumpToStreamData(fromUs: number, toUs: number) {
+-  searchObj.data.datetime.startTime = fromUs;
+-  searchObj.data.datetime.endTime = toUs;
+-  searchObj.data.datetime.type = "absolute";
+-  searchObj.data.datetime.relativeTimePeriod = "";
+-}
+-</script>
+diff --git a/web/src/plugins/traces/views/ServicesCatalogView.vue b/web/src/plugins/traces/views/ServicesCatalogView.vue
+deleted file mode 100644
+index a278ca6560d..00000000000
+--- a/web/src/plugins/traces/views/ServicesCatalogView.vue
++++ /dev/null
+@@ -1,150 +0,0 @@
+-<!-- Copyright 2026 OpenObserve Inc.
+-
+-This program is free software: you can redistribute it and/or modify
+-it under the terms of the GNU Affero General Public License as published by
+-the Free Software Foundation, either version 3 of the License, or
+-(at your option) any later version.
+-
+-This program is distributed in the hope that it will be useful
+-but WITHOUT ANY WARRANTY; without even the implied warranty of
+-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-GNU Affero General Public License for more details.
+-
+-You should have received a copy of the GNU Affero General Public License
+-along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
+-
+-<!--
+-  Standalone Services route (`/traces/services`).
+-
+-  Header follows the Agent Graph page exactly — OPageLayout with
+-  title/subtitle/icon, a DateTime picker in #actions, and an ORefreshButton
+-  showing the last run time in the same bordered box (see
+-  enterprise/components/AIObservability/AiPageShell.vue). AiPageShell itself is
+-  not reused: it is bound to the AI section's `useAiDateRange` state, whereas
+-  the catalog reads the shared traces datetime.
+--->
+-<template>
+-  <OPageLayout
+-    data-test="services-catalog-page"
+-    :title="t('menu.services')"
+-    :subtitle="t('traces.servicesCatalogSubtitle')"
+-    icon="menu-book"
+-    bleed
+-    :scroll="false"
+-  >
+-    <template #actions>
+-      <DateTime
+-        auto-apply
+-        menu-align="end"
+-        :default-type="searchObj.data.datetime.type"
+-        :default-absolute-time="{
+-          startTime: searchObj.data.datetime.startTime,
+-          endTime: searchObj.data.datetime.endTime,
+-        }"
+-        :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+-        data-test="services-catalog-date-time-picker"
+-        class="h-8"
+-        @on:date-change="onDateChange"
+-      />
+-      <div
+-        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
+-      >
+-        <ORefreshButton
+-          :last-run-at="catalogRef?.lastRunAt ?? null"
+-          :loading="catalogRef?.loading ?? false"
+-          :disabled="catalogRef?.loading ?? false"
+-          data-test="services-catalog-refresh-btn"
+-          @click="catalogRef?.refresh()"
+-        />
+-      </div>
+-    </template>
+-
+-    <ServicesCatalog
+-      ref="catalogRef"
+-      class="h-full"
+-      @view-traces="onViewTraces"
+-      @request:stream-change="onStreamChange"
+-      @jump-to-stream-data="onJumpToStreamData"
+-    />
+-  </OPageLayout>
+-</template>
+-
+-<script setup lang="ts">
+-import { defineAsyncComponent, ref, watch } from "vue";
+-import { useRouter } from "vue-router";
+-import { useStore } from "vuex";
+-import { useI18nTyped } from "@/types/i18n";
+-import DateTime from "@/components/DateTime.vue";
+-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+-import useTraces from "@/composables/useTraces";
+-import { viewTracesQuery, type ViewTracesPayload } from "../viewTracesHandoff";
+-import { applyUrlTimeRange } from "./useServiceViewTimeRange";
+-
+-const ServicesCatalog = defineAsyncComponent(() => import("../ServicesCatalog.vue"));
+-
+-const { t } = useI18nTyped();
+-const catalogRef = ref<any>(null);
+-const router = useRouter();
+-const store = useStore();
+-const { searchObj } = useTraces();
+-
+-// The Traces page sets this inside loadPageData(); on these standalone routes
+-// nothing else does, and an empty org produces requests to `/api//_search`.
+-searchObj.organizationIdentifier = store.state.selectedOrganization?.identifier ?? "";
+-watch(
+-  () => store.state.selectedOrganization?.identifier,
+-  (id) => {
+-    if (id) searchObj.organizationIdentifier = id;
+-  },
+-);
+-
+-// Honour ?period= / ?from=&to= before the catalog queries (these routes are
+-// deep-linked by tests and by shared links).
+-applyUrlTimeRange(router, searchObj.data.datetime);
+-
+-/**
+- * Hand off to the Traces route. The filter, stream, mode and time range travel
+- * as query params (see `viewTracesQuery`) rather than as a mutation of the
+- * shared store, so the resulting URL is bookmarkable and survives a reload.
+- */
+-function onViewTraces(data: string | ViewTracesPayload) {
+-  router.push({
+-    name: "traces",
+-    query: {
+-      org_identifier: router.currentRoute.value.query.org_identifier,
+-      ...viewTracesQuery(data),
+-    },
+-  });
+-}
+-
+-/**
+- * Write the picked range into the shared traces datetime; the catalog watches
+- * it and reloads itself.
+- */
+-function onDateChange(value: any) {
+-  searchObj.data.datetime = {
+-    startTime: value.startTime,
+-    endTime: value.endTime,
+-    relativeTimePeriod: value.relativeTimePeriod
+-      ? value.relativeTimePeriod
+-      : searchObj.data.datetime.relativeTimePeriod,
+-    type: value.relativeTimePeriod ? "relative" : "absolute",
+-  };
+-}
+-
+-/**
+- * On its own route there is no traces query editor to invalidate, so a stream
+- * change applies directly — no "you will lose your query" confirmation.
+- */
+-function onStreamChange(newStream: string) {
+-  searchObj.data.stream.selectedStream = { label: newStream, value: newStream };
+-}
+-
+-function onJumpToStreamData(fromUs: number, toUs: number) {
+-  searchObj.data.datetime.startTime = fromUs;
+-  searchObj.data.datetime.endTime = toUs;
+-  searchObj.data.datetime.type = "absolute";
+-  searchObj.data.datetime.relativeTimePeriod = "";
+-}
+-</script>
+diff --git a/web/src/plugins/traces/views/useServiceViewTimeRange.ts b/web/src/plugins/traces/views/useServiceViewTimeRange.ts
+deleted file mode 100644
+index 9da9eb76c7b..00000000000
+--- a/web/src/plugins/traces/views/useServiceViewTimeRange.ts
++++ /dev/null
+@@ -1,51 +0,0 @@
+-// Copyright 2026 OpenObserve Inc.
+-//
+-// This program is free software: you can redistribute it and/or modify
+-// it under the terms of the GNU Affero General Public License as published by
+-// the Free Software Foundation, either version 3 of the License, or
+-// (at your option) any later version.
+-//
+-// This program is distributed in the hope that it will be useful
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU Affero General Public License for more details.
+-//
+-// You should have received a copy of the GNU Affero General Public License
+-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-
+-import type { Router } from "vue-router";
+-
+-/**
+- * Apply `?period=` / `?from=`+`?to=` from the URL to the shared traces datetime.
+- *
+- * The Traces page has always supported these params (see `restoreUrlQueryParams`
+- * in plugins/traces/Index.vue). When Service Graph and Services Catalog were
+- * tabs on that page they inherited the behaviour for free; now that each is its
+- * own route, they have to read the params themselves — otherwise a link like
+- * `/traces/services?period=7d` silently renders the 15-minute default.
+- *
+- * @returns true when the URL specified a range (so the caller can skip its own
+- *          default), false when it did not.
+- */
+-export function applyUrlTimeRange(router: Router, datetime: Record<string, any>): boolean {
+-  const q = router.currentRoute.value.query;
+-
+-  const from = typeof q.from === "string" ? Number(q.from) : NaN;
+-  const to = typeof q.to === "string" ? Number(q.to) : NaN;
+-  if (Number.isFinite(from) && Number.isFinite(to) && from > 0 && to > 0) {
+-    datetime.startTime = from;
+-    datetime.endTime = to;
+-    datetime.type = "absolute";
+-    datetime.relativeTimePeriod = null;
+-    return true;
+-  }
+-
+-  const period = typeof q.period === "string" ? q.period.trim() : "";
+-  if (period) {
+-    datetime.relativeTimePeriod = period;
+-    datetime.type = "relative";
+-    return true;
+-  }
+-
+-  return false;
+-}
+diff --git a/web/src/ts/interfaces/traces/trace.types.ts b/web/src/ts/interfaces/traces/trace.types.ts
+index a616cf6c471..cb034e7a097 100644
+--- a/web/src/ts/interfaces/traces/trace.types.ts
++++ b/web/src/ts/interfaces/traces/trace.types.ts
+@@ -10,6 +10,27 @@ import { type Span, type EnrichedSpan, type SpanStatus } from "./span.types";
+  */
+ export type TraceSearchMode = "traces" | "spans" | "service-graph" | "services-catalog";
+ 
++export const TRACE_SEARCH_MODES: readonly TraceSearchMode[] = [
++  "traces",
++  "spans",
++  "service-graph",
++  "services-catalog",
++];
++
++export const DEFAULT_TRACE_SEARCH_MODE: TraceSearchMode = "spans";
++
++export const isTraceSearchMode = (value: unknown): value is TraceSearchMode =>
++  typeof value === "string" && TRACE_SEARCH_MODES.some((mode) => mode === value);
++
++export const resolveTraceSearchMode = (
++  value: unknown,
++  serviceGraphEnabled: boolean,
++): TraceSearchMode => {
++  if (!isTraceSearchMode(value)) return DEFAULT_TRACE_SEARCH_MODE;
++  if (value === "service-graph" && !serviceGraphEnabled) return DEFAULT_TRACE_SEARCH_MODE;
++  return value;
++};
++
+ /**
+  * Trace - Collection of spans representing a single request
+  */
+diff --git a/web/src/views/slos/SloDetail.vue b/web/src/views/slos/SloDetail.vue
+index a7451c5b0f7..450ea7ebb77 100644
+--- a/web/src/views/slos/SloDetail.vue
++++ b/web/src/views/slos/SloDetail.vue
+@@ -51,9 +51,6 @@
+           size="xs"
+           :label="raw(tag)"
+         />
+-        <span v-if="slo" class="text-compact text-text-secondary">
+-          {{ t("slos.generation", { n: slo.definition_generation }) }}
+-        </span>
+       </div>
+     </template>
+ 
+diff --git a/web/src/views/slos/SloList.vue b/web/src/views/slos/SloList.vue
+index 0f1f48b0ee0..d014a5a5eba 100644
+--- a/web/src/views/slos/SloList.vue
++++ b/web/src/views/slos/SloList.vue
+@@ -621,7 +621,7 @@ const stats = computed<StatItem[]>(() => {
+       dataTest: "slos-slolist-stat-no_data",
+       label: t("slos.health.no_data"),
+       value: counts.no_data,
+-      icon: "help",
++      icon: "help-outline",
+       tone: "neutral",
+       max: total,
+     },

@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/tracesQueryTabs.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traces-toolbar-tabs.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/service-catalog.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/service-graph.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_target": "tests/ui-testing/ci-matrix/ci_matrix.json -> Traces shard run_files (this repo's single source of truth; equivalent of playwright.yml)",
+  "rationale": "The PR #13852 reorganized Traces sub-views onto a single /traces?tab= route. The closest existing spec, traces-toolbar-tabs.spec.js, still encodes the PRE-reorg dual semantics (asserts the now-removed /traces/service-graph standalone route, uses the stale nav-group-item-serviceGraph selector) and is NOT registered in ci_matrix.json, so it never runs in CI. service-graph.spec.js is @enterprise and correctly excluded from the OSS gate. service-catalog.spec.js still navigates via the legacy /traces/services URL (now a redirect) and its clickServiceCatalogTab() uses the stale nav-group-item-servicesCatalog selector. The reorg is a distinct behavior surface (single ?tab= route + same-route flyout nav + legacy redirects + canonicalization + OSS service-graph gating) with no correctly-tagged OSS spec, so a fresh spec at the run-context spec_path is the cleanest fit. Register it in the Traces shard. traces-toolbar-tabs.spec.js should be disabled/deleted in a follow-up (superseded).",
+  "stale_assets_note": "traces-toolbar-tabs.spec.js (stale assertions, unregistered), tracesPage.js serviceMapsNavItem/servicesCatalogNavItem/serviceGraphPage selectors, servicesCatalogPage.js servicesCatalogNavItem + /traces/services URL, serviceGraphPage.js nav-group-item-serviceGraph + /traces/service-graph URL — all reference pre-reorg routes/selectors."
+}
