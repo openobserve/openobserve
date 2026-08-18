@@ -101,6 +101,38 @@ describe("ConditionBuilder", () => {
     expect(payload.conditions.conditions[0].column).toBe("level");
   });
 
+  it("normalizes dotted columns on submit when normalizeColumnNames is on", async () => {
+    const saved = {
+      filterType: "group",
+      conditions: [
+        { filterType: "condition", column: "data.alert.name", operator: "=", value: "x" },
+        {
+          filterType: "group",
+          conditions: [
+            { filterType: "condition", column: "row.some.field", operator: "=", value: "y" },
+          ],
+        },
+      ],
+    };
+    const wrapper = createWrapper({ initialConditions: saved, normalizeColumnNames: true });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload.conditions.conditions[0].column).toBe("data_alert_name");
+    // nested groups are normalized too
+    expect(payload.conditions.conditions[1].conditions[0].column).toBe("row_some_field");
+  });
+
+  it("leaves dotted columns untouched on submit when normalizeColumnNames is off", async () => {
+    const saved = {
+      filterType: "group",
+      conditions: [
+        { filterType: "condition", column: "data.alert.name", operator: "=", value: "x" },
+      ],
+    };
+    const wrapper = createWrapper({ initialConditions: saved });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload.conditions.conditions[0].column).toBe("data.alert.name");
+  });
+
   // The zod schema now gates the save: an empty/incomplete rule fails
   // validation, so submit() resolves null and the message renders inline under
   // the FilterGroup (the old imperative error toast is gone).
