@@ -2578,6 +2578,23 @@
     "triggerRequired": "Ein Trigger ist erforderlich",
     "addStepRequired": "Fügen Sie mindestens einen Schritt nach dem Trigger hinzu",
     "connectAllNodes": "Verbinden Sie alle Knoten vor dem Speichern",
+    "finishStepsBeforePublish": "Schließe die Konfiguration aller Schritte ab, bevor du veröffentlichst",
+    "draft": "Entwurf",
+    "saveDraft": "Als Entwurf speichern",
+    "publish": "Veröffentlichen",
+    "draftSaveSuccess": "Entwurf erfolgreich gespeichert",
+    "publishSuccess": "Workflow erfolgreich veröffentlicht",
+    "publishError": "Fehler beim Veröffentlichen des Workflows",
+    "comingSoon": "Dies folgt in einem späteren Schritt",
+    "triggerType": {
+      "pick": "Wähle einen Trigger",
+      "dialogTitle": "Neuen Workflow erstellen",
+      "dialogIntro": "Wähle, wie dieser Workflow ausgelöst wird. Weitere Trigger-Typen folgen bald.",
+      "cta": "Workflow erstellen",
+      "soonCta": "Verfügbar in einer zukünftigen Version",
+      "comingSoon": "In Kürze",
+      "soon": "Bald"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alert ausgelöst",
@@ -2675,7 +2692,6 @@
       "linkError": "Alarme konnten nicht verknüpft werden."
     },
     "chooseTrigger": "Trigger auswählen",
-    "edgeDeleteHint": "Drücken Sie Backspace / Delete, um die Kante zu entfernen",
     "node": {
       "kindTrigger": "Auslöser",
       "kindLogic": "Logik",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "Um einen Null-Wert zu prüfen, verwenden Sie null. Beispiel:",
       "conditionNoteCustom": "Um eine benutzerdefinierte Spalte hinzuzufügen, geben Sie ihren Namen ein und drücken Sie die Eingabetaste.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Payload mit einer Funktion umformen",
+      "functionBodySet": "Wendet {name} an",
+      "functionSelect": "Funktion auswählen",
+      "functionCreateNew": "Neue Funktion erstellen",
+      "functionRequired": "Funktion ist erforderlich",
+      "functionLoadError": "Funktionen konnten nicht geladen werden",
+      "destinationBody": "An ein Ziel senden",
+      "destinationBodySet": "Sendet an {name}",
+      "destinationSelect": "Ziel",
+      "destinationCreateNew": "Neues Ziel erstellen",
+      "destinationRequired": "Bitte wähle ein Ziel",
+      "destinationLoadError": "Ziele konnten nicht geladen werden",
+      "namePlaceholder": "Diesen Schritt benennen (optional)",
+      "commentLabel": "Kommentar (optional)",
+      "commentPlaceholder": "Füge eine Notiz zu diesem Schritt hinzu...",
+      "commentAdd": "Kommentar hinzufügen",
+      "disable": "Schritt deaktivieren",
+      "enable": "Schritt aktivieren",
+      "disabledBadge": "Deaktiviert",
+      "incompleteBadge": "Später einrichten",
+      "destinationSetUpLater": "Später einrichten",
+      "destinationSetUpLaterPrompt": "Noch kein Ziel? Aktiviere dies, um es später einzurichten — du kannst einen Entwurf speichern und jetzt testen.",
+      "destinationSetUpLaterActive": "Das Ziel wird vorerst übersprungen — Name und Kommentar werden weiterhin gespeichert. Du brauchst ein Ziel, bevor du veröffentlichst.",
+      "functionSetUpLater": "Später einrichten",
+      "functionSetUpLaterPrompt": "Noch keine Funktion? Aktiviere dies, um sie später einzurichten — du kannst einen Entwurf speichern und jetzt testen.",
+      "functionSetUpLaterActive": "Die Funktion wird vorerst übersprungen — Name und Kommentar werden weiterhin gespeichert. Du brauchst eine Funktion, bevor du veröffentlichst."
     },
-    "commonFieldsAbove": "gemeinsame Felder oben"
+    "commonFieldsAbove": "gemeinsame Felder oben",
+    "canvas": {
+      "undo": "Rückgängig machen",
+      "tidyUp": "Aufräumen",
+      "insertStep": "Schritt einfügen",
+      "deleteEdge": "Verbindung löschen"
+    },
+    "unsaved": {
+      "title": "Nicht gespeicherte Änderungen",
+      "message": "Du hast nicht gespeicherte Änderungen. Wenn du jetzt gehst, werden sie verworfen.",
+      "discard": "Änderungen verwerfen",
+      "stay": "Weiter bearbeiten"
+    },
+    "results": {
+      "title": "Schrittergebnisse",
+      "collapse": "Einklappen",
+      "expand": "Aufklappen",
+      "close": "Ergebnisse löschen und schließen",
+      "nodesTitle": "Schritte",
+      "empty": "Führen Sie einen Test aus, um hier die Schrittergebnisse zu sehen."
+    }
   },
   "pipeline": {
     "validation": {
@@ -11454,19 +11516,19 @@
           "span": {
             "title": "Passende Spans",
             "hint": "Sobald Sie einen Stream und einen Filter ausgewählt haben, zeigt dieses Feld, wie viele Spans Ihr Job abgleicht.",
-            "matchedSuffix": "Spans abgeglichen · letzte 24h",
+            "matchedSuffix": "Spans gefunden · letzte 1h",
             "matchedLoading": "Passende Spans werden gezählt…"
           },
           "trace": {
             "title": "Passende Traces",
             "hint": "Sobald Sie einen Stream und einen Filter ausgewählt haben, zeigt dieses Feld, wie viele Traces Ihr Job abgleicht.",
-            "matchedSuffix": "Traces abgeglichen · letzte 24h",
+            "matchedSuffix": "Traces gefunden · letzte 1h",
             "matchedLoading": "Passende Traces werden gezählt…"
           },
           "session": {
             "title": "Passende Sitzungen",
             "hint": "Sobald Sie einen Stream und einen Filter ausgewählt haben, zeigt dieses Feld, wie viele Sitzungen Ihr Job abgleicht.",
-            "matchedSuffix": "Sitzungen abgeglichen · letzte 24h",
+            "matchedSuffix": "Sessions gefunden · letzte 1h",
             "matchedLoading": "Passende Sitzungen werden gezählt…"
           }
         },
@@ -13992,7 +14054,6 @@
     "rolling": "gleitend",
     "totalSlos": "SLOs gesamt",
     "noGrouping": "Keine (eine einzelne Gesamtserie)",
-    "generation": "Generation {n}",
     "newAlert": "Neuer Alarm",
     "overRolling": "über gleitende {window}",
     "searchPlaceholder": "SLO oder Tag suchen, z. B. team:payments",

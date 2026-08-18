@@ -2578,6 +2578,23 @@
     "triggerRequired": "트리거가 필요합니다.",
     "addStepRequired": "트리거 뒤에 최소 하나의 단계를 추가하세요.",
     "connectAllNodes": "저장하기 전에 모든 노드를 연결하세요.",
+    "finishStepsBeforePublish": "게시하기 전에 모든 단계 구성을 완료하세요",
+    "draft": "초안",
+    "saveDraft": "초안으로 저장",
+    "publish": "게시",
+    "draftSaveSuccess": "초안이 성공적으로 저장되었습니다",
+    "publishSuccess": "워크플로가 성공적으로 게시되었습니다",
+    "publishError": "워크플로 게시 중 오류 발생",
+    "comingSoon": "이 기능은 이후 단계에서 제공됩니다",
+    "triggerType": {
+      "pick": "트리거 선택",
+      "dialogTitle": "새 워크플로 만들기",
+      "dialogIntro": "이 워크플로가 트리거되는 방식을 선택하세요. 더 많은 트리거 유형이 곧 제공됩니다.",
+      "cta": "워크플로 만들기",
+      "soonCta": "향후 릴리스에서 사용 가능",
+      "comingSoon": "곧 제공",
+      "soon": "곧"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "알림 발생",
@@ -2675,7 +2692,6 @@
       "linkError": "알림을 연결할 수 없습니다."
     },
     "chooseTrigger": "트리거 선택",
-    "edgeDeleteHint": "엣지를 제거하려면 Backspace / Delete를 누르세요",
     "node": {
       "kindTrigger": "트리거",
       "kindLogic": "로직",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "널 값을 확인하려면 null을 사용하세요. 예:",
       "conditionNoteCustom": "사용자 정의 열을 추가하려면 이름을 입력하고 Enter를 누르세요.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "함수로 페이로드 변형",
+      "functionBodySet": "{name} 적용",
+      "functionSelect": "함수 선택",
+      "functionCreateNew": "새 함수 만들기",
+      "functionRequired": "함수가 필요합니다",
+      "functionLoadError": "함수를 불러올 수 없습니다",
+      "destinationBody": "대상으로 보내기",
+      "destinationBodySet": "{name}에게 전송",
+      "destinationSelect": "대상",
+      "destinationCreateNew": "새 대상 만들기",
+      "destinationRequired": "대상을 선택하세요",
+      "destinationLoadError": "대상을 불러올 수 없습니다",
+      "namePlaceholder": "이 단계 이름 지정(선택 사항)",
+      "commentLabel": "댓글(선택 사항)",
+      "commentPlaceholder": "이 단계에 대한 메모 추가...",
+      "commentAdd": "댓글 추가",
+      "disable": "단계 비활성화",
+      "enable": "단계 활성화",
+      "disabledBadge": "비활성화됨",
+      "incompleteBadge": "나중에 설정",
+      "destinationSetUpLater": "아직 대상이 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
+      "destinationSetUpLaterPrompt": "대상은 지금 건너뜁니다 — 이름과 댓글은 여전히 저장됩니다. 게시하기 전에 대상이 필요합니다.",
+      "destinationSetUpLaterActive": "나중에 설정",
+      "functionSetUpLater": "아직 함수가 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
+      "functionSetUpLaterPrompt": "함수는 지금 건너뜁니다 — 이름과 댓글은 여전히 저장됩니다. 게시하기 전에 함수가 필요합니다.",
+      "functionSetUpLaterActive": "나중에 설정"
     },
-    "commonFieldsAbove": "위의 공통 필드"
+    "commonFieldsAbove": "위의 공통 필드",
+    "canvas": {
+      "undo": "실행 취소",
+      "tidyUp": "정리",
+      "insertStep": "단계 삽입",
+      "deleteEdge": "연결 삭제"
+    },
+    "unsaved": {
+      "title": "저장되지 않은 변경 사항",
+      "message": "저장되지 않은 변경 사항이 있습니다. 지금 나가면 변경 사항이 삭제됩니다.",
+      "discard": "변경 사항 삭제",
+      "stay": "계속 편집"
+    },
+    "results": {
+      "title": "단계 결과",
+      "collapse": "접기",
+      "expand": "펼치기",
+      "close": "결과 지우기 및 닫기",
+      "nodesTitle": "단계",
+      "empty": "여기에서 테스트를 실행하여 단계 결과를 확인하세요."
+    }
   },
   "pipeline": {
     "validation": {
@@ -11454,19 +11516,19 @@
           "span": {
             "title": "일치하는 스팬",
             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 스팬 수가 표시됩니다.",
-            "matchedSuffix": "일치하는 스팬 · 지난 24시간",
+            "matchedSuffix": "일치된 스팬 · 최근 1h",
             "matchedLoading": "일치하는 스팬 계산 중…"
           },
           "trace": {
             "title": "일치하는 추적",
             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 추적 수가 표시됩니다.",
-            "matchedSuffix": "일치하는 추적 · 지난 24시간",
+            "matchedSuffix": "일치된 트레이스 · 최근 1h",
             "matchedLoading": "일치하는 추적 계산 중…"
           },
           "session": {
             "title": "일치하는 세션",
             "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 세션 수가 표시됩니다.",
-            "matchedSuffix": "일치하는 세션 · 지난 24시간",
+            "matchedSuffix": "일치된 세션 · 최근 1h",
             "matchedLoading": "일치하는 세션 계산 중…"
           }
         },
@@ -13992,7 +14054,6 @@
     "rolling": "롤링",
     "totalSlos": "총 SLO",
     "noGrouping": "없음 (단일 전체 시리즈)",
-    "generation": "세대 {n}",
     "newAlert": "새 알림",
     "overRolling": "롤링 {window} 동안",
     "searchPlaceholder": "SLO 또는 태그 검색, 예: team:payments",
