@@ -134,6 +134,52 @@ pub async fn create(
     Ok(rule)
 }
 
+/// Repoints an existing rule at a team, a path, or both.
+///
+/// `Ok(None)` when no such rule exists in this org, so the caller can answer
+/// 404 rather than inventing one — an update that silently creates is how a
+/// typo'd id ends up owning production traffic.
+///
+/// `path` is recomputed from the dimensions rather than carried, because it is
+/// the unique key and the only thing routing matches on. A stale path with
+/// fresh dimensions would route by one and display the other.
+pub async fn update(
+    org_id: &str,
+    id: &str,
+    team_id: &str,
+    dimensions: HashMap<String, String>,
+) -> Result<Option<OwnershipRule>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some(existing) = oncall_ownership_rules::Entity::find()
+        .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
+        .filter(oncall_ownership_rules::Column::Id.eq(id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let now = now_micros();
+    let rule = OwnershipRule {
+        id: existing.id.clone(),
+        org_id: org_id.to_string(),
+        team_id: team_id.to_string(),
+        dimensions,
+        // Preserved: the rule is the same claim, repointed. Losing its age
+        // would reset every "this rule has never matched" judgement built on
+        // top of it.
+        created_at: existing.created_at,
+        updated_at: now,
+    };
+    let mut model: oncall_ownership_rules::ActiveModel = existing.into();
+    model.team_id = Set(rule.team_id.clone());
+    model.path = Set(rule.path());
+    model.dimensions = Set(serde_json::to_string(&rule.dimensions)?);
+    model.updated_at = Set(now);
+    model.update(client).await?;
+    invalidate_and_publish(org_id).await;
+    Ok(Some(rule))
+}
+
 /// Every rule for an org. The routing path loads the whole set and resolves in
 /// memory: the match is longest-prefix over a map, which SQL cannot express,
 /// and an org has tens of rules, not thousands.

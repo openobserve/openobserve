@@ -1370,7 +1370,7 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/oncall/ownership/{rule_id}",
-                    delete(oncall::delete_ownership_rule),
+                    put(oncall::update_ownership_rule).delete(oncall::delete_ownership_rule),
                 )
                 .route(
                     "/{org_id}/oncall/responses/{response_id}/notes",

@@ -734,8 +734,28 @@ pub async fn resolve(
     else {
         return Ok(None);
     };
+    let note = cause_note.map(str::trim).filter(|n| !n.is_empty());
+    // Already closed. Resolving again must not move `closed_at` — it was
+    // resolved when it was resolved, and rewriting that would falsify every
+    // time-to-resolve built on it.
+    //
+    // But it must not swallow a cause either. This used to return the record
+    // untouched, so somebody who resolved in a hurry and came back to record
+    // *why* got a 200 and lost what they typed. A cause arriving late is the
+    // most useful thing anybody adds to a closed record: it is what turns the
+    // next firing's `prior-causes` from a list of dates into history.
     if existing.closed_at.is_some() {
-        return Ok(to_response(existing));
+        if cause.is_none() && note.is_none() {
+            return Ok(to_response(existing));
+        }
+        let mut model: oncall_responses::ActiveModel = existing.into();
+        if let Some(c) = cause {
+            model.cause = Set(Some(c.as_str().to_string()));
+        }
+        if let Some(n) = note {
+            model.cause_note = Set(Some(n.to_string()));
+        }
+        return Ok(to_response(model.update(client).await?));
     }
     let mut model: oncall_responses::ActiveModel = existing.into();
     model.state = Set(ResponseState::Resolved.to_i32());
@@ -743,7 +763,7 @@ pub async fn resolve(
     if let Some(c) = cause {
         model.cause = Set(Some(c.as_str().to_string()));
     }
-    if let Some(n) = cause_note.map(str::trim).filter(|n| !n.is_empty()) {
+    if let Some(n) = note {
         model.cause_note = Set(Some(n.to_string()));
     }
     Ok(to_response(model.update(client).await?))
