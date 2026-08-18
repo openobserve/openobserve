@@ -146,6 +146,19 @@ services:
       MYSQL_DATABASE: dbmlab
       MYSQL_USER: dbm
       MYSQL_PASSWORD: dbm
+    # A production-shaped host name, in ADDITION to the compose service name --
+    # exactly as `postgres` carries `pg-prod-1` above, and for the same reason.
+    # Whatever the collector connects THROUGH becomes the instance identity the
+    # UI's "database" filter offers, and `mysql` reads as a placeholder rather
+    # than a server an operator would recognise. my-rig.sh gives the collector
+    # MYSQLHOST=my-prod-1, which the mysql recipes stamp into every row as
+    # `server_address` and resource/ident upserts as server.address/host.name --
+    # ONE value, so one server keeps ONE identity. The `mysql` alias is kept so
+    # the workload's own MYSQL_HOST keeps resolving unchanged.
+    networks:
+      default:
+        aliases:
+          - my-prod-1
     ports:
       - "33306:3306"
     volumes:
