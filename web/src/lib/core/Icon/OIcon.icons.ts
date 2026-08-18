@@ -307,6 +307,7 @@ import PlayCircleFilled from "~icons/material-symbols/play-circle-outline";
 import Pets from "~icons/material-symbols/pets";
 import MonitorHeart from "~icons/material-symbols/monitor-heart-outline";
 import Dataset from "~icons/material-symbols/dataset-outline";
+import Science from "~icons/material-symbols/science-outline";
 import FolderOpen from "~icons/material-symbols/folder-open-outline";
 import Folder from "~icons/material-symbols/folder";
 import FolderOutline from "~icons/material-symbols/folder-outline";
@@ -694,6 +695,7 @@ export const iconRegistry = {
   checklist: Checklist,
   "photo-camera": PhotoCamera,
   "smart-display": SmartDisplay,
+  science: Science,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;
