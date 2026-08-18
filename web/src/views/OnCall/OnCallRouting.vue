@@ -540,24 +540,26 @@ function openClaim(signal: UnroutedSignal) {
   dialogOpen.value = true;
 }
 
-/// There is no update route for a rule, deliberately or not — so an edit is a
-/// create followed by a delete, in that order: if the create fails the old
-/// rule still stands, and the path never has a window with no rule at all.
+/// One call, in place. An edit used to be create-then-delete, which was
+/// deliberate — the path was never owned by nobody — but the server now
+/// refuses the create while the original still holds the path, so repointing a
+/// rule to another team failed with "another team already owns this path". The
+/// update route does the same job atomically.
 async function saveRule() {
   saving.value = true;
+  const data = {
+    team_id: draftTeam.value,
+    dimensions: Object.fromEntries(draftPairs.value.map((pair) => [pair.name, pair.value])),
+  };
   try {
-    await oncallService.createOwnershipRule({
-      org_identifier: orgId.value,
-      data: {
-        team_id: draftTeam.value,
-        dimensions: Object.fromEntries(draftPairs.value.map((pair) => [pair.name, pair.value])),
-      },
-    });
     if (editingRule.value) {
-      await oncallService.deleteOwnershipRule({
+      await oncallService.updateOwnershipRule({
         org_identifier: orgId.value,
         rule_id: editingRule.value.rule_id,
+        data,
       });
+    } else {
+      await oncallService.createOwnershipRule({ org_identifier: orgId.value, data });
     }
     const edited = !!editingRule.value;
     const claimed = !!claimingSignal.value;

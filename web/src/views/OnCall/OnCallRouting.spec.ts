@@ -29,6 +29,7 @@ vi.mock("@/services/oncall", () => ({
     listTeams: vi.fn(),
     ownershipStats: vi.fn(),
     createOwnershipRule: vi.fn(),
+    updateOwnershipRule: vi.fn(),
     deleteOwnershipRule: vi.fn(),
     previewRouting: vi.fn(),
     unroutedSignals: vi.fn(),
@@ -164,6 +165,7 @@ describe("OnCallRouting", () => {
     service.ownershipStats.mockResolvedValue({ data: { rules: [], total: 0 } } as any);
     service.unroutedSignals.mockResolvedValue({ data: [] } as any);
     service.createOwnershipRule.mockResolvedValue({ data: {} } as any);
+    service.updateOwnershipRule.mockResolvedValue({ data: {} } as any);
     alerts.getSemanticGroups.mockResolvedValue({ data: [] } as any);
   });
 

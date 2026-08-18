@@ -28,6 +28,7 @@ vi.mock("@/services/oncall", () => ({
   default: {
     ownershipStats: vi.fn(),
     createOwnershipRule: vi.fn(),
+    updateOwnershipRule: vi.fn(),
     deleteOwnershipRule: vi.fn(),
     previewRouting: vi.fn(),
     unroutedSignals: vi.fn(),
@@ -99,6 +100,7 @@ describe("OnCallOwnership", () => {
     service.ownershipStats.mockResolvedValue({ data: { rules: [], total: 0 } } as any);
     service.unroutedSignals.mockResolvedValue({ data: [] } as any);
     service.createOwnershipRule.mockResolvedValue({ data: {} } as any);
+    service.updateOwnershipRule.mockResolvedValue({ data: {} } as any);
   });
 
   /// Scoped to this team: the org-wide stats endpoint would otherwise show
@@ -171,34 +173,27 @@ describe("OnCallOwnership", () => {
     });
   });
 
-  /// There is no update route: an edit creates the replacement FIRST, so a
-  /// failed create leaves the old rule standing rather than no rule at all.
-  it("edits by creating the replacement before deleting the original", async () => {
-    service.deleteOwnershipRule.mockResolvedValue({ data: {} } as any);
-    const order: string[] = [];
-    service.createOwnershipRule.mockImplementation(async () => {
-      order.push("create");
-      return { data: {} } as any;
-    });
-    service.deleteOwnershipRule.mockImplementation(async () => {
-      order.push("delete");
-      return { data: {} } as any;
-    });
-
+  /// An edit used to create the replacement and then delete the original, so
+  /// that the path was never owned by nobody. The server refuses that now —
+  /// the create is a duplicate while the original still holds the path — which
+  /// broke repointing a rule, the exact correction the route exists for.
+  it("edits in place rather than creating a duplicate of the same path", async () => {
     const wrapper = render();
     await flushPromises();
     list(wrapper).vm.$emit("save-rule", {
       dimensions: { service: "api" },
-      team_id: "team_1",
+      team_id: "team_2",
       rule: { rule_id: "r9" },
     });
     await flushPromises();
 
-    expect(order).toEqual(["create", "delete"]);
-    expect(service.deleteOwnershipRule).toHaveBeenCalledWith({
+    expect(service.updateOwnershipRule).toHaveBeenCalledWith({
       org_identifier: ORG,
       rule_id: "r9",
+      data: { team_id: "team_2", dimensions: { service: "api" } },
     });
+    expect(service.createOwnershipRule).not.toHaveBeenCalled();
+    expect(service.deleteOwnershipRule).not.toHaveBeenCalled();
   });
 
   it("deletes a rule by its rule id once confirmed", async () => {

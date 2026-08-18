@@ -293,6 +293,27 @@ const oncall = {
     data: { team_id: string; dimensions: Record<string, string> };
   }) => http().post<OwnershipRule>(`/api/${org_identifier}/oncall/ownership`, data),
 
+  /// Repoint an existing rule. Takes the same body as create; 404 on an
+  /// unknown id, 409 when another team already owns the path.
+  ///
+  /// Editing used to be create-then-delete, which the server now refuses:
+  /// creating the replacement while the original still holds the path is a
+  /// duplicate, so repointing a rule to another team — the whole reason this
+  /// route exists — failed with "another team already owns this path".
+  updateOwnershipRule: ({
+    org_identifier,
+    rule_id,
+    data,
+  }: {
+    org_identifier: string;
+    rule_id: string;
+    data: { team_id: string; dimensions: Record<string, string> };
+  }) =>
+    http().put<OwnershipRule>(
+      `/api/${org_identifier}/oncall/ownership/${encodeURIComponent(rule_id)}`,
+      data,
+    ),
+
   deleteOwnershipRule: ({
     org_identifier,
     rule_id,

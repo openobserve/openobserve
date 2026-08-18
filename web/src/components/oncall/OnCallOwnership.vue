@@ -206,21 +206,23 @@ async function fetchRoutingConfig() {
   }
 }
 
-/// There is no update route for a rule, deliberately or not — so an edit is a
-/// create followed by a delete, in that order: if the create fails the old rule
-/// still stands, and the team never has a window with no rule at all.
+/// One call, in place. An edit used to be create-then-delete, which was
+/// deliberate — the path was never owned by nobody — but the server now
+/// refuses the create while the original still holds the path, so repointing a
+/// rule to another team failed with "another team already owns this path". The
+/// update route does the same job atomically.
 async function saveRule(draft: RuleDraft & { rule?: OwnershipRuleStats | null }) {
   saving.value = true;
+  const data = { team_id: draft.team_id || props.teamId, dimensions: draft.dimensions };
   try {
-    await oncallService.createOwnershipRule({
-      org_identifier: orgId.value,
-      data: { team_id: draft.team_id || props.teamId, dimensions: draft.dimensions },
-    });
     if (draft.rule) {
-      await oncallService.deleteOwnershipRule({
+      await oncallService.updateOwnershipRule({
         org_identifier: orgId.value,
         rule_id: draft.rule.rule_id,
+        data,
       });
+    } else {
+      await oncallService.createOwnershipRule({ org_identifier: orgId.value, data });
     }
     toast({
       variant: "success",
