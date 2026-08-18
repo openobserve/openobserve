@@ -25,7 +25,8 @@ use config::{
     meta::{
         promql::{
             HASH_LABEL, format_tsid_major_file_name, is_hash_sorted_file_name,
-            is_tsid_major_file_name, to_hash_sorted_file_key, to_tsid_series_index_name,
+            is_tsid_major_file_name, metrics_tsid_major_enabled, to_hash_sorted_file_key,
+            to_tsid_series_index_name,
         },
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
@@ -67,13 +68,6 @@ use tokio::{
 };
 
 use super::worker::{MergeBatch, MergeSender};
-
-fn metrics_tsid_major_enabled(stream_type: StreamType) -> bool {
-    let cfg = get_config();
-    stream_type == StreamType::Metrics
-        && cfg.compact.metrics_tsid_major_enabled
-        && cfg.common.file_format.for_stream(stream_type) == FileFormat::Parquet
-}
 
 fn needs_tsid_layout_rewrite(stream_type: StreamType, files: &[FileKey]) -> bool {
     if !metrics_tsid_major_enabled(stream_type) {

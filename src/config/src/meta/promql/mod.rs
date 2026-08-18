@@ -142,11 +142,18 @@ mod tsid_major_tests {
 /// without opening it.
 const HASH_SORTED_FILE_PREFIX: &str = "hash-sorted-";
 
-/// True when metrics files of `stream_type` may be written in the hash-sorted
-/// layout (`ZO_METRICS_TSID_MAJOR_ENABLED`). Readers must not assume a
-/// `_timestamp` order for such streams.
-pub fn metrics_hash_sort_enabled(stream_type: StreamType) -> bool {
-    stream_type == StreamType::Metrics && crate::get_config().compact.metrics_tsid_major_enabled
+/// True when `stream_type` uses the TSID-major layout
+/// (`ZO_METRICS_TSID_MAJOR_ENABLED`): Parquet metrics files ordered by
+/// `(__hash__, _timestamp)`, written hash-sorted by the ingester and
+/// size-split with `.sidx` sidecars by the compactor. Readers must not assume
+/// a `_timestamp` order for such streams.
+pub fn metrics_tsid_major_enabled(stream_type: StreamType) -> bool {
+    if stream_type != StreamType::Metrics {
+        return false;
+    }
+    let cfg = crate::get_config();
+    cfg.compact.metrics_tsid_major_enabled
+        && cfg.common.file_format.for_stream(stream_type) == crate::FileFormat::Parquet
 }
 
 /// Add the hash-sorted marker to the file name of `key`

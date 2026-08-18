@@ -19,7 +19,7 @@ use arrow::array::RecordBatch;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::{HASH_LABEL, metrics_hash_sort_enabled},
+        promql::{HASH_LABEL, metrics_tsid_major_enabled},
         stream::{FileMeta, StreamType},
     },
     utils::{
@@ -252,13 +252,13 @@ pub async fn merge_parquet_files(
 /// series is contiguous: the ingester writes plain hash-sorted files, the
 /// compactor writes size-bounded TSID-major files. Streams without a
 /// `__hash__` column (or written as Vortex) keep the classic layout.
-pub fn merge_output_sort_order(
+fn merge_output_sort_order(
     stream_type: StreamType,
     file_format: FileFormat,
     schema: &Schema,
 ) -> FileSortOrder {
     if file_format == FileFormat::Parquet
-        && metrics_hash_sort_enabled(stream_type)
+        && metrics_tsid_major_enabled(stream_type)
         && schema.field_with_name(HASH_LABEL).is_ok()
     {
         FileSortOrder::HashTimestampAsc
