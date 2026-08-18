@@ -302,13 +302,13 @@ describe("ONavGroup", () => {
         icon: "layers",
         name: "traces",
         tab: "spans",
-        defaultForRoute: true,
       },
       {
         titleKey: "menu.traces",
         icon: "account-tree",
         name: "traces",
         tab: "traces",
+        defaultForRoute: true,
       },
       {
         titleKey: "menu.serviceGraph",
@@ -369,9 +369,9 @@ describe("ONavGroup", () => {
         .map((el) => el.attributes("data-test")!.replace("nav-group-item-traces-", ""));
     }
 
-    it("marks Spans on plain /traces", async () => {
+    it("marks Traces on plain /traces", async () => {
       wrapper = await mountAt("/traces");
-      expect(activeTabs(wrapper)).toEqual(["spans"]);
+      expect(activeTabs(wrapper)).toEqual(["traces"]);
     });
 
     it("marks Traces on /traces?tab=traces", async () => {

@@ -24,7 +24,7 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
-import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { DEFAULT_TRACE_SEARCH_MODE } from "@/ts/interfaces/traces/trace.types";
 const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
@@ -88,7 +88,7 @@ const defaultObject = {
     metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
     queryEditorPlaceholderFlag: true,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
-    searchMode: "spans" as TraceSearchMode,
+    searchMode: DEFAULT_TRACE_SEARCH_MODE,
     serviceGraphVisualizationType:
       (localStorage.getItem("serviceGraph_visualizationType") as "tree" | "graph") || "tree",
     serviceGraphLayoutType: localStorage.getItem("serviceGraph_layoutType") || "horizontal",
