@@ -1075,6 +1075,14 @@ pub fn detect_database(rec: &Map<String, Value>) -> Option<String> {
             "db_namespace",
             "schema_name",
             "my_db",
+            // The MSSQL deadlock shred emits the participant's database as
+            // `mssql_db` (`@currentdbname` from the deadlock graph). It was
+            // already in the raw-projection vocabulary and in
+            // `canonicalize_mssql_deadlock`'s own local lookup, but NOT here --
+            // so every other consumer of `detect_database` saw null on a row
+            // that was carrying a perfectly good database all along. Measured on
+            // the reference rig: 42/42 mssql_deadlock rows populated.
+            "mssql_db",
             "database",
         ],
     )

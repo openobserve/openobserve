@@ -717,3 +717,103 @@ fn json_path_flat_record_resolves_env_from_service_prefixed_key() {
     let out = enrich(&rec, 3).unwrap();
     assert_eq!(out_str(&out, O2_DB_ENV).as_deref(), Some("capture-env-a"));
 }
+
+// ─── Stream eligibility gate (regression: the `o2_db_*`-only schema) ─────────
+
+/// Build a trace-stream schema from field names, all Utf8 — only presence matters
+/// to the gate.
+fn schema_of(fields: &[&str]) -> arrow_schema::Schema {
+    arrow_schema::Schema::new(
+        fields
+            .iter()
+            .map(|n| arrow_schema::Field::new(*n, arrow_schema::DataType::Utf8, true))
+            .collect::<Vec<_>>(),
+    )
+}
+
+/// A full span stream carrying DB spans is eligible — the gate must not get
+/// stricter than the SQL it guards.
+#[test]
+fn full_span_stream_with_db_columns_is_eligible() {
+    let mut fields: Vec<&str> = super::REQUIRED_SPAN_FIELDS.to_vec();
+    fields.push(super::O2_DB_FINGERPRINT);
+    fields.push("span_status");
+    assert!(super::stream_supports_db_monitoring(&schema_of(&fields)));
+}
+
+/// A trace stream with no DB columns is not eligible (the original gate's job).
+#[test]
+fn span_stream_without_db_columns_is_not_eligible() {
+    let fields: Vec<&str> = super::REQUIRED_SPAN_FIELDS.to_vec();
+    assert!(!super::stream_supports_db_monitoring(&schema_of(&fields)));
+}
+
+/// THE REGRESSION. `ensure_db_fields_in_schema` provisions the eleven `o2_db_*`
+/// columns via `infra::schema::merge`, and on a stream with no schema yet that
+/// takes merge's CREATE branch — persisting and caching a schema whose ONLY
+/// fields are `o2_db_*`. That schema HAS `o2_db_fingerprint`, so a
+/// fingerprint-only gate passed it through and every DBM read then died at plan
+/// time with `Schema error: No field named _timestamp` (live on
+/// `rig4_ent_t/default`: `/traces/db_monitoring/samples` answered HTTP 500 and
+/// the rollup logged `offset NOT advanced` on every tick).
+///
+/// Such a stream has no DB spans to report, so the gate must exclude it and let
+/// the endpoints answer an empty window.
+#[test]
+fn o2_db_only_schema_is_not_eligible() {
+    let db_only = schema_of(&super::ALL_DB_FIELDS);
+    // The precondition that fooled the old gate.
+    assert!(
+        db_only.field_with_name(super::O2_DB_FINGERPRINT).is_ok(),
+        "precondition: the truncated schema does carry the fingerprint column"
+    );
+    assert!(
+        !super::stream_supports_db_monitoring(&db_only),
+        "an o2_db_*-only schema has no _timestamp/trace_id/service_name/\
+         start_time/end_time and must not be queried"
+    );
+}
+
+/// Each base column is individually load-bearing: dropping any ONE of them from
+/// an otherwise-complete DB stream makes it ineligible. Guards against a future
+/// edit trimming `REQUIRED_SPAN_FIELDS` to just the timestamp — `service_name`
+/// and `end_time - start_time` failed on the same live stream.
+#[test]
+fn every_required_span_field_is_load_bearing() {
+    for omitted in super::REQUIRED_SPAN_FIELDS {
+        let mut fields: Vec<&str> = super::REQUIRED_SPAN_FIELDS
+            .iter()
+            .copied()
+            .filter(|f| *f != omitted)
+            .collect();
+        fields.push(super::O2_DB_FINGERPRINT);
+        assert!(
+            !super::stream_supports_db_monitoring(&schema_of(&fields)),
+            "a stream missing `{omitted}` must not be queried"
+        );
+    }
+}
+
+/// The user-visible error verbatim. DataFusion listed exactly these nine columns
+/// as "Valid fields" for stream `default` on org `rig4_ent_t` while reporting
+/// `No field named _timestamp` — the nine are the ten Utf8 `o2_db_*` columns
+/// minus `o2_db_user`, which the projection had already pruned. Gating on this
+/// exact set must exclude the stream.
+#[test]
+fn the_reported_nine_column_schema_is_not_eligible() {
+    let reported = schema_of(&[
+        "o2_db_env",
+        "o2_db_fingerprint",
+        "o2_db_instance",
+        "o2_db_namespace",
+        "o2_db_operation",
+        "o2_db_query_norm",
+        "o2_db_status_code",
+        "o2_db_stmt_class",
+        "o2_db_system",
+    ]);
+    assert!(
+        !super::stream_supports_db_monitoring(&reported),
+        "the schema from the reported ErrorCode#20004 must be gated out"
+    );
+}

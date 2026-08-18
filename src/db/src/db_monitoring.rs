@@ -98,6 +98,43 @@ pub async fn set_offset(
     Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
 }
 
+/// Set the offset ONLY IF the stored value is still `expected` — the
+/// compare-and-swap the plain [`set_offset`] is not.
+///
+/// Returns `Ok(true)` when this node won and the value was written, `Ok(false)`
+/// when the stored value had moved (another node wrote in between; the caller
+/// has lost the stream and must stop).
+///
+/// **Why the rollup needs this.** The window records are appended to a log
+/// stream and the read path SUMS the constituent rows of a window, so a window
+/// written twice is not overwritten — it is double-counted, permanently, by
+/// every later read. The offset is the only thing standing between a window
+/// and a second write of itself, which makes an unguarded read-then-write a
+/// duplicate generator: two nodes that both read offset N both process window
+/// N, and the second `put` merely overwrites the first's identical offset while
+/// both sets of records are already in the stream.
+///
+/// This is NOT atomic against the meta store — there is no CAS primitive
+/// underneath, so this re-reads and then writes. It closes the wide window
+/// (a whole window's three searches, seconds to minutes, between the read and
+/// the write) rather than the instruction-level one, which is the difference
+/// between "duplicates whenever two nodes tick together" and "duplicates only
+/// if two writes interleave inside the same few milliseconds".
+pub async fn compare_and_set_offset(
+    org_id: &str,
+    stream_name: &str,
+    expected: (i64, &str),
+    offset: i64,
+    node: Option<&str>,
+) -> Result<bool, anyhow::Error> {
+    let (current_offset, current_node) = get_offset(org_id, stream_name).await?;
+    if current_offset != expected.0 || current_node != expected.1 {
+        return Ok(false);
+    }
+    set_offset(org_id, stream_name, offset, node).await?;
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
