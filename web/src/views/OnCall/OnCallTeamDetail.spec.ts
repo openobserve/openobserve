@@ -112,9 +112,7 @@ describe("OnCallTeamDetail", () => {
     const wrapper = render();
     await flushPromises();
 
-    const names = wrapper
-      .findAllComponents({ name: "OTab" })
-      .map((tab) => tab.props("name"));
+    const names = wrapper.findAllComponents({ name: "OTab" }).map((tab) => tab.props("name"));
     expect(names).toEqual(["overview", "schedule", "policy", "ownership", "members"]);
   });
 
@@ -503,21 +501,52 @@ describe("OnCallTeamDetail", () => {
 
     /// Same shape as Schedule: reading the policy tells you its shape, the dry
     /// run tells you whether it reaches anybody.
-    it("shows the dry run, not the editor, by default", async () => {
+    it("shows the dry run, with the editor drawer closed, by default", async () => {
       const wrapper = await openEscalation();
 
       expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).exists()).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallEscalationDryRun" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("open")).toBe(false);
     });
 
-    it("swaps to the editor on demand, and never renders both", async () => {
+    /// The read view is what the edit is checked against, so it stays on
+    /// screen behind the drawer rather than being swapped out for it.
+    it("opens the editor as a drawer over the read view", async () => {
       const wrapper = await openEscalation();
       wrapper.findComponent({ name: "OnCallEscalationLadder" }).vm.$emit("edit");
       await flushPromises();
 
-      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("open")).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallEscalationDryRun" }).exists()).toBe(true);
+    });
+
+    /// The chips are labels ("P3"); the policy's rungs are numbered. Editing
+    /// from P3 must open on P3, not send the reader back to find it.
+    it("opens the drawer on the priority the ladder is showing", async () => {
+      const wrapper = await openEscalation();
+      const ladder = wrapper.findComponent({ name: "OnCallEscalationLadder" });
+      ladder.vm.$emit("update:selected", "P3");
+      await flushPromises();
+
+      ladder.vm.$emit("edit");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("priority")).toBe(3);
+    });
+
+    /// Closing from inside the drawer (× / Escape / Cancel) has to reach the
+    /// page state, or the drawer reopens itself on the next render.
+    it("closes when the drawer asks to close", async () => {
+      const wrapper = await openEscalation();
+      const editor = wrapper.findComponent({ name: "OnCallPolicyEditor" });
+      wrapper.findComponent({ name: "OnCallEscalationLadder" }).vm.$emit("edit");
+      await flushPromises();
+
+      editor.vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("open")).toBe(false);
     });
 
     /// The answer depends on who is on call at THIS instant, so switching
@@ -541,11 +570,11 @@ describe("OnCallTeamDetail", () => {
   it.each([["policy"], ["schedule"], ["ownership"]])(
     "opens the %s tab the banner asked for",
     async (expectedTab) => {
-    const wrapper = render();
-    await flushPromises();
+      const wrapper = render();
+      await flushPromises();
 
-    const panels = wrapper.findComponent({ name: "OTabPanels" });
-    expect(panels.props("modelValue")).not.toBe(expectedTab);
+      const panels = wrapper.findComponent({ name: "OTabPanels" });
+      expect(panels.props("modelValue")).not.toBe(expectedTab);
 
       wrapper.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("act", expectedTab);
       await flushPromises();
@@ -584,5 +613,4 @@ describe("OnCallTeamDetail", () => {
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(true);
     expect(wrapper.findComponent({ name: "OnCallTeamPulse" }).exists()).toBe(false);
   });
-
 });

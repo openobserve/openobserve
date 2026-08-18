@@ -327,47 +327,40 @@
            tells you whether it reaches anybody. -->
       <OTabPanel name="policy">
         <OContent y class="flex flex-col gap-5">
-          <template v-if="!editingPolicy">
-            <span class="flex flex-wrap items-baseline gap-x-2">
-              <OText variant="panel-title">{{ t("oncall.escalationReadTitle") }}</OText>
-              <OButton
-                variant="outline"
-                size="xs"
-                class="ms-auto"
-                data-test="oncall-policy-edit"
-                @click="editingPolicy = true"
-              >
-                {{ t("oncall.edit") }}
-              </OButton>
-            </span>
+          <span class="flex flex-wrap items-baseline gap-x-2">
+            <OText variant="panel-title">{{ t("oncall.escalationReadTitle") }}</OText>
+            <OButton
+              variant="outline"
+              size="xs"
+              class="ms-auto"
+              data-test="oncall-policy-edit"
+              @click="editingPolicy = true"
+            >
+              {{ t("oncall.edit") }}
+            </OButton>
+          </span>
 
-            <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-              <OnCallEscalationLadder
-                v-model:selected="selectedPriority"
-                :priorities="overview?.rungs ?? []"
-                :preview="preview"
-                :loading="previewLoading"
-                @edit="editingPolicy = true"
-              />
-              <OnCallEscalationDryRun :preview="preview" />
-            </div>
-          </template>
+          <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <OnCallEscalationLadder
+              v-model:selected="selectedPriority"
+              :priorities="overview?.rungs ?? []"
+              :preview="preview"
+              :loading="previewLoading"
+              @edit="editingPolicy = true"
+            />
+            <OnCallEscalationDryRun :preview="preview" />
+          </div>
 
-          <template v-else>
-            <span class="flex flex-wrap items-baseline gap-x-2">
-              <OText variant="panel-title">{{ t("oncall.escalationEditing") }}</OText>
-              <OButton
-                variant="outline"
-                size="xs"
-                class="ms-auto"
-                data-test="oncall-policy-done-editing"
-                @click="editingPolicy = false"
-              >
-                {{ t("oncall.policyDoneEditing") }}
-              </OButton>
-            </span>
-            <OnCallPolicyEditor :team-id="teamId" :policy="policy" @saved="onPolicySaved" />
-          </template>
+          <!-- Same move as the schedule tab: the editor is a drawer, so the
+               ladder and the dry run stay on screen behind it and the edit is
+               checked against what it is replacing. -->
+          <OnCallPolicyEditor
+            v-model:open="editingPolicy"
+            :priority="selectedPriorityNumber"
+            :team-id="teamId"
+            :policy="policy"
+            @saved="onPolicySaved"
+          />
         </OContent>
       </OTabPanel>
 
@@ -510,6 +503,9 @@ const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);
 const editingPolicy = ref(false);
 const selectedPriority = ref("P1");
+/// The ladder chips are labels ("P3"); the policy's rungs are numbered. The
+/// editor opens on whichever ladder the reader was already looking at.
+const selectedPriorityNumber = computed(() => Number(selectedPriority.value.slice(1)) || 1);
 const preview = ref<EscalationPreview | null>(null);
 const previewLoading = ref(false);
 /// Owned by the timeline, which decides the visible range; the fetch follows it.

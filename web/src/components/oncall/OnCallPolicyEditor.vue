@@ -1,339 +1,356 @@
 <template>
-  <OCard data-test="oncall-policy-editor">
-    <OCardSection>
-      <p class="text-text-secondary mb-4 text-sm">{{ t("oncall.policyHint") }}</p>
+  <!-- The ladder is wide — a rung is a wait, a row of target chips and a
+       resolved preview on one line. Editing it in place squeezed all three
+       into the tab column and pushed the read view off screen; the drawer
+       gives it the width and leaves the dry run visible underneath. -->
+  <ODrawer
+    :open="props.open"
+    size="xxl"
+    :title="t('oncall.escalationEditing')"
+    :sub-title="t('oncall.policyHint')"
+    bleed
+    data-test="oncall-policy-editor"
+    @update:open="(v: boolean) => emit('update:open', v)"
+  >
+    <!-- `bleed` because the chip bar spans the full width and supplies its own
+         inset; everything below keeps the drawer's standard one. -->
+    <!-- Same chips as the read view, so editing feels like the ladder
+         becoming editable rather than a different screen. One priority at a
+         time: five stacked ladders was a page nobody could scan. Sticky,
+         because a long ladder scrolls the only thing saying which priority
+         you are editing off the top. -->
+    <div
+      class="bg-dialog-bg border-dialog-header-border px-dialog-content-px py-dialog-content-py sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b"
+      data-test="oncall-policy-priority-bar"
+    >
+      <OButton
+        v-for="rung in draft"
+        :key="rung.priority"
+        :variant="rung.priority === selected ? 'primary' : 'outline'"
+        size="xs"
+        :data-test="`oncall-policy-priority-${rung.priority}`"
+        @click="selected = rung.priority"
+      >
+        {{ priorityLabel(rung.priority) }}
+        {{
+          rung.steps.length
+            ? t("oncall.policyChipRungs", { count: rung.steps.length }, rung.steps.length)
+            : t("oncall.reachPagesNobody")
+        }}
+      </OButton>
+    </div>
 
-      <div class="flex flex-col gap-4">
-        <!-- Same chips as the read view, so editing feels like the ladder
-             becoming editable rather than a different screen. One priority at
-             a time: five stacked ladders was a page nobody could scan. -->
+    <div class="px-dialog-content-px py-dialog-content-py flex flex-col gap-4">
+      <div
+        v-if="current"
+        :key="current.priority"
+        class="flex flex-col gap-3"
+        data-test="oncall-policy-rung"
+      >
+        <!-- The ladder, as a ladder: a rail of rungs with the wait edited on
+             the connector BETWEEN them. "If nobody acknowledges in 5m" is
+             the sentence an operator thinks in; a delay field inside the
+             card made every rung an absolute offset they had to subtract. -->
+        <div
+          v-if="current.steps.length"
+          class="flex flex-col"
+          :data-test="`oncall-policy-preview-${current.priority}`"
+        >
+          <template v-for="(step, stepIndex) in current.steps" :key="stepIndex">
+            <!-- Connector: the wait that puts this rung where it is. -->
+            <div class="border-border-strong ms-3 flex items-center gap-2 border-s py-2 ps-4">
+              <span class="text-text-label text-xs">
+                {{ stepIndex === 0 ? t("oncall.policyFirstPage") : t("oncall.policyIfNoAck") }}
+              </span>
+              <span class="w-44">
+                <OSelect
+                  :model-value="gapBefore(current, stepIndex)"
+                  :options="stepIndex === 0 ? leadGapOptions : gapOptions"
+                  :data-test="`oncall-policy-step-delay-${current.priority}-${stepIndex}`"
+                  @update:model-value="(v: any) => setGap(current!, stepIndex, Number(v))"
+                />
+              </span>
+            </div>
+
+            <!-- The rung. -->
+            <div
+              class="border-border-default rounded-surface relative flex flex-col gap-2 border p-3"
+              :data-test="`oncall-policy-rung-${current.priority}-${stepIndex}`"
+            >
+              <div class="flex flex-wrap items-center gap-2">
+                <OTag variant="default-soft" size="sm">
+                  {{
+                    step.after_micros
+                      ? raw(`+${formatMicrosDuration(step.after_micros)}`)
+                      : t("oncall.ladderNow")
+                  }}
+                </OTag>
+                <span class="text-text-label text-xs">{{ t("oncall.rungPages") }}</span>
+
+                <OTag
+                  v-for="(target, ti) in step.targets"
+                  :key="ti"
+                  variant="default-soft"
+                  size="sm"
+                  :data-test="`oncall-policy-target-${current.priority}-${stepIndex}-${ti}`"
+                >
+                  {{ describeTarget(target, t) }}
+                  <button
+                    type="button"
+                    class="ml-1"
+                    :aria-label="t('oncall.removeTarget')"
+                    :data-test="`oncall-policy-target-remove-${current.priority}-${stepIndex}-${ti}`"
+                    @click="step.targets.splice(ti, 1)"
+                  >
+                    {{ raw("×") }}
+                  </button>
+                </OTag>
+
+                <span class="w-52">
+                  <OSelect
+                    :model-value="''"
+                    :options="targetOptions"
+                    :placeholder="t('oncall.addTarget')"
+                    :data-test="`oncall-policy-add-target-${current.priority}-${stepIndex}`"
+                    @update:model-value="(v: any) => addTarget(step, String(v))"
+                  />
+                </span>
+
+                <!-- A person target needs a name, so it asks rather than
+                     adding an empty chip the server would reject on save. -->
+                <span v-if="pendingUserStep === step" class="w-52">
+                  <OSelect
+                    :model-value="''"
+                    :options="memberOptions"
+                    :placeholder="t('oncall.targetPickPerson')"
+                    :data-test="`oncall-policy-pick-person-${current.priority}-${stepIndex}`"
+                    @update:model-value="(v: any) => addUser(String(v))"
+                  />
+                </span>
+
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="delete-outline"
+                  class="ms-auto"
+                  :aria-label="t('oncall.removeRung')"
+                  :data-test="`oncall-policy-remove-rung-${current.priority}-${stepIndex}`"
+                  @click="removeStep(current!, stepIndex)"
+                />
+              </div>
+
+              <!-- Who this rung wakes, resolved against the rotation in
+                   force right now — the question the ladder is built out of
+                   target KINDS never answers. -->
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-text-label text-xs">{{ t("oncall.policyRightNow") }}</span>
+                <template
+                  v-for="(line, i) in [resolveLadder(current, onCallNow)[stepIndex]]"
+                  :key="i"
+                >
+                  <OUserCell v-for="email in line?.people ?? []" :key="email" :value="email" />
+                  <span v-if="line?.wholeTeam" class="text-text-body text-sm">
+                    {{ t("oncall.target_whole_team") }}
+                  </span>
+                  <span
+                    v-for="pool in line?.pools ?? []"
+                    :key="pool"
+                    class="text-text-body text-sm"
+                  >
+                    {{ t("oncall.ladderPoolEveryone", { slot: raw(pool) }) }}
+                  </span>
+                  <span
+                    v-if="line && !line.people.length && !line.wholeTeam && !line.pools.length"
+                    class="text-status-warning-text text-sm"
+                    :data-test="`oncall-policy-preview-nobody-${current.priority}-${stepIndex}`"
+                  >
+                    {{ t("oncall.ladderReachesNobody") }}
+                  </span>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- What the ladder does when it runs out is part of its shape. -->
+          <div class="border-border-strong ms-3 flex flex-col gap-0.5 border-s py-2 ps-4">
+            <span class="text-text-secondary text-xs" data-test="oncall-policy-ladder-end">
+              {{ ladderEndLine }}
+            </span>
+            <!-- §G.9 #9: notify_default_team with nobody nominated is
+                 indistinguishable from stop — the ladder ends silently while
+                 the policy reads as having a safety net. Said HERE, where the
+                 policy is being written, not on a routing screen the author
+                 may never open. -->
+            <span
+              v-if="defaultTeamMissing"
+              class="text-status-warning-text text-xs"
+              data-test="oncall-policy-no-default-warning"
+            >
+              {{ t("oncall.policyNoDefaultTeam") }}
+            </span>
+          </div>
+        </div>
+
+        <p v-else class="text-text-secondary text-sm" data-test="oncall-policy-silent">
+          {{ t("oncall.policyPrioritySilent", { priority: raw(priorityLabel(current.priority)) }) }}
+        </p>
+
         <div class="flex flex-wrap items-center gap-2">
           <OButton
-            v-for="rung in draft"
-            :key="rung.priority"
-            :variant="rung.priority === selected ? 'primary' : 'outline'"
-            size="xs"
-            :data-test="`oncall-policy-priority-${rung.priority}`"
-            @click="selected = rung.priority"
-          >
-            {{ priorityLabel(rung.priority) }}
-            {{
-              rung.steps.length
-                ? t("oncall.policyChipRungs", { count: rung.steps.length }, rung.steps.length)
-                : t("oncall.reachPagesNobody")
-            }}
-          </OButton>
-        </div>
-
-        <div
-          v-if="current"
-          :key="current.priority"
-          class="flex flex-col gap-3"
-          data-test="oncall-policy-rung"
-        >
-          <!-- The ladder, as a ladder: a rail of rungs with the wait edited on
-               the connector BETWEEN them. "If nobody acknowledges in 5m" is
-               the sentence an operator thinks in; a delay field inside the
-               card made every rung an absolute offset they had to subtract. -->
-          <div
-            v-if="current.steps.length"
-            class="flex flex-col"
-            :data-test="`oncall-policy-preview-${current.priority}`"
-          >
-            <template v-for="(step, stepIndex) in current.steps" :key="stepIndex">
-              <!-- Connector: the wait that puts this rung where it is. -->
-              <div class="border-border-strong ms-3 flex items-center gap-2 border-s py-2 ps-4">
-                <span class="text-text-label text-xs">
-                  {{
-                    stepIndex === 0
-                      ? t("oncall.policyFirstPage")
-                      : t("oncall.policyIfNoAck")
-                  }}
-                </span>
-                <span class="w-44">
-                  <OSelect
-                    :model-value="gapBefore(current, stepIndex)"
-                    :options="stepIndex === 0 ? leadGapOptions : gapOptions"
-                    :data-test="`oncall-policy-step-delay-${current.priority}-${stepIndex}`"
-                    @update:model-value="(v: any) => setGap(current!, stepIndex, Number(v))"
-                  />
-                </span>
-              </div>
-
-              <!-- The rung. -->
-              <div
-                class="border-border-default relative flex flex-col gap-2 rounded-surface border p-3"
-                :data-test="`oncall-policy-rung-${current.priority}-${stepIndex}`"
-              >
-                <div class="flex flex-wrap items-center gap-2">
-                  <OTag variant="default-soft" size="sm">
-                    {{
-                      step.after_micros
-                        ? raw(`+${formatMicrosDuration(step.after_micros)}`)
-                        : t("oncall.ladderNow")
-                    }}
-                  </OTag>
-                  <span class="text-text-label text-xs">{{ t("oncall.rungPages") }}</span>
-
-                  <OTag
-                    v-for="(target, ti) in step.targets"
-                    :key="ti"
-                    variant="default-soft"
-                    size="sm"
-                    :data-test="`oncall-policy-target-${current.priority}-${stepIndex}-${ti}`"
-                  >
-                    {{ describeTarget(target, t) }}
-                    <button
-                      type="button"
-                      class="ml-1"
-                      :aria-label="t('oncall.removeTarget')"
-                      :data-test="`oncall-policy-target-remove-${current.priority}-${stepIndex}-${ti}`"
-                      @click="step.targets.splice(ti, 1)"
-                    >
-                      {{ raw("×") }}
-                    </button>
-                  </OTag>
-
-                  <span class="w-52">
-                    <OSelect
-                      :model-value="''"
-                      :options="targetOptions"
-                      :placeholder="t('oncall.addTarget')"
-                      :data-test="`oncall-policy-add-target-${current.priority}-${stepIndex}`"
-                      @update:model-value="(v: any) => addTarget(step, String(v))"
-                    />
-                  </span>
-
-                  <!-- A person target needs a name, so it asks rather than
-                       adding an empty chip the server would reject on save. -->
-                  <span v-if="pendingUserStep === step" class="w-52">
-                    <OSelect
-                      :model-value="''"
-                      :options="memberOptions"
-                      :placeholder="t('oncall.targetPickPerson')"
-                      :data-test="`oncall-policy-pick-person-${current.priority}-${stepIndex}`"
-                      @update:model-value="(v: any) => addUser(String(v))"
-                    />
-                  </span>
-
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="delete-outline"
-                    class="ms-auto"
-                    :aria-label="t('oncall.removeRung')"
-                    :data-test="`oncall-policy-remove-rung-${current.priority}-${stepIndex}`"
-                    @click="removeStep(current!, stepIndex)"
-                  />
-                </div>
-
-                <!-- Who this rung wakes, resolved against the rotation in
-                     force right now — the question the ladder is built out of
-                     target KINDS never answers. -->
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-text-label text-xs">{{ t("oncall.policyRightNow") }}</span>
-                  <template v-for="(line, i) in [resolveLadder(current, onCallNow)[stepIndex]]" :key="i">
-                    <OUserCell v-for="email in line?.people ?? []" :key="email" :value="email" />
-                    <span v-if="line?.wholeTeam" class="text-text-body text-sm">
-                      {{ t("oncall.target_whole_team") }}
-                    </span>
-                    <span
-                      v-for="pool in line?.pools ?? []"
-                      :key="pool"
-                      class="text-text-body text-sm"
-                    >
-                      {{ t("oncall.ladderPoolEveryone", { slot: raw(pool) }) }}
-                    </span>
-                    <span
-                      v-if="line && !line.people.length && !line.wholeTeam && !line.pools.length"
-                      class="text-status-warning-text text-sm"
-                      :data-test="`oncall-policy-preview-nobody-${current.priority}-${stepIndex}`"
-                    >
-                      {{ t("oncall.ladderReachesNobody") }}
-                    </span>
-                  </template>
-                </div>
-              </div>
-            </template>
-
-            <!-- What the ladder does when it runs out is part of its shape. -->
-            <div class="border-border-strong ms-3 flex flex-col gap-0.5 border-s py-2 ps-4">
-              <span class="text-text-secondary text-xs" data-test="oncall-policy-ladder-end">
-                {{ ladderEndLine }}
-              </span>
-              <!-- §G.9 #9: notify_default_team with nobody nominated is
-                   indistinguishable from stop — the ladder ends silently while
-                   the policy reads as having a safety net. Said HERE, where the
-                   policy is being written, not on a routing screen the author
-                   may never open. -->
-              <span
-                v-if="defaultTeamMissing"
-                class="text-status-warning-text text-xs"
-                data-test="oncall-policy-no-default-warning"
-              >
-                {{ t("oncall.policyNoDefaultTeam") }}
-              </span>
-            </div>
-          </div>
-
-          <p v-else class="text-text-secondary text-sm" data-test="oncall-policy-silent">
-            {{ t("oncall.policyPrioritySilent", { priority: raw(priorityLabel(current.priority)) }) }}
-          </p>
-
-          <div class="flex flex-wrap items-center gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="add"
-              :data-test="`oncall-policy-add-step-${current.priority}`"
-              @click="addStep(current)"
-            >
-              {{ t("oncall.addRung") }}
-            </OButton>
-          </div>
-
-          <!-- Channels apply to everyone paged at this priority; the primary
-               and the secondary are not treated differently. -->
-          <div class="flex flex-col gap-1">
-            <span class="text-text-label text-xs">{{ t("oncall.channels") }}</span>
-            <span class="text-text-muted text-xs">{{ t("oncall.channelsAvailableHint") }}</span>
-            <div class="flex flex-wrap gap-2">
-              <OCheckbox
-                v-for="channel in CHANNELS"
-                :key="channel"
-                :model-value="current.channels.includes(channel)"
-                :label="t(`oncall.channel_${channel}`)"
-                :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
-                @update:model-value="(on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- Ticking `webhook` above says HOW to page; this says WHERE. Without
-             it the channel is on and delivers nowhere, which looks identical
-             to working. -->
-        <div v-if="webhookEnabled" class="flex flex-col gap-1">
-          <span class="text-text-label text-xs">{{ t("oncall.policyDestinations") }}</span>
-          <span class="text-text-muted text-xs">{{ t("oncall.policyDestinationsHint") }}</span>
-          <OSelect
-            v-model="destinations"
-            :options="destinationOptions"
-            multiple
-            :placeholder="t('oncall.policyDestinationsPlaceholder')"
-            data-test="oncall-policy-destinations"
-          />
-          <span
-            v-if="!destinations.length"
-            class="text-status-warning-text text-xs"
-            data-test="oncall-policy-destinations-warning"
-          >
-            {{ t("oncall.policyNoDestinationWarning") }}
-          </span>
-        </div>
-
-        <!-- C11: the l0_json block. Wire rule: `l0` absent on the PUT means
-             unchanged, so it is only included once the panel is touched —
-             editing rungs must never silently rewrite the gate. -->
-        <!-- WHERE the team is talked to, beside the policy list it can
-             override. `source` makes precedence visible: "I set the team
-             channel and pages still go to the old room" has to be answerable
-             here, not by paging somebody to find out. -->
-        <div class="flex flex-col gap-1" data-test="oncall-team-channel">
-          <span class="flex items-center gap-2">
-            <span class="text-text-label text-xs">{{ t("oncall.teamChannelTitle") }}</span>
-            <OTag
-              v-if="teamChannel"
-              :variant="teamChannel.source === 'team' ? 'primary-soft' : 'default-soft'"
-              size="sm"
-              data-test="oncall-team-channel-source"
-            >
-              {{
-                teamChannel.source === "team"
-                  ? t("oncall.teamChannelFromTeam")
-                  : t("oncall.teamChannelFromPolicy")
-              }}
-            </OTag>
-          </span>
-          <!-- One post per firing, not a live room: the only transport is an
-               HTTP destination, which cannot edit what it already sent. Said
-               here so nobody designs an expectation the engine cannot meet. -->
-          <span class="text-text-muted text-xs">{{ t("oncall.teamChannelHint") }}</span>
-          <OSelect
-            v-model="teamChannelDraft"
-            :options="destinationOptions"
-            multiple
-            :placeholder="t('oncall.teamChannelPlaceholder')"
-            data-test="oncall-team-channel-select"
-          />
-          <span class="flex flex-wrap items-center gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              :loading="savingChannel"
-              :disabled="!teamChannelDirty"
-              data-test="oncall-team-channel-save"
-              @click="saveTeamChannel(teamChannelDraft)"
-            >
-              {{ t("oncall.teamChannelSave") }}
-            </OButton>
-            <!-- Clearing is its own verb because null and [] are different
-                 facts on the wire: back-to-policy versus silence-on-purpose. -->
-            <OButton
-              v-if="teamChannel?.source === 'team'"
-              variant="ghost"
-              size="sm-action"
-              :loading="savingChannel"
-              data-test="oncall-team-channel-clear"
-              @click="saveTeamChannel(null)"
-            >
-              {{ t("oncall.teamChannelUsePolicy") }}
-            </OButton>
-          </span>
-          <span
-            v-if="teamChannel && !teamChannel.destinations.length"
-            class="text-status-warning-text text-xs"
-            data-test="oncall-team-channel-silent"
-          >
-            {{ t("oncall.teamChannelSilent") }}
-          </span>
-        </div>
-
-        <OnCallL0Editor
-          :l0="props.policy?.l0 ?? null"
-          @update:l0="onL0Update"
-          @update:valid="(v: boolean) => (l0Valid = v)"
-        />
-
-        <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="reset">
-            {{ t("oncall.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
+            variant="outline"
             size="sm-action"
-            :loading="saving"
-            :disabled="!l0Valid"
-            data-test="oncall-policy-save"
-            @click="save"
+            icon-left="add"
+            :data-test="`oncall-policy-add-step-${current.priority}`"
+            @click="addStep(current)"
           >
-            {{ t("oncall.save") }}
+            {{ t("oncall.addRung") }}
           </OButton>
+        </div>
+
+        <!-- Channels apply to everyone paged at this priority; the primary
+             and the secondary are not treated differently. -->
+        <div class="flex flex-col gap-1">
+          <span class="text-text-label text-xs">{{ t("oncall.channels") }}</span>
+          <span class="text-text-muted text-xs">{{ t("oncall.channelsAvailableHint") }}</span>
+          <div class="flex flex-wrap gap-2">
+            <OCheckbox
+              v-for="channel in CHANNELS"
+              :key="channel"
+              :model-value="current.channels.includes(channel)"
+              :label="t(`oncall.channel_${channel}`)"
+              :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
+              @update:model-value="
+                (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
+              "
+            />
+          </div>
         </div>
       </div>
-    </OCardSection>
-  </OCard>
+
+      <!-- Ticking `webhook` above says HOW to page; this says WHERE. Without
+           it the channel is on and delivers nowhere, which looks identical
+           to working. -->
+      <div v-if="webhookEnabled" class="flex flex-col gap-1">
+        <span class="text-text-label text-xs">{{ t("oncall.policyDestinations") }}</span>
+        <span class="text-text-muted text-xs">{{ t("oncall.policyDestinationsHint") }}</span>
+        <OSelect
+          v-model="destinations"
+          :options="destinationOptions"
+          multiple
+          :placeholder="t('oncall.policyDestinationsPlaceholder')"
+          data-test="oncall-policy-destinations"
+        />
+        <span
+          v-if="!destinations.length"
+          class="text-status-warning-text text-xs"
+          data-test="oncall-policy-destinations-warning"
+        >
+          {{ t("oncall.policyNoDestinationWarning") }}
+        </span>
+      </div>
+
+      <!-- C11: the l0_json block. Wire rule: `l0` absent on the PUT means
+           unchanged, so it is only included once the panel is touched —
+           editing rungs must never silently rewrite the gate. -->
+      <!-- WHERE the team is talked to, beside the policy list it can
+           override. `source` makes precedence visible: "I set the team
+           channel and pages still go to the old room" has to be answerable
+           here, not by paging somebody to find out. -->
+      <div class="flex flex-col gap-1" data-test="oncall-team-channel">
+        <span class="flex items-center gap-2">
+          <span class="text-text-label text-xs">{{ t("oncall.teamChannelTitle") }}</span>
+          <OTag
+            v-if="teamChannel"
+            :variant="teamChannel.source === 'team' ? 'primary-soft' : 'default-soft'"
+            size="sm"
+            data-test="oncall-team-channel-source"
+          >
+            {{
+              teamChannel.source === "team"
+                ? t("oncall.teamChannelFromTeam")
+                : t("oncall.teamChannelFromPolicy")
+            }}
+          </OTag>
+        </span>
+        <!-- One post per firing, not a live room: the only transport is an
+             HTTP destination, which cannot edit what it already sent. Said
+             here so nobody designs an expectation the engine cannot meet. -->
+        <span class="text-text-muted text-xs">{{ t("oncall.teamChannelHint") }}</span>
+        <OSelect
+          v-model="teamChannelDraft"
+          :options="destinationOptions"
+          multiple
+          :placeholder="t('oncall.teamChannelPlaceholder')"
+          data-test="oncall-team-channel-select"
+        />
+        <span class="flex flex-wrap items-center gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :loading="savingChannel"
+            :disabled="!teamChannelDirty"
+            data-test="oncall-team-channel-save"
+            @click="saveTeamChannel(teamChannelDraft)"
+          >
+            {{ t("oncall.teamChannelSave") }}
+          </OButton>
+          <!-- Clearing is its own verb because null and [] are different
+               facts on the wire: back-to-policy versus silence-on-purpose. -->
+          <OButton
+            v-if="teamChannel?.source === 'team'"
+            variant="ghost"
+            size="sm-action"
+            :loading="savingChannel"
+            data-test="oncall-team-channel-clear"
+            @click="saveTeamChannel(null)"
+          >
+            {{ t("oncall.teamChannelUsePolicy") }}
+          </OButton>
+        </span>
+        <span
+          v-if="teamChannel && !teamChannel.destinations.length"
+          class="text-status-warning-text text-xs"
+          data-test="oncall-team-channel-silent"
+        >
+          {{ t("oncall.teamChannelSilent") }}
+        </span>
+      </div>
+
+      <OnCallL0Editor
+        :l0="props.policy?.l0 ?? null"
+        @update:l0="onL0Update"
+        @update:valid="(v: boolean) => (l0Valid = v)"
+      />
+    </div>
+
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <OButton variant="outline" size="sm-action" @click="cancel">
+          {{ t("oncall.cancel") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :loading="saving"
+          :disabled="!l0Valid"
+          data-test="oncall-policy-save"
+          @click="save"
+        >
+          {{ t("oncall.save") }}
+        </OButton>
+      </div>
+    </template>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -356,15 +373,16 @@ import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { formatMicrosDuration } from "@/utils/formatters";
-import {
-  DELIVERABLE_CHANNELS,
-  describeTarget,
-  priorityLabel,
-  resolveLadder,
-} from "@/utils/oncall";
+import { DELIVERABLE_CHANNELS, describeTarget, priorityLabel, resolveLadder } from "@/utils/oncall";
 
-const props = defineProps<{ teamId: string; policy: OnCallPolicy | null }>();
-const emit = defineEmits<{ saved: [] }>();
+const props = defineProps<{
+  teamId: string;
+  policy: OnCallPolicy | null;
+  open?: boolean;
+  /** The priority the reader had selected — the editor opens on the same one. */
+  priority?: number;
+}>();
+const emit = defineEmits<{ saved: []; "update:open": [boolean] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -388,6 +406,12 @@ const onCallNow = ref<OnCallSlot[]>([]);
 const destinations = ref<string[]>([]);
 const availableDestinations = ref<string[]>([]);
 const saving = ref(false);
+
+/// Held OUTSIDE the PUT body until touched: the server reads an absent `l0`
+/// as "unchanged", which is the only reason a rung edit cannot wipe the gate.
+const l0Draft = ref<L0Policy | null>(null);
+const l0Touched = ref(false);
+const l0Valid = ref(true);
 
 // The picker only matters if something is set to page through it.
 const webhookEnabled = computed(() =>
@@ -564,9 +588,40 @@ function reset() {
   }));
   pendingUserStep.value = null;
   destinations.value = [...(props.policy?.destinations ?? [])];
+  l0Draft.value = null;
+  l0Touched.value = false;
 }
 
 watch(() => props.policy, reset, { immediate: true });
+
+/// The drawer keeps this component mounted between visits, so a discarded edit
+/// would still be sitting in `draft` the next time it opens — and nothing the
+/// body needs is worth fetching until then. Re-read on every open because the
+/// preview names whoever is on call at THIS instant.
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) return;
+    reset();
+    // A policy need not carry a rung for every priority, so an unrepresented
+    // one falls back to a chip that exists rather than an empty body.
+    const wanted = props.priority ?? selected.value;
+    selected.value = draft.value.some((rung) => rung.priority === wanted)
+      ? wanted
+      : (draft.value[0]?.priority ?? selected.value);
+    fetchDestinations();
+    fetchRoutingConfig();
+    fetchTeamChannel();
+    fetchMembers();
+    fetchOnCallNow();
+  },
+  { immediate: true },
+);
+
+function cancel() {
+  reset();
+  emit("update:open", false);
+}
 
 // A failure here leaves the picker empty rather than breaking the editor: the
 // rest of the policy is still worth editing.
@@ -619,14 +674,6 @@ async function fetchOnCallNow() {
   }
 }
 
-onMounted(() => {
-  fetchDestinations();
-  fetchRoutingConfig();
-  fetchTeamChannel();
-  fetchMembers();
-  fetchOnCallNow();
-});
-
 function addStep(rung: PriorityRung) {
   // A new rung lands after the last one. Two rungs at the same delay would
   // fire together, which the server rejects — and rightly, since that is one
@@ -646,12 +693,6 @@ function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {
     rung.channels = rung.channels.filter((c) => c !== channel);
   }
 }
-
-/// Held OUTSIDE the PUT body until touched: the server reads an absent `l0`
-/// as "unchanged", which is the only reason a rung edit cannot wipe the gate.
-const l0Draft = ref<L0Policy | null>(null);
-const l0Touched = ref(false);
-const l0Valid = ref(true);
 
 function onL0Update(value: L0Policy) {
   l0Draft.value = value;

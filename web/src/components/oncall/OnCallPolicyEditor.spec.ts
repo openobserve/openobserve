@@ -39,8 +39,11 @@ const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
 
 const stubs = {
-  OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
+  ODrawer: {
+    name: "ODrawer",
+    props: ["open"],
+    template: `<div v-if="open"><slot /><slot name="footer" /></div>`,
+  },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OButton: {
     name: "OButton",
@@ -72,7 +75,7 @@ const policy: OnCallPolicy = {
 
 function render() {
   return mount(OnCallPolicyEditor, {
-    props: { teamId: "team_1", policy },
+    props: { teamId: "team_1", policy, open: true },
     global: { plugins: [i18n, store], stubs },
   });
 }
@@ -117,6 +120,67 @@ describe("OnCallPolicyEditor", () => {
     expect(wrapper.text()).toContain("Pages nobody");
   });
 
+  /// A long ladder scrolls past the only thing saying which priority is being
+  /// edited, so the chips live in their own bar rather than in the scroll flow.
+  it("keeps the priority chips out of the scrolling body", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    const bar = wrapper.find('[data-test="oncall-policy-priority-bar"]');
+    expect(bar.exists()).toBe(true);
+    expect(bar.classes()).toContain("sticky");
+    expect(bar.find('[data-test="oncall-policy-priority-1"]').exists()).toBe(true);
+  });
+
+  /// Reading P3 and pressing Edit has to land on P3. Opening on P1 asks the
+  /// reader to re-find the ladder they were already looking at.
+  describe("the priority the drawer opens on", () => {
+    it("opens on the priority the reader had selected", async () => {
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy, open: true, priority: 4 },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-policy-add-step-4"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-policy-add-step-1"]').exists()).toBe(false);
+    });
+
+    /// The read view lists every priority; the policy only carries the ones
+    /// with rungs. Asking for an absent one must not open an empty editor.
+    it("falls back to a priority the policy actually has", async () => {
+      // No P1 either, so landing on a real chip cannot be the default's doing.
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: {
+          teamId: "team_1",
+          policy: { ...policy, rungs: [{ priority: 4, steps: [], channels: [] }] },
+          open: true,
+          priority: 3,
+        },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-policy-add-step-4"]').exists()).toBe(true);
+    });
+
+    /// The drawer stays mounted between visits, so the selection has to
+    /// follow each open rather than only the first.
+    it("re-selects on every open, not just the first", async () => {
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy, open: true, priority: 1 },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      await wrapper.setProps({ open: false });
+      await wrapper.setProps({ open: true, priority: 4 });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-policy-add-step-4"]').exists()).toBe(true);
+    });
+  });
+
   /// Ticking `webhook` says HOW to page; the destination says WHERE. Offering
   /// the channel without the target lets someone turn on a page that silently
   /// reaches nobody.
@@ -137,7 +201,7 @@ describe("OnCallPolicyEditor", () => {
 
     it("hides the picker when nothing pages by webhook", async () => {
       const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy },
+        props: { teamId: "team_1", policy, open: true },
         global: { plugins: [i18n, store], stubs },
       });
       await flushPromises();
@@ -147,32 +211,30 @@ describe("OnCallPolicyEditor", () => {
 
     it("warns when the webhook channel has nowhere to go", async () => {
       const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: { ...webhookPolicy, destinations: [] } },
+        props: { teamId: "team_1", policy: { ...webhookPolicy, destinations: [] }, open: true },
         global: { plugins: [i18n, store], stubs },
       });
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="oncall-policy-destinations-warning"]').text(),
-      ).toContain("reach nobody");
+      expect(wrapper.find('[data-test="oncall-policy-destinations-warning"]').text()).toContain(
+        "reach nobody",
+      );
     });
 
     it("does not warn once a destination is chosen", async () => {
       const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: webhookPolicy },
+        props: { teamId: "team_1", policy: webhookPolicy, open: true },
         global: { plugins: [i18n, store], stubs },
       });
       await flushPromises();
 
-      expect(wrapper.find('[data-test="oncall-policy-destinations-warning"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="oncall-policy-destinations-warning"]').exists()).toBe(false);
     });
 
     it("saves the destinations alongside the rungs", async () => {
       service.setPolicy.mockResolvedValue({ data: {} } as any);
       const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: webhookPolicy },
+        props: { teamId: "team_1", policy: webhookPolicy, open: true },
         global: { plugins: [i18n, store], stubs },
       });
       await flushPromises();
@@ -191,7 +253,7 @@ describe("OnCallPolicyEditor", () => {
     it("still renders when destinations cannot be loaded", async () => {
       destinations.list.mockRejectedValue(new Error("boom"));
       const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: webhookPolicy },
+        props: { teamId: "team_1", policy: webhookPolicy, open: true },
         global: { plugins: [i18n, store], stubs },
       });
       await flushPromises();
@@ -218,6 +280,7 @@ describe("OnCallPolicyEditor", () => {
             },
           ],
         },
+        open: true,
       },
       global: { plugins: [i18n, store], stubs },
     });
@@ -244,14 +307,13 @@ describe("OnCallPolicyEditor", () => {
             },
           ],
         },
+        open: true,
       },
       global: { plugins: [i18n, store], stubs },
     });
     await flushPromises();
 
-    expect(
-      wrapper.find('[data-test="oncall-policy-preview-nobody-1-0"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="oncall-policy-preview-nobody-1-0"]').exists()).toBe(true);
   });
 
   // The connector edits the WAIT between neighbours; the model stores
@@ -274,7 +336,7 @@ describe("OnCallPolicyEditor", () => {
       ],
     };
     const wrapper = mount(OnCallPolicyEditor, {
-      props: { teamId: "team_1", policy: threeRungs },
+      props: { teamId: "team_1", policy: threeRungs, open: true },
       global: { plugins: [i18n, store], stubs },
     });
     await flushPromises();
@@ -310,7 +372,7 @@ describe("OnCallPolicyEditor", () => {
       ],
     };
     const wrapper = mount(OnCallPolicyEditor, {
-      props: { teamId: "team_1", policy: threeRungs },
+      props: { teamId: "team_1", policy: threeRungs, open: true },
       global: { plugins: [i18n, store], stubs },
     });
     await flushPromises();
@@ -342,7 +404,7 @@ describe("OnCallPolicyEditor", () => {
 
     it("warns when the final action hands to a default team nobody nominated", async () => {
       const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: policyEnding("notify_default_team") },
+        props: { teamId: "team_1", policy: policyEnding("notify_default_team"), open: true },
         global: { plugins: [i18n, store], stubs },
       });
       await flushPromises();
@@ -352,10 +414,15 @@ describe("OnCallPolicyEditor", () => {
 
     it("names the default team once one exists, and does not warn", async () => {
       service.getRoutingConfig.mockResolvedValue({
-        data: { org_id: "default", default_team_id: "t9", default_team_name: "Platform", updated_at: 1 },
+        data: {
+          org_id: "default",
+          default_team_id: "t9",
+          default_team_name: "Platform",
+          updated_at: 1,
+        },
       } as any);
       const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: policyEnding("notify_default_team") },
+        props: { teamId: "team_1", policy: policyEnding("notify_default_team"), open: true },
         global: { plugins: [i18n, store], stubs },
       });
       await flushPromises();
@@ -365,7 +432,7 @@ describe("OnCallPolicyEditor", () => {
 
     it("says a stopping ladder marks the record never answered", async () => {
       const wrapper = mount(OnCallPolicyEditor, {
-        props: { teamId: "team_1", policy: policyEnding("stop") },
+        props: { teamId: "team_1", policy: policyEnding("stop"), open: true },
         global: { plugins: [i18n, store], stubs },
       });
       await flushPromises();
@@ -415,5 +482,4 @@ describe("OnCallPolicyEditor", () => {
       expect(wrapper.find('[data-test="oncall-team-channel-silent"]').exists()).toBe(true);
     });
   });
-
 });
