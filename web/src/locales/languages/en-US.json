@@ -15205,6 +15205,8 @@
         "noPlansHint": "Plan capture is off by default. Turn on top query collection in your collector and set ZO_DB_MONITORING_TOP_QUERY_ENABLED to start capturing plans.",
         "noPlanForQuery": "No plan for this query",
         "noPlanForQueryHint": "We're capturing plans for this database — this query just doesn't have one. That's normal for statements the database can't explain, like COMMIT, ROLLBACK and SHOW.",
+        "captureSwitchedOff": "Plan capture is switched off",
+        "captureSwitchedOffHint": "This stream has captured plans before, but plan collection is switched off now, so no new plan can arrive for any query. Set ZO_DB_MONITORING_TOP_QUERY_ENABLED for estimated plans, or ZO_DB_MONITORING_EXPLAIN_ENABLED for real executed plans, and enable the matching block in your collector recipe — both sides have to be on.",
         "planHash": "Plan",
         "firstSeen": "First seen",
         "lastSeen": "Last seen",
@@ -15698,7 +15700,9 @@
           },
           "sampling": {
             "no": "Nothing is sampling your databases' session tables",
-            "noDetail": "Session sampling is off by default because it adds meaningful ingest. Turn on ZO_DB_MONITORING_ACTIVITY_ENABLED and add the query sample collection block to your collector recipe."
+            "noDetail": "Session sampling is off by default because it adds meaningful ingest. Turn on ZO_DB_MONITORING_ACTIVITY_ENABLED and add the query sample collection block to your collector recipe.",
+            "ingestOff": "Session sampling is switched off in OpenObserve",
+            "ingestOffDetail": "ZO_DB_MONITORING_ACTIVITY_ENABLED is off here, so session samples are discarded even if your collector is sending them. Your collector is not the problem. Set it to true, and enable db.server.query_sample in your collector recipe — both sides have to be on. Sampling is off by default because it adds meaningful ingest."
           }
         }
       }

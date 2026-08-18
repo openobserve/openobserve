@@ -2180,6 +2180,29 @@ const onStmtClassChange = (value: unknown) => {
 };
 
 /**
+ * The search box, which on THIS page is a server refinement and not only a
+ * client filter: `requestParams()` sends `search` to `/queries`, so the term
+ * has to reach a refetch or the table keeps answering the previous one.
+ *
+ * That is the difference from SamplesPage, whose endpoint takes no `search`
+ * param and whose box therefore assigns the ref and stops. Here the handler
+ * follows this page's own convention for a refinement (`onStmtClassChange`
+ * above): assign, publish to the URL, refetch — so a shared link carries the
+ * term and the rows below match it.
+ *
+ * The refetch is not per keystroke: `OSearchInput` is bound with
+ * `:debounce="400"`, so `update:model-value` fires 400ms after typing stops.
+ * This restores the `@search="load"` behaviour the control had inside
+ * `DbmTableToolbar`, which emitted `update:search` and `search` together and
+ * was lost when the box was hoisted out of the table toolbar.
+ */
+const onSearchInput = (value: unknown) => {
+  search.value = typeof value === "string" ? value : "";
+  syncUrl();
+  load();
+};
+
+/**
  * Drop every refinement at once, from the toolbar's clear affordance.
  *
  * "Clear all" means all: the search box and the active insight are refinements

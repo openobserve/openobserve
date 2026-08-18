@@ -26,7 +26,31 @@
  * six questions. And a count is not cheap: measured live, `/activity` costs
  * 1880ms for the full read and 1739ms at `?size=1`, because the price is the
  * SCAN (dbm_server holds 2.77M irrelevant rows beside ~22K DBM records), not
- * the rows returned. There is no cheaper count to fetch instead.
+ * the rows returned.
+ *
+ * That scan is now PRUNABLE, and this comment used to say it was not.
+ * `o2_dbm_kind` is seeded as a SECONDARY INDEX (a raw-tokenized tantivy column,
+ * not full-text search) on the server-vantage stream at ingest
+ * (`server_vantage::ensure_server_stream_index_field`), so a read filtering on
+ * one kind — which every DBM read does — prunes to the matching rows via the
+ * inverted index instead of scanning every row. Three things to know before
+ * reading a timing against this:
+ *
+ *   - it is NOT retroactive. The index is built per-parquet as files are
+ *     written, so files written before the seed landed carry none and fall back
+ *     to a full scan. A window still holding pre-seed data pays the old cost for
+ *     that part of it; the improvement arrives as that data ages out;
+ *   - it is NOT unconditional. A tantivy index is abandoned for a file once the
+ *     predicate matches more than `inverted_index_skip_threshold` percent of its
+ *     rows (default 35), falling back to DataFusion. `o2_dbm_kind='activity'`
+ *     measured ~21.6% of the stream — under the cutoff, but the same order of
+ *     magnitude. The rarer kinds benefit most; `activity` is the weakest case
+ *     and may show no improvement on a stream carrying little else;
+ *   - it prunes the SCAN, not the aggregate. The count is still
+ *     `COUNT(DISTINCT pid)` over whatever survives the prune, and there is
+ *     still no cheaper count to fetch INSTEAD — a pre-aggregated activity
+ *     grain in `_o2_db_stats` (the rollup the `databases` and `queries` members
+ *     already read in ~8ms) would be that, and it is not built yet.
  *
  * Round one replaced the six per-page fan-outs with one shared browser
  * fan-out. Round two — the current shape — moved that fan-out server-side:
