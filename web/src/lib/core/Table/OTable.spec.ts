@@ -1997,3 +1997,95 @@ describe("OTable row rail + row tone", () => {
     expect(classes).not.toContain("bg-surface-panel");
   });
 });
+
+describe("OTable body sections", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function mountSectioned(props: Record<string, any> = {}) {
+    return mount(OTable, {
+      props: {
+        data: makeRows(4),
+        columns: makeColumns(),
+        rowSection: (row: TestRow) => (row.id % 2 === 0 ? "even" : "odd"),
+        sectionOrder: ["odd", "even"],
+        ...props,
+      },
+      slots: {
+        "group-header": `<template #group-header="{ sectionKey, rows }">
+          <span :data-test="'hdr-' + sectionKey">{{ sectionKey }}:{{ rows.length }}</span>
+        </template>`,
+      },
+    }) as unknown as VueWrapper;
+  }
+
+  it("renders one heading per section, in the given order", () => {
+    wrapper = mountSectioned();
+
+    const headings = wrapper.findAll("[data-test^='hdr-']").map((el) => el.text());
+    expect(headings).toEqual(["odd:2", "even:2"]);
+  });
+
+  /// Rows have to sit under their own heading, or the heading is describing
+  /// whatever happened to follow it.
+  it("gathers each section's rows contiguously", () => {
+    wrapper = mountSectioned();
+
+    // Section rows are addressable by the heading row that precedes them.
+    const rowText = wrapper.findAll("tbody tr").map((tr) => tr.text());
+    const oddAt = rowText.findIndex((t) => t.includes("odd:2"));
+    const evenAt = rowText.findIndex((t) => t.includes("even:2"));
+    expect(oddAt).toBe(0);
+    // Two data rows between the two headings.
+    expect(evenAt).toBe(3);
+  });
+
+  /// A key nobody listed renders after every key that was, so a new state stays
+  /// visible instead of disappearing because the caller forgot it.
+  it("puts an unlisted section after the listed ones", () => {
+    wrapper = mountSectioned({
+      data: [...makeRows(2), { id: 99, name: "New", email: "n@e.com", status: "Other" }],
+      rowSection: (row: TestRow) => (row.id === 99 ? "surprise" : "odd"),
+      sectionOrder: ["odd"],
+    });
+
+    const headings = wrapper.findAll("[data-test^='hdr-']").map((el) => el.text());
+    expect(headings[headings.length - 1]).toContain("surprise");
+  });
+
+  /// A heading over no rows reads as a load that failed rather than a state
+  /// nothing happens to be in.
+  it("renders no heading for a section with no rows", () => {
+    wrapper = mountSectioned({
+      data: makeRows(2).filter((r) => r.id % 2 === 1),
+      sectionOrder: ["odd", "even"],
+    });
+
+    expect(wrapper.find("[data-test='hdr-even']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='hdr-odd']").exists()).toBe(true);
+  });
+
+  /// Returning null drops a row from the body as well as from every heading —
+  /// otherwise it would render under whichever section happened to precede it.
+  it("drops a row no section claims", () => {
+    wrapper = mountSectioned({
+      rowSection: (row: TestRow) => (row.id === 1 ? null : "kept"),
+      sectionOrder: ["kept"],
+    });
+
+    expect(wrapper.text()).not.toContain("User 1");
+    expect(wrapper.find("[data-test='hdr-kept']").text()).toBe("kept:3");
+  });
+
+  /// Without the prop nothing changes — the plain body is the same one every
+  /// other table in the app renders.
+  it("renders no headings when no section resolver is given", () => {
+    wrapper = mountSectioned({ rowSection: undefined });
+
+    expect(wrapper.findAll("[data-test^='hdr-']")).toHaveLength(0);
+    expect(wrapper.findAll("tbody tr")).toHaveLength(4);
+  });
+});

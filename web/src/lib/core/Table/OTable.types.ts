@@ -18,6 +18,20 @@ export type RowRailTone = StatTone | "p1" | "p2" | "p3" | "p4" | "p5";
 /** How a row is de-emphasised. One value today; a union so it can grow. */
 export type RowTone = "muted";
 
+// ─── Body sections ───────────────────────────────────────────────
+/**
+ * One contiguous run of body rows under a shared heading.
+ *
+ * Sections are a RENDERING grouping, not a second sort: rows keep the order the
+ * active sort gave them, and are only gathered so each section is contiguous.
+ * `rows` is what survived filtering and pagination, so a section's own total
+ * belongs to the caller, which is the only side that knows the unpaginated set.
+ */
+export interface OTableSection<TData = any> {
+  key: string;
+  rows: Row<TData>[];
+}
+
 /**
  * Tone → utility classes for the rail. The rail paints the row's FIRST cell
  * (an extra `<td>` would add a phantom column and misalign every cell under
@@ -310,6 +324,24 @@ export interface OTableProps<TData = any> {
   /** For tree/grouping: returns sub-rows of a given row */
   getSubRows?: (row: TData) => TData[];
 
+  // ── Body sections ──
+  /**
+   * Section key for a row, or null to leave it out of every section. Setting
+   * this turns on section rendering: rows are gathered so each key is
+   * contiguous and `#group-header` is rendered above each run.
+   *
+   * Ignored under `virtualScroll` and `enableRowReorder` — a sticky heading has
+   * no fixed row to hang off in a virtualised body, and dragging a row between
+   * sections would imply a reorder the caller cannot honour.
+   */
+  rowSection?: (row: TData) => string | null;
+  /**
+   * Section order, most important first. A key this does not name renders after
+   * every key it does, in first-seen order — a new state stays visible rather
+   * than disappearing because nobody listed it.
+   */
+  sectionOrder?: readonly string[];
+
   // ── Tree mode (parent + nested children, inline chevron, optional warning row) ──
   /**
    * Enables tree mode. When true, OTable flattens parents + their children
@@ -590,6 +622,14 @@ export interface OTableSlots<TData = any> {
   expansion?: (props: { row: TData }) => any;
   /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */
   "tree-warning"?: (props: { row: TData }) => any;
+  /**
+   * Heading row above each section, spanning every visible column. Scoped to
+   * the section key and the rows of that section ON THIS PAGE — a section total
+   * has to come from the caller's own unpaginated data.
+   *
+   * `sectionKey` rather than `key`, which Vue reserves on a slot outlet.
+   */
+  "group-header"?: (props: { sectionKey: string; rows: Row<TData>[] }) => any;
 }
 
 // ── Exposed (template ref) ────────────────────────────────────────
