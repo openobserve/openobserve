@@ -1111,6 +1111,9 @@ where
                 && path_columns[0].eq(V2_API_PREFIX)
                 && path_columns[2].eq("alerts")
                 && path_columns[3].eq("history"))
+            || (url_len == 3
+                && path_columns[1].eq("search")
+                && path_columns[2].eq("profile"))
             {
                 return Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
