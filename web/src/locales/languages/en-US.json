@@ -12730,8 +12730,7 @@
       "evidenceCounts": "{consoleErrors} console errors · {pageErrors} page errors · {failed} failed requests · {nonOk} non-2xx responses",
       "evidenceTruncated": "Some events were dropped during this run because the capture limit was reached. The bundle names what went.",
       "pageActivity": "Page activity",
-      "pageActivityCount": "{shown} of {total}",
-      "pageActivityCountTruncated": "{shown} of {total}+",
+      "pageActivityEvents": "{count} events",
       "pageActivityViewAllShort": "View all in Evidence",
       "expandScreenshot": "Expand"
     },

@@ -74,8 +74,9 @@ const props = withDefaults(
      */
     originTs?: number | null;
     /**
-     * Long URLs and console messages wrap instead of truncating. Panel only —
-     * the inline step list is five short rows inside a card.
+     * Long URLs and console messages wrap instead of truncating. Available on
+     * both surfaces — the panel and the step card — now that the card renders
+     * this same paged table rather than five short rows.
      */
     wrap?: boolean;
   }>(),

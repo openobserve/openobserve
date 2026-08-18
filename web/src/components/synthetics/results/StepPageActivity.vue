@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   lived one tab away, in a list grouped by event kind, where the correlation the
   engineer arrived with had to be rebuilt by hand.
 
-  Capped at INLINE_EVIDENCE_LIMIT and ranked worst-first, because attribution is
-  lopsided: a live 158-event bundle carried two distinct step ids, so one step's
-  bucket can hold 136 rows. The full list stays one click away, filtered to this
-  step — the step is a filter over the run log, not a second copy of it.
+  Shows the step's FULL bucket, in time order, paged — the same table the
+  Evidence tab renders for the whole run, filtered to this step. It used to be
+  a worst-first top five with the rest a tab-switch away; now the tab switch is
+  only for the run-level view, not for finishing reading one step.
 
   Separate from StepEvidence.vue, which is gated on the failure detail and so
   renders only on the step that failed. Page activity renders on ANY step that
@@ -39,11 +39,12 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import EvidenceEvents from "./EvidenceEvents.vue";
+import EvidenceFilters from "./EvidenceFilters.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { INLINE_EVIDENCE_LIMIT } from "@/constants/synthetics";
+import { useEvidenceFilters } from "@/composables/synthetics/useEvidenceFilters";
 import {
   EVIDENCE_ERROR_MESSAGE,
   evidenceErrorCanRetry,
@@ -59,7 +60,7 @@ import {
 const props = withDefaults(
   defineProps<{
     stepId: string;
-    /** This step's bucket, already ranked worst-first. */
+    /** This step's whole event bucket, in whatever order the caller holds it. */
     events: EvidenceEvent[];
     status: EvidenceStatus;
     /** Raw technical detail. Shown under the explanation, never as it. */
@@ -78,31 +79,26 @@ const emit = defineEmits<{ (e: "view-all", stepId: string): void; (e: "retry"): 
 
 const { t } = useI18nTyped();
 
-const shown = computed(() => props.events.slice(0, INLINE_EVIDENCE_LIMIT));
-const hasMore = computed(() => props.events.length > INLINE_EVIDENCE_LIMIT);
+// Same toolbar state as the run-level panel, scoped to this step's bucket.
+const filters = useEvidenceFilters(computed(() => props.events));
 
 /**
- * Elapsed readings count from the step's first event, not the shown five.
+ * Elapsed readings count from the step's WHOLE bucket, never the filtered list.
  *
- * The bucket is ranked worst-first, so the earliest event is routinely one the
- * cap dropped; zeroing on `shown` would move every offset in the card whenever
- * a new anomaly outranked the row that happened to be first.
+ * Zeroing on the filtered view would move every offset in the card whenever a
+ * filter changed which row happened to be first — the one thing the elapsed
+ * column exists to hold stable.
  */
 const originTs = computed(() => evidenceOriginTs(props.events));
 
 /**
- * "5 of 136", or "5 of 136+" when the cap bound during capture.
+ * "12 events" — what the step has, not what a cap let through.
  *
- * The `+` is the whole point: a silently short list reads as a quiet run, which
- * is the opposite of what a truncated capture means.
+ * No truncation `+` here: truncation is a property of the whole capture, and
+ * the panel already reports it; this count is scoped to one step.
  */
 const countLabel = computed(() =>
-  t(
-    props.truncated
-      ? "synthetics.runDetail.pageActivityCountTruncated"
-      : "synthetics.runDetail.pageActivityCount",
-    { shown: shown.value.length, total: props.events.length },
-  ),
+  t("synthetics.runDetail.pageActivityEvents", { count: props.events.length }),
 );
 
 const isLoading = computed(() => props.status === "idle" || props.status === "loading");
@@ -164,11 +160,13 @@ function reloadPage() {
       >
         {{ countLabel }}
       </span>
-      <!-- Trailing in the header, where the section's scope is stated: the list
-           below is a capped window on the run log, and this is the way out of
-           the window. In the body it sat above the rows and read as one. -->
+      <!-- Trailing in the header, where the section's scope is stated: this
+           table is one step, and the button is the way to the run-level view.
+           Unconditional — the run-level view is a different question (how does
+           this step compare to the rest) rather than an overflow escape now
+           that nothing here is capped. In the body it sat above the rows and
+           read as one. -->
       <OButton
-        v-if="hasMore"
         variant="ghost"
         size="xs"
         icon-right="arrow-forward"
@@ -246,14 +244,26 @@ function reloadPage() {
         </span>
       </p>
 
-      <!-- Four dense rows tall (4 × 2.375rem), then scroll. The cap is INLINE_
-           EVIDENCE_LIMIT rows, so the fifth sits just past the fold: a step
-           expansion holding several of these cards has to stay readable as a
-           timeline, and a partially visible row is what says "there is more"
-           without a second affordance. -->
-      <div v-else class="max-h-38 overflow-y-auto" data-test="synthetics-step-page-activity-events">
-        <EvidenceEvents :events="shown" mode="inline" :origin-ts="originTs" />
-      </div>
+      <template v-else>
+        <EvidenceFilters
+          v-model:view="filters.view.value"
+          v-model:first-party-only="filters.firstPartyOnly.value"
+          v-model:wrap="filters.wrap.value"
+          :views="filters.views.value"
+        />
+
+        <!-- Pagination is now the height bound, not a fixed max-height: the
+             table pages itself, so a nested vertical scrollbar inside a step
+             expansion that is itself scrolling is no longer needed. -->
+        <div data-test="synthetics-step-page-activity-events">
+          <EvidenceEvents
+            :events="filters.visibleEvents.value"
+            mode="inline"
+            :origin-ts="originTs"
+            :wrap="filters.wrap.value"
+          />
+        </div>
+      </template>
     </div>
   </section>
 </template>
