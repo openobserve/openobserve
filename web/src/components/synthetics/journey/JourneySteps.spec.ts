@@ -859,5 +859,89 @@ describe("JourneySteps", () => {
       expect(rules[0].classes()).toContain("bg-accent");
       expect(rules[1].classes()).toContain("bg-accent/50");
     });
+
+    it("drops a stale preview once the control it belongs to is disabled", async () => {
+      // A replay can start from the toolbar while the pointer rests on a row
+      // control. Nothing moves, so no mouseleave arrives — and a preview would
+      // otherwise sit on a locked table offering a click that is now refused.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      recordBeforeTarget(wrapper, 1).dispatchEvent(new MouseEvent("mouseenter"));
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        true,
+      );
+
+      await wrapper.setProps({ locked: true });
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("moves the marker when the anchor moves", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const detailsFor = (id: string) =>
+        wrapper.findAll('[data-test="o2-table-cell-details"]')[
+          makeSteps(3).findIndex((s) => s.id === id)
+        ];
+      expect(
+        detailsFor("step-2").find('[data-test="synthetics-journey-recording-marker"]').exists(),
+      ).toBe(true);
+
+      await wrapper.setProps({ anchorId: "step-3" });
+      await flushPromises();
+
+      expect(
+        detailsFor("step-2").find('[data-test="synthetics-journey-recording-marker"]').exists(),
+      ).toBe(false);
+      expect(
+        detailsFor("step-3").find('[data-test="synthetics-journey-recording-marker"]').exists(),
+      ).toBe(true);
+    });
+
+    it("positions the marker on the row's top edge without taking layout", async () => {
+      // The whole point of absolute positioning here: previewing on hover must
+      // repaint, never reflow. These classes ARE that contract.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const rule = wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]');
+      expect(rule.classes()).toEqual(
+        expect.arrayContaining(["absolute", "inset-x-0", "top-0", "h-0.5"]),
+      );
+
+      // The label straddles the boundary, which is what makes it read as a
+      // position BETWEEN rows rather than a badge on one.
+      const label = wrapper.find('[data-test="synthetics-journey-recording-marker"]');
+      expect(label.classes()).toEqual(
+        expect.arrayContaining(["absolute", "top-0", "left-0", "-translate-y-1/2"]),
+      );
+    });
+
+    it("renders no marker in results mode", async () => {
+      // Results rows are a record of a run — there is nothing to insert into.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "results", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker"]').exists()).toBe(
+        false,
+      );
+    });
   });
 });

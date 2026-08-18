@@ -298,11 +298,20 @@ function onRecordBeforeLeave() {
   hoverAnchorId.value = null;
 }
 
-/** Which marker a row shows, if any. Hover is a preview; anchor is committed. */
+/**
+ * Which marker a row shows, if any. Hover is a preview; anchor is committed.
+ *
+ * The hover branch re-reads `recordBeforeDisabled` rather than trusting the enter
+ * handler's check: a replay can start from the toolbar while the pointer rests on
+ * a control, and with nothing moving no `mouseleave` ever arrives to clear it.
+ * Results rows are excluded outright — a finished run has nothing to insert into,
+ * and only the editor's details column is positioned to host the marker.
+ */
 function markerTone(row: TData): "anchor" | "hover" | null {
+  if (!isEditor.value) return null;
   if (isAnchor(row)) return "anchor";
   const id = (row as { id?: string }).id;
-  return id && id === hoverAnchorId.value ? "hover" : null;
+  return id && id === hoverAnchorId.value && !recordBeforeDisabled(row) ? "hover" : null;
 }
 
 /**
