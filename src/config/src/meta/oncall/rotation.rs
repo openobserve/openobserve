@@ -923,6 +923,16 @@ pub fn slots(rotations: &[Rotation]) -> Vec<String> {
             out.push(derived.clone());
         }
     }
+    // And the implicit one, last: anything staffed directly or declared
+    // explicitly has already claimed its name, so this only ever adds
+    // `secondary` to a team that has not spoken about it — which is most teams.
+    if !out.iter().any(|s| same_slot(s, SECONDARY_SLOT))
+        && rotations
+            .iter()
+            .any(Rotation::derives_secondary_implicitly)
+    {
+        out.push(SECONDARY_SLOT.to_string());
+    }
     if let Some(pos) = out.iter().position(|s| same_slot(s, DEFAULT_SLOT))
         && pos > 0
     {
@@ -1133,19 +1143,58 @@ fn derived_holder(
 /// Split out because two callers need it and they must not disagree: whether a
 /// derived slot resolves at all, and what `resolve_on_call` calls the rotation
 /// behind it. They did disagree once — see the note on [`resolve_on_call`].
+impl Rotation {
+    /// Whether this rotation staffs a **secondary** position without anybody
+    /// having said so.
+    ///
+    /// One roster with two or more people always has a "who is after the person
+    /// on call" — the calendar draws it. Requiring a field to be *written*
+    /// before that position could be covered is what left teams created before
+    /// the field existed, or by any client that does not set it, with a
+    /// secondary they could see and could not act on: `POST .../overrides
+    /// {"slot":"secondary"}` was refused because `slots()` never reported it.
+    ///
+    /// Deriving it implicitly removes the timing problem entirely — there is no
+    /// marker to backfill, no member-add to wait for, and no "automatic, but
+    /// only for teams created after Tuesday".
+    ///
+    /// Only from the **default** slot: a rotation that already staffs some other
+    /// named position is somebody's design, and inventing a second position off
+    /// it would be inventing a pool nobody asked for.
+    pub fn derives_secondary_implicitly(&self) -> bool {
+        self.secondary_slot.is_none()
+            && self.members.len() >= 2
+            && self.is_in_slot(DEFAULT_SLOT)
+            && self.validate().is_ok()
+    }
+}
+
 fn deriving_rotation<'a>(
     rotations: &'a [Rotation],
     slot: &str,
     at: i64,
     tz: chrono_tz::Tz,
 ) -> Option<&'a Rotation> {
-    rotations.iter().find(|r| {
+    let declared = rotations.iter().find(|r| {
         r.secondary_slot
             .as_deref()
             .is_some_and(|d| same_slot(d, slot))
             && r.validate().is_ok()
             && r.applies_at(at, tz)
-    })
+    });
+    if declared.is_some() {
+        return declared;
+    }
+    // The implicit case: nobody wrote the field, and the default slot's winner
+    // has somebody after them. Resolved from whichever primary-slot rotation is
+    // winning at `at`, so a follow-the-sun schedule derives its secondary from
+    // the layer actually on duty rather than from whichever happens to be first
+    // in the list.
+    if !same_slot(slot, SECONDARY_SLOT) {
+        return None;
+    }
+    winning_rotation_in_slot(rotations, DEFAULT_SLOT, at, tz)
+        .filter(|r| r.derives_secondary_implicitly())
 }
 
 /// The person the rotation in force hands over to next.
@@ -3493,7 +3542,11 @@ mod tests {
             Some("ana@o2.ai"),
             "naming the default slot explicitly is the same question"
         );
-        assert_eq!(slots(&rotations), vec![DEFAULT_SLOT.to_string()]);
+        assert_eq!(
+            slots(&rotations),
+            vec![DEFAULT_SLOT.to_string(), SECONDARY_SLOT.to_string()],
+            "the secondary is derived implicitly — nothing is stored for it"
+        );
 
         let json = serde_json::to_string(&r).unwrap();
         assert!(
@@ -3836,18 +3889,65 @@ mod tests {
         assert!(r.validate().unwrap_err().to_string().contains("two people at once"));
     }
 
-    /// Absent means exactly what it always meant, and stays off the wire, so
-    /// every schedule stored before this existed round-trips unchanged.
+    /// **An ordinary two-person rotation has a coverable secondary without
+    /// anybody writing a field**, and still stores nothing new.
+    ///
+    /// This test asserted the opposite until 2026-08-18 — that an undeclared
+    /// derived slot "changes nothing". That was the defect: a team created
+    /// before the field existed, or by any client that does not set it, could
+    /// *see* its secondary on the calendar and could not write a cover against
+    /// it, because `slots()` never reported the name and override creation
+    /// validates against `slots()`.
+    ///
+    /// The wire form is unchanged, which is the part worth keeping: nothing is
+    /// written, so every stored schedule round-trips byte-for-byte.
     #[test]
-    fn test_an_undeclared_derived_slot_changes_nothing() {
+    fn test_an_ordinary_rotation_has_a_coverable_secondary_with_nothing_written() {
         let r = Rotation::weekly("Team", vec!["a@o2.ai".into(), "b@o2.ai".into()], ANCHOR);
         let json = serde_json::to_string(&r).unwrap();
-        assert!(!json.contains("secondary_slot"), "{json}");
+        assert!(!json.contains("secondary_slot"), "still nothing on the wire: {json}");
         assert!(!json.contains("source"), "{json}");
-        assert_eq!(slots(std::slice::from_ref(&r)), vec!["primary".to_string()]);
+
         assert_eq!(
-            on_call_in_slot(std::slice::from_ref(&r), &[], &[], "secondary", ANCHOR, TZ),
-            None
+            slots(std::slice::from_ref(&r)),
+            vec!["primary".to_string(), "secondary".to_string()],
+            "the position exists, so a cover can name it"
+        );
+        assert_eq!(
+            on_call_in_slot(std::slice::from_ref(&r), &[], &[], "secondary", ANCHOR, TZ).as_deref(),
+            Some("b@o2.ai"),
+            "and it resolves to the person the calendar shows taking over next"
+        );
+    }
+
+    /// The cases that must **not** grow a secondary out of nowhere.
+    #[test]
+    fn test_the_implicit_secondary_is_withheld_where_it_would_be_wrong() {
+        // One person has nobody after them; a slot here would be a permanent
+        // coverage gap invented out of a team that is fine.
+        let alone = Rotation::weekly("Solo", vec!["a@o2.ai".into()], ANCHOR);
+        assert_eq!(slots(std::slice::from_ref(&alone)), vec!["primary".to_string()]);
+
+        // A rotation that already staffs a named position is somebody's design.
+        let seniors = Rotation::weekly("Seniors", vec!["e@o2.ai".into(), "f@o2.ai".into()], ANCHOR)
+            .in_slot("escalation");
+        assert_eq!(
+            slots(std::slice::from_ref(&seniors)),
+            vec!["escalation".to_string()],
+            "no phantom secondary off a non-default slot"
+        );
+
+        // And a real secondary rotation wins the name outright — it is not
+        // listed twice, and it is what resolves.
+        let primary = Rotation::weekly("Core", vec!["a@o2.ai".into(), "b@o2.ai".into()], ANCHOR);
+        let real = Rotation::weekly("Backup", vec!["x@o2.ai".into(), "y@o2.ai".into()], ANCHOR)
+            .in_slot("secondary");
+        let both = vec![primary, real];
+        assert_eq!(slots(&both), vec!["primary".to_string(), "secondary".to_string()]);
+        assert_eq!(
+            on_call_in_slot(&both, &[], &[], "secondary", ANCHOR, TZ).as_deref(),
+            Some("x@o2.ai"),
+            "staffed directly beats derived"
         );
     }
 

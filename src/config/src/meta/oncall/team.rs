@@ -613,9 +613,13 @@ mod tests {
         let s = schedule(vec![weekly("Primary", &["ana@o2.ai", "bob@o2.ai"])]);
 
         let slots = s.on_call_at(ANCHOR);
-        assert_eq!(slots.len(), 1);
+        // Two positions from one roster: the person on shift, and the person
+        // after them — the latter derived, stored nowhere, and coverable.
+        assert_eq!(slots.len(), 2);
         assert_eq!(slots[0].user_email, "ana@o2.ai");
         assert_eq!(slots[0].next_user_email.as_deref(), Some("bob@o2.ai"));
+        assert_eq!(slots[1].slot, "secondary");
+        assert_eq!(slots[1].user_email, "bob@o2.ai");
 
         let next_week = s.on_call_at(ANCHOR + MICROS_PER_WEEK);
         assert_eq!(next_week[0].user_email, "bob@o2.ai");
@@ -1133,16 +1137,27 @@ mod tests {
         assert!(s.unstaffed_slots(ANCHOR).is_empty());
     }
 
-    /// A team on one rotation must not be able to tell that slots exist.
+    /// A team on one rotation still configures nothing — but it **does** get a
+    /// secondary, and that is the point.
+    ///
+    /// This asserted "must not be able to tell that slots exist" until
+    /// 2026-08-18. It was the wrong goal: hiding the position is what made it
+    /// impossible to write a cover against, since override creation validates
+    /// against `slots()`. The team still names no slot, stores no field and
+    /// runs one rotation; it simply has somebody it can hand the pager to.
     #[test]
-    fn test_a_one_rotation_team_notices_nothing() {
+    fn test_a_one_rotation_team_still_gets_a_secondary_it_can_cover() {
         let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai", "bob@o2.ai"])]);
-        assert!(!s.has_named_slots());
-        assert_eq!(s.slots(), vec!["primary".to_string()]);
-        assert_eq!(s.on_call_at(ANCHOR).len(), 1);
+        assert!(!s.has_named_slots(), "nobody named a slot");
+        assert_eq!(s.slots(), vec!["primary".to_string(), "secondary".to_string()]);
+        assert_eq!(s.on_call_at(ANCHOR).len(), 2);
         assert_eq!(s.on_call_at(ANCHOR)[0].slot, "primary");
+        assert_eq!(s.on_call_at(ANCHOR)[1].slot, "secondary");
         assert!(s.is_staffed(ANCHOR));
-        assert!(s.unstaffed_slots(ANCHOR).is_empty());
+        assert!(
+            s.unstaffed_slots(ANCHOR).is_empty(),
+            "and the derived position is staffed, not a gap"
+        );
     }
 
     /// Two rotations with the same priority and restrictions used to be
