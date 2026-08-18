@@ -239,26 +239,6 @@ const oncall = {
     );
   },
 
-  /// How many records the same filters match, so a paged list can say what it
-  /// is a page OF. Degrade to the loaded count if the endpoint is absent.
-  countResponses: ({
-    org_identifier,
-    team_id,
-    include_resolved,
-  }: {
-    org_identifier: string;
-    team_id?: string;
-    include_resolved?: boolean;
-  }) => {
-    const params: Record<string, string | boolean> = {};
-    if (team_id) params.team_id = team_id;
-    if (include_resolved) params.include_resolved = true;
-    return http().get<{ count: number }>(
-      `/api/${org_identifier}/oncall/responses/count`,
-      Object.keys(params).length ? { params } : undefined,
-    );
-  },
-
   getResponse: ({
     org_identifier,
     response_id,

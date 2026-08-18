@@ -25,7 +25,6 @@ vi.mock("@/services/oncall", () => ({
   RESPONSE_PAGE_LIMIT: 200,
   default: {
     listResponses: vi.fn(),
-    countResponses: vi.fn(),
     listTeams: vi.fn(),
     coverageGaps: vi.fn(),
     whoIsOnCall: vi.fn(),
@@ -144,7 +143,6 @@ describe("OnCallResponses", () => {
     vi.clearAllMocks();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     service.listResponses.mockResolvedValue({ data: [] } as any);
-    service.countResponses.mockResolvedValue({ data: { count: 0 } } as any);
     service.listTeams.mockResolvedValue({ data: [] } as any);
     // A fully configured org by default, so only the tests that care about the
     // checklist have to say anything about it.
@@ -755,7 +753,6 @@ describe("OnCallResponses", () => {
       const full = Array.from({ length: 200 }, (_, i) => page({ id: `r${i}` }, `al_${i}`));
       service.listTeams.mockResolvedValue({ data: [team] } as any);
       service.listResponses.mockResolvedValue({ data: full } as any);
-      service.countResponses.mockResolvedValue({ data: { count: 4321 } } as any);
 
       const wrapper = render();
       await flushPromises();
@@ -766,13 +763,21 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test="oncall-responses-truncated"]').exists()).toBe(true);
     }, 20_000);
 
-    /// A server without the counter must not break the screen.
-    it("survives the total being unavailable", async () => {
-      service.countResponses.mockRejectedValue(new Error("404"));
-      const wrapper = await withPages([page()]);
+    /// The truncation line never claims a total. `/responses/count` was
+    /// invented by the client — no build has ever served it — so it 404'd on
+    /// every load and the total was always unknown anyway.
+    it("says how many it loaded without claiming that is all of them", async () => {
+      const full = Array.from({ length: 200 }, (_, i) => page({ id: `r${i}` }, `al_${i}`));
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listResponses.mockResolvedValue({ data: full } as any);
 
-      expect(wrapper.findComponent({ name: "OTable" }).props("error")).toBeNull();
-    });
+      const wrapper = render();
+      await flushPromises();
+
+      const line = wrapper.find('[data-test="oncall-responses-truncated"]').text();
+      expect(line).toContain("600");
+      expect(line).not.toContain(" of ");
+    }, 20_000);
   });
 
   it("always offers a route to Teams", async () => {

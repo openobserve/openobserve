@@ -12959,7 +12959,6 @@
     "bulkResolveTitle": "Resolve selected pages",
     "retry": "Try again",
     "listTruncatedNoTotal": "Showing the first {count} — more exist. Narrow the filters to see the rest.",
-    "listTruncated": "Showing the first {count} of {total}. Narrow the filters to see the rest.",
     "liveRefreshPaused": "Live refresh is paused while rows are selected.",
     "snooze15m": "15 minutes",
     "snooze30m": "30 minutes",

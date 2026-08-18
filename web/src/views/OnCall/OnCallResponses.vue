@@ -529,12 +529,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            would otherwise read as "nothing has fired". -->
       <template v-if="truncated || escalationCapped" #bottom>
         <span class="text-text-secondary flex flex-wrap gap-x-3 text-xs">
+          <!-- The loaded length is never presented as the total: §G.5 is
+               explicit that the list endpoint has no count, and "the first
+               2000 of 2000" is a lie exactly when the number matters. -->
           <span v-if="truncated" data-test="oncall-responses-truncated">
-            {{
-              totalCount !== null
-                ? t("oncall.listTruncated", { count: responses.length, total: totalCount })
-                : t("oncall.listTruncatedNoTotal", { count: responses.length })
-            }}
+            {{ t("oncall.listTruncatedNoTotal", { count: responses.length }) }}
           </span>
           <span v-if="escalationCapped" data-test="oncall-escalation-capped">
             {{ t("oncall.escalationDetailCapped", { count: ESCALATION_DETAIL_LIMIT }) }}
@@ -658,7 +657,6 @@ const expandedCauses = ref<CauseGroup[]>([]);
 const expandedLoading = ref(false);
 const causeAnalytics = ref<CauseAnalytics | null>(null);
 const teamsAvailable = ref(true);
-const totalCount = ref<number | null>(null);
 const truncated = ref(false);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
@@ -1291,7 +1289,6 @@ async function fetchResponses() {
     // error render the first-run checklist, telling a configured org that
     // nothing is set up.
     loaded.value = true;
-    await refreshTotal();
   } catch (err) {
     // §G.8.1: the probe said "not here". Leaving `loaded` false keeps the
     // setup checklist away too — a build that cannot page must not be told
@@ -1303,23 +1300,6 @@ async function fetchResponses() {
     loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));
   } finally {
     loading.value = false;
-  }
-}
-
-/// Best-effort: the real total only matters when the list is truncated, and a
-/// server without the counter must not break the screen. Without it the total
-/// is UNKNOWN — §G.5 is explicit that the list endpoint has no total and the
-/// loaded length must never stand in for one. "The first 2000 of 2000" on a
-/// truncated list is a lie exactly when the number matters.
-async function refreshTotal() {
-  try {
-    const res = await oncallService.countResponses({
-      org_identifier: orgId.value,
-      include_resolved: includeResolved.value,
-    });
-    totalCount.value = res.data?.count ?? null;
-  } catch {
-    totalCount.value = null;
   }
 }
 
