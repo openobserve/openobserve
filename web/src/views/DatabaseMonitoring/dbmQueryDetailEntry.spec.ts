@@ -45,6 +45,12 @@ const detail = read("QueryDetailPage.vue");
 const list = read("QueriesPage.vue");
 const shell = read("DbmShell.vue");
 
+/** The body of a top-level `const <name> = ...` declaration, to its terminator. */
+const declaration = (name: string): string => {
+  const after = detail.split(`const ${name} =`)[1] ?? "";
+  return after.split("\n};")[0] ?? "";
+};
+
 describe("the queries list hands the clicked row to the detail page", () => {
   /**
    * The seed hand-off and the push live in `useDbmQueryDetailHop` now — four
@@ -109,15 +115,45 @@ describe("the detail page claims the seed under its guards", () => {
 
 describe("the detail page's own reads are collapsed", () => {
   /**
-   * ONE `queries` read, where there were two: the previous window rides the
-   * endpoint's baseline contract, fetched server-side under the same filters —
-   * which is also what makes the delta compare like with like.
+   * The previous window rides the endpoint's baseline contract, fetched
+   * server-side under the same filters — which is also what makes the delta
+   * compare like with like. It is never a second, sequential window read.
+   *
+   * EVERY `queries` read on this page carries the pair, so no path can
+   * reintroduce the sequential fetch this replaced. There are two reads: the
+   * scope page, and the targeted re-ask a fingerprint ranked below the page's
+   * cap needs (which only a miss issues) — and the re-ask must carry the
+   * baseline too, or the deltas would inherit the very ceiling it exists to
+   * escape.
    */
-  it("reads the row and its previous window in a single request", () => {
+  it("reads every window through the baseline contract", () => {
     const calls = detail.match(/dbMonitoringService\.getQueries\(/g) ?? [];
-    expect(calls, "the previous window must ride the baseline contract").toHaveLength(1);
-    expect(detail).toContain("baselineStartTime: previous.value.startTime");
-    expect(detail).toContain("baselineEndTime: previous.value.endTime");
+    expect(calls, "the row lookup and its targeted re-ask").toHaveLength(2);
+    const baselineStarts = detail.match(/baselineStartTime: previous\.value\.startTime/g) ?? [];
+    const baselineEnds = detail.match(/baselineEndTime: previous\.value\.endTime/g) ?? [];
+    expect(baselineStarts, "each read carries the baseline pair").toHaveLength(calls.length);
+    expect(baselineEnds, "each read carries the baseline pair").toHaveLength(calls.length);
+  });
+
+  /**
+   * A rank below the scope page's cap is not absence. Without the re-ask, a
+   * cold deep link to a query outside the top `ROW_LOOKUP_LIMIT` of its scope
+   * painted no row at all — the page's own comment conceded the miss and fell
+   * through to the seed, which a deep link does not have.
+   *
+   * `search` is the narrowing that works: an exact-prefix match over the
+   * fingerprint applied server-side BEFORE the sort and the truncation, so
+   * rank cannot hide the row.
+   */
+  it("re-asks by name when the ranked page did not contain the fingerprint", () => {
+    const targeted = declaration("loadTargetedRow");
+    expect(targeted, "loadTargetedRow must exist").not.toBe("");
+    expect(targeted, "the re-ask must narrow server-side").toContain("search: fingerprint.value");
+    // Issued only on a miss — a page that already found the row must not pay
+    // for a second round trip.
+    expect(declaration("loadRow")).toMatch(
+      /if \(!fetched\) \{\s*\n\s*targeted = await loadTargetedRow\(token\);/,
+    );
   });
 
   /** A failed baseline degrades the deltas — it must not read as change. */

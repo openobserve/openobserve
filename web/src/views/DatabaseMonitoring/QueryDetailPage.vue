@@ -724,6 +724,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
 
+            <!-- The stream HAS plan history, so `plan_capture` says `on`, but both
+             ingest knobs are off server-side and nothing new can land. Without
+             this branch the sentence below claimed we were capturing plans for
+             this database and blamed the statement for an absent feed. -->
+            <template v-else-if="planEmpty === 'captureKnobOff'">
+              <DbmStateNote
+                :title="t('dbm.detail.plans.captureSwitchedOff')"
+                :hint="t('dbm.detail.plans.captureSwitchedOffHint')"
+                placement="centered"
+                data-test="dbm-detail-plans-knob-off"
+              />
+            </template>
+
             <template v-else-if="planEmpty === 'noPlanForQuery'">
               <DbmStateNote
                 :title="t('dbm.detail.plans.noPlanForQuery')"
@@ -1181,11 +1194,19 @@ const BACKFILL_MAX_WINDOWS = 6;
 /** Enough to show a distribution without turning the scatter into a smear. */
 const SAMPLE_LIMIT = 100;
 /**
- * Rows pulled when locating this fingerprint's row in the scope. The match is a
- * client-side find, so a fingerprint ranked below this is not found at all —
- * generous on purpose, and still one bounded response.
+ * Rows pulled for the SCOPE read — the denominator behind "% of this database"
+ * and the `_other` remainder. Not the row lookup: a fingerprint ranked below
+ * this is absent from the page, and `loadRow` re-asks for it by name rather
+ * than concluding it does not exist (see `TARGETED_ROW_LIMIT`).
  */
 const ROW_LOOKUP_LIMIT = 500;
+/**
+ * The targeted re-ask when the ranked page above did not contain this
+ * fingerprint. `search` is an exact-prefix match over the fingerprint applied
+ * SERVER-side before the sort and the truncation (`search_matches` in api.rs),
+ * so rank cannot hide the row — a handful of rows is every row it can match.
+ */
+const TARGETED_ROW_LIMIT = 10;
 /**
  * Rollup interval assumed until the real one is inferred from the gaps between
  * history points. Matches `ZO_DB_MONITORING_INTERVAL_SECS`' 900s default, so the
@@ -1375,6 +1396,21 @@ const traceVantage = computed(() =>
 const planDrift = ref<PlanDriftLevel>("none");
 /** Why the section is empty, when it is — see `planEmptyReason`. */
 const planEmpty = ref<ReturnType<typeof planEmptyReason>>("captureOff");
+/**
+ * The top-query ingest knob, default OFF, read from `zoConfig` the way the
+ * Databases page reads `database_monitoring_instance_metrics`.
+ *
+ * Needed because the response's `plan_capture` is derived from the stream
+ * SCHEMA, so it stays `on` after the knob is switched back off — and the empty
+ * state was then telling a reader "we're capturing plans for this database"
+ * over a feed that is switched off. The OTHER producer's knob does not come
+ * from here: the plans response already reports it per-request as
+ * `explain_enabled`, which is the authoritative value the section already
+ * branches on, so `planEmptyReason` takes it from the payload.
+ */
+const topQueryEnabled = computed(
+  () => store.state.zoConfig?.database_monitoring_top_query_enabled as boolean | undefined,
+);
 const plansError = ref<string | null>(null);
 /**
  * Anchor for the promoted drift callout's "View plans" jump. A component ref
@@ -2279,6 +2315,59 @@ const load = async () => {
   }
 };
 
+/** What the targeted re-ask resolved: this row, and its baseline counterpart. */
+type TargetedRow = {
+  hit: QueryStatsRow | null;
+  baselineHits: QueryStatsRow[];
+  baselineFailed: boolean;
+} | null;
+
+/**
+ * Re-ask for ONE fingerprint's row by name, for when the ranked page did not
+ * contain it.
+ *
+ * The ranked page is capped, and a fingerprint below the cap is missing from it
+ * — indistinguishable, client-side, from a fingerprint that never ran. That is
+ * a cold deep link to any query outside the top `ROW_LOOKUP_LIMIT` of its
+ * scope rendering no row at all.
+ *
+ * `search` is the narrowing the server already has: it matches an exact prefix
+ * of the fingerprint (`search_matches` in api.rs) and it is applied BEFORE the
+ * sort and the truncation, so rank cannot hide the row. It is not a
+ * fingerprint EQUALITY filter — the `fingerprint` param is, but that one
+ * narrows only the server-vantage fallback — so the response is still filtered
+ * to the exact fingerprint here, as everything on this page is.
+ *
+ * A search-scoped window reports no `_other` remainder by design (§5.2), which
+ * is why this is a SECOND request rather than a replacement for the first: the
+ * scope arithmetic ("% of this database") needs the whole scope the ranked
+ * page describes. Only a miss pays for the extra round trip.
+ *
+ * TODO: a server-side fingerprint EQUALITY filter over the client-vantage rows
+ * would make this one narrow request instead of a page plus a re-ask.
+ */
+const loadTargetedRow = async (token: number): Promise<TargetedRow> => {
+  const response = await dbMonitoringService.getQueries(org.value, {
+    system: systemFilter.value,
+    instance: instanceFilter.value,
+    namespace: namespaceFilter.value,
+    stream: streamParam.value || undefined,
+    stmtClass: "all",
+    limit: TARGETED_ROW_LIMIT,
+    startTime: current.value.startTime,
+    endTime: current.value.endTime,
+    baselineStartTime: previous.value.startTime,
+    baselineEndTime: previous.value.endTime,
+    search: fingerprint.value,
+  });
+  if (requestSeq.isStale(token)) return null;
+  return {
+    hit: (response.data.hits ?? []).find((hit) => hit.fingerprint === fingerprint.value) ?? null,
+    baselineHits: response.data.baseline_hits ?? [],
+    baselineFailed: Boolean(response.data.baseline_read_failed),
+  };
+};
+
 /**
  * The fingerprint's row, plus the same row in the previous window for the
  * deltas the incident summary quotes — both from ONE request. The previous
@@ -2287,6 +2376,9 @@ const load = async () => {
  * windows server-side under the same filters — exactly what two sequential
  * calls did here before, minus a round trip. Either way the result is filtered
  * client-side to the exact fingerprint rather than trusting a text match.
+ *
+ * The ranked page it reads is capped; when this fingerprint is not on it, the
+ * row is re-asked by name rather than reported absent.
  */
 const loadRow = async (token: number = requestSeq.current(), seed: QueryStatsRow | null = null) => {
   const response = await dbMonitoringService.getQueries(org.value, {
@@ -2314,11 +2406,19 @@ const loadRow = async (token: number = requestSeq.current(), seed: QueryStatsRow
 
   const hits = response.data.hits ?? [];
   const others = response.data.other ?? [];
-  // A miss here can be a rank below `ROW_LOOKUP_LIMIT`, not proof of absence.
-  // When this load was seeded, the seed answered the SAME window — falling
-  // back to it keeps the page painted rather than flashing away the row the
-  // reader just clicked. On a cold load there is no seed: no row, no claim.
-  const fetched = hits.find((hit) => hit.fingerprint === fingerprint.value) ?? null;
+  // A miss in the ranked page above is a rank below `ROW_LOOKUP_LIMIT`, NOT
+  // proof of absence — so it is re-asked by name rather than concluded. Only
+  // the miss pays for it, and only for the row: the scope arithmetic below
+  // keeps using the ranked page, which is the whole scope this narrowed
+  // response no longer describes.
+  let fetched = hits.find((hit) => hit.fingerprint === fingerprint.value) ?? null;
+  let targeted: TargetedRow = null;
+  if (!fetched) {
+    targeted = await loadTargetedRow(token);
+    // A newer window or stream pick took the page while that was in flight.
+    if (requestSeq.isStale(token)) return;
+    fetched = targeted?.hit ?? null;
+  }
   // A seed painting the header is NOT client data: a server-vantage entry
   // (Activity, the database-reported lists) seeds text and dimensions with no
   // client row anywhere. The coverage gate keys on what the FETCH found.
@@ -2331,11 +2431,17 @@ const loadRow = async (token: number = requestSeq.current(), seed: QueryStatsRow
     response.data.server_fallback?.hits?.find((hit) => hit.fingerprint === fingerprint.value) ??
     null;
   // A server-side baseline failure degrades the deltas to "no baseline" rather
-  // than comparing against an empty set it would misread as change.
-  const baselineHits = response.data.baseline_read_failed
-    ? []
-    : (response.data.baseline_hits ?? []);
-  previousRow.value = baselineHits.find((hit) => hit.fingerprint === fingerprint.value) ?? null;
+  // than comparing against an empty set it would misread as change. The
+  // targeted response, when one was needed, carries the baseline under the
+  // SAME narrowing — so the previous window is subject to the ranked page's
+  // ceiling exactly as little as the current one is.
+  const baselineSource = targeted ?? {
+    baselineFailed: Boolean(response.data.baseline_read_failed),
+    baselineHits: response.data.baseline_hits ?? [],
+  };
+  previousRow.value = baselineSource.baselineFailed
+    ? null
+    : (baselineSource.baselineHits.find((hit) => hit.fingerprint === fingerprint.value) ?? null);
   freshness.value = response.data.freshness;
   topNSubset.value = response.data.top_n_subset;
 
@@ -2549,7 +2655,9 @@ const loadQueryInsights = async (token: number = requestSeq.current()) => {
     if (data.plans) {
       plans.value = planRows(data.plans);
       planDrift.value = planDriftLevel(data.plans);
-      planEmpty.value = planEmptyReason(data.plans);
+      planEmpty.value = planEmptyReason(data.plans, {
+        topQueryEnabled: topQueryEnabled.value,
+      });
     } else {
       plansError.value = t("dbm.common.loadFailed");
       plans.value = [];

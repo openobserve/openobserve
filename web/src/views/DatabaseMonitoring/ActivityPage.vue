@@ -382,6 +382,7 @@ const {
   lastRunAt,
   org,
   dbmEnabled,
+  activityIngestEnabled,
   queryCount,
   databaseCount,
   run,
@@ -744,8 +745,29 @@ const notCollectingChecks = computed<DbmLockCheck[]>(() =>
       {
         id: "sampling",
         status: "fail",
-        title: t("dbm.activity.notCollecting.checks.sampling.no"),
-        detail: t("dbm.activity.notCollecting.checks.sampling.noDetail"),
+        // TWO DIFFERENT FAILURES, and the fix for each is somewhere else.
+        //
+        // `ZO_DB_MONITORING_ACTIVITY_ENABLED` defaults OFF, so the ordinary
+        // reason this page is empty is that OpenObserve is discarding the feed
+        // — an OpenObserve setting, fixed by whoever runs OpenObserve. The
+        // other reason is that nothing is sending samples, which is fixed in
+        // the collector recipe on the database host. Until the flag reached
+        // `zoConfig` this check hardcoded the second sentence, so a reader
+        // whose real problem was the server knob was sent to audit a collector
+        // that was working.
+        //
+        // `undefined` — an older server that does not report the flag — keeps
+        // the original sentence, which names both halves and asserts nothing
+        // about a field nobody sent.
+        ...(activityIngestEnabled.value === false
+          ? {
+              title: t("dbm.activity.notCollecting.checks.sampling.ingestOff"),
+              detail: t("dbm.activity.notCollecting.checks.sampling.ingestOffDetail"),
+            }
+          : {
+              title: t("dbm.activity.notCollecting.checks.sampling.no"),
+              detail: t("dbm.activity.notCollecting.checks.sampling.noDetail"),
+            }),
       },
     ],
   ),

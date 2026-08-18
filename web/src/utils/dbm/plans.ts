@@ -116,6 +116,13 @@ export interface QueryPlansResponse {
    * `off` = the stream carries no plan hash column, so nothing ever looked.
    * `on` = capture ran and this statement has no plan, which is normal.
    * Optional because a server predating the field sends nothing at all.
+   *
+   * READ IT AS PAST TENSE. The backend derives it from the stream SCHEMA —
+   * whether `o2_dbm_plan_hash` is present — so it says capture ran at some
+   * point in this stream's history, NOT that it is running now. The column
+   * survives after either ingest knob is switched back off, so `on` alone is
+   * not grounds to tell a reader plans are being captured; see
+   * `PlanCaptureKnobs`.
    */
   plan_capture?: "on" | "off";
   /**
@@ -390,6 +397,25 @@ export function planDriftLevel(res: QueryPlansResponse): PlanDriftLevel {
 }
 
 /**
+ * The server knob for the ESTIMATED-plan producer, read from `zoConfig`
+ * (`ZO_DB_MONITORING_TOP_QUERY_ENABLED`). Defaults OFF.
+ *
+ * Plans have exactly two producers, each with its own ingest knob: `top_query`
+ * writes the receiver's generic estimate, `auto_explain` writes the real
+ * executed plan. Only the first is passed in — the second already arrives on
+ * the response itself as `explain_enabled`, and one source per fact keeps the
+ * two from disagreeing. With both off nothing new can arrive, whatever the
+ * stream schema says.
+ *
+ * Optional so a caller with no store access, and an older server that does not
+ * send the field, both degrade to the previous behaviour instead of asserting
+ * a state nobody reported.
+ */
+export interface PlanCaptureKnobs {
+  topQueryEnabled?: boolean;
+}
+
+/**
  * Why the Plans section is empty, or `null` when it is not.
  *
  * `none` tells the renderer there is nothing to draw; it cannot tell it WHY,
@@ -406,16 +432,40 @@ export function planDriftLevel(res: QueryPlansResponse): PlanDriftLevel {
  * plan for it. It must never render as a config error; the copy says capture
  * is working and nothing qualified.
  *
+ * `captureKnobOff` is the fourth, and it exists because `plan_capture: "on"`
+ * is PAST TENSE — the backend derives it from the presence of the
+ * `o2_dbm_plan_hash` column in the stream schema, which outlives the ingest
+ * that wrote it. On a stream with plan history whose ingest knobs have since
+ * been switched off (or were never on server-side while the collector shipped
+ * the feed anyway), the `noPlanForQuery` sentence asserts "we're capturing
+ * plans for this database", which is then simply false — it blames the
+ * statement for an absent feed and sends a DBA looking for a fault in a query
+ * that has none. When BOTH producers are switched off the honest answer names
+ * the switch, so this reason outranks `noPlanForQuery`. It does NOT outrank
+ * `captureOff`: a stream that never carried a plan column at all is still the
+ * more basic state, and its copy already names `ZO_DB_MONITORING_TOP_QUERY_ENABLED`.
+ *
  * A response with no `plan_capture` at all falls back to `captureOff`: that is
  * the copy that shipped before the field existed, so an older server degrades
  * to the previous behaviour rather than asserting a state it never reported.
+ * `knobs` is optional for the same reason — absent, the branch cannot fire and
+ * the three original reasons behave exactly as they did.
  */
 export function planEmptyReason(
   res: QueryPlansResponse,
-): "captureOff" | "noPlanForQuery" | "noExecutionCaptured" | null {
+  knobs: PlanCaptureKnobs = {},
+): "captureOff" | "noPlanForQuery" | "noExecutionCaptured" | "captureKnobOff" | null {
   if ((res.hits?.length ?? 0) > 0) return null;
   if (res.plan_capture !== "on") return "captureOff";
-  return res.explain_enabled ? "noExecutionCaptured" : "noPlanForQuery";
+  // Explain ingest on and running outranks everything below: that state is
+  // good news about a working feed, and must never read as a config problem.
+  if (res.explain_enabled) return "noExecutionCaptured";
+  // Reached only with `explain_enabled` already falsy (the guard above), so the
+  // executed-plan producer is off; the estimated-plan knob decides the rest.
+  // `undefined` means "not reported" — never "false" — so an older server or a
+  // caller without store access keeps the previous sentence.
+  if (knobs.topQueryEnabled === false) return "captureKnobOff";
+  return "noPlanForQuery";
 }
 
 /**
