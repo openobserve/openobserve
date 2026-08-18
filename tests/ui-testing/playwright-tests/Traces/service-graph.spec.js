@@ -124,9 +124,11 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     await pm.serviceGraphPage.navigateToServiceGraphUrl();
     testLogger.info('Navigated to service graph');
 
-    // Service Graph is its own route now (not a ?tab= on the traces page)
-    await expect(page).toHaveURL(/\/traces\/service-graph/);
-    testLogger.info('URL is the /traces/service-graph route');
+    // Service Graph is reachable via the legacy /traces/service-graph route, which now
+    // redirects to the canonical /traces?tab=service-graph tab (OSS #13852). Accept either
+    // form so this passes both against main (standalone route) and against the redirect PR.
+    await expect(page).toHaveURL(/\/traces(\/service-graph|\?.*\btab=service-graph\b)/);
+    testLogger.info('URL is the service graph route (standalone or ?tab=service-graph)');
 
     // Verify chart container is visible
     await pm.serviceGraphPage.expectServiceGraphPageVisible();
