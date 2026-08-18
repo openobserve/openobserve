@@ -485,7 +485,13 @@ function handleUpdateExpanded(ids: string[]) {
             data-test="synthetics-journey-recording-marker-rule"
             aria-hidden="true"
           />
-          <span class="text-2xs shrink-0 font-semibold capitalize">
+          <!-- Opts out of the container's tone: only the rule fades for a
+               preview, because a half-opacity word at this size is just hard
+               to read. -->
+          <span
+            class="text-accent text-2xs shrink-0 font-semibold capitalize"
+            data-test="synthetics-journey-recording-marker-label"
+          >
             {{ t("synthetics.journey.newStepsLandHere") }}
           </span>
           <span

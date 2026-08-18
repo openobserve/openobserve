@@ -795,6 +795,12 @@ describe("JourneySteps", () => {
       // A preview reads lighter than the committed anchor.
       expect(marker.classes()).toContain("text-accent/50");
 
+      // Only the rule fades. The label stays full strength in both states —
+      // at this size a half-opacity word is just hard to read.
+      const label = wrapper.find('[data-test="synthetics-journey-recording-marker-label"]');
+      expect(label.classes()).toContain("text-accent");
+      expect(label.classes()).not.toContain("text-accent/50");
+
       target.dispatchEvent(new MouseEvent("mouseleave"));
       await flushPromises();
       expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
