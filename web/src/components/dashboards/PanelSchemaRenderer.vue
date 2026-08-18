@@ -47,7 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
-          @cell-click="onCellClick"
+          @cell-click="(params) => onCellClick(params.columnId, params.value, params.row)"
+          @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -55,6 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           :enable-column-format="enableColumnFormat"
+          :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
+          :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -227,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- Cell explorer drawer — opened when user clicks a table cell with no drilldown configured -->
+    <!-- Cell explorer drawer -->
     <ODrawer
       v-model:open="cellDrawer.open"
       side="right"
@@ -288,6 +291,7 @@ const ChartRenderer = defineAsyncComponent(() => {
 const TableRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/TableRenderer.vue");
 });
+
 
 const PromQLTableChart = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/PromQLTableChart.vue");
@@ -1519,8 +1523,14 @@ export default defineComponent({
 
     const onFormatColumn = (field: string) => emit("format-column", field);
 
-    const { drilldownArray, onChartClick, openDrilldown, hidePopupsAndOverlays } =
-      usePanelDrilldown({
+    const {
+      drilldownArray,
+      onChartClick,
+      openDrilldown,
+      hidePopupsAndOverlays,
+      drilldownColumnAliases,
+      drilldownAllColumns,
+    } = usePanelDrilldown({
         panelSchema,
         variablesData,
         selectedTimeObj,
@@ -1618,7 +1628,6 @@ export default defineComponent({
       return { options: { backgroundColor: "transparent" } };
     });
 
-    // Cell-explorer drawer — opens when user clicks a table cell with no drilldown configured.
     const cellDrawer = ref<{
       open: boolean;
       field: string;
@@ -1638,7 +1647,7 @@ export default defineComponent({
     });
 
     function resolveAliasToColumn(alias: string, query: any): string {
-      // 1. Field config lookup (field-based panels).
+      // Field-config lookup (field-based panels).
       const allConfigFields: any[] = [
         ...(Array.isArray(query?.fields?.x) ? query.fields.x : []),
         ...(Array.isArray(query?.fields?.y) ? query.fields.y : []),
@@ -1647,9 +1656,7 @@ export default defineComponent({
       const fromConfig = allConfigFields.find((f: any) => f.alias === alias && f.column);
       if (fromConfig) return fromConfig.column;
 
-      // 2. SQL regex fallback (custom SQL panels): the dashboard query builder always
-      //    double-quotes aliases — `k8s_cluster as "x_axis_1"` — so match with optional quotes.
-      //    Columns may also carry a stream prefix like `default.k8s_cluster`; strip it.
+      // SQL fallback (custom SQL panels): aliases are double-quoted; column may carry a stream prefix.
       const sql: string =
         metadata.value?.queries?.[0]?.query ??
         props.panelSchema.queries?.[0]?.query ??
@@ -1662,8 +1669,8 @@ export default defineComponent({
         );
         const m = re.exec(sql.replace(/\n/g, " "));
         if (m?.[1]) {
-          // Strip optional stream prefix: "default.k8s_cluster" → "k8s_cluster"
-          const col = m[1].split(".").pop()!;
+          const col = m[1].split(".").pop()!; // strip stream prefix
+
           if (col.toLowerCase() !== alias.toLowerCase()) return col;
         }
       }
@@ -1671,9 +1678,7 @@ export default defineComponent({
       return alias; // last resort — works when the alias IS the stream field name
     }
 
-    // Timestamps throughout the dashboard are stored as µs (Dates constructed from µs values,
-    // so getTime() returns µs). This helper safely extracts the µs value from either a Date or
-    // a raw number already in µs.
+    // Dashboard timestamps are µs; Dates are built from µs so getTime() returns µs.
     function toµs(v: any): number {
       if (v instanceof Date) return v.getTime();
       const n = Number(v);
@@ -1716,8 +1721,8 @@ export default defineComponent({
       }
     }
 
-    function onCellClick(alias: string, value: unknown, _row: any) {
-      if (props.panelSchema.config?.drilldown?.length > 0) return;
+    // Called directly by the search icon so it works even with a panel drilldown config.
+    function exploreCellInLogs(alias: string, value: unknown, _row: any) {
       const query = props.panelSchema.queries?.[0];
       const stream = query?.fields?.stream ?? query?.stream ?? "";
       const streamType = query?.fields?.stream_type ?? query?.stream_type ?? "logs";
@@ -1738,6 +1743,11 @@ export default defineComponent({
       });
     }
 
+    function onCellClick(alias: string, value: unknown, row: any) {
+      if (props.panelSchema.config?.drilldown?.length > 0) return;
+      exploreCellInLogs(alias, value, row);
+    }
+
     return {
       t,
       store,
@@ -1756,6 +1766,8 @@ export default defineComponent({
       onChartClick,
       onFormatColumn,
       onDataZoom,
+      drilldownColumnAliases,
+      drilldownAllColumns,
       drilldownArray,
       selectedAnnotationData,
       openDrilldown,
@@ -1806,6 +1818,7 @@ export default defineComponent({
       handleCreateAlert,
       cellDrawer,
       onCellClick,
+      exploreCellInLogs,
       onCellDrawerOpenChange,
     };
   },

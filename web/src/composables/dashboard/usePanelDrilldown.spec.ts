@@ -200,4 +200,37 @@ describe("usePanelDrilldown", () => {
     expect(resultSchemaMock).not.toHaveBeenCalled();
     expect(api.crossLinksData.value).toEqual({ stream_links: [], org_links: [] });
   });
+
+  // ── Table cell → Logs drilldown ──────────────────────────────────────────
+  // The drillable-columns watcher parses SQL via a dynamically-imported parser,
+  // so give the microtasks a few turns to settle before asserting.
+  const flush = async () => {
+    for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+  };
+
+  const makeTableDeps = (query: string) => {
+    const deps = makeDeps();
+    deps.panelSchema.value.type = "table";
+    (deps.panelSchema.value.queries[0] as any).query = query;
+    (deps.metadata.value.queries[0] as any).query = query;
+    return deps;
+  };
+
+  it("marks group-by dimension columns drillable and excludes aggregates", async () => {
+    const deps = makeTableDeps("select service, count(*) as cnt from logs group by service");
+    const api = usePanelDrilldown(deps as any);
+    await flush();
+
+    expect(api.drilldownColumnAliases.value).toContain("service");
+    expect(api.drilldownColumnAliases.value).not.toContain("cnt");
+    expect(api.drilldownAllColumns.value).toBe(false);
+  });
+
+  it("treats SELECT * / dynamic-columns tables as all-columns drillable", async () => {
+    const deps = makeTableDeps("select * from logs");
+    const api = usePanelDrilldown(deps as any);
+    await flush();
+
+    expect(api.drilldownAllColumns.value).toBe(true);
+  });
 });

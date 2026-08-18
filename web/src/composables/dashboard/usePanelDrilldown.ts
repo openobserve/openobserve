@@ -21,6 +21,7 @@ import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUt
 import searchService from "@/services/search";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
+import { extractFields } from "@/utils/query/sqlUtils";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -249,6 +250,88 @@ export function usePanelDrilldown({
 
     return whereClause;
   };
+
+  // ── Table cell → Logs drilldown ──
+  // Drillable = a plain column_ref (aggregates aren't valid in a WHERE clause).
+  // Keyed by column alias (the table column id).
+  const cellDrilldownFields: any = ref(new Map());
+  // SELECT * / dynamic-columns tables: every column id is drillable (see wildcard branch).
+  const cellDrilldownWildcard: any = ref(null);
+
+  const drilldownColumnAliases = computed<string[]>(() =>
+    Array.from(cellDrilldownFields.value.keys()) as string[],
+  );
+  const drilldownAllColumns = computed(() => !!cellDrilldownWildcard.value);
+
+  const isSelectStar = (ast: any): boolean =>
+    Array.isArray(ast?.columns) &&
+    ast.columns.some((col: any) => col?.expr?.column === "*" || col?.expr?.type === "star");
+
+  const computeCellDrilldownFields = async () => {
+    const map = new Map<string, any>();
+    let wildcard: any = null;
+    const schema = panelSchema.value;
+    if (!schema || schema.type !== "table" || schema.queryType === "promql") {
+      cellDrilldownFields.value = map;
+      cellDrilldownWildcard.value = null;
+      return;
+    }
+    if (!parser) await importSqlParser();
+
+    const queries = schema.queries ?? [];
+    const singleQuery = queries.length === 1;
+
+    queries.forEach((query: any, queryIndex: number) => {
+      const executedQuery = metadata?.value?.queries?.[queryIndex]?.query ?? query?.query;
+      const streamName = query?.fields?.stream;
+      const streamType = query?.fields?.stream_type;
+      if (!executedQuery || !streamName) return;
+
+      let parsed: any;
+      try {
+        parsed = parser.astify(executedQuery);
+      } catch {
+        return;
+      }
+      const ast = Array.isArray(parsed) ? parsed[0] : parsed;
+      // Only single-table SELECTs; joins would need qualified predicates.
+      if (!ast || ast.type !== "select" || (ast.from?.length ?? 0) > 1) return;
+
+      const fields = extractFields(ast, "_timestamp", parser);
+
+      // SELECT *: resolve drillable columns by id at click time (needs the response).
+      if (!fields.length && singleQuery && isSelectStar(ast)) {
+        wildcard = { streamName, streamType, query: executedQuery };
+        return;
+      }
+
+      fields.forEach((field: any) => {
+        if (field.aggregationFunction || !field.column) return;
+        map.set(field.alias, {
+          column: field.column,
+          streamName,
+          streamType,
+          query: executedQuery,
+        });
+      });
+    });
+
+    cellDrilldownFields.value = map;
+    cellDrilldownWildcard.value = wildcard;
+  };
+
+  watch(
+    () => [
+      metadata?.value?.queries,
+      panelSchema.value?.queries,
+      panelSchema.value?.type,
+      panelSchema.value?.queryType,
+    ],
+    () => {
+      computeCellDrilldownFields();
+    },
+    { immediate: true, deep: true },
+  );
 
   const replaceVariablesValue = (
     query: any,
@@ -1125,5 +1208,7 @@ export function usePanelDrilldown({
     parser,
     interval,
     intervalMicro,
+    drilldownColumnAliases,
+    drilldownAllColumns,
   };
 }

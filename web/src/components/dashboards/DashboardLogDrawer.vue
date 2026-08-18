@@ -1,23 +1,34 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- Primary: log-explorer results filtered by a clicked dashboard cell.
-     Secondary: clicking any row opens a full ODrawer with 4 visual insight sections. -->
+<!-- Log-explorer results filtered by a clicked dashboard cell; row click opens a detail drawer. -->
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import DateTime from "@/components/DateTime.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
+import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+const JsonPreview = defineAsyncComponent(() => import("@/plugins/logs/JsonPreview.vue"));
+const ChartRenderer = defineAsyncComponent(() => import("@/components/dashboards/panels/ChartRenderer.vue"));
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
 import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
@@ -37,6 +48,19 @@ const route  = useRoute();
 const router = useRouter();
 const orgId  = computed(() => store.state.selectedOrganization.identifier);
 
+// Editable time range (µs); searches read these refs, not the fixed props.
+const rangeStart = ref(props.startTime);
+const rangeEnd   = ref(props.endTime);
+watch(
+  () => [props.startTime, props.endTime],
+  () => { rangeStart.value = props.startTime; rangeEnd.value = props.endTime; },
+);
+const onDateChange = (d: { startTime: number; endTime: number }) => {
+  rangeStart.value = Number.isFinite(d.startTime) ? Math.trunc(d.startTime) : rangeStart.value;
+  rangeEnd.value   = Number.isFinite(d.endTime)   ? Math.trunc(d.endTime)   : rangeEnd.value;
+  loadEvents();
+};
+
 // ── Search state ──────────────────────────────────────────────────────────────
 const events    = ref<any[]>([]);
 const total     = ref(0);
@@ -45,15 +69,7 @@ const pageSize  = ref(100);
 const loading   = ref(false);
 const errorMsg  = ref("");
 
-const pageSizeOptions = [
-  { label: "50 / page",  value: 50  },
-  { label: "100 / page", value: 100 },
-  { label: "200 / page", value: 200 },
-  { label: "500 / page", value: 500 },
-];
-
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
-const pageFrom   = computed(() => total.value === 0 ? 0 : page.value * pageSize.value + 1);
 const pageTo     = computed(() => Math.min(page.value * pageSize.value + events.value.length, total.value));
 const hasPrev    = computed(() => page.value > 0);
 const hasNext    = computed(() => pageTo.value < total.value);
@@ -65,15 +81,20 @@ const cols = computed((): string[] => {
 });
 
 // ── SQL editor ────────────────────────────────────────────────────────────────
-const queryMode = ref(false);
 const customSql = ref("");
 
 function escSql(v: string | number): string { return String(v).replace(/'/g, "''"); }
+// Clicked cell predicate: IS NULL for empty, unquoted for numbers, escaped-quote otherwise.
+function cellWhere(): string {
+  const v = props.value;
+  if (v === null || v === undefined || v === "") return `${props.field} IS NULL`;
+  if (typeof v === "number") return `${props.field} = ${v}`;
+  return `${props.field} = '${escSql(v)}'`;
+}
 function buildDefaultSql(): string {
-  return `SELECT * FROM "${props.stream}" WHERE "${props.field}" = '${escSql(props.value)}' ORDER BY _timestamp DESC`;
+  return `SELECT * FROM "${props.stream}" WHERE ${cellWhere()} ORDER BY _timestamp DESC`;
 }
 function activeSql()  { return customSql.value || buildDefaultSql(); }
-function resetSql()   { customSql.value = buildDefaultSql(); }
 
 // ── Event detail drawer ───────────────────────────────────────────────────────
 const selectedEvent = ref<Record<string, any> | null>(null);
@@ -83,21 +104,32 @@ const detailTab     = ref("insights");
 // ── Insights state (loaded when detail drawer opens) ──────────────────────────
 const insightsLoading  = ref(false);
 const timeline         = ref<{ keyMs: number; num: number }[]>([]);
+
+// Field Anomaly Profile table: rarity column carries chip + bar, value column the sample.
+const anomalyColumns = computed<OTableColumnDef[]>(() => [
+  { id: "fld", header: t("panel.logExplorer.insights.colField"), accessorKey: "fld", size: 160 },
+  { id: "rarity", header: t("panel.logExplorer.insights.colRarity"), accessorKey: "rarity", size: 120, minSize: 120 },
+  // Elastic value column: absorbs leftover width and ellipsis-truncates instead of scrolling.
+  { id: "sv", header: t("panel.logExplorer.insights.colValue"), accessorKey: "sv", meta: { autoWidth: true, fillRemaining: true } },
+]);
 const insightPatterns  = ref<any[]>([]);
 const surroundEvents   = ref<any[]>([]);
 const surroundMinutes  = ref(3);
 const surroundLoading  = ref(false);
 const surroundPage        = ref(0);
-const SURROUND_PER_PAGE   = 20;
+const surroundPageSize    = ref(20);
 const surroundExpandedIdx = ref(new Set<number>());
 
 const surroundWindowOptions = [
-  { label: "±1 min",  value: 1  },
-  { label: "±2 min",  value: 2  },
-  { label: "±3 min",  value: 3  },
-  { label: "±5 min",  value: 5  },
-  { label: "±10 min", value: 10 },
+  { label: raw("±1 min"),  value: 1  },
+  { label: raw("±2 min"),  value: 2  },
+  { label: raw("±3 min"),  value: 3  },
+  { label: raw("±5 min"),  value: 5  },
+  { label: raw("±10 min"), value: 10 },
 ];
+const surroundLabel = computed(
+  () => surroundWindowOptions.find((o) => o.value === surroundMinutes.value)?.label ?? raw(""),
+);
 
 // Field anomaly profile: how rare is each field value in this event vs current page?
 const fieldAnomalyProfile = computed(() => {
@@ -116,26 +148,101 @@ const fieldAnomalyProfile = computed(() => {
     .sort((a, b) => a.pct - b.pct); // rarest fields first
 });
 
-const timelineMax      = computed(() => Math.max(1, ...timeline.value.map(b => b.num)));
-const surroundTotalPages = computed(() => Math.max(1, Math.ceil(surroundEvents.value.length / SURROUND_PER_PAGE)));
-const surroundPagedEvents = computed(() =>
-  surroundEvents.value.slice(surroundPage.value * SURROUND_PER_PAGE, (surroundPage.value + 1) * SURROUND_PER_PAGE)
-);
-// eventXFrac: position of the selected event within the full time range (0–1)
-// props times are µs; selected event _timestamp is µs
-const eventXFrac  = computed(() => {
-  if (!selectedEvent.value || !timeline.value.length) return -1;
-  const ts   = Number(selectedEvent.value._timestamp ?? 0);
-  // Use the actual timeline bucket range for the fraction so the marker lines up with the bars
-  const tMin = timeline.value[0].keyMs * 1_000;  // ms → µs
-  const tMax = timeline.value[timeline.value.length - 1].keyMs * 1_000;
-  const span = tMax - tMin;
-  if (!ts || span <= 0) return -1;
-  return Math.max(0, Math.min(1, (ts - tMin) / span));
-});
+// Event Timeline as an ECharts bar chart via the shared ChartRenderer (same tooltip/theming).
+const timelineChartOptions = computed(() => {
+  const rootStyle = getComputedStyle(document.documentElement);
+  const readVar = (name: string, fallback: string) =>
+    rootStyle.getPropertyValue(name).trim() || fallback;
+  // Touch the theme so colors recompute when it toggles.
+  void store.state.theme;
+  const accent   = readVar("--color-accent", "#7c6cf6");
+  const axisText = readVar("--color-text-tertiary", "#9ca3af");
+  const axisLine = readVar("--color-border-default", "#e5e7eb");
 
+  const times  = timeline.value.map((b) => b.keyMs);
+  const counts = timeline.value.map((b) => b.num);
+
+  // Nearest bucket to the selected event → dashed marker line.
+  const evMs = Number(selectedEvent.value?._timestamp ?? 0) / 1000;
+  let markerIdx = -1;
+  if (evMs > 0 && times.length) {
+    let best = Infinity;
+    times.forEach((tMs, i) => {
+      const d = Math.abs(tMs - evMs);
+      if (d < best) { best = d; markerIdx = i; }
+    });
+  }
+
+  return {
+    backgroundColor: "transparent",
+    // containLabel:false — edge labels pinned via alignMin/MaxLabel below; top leaves marker room.
+    grid: { top: 20, right: 4, bottom: 2, left: 4, containLabel: false },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params;
+        const ms = Number(times[p.dataIndex]);
+        const n = Number(p.data ?? 0);
+        const label = n === 1 ? t("panel.logExplorer.event") : t("panel.logExplorer.events");
+        return `${fmtTsShort(ms)}<br/>${n} ${label}`;
+      },
+    },
+    xAxis: {
+      type: "category",
+      data: times,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: axisLine } },
+      axisLabel: {
+        color: axisText,
+        fontSize: 10,
+        interval: (index: number) => index === 0 || index === times.length - 1,
+        formatter: (v: any) => fmtTsShort(Number(v)),
+        showMinLabel: true,
+        showMaxLabel: true,
+        // Pin first/last labels to the plot edges so they don't overflow.
+        alignMinLabel: "left",
+        alignMaxLabel: "right",
+      },
+    },
+    yAxis: { type: "value", show: false },
+    series: [
+      {
+        type: "bar",
+        data: counts,
+        barCategoryGap: "20%",
+        itemStyle: { color: accent, opacity: 0.8, borderRadius: [2, 2, 0, 0] },
+        emphasis: { disabled: true },
+        markLine: markerIdx >= 0
+          ? {
+              silent: true,
+              symbol: "none",
+              lineStyle: { color: accent, type: "dashed", width: 1.5 },
+              label: {
+                show: true,
+                position: "insideEndTop",
+                // Event count in the selected event's bucket.
+                formatter: () => String(counts[markerIdx] ?? 0),
+                color: accent,
+                fontSize: 10,
+                fontWeight: 600,
+                rotate: 0,
+                align: "right",
+                padding: [0, 2, 2, 0],
+              },
+              data: [{ xAxis: markerIdx }],
+            }
+          : undefined,
+      },
+    ],
+  };
+});
+const surroundTotalPages = computed(() => Math.max(1, Math.ceil(surroundEvents.value.length / surroundPageSize.value)));
+const surroundPagedEvents = computed(() =>
+  surroundEvents.value.slice(surroundPage.value * surroundPageSize.value, (surroundPage.value + 1) * surroundPageSize.value)
+);
 function getTimeBucket(): string {
-  const rangeMs = (props.endTime - props.startTime) / 1_000;
+  const rangeMs = (rangeEnd.value - rangeStart.value) / 1_000;
   if (rangeMs < 30 * 60_000)        return "1 minute";
   if (rangeMs < 3 * 3_600_000)      return "5 minute";
   if (rangeMs < 12 * 3_600_000)     return "15 minute";
@@ -162,7 +269,7 @@ async function loadSurrounding(ev: Record<string, any>) {
     surroundEvents.value = res.data?.hits ?? [];
     // Jump to the page containing the selected event
     const idx = surroundEvents.value.findIndex(e => String(e._timestamp) === String(ts));
-    if (idx >= 0) surroundPage.value = Math.floor(idx / SURROUND_PER_PAGE);
+    if (idx >= 0) surroundPage.value = Math.floor(idx / surroundPageSize.value);
   } catch { surroundEvents.value = []; }
   surroundLoading.value = false;
 }
@@ -174,7 +281,7 @@ async function loadInsights(ev: Record<string, any>) {
   surroundEvents.value = [];
 
   const intv  = getTimeBucket();
-  const where = `"${props.field}" = '${escSql(props.value)}'`;
+  const where = cellWhere();
 
   const [histR, patR] = await Promise.allSettled([
     // 1. Histogram — event count per time bucket over full range
@@ -182,7 +289,7 @@ async function loadInsights(ev: Record<string, any>) {
       org_identifier: orgId.value,
       query: { query: {
         sql: `SELECT histogram(_timestamp, '${intv}') AS zo_key, COUNT(*) AS zo_cnt FROM "${props.stream}" WHERE ${where} GROUP BY zo_key ORDER BY zo_key`,
-        start_time: props.startTime, end_time: props.endTime, from: 0, size: 500,
+        start_time: rangeStart.value, end_time: rangeEnd.value, from: 0, size: 500,
       }},
       page_type: props.streamType ?? "logs",
     }, "ui"),
@@ -191,14 +298,18 @@ async function loadInsights(ev: Record<string, any>) {
     patternsService.extractPatterns({
       org_identifier: orgId.value,
       stream_name: props.stream,
-      query: { query: { sql: `SELECT * FROM "${props.stream}" WHERE ${where}`, start_time: props.startTime, end_time: props.endTime, from: 0, size: 1000 } },
+      query: { query: { sql: `SELECT * FROM "${props.stream}" WHERE ${where}`, start_time: rangeStart.value, end_time: rangeEnd.value, from: 0, size: 1000 } },
     }),
   ]);
 
   if (histR.status === "fulfilled") {
-    // OpenObserve histogram() returns zo_key as an ISO-8601 date string (e.g. "2024-01-15T10:30:00")
+    // zo_key is UTC ISO-8601 without a zone suffix; append "Z" so it isn't parsed as local.
+    const toUtcMs = (key: string): number => {
+      const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(key) ? key : `${key}Z`;
+      return new Date(iso).getTime();
+    };
     timeline.value = (histR.value.data?.hits ?? [])
-      .map((h: any) => ({ keyMs: new Date(h.zo_key).getTime(), num: Number(h.zo_cnt) }))
+      .map((h: any) => ({ keyMs: toUtcMs(String(h.zo_key ?? "")), num: Number(h.zo_cnt) }))
       .filter((b: any) => !isNaN(b.keyMs))
       .sort((a: any, b: any) => a.keyMs - b.keyMs);
   }
@@ -231,8 +342,29 @@ function closeEventDetail() {
   router.replace({ query: q });
 }
 
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(String(text)).catch(() => {/* best-effort */});
+// Details tab: field/value rows, filtered by the search box.
+const detailFilter = ref("");
+const wrapDetailValues = ref(false);
+// Format the timestamp column; pass everything else through for LogsHighLighting.
+function getDetailDisplayValue(field: string, value: any): any {
+  return field === "_timestamp" ? fmtTs(value) : value;
+}
+const detailRows = computed<[string, any][]>(() => {
+  const entries = Object.entries(selectedEvent.value ?? {});
+  const q = detailFilter.value.trim().toLowerCase();
+  if (!q) return entries;
+  return entries.filter(
+    ([k, v]) => k.toLowerCase().includes(q) || String(v ?? "").toLowerCase().includes(q),
+  );
+});
+
+// JsonPreview's @copy emits an object; stringify non-strings as pretty JSON.
+function copyToClipboard(value: unknown) {
+  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  navigator.clipboard
+    .writeText(text)
+    .then(() => toast({ variant: "success", message: t("common.copiedToClipboard") }))
+    .catch(() => {/* best-effort */});
 }
 function copyCurrentUrl() {
   copyToClipboard(window.location.href);
@@ -268,14 +400,6 @@ function fmtRelTime(tsµs: number, refµs: number): string {
   return s === 0 ? `${sign}${m}m` : `${sign}${m}m ${s}s`;
 }
 
-const dateRange = computed(() => {
-  if (!props.startTime || !props.endTime) return "";
-  const fmt = (µs: number) =>
-    new Date(µs / 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  return `${fmt(props.startTime)} – ${fmt(props.endTime)}`;
-});
-
-function fmtJson(obj: any): string { return JSON.stringify(obj, null, 2); }
 
 // ── Search ────────────────────────────────────────────────────────────────────
 async function runSql(sql: string, fromOffset: number) {
@@ -288,7 +412,7 @@ async function runSql(sql: string, fromOffset: number) {
   try {
     const res = await searchService.search({
       org_identifier: orgId.value,
-      query: { query: { sql, start_time: props.startTime, end_time: props.endTime, from: fromOffset, size: pageSize.value } },
+      query: { query: { sql, start_time: rangeStart.value, end_time: rangeEnd.value, from: fromOffset, size: pageSize.value } },
       page_type: props.streamType ?? "logs",
     }, "ui");
     events.value = res.data?.hits ?? [];
@@ -303,8 +427,7 @@ async function loadEvents() { page.value = 0; const sql = buildDefaultSql(); cus
 async function runQuery()   { page.value = 0; await runSql(activeSql(), 0); }
 async function goToPage(p: number) { page.value = p; await runSql(activeSql(), p * pageSize.value); }
 
-// Restore the event detail drawer from URL param — does a dedicated 1-row fetch
-// by exact _timestamp so the event never has to be on the first results page.
+// Restore the detail drawer from URL param via a 1-row fetch by exact _timestamp.
 async function restoreEventDetail() {
   const ts = route.query.cell_event_ts;
   if (!ts || selectedEvent.value) return;
@@ -313,7 +436,7 @@ async function restoreEventDetail() {
       org_identifier: orgId.value,
       query: { query: {
         sql: `SELECT * FROM "${props.stream}" WHERE _timestamp = ${ts}`,
-        start_time: props.startTime, end_time: props.endTime,
+        start_time: rangeStart.value, end_time: rangeEnd.value,
         from: 0, size: 1,
       }},
       page_type: props.streamType ?? "logs",
@@ -341,7 +464,7 @@ function toggleSurroundExpand(globalIdx: number) {
   surroundExpandedIdx.value = next;
 }
 function isSurroundExpanded(pageIdx: number) {
-  return surroundExpandedIdx.value.has(surroundPage.value * SURROUND_PER_PAGE + pageIdx);
+  return surroundExpandedIdx.value.has(surroundPage.value * surroundPageSize.value + pageIdx);
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -360,9 +483,9 @@ function openPatternInLogs(template: string) {
   url.searchParams.set("org_identifier", orgId.value);
   url.searchParams.set("stream_type",    props.streamType ?? "logs");
   url.searchParams.set("stream",         props.stream);
-  url.searchParams.set("from",           String(props.startTime));
-  url.searchParams.set("to",             String(props.endTime));
-  url.searchParams.set("query",          b64EncodeUnicode(patternToSql(template)));
+  url.searchParams.set("from",           String(rangeStart.value));
+  url.searchParams.set("to",             String(rangeEnd.value));
+  url.searchParams.set("query",          b64EncodeUnicode(patternToSql(template)) ?? "");
   url.searchParams.set("sql_mode",       "true");
   url.searchParams.set("quick_mode",     "false");
   url.searchParams.set("show_histogram", "true");
@@ -378,9 +501,9 @@ function openInLogs() {
   url.searchParams.set("org_identifier", orgId.value);
   url.searchParams.set("stream_type",    props.streamType ?? "logs");
   url.searchParams.set("stream",         props.stream);
-  url.searchParams.set("from",           String(props.startTime));
-  url.searchParams.set("to",             String(props.endTime));
-  url.searchParams.set("query",          b64EncodeUnicode(activeSql()));
+  url.searchParams.set("from",           String(rangeStart.value));
+  url.searchParams.set("to",             String(rangeEnd.value));
+  url.searchParams.set("query",          b64EncodeUnicode(activeSql()) ?? "");
   url.searchParams.set("sql_mode",       "true");
   url.searchParams.set("quick_mode",     "false");
   url.searchParams.set("show_histogram", "false");
@@ -391,50 +514,44 @@ function openInLogs() {
 <template>
   <div class="flex flex-col h-full min-h-0 overflow-hidden">
 
-    <!-- ── Header context strip ─────────────────────────────────────── -->
-    <div class="flex flex-col border-b border-border-default bg-surface-panel shrink-0 min-w-0">
-      <div class="flex items-center gap-2 px-4 pt-2 pb-1 min-w-0">
-        <span class="text-text-secondary text-xs font-mono shrink-0">{{ field }}</span>
-        <OIcon name="arrow-forward" size="xs" class="text-text-tertiary shrink-0" />
-        <span class="text-accent text-xs font-mono font-semibold truncate">{{ value }}</span>
+    <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
+    <div class="flex flex-col border-b border-border-default shrink-0 min-w-0">
+      <div class="flex items-center gap-2 pt-3 pb-2 min-w-0">
         <div class="flex-1" />
-        <OButton size="sm" :variant="queryMode ? 'secondary' : 'ghost'" icon-left="code"
-          data-test="log-explorer-query-mode-toggle" @click="queryMode = !queryMode">
-          {{ t("panel.logExplorer.queryMode") }}
-        </OButton>
-        <OButton size="sm" variant="ghost" icon-left="open-in-new"
+        <DateTime
+          default-type="absolute"
+          :default-absolute-time="{ startTime: rangeStart, endTime: rangeEnd }"
+          data-test-name="dashboard-log-drawer-date-time"
+          @on:date-change="onDateChange"
+        />
+        <OButton size="sm" variant="outline" icon-left="open-in-new"
           data-test="log-explorer-open-in-logs" @click="openInLogs">
           {{ t("panel.logExplorer.openInLogs") }}
         </OButton>
-        <OButton size="sm" variant="ghost" icon-left="refresh" :loading="loading"
-          data-test="log-explorer-refresh" @click="loadEvents" />
-      </div>
-      <div v-if="dateRange" class="flex items-center gap-1 px-4 pb-2">
-        <OIcon name="schedule" size="xs" class="text-text-tertiary shrink-0" />
-        <span class="text-text-tertiary text-2xs font-mono">{{ dateRange }}</span>
-      </div>
-    </div>
-
-    <!-- ── SQL editor ──────────────────────────────────────────────── -->
-    <div v-if="queryMode" class="dld-editor shrink-0 border-b border-border-default"
-      @keydown.ctrl.enter.prevent="runQuery">
-      <div class="flex items-center gap-2 px-3 py-1.5 bg-surface-subtle border-b border-border-default">
-        <span class="dld-editor__dot rounded-full" /><span class="dld-editor__dot rounded-full" /><span class="dld-editor__dot rounded-full" />
-        <span class="text-text-tertiary text-2xs font-mono ml-1 flex-1">SQL</span>
-        <OButton size="sm" variant="ghost" icon-left="restart-alt" @click="resetSql">{{ t("panel.logExplorer.resetSql") }}</OButton>
-        <OButton size="sm" variant="primary" icon-left="play-arrow" :loading="loading" @click="runQuery">
-          {{ t("panel.logExplorer.runQuery") }}<span class="text-2xs opacity-50 ml-1 hidden sm:inline">Ctrl↵</span>
+        <OButton size="sm" variant="primary" icon-left="play-arrow" :loading="loading"
+          data-test="log-explorer-run" @click="runQuery">
+          {{ t("panel.logExplorer.runQuery") }}
         </OButton>
       </div>
-      <div class="dld-editor__body">
-        <OTextarea v-model="customSql" :rows="6" :autogrow="false" :placeholder="t('panel.logExplorer.sqlPlaceholder')" />
+      <div class=" pb-2">
+        <div class="border-border-default rounded-default overflow-hidden border">
+          <QueryEditor
+            :query="customSql"
+            :languages="['sql']"
+            editor-height="4rem"
+            hide-nl-toggle
+            data-test-prefix="log-explorer-editor"
+            @update:query="customSql = $event"
+            @run-query="runQuery"
+          />
+        </div>
       </div>
     </div>
 
     <!-- ── Error ────────────────────────────────────────────────────── -->
     <div v-if="errorMsg" class="flex items-start gap-2 px-4 py-3 shrink-0">
       <OIcon name="error-outline" size="sm" class="text-error-500 shrink-0 mt-0.5" />
-      <code class="text-2xs font-mono text-error-500 whitespace-pre-wrap break-all">{{ errorMsg }}</code>
+      <code class="text-xs font-mono text-error-500 whitespace-pre-wrap break-all">{{ errorMsg }}</code>
     </div>
 
     <template v-else-if="loading && !events.length">
@@ -445,7 +562,7 @@ function openInLogs() {
       class="flex flex-col items-center justify-center gap-4 flex-1 px-6">
       <OIcon name="manage-search" size="xl" class="text-text-tertiary opacity-30" />
       <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
-      <code class="text-2xs text-text-tertiary font-mono bg-surface-subtle rounded-default px-3 py-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all text-center">{{ customSql }}</code>
+      <code class="text-xs text-text-tertiary font-mono bg-surface-subtle rounded-default px-3 py-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all text-center">{{ customSql }}</code>
     </div>
 
     <!-- ── Results ──────────────────────────────────────────────────── -->
@@ -473,22 +590,22 @@ function openInLogs() {
         </table>
       </div>
 
-      <!-- Pagination footer -->
-      <div class="flex items-center gap-3 px-3 h-10 shrink-0 border-t border-border-default bg-surface-panel">
-        <OSelect v-model="pageSize" :options="pageSizeOptions" size="sm" />
-        <span class="text-text-tertiary text-xs tabular-nums whitespace-nowrap">
-          {{ pageFrom.toLocaleString() }}–{{ pageTo.toLocaleString() }}
-          {{ t("panel.logExplorer.of") }} {{ total.toLocaleString() }}
-          {{ total === 1 ? t("panel.logExplorer.event") : t("panel.logExplorer.events") }}
-        </span>
+      <!-- Pagination footer — project-standard controls (matches dashboard tables) -->
+      <div class="border-border-default flex h-10 w-full shrink-0 items-center border-t px-3">
         <div class="flex-1" />
-        <div class="flex items-center gap-1">
-          <OButton size="sm" variant="ghost" icon-left="first-page"    :disabled="!hasPrev" @click="goToPage(0)" />
-          <OButton size="sm" variant="ghost" icon-left="chevron-left"  :disabled="!hasPrev" @click="goToPage(page - 1)" />
-          <span class="text-text-secondary text-xs tabular-nums px-2 whitespace-nowrap">{{ (page + 1).toLocaleString() }} / {{ totalPages.toLocaleString() }}</span>
-          <OButton size="sm" variant="ghost" icon-left="chevron-right" :disabled="!hasNext" @click="goToPage(page + 1)" />
-          <OButton size="sm" variant="ghost" icon-left="last-page"     :disabled="!hasNext" @click="goToPage(totalPages - 1)" />
-        </div>
+        <TablePaginationControls
+          :show-pagination="true"
+          :pagination="{ page: page + 1, rowsPerPage: pageSize }"
+          :total-rows="total"
+          :pages-number="totalPages"
+          :is-first-page="!hasPrev"
+          :is-last-page="!hasNext"
+          @update:rows-per-page="(n) => { pageSize = n; goToPage(0); }"
+          @first-page="goToPage(0)"
+          @prev-page="goToPage(page - 1)"
+          @next-page="goToPage(page + 1)"
+          @last-page="goToPage(totalPages - 1)"
+        />
       </div>
     </template>
 
@@ -507,16 +624,16 @@ function openInLogs() {
         <div class="flex items-center gap-3 px-4 py-2 border-b border-border-default bg-surface-panel shrink-0">
           <div class="flex flex-col min-w-0 flex-1">
             <span class="text-text-heading text-xs font-medium font-mono tabular-nums">{{ fmtTs(selectedEvent["_timestamp"]) }}</span>
-            <span class="text-text-tertiary text-2xs font-mono">{{ stream }}</span>
+            <span class="text-text-tertiary text-xs font-mono">{{ stream }}</span>
           </div>
-          <OButton size="sm" variant="ghost" icon-left="link"
+          <OButton size="sm" variant="outline" icon-left="link"
             @click="copyCurrentUrl()">
             {{ t("panel.logExplorer.detail.copyLink") }}
           </OButton>
         </div>
 
         <!-- Tabs -->
-        <OTabs v-model="detailTab" dense bordered class="px-4 shrink-0">
+        <OTabs v-model="detailTab" dense bordered class="px-4 shrink-0 mb-2">
           <OTab name="insights" :label="t('panel.logExplorer.detail.insights')" icon="insights" />
           <OTab name="details"  :label="t('panel.logExplorer.detail.details')" />
           <OTab name="json"     :label="t('panel.logExplorer.detail.json')" />
@@ -537,24 +654,40 @@ function openInLogs() {
                 <span>{{ t("panel.logExplorer.insights.anomalyTitle") }}</span>
                 <span class="dld-section-hint">{{ t("panel.logExplorer.insights.anomalyHint", { n: events.length }) }}</span>
               </header>
-              <div class="flex flex-col gap-2 px-4 pb-3">
-                <div v-for="item in fieldAnomalyProfile" :key="item.fld"
-                  class="flex flex-col gap-0.5 group">
-                  <div class="flex items-center gap-2">
-                    <span class="text-2xs text-text-tertiary font-mono w-32 shrink-0 truncate" :title="item.fld">{{ item.fld }}</span>
-                    <span :class="['dld-rarity-badge rounded-full', `dld-rarity-badge--${item.rarity}`]">
-                      {{ t(`panel.logExplorer.insights.rarity.${item.rarity}`) }} {{ item.pct }}%
-                    </span>
-                    <span class="text-2xs text-text-secondary font-mono flex-1 truncate" :title="item.sv">{{ item.sv }}</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <div class="w-32 shrink-0" />
-                    <div class="flex-1 h-1 rounded-full bg-surface-subtle overflow-hidden">
-                      <div :class="['h-full rounded-full', item.rarity === 'common' ? 'bg-accent opacity-40' : item.rarity === 'uncommon' ? 'bg-accent opacity-60' : 'bg-error-500 opacity-70']"
-                        :style="`--dld-pct:${item.pct}%;width:var(--dld-pct,0%)`" />
+              <div class="px-4 pb-3">
+                <OTable
+                  :data="fieldAnomalyProfile"
+                  :columns="anomalyColumns"
+                  :default-columns="false"
+                  :show-global-filter="false"
+                  :bordered="true"
+                  pagination="none"
+                  sorting="none"
+                  :wrap="true"
+                >
+                  <!-- Field name -->
+                  <template #cell-fld="{ value }">
+                    <span class="truncate text-text-primary">{{ value }}<OTooltip :content="raw(String(value))" /></span>
+                  </template>
+                  <!-- Rarity chip + magnitude bar -->
+                  <template #cell-rarity="{ row }">
+                    <div class="flex flex-col gap-1 py-1">
+                      <OTag type="fieldRarity" :value="row.rarity" class="self-start">
+                        {{ t(`panel.logExplorer.insights.rarity.${row.rarity}`) }} {{ row.pct }}%
+                      </OTag>
+                      <div class="h-1 w-full overflow-hidden rounded-full bg-surface-subtle">
+                        <div
+                          :class="['h-full rounded-full opacity-80', row.rarity === 'anomalous' || row.rarity === 'rare' ? 'bg-error-500' : 'bg-accent']"
+                          :style="`width:${row.pct}%`"
+                        />
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </template>
+                  <!-- Sampled value -->
+                  <template #cell-sv="{ value }">
+                    <span class="truncate text-text-secondary">{{ value }}<OTooltip :content="raw(String(value))" max-width="22.5rem" /></span>
+                  </template>
+                </OTable>
               </div>
             </section>
 
@@ -569,34 +702,12 @@ function openInLogs() {
                 <!-- Skeleton while loading -->
                 <div v-if="insightsLoading && !timeline.length" class="h-14 rounded-default bg-surface-subtle animate-pulse" />
                 <div v-else-if="!timeline.length" class="h-14 flex items-center justify-center">
-                  <span class="text-2xs text-text-tertiary">No data</span>
+                  <span class="text-xs text-text-tertiary">{{ t("panel.logExplorer.insights.timelineEmpty") }}</span>
                 </div>
-                <template v-else>
-                  <!-- SVG bar chart -->
-                  <svg class="dld-timeline-svg" viewBox="0 0 200 54" preserveAspectRatio="none">
-                    <!-- Bars -->
-                    <rect
-                      v-for="(bucket, i) in timeline"
-                      :key="i"
-                      :x="(i / timeline.length) * 200"
-                      :y="52 - (bucket.num / timelineMax) * 46"
-                      :width="Math.max(0.5, (200 / timeline.length) - 0.5)"
-                      :height="(bucket.num / timelineMax) * 46"
-                      class="dld-timeline-bar"
-                    />
-                    <!-- Selected event marker -->
-                    <line v-if="eventXFrac >= 0"
-                      :x1="eventXFrac * 200" :x2="eventXFrac * 200"
-                      y1="0" y2="54"
-                      class="dld-timeline-marker"
-                    />
-                  </svg>
-                  <!-- X-axis labels -->
-                  <div class="flex justify-between mt-1">
-                    <span class="text-2xs text-text-tertiary font-mono">{{ fmtTsShort(timeline[0]?.keyMs) }}</span>
-                    <span class="text-2xs text-text-tertiary font-mono">{{ fmtTsShort(timeline[timeline.length - 1]?.keyMs) }}</span>
-                  </div>
-                </template>
+                <!-- ECharts bar chart via the shared dashboard ChartRenderer -->
+                <div v-else class="h-24">
+                  <ChartRenderer :data="{ options: timelineChartOptions }" />
+                </div>
               </div>
             </section>
 
@@ -613,30 +724,31 @@ function openInLogs() {
                   <div v-for="n in 3" :key="n" class="h-6 rounded-default bg-surface-subtle animate-pulse" />
                 </div>
                 <div v-else-if="!insightPatterns.length" class="px-4 py-3">
-                  <span class="text-2xs text-text-tertiary">{{ t("panel.logExplorer.insights.patternsEmpty") }}</span>
+                  <span class="text-xs text-text-tertiary">{{ t("panel.logExplorer.insights.patternsEmpty") }}</span>
                 </div>
                 <template v-else>
                   <div v-for="p in insightPatterns" :key="p.template"
-                    class="px-4 py-2 flex flex-col gap-1 hover:bg-surface-subtle transition-colors">
+                    class="dld-pat-row px-4 py-2 flex flex-col gap-1 transition-colors">
                     <div class="flex items-center gap-2">
                       <!-- Anomaly badge if z_score is high -->
-                      <span v-if="p.z_score > 2" class="dld-rarity-badge rounded-full dld-rarity-badge--rare shrink-0">
-                        z={{ p.z_score.toFixed(1) }}
-                      </span>
-                      <span class="text-2xs font-medium tabular-nums text-text-tertiary whitespace-nowrap shrink-0">{{ p.pct }}%</span>
+                      <OTag v-if="p.z_score > 2" type="fieldRarity"
+                        :value="p.z_score > 3 ? 'anomalous' : 'rare'" class="shrink-0">
+                        {{ t("panel.logExplorer.insights.zScore", { value: p.z_score.toFixed(1) }) }}
+                      </OTag>
+                      <span class="text-xs font-medium tabular-nums text-text-tertiary whitespace-nowrap shrink-0">{{ p.pct }}%</span>
                       <!-- Pattern template with wildcards -->
-                      <code class="text-2xs font-mono text-text-secondary flex-1 truncate" :title="p.template">{{ p.template }}</code>
+                      <code class="text-xs font-mono text-text-secondary flex-1 truncate">{{ p.template }}<OTooltip :content="raw(p.template)" max-width="22.5rem" /></code>
                       <!-- Open in Logs -->
                       <OButton size="sm" variant="ghost" icon-left="open-in-new" class="shrink-0"
                         data-test="log-explorer-pattern-open" @click.stop="openPatternInLogs(p.template)" />
                     </div>
                     <!-- Mini frequency bar -->
                     <div class="h-1 rounded-full bg-surface-subtle overflow-hidden">
-                      <div class="h-full rounded-full bg-accent opacity-50"
+                      <div class="h-full rounded-full bg-accent opacity-80"
                         :style="`width:${Math.min(p.pct, 100)}%`" />
                     </div>
                     <!-- Sample log line -->
-                    <p v-if="p.sample" class="text-2xs text-text-tertiary font-mono truncate leading-snug" :title="p.sample">{{ p.sample }}</p>
+                    <p v-if="p.sample" class="text-xs text-text-tertiary font-mono truncate leading-snug">{{ p.sample }}<OTooltip :content="raw(p.sample)" max-width="22.5rem" /></p>
                   </div>
                 </template>
               </div>
@@ -647,12 +759,26 @@ function openInLogs() {
               <header class="dld-section-header">
                 <OIcon name="timeline" size="xs" class="text-accent shrink-0" />
                 <span>{{ t("panel.logExplorer.insights.contextTitle") }}</span>
-                <OTooltip :content="t('panel.logExplorer.insights.contextTooltip')" side="bottom" :max-width="'280px'">
+                <OTooltip :content="t('panel.logExplorer.insights.contextTooltip')" side="bottom" max-width="17.5rem">
                   <OIcon name="info-outline" size="xs" class="text-text-tertiary cursor-help" />
                 </OTooltip>
                 <div class="ml-auto shrink-0">
-                  <OSelect v-model="surroundMinutes" :options="surroundWindowOptions" size="sm"
-                    data-test="log-explorer-surround-window" />
+                  <ODropdown side="bottom" align="end">
+                    <template #trigger>
+                      <OButton size="sm" variant="outline" icon-right="arrow-drop-down"
+                        data-test="log-explorer-surround-window">
+                        {{ surroundLabel }}
+                      </OButton>
+                    </template>
+                    <ODropdownItem
+                      v-for="opt in surroundWindowOptions"
+                      :key="opt.value"
+                      :data-test="`log-explorer-surround-window-${opt.value}`"
+                      @select="surroundMinutes = opt.value"
+                    >
+                      {{ opt.label }}
+                    </ODropdownItem>
+                  </ODropdown>
                 </div>
               </header>
               <div class="flex flex-col">
@@ -661,11 +787,12 @@ function openInLogs() {
                   <div v-for="n in 5" :key="n" class="h-7 rounded-default bg-surface-subtle animate-pulse" />
                 </div>
                 <div v-else-if="!surroundEvents.length" class="px-4 py-3">
-                  <span class="text-2xs text-text-tertiary">{{ t("panel.logExplorer.insights.contextEmpty") }}</span>
+                  <span class="text-xs text-text-tertiary">{{ t("panel.logExplorer.insights.contextEmpty") }}</span>
                 </div>
                 <template v-else>
                   <div v-for="(ev, i) in surroundPagedEvents" :key="i"
-                    :class="['dld-ctx-row', String(ev._timestamp) === String(selectedEvent!._timestamp) && 'dld-ctx-row--current']">
+                    :class="['dld-ctx-row cursor-pointer', String(ev._timestamp) === String(selectedEvent!._timestamp) && 'dld-ctx-row--current']"
+                    @click="toggleSurroundExpand(surroundPage * surroundPageSize + i)">
                     <!-- Timeline spine -->
                     <div class="dld-ctx-spine">
                       <div :class="['dld-ctx-dot rounded-full', String(ev._timestamp) === String(selectedEvent!._timestamp) && 'dld-ctx-dot--current']" />
@@ -678,10 +805,10 @@ function openInLogs() {
                         <span :class="['text-2xs font-mono tabular-nums whitespace-nowrap shrink-0', String(ev._timestamp) === String(selectedEvent!._timestamp) ? 'text-accent font-semibold' : 'text-text-tertiary']">
                           {{ fmtRelTime(Number(ev._timestamp), Number(selectedEvent!._timestamp)) }}
                         </span>
-                        <span class="text-2xs text-text-tertiary font-mono truncate flex-1">{{ fmtTsShort(ev._timestamp) }}</span>
+                        <span class="text-xs text-text-tertiary font-mono truncate flex-1">{{ fmtTsShort(ev._timestamp) }}</span>
                         <button class="dld-expand-btn shrink-0"
                           :aria-label="isSurroundExpanded(i) ? 'Collapse' : 'Expand'"
-                          @click.stop="toggleSurroundExpand(surroundPage * SURROUND_PER_PAGE + i)">
+                          @click.stop="toggleSurroundExpand(surroundPage * surroundPageSize + i)">
                           <OIcon :name="isSurroundExpanded(i) ? 'expand-less' : 'expand-more'" size="xs" />
                         </button>
                       </div>
@@ -690,7 +817,7 @@ function openInLogs() {
                       <div v-if="!isSurroundExpanded(i)"
                         class="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                         <template v-for="col in Object.keys(ev).filter(k => !k.startsWith('_')).slice(0, 4)" :key="col">
-                          <span v-if="ev[col] != null" class="text-2xs font-mono">
+                          <span v-if="ev[col] != null" class="text-xs font-mono">
                             <span class="text-text-tertiary">{{ col }}=</span>
                             <span class="text-text-secondary truncate max-w-32 inline-block align-bottom">{{ ev[col] }}</span>
                           </span>
@@ -700,66 +827,88 @@ function openInLogs() {
                       <!-- Expanded: all fields as KV list, full values wrap -->
                       <div v-else class="flex flex-col gap-0.5 mt-1 border-t border-border-default pt-1">
                         <div v-for="col in Object.keys(ev).filter(k => !k.startsWith('_'))" :key="col"
-                          class="flex gap-2 text-2xs font-mono">
-                          <span class="text-text-tertiary shrink-0 w-36 truncate" :title="col">{{ col }}</span>
+                          class="flex gap-2 text-xs font-mono">
+                          <span class="text-text-tertiary shrink-0 w-36 truncate">{{ col }}<OTooltip :content="raw(col)" /></span>
                           <span class="text-text-secondary break-all">{{ ev[col] ?? "—" }}</span>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <!-- Surrounding events pagination -->
-                  <div v-if="surroundTotalPages > 1"
-                    class="flex items-center justify-between px-4 py-2 border-t border-border-default bg-surface-panel">
-                    <span class="text-2xs text-text-tertiary tabular-nums">
-                      {{ surroundPage + 1 }} / {{ surroundTotalPages }}
-                      &nbsp;·&nbsp; {{ surroundEvents.length }} events
-                    </span>
-                    <div class="flex items-center gap-1">
-                      <OButton size="sm" variant="ghost" icon-left="first-page"
-                        :disabled="surroundPage === 0" @click="surroundPage = 0" />
-                      <OButton size="sm" variant="ghost" icon-left="chevron-left"
-                        :disabled="surroundPage === 0" @click="surroundPage--" />
-                      <OButton size="sm" variant="ghost" icon-left="chevron-right"
-                        :disabled="surroundPage >= surroundTotalPages - 1" @click="surroundPage++" />
-                      <OButton size="sm" variant="ghost" icon-left="last-page"
-                        :disabled="surroundPage >= surroundTotalPages - 1" @click="surroundPage = surroundTotalPages - 1" />
-                    </div>
+                  <!-- Surrounding events pagination — project-standard controls -->
+                  <div v-if="surroundEvents.length" class="flex w-full items-center px-3 pt-2">
+                    <div class="flex-1" />
+                    <TablePaginationControls
+                      :show-pagination="true"
+                      :pagination="{ page: surroundPage + 1, rowsPerPage: surroundPageSize }"
+                      :total-rows="surroundEvents.length"
+                      :pages-number="surroundTotalPages"
+                      :is-first-page="surroundPage === 0"
+                      :is-last-page="surroundPage >= surroundTotalPages - 1"
+                      @update:rows-per-page="(n) => { surroundPageSize = n; surroundPage = 0; }"
+                      @first-page="surroundPage = 0"
+                      @prev-page="surroundPage--"
+                      @next-page="surroundPage++"
+                      @last-page="surroundPage = surroundTotalPages - 1"
+                    />
                   </div>
                 </template>
               </div>
             </section>
           </OTabPanel>
 
-          <!-- ═══ DETAILS TAB ════════════════════════════════════════ -->
-          <OTabPanel name="details" class="p-0">
+          <!-- ═══ DETAILS TAB (searchable Name/Value table) ═════════════ -->
+          <OTabPanel name="details" class="px-2 pb-2">
+            <div class="mb-2 flex items-center gap-2">
+              <OInput
+                v-model="detailFilter"
+                size="sm"
+                icon-left="search"
+                :placeholder="t('common.search')"
+                class="flex-1"
+                data-test="log-explorer-detail-search"
+              />
+              <OSwitch
+                v-model="wrapDetailValues"
+                :label="t('common.wrap')"
+                size="md"
+                data-test="log-explorer-detail-wrap"
+              />
+            </div>
             <table class="dld-kv-table">
+              <thead>
+                <tr class="dld-kv-head-row">
+                  <th class="dld-kv-head dld-kv-head--key">{{ t("search.sourceName") }}</th>
+                  <th class="dld-kv-head">{{ t("search.sourceValue") }}</th>
+                </tr>
+              </thead>
               <tbody>
-                <tr v-for="[k, v] in Object.entries(selectedEvent)" :key="k"
+                <tr v-for="[k, v] in detailRows" :key="k"
                   class="dld-kv-row" :class="{ 'dld-kv-row--highlight': k === field }">
-                  <td class="dld-kv-key">{{ k }}</td>
+                  <td class="dld-kv-key log-key">{{ k }}</td>
                   <td class="dld-kv-val">
-                    <template v-if="k === '_timestamp'">{{ fmtTs(v) }}</template>
-                    <template v-else>{{ v ?? "—" }}</template>
-                  </td>
-                  <td class="dld-kv-copy">
-                    <button class="dld-copy-btn" @click.stop="copyToClipboard(v)">
-                      <OIcon name="content-copy" size="xs" />
-                    </button>
+                    <pre
+                      class="m-0 block w-full min-w-0 p-0 font-mono font-normal"
+                      :class="wrapDetailValues ? 'whitespace-pre-wrap break-all' : 'overflow-hidden text-ellipsis whitespace-nowrap'"
+                    ><LogsHighLighting :data="getDetailDisplayValue(k, v)" :show-braces="false" /></pre>
                   </td>
                 </tr>
               </tbody>
             </table>
           </OTabPanel>
 
-          <!-- ═══ JSON TAB ═══════════════════════════════════════════ -->
-          <OTabPanel name="json" class="p-0">
-            <div class="relative">
-              <OButton size="sm" variant="ghost" icon-left="content-copy"
-                class="absolute top-2 right-2 z-10"
-                @click="copyToClipboard(fmtJson(selectedEvent))">
-                {{ t("panel.logExplorer.detail.copy") }}
-              </OButton>
-              <pre class="dld-json">{{ fmtJson(selectedEvent) }}</pre>
+          <!-- ═══ JSON TAB (tree — same as Source Details) ═══════════════ -->
+          <OTabPanel name="json" class="px-2 pb-2">
+            <div class="dld-json-preview">
+              <JsonPreview
+                :value="selectedEvent"
+                mode="sidebar"
+                :stream-name="stream"
+                :show-copy-button="true"
+                hide-view-related
+                hide-search-term-actions
+                hide-field-options
+                @copy="copyToClipboard"
+              />
             </div>
           </OTabPanel>
         </OTabPanels>
@@ -770,6 +919,10 @@ function openInLogs() {
 
 <style scoped>
 /* keep(keyframes): pulse/progress @keyframes and :deep(OTextarea) SQL chrome cannot be expressed as Tailwind */
+/* Scoped to .dld-json-preview so the shared JsonPreview elsewhere is unaffected. */
+.dld-json-preview :deep(.log_json_content) {
+  padding-block: 0.1875rem;
+}
 /* ── Skeletons ────────────────────────────────────────────────────────────── */
 .dld-skeleton {
   height: 2rem; border-radius: 0.25rem; margin: 0.125rem 1rem;
@@ -815,9 +968,11 @@ function openInLogs() {
   letter-spacing: 0.04em; white-space: nowrap;
   background: color-mix(in srgb, var(--color-surface-panel) 100%, transparent);
   color: color-mix(in srgb, var(--color-text-tertiary) 100%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1px table header divider */
   border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 100%, transparent);
 }
 .dld-row {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1px row divider */
   border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 100%, transparent);
   cursor: pointer; transition: background 80ms;
 }
@@ -832,49 +987,42 @@ function openInLogs() {
 
 /* ── Insight sections ────────────────────────────────────────────────────── */
 .dld-section {
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 100%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: section divider (1 device pixel) */
+  border-bottom: 1px solid var(--color-border-default);
+  padding-bottom: 0.5rem;
+}
+.dld-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 .dld-section-header {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.625rem 1rem;
-  font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-  color: color-mix(in srgb, var(--color-text-secondary) 100%, transparent);
-  background: color-mix(in srgb, var(--color-surface-subtle) 40%, transparent);
+  display: flex; align-items: center; gap: 0.625rem;
+  padding: 1.25rem 1rem 0.875rem;
+  font-size: var(--text-sm); font-weight: 600; letter-spacing: 0;
+  color: var(--color-text-primary);
 }
+/* Render the leading section OIcon as a small accent chip. */
+.dld-section-header > :first-child {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.25rem; height: 1.25rem; flex: none;
+  border-radius: 0.3125rem;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.dld-section-header :deep(svg) { color: var(--color-accent); width: 0.75rem; height: 0.75rem; }
 .dld-section-hint {
-  font-weight: 400; text-transform: none; letter-spacing: 0;
-  font-size: 0.625rem;
-  color: color-mix(in srgb, var(--color-text-tertiary) 100%, transparent);
+  font-weight: 400; letter-spacing: 0;
+  font-size: var(--text-2xs);
+  color: var(--color-text-tertiary);
   margin-left: auto;
 }
-
-/* Rarity badges */
-.dld-rarity-badge {
-  display: inline-flex; align-items: center;
-  padding: 0.1rem 0.4rem;
-  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-  white-space: nowrap; flex-shrink: 0;
-}
-.dld-rarity-badge--common   { background: color-mix(in srgb, var(--color-surface-subtle) 100%, transparent); color: color-mix(in srgb, var(--color-text-tertiary) 100%, transparent); }
-.dld-rarity-badge--uncommon { background: color-mix(in srgb, oklch(70% 0.18 75) 15%, transparent); color: oklch(60% 0.18 75); }
-.dld-rarity-badge--rare     { background: color-mix(in srgb, oklch(60% 0.2 25) 15%, transparent);  color: oklch(60% 0.2 25); }
-.dld-rarity-badge--anomalous{ background: color-mix(in srgb, oklch(55% 0.22 25) 20%, transparent); color: oklch(55% 0.22 25); font-weight: 900; }
-
-/* ── Timeline SVG chart ──────────────────────────────────────────────────── */
-.dld-timeline-svg { width: 100%; height: 3.5rem; display: block; }
-.dld-timeline-bar {
-  fill: color-mix(in srgb, var(--color-accent) 55%, transparent);
-  transition: fill 80ms;
-}
-.dld-timeline-bar:hover { fill: color-mix(in srgb, var(--color-accent) 80%, transparent); }
-.dld-timeline-marker { stroke: color-mix(in srgb, var(--color-accent) 90%, transparent); stroke-width: 1.5; stroke-dasharray: 3 2; }
 
 /* ── Temporal context timeline ───────────────────────────────────────────── */
 .dld-ctx-row {
   display: flex; align-items: stretch; gap: 0; min-width: 0;
   transition: background 80ms;
 }
-.dld-ctx-row:hover { background: color-mix(in srgb, var(--color-surface-subtle) 100%, transparent); }
+.dld-ctx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
+.dld-pat-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
 .dld-ctx-row--current { background: color-mix(in srgb, var(--color-accent) 5%, transparent); }
 .dld-ctx-row--current:hover { background: color-mix(in srgb, var(--color-accent) 9%, transparent); }
 
@@ -891,20 +1039,28 @@ function openInLogs() {
   box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
 .dld-ctx-line {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1px vertical connector line */
   width: 1px; flex: 1;
   background: color-mix(in srgb, var(--color-border-default) 60%, transparent);
   margin-top: 0.25rem;
 }
 
 /* ── Event detail KV table ───────────────────────────────────────────────── */
-.dld-kv-table { width: 100%; border-collapse: collapse; font-size: 0.6875rem; }
+/* eslint-disable-next-line local/no-hardcoded-px -- hairline: table grid line (1 device pixel) */
+.dld-kv-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-xs); border: 1px solid var(--color-border-default); }
+/* eslint-disable-next-line local/no-hardcoded-px -- hairline: header divider (1 device pixel) */
+.dld-kv-head-row { border-bottom: 1px solid var(--color-border-default); }
+.dld-kv-head { padding: 0.35rem 0.5rem; text-align: left; font-weight: 600; color: var(--color-text-secondary); background: var(--color-surface-subtle); }
+.dld-kv-head--key { padding-left: 1rem; width: 38%; }
+/* eslint-disable-next-line local/no-hardcoded-px -- hairline: row divider (1 device pixel) */
 .dld-kv-row { border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 50%, transparent); }
 .dld-kv-row:hover { background: color-mix(in srgb, var(--color-surface-subtle) 100%, transparent); }
 .dld-kv-row--highlight { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
 .dld-kv-row--highlight:hover { background: color-mix(in srgb, var(--color-accent) 13%, transparent); }
-.dld-kv-key { padding: 0.35rem 0.5rem 0.35rem 1rem; font-family: var(--font-mono); font-weight: 600; white-space: nowrap; width: 38%; vertical-align: top; color: color-mix(in srgb, var(--color-text-secondary) 100%, transparent); }
-.dld-kv-val { padding: 0.35rem 0.5rem; word-break: break-all; vertical-align: top; color: color-mix(in srgb, var(--color-text-primary) 100%, transparent); }
-.dld-kv-copy { padding: 0.25rem 0.75rem 0.25rem 0; vertical-align: top; }
+/* Key colour from the global `.log-key` class; values coloured by LogsHighLighting. */
+/* eslint-disable-next-line local/no-hardcoded-px -- hairline: column divider (1 device pixel) */
+.dld-kv-key { padding: 0.35rem 0.5rem 0.35rem 1rem; font-family: var(--font-mono); font-weight: normal; white-space: nowrap; width: 38%; vertical-align: top; border-right: 1px solid color-mix(in srgb, var(--color-border-default) 50%, transparent); }
+.dld-kv-val { padding: 0.35rem 0.5rem; vertical-align: top; max-width: 0; }
 .dld-copy-btn {
   display: flex; align-items: center; justify-content: center; padding: 0.25rem;
   border-radius: 0.25rem; border: none; background: transparent; cursor: pointer;

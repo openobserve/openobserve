@@ -82,27 +82,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-else>{{ formatCellValue(value, column, row) }}</span>
       </template>
 
-      <!-- Explorer cells: hover highlight + click to open log drawer.
-           Only registered when explorerColumns is non-empty (explorable=true). -->
+      <!-- Explore-in-Logs hover action, drillable columns only -->
       <template
-        v-for="col in explorerColumns"
-        :key="`explorer-cell-${col.id}`"
-        #[`cell-${col.id}`]="{ value, column, row }"
+        v-if="drilldownColumns.length || drilldownAllColumns"
+        #copy-actions="{ columnId, row, value }"
       >
-        <span
-          v-if="isCellExplorable(value)"
-          class="group/cell relative inline-flex items-center gap-1 cursor-pointer rounded-default px-0.5 -mx-0.5 hover:bg-surface-subtle-hover transition-colors"
-          :title="t('panel.logExplorer.filterHint')"
-          @click.stop="$emit('cell-click', col.field ?? col.id, value, row)"
+        <OButton
+          v-if="isCellDrillable(columnId)"
+          variant="ghost"
+          size="icon-xs-sq"
+          :data-test="`dashboard-table-cell-drilldown-${columnId}`"
+          class="h-4! min-h-0! w-4! ml-1 shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
+          @click.stop="onCellDrilldown({ columnId, row, value })"
         >
-          <span class="truncate">{{ formatCellValue(value, column, row) }}</span>
-          <OIcon
-            name="filter-alt"
-            size="xs"
-            class="text-text-tertiary opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity"
-          />
-        </span>
-        <span v-else>{{ formatCellValue(value, column, row) }}</span>
+          <OIcon name="search" size="sm" />
+          <OTooltip :content="t('dashboard.tableCellDrilldownTooltip')" />
+        </OButton>
       </template>
 
       <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState,
@@ -151,11 +146,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed, watch, type PropType } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
@@ -169,7 +166,9 @@ export default defineComponent({
   components: {
     OTable,
     OEmptyState,
+    OButton,
     OIcon,
+    OTooltip,
     TablePaginationControls,
     JsonFieldRenderer,
   },
@@ -210,8 +209,20 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Column ids drillable → Logs (group-by fields); empty hides the button. */
+    drilldownColumns: {
+      required: false,
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
+    /** SELECT * / dynamic-columns tables: every cell is drillable. */
+    drilldownAllColumns: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["row-click", "cell-click", "format-column"],
+  emits: ["row-click", "format-column", "cell-click", "explore-cell"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
@@ -320,25 +331,6 @@ export default defineComponent({
       return format ? format(value, row) : value;
     };
 
-    // Columns that get the hover-to-explore treatment: everything that isn't
-    // already rendered by the JSON or link slot handlers.
-    const explorerColumns = computed(() => {
-      const jsonIds = new Set((jsonFieldColumns.value as any[]).map((c: any) => c.id));
-      const linkIds = new Set((linkFieldColumns.value as any[]).map((c: any) => c.id));
-      return (otableColumns.value as any[]).filter(
-        (c: any) => !jsonIds.has(c.id) && !linkIds.has(c.id),
-      );
-    });
-
-    // A cell value is explorable if it's a non-empty scalar that makes sense
-    // as an equality filter: skip nulls, empty strings, blobs (>200 chars),
-    // and bare large integers that are almost certainly Unix timestamps.
-    const isCellExplorable = (value: unknown): boolean => {
-      if (value === null || value === undefined || value === "") return false;
-      if (typeof value === "number" && value > 1e12) return false;
-      return String(value).length <= 200;
-    };
-
     /**
      * Computes the inline style for a given TanStack cell.
      * Handles auto-color mode (stable palette per distinct value) and
@@ -385,6 +377,17 @@ export default defineComponent({
 
     // Colour engine, in precedence order: auto-color palette → value-mapping →
     // conditional rules → column override.
+    const drilldownColumnSet = computed(() => new Set(props.drilldownColumns));
+    const isCellDrillable = (columnId: string) =>
+      props.drilldownAllColumns || drilldownColumnSet.value.has(columnId);
+
+    // Own event (not `cell-click`) so it fires even when a panel drilldown config
+    // would otherwise swallow plain cell clicks.
+    const onCellDrilldown = (params: { columnId: string; row: any; value: any }) => {
+      if (!isCellDrillable(params.columnId)) return;
+      emit("explore-cell", params, sortedRows.value.indexOf(params.row));
+    };
+
     const cellStyleFn = computed(
       () =>
         (params: { columnId: string; row: any; value: any }): Record<string, any> => {
@@ -564,8 +567,6 @@ export default defineComponent({
       pivotRowColumns,
       jsonFieldColumns,
       linkFieldColumns,
-      explorerColumns,
-      isCellExplorable,
       getHttpUrl,
       formatCellValue,
       cellStyleFn,
@@ -579,6 +580,8 @@ export default defineComponent({
       handleSortChange,
       onOTableSortChange,
       onFormatColumn,
+      onCellDrilldown,
+      isCellDrillable,
       getTableCsvString,
       downloadTableAsCSV,
       downloadTableAsJSON,
