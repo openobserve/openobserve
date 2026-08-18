@@ -190,6 +190,90 @@
           />
         </section>
 
+
+        <!-- The half of a layer the editor could not express at all: a
+             follow-the-sun setup was preset-or-API only, and a rotation the
+             API had restricted rendered here as if it applied always. -->
+        <section class="flex flex-col gap-4">
+          <OText variant="section">{{ t("oncall.rotationSectionApplies") }}</OText>
+
+          <p class="text-text-secondary text-sm">{{ t("oncall.rotationRestrictionHint") }}</p>
+
+          <div
+            v-for="(window, index) in active.restrictions ?? []"
+            :key="index"
+            class="border-border-default rounded-surface flex flex-wrap items-end gap-3 border p-3"
+            :data-test="`oncall-schedule-restriction-${index}`"
+          >
+            <OSelect
+              :model-value="window.days"
+              multiple
+              :label="t('oncall.rotationRestrictionDays')"
+              :options="dayOptions"
+              width="sm"
+              :data-test="`oncall-schedule-restriction-days-${index}`"
+              @update:model-value="(v: unknown) => (window.days = (v as number[]) ?? [])"
+            />
+            <OSelect
+              :model-value="window.start_minute"
+              :label="t('oncall.rotationRestrictionFrom')"
+              :options="minuteOptions"
+              width="xs"
+              :data-test="`oncall-schedule-restriction-from-${index}`"
+              @update:model-value="(v: unknown) => (window.start_minute = Number(v))"
+            />
+            <OSelect
+              :model-value="window.end_minute"
+              :label="t('oncall.rotationRestrictionTo')"
+              :options="minuteOptions"
+              width="xs"
+              :data-test="`oncall-schedule-restriction-to-${index}`"
+              @update:model-value="(v: unknown) => (window.end_minute = Number(v))"
+            />
+            <OButton
+              variant="ghost"
+              size="sm-action"
+              icon-left="delete-outline"
+              :data-test="`oncall-schedule-restriction-remove-${index}`"
+              @click="removeRestriction(index)"
+            >
+              {{ t("oncall.rotationRestrictionRemove") }}
+            </OButton>
+          </div>
+
+          <div class="flex">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              icon-left="add"
+              data-test="oncall-schedule-restriction-add"
+              @click="addRestriction"
+            >
+              {{ t("oncall.rotationRestrictionAdd") }}
+            </OButton>
+          </div>
+
+          <!-- Two layers that both apply and share a priority are "equally in
+               force", and the server refuses the WHOLE save — taking the
+               rotation that already worked down with the edit. -->
+          <OSelect
+            :model-value="active.priority ?? 0"
+            :label="t('oncall.rotationPriority')"
+            :help-text="t('oncall.rotationPriorityHint')"
+            :options="priorityOptions"
+            width="sm"
+            data-test="oncall-schedule-priority"
+            @update:model-value="(v: unknown) => setPriority(active as Rotation, Number(v))"
+          />
+          <p
+            v-if="priorityClash"
+            class="text-status-warning-text text-sm"
+            data-test="oncall-schedule-priority-clash"
+          >
+            {{ priorityClash }}
+          </p>
+        </section>
+
         <!-- The answer the form produces. It is the reason to have a drawer at
              all: a cadence and an anchor are not readable as a rota until you
              see the dates they generate. -->
@@ -244,6 +328,7 @@
             variant="primary"
             size="sm-action"
             :loading="saving"
+            :disabled="!!priorityClash"
             data-test="oncall-rotation-done"
             @click="save"
           >
@@ -279,10 +364,11 @@ import type {
   ScheduleEditorIntent,
   Unavailability,
 } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, MICROS_PER_WEEK, sameSlot } from "@/ts/interfaces/oncall";
+import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Shift } from "@/utils/oncall";
-import { SHIFT_PRESETS, upcomingShifts } from "@/utils/oncall";
+import { formatMinuteOfDay, SHIFT_PRESETS, upcomingShifts } from "@/utils/oncall";
 
 const PREVIEW_SHIFTS = 5;
 
@@ -431,6 +517,81 @@ const memberOptions = computed(() =>
 const shiftOptions = computed(() =>
   SHIFT_PRESETS.map((preset) => ({ label: t(preset.labelKey), value: preset.micros })),
 );
+
+/// 0 = Monday .. 6 = Sunday, matching the engine's own numbering.
+const DAY_KEYS: I18nKey[] = [
+  "oncall.day_mon",
+  "oncall.day_tue",
+  "oncall.day_wed",
+  "oncall.day_thu",
+  "oncall.day_fri",
+  "oncall.day_sat",
+  "oncall.day_sun",
+];
+
+const dayOptions = computed(() => DAY_KEYS.map((key, value) => ({ label: t(key), value })));
+
+/// Half-hours from local midnight, plus 24:00 as an end — a window ending at
+/// midnight is the common night shift, and 00:00 would read as zero length.
+const minuteOptions = computed(() =>
+  Array.from({ length: 49 }, (_, index) => index * 30).map((minute) => ({
+    label: raw(minute === 1440 ? "24:00" : formatMinuteOfDay(minute)),
+    value: minute,
+  })),
+);
+
+/// Offered rather than typed. Two layers that both apply and share a priority
+/// are equally in force, and the server rejects the ENTIRE save rather than
+/// the one rotation — so a free number field is a way to take a working rota
+/// down while editing something else.
+const priorityOptions = computed(() => {
+  const highest = draft.value.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
+  const mine = active.value?.priority ?? 0;
+  const levels = new Set<number>([0, mine, highest, highest + 1]);
+  return [...levels]
+    .filter((level) => level >= 0)
+    .sort((a, b) => a - b)
+    .map((level) => ({
+      label: level === 0 ? t("oncall.rotationPriorityBase") : raw(String(level)),
+      value: level,
+    }));
+});
+
+/// Only rotations sharing a SLOT compete: two slots resolve at the same instant
+/// with their own members, so an identical priority across them is not a clash.
+const priorityClash = computed<I18nText | "">(() => {
+  const rotation = active.value;
+  if (!rotation) return "";
+  const rival = draft.value.find(
+    (other) =>
+      other !== rotation &&
+      other.name !== rotation.name &&
+      sameSlot(other.slot, rotation.slot) &&
+      (other.priority ?? 0) === (rotation.priority ?? 0),
+  );
+  return rival ? t("oncall.rotationPriorityClash", { name: raw(rival.name) }) : "";
+});
+
+function setPriority(rotation: Rotation, priority: number) {
+  rotation.priority = priority;
+}
+
+/// A window with no days applies on no day, which is a rotation that resolves
+/// to nobody — so a new one starts as the working week.
+function addRestriction() {
+  const rotation = active.value;
+  if (!rotation) return;
+  rotation.restrictions = [
+    ...(rotation.restrictions ?? []),
+    { days: [0, 1, 2, 3, 4], start_minute: 9 * 60, end_minute: 17 * 60 },
+  ];
+}
+
+function removeRestriction(index: number) {
+  const rotation = active.value;
+  if (!rotation?.restrictions) return;
+  rotation.restrictions = rotation.restrictions.filter((_, at) => at !== index);
+}
 
 
 

@@ -313,4 +313,94 @@ describe("OnCallScheduleEditor", () => {
 
     expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(false);
   });
+  /// A layer's *when* was the half the editor could not express: a
+  /// follow-the-sun setup was preset-or-API only, and a rotation the API had
+  /// restricted rendered here as though it applied always.
+  describe("when a layer applies", () => {
+    const layer = (over: Record<string, unknown> = {}) => ({
+      name: "Primary",
+      members: ["ana@o2.ai"],
+      shift_micros: MICROS_PER_WEEK,
+      anchor_micros: ANCHOR,
+      priority: 0,
+      ...over,
+    });
+
+    it("round-trips a restriction the API wrote", async () => {
+      const wrapper = render({
+        schedule: schedule([
+          layer({ restrictions: [{ days: [0, 1, 2], start_minute: 540, end_minute: 1020 }] }),
+        ]),
+      });
+      await openRotation(wrapper);
+
+      expect(wrapper.find('[data-test="oncall-schedule-restriction-0"]').exists()).toBe(true);
+      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+      await flushPromises();
+
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations[0];
+      expect(sent.restrictions).toEqual([{ days: [0, 1, 2], start_minute: 540, end_minute: 1020 }]);
+    });
+
+    /// A window with no days applies on no day, which is a rotation resolving
+    /// to nobody — so a new one starts as the working week.
+    it("adds a window that already means something", async () => {
+      const wrapper = render({ schedule: schedule([layer()]) });
+      await openRotation(wrapper);
+
+      await wrapper.find('[data-test="oncall-schedule-restriction-add"]').trigger("click");
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+      await flushPromises();
+
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations[0];
+      expect(sent.restrictions).toEqual([{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 }]);
+    });
+
+    it("removes a window", async () => {
+      const wrapper = render({
+        schedule: schedule([
+          layer({ restrictions: [{ days: [0], start_minute: 0, end_minute: 60 }] }),
+        ]),
+      });
+      await openRotation(wrapper);
+
+      await wrapper.find('[data-test="oncall-schedule-restriction-remove-0"]').trigger("click");
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+      await flushPromises();
+
+      expect((service.setSchedule.mock.calls[0][0] as any).data.rotations[0].restrictions).toEqual([]);
+    });
+
+    /// Two layers equally in force are refused as a WHOLE — the rotation that
+    /// works today goes down with the edit — so Save has to be unreachable
+    /// rather than the reader learning it from a 400.
+    it("blocks a save that would collide with another layer's priority", async () => {
+      const wrapper = render({
+        schedule: schedule([layer(), layer({ name: "Weekend", priority: 1 })]),
+      });
+      await openRotation(wrapper, 1);
+
+      const priority = wrapper.find('[data-test="oncall-schedule-priority"]');
+      priority.element.value = "0";
+      await priority.trigger("change");
+
+      expect(wrapper.find('[data-test="oncall-schedule-priority-clash"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
+      ).toBeDefined();
+    });
+
+    /// Slots do not compete — both resolve at the same instant with their own
+    /// members — so an identical priority across two slots is not a clash.
+    it("allows the same priority in a different slot", async () => {
+      const wrapper = render({
+        schedule: schedule([layer(), layer({ name: "Backup", slot: "secondary", priority: 0 })]),
+      });
+      await openRotation(wrapper, 1);
+
+      expect(wrapper.find('[data-test="oncall-schedule-priority-clash"]').exists()).toBe(false);
+    });
+  });
 });
