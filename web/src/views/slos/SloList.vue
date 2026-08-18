@@ -692,6 +692,7 @@ const stats = computed<StatItem[]>(() => {
   return [
     {
       key: "budget_blown",
+      dataTest: "slos-slolist-stat-budget_blown",
       label: t("slos.health.budget_blown"),
       value: counts.budget_blown,
       icon: "local-fire-department",
@@ -700,6 +701,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "at_risk",
+      dataTest: "slos-slolist-stat-at_risk",
       label: t("slos.health.at_risk"),
       value: counts.at_risk,
       icon: "trending-down",
@@ -708,6 +710,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "meeting",
+      dataTest: "slos-slolist-stat-meeting",
       label: t("slos.health.meeting"),
       value: counts.meeting,
       icon: "check-circle",
@@ -716,13 +719,21 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "no_data",
+      dataTest: "slos-slolist-stat-no_data",
       label: t("slos.health.no_data"),
       value: counts.no_data,
       icon: "help",
       tone: "neutral",
       max: total,
     },
-    { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: true },
+    {
+      key: "total",
+      dataTest: "slos-slolist-stat-total",
+      label: t("slos.totalSlos"),
+      value: total,
+      tone: "primary",
+      selectable: true,
+    },
   ];
 });
 
