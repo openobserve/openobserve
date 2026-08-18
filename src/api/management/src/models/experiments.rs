@@ -269,6 +269,9 @@ pub struct ClientExecutionRecordBody {
     pub error_message: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_attempt_count: Option<u32>,
+    /// Free-text reason a Task gave for declining the Slot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skip_message: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latency_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -352,6 +355,7 @@ impl From<ClientExecutionRecordBody> for ClientExecutionRecord {
             output: value.output,
             error_message: value.error_message,
             error_attempt_count: value.error_attempt_count,
+            skip_message: value.skip_message,
             latency_ms: value.latency_ms,
             tokens_in: value.tokens_in,
             tokens_out: value.tokens_out,
@@ -993,6 +997,14 @@ mod tests {
                     "messages": [{"role": "user", "content": "{{ input }}"}],
                     "providerId": "provider-1"
                 }),
+                // An SDK Task is identified by the customer code behind it, so
+                // its fingerprint is part of the definition rather than an
+                // optional extra.
+                "sdk" => serde_json::json!({
+                    "type": kind,
+                    "taskFingerprint": "sha256:customer-code-v3",
+                    "config": {}
+                }),
                 _ => serde_json::json!({"type": kind, "config": {}}),
             };
             let body: CreateExperimentRequestBody = serde_json::from_value(serde_json::json!({
@@ -1006,6 +1018,25 @@ mod tests {
             .unwrap();
             assert_eq!(body.dataset_version, 3);
         }
+    }
+
+    #[test]
+    fn an_sdk_task_without_a_fingerprint_is_refused_at_the_edge() {
+        let body: Result<ExperimentTaskBody, _> =
+            serde_json::from_value(serde_json::json!({"type": "sdk", "config": {}}));
+        assert!(body.is_err());
+
+        let accepted: ExperimentTaskBody = serde_json::from_value(
+            serde_json::json!({"type": "sdk", "taskFingerprint": "sha256:abc"}),
+        )
+        .unwrap();
+        let ExperimentTaskBody::Sdk {
+            task_fingerprint, ..
+        } = accepted
+        else {
+            panic!("expected an SDK task");
+        };
+        assert_eq!(task_fingerprint, "sha256:abc");
     }
 
     #[test]

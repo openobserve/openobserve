@@ -119,6 +119,10 @@ pub enum LlmScoreEvaluationSource<'a> {
     ClientExperiment {
         experiment_id: &'a str,
         client_scorer_key: &'a str,
+        /// Physical Score Config row. It pins the exact version, so a mid-run
+        /// `ensure()` version bump stays a separate dimension instead of
+        /// collapsing onto the earlier one.
+        score_config_row_id: &'a str,
         row_id: &'a str,
         trial_index: u32,
     },
@@ -171,6 +175,7 @@ pub fn evaluation_key(
         LlmScoreEvaluationSource::ClientExperiment {
             experiment_id,
             client_scorer_key,
+            score_config_row_id,
             row_id,
             trial_index,
         } => serde_json::json!({
@@ -178,6 +183,7 @@ pub fn evaluation_key(
             "source": "client_experiment",
             "experimentId": experiment_id,
             "clientScorerKey": client_scorer_key,
+            "scoreConfigRowId": score_config_row_id,
             "rowId": row_id,
             "trialIndex": trial_index,
         }),
