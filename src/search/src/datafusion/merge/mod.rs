@@ -113,10 +113,7 @@ pub async fn merge_parquet_files(
         // for file list we do not have timestamp, so we instead sort by min ts of entries
         "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
     } else {
-        format!(
-            "SELECT * FROM tbl ORDER BY {}",
-            FileSortOrder::TimestampDesc.order_by_clause().unwrap()
-        )
+        format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
     };
     log::debug!("merge_parquet_files sql: {sql}");
 

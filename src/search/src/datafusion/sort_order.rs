@@ -33,6 +33,12 @@ use datafusion::{
     prelude::col,
 };
 
+const TIMESTAMP_DESC_COLUMNS: &[SortColumn] = &[SortColumn::desc(TIMESTAMP_COL_NAME)];
+const HASH_TIMESTAMP_ASC_COLUMNS: &[SortColumn] = &[
+    SortColumn::asc(HASH_LABEL),
+    SortColumn::asc(TIMESTAMP_COL_NAME),
+];
+
 /// One column of a [`FileSortOrder`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SortColumn {
@@ -77,12 +83,6 @@ pub enum FileSortOrder {
     /// one series are contiguous and time-ordered inside a file.
     HashTimestampAsc,
 }
-
-const TIMESTAMP_DESC_COLUMNS: &[SortColumn] = &[SortColumn::desc(TIMESTAMP_COL_NAME)];
-const HASH_TIMESTAMP_ASC_COLUMNS: &[SortColumn] = &[
-    SortColumn::asc(HASH_LABEL),
-    SortColumn::asc(TIMESTAMP_COL_NAME),
-];
 
 impl FileSortOrder {
     /// Bridge for the legacy `sorted_by_time: bool` flag.
