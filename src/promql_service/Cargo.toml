@@ -21,6 +21,7 @@ vectorscan = ["search/vectorscan", "search_service/vectorscan"]
 [dependencies]
 arrow.workspace = true
 async-trait.workspace = true
+bytes.workspace = true
 config.workspace = true
 datafusion.workspace = true
 db.workspace = true
