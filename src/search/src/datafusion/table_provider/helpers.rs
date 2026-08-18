@@ -134,14 +134,11 @@ fn generate_parquet_access_plan_from_ranges(
 
     let mut previous_end = 0;
     for range in ranges {
-        if range.start >= range.end || range.end > num_rows || range.start < previous_end {
-            log::warn!(
-                "invalid sorted row range {:?} for file {} with {num_rows} rows",
-                range,
-                file.path().as_ref()
-            );
-            return None;
-        }
+        assert!(
+            previous_end <= range.start && range.start < range.end && range.end <= num_rows,
+            "invalid sorted row range {range:?} for file {} with {num_rows} rows",
+            file.path().as_ref()
+        );
         previous_end = range.end;
         row_group_selection.push_selected_range(range.start, range.end);
     }
@@ -402,6 +399,15 @@ mod tests {
             RowSelection::from(vec![RowSelector::skip(2), RowSelector::select(2)]),
         );
         assert_eq!(plan, expected);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid sorted row range")]
+    fn test_generate_parquet_access_plan_rejects_out_of_bounds_row_ids() {
+        let file = make_partitioned_file(4);
+        let row_ids = BooleanBuffer::from_iter((0..5).map(|i| i == 4));
+
+        generate_parquet_access_plan(&file, &row_ids, Some(4));
     }
 
     #[test]
