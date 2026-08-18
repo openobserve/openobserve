@@ -36,7 +36,12 @@ const builderSubmit = vi.fn();
 vi.mock("@/components/flow/forms/ConditionBuilder.vue", () => ({
   default: {
     name: "ConditionBuilder",
-    props: ["fields", "initialConditions", "normalizeOperators"],
+    props: {
+      fields: { default: () => [] },
+      initialConditions: { default: null },
+      normalizeOperators: { type: Boolean, default: false },
+      normalizeColumnNames: { type: Boolean, default: false },
+    },
     methods: {
       submit: (...args: any[]) => builderSubmit(...args),
     },
@@ -184,5 +189,14 @@ describe("WorkflowCondition", () => {
       const wrapper = createWrapper();
       await expect((wrapper.vm as any).submit()).resolves.toBeNull();
     });
+  });
+
+  it("opts into custom-column normalization on the shared builder", () => {
+    const wrapper = createWrapper();
+    // ConditionBuilder normalizes dotted custom columns to the flattened form; the
+    // workflow condition turns it on (its trigger payload is flattened).
+    expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("normalizeColumnNames")).toBe(
+      true,
+    );
   });
 });

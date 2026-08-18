@@ -1259,6 +1259,10 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/workflows/{id}/enable",
                     put(workflows::enable_workflow),
+                )
+                .route(
+                    "/{org_id}/workflows/promote/{id}",
+                    post(workflows::promote_draft),
                 );
         }
 

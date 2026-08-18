@@ -1613,8 +1613,12 @@ function formatDimLabels(dims: any[]): string {
   const labels = dims.map((d: any) => d.label);
   if (labels.length === 0) return "";
   if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-  return labels.slice(0, -1).join(", ") + ", and " + labels[labels.length - 1];
+  if (labels.length === 2)
+    return t("settings.listConjunctionAndTwo", { first: labels[0], last: labels[1] });
+  return t("settings.listConjunctionAnd", {
+    list: labels.slice(0, -1).join(", "),
+    last: labels[labels.length - 1],
+  });
 }
 
 /** Build insight data for the currently open popup */
@@ -1804,7 +1808,9 @@ const insightData = computed(() => {
       count,
       total,
       childLabel: primaryDim.value
-        ? `Found in ${pluralize(primaryDim.value.display).toLowerCase()}`
+        ? t("settings.serviceIdentitySetup.foundIn", {
+            dimension: pluralize(primaryDim.value.display).toLowerCase(),
+          })
         : "",
       childCountLabel: "",
       children: parents.map((p) => ({ name: p, count: 0 })),
@@ -1884,7 +1890,7 @@ const insightData = computed(() => {
     coverage,
     count,
     total,
-    childLabel: "Runs in",
+    childLabel: t("settings.runsIn"),
     childCountLabel: "",
     children: [] as { name: string; count: number }[],
     maxChildCount: 1,
@@ -1958,7 +1964,16 @@ const insightChartData = computed(() => {
         extraCssText: "max-height: 15rem; overflow-y: auto;",
         formatter: function (params: any) {
           const names: string[] = params.data?.streamNames ?? [];
-          const header = `${params.marker} ${params.name} : <b>${params.value} streams (${params.percent}%)</b>`;
+          // The marker (echarts' own colour swatch) and the <b> wrapper stay in
+          // code; the messages carry only words and placeholders.
+          const stats = t("settings.serviceIdentitySetup.streamCountStats", {
+            count: params.value,
+            percent: params.percent,
+          });
+          const header = `${params.marker} ${t("settings.serviceIdentitySetup.streamCountTooltip", {
+            name: params.name,
+            stats: `<b>${stats}</b>`,
+          })}`;
           if (!names.length) return header;
           const list = names
             .map(
@@ -2008,7 +2023,7 @@ const insightChartData = computed(() => {
                   textAlign: "center",
                 },
                 subtextStyle: {
-                  text: "streams",
+                  text: t("settings.serviceIdentitySetup.streamsSubtext"),
                   fontSize: 10,
                 },
               },
@@ -2185,12 +2200,20 @@ const suggestedConfig = computed<SuggestedConfig | null>(() => {
     ),
   ];
 
+  // Each clause is a whole translated phrase; only the "·" list separator is
+  // assembled here, never a sentence built from translated fragments.
   const parts: string[] = [];
-  if (bestCard) parts.push(`${bestCard} cardinality`);
-  if (minCoverage > 0) parts.push(`${minCoverage}% coverage`);
+  if (bestCard)
+    parts.push(t("settings.serviceIdentitySetup.reasonCardinality", { level: bestCard }));
+  if (minCoverage > 0)
+    parts.push(t("settings.serviceIdentitySetup.reasonCoverage", { coverage: minCoverage }));
   if (allStreamTypes.length > 1) {
     parts.push(
-      `across ${allStreamTypes.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(", ")}`,
+      t("settings.serviceIdentitySetup.reasonAcrossStreamTypes", {
+        types: allStreamTypes
+          .map((streamType) => streamType.charAt(0).toUpperCase() + streamType.slice(1))
+          .join(", "),
+      }),
     );
   }
 
@@ -2198,8 +2221,10 @@ const suggestedConfig = computed<SuggestedConfig | null>(() => {
     distinguish_by: suggested,
     reason:
       parts.length > 0
-        ? `${parts.join(" · ")} — ideal for service disambiguation`
-        : "Recommended based on field coverage in your streams.",
+        ? t("settings.serviceIdentitySetup.reasonIdealForDisambiguation", {
+            details: parts.join(" · "),
+          })
+        : t("settings.recommendedByFieldCoverage"),
   };
 });
 

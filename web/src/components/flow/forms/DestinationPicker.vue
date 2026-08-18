@@ -35,11 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSwitch
       v-model="createNewDestination"
       :label="t('flow.destination.createNew')"
+      :disabled="disabled"
       data-test="destination-picker-create-toggle"
     />
 
     <!-- inline create destination form (own save/cancel) -->
-    <div v-if="createNewDestination" class="w-full">
+    <div v-if="createNewDestination && !disabled" class="w-full">
       <CreateDestinationForm
         :forced-type="forcedType"
         @created="onDestinationCreated"
@@ -52,7 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OFormSelect
         name="selectedDestination"
         :label="t('flow.destination.select')"
-        required
+        :required="!optional"
+        :disabled="disabled"
         :options="destinationOptions"
         tabindex="0"
         data-test="destination-picker-select"
@@ -79,10 +81,25 @@ import {
 
 // `forcedType`, when set, is forwarded to the inline create form to lock its
 // destination type and skip the type-selection step (workflows → "custom").
-const props = withDefaults(defineProps<{ initialName?: string; forcedType?: string }>(), {
-  initialName: "",
-  forcedType: undefined,
-});
+// `optional` (Workflows) lets the picker be saved with NO destination selected —
+// `submit()` then returns an empty `destination_name` instead of null, and the
+// required schema check is skipped. `disabled` greys the whole picker out (used by
+// the Workflows "Set up later" toggle). Both default false so Pipelines are
+// unaffected.
+const props = withDefaults(
+  defineProps<{
+    initialName?: string;
+    forcedType?: string;
+    optional?: boolean;
+    disabled?: boolean;
+  }>(),
+  {
+    initialName: "",
+    forcedType: undefined,
+    optional: false,
+    disabled: false,
+  },
+);
 const emit = defineEmits<{ (e: "expand", value: boolean): void }>();
 
 const { t } = useI18nTyped();
@@ -165,6 +182,16 @@ const onDestinationCreated = (name: string) => {
 // only fires on a schema-valid submit, so `validated` stays null otherwise.
 const submit = async () => {
   if (createNewDestination.value) return null; // still in the inline create form
+  // Optional (Workflows placeholder): empty is allowed. Read the current value
+  // WITHOUT running the required schema, so no inline error and empty resolves to
+  // "" rather than null.
+  if (props.optional) {
+    const name = (form.state.values.selectedDestination as string) || "";
+    return {
+      org_id: store.state.selectedOrganization.identifier,
+      destination_name: name,
+    };
+  }
   validated.value = null;
   await form.handleSubmit();
   const values = validated.value as ExternalDestinationForm | null;

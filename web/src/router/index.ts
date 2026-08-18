@@ -15,6 +15,7 @@
 
 import { createRouter, createWebHistory } from "vue-router";
 import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
+import { gt } from "@/types/i18n";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 
@@ -76,9 +77,16 @@ export default function (store: any) {
   const router = createRouter(routerMap);
 
   router.beforeEach((to: any, from: any, next: any) => {
-    // Set page title with OpenObserve prefix
-    if (to.meta && to.meta.title) {
-      document.title = `OpenObserve - ${to.meta.title}`;
+    // Set page title with OpenObserve prefix.
+    //
+    // Routes carry an i18n KEY (`meta.titleKey`), not the text: the route tables
+    // are module-scope, so translating where a route is declared would freeze the
+    // tab title at whatever locale happened to be active at import time. Resolving
+    // here — per navigation — keeps it in the current locale. `gt` (not `t`)
+    // because a navigation guard runs outside any component setup.
+    if (to.meta && to.meta.titleKey) {
+      // The brand prefix is a product noun, never translated; the page name is.
+      document.title = `OpenObserve - ${gt(to.meta.titleKey)}`;
     } else {
       document.title = "OpenObserve";
     }

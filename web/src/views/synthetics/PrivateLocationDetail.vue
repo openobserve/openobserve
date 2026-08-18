@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :dot="true"
                 size="sm"
               >
-                {{ resolveBadge("serviceStatus", (row as any).last_check_status).label }}
+                {{ resolveBadgeLabel("serviceStatus", (row as any).last_check_status) }}
               </OBadge>
             </template>
           </OTable>
@@ -231,7 +231,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import syntheticsService from "@/services/synthetics";

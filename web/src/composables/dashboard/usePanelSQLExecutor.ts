@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { markRaw, toRaw, nextTick } from "vue";
+import { gt } from "@/types/i18n";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
 import logsUtils from "@/composables/useLogs/logsUtils";
@@ -371,7 +372,9 @@ export const usePanelSQLExecutor = (ctx: {
             // Validate that timestamp column is not used as an alias for other fields
             if (!checkTimestampAlias(query)) {
               state.errorDetail = {
-                message: `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+                message: gt("dashboard.utils.aliasNotAllowed", {
+                  alias: store.state.zoConfig.timestamp_column || "_timestamp",
+                }),
                 code: "400",
               };
               addTraceId("tempTraceId");
@@ -643,7 +646,9 @@ export const usePanelSQLExecutor = (ctx: {
           // Validate that timestamp column is not used as an alias for other fields
           if (!checkTimestampAlias(query)) {
             state.errorDetail = {
-              message: `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+              message: gt("dashboard.utils.aliasNotAllowed", {
+                alias: store.state.zoConfig.timestamp_column || "_timestamp",
+              }),
               code: "400",
             };
             state.loading = false;
@@ -895,7 +900,9 @@ export const usePanelSQLExecutor = (ctx: {
 
           if (!checkTimestampAlias(query)) {
             state.errorDetail = {
-              message: `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+              message: gt("dashboard.utils.aliasNotAllowed", {
+                alias: store.state.zoConfig.timestamp_column || "_timestamp",
+              }),
               code: "400",
             };
             addTraceId("tempTraceId");
@@ -941,7 +948,9 @@ export const usePanelSQLExecutor = (ctx: {
 
         if (!checkTimestampAlias(query)) {
           state.errorDetail = {
-            message: `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+            message: gt("dashboard.utils.aliasNotAllowed", {
+              alias: store.state.zoConfig.timestamp_column || "_timestamp",
+            }),
             code: "400",
           };
           state.loading = false;

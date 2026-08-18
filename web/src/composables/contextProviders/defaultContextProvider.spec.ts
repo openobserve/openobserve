@@ -29,7 +29,7 @@ describe("createDefaultContextProvider", () => {
     const router = {
       currentRoute: {
         value: {
-          meta: { title: "Logs" },
+          meta: { titleKey: "menu.search" },
           name: "logs",
           path: "/logs",
           fullPath: "/logs?stream=default",

@@ -4,7 +4,7 @@
 import type { TimeProps, TimeEmits, TimeSlots } from "./OTime.types";
 import { computed, ref, useAttrs, useId, watch } from "vue";
 import { PopoverRoot, PopoverTrigger, PopoverContent } from "reka-ui";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18nTyped();
@@ -95,6 +95,17 @@ interface ClockNum {
   x: number;
   y: number;
 }
+
+// Screen-reader label for a clock-face number ("7 hour", "05 minute"). One
+// whole-sentence key per mode — the mode noun can't be appended to the number,
+// since word order differs across languages.
+const clockNumberKey = computed<I18nKey>(() =>
+  clockMode.value === "hour"
+    ? "common.clockNumberHour"
+    : clockMode.value === "minute"
+      ? "common.clockNumberMinute"
+      : "common.clockNumberSecond",
+);
 
 const clockNumbers = computed((): ClockNum[] => {
   if (clockMode.value === "hour") {
@@ -435,7 +446,7 @@ const fieldClasses = computed(() => [
               :key="num.value"
               role="button"
               tabindex="0"
-              :aria-label="`${num.label} ${clockMode}`"
+              :aria-label="t(clockNumberKey, { number: num.label })"
               :aria-pressed="isClockNumSelected(num)"
               class="group cursor-pointer"
               @click="onClockClick(num)"

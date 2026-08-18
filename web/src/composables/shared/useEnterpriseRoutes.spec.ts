@@ -1,5 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
+import enLocale from "@/locales/languages/en-US.json";
+
+/** Every `meta.titleKey` in a route tree, children included. */
+const collectTitleKeys = (routes: any[]): string[] =>
+  routes.flatMap((route) => [
+    ...(route?.meta?.titleKey ? [route.meta.titleKey] : []),
+    ...collectTitleKeys(route?.children ?? []),
+  ]);
+
+const enMessage = (key: string) =>
+  key.split(".").reduce<any>((node, part) => node?.[part], enLocale);
 
 // Mock the config module with mutable reference
 vi.mock("@/aws-exports", () => {
@@ -807,6 +818,24 @@ describe("useEnterpriseRoutes.ts", () => {
 
       const uniqueNames = [...new Set(allNames)];
       expect(uniqueNames.length).toBe(allNames.length); // No duplicates
+    });
+  });
+
+  // Route meta is untyped (`routes: any`), so a typo in a titleKey cannot be
+  // caught by the compiler — this is the gate instead. An unresolvable key would
+  // put the raw key in the browser tab.
+  describe("meta.titleKey", () => {
+    it("should only use i18n keys that exist in en-US.json", async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "true";
+      config.default.isEnterprise = "true";
+
+      const titleKeys = collectTitleKeys(useEnterpriseRoutes());
+      expect(titleKeys.length).toBeGreaterThan(0);
+
+      for (const titleKey of titleKeys) {
+        expect(enMessage(titleKey), `no en-US message for "${titleKey}"`).toBeTypeOf("string");
+      }
     });
   });
 });

@@ -190,7 +190,7 @@ async function loadCatalog() {
     scoreConfigEntries.value = catalog.scoreConfigs.filter((e) => e.level === "span");
     scorerEntries.value = catalog.scorers.filter((e) => e.level === "span");
   } catch (err: any) {
-    loadError.value = err?.message || "Failed to load catalog";
+    loadError.value = err?.message || t("onlineEvals.failedToLoadCatalog");
   } finally {
     isLoadingCatalog.value = false;
   }
@@ -279,7 +279,7 @@ async function importSelected() {
         continue;
       }
       failCount++;
-      if (failCount === 1) showError(err, "Failed to import scorer");
+      if (failCount === 1) showError(err, t("onlineEvals.failedToImportScorer"));
     }
   }
 
@@ -288,10 +288,12 @@ async function importSelected() {
   emit("imported");
 
   if (successCount > 0 || skipCount > 0) {
+    // Each clause is a whole translated phrase; only the list separator is
+    // assembled here, never a sentence built from translated fragments.
     const parts: string[] = [];
-    if (successCount) parts.push(`${successCount} imported`);
-    if (skipCount) parts.push(`${skipCount} skipped (already exists)`);
-    if (failCount) parts.push(`${failCount} failed`);
+    if (successCount) parts.push(t("onlineEvals.import.summaryImported", { count: successCount }));
+    if (skipCount) parts.push(t("onlineEvals.import.summarySkipped", { count: skipCount }));
+    if (failCount) parts.push(t("onlineEvals.import.summaryFailed", { count: failCount }));
     toast({
       variant: failCount > 0 && successCount === 0 ? "error" : "success",
       message: raw(parts.join(" · ")),
@@ -306,7 +308,7 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
   if (existing) return existing;
 
   const catalogEntry = scoreConfigEntries.value.find((e) => e.name === name);
-  if (!catalogEntry) throw new Error(`Catalog score config not found: ${name}`);
+  if (!catalogEntry) throw new Error(t("onlineEvals.catalogScoreConfigNotFound", { name }));
 
   try {
     return await onlineEvalsService.scoreConfigs.create(

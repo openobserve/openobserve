@@ -152,7 +152,7 @@ const saveSchema = computed(() => makeBrowserCheckSaveSchema(t));
 
 // Extension setup state — persists across phases in this session.
 // `extensionInstalled` is now driven by a real runtime probe (not a manual click).
-const recorder = useSyntheticsRecorder();
+const recorder = useSyntheticsRecorder(t);
 const extensionInstalled = ref(false);
 // Session-only on purpose: persisting the attestations would keep tasks
 // pre-completed after the extension is removed. After the connect step's

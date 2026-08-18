@@ -14,10 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { escapeHtml } from "@/utils/html";
+import { gt, raw } from "@/types/i18n";
 
 /**
  * Helper functions for tree view custom tooltips
  */
+
+/**
+ * Emphasise a metric label. The markup lives here rather than in the message so
+ * the translations stay plain text (same rationale as `chip()` in
+ * `alerts/anomalySummaryGenerator.ts`).
+ */
+const bold = (value: string) => `<strong>${value}</strong>`;
 
 /**
  * Format large numbers with K/M notation
@@ -32,7 +40,7 @@ export const formatNumber = (n: number): string => {
  * Format latency from nanoseconds to human-readable string
  */
 export const formatLatency = (ns: number): string => {
-  if (!ns) return "N/A";
+  if (!ns) return raw("N/A");
   const ms = ns / 1e6;
   return ms >= 1000 ? (ms / 1000).toFixed(2) + "s" : ms.toFixed(2) + "ms";
 };
@@ -79,9 +87,9 @@ export const generateNodeTooltipContent = (
 ): string => {
   return `
     <strong>${escapeHtml(nodeName)}</strong><br/>
-    Requests: ${formatNumber(requests)}<br/>
-    Errors: ${formatNumber(errors)}<br/>
-    Error Rate: ${errorRate.toFixed(2)}%
+    ${gt("traces.graphTooltip.requests", { value: formatNumber(requests) })}<br/>
+    ${gt("traces.graphTooltip.errors", { value: formatNumber(errors) })}<br/>
+    ${gt("traces.graphTooltip.errorRate", { value: errorRate.toFixed(2) })}
   `;
 };
 
@@ -97,11 +105,11 @@ export const generateEdgeTooltipContent = (
   p99Ns: number,
 ): string => {
   return `
-    <strong>Requests:</strong> ${formatNumber(total)}<br/>
-    <strong>Errors:</strong> ${failed} (${errorRate.toFixed(2)}%)<br/>
-    <strong>P50:</strong> ${formatLatency(p50Ns)}<br/>
-    <strong>P95:</strong> ${formatLatency(p95Ns)}<br/>
-    <strong>P99:</strong> ${formatLatency(p99Ns)}
+    ${bold(gt("traces.graphTooltip.requestsLabel"))} ${formatNumber(total)}<br/>
+    ${bold(gt("traces.graphTooltip.errorsLabel"))} ${failed} (${errorRate.toFixed(2)}%)<br/>
+    ${bold(gt("traces.graphTooltip.p50Label"))} ${formatLatency(p50Ns)}<br/>
+    ${bold(gt("traces.graphTooltip.p95Label"))} ${formatLatency(p95Ns)}<br/>
+    ${bold(gt("traces.graphTooltip.p99Label"))} ${formatLatency(p99Ns)}
   `;
 };
 
@@ -162,11 +170,11 @@ export const generateServiceNodeTooltipContent = (metadata: any): string => {
 
   return `
     <div class="tree-tooltip">
-      <div class="tooltip-header">${escapeHtml(metadata.serviceName || "Unknown Service")}</div>
+      <div class="tooltip-header">${escapeHtml(metadata.serviceName || gt("traces.unknownService"))}</div>
       <div class="tooltip-metrics">
-        <div>Requests: ${formatNumber(requests)}</div>
-        <div>Errors: ${formatNumber(errors)}</div>
-        <div>Error Rate: ${errorRate.toFixed(1)}%</div>
+        <div>${gt("traces.graphTooltip.requests", { value: formatNumber(requests) })}</div>
+        <div>${gt("traces.graphTooltip.errors", { value: formatNumber(errors) })}</div>
+        <div>${gt("traces.graphTooltip.errorRate", { value: errorRate.toFixed(1) })}</div>
       </div>
     </div>
   `;
@@ -179,7 +187,7 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
   if (!metadata) return "";
   const {
     serviceName,
-    pathSignature = "Unknown Pattern",
+    pathSignature = gt("traces.unknownPattern"),
     count = 1,
     avg = 0,
     traceTimePercent = 0,
@@ -189,15 +197,18 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
     <div class="flex flex-col gap-0.5">
       <div class="font-semibold pb-1 text-left">${escapeHtml(serviceName || pathSignature)}</div>
       <div class="flex justify-between gap-3">
-        <span class="w-12 text-left">Spans:</span>
+        <span class="w-12 text-left">${gt("traces.graphTooltip.spansLabel")}</span>
         <span class="font-mono text-left flex-1">${count}</span>
       </div>
       <div class="flex justify-between gap-3">
-        <span class="w-12 text-left">Average:</span>
-        <span class="font-mono text-left flex-1">${avg.toFixed(2)}ms (${traceTimePercent.toFixed(1)}% of trace)</span>
+        <span class="w-12 text-left">${gt("traces.graphTooltip.averageLabel")}</span>
+        <span class="font-mono text-left flex-1">${gt("traces.graphTooltip.averageOfTrace", {
+          avg: avg.toFixed(2),
+          percent: traceTimePercent.toFixed(1),
+        })}</span>
       </div>
       <div class="flex justify-between gap-3">
-        <span class="w-12 text-left">Errors:</span>
+        <span class="w-12 text-left">${gt("traces.graphTooltip.errorsLabel")}</span>
         <span class="font-mono text-left flex-1">${metadata.errorCount || 0}</span>
       </div>
     </div>
@@ -226,16 +237,16 @@ export const generateTracePatternTooltipContent = (metadata: any): string => {
           color: rgba(255, 255, 255, 0.95);
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
           padding-bottom: 0.25rem;
-        ">Unknown Pattern</div>
+        ">${gt("traces.unknownPattern")}</div>
         <div>
-          <div style="margin-bottom: 0.125rem;">Calls: <span style="font-family: var(--font-mono);">1</span></div>
-          <div style="margin-bottom: 0.125rem;">Average: <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 0.125rem;">Minimum: <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 0.125rem;">Maximum: <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 0.125rem;">P75: <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 0.125rem;">P95: <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 0.125rem;">P99: <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 0.125rem;">Error Rate: <span style="font-family: var(--font-mono); color: #10b981;">0.0%</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.callsLabel")} <span style="font-family: var(--font-mono);">1</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.averageLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.minimumLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.maximumLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p75Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p95Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p99Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.errorRateLabel")} <span style="font-family: var(--font-mono); color: #10b981;">0.0%</span></div>
         </div>
       </div>
     `;
@@ -243,7 +254,7 @@ export const generateTracePatternTooltipContent = (metadata: any): string => {
   }
 
   const {
-    pathSignature = "Unknown Pattern",
+    pathSignature = gt("traces.unknownPattern"),
     count = 1,
     avg = 0,
     min = 0,
@@ -273,14 +284,14 @@ export const generateTracePatternTooltipContent = (metadata: any): string => {
       ">${escapeHtml(pathSignature)}</div>
 
       <div>
-        <div style="margin-bottom: 0.125rem;">Calls: <span style="font-family: var(--font-mono);">${count}</span></div>
-        <div style="margin-bottom: 0.125rem;">Average: <span style="font-family: var(--font-mono);">${avg.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 0.125rem;">Minimum: <span style="font-family: var(--font-mono);">${min.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 0.125rem;">Maximum: <span style="font-family: var(--font-mono);">${max.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 0.125rem;">P75: <span style="font-family: var(--font-mono);">${p75.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 0.125rem;">P95: <span style="font-family: var(--font-mono);">${p95.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 0.125rem;">P99: <span style="font-family: var(--font-mono);">${p99.toFixed(1)}ms</span></div>
-        <div>Error Rate: <span style="font-family: var(--font-mono); color: ${errorRate > 0 ? "#ef4444" : "#10b981"};">${errorRate.toFixed(1)}%</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.callsLabel")} <span style="font-family: var(--font-mono);">${count}</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.averageLabel")} <span style="font-family: var(--font-mono);">${avg.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.minimumLabel")} <span style="font-family: var(--font-mono);">${min.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.maximumLabel")} <span style="font-family: var(--font-mono);">${max.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p75Label")} <span style="font-family: var(--font-mono);">${p75.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p95Label")} <span style="font-family: var(--font-mono);">${p95.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p99Label")} <span style="font-family: var(--font-mono);">${p99.toFixed(1)}ms</span></div>
+        <div>${gt("traces.graphTooltip.errorRateLabel")} <span style="font-family: var(--font-mono); color: ${errorRate > 0 ? "#ef4444" : "#10b981"};">${errorRate.toFixed(1)}%</span></div>
       </div>
     </div>
   `;

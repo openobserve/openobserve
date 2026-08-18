@@ -138,7 +138,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/nodejs.svg"),
-        label: t("ingestion.nodejs"),
+        label: raw("NodeJS"),
         contentClass: "tab_content",
       },
       {
@@ -150,7 +150,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/golang.svg"),
-        label: t("ingestion.go"),
+        label: raw("Go"),
         contentClass: "tab_content",
       },
       // {
@@ -162,7 +162,7 @@ export default defineComponent({
       //     },
       //   },
       //   icon: "img:" + getImageURL("images/ingestion/rust.svg"),
-      //   label: t("ingestion.rust"),
+      //   label: raw("Rust"),
       //   contentClass: "tab_content",
       // },
       // {
@@ -174,7 +174,7 @@ export default defineComponent({
       //     },
       //   },
       //   icon: "img:" + getImageURL("images/ingestion/java.svg"),
-      //   label: t("ingestion.java"),
+      //   label: raw("Java"),
       //   contentClass: "tab_content",
       // },
     ];

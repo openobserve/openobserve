@@ -18,7 +18,7 @@
 // specifics. Follows the OpenObserve guide:
 // https://openobserve.ai/blog/how-to-monitor-postgresql-performance
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -73,15 +73,15 @@ service:
       processors: [memory_limiter, batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function postgresCard(subs: CardSubstitutions): RichCardContent {
+export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
   return {
     provider: {
-      name: "Postgres",
-      tagline: gt("ingestion.setupCard.postgresqlTagline"),
+      name: raw("Postgres"),
+      tagline: t("ingestion.setupCard.postgresqlTagline"),
       logo: getImageURL("images/ingestion/postgres.png"),
       tone: "#336791",
-      metaBadges: [gt("common.metrics")],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
       {
@@ -99,7 +99,7 @@ export default function postgresCard(subs: CardSubstitutions): RichCardContent {
               lang: "bash",
               raw: applyRole("psql -h localhost -U postgres"),
             },
-            note: "Run as a Postgres superuser (psql prompts for its password).",
+            note: t("ingestion.setupCard.postgresSuperuserNote"),
           },
           {
             id: "docker",
@@ -118,7 +118,7 @@ export default function postgresCard(subs: CardSubstitutions): RichCardContent {
           },
         ],
       },
-      collectorInstallStep(),
+      collectorInstallStep(t),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -165,14 +165,15 @@ export default function postgresCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // pg_stat_database counter names — they appear verbatim in the ingested
-        // metrics, so translating the pill would desync it from the data.
+        // What the verify step will show, in prose. These are NOT the pg_stat_database
+        // counter names that appear in the ingested metrics — they are a plain-English
+        // summary of them, so they are translated.
         pills: [
-          raw("Active Backends"),
-          raw("Commits"),
-          raw("Rollbacks"),
-          raw("Database Size"),
-          raw("Blocks Read"),
+          t("ingestion.setupCard.pillActiveBackends"),
+          t("ingestion.setupCard.pillCommits"),
+          t("ingestion.setupCard.pillRollbacks"),
+          t("ingestion.setupCard.pillDatabaseSize"),
+          t("ingestion.setupCard.pillBlocksRead"),
         ],
       },
     ],

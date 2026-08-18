@@ -240,7 +240,7 @@ export default defineComponent({
     let commitPendingChange: (() => void) | null = null;
     const { searchObj } = searchState();
     const { detectNaturalLanguage, generateSQL, transformToSQL, isGenerating, streamingResponse } =
-      useNLQuery();
+      useNLQuery(t);
 
     const currentEditorText = ref("");
 
@@ -933,7 +933,7 @@ export default defineComponent({
           const word = model.getWordAtPosition(position);
           if (!word?.word) return null;
           const entry = findCatalogEntry(word.word, config.keywords(), config.suggestions());
-          const contents = buildHoverContents(entry as any);
+          const contents = buildHoverContents(t, entry as any);
           if (!contents) return null;
           return {
             contents,
@@ -1103,7 +1103,7 @@ export default defineComponent({
       // editor. What is left here is the monaco half: offsets to positions,
       // positions to markers.
       const text = model.getValue();
-      const markers = findDoubleQuoteIssues(text).map((issue) => {
+      const markers = findDoubleQuoteIssues(t, text).map((issue) => {
         const startPos = model.getPositionAt(issue.startOffset);
         const endPos = model.getPositionAt(issue.endOffset);
         return {

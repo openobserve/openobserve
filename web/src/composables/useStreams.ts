@@ -290,7 +290,11 @@ const useStreams = (t: TranslateFn) => {
                 updateStreamsInStore(streamType, streamList);
               } catch (err: any) {
                 return reject(
-                  new Error(`Error while fetching schema: ${err?.message || "Unknown error"}`),
+                  new Error(
+                    t("logStream.errorWhileFetchingSchema", {
+                      message: err?.message || t("search.unknownError"),
+                    }),
+                  ),
                 );
               }
             }
@@ -308,7 +312,11 @@ const useStreams = (t: TranslateFn) => {
             //     return resolve(streams[streamType].list[streamIndex]);
             //   })
             //   .catch(() => reject(new Error("Stream Not Found")));
-            return reject(new Error(`Stream '${streamName}' not found for type '${streamType}'`));
+            return reject(
+              new Error(
+                t("logStream.streamNotFoundForType", { stream: streamName, type: streamType }),
+              ),
+            );
           }
         } catch (e: any) {
           reject(new Error(e.message));

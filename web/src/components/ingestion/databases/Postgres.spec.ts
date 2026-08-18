@@ -21,6 +21,7 @@ import { ref } from "vue";
 import Postgres from "./Postgres.vue";
 import postgresCard from "@/components/ingestion/setupCard/content/postgres";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -61,7 +62,7 @@ const SUBS = {
 
 describe("postgresCard builder", () => {
   it("builds the Postgres card metadata and step flow", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     expect(card.provider.name).toBe("Postgres");
     expect(card.provider.metaBadges).toEqual(["Metrics"]);
     expect(card.detect).toMatchObject({
@@ -79,7 +80,7 @@ describe("postgresCard builder", () => {
   });
 
   it("offers psql / docker / GUI tabs to create the monitoring role", () => {
-    const prepare = postgresCard(SUBS).steps.find((s) => s.id === "prepare")!;
+    const prepare = postgresCard(SUBS, gt).steps.find((s) => s.id === "prepare")!;
     expect(prepare.variants?.map((v) => v.id)).toEqual(["psql", "docker", "sql-client"]);
     const psql = prepare.variants!.find((v) => v.id === "psql")!.code;
     expect(psql.raw).toContain("psql");
@@ -90,7 +91,7 @@ describe("postgresCard builder", () => {
   });
 
   it("writes a postgresql receiver config with the org's exporter", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "configure")!;
     expect(configure.inputs?.map((i) => i.id)).toEqual(["host", "port"]);
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
@@ -112,7 +113,7 @@ describe("Postgres.vue", () => {
   });
 
   it("renders the shared setup card for the postgres slug", () => {
-    expect(getDataSourceCard("postgres", SUBS)?.provider.name).toBe("Postgres");
+    expect(getDataSourceCard("postgres", SUBS, gt)?.provider.name).toBe("Postgres");
     wrapper = mount(Postgres, { global: { plugins: [mockStore, mockI18n] } });
     const stub = wrapper.findComponent({ name: "SetupCardRenderer" });
     expect(stub.exists()).toBe(true);

@@ -268,9 +268,7 @@ export default defineComponent({
       );
     },
     connectedLabel(): I18nText {
-      // Plain t() + concatenation: named interpolation THROWS on a missing
-      // key, which would take down this whole branch's render.
-      return raw(`${this.t("alert_sources.connectedPrefix")} ${this.detectedFormat}`);
+      return this.t("alert_sources.connectedFormat", { format: this.detectedFormat });
     },
   },
   watch: {

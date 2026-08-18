@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, watch, computed, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import BillingService from "@/services/billings";
 import organizations from "@/services/organizations";
 import { useRouter } from "vue-router";
@@ -345,7 +345,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           variant: "error",
-          message: e?.message ?? "Failed to enable usage reporting",
+          message: e?.message ?? t("billing.failedToEnableUsageReporting"),
           timeout: 5000,
         });
       } finally {
@@ -398,7 +398,7 @@ export default defineComponent({
     const combinedSchema = computed(() => {
       const orgId = store.state.selectedOrganization.identifier;
       const dt = usageDataType.value === "mb" ? "mb" : "gb";
-      return buildUsageCombinedLinePanelSchema({ orgId, dataType: dt });
+      return buildUsageCombinedLinePanelSchema({ orgId, dataType: dt, t });
     });
 
     // The org's `usage` stream doesn't exist until it has reported some usage,
@@ -552,22 +552,22 @@ export default defineComponent({
     // metrics auto-scale from the GB/MB toggle; AI credits is a plain count.
     const usageTiles = computed(() => {
       const base = usageDataType.value.toUpperCase(); // GB | MB
-      const byteTile = (key: string, label: string, icon: any) => {
+      const byteTile = (key: string, label: I18nText, icon: any) => {
         const scaled = scaleByteValue(usageData.value[key] ?? 0, base);
         return { key, label, icon, value: scaled.value, unit: scaled.unit };
       };
       return [
-        byteTile("ingestion", "Ingestion", ingestionIcon),
-        byteTile("search", "Search", searchIcon),
-        byteTile("pipeline", "Pipelines", pipelineIcon),
-        byteTile("remotepipeline", "Remote Pipelines", remotePipelineIcon),
-        byteTile("dataretention", "Data Retention", dataRetentionIcon),
+        byteTile("ingestion", t("billing.ingestion"), ingestionIcon),
+        byteTile("search", t("billing.search"), searchIcon),
+        byteTile("pipeline", t("billing.pipelines"), pipelineIcon),
+        byteTile("remotepipeline", t("billing.remotePipelines"), remotePipelineIcon),
+        byteTile("dataretention", t("billing.dataRetention"), dataRetentionIcon),
         {
           key: "ai_credits",
           label: t("billing.aiCredits"),
           icon: aiIcon.value,
           value: usageData.value.ai_credits ?? "0.00",
-          unit: "Credits",
+          unit: t("billing.credits"),
         },
       ];
     });

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
-import { raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 const DB_NAME = "o2ChatDB";
 const DB_VERSION = 2;
@@ -91,8 +91,13 @@ const computeUserOrgKey = async (userEmail: string, orgIdentifier: string): Prom
  *   current value from the Vuex store, so org/user switches are reflected
  *   immediately without re-mounting the component.
  * @param getOrgIdentifier - Getter returning the current org identifier.
+ * @param t - Translator from the calling component's `useI18nTyped()`.
  */
-export function useChatHistory(getUserEmail: () => string, getOrgIdentifier: () => string) {
+export function useChatHistory(
+  getUserEmail: () => string,
+  getOrgIdentifier: () => string,
+  t: TranslateFn,
+) {
   // Cache the last computed hash alongside the raw input that produced it.
   // When the org or user changes the raw string changes, triggering a new hash.
   let _cachedRaw: string | null = null;
@@ -137,7 +142,7 @@ export function useChatHistory(getUserEmail: () => string, getOrgIdentifier: () 
           ? firstUserMessage.content.length > 40
             ? firstUserMessage.content.substring(0, 40) + "..."
             : firstUserMessage.content
-          : "New Chat");
+          : t("common.newChat"));
 
       // Strip Vue reactivity from messages
       const serializableMessages = messages.map((msg) => {

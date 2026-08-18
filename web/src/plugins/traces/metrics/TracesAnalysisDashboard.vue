@@ -389,8 +389,8 @@ const { isDark } = useTheme();
 const chipColors = computed(() =>
   isDark.value ? COMPARISON_COLORS.dark : COMPARISON_COLORS.light,
 );
-const { loading, error } = useLatencyInsightsAnalysis();
-const { generateDashboard } = useLatencyInsightsDashboard();
+const { loading, error } = useLatencyInsightsAnalysis(t);
+const { generateDashboard } = useLatencyInsightsDashboard(t);
 
 // Variables manager will be initialized by RenderDashboardCharts
 // and we'll receive a reference to it via the @variablesManagerReady event

@@ -123,6 +123,24 @@ describe("DestinationPicker", () => {
     expect(payload.org_id).toBeDefined();
   });
 
+  // `optional` (Workflows placeholder): an empty selection is ALLOWED — submit()
+  // resolves an empty destination_name instead of null, and no required check runs.
+  it("optional: submit resolves an empty destination_name when nothing is selected", async () => {
+    const wrapper = createWrapper({ optional: true });
+    await flushPromises();
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+    expect(payload.destination_name).toBe("");
+    expect(payload.org_id).toBeDefined();
+  });
+
+  it("optional: still resolves the selected destination when one is chosen", async () => {
+    const wrapper = createWrapper({ initialName: "sink-a", optional: true });
+    await flushPromises();
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload.destination_name).toBe("sink-a");
+  });
+
   it("emits expand when toggling create mode", async () => {
     const wrapper = createWrapper();
     await flushPromises();

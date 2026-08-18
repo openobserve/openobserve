@@ -45,7 +45,11 @@
           :label="t('onlineEvals.scoreConfig.nameLabel')"
           :required="mode === 'create'"
           :disabled="mode === 'edit'"
-          :placeholder="t('onlineEvals.scoreConfig.namePlaceholder')"
+          :placeholder="
+            t('onlineEvals.scoreConfig.namePlaceholder', {
+              example: raw(`&quot;faithfulness&quot;`),
+            })
+          "
           size="sm"
           data-test="score-config-name-input"
         />

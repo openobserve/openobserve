@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   CopyContent + doc link so un-migrated data sources keep working unchanged.
 -->
 <script setup lang="ts">
-import { raw } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { b64EncodeStandard } from "@/utils/zincutils";
@@ -49,6 +49,7 @@ const props = defineProps<{
 }>();
 
 const store = useStore();
+const { t } = useI18nTyped();
 const { endpoint } = useIngestion();
 
 // Per-org url/org/token — the same Basic-auth token every Data Sources card
@@ -63,7 +64,7 @@ const subs = computed<CardSubstitutions>(() => {
   };
 });
 
-const content = computed(() => getDataSourceCard(props.slug, subs.value));
+const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
 </script>
 
 <template>

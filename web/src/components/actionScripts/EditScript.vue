@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, nextTick, onMounted, watch } from "vue";
 import { computed } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import {
   getUUID,
@@ -497,8 +497,10 @@ const actionTypes = [
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is just the empty placeholder; both fields are set from t() before the
+  // dialog is shown, so they carry the I18nText brand for ConfirmDialog's props.
+  title: raw(""),
+  message: raw(""),
   okCallback: () => {},
 });
 
@@ -545,14 +547,14 @@ const frequency = ref({
  */
 const getCronError = (cron: string): string => {
   const value = String(cron ?? "").trim();
-  if (!value) return "Invalid cron expression!";
+  if (!value) return t("actionScripts.invalidCronExpression");
   try {
     // cron-parser v5 dropped the `utc` option; parse validity is tz-independent here.
     CronExpressionParser.parse(value, {
       currentDate: new Date(),
     });
   } catch {
-    return "Invalid cron expression!";
+    return t("actionScripts.invalidCronExpression");
   }
   try {
     const intervalInSecs = getCronIntervalDifferenceInSeconds(value);
@@ -561,10 +563,10 @@ const getCronError = (cron: string): string => {
       !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
     ) {
       const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-      return `Frequency should be greater than ${minInterval - 1} seconds.`;
+      return t("pipeline.frequencyGreaterThanSeconds", { seconds: minInterval - 1 });
     }
   } catch {
-    return "Invalid cron expression!";
+    return t("actionScripts.invalidCronExpression");
   }
   return "";
 };
@@ -749,7 +751,7 @@ let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
-const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+const browserTime = raw("Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")");
 
 // Add the UTC option
 timezoneOptions.unshift("UTC");
@@ -849,7 +851,11 @@ const saveActionScript = async (value: EditScriptForm) => {
           variant: "error",
           message:
             error?.response?.data?.message ||
-            `Error while ${isEditingActionScript.value ? "updating" : "saving"} Action.`,
+            t(
+              isEditingActionScript.value
+                ? "toastMessages.actionScripts.errorWhileUpdating"
+                : "toastMessages.actionScripts.errorWhileSaving",
+            ),
         });
       }
     })
@@ -913,8 +919,8 @@ const openCancelDialog = () => {
     return;
   }
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel Action changes?";
+  dialog.value.title = t("common.discardChanges");
+  dialog.value.message = t("actionScripts.cancelActionChangesConfirm");
   dialog.value.okCallback = goToActionScripts;
 };
 const editFileToUpload = () => {
@@ -968,7 +974,7 @@ const handleActionScript = async () => {
         if (err.response.status != 403) {
           toast({
             variant: "error",
-            message: err?.data?.message || "Error while fetching Action!",
+            message: err?.data?.message || t("actionScripts.fetchActionError"),
           });
         }
       })
@@ -995,7 +1001,7 @@ const getServiceAccounts = async () => {
     if (err.response?.status != 403) {
       toast({
         variant: "error",
-        message: err.response?.data?.message || "Error while fetching service accounts.",
+        message: err.response?.data?.message || t("actionScripts.fetchServiceAccountsError"),
       });
     }
   } finally {

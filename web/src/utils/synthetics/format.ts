@@ -13,15 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 /** Humanizes an epoch-microseconds timestamp as "5s ago" / "2h ago". */
 export function formatTimeAgoUs(us: number): string {
   const s = Math.max(0, Math.floor((Date.now() - us / 1000) / 1000));
-  if (s < 60) return `${s}s ago`;
+  if (s < 60) return gt("synthetics.secondsAgo", { count: s });
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return gt("synthetics.minutesAgo", { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return gt("synthetics.hoursAgo", { count: h });
+  return gt("synthetics.daysAgo", { count: Math.floor(h / 24) });
 }
 
 /** Renders a check interval in seconds as a compact label ("30s", "5m", "1h"). */

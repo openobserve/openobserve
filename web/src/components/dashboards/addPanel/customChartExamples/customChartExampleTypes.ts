@@ -10,14 +10,15 @@ export interface ChartType {
 }
 
 export interface ChartCategory {
-  chartLabel: string;
+  /** Resolved by the consumer at render time; also the stable per-category identity. */
+  chartLabelKey: I18nKey;
   type: ChartType[];
 }
 
 export const chartTypesData: { data: ChartCategory[] } = {
   data: [
     {
-      chartLabel: "Line",
+      chartLabelKey: "dashboard.lineLabel",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.basicLineChart",
@@ -42,7 +43,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Bar",
+      chartLabelKey: "dashboard.barLabel",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.barRace",
@@ -62,7 +63,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Pie",
+      chartLabelKey: "dashboard.pieLabel",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.pieWithBorder",
@@ -77,7 +78,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Scatter",
+      chartLabelKey: "dashboard.scatterLabel",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.scatterMatrix",
@@ -92,7 +93,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Radar",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.radar",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.customizedRadarChart",
@@ -107,7 +108,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Boxplot",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.boxplot",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.dataTransformSimpleAggregate",
@@ -117,7 +118,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Graph",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.graph",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.graphOnCartesian",
@@ -127,7 +128,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Treemap",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.treemap",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.treemapChart",
@@ -137,7 +138,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Funnel",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.funnel",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.customizedFunnel",
@@ -147,7 +148,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Dataset",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.dataset",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.seriesLayout",
@@ -157,7 +158,7 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "3D",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.threeD",
       type: [
         {
           labelKey: "dashboard.customChartTypeSelector.examples.threeDBarWithDataset",

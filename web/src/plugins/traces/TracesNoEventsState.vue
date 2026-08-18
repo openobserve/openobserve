@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Filter applied within an overlapping window: relax the query. -->
       <span
         v-if="windowHasStreamData && hasFilters"
-        v-html="t('traces.noEvents.descWithFilters')"
+        v-html="DOMPurify.sanitize(t('traces.noEvents.descWithFilters'))"
       />
       <!-- We know where the stream's last data is: offer to jump to it. -->
       <span v-else-if="jumpTarget">{{ t("traces.noEvents.descOutOfRange") }}</span>
@@ -92,6 +92,7 @@ import useTraces from "@/composables/useTraces";
 import useWidenRange from "@/composables/useWidenRange";
 import { useAiIcon } from "@/composables/useAiIcon";
 import { getConsumableRelativeTime } from "@/utils/date";
+import DOMPurify from "dompurify";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 const END_NUDGE_US = 1_000_000;

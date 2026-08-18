@@ -308,13 +308,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex h-9 w-full items-center justify-between">
                 <div class="mr-md w-[15.625rem] text-xs font-normal">
                   {{
-                    filteredGroupCount === 1
-                      ? t("settings.correlation.serviceCountSingular", {
-                          count: filteredGroupCount,
-                        })
-                      : t("settings.correlation.serviceCountPlural", {
-                          count: filteredGroupCount,
-                        })
+                    t("settings.correlation.serviceCountSingular", {
+                      count: filteredGroupCount,
+                    })
                   }}
                   {{
                     t("settings.correlation.instancesCount", {

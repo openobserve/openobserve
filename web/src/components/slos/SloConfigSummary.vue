@@ -101,7 +101,7 @@ const sections = computed<{ key: string; title: I18nText; fields: SummaryField[]
       {
         key: "sli-type",
         label: t("slos.field.sliType"),
-        value: raw(sliTypeLabel(props.slo.sli_type)),
+        value: raw(sliTypeLabel(props.slo.sli_type, t)),
       },
       {
         key: "target",
