@@ -621,7 +621,11 @@ describe("useRoutes (router.ts)", () => {
         throw new Error("Missing Service Graph legacy redirect");
       }
 
-      expect(route.redirect({ query: { org_identifier: "default", period: "7d" } })).toEqual({
+      expect(
+        route.redirect({
+          query: { org_identifier: "default", period: "7d", search_mode: "spans" },
+        }),
+      ).toEqual({
         name: "traces",
         query: { org_identifier: "default", period: "7d", tab: "service-graph" },
       });
@@ -691,6 +695,35 @@ describe("useRoutes (router.ts)", () => {
         name: "traces",
         query: { org_identifier: "default", stream: "traces", tab: "traces" },
         hash: "",
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("removes legacy search_mode from an otherwise valid Traces URL", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "traces");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        {
+          query: {
+            org_identifier: "default",
+            stream: "traces",
+            tab: "spans",
+            search_mode: "traces",
+          },
+          hash: "#results",
+        },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        name: "traces",
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+        hash: "#results",
         replace: true,
       });
       expect(routeGuard).not.toHaveBeenCalled();

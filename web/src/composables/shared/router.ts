@@ -19,7 +19,7 @@ import {
   useLocalCurrentUser,
   invalidateLoginData,
 } from "@/utils/zincutils";
-import type { LocationQuery, RouteLocationRaw } from "vue-router";
+import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import Home from "@/views/HomeView.vue";
@@ -45,11 +45,20 @@ const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
 const supportedTraceTab = (tab: unknown): TraceSearchMode =>
   resolveTraceSearchMode(tab, config.isEnterprise === "true");
 
+const canonicalTraceQuery = (
+  query: LocationQuery | undefined,
+  tab: TraceSearchMode,
+): LocationQueryRaw => {
+  const canonicalQuery: LocationQueryRaw = { ...(query ?? {}), tab };
+  delete canonicalQuery.search_mode;
+  return canonicalQuery;
+};
+
 const redirectToTraceTab =
   (tab: "service-graph" | "services-catalog") =>
   (to: { query: LocationQuery }): RouteLocationRaw => ({
     name: "traces",
-    query: { ...to.query, tab: supportedTraceTab(tab) },
+    query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
   });
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
@@ -276,10 +285,10 @@ const useRoutes = () => {
       },
       beforeEnter(to: any, from: any, next: any) {
         const tab = supportedTraceTab(to.query?.tab);
-        if (to.query?.tab !== tab) {
+        if (to.query?.tab !== tab || to.query?.search_mode !== undefined) {
           next({
             name: "traces",
-            query: { ...(to.query ?? {}), tab },
+            query: canonicalTraceQuery(to.query, tab),
             hash: to.hash,
             replace: true,
           });
