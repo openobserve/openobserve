@@ -1,17 +1,21 @@
 <template>
-  <div class="flex flex-col gap-4" data-test="oncall-members">
+  <div class="flex flex-col gap-3" data-test="oncall-members">
     <OTable
-      :data="sortedMembers"
+      :data="rows"
       :columns="columns"
       row-key="id"
       :frame="false"
       pagination="client"
       :show-global-filter="false"
+      :row-rail-tone="railTone"
+      :row-class="rowClass"
       table-id="oncall-team-members"
       data-test="oncall-members-table"
     >
+      <!-- Add on the left, the state of the roster on the right: the toolbar
+           answers "is anyone missing" in the same glance that offers to fix it. -->
       <template #toolbar>
-        <div class="flex w-full flex-wrap items-end gap-2">
+        <div class="flex w-full flex-wrap items-center gap-2">
           <div class="min-w-0 flex-1">
             <OSelect
               v-if="!userLookupFailed"
@@ -41,12 +45,20 @@
           >
             {{ t("oncall.addPeopleCta", { count: pendingEmails.length }, pendingEmails.length) }}
           </OButton>
+
+          <span
+            v-if="orgTotal"
+            class="text-text-secondary ms-auto shrink-0 text-xs"
+            data-test="oncall-members-coverage"
+          >
+            {{ t("oncall.membersOfOrg", { onTeam: onTeamCount, total: orgTotal }) }}
+          </span>
           <!-- The single-team org is the usual starting point, and picking the
                same eight people one at a time is the whole of its setup. Shown
                only while somebody is still missing. -->
           <OButton
             v-if="everyoneCount"
-            variant="outline"
+            variant="ghost"
             size="sm-action"
             :loading="adding"
             data-test="oncall-members-add-everyone"
@@ -57,36 +69,72 @@
         </div>
       </template>
 
+      <!-- Name, why this row matters, and the address underneath it. The three
+           badges are mutually exclusive on purpose: a person has one headline. -->
       <template #cell-person="{ row }">
-        <OUserCell :value="row.user_email" />
-      </template>
-
-      <!-- Answers the question adding somebody immediately raises: did that
-           actually put them in the paging order? -->
-      <template #cell-rotation="{ row }">
-        <OTag v-if="rotationOf(row.user_email)" variant="default-soft" size="sm">
-          {{ raw(rotationOf(row.user_email) as string) }}
-        </OTag>
-        <span v-else class="text-text-muted text-sm">{{ t("oncall.notInRotation") }}</span>
-      </template>
-
-      <!-- The rota already SKIPS an away member; this says so where the
-           people are listed, before somebody asks why the order changed. -->
-      <template #cell-away="{ row }">
-        <span v-if="awayOf(row.user_email)" class="flex flex-wrap items-center gap-1">
-          <OTag variant="warning-soft" size="sm" :data-test="`oncall-members-away-${row.id}`">
-            {{ awayLabel(awayOf(row.user_email)!) }}
-          </OTag>
-          <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="close"
-            :aria-label="t('oncall.awayRemove')"
-            :data-test="`oncall-members-away-remove-${row.id}`"
-            @click.stop="removeAbsence(awayOf(row.user_email)!)"
-          />
+        <span class="flex min-w-0 flex-col gap-0.5 py-1">
+          <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span class="text-text-heading truncate text-sm font-medium">
+              {{ raw(row.name) }}
+            </span>
+            <OTag v-if="row.state === 'on_call'" variant="success-soft" size="sm">
+              {{ t("oncall.badgeOnCallNow") }}
+            </OTag>
+            <OTag v-else-if="row.state === 'next'" variant="primary-soft" size="sm">
+              {{ t("oncall.badgeNextUp") }}
+            </OTag>
+            <span v-else-if="row.away" class="flex items-center gap-1">
+              <OTag variant="warning-soft" size="sm" :data-test="`oncall-members-away-${row.id}`">
+                {{ awayLabel(row.away) }}
+              </OTag>
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                icon-left="close"
+                :aria-label="t('oncall.awayRemove')"
+                :data-test="`oncall-members-away-remove-${row.id}`"
+                @click.stop="removeAbsence(row.away)"
+              />
+            </span>
+            <OTag v-if="row.unreachable" variant="error-soft" size="sm">
+              {{ t("oncall.contactUnreachable") }}
+            </OTag>
+          </span>
+          <span class="text-text-secondary truncate text-xs">{{ raw(row.user_email) }}</span>
         </span>
-        <span v-else class="text-text-muted text-sm">{{ ABSENT }}</span>
+      </template>
+
+      <template #cell-reach="{ row }">
+        <OnCallChannelChips
+          :email="row.user_email"
+          :channels="row.reach?.channels ?? []"
+          :would-land="row.reach?.would_a_page_land ?? true"
+        />
+      </template>
+
+      <!-- The bar is the whole point: an uneven rota is invisible as a column
+           of numbers and obvious as a column of bars. -->
+      <template #cell-pages="{ row, value }">
+        <ODataBarCell
+          :value="row.pages"
+          :max="pagesMax"
+          :display="String(value)"
+          :variant="row.pages > 0 && row.pages >= heavyLoad ? 'warning' : 'default'"
+        />
+      </template>
+
+      <template #cell-nextShift="{ row }">
+        <span class="flex flex-col gap-0.5">
+          <span
+            :class="row.rotation ? 'text-text-body text-sm' : 'text-text-muted text-sm'"
+            :data-test="`oncall-members-shift-${row.id}`"
+          >
+            {{ shiftLine(row) }}
+          </span>
+          <span v-if="row.rotation" class="text-text-secondary truncate text-xs">
+            {{ row.away ? t("oncall.shiftSkippedWhileAway") : raw(row.rotation) }}
+          </span>
+        </span>
       </template>
 
       <template #cell-actions="{ row }">
@@ -118,8 +166,63 @@
       </template>
     </OTable>
 
-    <!-- The obvious next question after adding people is "so who is primary?",
-         and the answer lives one tab over. -->
+    <!-- The load verdict sits under the people it is about, next to the only
+         control that fixes it. It used to be a separate panel below the table,
+         which made "who is overloaded" and "who is in the rota" two screens. -->
+    <div
+      v-if="loadSummary || fairness.length"
+      class="border-border-subtle flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3 pt-3"
+      data-test="oncall-members-load"
+    >
+      <template v-if="loadSummary">
+        <span class="text-text-secondary text-xs">{{ t("oncall.loadUnevenLabel") }}</span>
+        <span class="text-text-heading text-xs font-medium">{{ loadSummary }}</span>
+      </template>
+      <span
+        v-for="line in fairness"
+        :key="line.rotation"
+        class="text-text-secondary text-xs"
+        :data-test="`oncall-members-fairness-${line.rotation}`"
+      >
+        {{ raw(`${line.rotation}: ${line.summary}`) }}
+      </span>
+      <OButton
+        variant="ghost"
+        size="xs"
+        class="ms-auto"
+        icon-right="arrow-forward"
+        data-test="oncall-members-rebalance"
+        @click="emit('open-schedule')"
+      >
+        {{ t("oncall.rebalanceInSchedule") }}
+      </OButton>
+    </div>
+
+    <!-- One `false` on the deployment explains every unreachable row, so it is
+         said once instead of once per person. -->
+    <OBanner v-if="transportMissing" variant="warning" data-test="oncall-members-no-transport">
+      {{ t("oncall.contactNoTransport") }}
+    </OBanner>
+    <OBanner
+      v-else-if="unreachableRow"
+      variant="warning"
+      data-test="oncall-members-unreachable-banner"
+    >
+      {{ unreachableWarning }}
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="xs"
+          icon-right="arrow-forward"
+          :loading="testing"
+          data-test="oncall-members-test-page"
+          @click="emit('test-page')"
+        >
+          {{ t("oncall.contactSendTest") }}
+        </OButton>
+      </template>
+    </OBanner>
+
     <ODialog
       :open="awayOpen"
       @update:open="(v: boolean) => (awayOpen = v)"
@@ -177,49 +280,78 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, RowRailTone } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OnCallChannelChips from "@/components/oncall/OnCallChannelChips.vue";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
-import type { OnCallTeamMember, Rotation, Unavailability } from "@/ts/interfaces/oncall";
+import type {
+  MemberReachability,
+  OnCallSlot,
+  OnCallTeamMember,
+  ResolvedSegment,
+  Rotation,
+  TeamLoad,
+  TeamReachability,
+  Unavailability,
+} from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import { formatInZone } from "@/utils/oncall";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { ABSENT } from "@/composables/useSloFormat";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-const props = defineProps<{
-  teamId: string;
-  members: OnCallTeamMember[];
-  rotations?: Rotation[];
-  timezone: string;
-}>();
-const emit = defineEmits<{ changed: [] }>();
+const props = withDefaults(
+  defineProps<{
+    teamId: string;
+    members: OnCallTeamMember[];
+    rotations?: Rotation[];
+    timezone: string;
+    /** Who holds the pager right now, per slot — the badge and the row rail. */
+    onCallNow?: OnCallSlot[];
+    /** Would a page land, per person. The verdicts are the server's. */
+    reachability?: TeamReachability | null;
+    /** Pages carried per person, for the magnitude bars. */
+    load?: TeamLoad | null;
+    testing?: boolean;
+  }>(),
+  { rotations: () => [], onCallNow: () => [], reachability: null, load: null, testing: false },
+);
+const emit = defineEmits<{ changed: []; "open-schedule": []; "test-page": [] }>();
 
 const { t } = useI18nTyped();
+
+const store = useStore();
+const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 /// Which rotation, if any, actually pages this person. Adding somebody to a
 /// team does not put them in the paging order, and that gap is where "why
 /// wasn't I paged" comes from.
 function rotationOf(email: string): string | null {
-  return (
-    props.rotations?.find((r) => r.members?.some((m) => m === email))?.name ?? null
-  );
+  return props.rotations?.find((r) => r.members?.some((m) => m === email))?.name ?? null;
 }
 
 /// The window worth marking: an absence sixty days out is real but not this
 /// table's news. Fetched org-wide and filtered to this team's emails.
 const ABSENCE_WINDOW_DAYS = 60;
+/// Far enough to name the next handover for a weekly rota, short enough that
+/// the answer is still "soon" rather than a calendar.
+const SHIFT_HORIZON_DAYS = 14;
+
 const absences = ref<Unavailability[]>([]);
+const segments = ref<ResolvedSegment[]>([]);
 const awayOpen = ref(false);
 const awayEmail = ref("");
 const awayFrom = ref("");
@@ -233,11 +365,29 @@ async function fetchAbsences() {
     const res = await oncallService.listUnavailability({
       org_identifier: orgId.value,
       from: now,
-      to: now + ABSENCE_WINDOW_DAYS * 86_400_000_000,
+      to: now + ABSENCE_WINDOW_DAYS * MICROS_PER_DAY,
     });
     absences.value = res.data ?? [];
   } catch {
     absences.value = [];
+  }
+}
+
+/// The engine's own answer for the next fortnight, so "next shift" is the
+/// resolved schedule rather than a guess made from rotation order. Silent on
+/// failure: the column falls back to naming the rotation.
+async function fetchSegments() {
+  try {
+    const now = Date.now() * 1000;
+    const res = await oncallService.resolvedSchedule({
+      org_identifier: orgId.value,
+      team_id: props.teamId,
+      from: now,
+      to: now + SHIFT_HORIZON_DAYS * MICROS_PER_DAY,
+    });
+    segments.value = res.data ?? [];
+  } catch {
+    segments.value = [];
   }
 }
 
@@ -281,7 +431,7 @@ async function saveAbsence() {
     });
     awayOpen.value = false;
     toast({ variant: "success", message: t("oncall.awaySaved") });
-    await fetchAbsences();
+    await Promise.all([fetchAbsences(), fetchSegments()]);
     // The rota moves the away person's turn, so the schedule tab's answer
     // just changed too.
     emit("changed");
@@ -302,7 +452,7 @@ async function removeAbsence(absence: Unavailability) {
       unavailability_id: absence.id,
     });
     toast({ variant: "success", message: t("oncall.awayRemoved") });
-    await fetchAbsences();
+    await Promise.all([fetchAbsences(), fetchSegments()]);
     emit("changed");
   } catch (err: any) {
     toast({
@@ -312,26 +462,210 @@ async function removeAbsence(absence: Unavailability) {
   }
 }
 
-const columns = computed<OTableColumnDef<OnCallTeamMember>[]>(() => [
+// ── The row ───────────────────────────────────────────────────────
+// One person, and the four things the tab exists to answer about them: can we
+// reach them, how much have they carried, when are they on next, and are they
+// in the paging order at all.
+
+type MemberState = "on_call" | "next" | "rostered" | "idle";
+
+interface MemberRow extends OnCallTeamMember {
+  /** Display name, or the email when the org has no name on file. */
+  name: string;
+  /** Rendered under the name — omitted when the name IS the email. */
+  subtitle: string;
+  state: MemberState;
+  rotation: string | null;
+  away: Unavailability | null;
+  reach: MemberReachability | null;
+  pages: number;
+  unreachable: boolean;
+}
+
+const STATE_RANK: Record<MemberState, number> = { on_call: 0, next: 1, rostered: 2, idle: 3 };
+
+const holders = computed(() => new Set(props.onCallNow.map((s) => s.user_email.toLowerCase())));
+const nextHolders = computed(
+  () =>
+    new Set(
+      props.onCallNow
+        .map((s) => s.next_user_email?.toLowerCase())
+        .filter((e): e is string => Boolean(e)),
+    ),
+);
+
+function lookup<T extends { user_email: string }>(list: T[] | undefined, email: string) {
+  const key = email.toLowerCase();
+  return list?.find((x) => x.user_email.toLowerCase() === key) ?? null;
+}
+
+/// On call, then next, then merely rostered, then the people no rotation
+/// pages. Alphabetical inside each band: the tab's first question is "who is
+/// holding it", not "whose name starts with A".
+const rows = computed<MemberRow[]>(() => {
+  const enriched = props.members.map((m) => {
+    const email = m.user_email;
+    const name = nameOf(email);
+    const reach = lookup(props.reachability?.members, email);
+    const rotation = rotationOf(email);
+    const state: MemberState = holders.value.has(email.toLowerCase())
+      ? "on_call"
+      : nextHolders.value.has(email.toLowerCase())
+        ? "next"
+        : rotation
+          ? "rostered"
+          : "idle";
+    return {
+      ...m,
+      name,
+      subtitle: name === email ? "" : email,
+      state,
+      rotation,
+      away: awayOf(email),
+      reach,
+      pages: lookup(props.load?.members, email)?.pages ?? 0,
+      unreachable: reach ? !reach.would_a_page_land : false,
+    };
+  });
+  return enriched.sort(
+    (a, b) => STATE_RANK[a.state] - STATE_RANK[b.state] || a.name.localeCompare(b.name),
+  );
+});
+
+/// The bar's 100% reference. Computed over every member, not the visible page,
+/// so paging cannot rescale the comparison mid-read.
+const pagesMax = computed(() => Math.max(0, ...rows.value.map((r) => r.pages)));
+
+/// Colour the bar only once somebody is carrying appreciably more than the
+/// middle of the team — a rota is allowed to be slightly uneven.
+const UNEVEN_FACTOR = 1.5;
+const medianPages = computed(() => {
+  const counted = rows.value.map((r) => r.pages).sort((a, b) => a - b);
+  if (!counted.length) return 0;
+  const mid = Math.floor(counted.length / 2);
+  return counted.length % 2 ? counted[mid] : (counted[mid - 1] + counted[mid]) / 2;
+});
+const heavyLoad = computed(() => medianPages.value * UNEVEN_FACTOR);
+
+const railTone = (row: MemberRow): RowRailTone | null =>
+  row.unreachable ? "error" : row.state === "on_call" ? "success" : null;
+
+/// Only the person actually holding the pager is tinted. Tinting every state
+/// turns the table into a legend nobody reads.
+const rowClass = (row: MemberRow) => (row.state === "on_call" ? "bg-status-success-bg" : "");
+
+// ── Next shift ────────────────────────────────────────────────────
+
+function segmentsFor(email: string): ResolvedSegment[] {
+  const key = email.toLowerCase();
+  return segments.value
+    .filter((s) => s.user_email?.toLowerCase() === key)
+    .sort((a, b) => a.from - b.from);
+}
+
+/// Weekday and time inside the week, a date beyond it — the two questions a
+/// handover actually raises, and never both at once.
+function whenLabel(micros: number): string {
+  const withinWeek = micros - Date.now() * 1000 < 7 * MICROS_PER_DAY;
+  return formatInZone(
+    micros,
+    props.timezone,
+    withinWeek
+      ? { weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }
+      : { weekday: "short", day: "numeric", month: "short" },
+  );
+}
+
+function shiftLine(row: MemberRow): I18nText {
+  const mine = segmentsFor(row.user_email);
+  const now = Date.now() * 1000;
+  const current = mine.find((s) => s.from <= now && now < s.to);
+  if (current) return t("oncall.shiftNowUntil", { until: raw(whenLabel(current.to)) });
+  const next = mine.find((s) => s.from > now);
+  if (next) return t("oncall.shiftStartsAt", { at: raw(whenLabel(next.from)) });
+  // No resolved span for them — either the horizon is too short, or the
+  // schedule never reaches them. The rotation tells us which.
+  if (row.rotation) {
+    return segments.value.length
+      ? t("oncall.shiftNoneInHorizon", { days: SHIFT_HORIZON_DAYS })
+      : t("oncall.shiftInRotation");
+  }
+  return t("oncall.notInRotation");
+}
+
+// ── Load verdict ──────────────────────────────────────────────────
+
+/// One sentence, only when the split is actually lopsided. Below the threshold
+/// the server's per-rotation verdict is the more honest thing to show, because
+/// a weighted rota is uneven on purpose.
+const loadSummary = computed<I18nText | null>(() => {
+  const top = rows.value.reduce<MemberRow | null>(
+    (best, r) => (!best || r.pages > best.pages ? r : best),
+    null,
+  );
+  if (!top || !top.pages || medianPages.value <= 0) return null;
+  const factor = top.pages / medianPages.value;
+  if (factor < UNEVEN_FACTOR) return null;
+  return t("oncall.loadUneven", {
+    name: raw(top.name),
+    factor: raw(factor.toFixed(1)),
+    days: props.load?.days ?? 30,
+  });
+});
+
+const fairness = computed(() => (loadSummary.value ? [] : (props.load?.rotations ?? [])));
+
+// ── Reachability warning ──────────────────────────────────────────
+
+const transportMissing = computed(
+  () => Boolean(props.reachability) && props.reachability?.smtp_configured === false,
+);
+
+const unreachableRows = computed(() => rows.value.filter((r) => r.unreachable));
+const unreachableRow = computed(() => unreachableRows.value[0] ?? null);
+
+/// The server's own sentence for the first one, and a count for the rest — a
+/// banner that stacks four finished sentences is a paragraph nobody finishes.
+const unreachableWarning = computed<I18nText>(() => {
+  const first = unreachableRow.value;
+  const rest = unreachableRows.value.length - 1;
+  const why = first?.reach?.why_not ? raw(first.reach.why_not) : t("oncall.contactNoChannel");
+  return rest > 0
+    ? t("oncall.membersUnreachableMore", { name: raw(first?.name ?? ""), why, count: rest }, rest)
+    : t("oncall.membersUnreachableOne", { name: raw(first?.name ?? ""), why });
+});
+
+// ── Columns ───────────────────────────────────────────────────────
+
+const columns = computed<OTableColumnDef<MemberRow>[]>(() => [
   {
     id: "person",
     header: t("oncall.person"),
-    accessorFn: (row: OnCallTeamMember) => row.user_email,
+    accessorFn: (row) => row.name,
     sortable: true,
-    meta: { isName: true },
+    meta: { isName: true, autoWidth: true, fillRemaining: true },
   },
   {
-    id: "rotation",
-    header: t("oncall.inRotation"),
-    accessorFn: (row: OnCallTeamMember) => rotationOf(row.user_email) ?? "",
+    id: "reach",
+    header: t("oncall.reachableVia"),
+    accessorFn: (row) => row.reach?.deliverable_channels.length ?? 0,
     sortable: true,
+    size: 150,
   },
   {
-    id: "away",
-    header: t("oncall.awayColumn"),
-    accessorFn: (row: OnCallTeamMember) => (awayOf(row.user_email) ? 1 : 0),
+    id: "pages",
+    header: t("oncall.pagesCarriedHeader", { days: props.load?.days ?? 30 }),
+    accessorFn: (row) => row.pages,
     sortable: true,
-    size: 200,
+    size: 190,
+    meta: { align: "right" },
+  },
+  {
+    id: "nextShift",
+    header: t("oncall.nextShift"),
+    accessorFn: (row) => STATE_RANK[row.state],
+    sortable: true,
+    size: 190,
   },
   {
     id: "actions",
@@ -339,10 +673,11 @@ const columns = computed<OTableColumnDef<OnCallTeamMember>[]>(() => [
     isAction: true,
     sortable: false,
     size: 80,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
-const store = useStore();
+
+// ── Adding people ─────────────────────────────────────────────────
 
 const selected = ref<string[]>([]);
 const fallbackEmails = ref("");
@@ -351,8 +686,6 @@ const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[
 const loadingUsers = ref(false);
 // Losing the picker must not lose the ability to add anybody.
 const userLookupFailed = ref(false);
-
-const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const memberEmails = computed(() => new Set(props.members.map((m) => m.user_email)));
 
@@ -363,9 +696,8 @@ const userOptions = computed(() =>
     .map((u) => ({ label: raw(displayName(u)), value: u.email })),
 );
 
-const sortedMembers = computed(() =>
-  [...props.members].sort((a, b) => a.user_email.localeCompare(b.user_email)),
-);
+const orgTotal = computed(() => orgUsers.value.length);
+const onTeamCount = computed(() => props.members.length);
 
 /** Comma/space/newline separated, so a pasted list works in the fallback. */
 const pendingEmails = computed(() => {
@@ -377,13 +709,16 @@ const pendingEmails = computed(() => {
 });
 
 /** "Ana Sharma (ana@o2.ai)" when a name exists, the email otherwise. */
-function displayName(user: {
-  email: string;
-  first_name?: string;
-  last_name?: string;
-}): string {
+function displayName(user: { email: string; first_name?: string; last_name?: string }): string {
   const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
   return name ? `${name} (${user.email})` : user.email;
+}
+
+/** Just the name for the table — the email is already on the line below it. */
+function nameOf(email: string): string {
+  const user = orgUsers.value.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  const name = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
+  return name || email;
 }
 
 async function fetchOrgUsers() {
@@ -454,8 +789,12 @@ async function removeMember(member: OnCallTeamMember) {
   }
 }
 
+// A team switched under the tab is a different roster and a different schedule.
+watch(() => props.teamId, fetchSegments);
+
 onMounted(() => {
   fetchOrgUsers();
   fetchAbsences();
+  fetchSegments();
 });
 </script>

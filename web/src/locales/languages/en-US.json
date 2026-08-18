@@ -13450,6 +13450,25 @@
     "attentionCheckedJustNow": "checked just now",
     "attentionHidden": "{count} more not shown | {count} more not shown",
     "attentionRecheck": "Re-check now",
-    "attentionFooter": "Checks re-run whenever the schedule, escalation or routing changes."
+    "attentionFooter": "Checks re-run whenever the schedule, escalation or routing changes.",
+    "badgeNextUp": "Next up",
+    "badgeOnCallNow": "On call now",
+    "channelDelivers": "{channel} — verified, a page lands here",
+    "channelUnavailable": "{channel} — no provider behind it",
+    "channelUnverified": "{channel} — on file, but nobody has verified it",
+    "loadUneven": "{name} carried {factor}× the median over the last {days} days",
+    "loadUnevenLabel": "Load is uneven:",
+    "membersOfOrg": "{onTeam} of {total} org members are on this team",
+    "membersUnreachableMore": "{name} is on this team, but no page to them can land — {why}. {count} other member is in the same state. | {name} is on this team, but no page to them can land — {why}. {count} other members are in the same state.",
+    "membersUnreachableOne": "{name} is on this team, but no page to them can land — {why}",
+    "nextShift": "Next shift",
+    "pagesCarriedHeader": "Pages carried, {days}d",
+    "reachableVia": "Reachable via",
+    "rebalanceInSchedule": "Rebalance in Schedule",
+    "shiftInRotation": "In the rotation",
+    "shiftNoneInHorizon": "Not on in the next {days} days",
+    "shiftNowUntil": "Now → {until}",
+    "shiftSkippedWhileAway": "Skipped while away",
+    "shiftStartsAt": "From {at}"
   }
 }

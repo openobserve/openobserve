@@ -251,20 +251,25 @@
         </OContent>
       </OTabPanel>
 
+      <!-- "1.9x load" is a fact about PEOPLE, and the only thing to be done about
+           it — change who is in the rotation — is on this tab. Reachability and
+           load are columns of the roster now, not panels beside it: one row per
+           person answers can we reach them, what have they carried, when are
+           they on next. -->
       <OTabPanel name="members">
         <OnCallMembers
           :team-id="teamId"
           :members="members"
           :rotations="schedule?.rotations ?? []"
           :timezone="team?.timezone ?? 'UTC'"
+          :on-call-now="onCallNow"
+          :reachability="reachability"
+          :load="teamLoad"
+          :testing="testingPage"
           @changed="fetchAll"
+          @open-schedule="activeTab = 'schedule'"
+          @test-page="sendTestPage"
         />
-        <!-- "1.9× load" is a fact about PEOPLE, and the only thing to be done
-             about it — change who is in the rotation — is on this tab. It sat
-             beside the schedule, one tab away from every control that fixes it. -->
-        <OContent y>
-          <OnCallLoadBalance :load="teamLoad" />
-        </OContent>
       </OTabPanel>
 
       <!-- What the schedule WILL do, then the rotations that decide it, then
@@ -434,7 +439,6 @@ import OnCallContactReadiness from "@/components/oncall/OnCallContactReadiness.v
 import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallEscalationDryRun from "@/components/oncall/OnCallEscalationDryRun.vue";
 import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
-import OnCallLoadBalance from "@/components/oncall/OnCallLoadBalance.vue";
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import OnCallTeamReach from "@/components/oncall/OnCallTeamReach.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";

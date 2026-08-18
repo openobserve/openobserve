@@ -31,6 +31,7 @@ vi.mock("@/services/oncall", () => ({
     listUnavailability: vi.fn(),
     createUnavailability: vi.fn(),
     deleteUnavailability: vi.fn(),
+    resolvedSchedule: vi.fn(),
   },
 }));
 vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
@@ -97,16 +98,25 @@ const stubs = {
   },
 };
 
-function render(
-  arg: OnCallTeamMember[] | { members?: OnCallTeamMember[]; rotations?: any[] } = [],
-) {
-  const opts = Array.isArray(arg) ? { members: arg } : arg;
+interface RenderOpts {
+  members?: OnCallTeamMember[];
+  rotations?: any[];
+  onCallNow?: any[];
+  reachability?: any;
+  load?: any;
+}
+
+function render(arg: OnCallTeamMember[] | RenderOpts = []) {
+  const opts: RenderOpts = Array.isArray(arg) ? { members: arg } : arg;
   return mount(OnCallMembers, {
     props: {
       teamId: "team_1",
       members: opts.members ?? [],
       rotations: opts.rotations ?? [],
       timezone: "UTC",
+      onCallNow: opts.onCallNow ?? [],
+      reachability: opts.reachability ?? null,
+      load: opts.load ?? null,
     },
     global: { plugins: [i18n, store], stubs },
   });
@@ -118,8 +128,9 @@ function member(email: string): OnCallTeamMember {
 
 describe("OnCallMembers", () => {
   beforeEach(() => {
-    oncall.listUnavailability.mockResolvedValue({ data: [] } as any);
     vi.clearAllMocks();
+    oncall.listUnavailability.mockResolvedValue({ data: [] } as any);
+    oncall.resolvedSchedule.mockResolvedValue({ data: [] } as any);
     users.orgUsers.mockResolvedValue({ data: { data: ORG_USERS } } as any);
     oncall.addMembers.mockResolvedValue({ data: [] } as any);
   });
@@ -141,9 +152,7 @@ describe("OnCallMembers", () => {
   it("falls back to the bare email when a user has no name", async () => {
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-members-user-select"]').text()).toContain(
-      "cara@o2.ai",
-    );
+    expect(wrapper.find('[data-test="oncall-members-user-select"]').text()).toContain("cara@o2.ai");
   });
 
   // Losing the picker must not lose the ability to add anybody.
@@ -194,9 +203,7 @@ describe("OnCallMembers", () => {
     const wrapper = render();
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-members-level-select"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-members-next-step"]').text()).toContain(
-      "Schedule",
-    );
+    expect(wrapper.find('[data-test="oncall-members-next-step"]').text()).toContain("Schedule");
   });
 
   it("cannot submit with nobody selected", async () => {
@@ -297,4 +304,182 @@ describe("OnCallMembers", () => {
     });
   });
 
+  /// The roster answers three questions per person. Each is a column fed by a
+  /// different endpoint, and a missing endpoint must cost only its own column.
+  describe("the roster columns", () => {
+    const ana = member("ana@o2.ai");
+    const bob = member("bob@o2.ai");
+
+    it("badges the person actually holding the pager", async () => {
+      const wrapper = render({
+        members: [ana, bob],
+        onCallNow: [{ rotation: "Primary", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" }],
+      });
+      await flushPromises();
+
+      const rows = wrapper.findAll('[data-test="row"]');
+      // On call first, next up second — the tab's first question is who is
+      // holding it, not whose name starts with A.
+      expect(rows[0].text()).toContain("On call now");
+      expect(rows[1].text()).toContain("Next up");
+    });
+
+    it("draws a chip per channel the server evaluated", async () => {
+      const wrapper = render({
+        members: [ana],
+        reachability: {
+          team_id: "team_1",
+          team_name: "T",
+          smtp_configured: true,
+          reachable: 1,
+          total: 1,
+          unreachable_members: [],
+          members: [
+            {
+              user_email: "ana@o2.ai",
+              is_org_user: true,
+              mailbox_shaped: true,
+              deliverable_channels: ["email"],
+              configured_but_unverified: [],
+              would_a_page_land: true,
+              channels: [
+                { channel: "email", deliverable: true, configured_but_unverified: false },
+                { channel: "sms", deliverable: false, configured_but_unverified: true },
+              ],
+            },
+          ],
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-email"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-sms"]').exists()).toBe(true);
+    });
+
+    /// Somebody on the team that no page can reach is a paging outage nobody
+    /// gets told about, so it is said once, in the server's own words.
+    it("warns about a member no page can reach", async () => {
+      const wrapper = render({
+        members: [ana],
+        reachability: {
+          team_id: "team_1",
+          team_name: "T",
+          smtp_configured: true,
+          reachable: 0,
+          total: 1,
+          unreachable_members: ["ana@o2.ai"],
+          members: [
+            {
+              user_email: "ana@o2.ai",
+              is_org_user: true,
+              mailbox_shaped: false,
+              deliverable_channels: [],
+              configured_but_unverified: [],
+              would_a_page_land: false,
+              why_not: "root@example is not a mailbox",
+              channels: [],
+            },
+          ],
+        },
+      });
+      await flushPromises();
+
+      const banner = wrapper.find('[data-test="oncall-members-unreachable-banner"]');
+      expect(banner.exists()).toBe(true);
+      expect(banner.text()).toContain("root@example is not a mailbox");
+    });
+
+    /// One `false` on the deployment explains every unreachable row, so the
+    /// per-person warning must give way to it rather than repeat it.
+    it("blames the deployment, not the people, when no transport exists", async () => {
+      const wrapper = render({
+        members: [ana],
+        reachability: {
+          team_id: "team_1",
+          team_name: "T",
+          smtp_configured: false,
+          reachable: 0,
+          total: 1,
+          unreachable_members: ["ana@o2.ai"],
+          members: [
+            {
+              user_email: "ana@o2.ai",
+              is_org_user: true,
+              mailbox_shaped: true,
+              deliverable_channels: [],
+              configured_but_unverified: [],
+              would_a_page_land: false,
+              channels: [],
+            },
+          ],
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-members-no-transport"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-members-unreachable-banner"]').exists()).toBe(false);
+    });
+
+    /// The load verdict sits next to the only control that changes it.
+    it("calls out a lopsided pager share and points at the schedule", async () => {
+      const wrapper = render({
+        members: [ana, bob],
+        load: {
+          team_id: "team_1",
+          from: 0,
+          to: 0,
+          days: 30,
+          upcoming_from: 0,
+          upcoming_to: 0,
+          rotations: [],
+          members: [
+            { user_email: "ana@o2.ai", pages: 12, nights: 4, acks: 12 },
+            { user_email: "bob@o2.ai", pages: 2, nights: 0, acks: 2 },
+          ],
+        },
+      });
+      await flushPromises();
+
+      const load = wrapper.find('[data-test="oncall-members-load"]');
+      expect(load.text()).toContain("Load is uneven");
+      await wrapper.find('[data-test="oncall-members-rebalance"]').trigger("click");
+      expect(wrapper.emitted("open-schedule")).toBeTruthy();
+    });
+
+    /// An even split is not a finding. Colouring it teaches people to ignore
+    /// the line that matters.
+    it("says nothing when the split is even", async () => {
+      const wrapper = render({
+        members: [ana, bob],
+        load: {
+          team_id: "team_1",
+          from: 0,
+          to: 0,
+          days: 30,
+          upcoming_from: 0,
+          upcoming_to: 0,
+          rotations: [],
+          members: [
+            { user_email: "ana@o2.ai", pages: 5, nights: 1, acks: 5 },
+            { user_email: "bob@o2.ai", pages: 5, nights: 1, acks: 5 },
+          ],
+        },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-members-load"]').exists()).toBe(false);
+    });
+
+    /// A failed schedule fetch must cost the shift column, not the table.
+    it("still names the rotation when the schedule cannot be resolved", async () => {
+      oncall.resolvedSchedule.mockRejectedValue(new Error("boom"));
+      const wrapper = render({
+        members: [ana],
+        rotations: [{ name: "Primary", members: ["ana@o2.ai"] }],
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-members-shift-ana@o2.ai"]').text()).toContain(
+        "In the rotation",
+      );
+    });
+  });
 });
