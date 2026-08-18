@@ -285,3 +285,144 @@ fn handler_tantivy_index(
     }
     plan
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::array::{Float64Array, Int64Array, RecordBatch, UInt64Array};
+    use arrow_schema::{DataType, Field, Schema};
+    use config::meta::promql::HASH_LABEL;
+    use datafusion::{
+        datasource::{
+            file_format::parquet::ParquetFormat,
+            listing::{ListingOptions, ListingTableUrl},
+        },
+        physical_plan::{collect, displayable},
+    };
+    use parquet::arrow::ArrowWriter;
+
+    use super::*;
+    use crate::datafusion::exec::DataFusionContextBuilder;
+
+    fn hash_sorted_schema() -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("value", DataType::Float64, false),
+        ]))
+    }
+
+    /// Write one Parquet file whose rows are ordered by (__hash__, _timestamp).
+    fn write_hash_sorted_file(dir: &std::path::Path, name: &str, rows: &[(u64, i64)]) {
+        let schema = hash_sorted_schema();
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from_iter_values(rows.iter().map(|r| r.0))),
+                Arc::new(Int64Array::from_iter_values(rows.iter().map(|r| r.1))),
+                Arc::new(Float64Array::from_iter_values(
+                    rows.iter().map(|r| r.0 as f64),
+                )),
+            ],
+        )
+        .unwrap();
+        let file = std::fs::File::create(dir.join(name)).unwrap();
+        let mut writer = ArrowWriter::try_new(file, schema, None).unwrap();
+        writer.write(&batch).unwrap();
+        writer.close().unwrap();
+    }
+
+    /// Hash-sorted files with overlapping hash ranges (every ingester file
+    /// covers the whole hash space) must still yield an ordered scan: one file
+    /// per partition, merged by SortPreservingMergeExec without a SortExec.
+    #[tokio::test]
+    async fn test_hash_sorted_files_merge_without_sort_exec() {
+        let dir = tempfile::tempdir().unwrap();
+        write_hash_sorted_file(
+            dir.path(),
+            "a.parquet",
+            &[(1, 10), (1, 30), (5, 10), (9, 20)],
+        );
+        write_hash_sorted_file(dir.path(), "b.parquet", &[(1, 20), (2, 10), (9, 10)]);
+        write_hash_sorted_file(dir.path(), "c.parquet", &[(3, 10), (5, 5), (5, 20)]);
+
+        let sort_order = FileSortOrder::HashTimestampAsc;
+        let ctx = DataFusionContextBuilder::new()
+            .trace_id("test_hash_sorted_merge")
+            .sort_order(sort_order)
+            .build(2)
+            .await
+            .unwrap();
+
+        let listing_options = ListingOptions::new(Arc::new(ParquetFormat::default()))
+            .with_target_partitions(2)
+            .with_collect_stat(true)
+            .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
+        let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
+        let config = ListingTableConfig::new(url)
+            .with_listing_options(listing_options)
+            .with_schema(hash_sorted_schema());
+        let table = ListingTableAdapter::try_new(
+            config,
+            "test_hash_sorted_merge".to_string(),
+            sort_order,
+            None,
+            vec![],
+            None,
+        )
+        .unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+
+        let plan = ctx
+            .state()
+            .create_logical_plan(&format!(
+                "SELECT * FROM t ORDER BY {}",
+                sort_order.order_by_clause().unwrap()
+            ))
+            .await
+            .unwrap();
+        let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+        let display = displayable(physical_plan.as_ref()).indent(true).to_string();
+        assert!(
+            display.contains("SortPreservingMergeExec"),
+            "expected a merge of pre-sorted partitions, got:\n{display}"
+        );
+        assert!(
+            !display.contains("SortExec"),
+            "hash-sorted inputs must not be re-sorted, got:\n{display}"
+        );
+
+        let batches = collect(physical_plan, ctx.task_ctx()).await.unwrap();
+        let mut rows = Vec::new();
+        for batch in &batches {
+            let hashes = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .unwrap();
+            let ts = batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap();
+            for i in 0..batch.num_rows() {
+                rows.push((hashes.value(i), ts.value(i)));
+            }
+        }
+        let mut expected = vec![
+            (1, 10),
+            (1, 30),
+            (5, 10),
+            (9, 20),
+            (1, 20),
+            (2, 10),
+            (9, 10),
+            (3, 10),
+            (5, 5),
+            (5, 20),
+        ];
+        expected.sort();
+        assert_eq!(rows, expected);
+    }
+}

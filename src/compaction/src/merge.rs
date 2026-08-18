@@ -24,8 +24,8 @@ use config::{
     get_config, ider, is_local_disk_storage,
     meta::{
         promql::{
-            format_tsid_major_file_name, is_hash_sorted_file_name, is_tsid_major_file_name,
-            to_tsid_series_index_name,
+            HASH_LABEL, format_tsid_major_file_name, is_hash_sorted_file_name,
+            is_tsid_major_file_name, to_tsid_series_index_name,
         },
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
@@ -908,18 +908,38 @@ pub async fn merge_files(
         target_partitions: 2,
     };
 
-    // Once TSID-major files exist, an input batch can contain the legacy
-    // timestamp-major layout, ingester written hash-sorted files and the new
-    // layout. Do not advertise a timestamp ordering in that case: the merge
-    // query supplies the authoritative sort.
+    // Physical order of the input files, which is what the merge query may
+    // rely on:
+    // - every input is (__hash__, _timestamp) ordered (ingester `hash-sorted-` files or compactor
+    //   `tsid-major-v3-` files) and the output is TSID-major too: declare that order so DataFusion
+    //   merges the pre-sorted files (SortPreservingMerge, one file per partition) instead of
+    //   materializing the whole batch in a SortExec;
+    // - a batch that mixes layouts (legacy timestamp-major, hash-sorted, TSID-major) or a
+    //   hash-sorted batch merged into the classic layout: declare nothing, the merge query supplies
+    //   the authoritative sort;
+    // - otherwise the classic `_timestamp DESC` layout.
     let metrics_tsid_major_requested =
         metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
-    let input_sort_order =
-        if metrics_tsid_major_requested || files.iter().any(|f| is_hash_sorted_file_name(&f.key)) {
-            FileSortOrder::None
-        } else {
-            FileSortOrder::TimestampDesc
-        };
+    let all_hash_sorted = files
+        .iter()
+        .all(|f| is_hash_sorted_file_name(&f.key) || is_tsid_major_file_name(&f.key));
+    let any_hash_sorted = files
+        .iter()
+        .any(|f| is_hash_sorted_file_name(&f.key) || is_tsid_major_file_name(&f.key));
+    let input_sort_order = if metrics_tsid_major_requested
+        && all_hash_sorted
+        && schema.field_with_name(HASH_LABEL).is_ok()
+    {
+        FileSortOrder::HashTimestampAsc
+    } else if metrics_tsid_major_requested || any_hash_sorted {
+        FileSortOrder::None
+    } else {
+        FileSortOrder::TimestampDesc
+    };
+    log::debug!(
+        "[COMPACTOR:WORKER:{thread_id}] merge input sort order: {input_sort_order}, files: {}",
+        files.len()
+    );
     let tables = match TableBuilder::new()
         .sort_order(input_sort_order)
         .build(session, files.clone(), schema.clone())

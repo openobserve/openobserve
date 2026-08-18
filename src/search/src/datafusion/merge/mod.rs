@@ -137,11 +137,9 @@ pub async fn merge_parquet_files(
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files")
-        .sort_order(if sort_order == FileSortOrder::HashTimestampAsc {
-            FileSortOrder::None
-        } else {
-            FileSortOrder::TimestampDesc
-        })
+        // enables split_file_groups_by_statistics for the declared input order;
+        // harmless when the input tables declare no order
+        .sort_order(sort_order)
         .build(get_config().limit.datafusion_min_partition_num)
         .await?;
     // register union table
