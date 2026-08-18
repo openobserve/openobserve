@@ -121,7 +121,7 @@ import usersService from "@/services/users";
 import type { OnCallTeam, Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { SHIFT_PRESETS } from "@/utils/oncall";
+import { resolvableTimezones, SHIFT_PRESETS } from "@/utils/oncall";
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
 
 import {
@@ -153,14 +153,13 @@ const schema = computed(() => makeOnCallTeamSchema(t));
  * set always matches what this runtime can actually resolve — the server
  * rejects anything it cannot parse, and a stale bundled list would surface
  * that as a save error instead of an absent option.
+ *
+ * The team's own zone is passed in so an edit never opens on a select holding
+ * a value absent from its options.
  */
-const timezoneOptions = computed(() => {
-  const supported =
-    typeof Intl.supportedValuesOf === "function"
-      ? Intl.supportedValuesOf("timeZone")
-      : ["UTC"];
-  return supported.map((tz) => ({ label: raw(tz), value: tz }));
-});
+const timezoneOptions = computed(() =>
+  resolvableTimezones(props.team?.timezone).map((tz) => ({ label: raw(tz), value: tz })),
+);
 
 const shiftOptions = computed(() =>
   SHIFT_PRESETS.map((preset) => ({ label: t(preset.labelKey), value: preset.micros })),

@@ -176,6 +176,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { resolvableTimezones } from "@/utils/oncall";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import type { OnCallTeamMember, PresetDescriptor, PresetInput } from "@/ts/interfaces/oncall";
@@ -324,9 +325,7 @@ const PresetField = defineComponent({
       label: gt("oncall.durationDays", { count: days }, days),
       value: days * 86_400_000_000,
     }));
-    const zones = (Intl as { supportedValuesOf?: (k: string) => string[] })
-      .supportedValuesOf?.("timeZone") ?? ["UTC"];
-    const ZONES = zones.map((z) => ({ label: raw(z), value: z }));
+    const ZONES = resolvableTimezones().map((z) => ({ label: raw(z), value: z }));
 
     return () => {
       const { input, model, memberOptions } = fieldProps;

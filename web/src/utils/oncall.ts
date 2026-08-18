@@ -333,6 +333,38 @@ export function describeTarget(
 }
 
 /**
+ * The zones this runtime can actually resolve, UTC first.
+ *
+ * `Intl.supportedValuesOf("timeZone")` returns the canonical IANA list, which
+ * **excludes `UTC`, `GMT` and all of `Etc/*`** — 418 zones and not the one an
+ * on-call team is most likely to want. Every engine resolves `UTC` perfectly
+ * well; it is simply not a canonical zone name, so it was never offered and a
+ * UTC team could not be created at all.
+ *
+ * `preferred` is put in the list if it is missing, so a select never holds a
+ * value that is not one of its own options — which reads as chosen and submits
+ * as nothing.
+ */
+export function resolvableTimezones(preferred?: string): string[] {
+  const canonical =
+    typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+  const wanted = ["UTC", ...canonical, ...(preferred ? [preferred] : [])];
+  const seen = new Set<string>();
+  return wanted.filter((zone) => {
+    if (!zone || seen.has(zone)) return false;
+    seen.add(zone);
+    // Offering a zone the runtime cannot format would turn an absent option
+    // into a save error, which is the failure this list exists to avoid.
+    try {
+      new Intl.DateTimeFormat("en", { timeZone: zone });
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
  * A target the engine already rendered, said in the product's one vocabulary.
  *
  * The read-only ladder printed `describe()`'s output and the editor printed
