@@ -21,7 +21,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
 
-use crate::{meta::search::SearchEventType, stats::MemorySize};
+use crate::{
+    meta::{search::SearchEventType, stream::StreamType},
+    stats::MemorySize,
+};
 
 /// Custom deserializer that accepts either a comma-separated string or a string array
 fn deserialize_string_or_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
@@ -130,6 +133,71 @@ mod tsid_major_tests {
         assert!(!is_tsid_major_file_name("tsid-major-v1-x.parquet"));
         assert!(!is_tsid_major_file_name("tsid-major-v3-x.vortex"));
         assert!(!is_tsid_major_file_name("tsid-major-v3-.parquet"));
+    }
+}
+
+/// File name prefix of Parquet metrics files whose rows are ordered by
+/// `(__hash__ ASC, _timestamp ASC)` instead of the classic `_timestamp DESC`.
+/// The marker lets readers and later merges know the physical order of a file
+/// without opening it.
+const HASH_SORTED_FILE_PREFIX: &str = "hash-sorted-";
+
+/// True when metrics files of `stream_type` may be written in the hash-sorted
+/// layout (`ZO_METRICS_TSID_MAJOR_ENABLED`). Readers must not assume a
+/// `_timestamp` order for such streams.
+pub fn metrics_hash_sort_enabled(stream_type: StreamType) -> bool {
+    stream_type == StreamType::Metrics && crate::get_config().compact.metrics_tsid_major_enabled
+}
+
+/// Add the hash-sorted marker to the file name of `key`
+/// (`files/.../7099303408192061440.parquet` ->
+/// `files/.../hash-sorted-7099303408192061440.parquet`).
+pub fn to_hash_sorted_file_key(key: &str) -> String {
+    match key.rfind('/') {
+        Some(pos) => format!(
+            "{}/{HASH_SORTED_FILE_PREFIX}{}",
+            &key[..pos],
+            &key[pos + 1..]
+        ),
+        None => format!("{HASH_SORTED_FILE_PREFIX}{key}"),
+    }
+}
+
+/// True when the file was written in the hash-sorted layout.
+pub fn is_hash_sorted_file_name(path: &str) -> bool {
+    path.rsplit('/')
+        .next()
+        .and_then(|file_name| file_name.strip_prefix(HASH_SORTED_FILE_PREFIX))
+        .is_some_and(|rest| rest.ends_with(".parquet") && rest.len() > ".parquet".len())
+}
+
+#[cfg(test)]
+mod hash_sorted_file_tests {
+    use super::*;
+
+    #[test]
+    fn marks_and_recognizes_hash_sorted_files() {
+        let key = "files/default/metrics/cpu/2026/08/18/10/7099303408192061440.parquet";
+        let marked = to_hash_sorted_file_key(key);
+        assert_eq!(
+            marked,
+            "files/default/metrics/cpu/2026/08/18/10/hash-sorted-7099303408192061440.parquet"
+        );
+        assert!(is_hash_sorted_file_name(&marked));
+        assert!(!is_hash_sorted_file_name(key));
+        assert!(is_hash_sorted_file_name("hash-sorted-1.parquet"));
+        assert_eq!(
+            to_hash_sorted_file_key("1.parquet"),
+            "hash-sorted-1.parquet"
+        );
+    }
+
+    #[test]
+    fn rejects_other_layouts_and_formats() {
+        assert!(!is_hash_sorted_file_name("hash-sorted-1.vortex"));
+        assert!(!is_hash_sorted_file_name("hash-sorted-.parquet"));
+        assert!(!is_hash_sorted_file_name("files/hash-sorted-dir/1.parquet"));
+        assert!(!is_hash_sorted_file_name("tsid-major-v3-1.parquet"));
     }
 }
 

@@ -57,18 +57,11 @@ pub fn try_decode(
         projection.as_ref(),
         &filters,
         node.limit.map(|v| v as usize),
-        decode_sort_order(&node),
+        // only the classic `_timestamp DESC` order travels with distributed
+        // plans; the hash order is a compactor-merge concern
+        FileSortOrder::from_sorted_by_time(node.sorted_by_time),
         full_schema,
     )))
-}
-
-/// Prefer the explicit `sort_order`; fall back to the legacy `sorted_by_time`
-/// flag written by nodes that predate the enum.
-fn decode_sort_order(node: &cluster_rpc::NewEmptyExecNode) -> FileSortOrder {
-    match FileSortOrder::from_proto(node.sort_order()) {
-        FileSortOrder::None => FileSortOrder::from_sorted_by_time(node.sorted_by_time),
-        order => order,
-    }
 }
 
 pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
@@ -85,10 +78,8 @@ pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()>
         }),
         filters,
         limit: node.limit().map(|v| v as u64),
-        // keep the legacy flag populated so older nodes still see the time order
         sorted_by_time: node.sort_order().is_timestamp_desc(),
         full_schema: Some(node.full_schema().as_ref().try_into()?),
-        sort_order: node.sort_order().to_proto() as i32,
     };
     let proto = cluster_rpc::PhysicalPlanNode {
         plan: Some(cluster_rpc::physical_plan_node::Plan::EmptyExec(plan_node)),
@@ -148,17 +139,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_datafusion_codec_sort_order_roundtrip() -> Result<()> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new(config::meta::promql::HASH_LABEL, DataType::UInt64, false),
-            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            config::TIMESTAMP_COL_NAME,
+            DataType::Int64,
+            false,
+        )]));
         let proto = super::super::get_physical_extension_codec();
         let ctx = datafusion::prelude::SessionContext::new();
-        for order in [
-            FileSortOrder::None,
-            FileSortOrder::TimestampDesc,
-            FileSortOrder::HashTimestampAsc,
-        ] {
+        for order in [FileSortOrder::None, FileSortOrder::TimestampDesc] {
             let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
                 "test",
                 Arc::clone(&schema),
@@ -175,19 +163,5 @@ mod tests {
             assert_eq!(decoded.sort_order(), order);
         }
         Ok(())
-    }
-
-    #[test]
-    fn test_decode_sort_order_prefers_enum_then_legacy_flag() {
-        let mut node = cluster_rpc::NewEmptyExecNode::default();
-        assert_eq!(decode_sort_order(&node), FileSortOrder::None);
-
-        // legacy sender: only the bool is populated
-        node.sorted_by_time = true;
-        assert_eq!(decode_sort_order(&node), FileSortOrder::TimestampDesc);
-
-        // new sender: enum wins over the bool
-        node.sort_order = cluster_rpc::FileSortOrder::HashTimestampAsc as i32;
-        assert_eq!(decode_sort_order(&node), FileSortOrder::HashTimestampAsc);
     }
 }

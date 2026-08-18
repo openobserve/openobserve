@@ -3306,14 +3306,10 @@ pub struct NewEmptyExecNode {
     pub filters: ::prost::alloc::vec::Vec<::datafusion_proto::protobuf::LogicalExprNode>,
     #[prost(uint64, optional, tag = "5")]
     pub limit: ::core::option::Option<u64>,
-    /// Legacy flag, kept for rolling upgrades: true == FILE_SORT_ORDER_TIMESTAMP_DESC.
-    /// Readers prefer `sort_order` when it is set to anything but NONE.
     #[prost(bool, tag = "6")]
     pub sorted_by_time: bool,
     #[prost(message, optional, tag = "7")]
     pub full_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
-    #[prost(enumeration = "FileSortOrder", tag = "8")]
-    pub sort_order: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TmpExecNode {
@@ -3492,36 +3488,6 @@ pub struct KvItem {
     pub key: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub value: ::prost::alloc::string::String,
-}
-/// Physical sort order of the files behind a table.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-#[repr(i32)]
-pub enum FileSortOrder {
-    None = 0,
-    TimestampDesc = 1,
-    HashTimestampAsc = 2,
-}
-impl FileSortOrder {
-    /// String value of the enum field names used in the ProtoBuf definition.
-    ///
-    /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            Self::None => "FILE_SORT_ORDER_NONE",
-            Self::TimestampDesc => "FILE_SORT_ORDER_TIMESTAMP_DESC",
-            Self::HashTimestampAsc => "FILE_SORT_ORDER_HASH_TIMESTAMP_ASC",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "FILE_SORT_ORDER_NONE" => Some(Self::None),
-            "FILE_SORT_ORDER_TIMESTAMP_DESC" => Some(Self::TimestampDesc),
-            "FILE_SORT_ORDER_HASH_TIMESTAMP_ASC" => Some(Self::HashTimestampAsc),
-            _ => None,
-        }
-    }
 }
 /// Response message for GetNodes
 #[derive(Clone, PartialEq, ::prost::Message)]

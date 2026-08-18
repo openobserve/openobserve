@@ -25,6 +25,7 @@ use chrono::{Duration, Utc};
 use config::{
     FxIndexMap, cluster, get_config,
     meta::{
+        promql::to_hash_sorted_file_key,
         search::StorageType,
         stream::{FileKey, FileMeta, StreamType},
     },
@@ -808,12 +809,13 @@ async fn merge_files(
         }
     };
 
-    let (buf, mut new_file_meta, file_format) = match buf {
+    let (buf, mut new_file_meta, file_format, sort_order) = match buf {
         MergeParquetResult::Single {
             buf,
             file_meta,
             file_format,
-        } => (buf, file_meta, file_format),
+            sort_order,
+        } => (buf, file_meta, file_format, sort_order),
         MergeParquetResult::Multiple { .. } => {
             // ingester should not support multiple files, it will be handled in compactor mode
             panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
@@ -825,13 +827,16 @@ async fn merge_files(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-    let new_file_key = super::generate_ingester_storage_file_key(
+    let mut new_file_key = super::generate_ingester_storage_file_key(
         &org_id,
         stream_type,
         &stream_name,
         &file_name,
         file_format,
     );
+    if sort_order == FileSortOrder::HashTimestampAsc {
+        new_file_key = to_hash_sorted_file_key(&new_file_key);
+    }
     log::info!(
         "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),

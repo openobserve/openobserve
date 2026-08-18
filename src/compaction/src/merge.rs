@@ -23,7 +23,10 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
-        promql::{format_tsid_major_file_name, is_tsid_major_file_name, to_tsid_series_index_name},
+        promql::{
+            format_tsid_major_file_name, is_hash_sorted_file_name, is_tsid_major_file_name,
+            to_tsid_series_index_name,
+        },
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
             StreamType,
@@ -905,17 +908,20 @@ pub async fn merge_files(
         target_partitions: 2,
     };
 
-    // Once TSID-major files exist, an input batch can contain both the legacy
-    // timestamp-major layout and the new layout. Do not advertise a timestamp
-    // ordering in that case: the merge query supplies the authoritative sort.
+    // Once TSID-major files exist, an input batch can contain the legacy
+    // timestamp-major layout, ingester written hash-sorted files and the new
+    // layout. Do not advertise a timestamp ordering in that case: the merge
+    // query supplies the authoritative sort.
     let metrics_tsid_major_requested =
         metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
-    let tables = match TableBuilder::new()
-        .sort_order(if metrics_tsid_major_requested {
+    let input_sort_order =
+        if metrics_tsid_major_requested || files.iter().any(|f| is_hash_sorted_file_name(&f.key)) {
             FileSortOrder::None
         } else {
             FileSortOrder::TimestampDesc
-        })
+        };
+    let tables = match TableBuilder::new()
+        .sort_order(input_sort_order)
         .build(session, files.clone(), schema.clone())
         .await
     {
@@ -975,6 +981,7 @@ pub async fn merge_files(
             buf,
             file_meta: mut new_file_meta,
             file_format,
+            ..
         } => {
             if new_file_meta.compressed_size == 0 {
                 return Err(anyhow::anyhow!(

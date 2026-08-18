@@ -19,7 +19,7 @@ use arrow::array::RecordBatch;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::HASH_LABEL,
+        promql::{HASH_LABEL, metrics_hash_sort_enabled},
         stream::{FileMeta, StreamType},
     },
     utils::{
@@ -69,6 +69,8 @@ pub enum MergeParquetResult {
         buf: Vec<u8>,
         file_meta: FileMeta,
         file_format: FileFormat,
+        /// Physical row order the file was written in.
+        sort_order: FileSortOrder,
     },
     #[allow(unused)]
     Multiple {
@@ -92,11 +94,9 @@ pub async fn merge_parquet_files(
     let cfg = get_config();
 
     let file_format = merge_output_file_format(stream_type, is_ingester, cfg.common.file_format);
-    let metrics_tsid_major = !is_ingester
-        && stream_type == StreamType::Metrics
-        && cfg.compact.metrics_tsid_major_enabled
-        && file_format == FileFormat::Parquet
-        && schema.field_with_name(HASH_LABEL).is_ok();
+    let sort_order = merge_output_sort_order(stream_type, file_format, &schema);
+    // compactor: size-bounded TSID-major files with series-index sidecars
+    let metrics_tsid_major = !is_ingester && sort_order == FileSortOrder::HashTimestampAsc;
 
     #[cfg(feature = "enterprise")]
     if stream_type == StreamType::Metrics && !is_ingester {
@@ -125,16 +125,19 @@ pub async fn merge_parquet_files(
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead sort by min ts of entries
         "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
-    } else if metrics_tsid_major {
-        format!("SELECT * FROM tbl ORDER BY {HASH_LABEL} ASC, {TIMESTAMP_COL_NAME} ASC")
     } else {
-        format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
+        format!(
+            "SELECT * FROM tbl ORDER BY {}",
+            sort_order
+                .order_by_clause()
+                .expect("merge output always has a sort order")
+        )
     };
     log::debug!("merge_parquet_files sql: {sql}");
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files")
-        .sort_order(if metrics_tsid_major {
+        .sort_order(if sort_order == FileSortOrder::HashTimestampAsc {
             FileSortOrder::None
         } else {
             FileSortOrder::TimestampDesc
@@ -231,7 +234,30 @@ pub async fn merge_parquet_files(
         buf,
         file_meta: metadata,
         file_format,
+        sort_order,
     })
+}
+
+/// Row order `merge_parquet_files` writes for the given stream.
+///
+/// The classic layout is `_timestamp DESC`. With `ZO_METRICS_TSID_MAJOR_ENABLED`
+/// Parquet metrics files are ordered by `(__hash__, _timestamp)` so every
+/// series is contiguous: the ingester writes plain hash-sorted files, the
+/// compactor writes size-bounded TSID-major files. Streams without a
+/// `__hash__` column (or written as Vortex) keep the classic layout.
+pub fn merge_output_sort_order(
+    stream_type: StreamType,
+    file_format: FileFormat,
+    schema: &Schema,
+) -> FileSortOrder {
+    if file_format == FileFormat::Parquet
+        && metrics_hash_sort_enabled(stream_type)
+        && schema.field_with_name(HASH_LABEL).is_ok()
+    {
+        FileSortOrder::HashTimestampAsc
+    } else {
+        FileSortOrder::TimestampDesc
+    }
 }
 
 fn merge_output_file_format(
