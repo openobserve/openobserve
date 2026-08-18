@@ -1,0 +1,22 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-terraform-export.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-import.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-ui-operations.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-multialert-ui.spec.js"
+  ],
+  "needs_registration": true,
+  "register_in": "tests/ui-testing/ci-matrix/ci_matrix.json -> Alerts shard -> run_files[]",
+  "secondary_area_uncovered": {
+    "area": "SLO",
+    "reason": "The same shared ExportResourceDialog is mounted by SloList.vue (slos-slolist-export-dialog / openobserve_slo), but SLO tests live in the SLO/ folder with @slo tags. Per the one-spec-one-area rule, SLO terraform export is NOT folded into this Alerts spec. A follow-up SLO/slo-terraform-export.spec.js (registered in the SLO shard) is still needed.",
+    "selectors": [
+      "slos-slolist-export-<name>",
+      "slos-slolist-export-selected",
+      "slos-slolist-export-dialog[-tabs|-json-tab|-terraform-tab|-copy-btn]",
+      "slos-slolist-iac-registries"
+    ]
+  },
+  "rationale": "No existing spec covers the Terraform export dialog. alerts-import.spec.js only exercises the legacy JSON round-trip download via pm.alertsPage.exportAlerts() (JSON tab + Download). The new ExportResourceDialog (JSON/Terraform tabs, copy, empty/skipped/dropped banners, single vs bulk, tab reset) is its own feature area and run-context explicitly designates Alerts/alerts-terraform-export.spec.js. The SLO caller is a separate area and is noted as uncovered rather than frankensteined into an Alerts spec."
+}

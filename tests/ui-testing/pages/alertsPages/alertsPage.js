@@ -4491,4 +4491,88 @@ export class AlertsPage {
     getAlertDeletedText() {
         return this.page.getByText(this.locators.alertDeletedMessage);
     }
+
+    // ==================== EXPORT RESOURCE DIALOG (TERRAFORM/JSON) ====================
+
+    /**
+     * Wait for the alert row to render in the list, reloading once if the list
+     * still shows a stale (pre-creation) snapshot under CI load. Reuses the same
+     * row-render retry pattern as `exportAlerts()`.
+     */
+    async waitForAlertRow(alertName) {
+        const moreBtn = this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`);
+        if (!(await moreBtn.isVisible({ timeout: 15000 }).catch(() => false))) {
+            await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            await expect(this.page.locator(this.locators.alertListPage)).toBeVisible({ timeout: 15000 });
+        }
+        await moreBtn.waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Alert row ready for export', { alertName });
+    }
+
+    /**
+     * Open the single-alert export dialog: the row's more-vert menu -> Export.
+     * @param {string} alertName
+     */
+    async openSingleAlertExport(alertName) {
+        await this.waitForAlertRow(alertName);
+        const moreBtn = this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`);
+        await moreBtn.click();
+        const exportItem = this.page.locator(`[data-test="alert-list-${alertName}-export-alert"]`);
+        await expect(exportItem).toBeVisible({ timeout: 10000 });
+        await exportItem.click();
+        testLogger.info('Opened single alert export', { alertName });
+    }
+
+    /**
+     * Open the bulk export dialog (select-all -> bottom-bar Export) WITHOUT
+     * downloading. Mirrors the selection-retry logic in `exportAlerts()`.
+     */
+    async openBulkExport() {
+        const headerCheckbox = this.page.locator(this.locators.alertListHeaderCheckbox).first();
+        await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+        const firstRow = this.page.locator('[data-test^="o2-table-row-"]').first();
+        if (!(await firstRow.isVisible({ timeout: 15000 }).catch(() => false))) {
+            await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+            await firstRow.waitFor({ state: 'visible', timeout: 15000 });
+        }
+        await headerCheckbox.click();
+        const exportBtn = this.page.locator(this.locators.alertExportButton);
+        await expect(async () => {
+            if (!(await exportBtn.isEnabled().catch(() => false))) {
+                await headerCheckbox.click().catch(() => {});
+            }
+            await expect(exportBtn).toBeVisible({ timeout: 3000 });
+            await expect(exportBtn).toBeEnabled({ timeout: 3000 });
+        }).toPass({ timeout: 30000 });
+        await exportBtn.click();
+        testLogger.info('Opened bulk alert export');
+    }
+
+    /**
+     * Assert the Terraform/OpenTofu registry links render in the Alerts header
+     * and each opens in a new tab with a non-empty http(s) href.
+     */
+    async expectIacRegistryLinksVisible() {
+        const container = this.page.locator('[data-test="alert-list-iac-registries"]');
+        await expect(container).toBeVisible({ timeout: 10000 });
+        const terraformLink = this.page.locator('[data-test="alert-list-iac-registries-terraform"]');
+        const opentofuLink = this.page.locator('[data-test="alert-list-iac-registries-opentofu"]');
+        await expect(terraformLink).toBeVisible();
+        await expect(opentofuLink).toBeVisible();
+        await expect(terraformLink).toHaveAttribute('target', '_blank');
+        await expect(opentofuLink).toHaveAttribute('target', '_blank');
+        await expect(terraformLink).toHaveAttribute('href', /^https?:\/\//);
+        await expect(opentofuLink).toHaveAttribute('href', /^https?:\/\//);
+        testLogger.info('IAC registry links verified in Alerts header');
+    }
+
+    /** Success toast shown after an alert export download. */
+    async expectExportSuccessToast() {
+        await expect(
+            this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' }),
+        ).toBeVisible({ timeout: 60000 });
+        testLogger.info('Export success toast visible');
+    }
 }

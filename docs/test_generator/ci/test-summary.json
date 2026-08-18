@@ -1,0 +1,9 @@
+[
+  { "title": "single alert export defaults to the JSON tab with a single object and downloads a .json", "action": "new", "verifies": "the dialog opens on JSON, renders a single object (not an array), and Download writes <name>.json with the success toast and close" },
+  { "title": "single alert export Terraform tab renders openobserve_alert and downloads a .tf", "action": "new", "verifies": "the Terraform tab renders an openobserve_alert resource (header comment, alert label, enabled) and Download writes <name>.tf" },
+  { "title": "bulk export produces a JSON array and one Terraform resource per alert", "action": "new", "verifies": "multi-item export yields a JSON array, one openobserve_alert resource per convertible alert, and a date-stem alerts-YYYY-MM-DD.tf filename" },
+  { "title": "copy button copies the active tab code to the clipboard", "action": "new", "verifies": "the copy button copies exactly the active tab's code to the clipboard for both JSON and Terraform" },
+  { "title": "Terraform and OpenTofu registry links render in the Alerts header", "action": "new", "verifies": "the Terraform/OpenTofu registry badges render in the Alerts header and link out in a new tab" },
+  { "title": "dropped provider-incompatible field is reported while the resource still renders", "action": "new", "verifies": "an alert with having.ignore_case reports the dropped field in the info banner while the resource still renders" },
+  { "title": "re-opening the dialog always lands back on the JSON tab", "action": "new", "verifies": "closing and re-opening the dialog resets the tab to JSON on every open" }
+]

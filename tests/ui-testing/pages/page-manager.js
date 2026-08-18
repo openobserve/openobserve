@@ -33,6 +33,7 @@ import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
 import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
+import { ExportResourceDialog } from "./exportResourceDialog.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -163,6 +164,9 @@ class PageManager {
     this.sloFormPage = new SloFormPage(page);
     this.sloDetailPage = new SloDetailPage(page);
     this.sloAlertsPage = new SloAlertsPage(page);
+
+    // ===== SHARED EXPORT RESOURCE DIALOG (alerts + SLO callers) =====
+    this.exportResourceDialog = new ExportResourceDialog(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);

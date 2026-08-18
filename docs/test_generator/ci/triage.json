@@ -1,0 +1,30 @@
+{
+  "feature_slug": "resource-terraform-export",
+  "feature_title": "Export Alerts & SLOs as Terraform (Export Resource Dialog)",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-terraform-export.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-terraform-export.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/common/ExportResourceDialog.vue",
+    "web/src/components/common/IacRegistryLinks.vue",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/views/slos/SloList.vue",
+    "web/src/utils/alerts/alertTerraform.ts",
+    "web/src/utils/slos/sloTerraform.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 40 changed paths live under web/src/**, tests/ui-testing/**, and scripts/translations/** — no enterprise-owned directory (enterprise/, o2_enterprise/, src/enterprise/) is touched. The symbols are Terraform/OpenTofu export and HCL highlighting, none of which are enterprise-gated keywords (no SSO/SAML/RBAC/SDR/cipher/logo-management), so this is an open-source frontend change.",
+    "skip": "Not skipped. No explicit opt-out: feature_hint.txt and trigger_comment.txt are both empty (no tests-added label, no skip comment). The change is user-facing — alert and SLO export switch from a direct download to a new review dialog — so the docs-only/CI-only skip condition does not apply.",
+    "e2e": "E2E is warranted. The alert export flow (web/src/components/alerts/AlertList.vue) changes from an immediate JSON download to a new ExportResourceDialog that offers JSON and Terraform tabs with copy/download, and the same dialog is wired into the SLO list (web/src/views/slos/SloList.vue). These are new user-exercisable interactions that need browser-level verification.",
+    "area": "Alerts is the primary surface: the largest behavioral change is in web/src/components/alerts/AlertList.vue plus web/src/utils/alerts/alertTerraform.ts, and the diff updates the existing Alerts E2E page object (tests/ui-testing/pages/alertsPages/alertsPage.js) for the new dialog. SLO export (web/src/views/slos/SloList.vue) is also touched but is secondary.",
+    "group": "Alerts — the existing 'Alerts' testfolder (actual_folder: Alerts) already runs alerts-import.spec.js, alerts-ui-operations.spec.js and alerts-e2e-flow.spec.js, so the new alert-export spec joins that matrix shard.",
+    "existing_tests": "No E2E specs in the diff. The only Playwright file changed is tests/ui-testing/pages/alertsPages/alertsPage.js — a page object, not a spec under tests/ui-testing/playwright-tests/. The .spec.ts files (AlertList.spec.ts, ExportResourceDialog.spec.ts, SloListExport.spec.ts, etc.) are Vitest unit tests under web/src/** and do not count as E2E coverage."
+  }
+}

@@ -1,0 +1,3830 @@
+===== COMPLETE LIST OF CHANGED FILES (40 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+tests/ui-testing/pages/alertsPages/alertsPage.js
+web/src/assets/images/common/opentofu.svg
+web/src/assets/images/common/opentofu_dark.svg
+web/src/assets/images/common/terraform.svg
+web/src/components/CodeQueryEditor.spec.ts
+web/src/components/CodeQueryEditor.vue
+web/src/components/alerts/AlertList.spec.ts
+web/src/components/alerts/AlertList.vue
+web/src/components/common/ExportResourceDialog.spec.ts
+web/src/components/common/ExportResourceDialog.vue
+web/src/components/common/IacRegistryLinks.spec.ts
+web/src/components/common/IacRegistryLinks.vue
+web/src/lib/core/Code/OCodeBlock.spec.ts
+web/src/lib/core/Code/OCodeBlock.types.ts
+web/src/lib/core/Code/OCodeBlock.vue
+web/src/lib/core/Code/hclLanguage.ts
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/utils/alerts/alertTerraform.spec.ts
+web/src/utils/alerts/alertTerraform.ts
+web/src/utils/slos/sloTerraform.spec.ts
+web/src/utils/slos/sloTerraform.ts
+web/src/utils/terraform/hcl.ts
+web/src/utils/terraform/provider.ts
+web/src/views/slos/SloList.vue
+web/src/views/slos/SloListExport.spec.ts
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index c6e698d59ea..18994e88e80 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -1999,6 +1999,8 @@
+     "errorSummary": "10a021941a74f178",
+     "errorValidations": "1e3d7d927f0df715",
+     "evaluationTime": "b38589b1cc372531",
++    "exportDialogSubtitle": "970fbd5f22926958",
++    "exportDialogTitle": "14d28d9c93bae395",
+     "externalDestinationTitle": "de81ae3e8c562977",
+     "failedToFetchHistory": "1563f1afee637be2",
+     "filters": {
+@@ -3380,6 +3382,7 @@
+     "dialog": "69b51517d04bcfed",
+     "disable": "b7e3e4aa4257b9a1",
+     "discardChanges": "f9bfa3dc7c8fcdea",
++    "download": "d6eafe8235910042",
+     "dragToResizeResetHint": "dc94eb66542cb221",
+     "drawer": "b36548cadb5783fc",
+     "dropFilesHint": "590ae380a94ff3d4",
+@@ -3403,6 +3406,10 @@
+     "excludeSearchTerm": "5931a84b092482d5",
+     "expand": "07548c2c6511d4d1",
+     "export": "3664895579f0a7e6",
++    "exportTerraformDropped": "ab1c77e7ce015f1b",
++    "exportTerraformEmpty": "3e453fe2899bb3eb",
++    "exportTerraformSkipped": "c490cd8582052059",
++    "exportTerraformTabTooltip": "93dacdf478b512f8",
+     "failedTimesInWindow": "1e5c41447e7fcc11",
+     "favourite": "ea713ecd8537f77e",
+     "field": "f45fc1dfdc96db27",
+@@ -3490,6 +3497,7 @@
+     "off": "ca7981b46ecf2c17",
+     "ok": "565339bc4d33d728",
+     "on": "b8d31e852725afb1",
++    "openProviderOnRegistry": "edd4dcde4b36d8ce",
+     "operator": "291101a07fe980e9",
+     "optional": "ec91fdd9256cb75a",
+     "other": "f97e9da0e3b879f0",
+@@ -11783,6 +11791,11 @@
+       "description": "c760f241cd657fb9",
+       "title": "6fd63ddb91b13306"
+     },
++    "exportFailed": "bc3cd7f464a63ec6",
++    "exportPartial": "d0c9856537393121",
++    "exportSubtitle": "970fbd5f22926958",
++    "exportSucceeded": "5161b89dc4f044c0",
++    "exportTitle": "3fb575ff7ced487e",
+     "field": {
+       "aggregate": "3c9193d0b2a451f5",
+       "aggregateHint": "f4c21ff8425b6f46",
+@@ -13367,6 +13380,7 @@
+       "pleaseWaitWhileSearchingForDashboards": "76b5eec899f94cb0",
+       "resumingAlerts": "26f5a3f06c1e9663",
+       "retrainingTriggered": "a77876d29d69b5ce",
++      "someAlertsCouldNotBeExported": "d0c9856537393121",
+       "successfullyAppliedChanges": "48dc5ec44f554495",
+       "successfullyDeletedTemplates": "517ca4f26aacb278",
+       "successfullyExportedAlert": "7f9cece79163e553",
+diff --git a/tests/ui-testing/pages/alertsPages/alertsPage.js b/tests/ui-testing/pages/alertsPages/alertsPage.js
+index eead2f680c9..d5301535e77 100644
+--- a/tests/ui-testing/pages/alertsPages/alertsPage.js
++++ b/tests/ui-testing/pages/alertsPages/alertsPage.js
+@@ -2764,6 +2764,16 @@ export class AlertsPage {
+             await expect(exportBtn).toBeEnabled({ timeout: 3000 });
+         }).toPass({ timeout: 30000 });
+         await exportBtn.click();
++
++        // Export no longer downloads on click: it opens a dialog offering the same
++        // definition as JSON or as a Terraform resource, and the file is written
++        // when Download is pressed there. The dialog opens on JSON, which is the
++        // format this test reads back, so no tab switch is needed.
++        const exportDialog = this.page.locator('[data-test="alert-export-dialog"]');
++        await expect(exportDialog).toBeVisible({ timeout: 15000 });
++        testLogger.info('Export dialog opened');
++        await exportDialog.locator('[data-test="o-dialog-primary-btn"]').click();
++
+         await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
+         testLogger.info('Export success notification visible');
+ 
+diff --git a/web/src/assets/images/common/opentofu.svg b/web/src/assets/images/common/opentofu.svg
+new file mode 100644
+index 00000000000..0962cd18697
+--- /dev/null
++++ b/web/src/assets/images/common/opentofu.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="131 -0.7 23 25"><path fill="#0D1A2B" fill-rule="evenodd" clip-rule="evenodd" d="M143.325.207a1.668 1.668 0 0 0-1.607 0l-8.233 4.526a3.096 3.096 0 0 0-.021.011l-1.084.596a1.668 1.668 0 0 0-.864 1.462V16.98c0 .609.331 1.169.864 1.462l8.312 4.568.032.018.994.546c.5.275 1.106.275 1.607 0l.996-.548.03-.016 8.311-4.568c.534-.293.865-.853.865-1.462V6.802c0-.609-.331-1.17-.865-1.462l-1.08-.594a2.892 2.892 0 0 0-.024-.013L143.325.207Zm.529 11.684 7.704-4.235a3.17 3.17 0 0 0 .024-.013l.092-.05a.385.385 0 0 1 .57.337v7.922a.385.385 0 0 1-.57.338l-.071-.04a3.397 3.397 0 0 0-.045-.025l-7.704-4.234Zm-10.389-4.246a.32.32 0 0 0 .02.011l7.704 4.235-7.704 4.234a1.08 1.08 0 0 0-.043.024l-.073.04a.385.385 0 0 1-.57-.337V7.93c0-.293.313-.479.57-.338l.096.053Zm17.487-1.781-7.219-3.968a.385.385 0 0 0-.57.326v8.584l7.788-4.28a.385.385 0 0 0 .001-.662Zm-16.859.662 7.787 4.28V2.222a.385.385 0 0 0-.57-.326l-7.217 3.966a.385.385 0 0 0 0 .664Zm.01 11.398a.385.385 0 0 1-.021-.662l7.798-4.286v8.584a.385.385 0 0 1-.555.334l-7.222-3.97Zm9.06 3.625v-8.573l7.798 4.286a.385.385 0 0 1-.021.662l-7.221 3.97a.385.385 0 0 1-.556-.334v-.011Z"/><path fill="#E2D23F" d="M142.336 1.33a.385.385 0 0 1 .371 0l8.233 4.526a.385.385 0 0 1 0 .675l-8.233 4.525a.386.386 0 0 1-.371 0l-8.233-4.525a.385.385 0 0 1 0-.675l8.233-4.525Z"/><path fill="#FFEC40" d="M132.799 7.928c0-.292.314-.478.57-.337l8.312 4.568a.384.384 0 0 1 .199.338v9.05a.385.385 0 0 1-.57.338l-8.312-4.569a.385.385 0 0 1-.199-.337V7.93Z"/><path fill="#fff" d="M151.674 7.591a.385.385 0 0 1 .57.337v9.051c0 .14-.076.27-.199.338l-8.312 4.568a.385.385 0 0 1-.57-.338v-9.05c0-.14.077-.27.2-.338l8.311-4.568Z"/><path fill="#0D1A2B" d="m136.289 15.03-.001.013-1.948-1.025.001-.013c.045-.606.518-.868 1.056-.585.538.283.937 1.004.892 1.61ZM139.355 16.8l-.001.013-1.948-1.025.001-.013c.045-.606.517-.868 1.055-.585.538.283.938 1.004.893 1.61Z"/></svg>
+diff --git a/web/src/assets/images/common/opentofu_dark.svg b/web/src/assets/images/common/opentofu_dark.svg
+new file mode 100644
+index 00000000000..11e9cdceaeb
+--- /dev/null
++++ b/web/src/assets/images/common/opentofu_dark.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#FFCA28" d="m10.184 23.25l.002-.01l-.033-.017l-8.388-4.611a1.68 1.68 0 0 1-.873-1.475V6.864c0-.614.335-1.18.873-1.476l9.424-5.18a1.69 1.69 0 0 1 1.622 0l8.31 4.568l.022.012l.006.002l-.004-.001l1.09.599c.538.296.873.862.873 1.476v10.273c0 .614-.335 1.179-.873 1.475l-8.388 4.611l-.03.016l-1.006.553a1.69 1.69 0 0 1-1.622 0l-1.003-.552zm.603-1.158l-.005-.001l.012.006a.388.388 0 0 0 .558-.338l.001-9.147a.39.39 0 0 0-.202-.34L2.763 7.661a.39.39 0 0 0-.576.341v9.135c0 .141.077.272.201.34l8.394 4.613zm-1.983-5.129l-.005.003l-1.959-1.031l-.003-.004l.001-.01c.023-.305.153-.525.346-.632c.194-.107.45-.101.72.041c.272.143.508.397.671.691s.252.628.229.935zM5.71 15.177l-.005.002l-1.96-1.031l-.002-.004l.001-.01c.022-.304.152-.524.346-.632s.449-.101.72.042s.508.396.671.69c.162.294.252.628.229.935zm14.981-8.999l-.003-.018a.38.38 0 0 0-.191-.25l-8.31-4.567a.39.39 0 0 0-.374 0L3.503 5.91a.39.39 0 0 0-.193.423l.009.007l-.009-.007c.022.1.083.194.183.253l8.32 4.572a.39.39 0 0 0 .374 0l8.321-4.573a.385.385 0 0 0 .183-.407M3.319 6.34l-.005-.006l-.004-.003zm-.467-1.56l-.003.002l.005.006zm.007.007l-.003.001h-.002z"/></svg>
+diff --git a/web/src/assets/images/common/terraform.svg b/web/src/assets/images/common/terraform.svg
+new file mode 100644
+index 00000000000..5e9f86d67ae
+--- /dev/null
++++ b/web/src/assets/images/common/terraform.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 291"><path fill="#4040b2" d="M176.485 188.994L256 143.127V51.249l-79.515 45.963z"/><path fill="#5c4ee5" d="m88.243 51.249l79.515 45.963v91.782L88.243 143.08M0 91.83l79.515 45.916v-91.83L0 0m88.243 244.994l79.515 45.915v-91.83l-79.515-45.915"/></svg>
+diff --git a/web/src/components/CodeQueryEditor.spec.ts b/web/src/components/CodeQueryEditor.spec.ts
+index 0ae2aafc14d..9e98289c3af 100644
+--- a/web/src/components/CodeQueryEditor.spec.ts
++++ b/web/src/components/CodeQueryEditor.spec.ts
+@@ -66,6 +66,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
+     defineTheme: vi.fn(),
+     setTheme: vi.fn(),
+     setModelMarkers: vi.fn(),
++    setModelLanguage: vi.fn(),
+   },
+   languages: {
+     // Real values, mirroring monaco-editor/esm/vs/editor/common/languages.js
+@@ -108,6 +109,7 @@ vi.mock("monaco-editor/esm/vs/language/html/monaco.contribution.js", () => ({}))
+ vi.mock("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js", () => ({}));
+ vi.mock("monaco-editor/esm/vs/basic-languages/python/python.contribution.js", () => ({}));
+ vi.mock("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js", () => ({}));
++vi.mock("monaco-editor/esm/vs/basic-languages/hcl/hcl.contribution.js", () => ({}));
+ 
+ // Fix: component imports default from "@/composables/useLogs/searchState"
+ vi.mock("@/composables/useLogs/searchState", () => ({
+@@ -204,6 +206,29 @@ describe("CodeQueryEditor", () => {
+     });
+   };
+ 
++  // A surface that switches language, such as the export dialog's JSON and
++  // Terraform tabs, used to force a remount to get new highlighting: that throws
++  // away the DOM, the scroll position and the undo stack on every toggle.
++  describe("language switching", () => {
++    it("retokenizes the existing model instead of recreating the editor", async () => {
++      attachEditorHost();
++      const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
++      const wrapper = createWrapper({ language: "json", query: "{}" });
++      await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalled());
++
++      const createdBefore = monacoApi.editor.create.mock.calls.length;
++      monacoApi.editor.setModelLanguage.mockClear();
++
++      await wrapper.setProps({ language: "hcl" });
++      await vi.waitFor(() => expect(monacoApi.editor.setModelLanguage).toHaveBeenCalled());
++
++      expect(monacoApi.editor.setModelLanguage.mock.calls[0][1]).toBe("hcl");
++      // No second editor: the same instance was retokenized.
++      expect(monacoApi.editor.create.mock.calls.length).toBe(createdBefore);
++      wrapper.unmount();
++    });
++  });
++
+   describe("Component Rendering", () => {
+     it("should render the component", () => {
+       const wrapper = createWrapper();
+diff --git a/web/src/components/CodeQueryEditor.vue b/web/src/components/CodeQueryEditor.vue
+index 55955011abd..c3b0ecf682a 100644
+--- a/web/src/components/CodeQueryEditor.vue
++++ b/web/src/components/CodeQueryEditor.vue
+@@ -667,30 +667,57 @@ export default defineComponent({
+       validateDoubleQuotes();
+     };
+ 
+-    onMounted(async () => {
+-      if (props.language === "sql") {
++    // Monaco tokenizes a language only once its contribution has been imported,
++    // and each is a separate chunk so a page pays for the one it uses. Factored
++    // out of onMounted because a surface that switches language, such as the
++    // export dialog's JSON and Terraform tabs, has to load the new one too.
++    const loadLanguageContribution = async (language: string) => {
++      if (language === "sql") {
+         await import("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js");
+       }
+ 
+-      if (props.language === "json") {
++      if (language === "json") {
+         await import("monaco-editor/esm/vs/language/json/monaco.contribution.js");
+       }
+ 
+-      if (props.language === "html") {
++      if (language === "html") {
+         await import("monaco-editor/esm/vs/language/html/monaco.contribution.js");
+       }
+ 
+-      if (props.language === "markdown") {
++      if (language === "markdown") {
+         await import("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js");
+       }
+ 
+-      if (props.language === "python") {
++      // Terraform / OpenTofu configuration, e.g. the alert and SLO exports.
++      if (language === "hcl") {
++        await import("monaco-editor/esm/vs/basic-languages/hcl/hcl.contribution.js");
++      }
++
++      if (language === "python") {
+         await import("monaco-editor/esm/vs/basic-languages/python/python.contribution.js");
+       }
+-      if (props.language === "javascript") {
++      if (language === "javascript") {
+         await import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js");
+       }
++    };
+ 
++    // Retokenize in place rather than making the consumer remount: recreating the
++    // editor to change language throws away the DOM, the scroll position and the
++    // undo stack, which reads as a hitch on every toggle. Providers are left
++    // alone deliberately; they register per language and re-registering here
++    // would stack duplicates on a surface that toggles repeatedly.
++    watch(
++      () => props.language,
++      async (language) => {
++        if (!editorObj || !language) return;
++        await loadLanguageContribution(language);
++        const model = editorObj.getModel();
++        if (model) monaco.editor.setModelLanguage(model, language);
++      },
++    );
++
++    onMounted(async () => {
++      await loadLanguageContribution(props.language);
+       setupEditor();
+     });
+ 
+diff --git a/web/src/components/alerts/AlertList.spec.ts b/web/src/components/alerts/AlertList.spec.ts
+index 08f412c59b3..f5d170dfdce 100644
+--- a/web/src/components/alerts/AlertList.spec.ts
++++ b/web/src/components/alerts/AlertList.spec.ts
+@@ -696,28 +696,47 @@ describe("AlertList - row actions", () => {
+     expect(call).toBeTruthy();
+   });
+ 
+-  it("exports a single alert to JSON (creates object URL)", async () => {
++  // Export fetches the definition and opens the format dialog; the file is
++  // written from there, once the user has picked JSON or Terraform.
++  it("opens the export dialog with the fetched alert definition", async () => {
+     const wrapper: any = await mountAlertList();
+     await waitData(wrapper);
+     const row = wrapper.vm.filteredResults[0];
+ 
+-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
+     // Trigger export through method to avoid menu interaction
+     await wrapper.vm.exportAlert(row);
+-    expect(createURLSpy).toHaveBeenCalled();
++    await flushPromises();
++
++    expect(wrapper.vm.showExportDialog).toBe(true);
++    expect(wrapper.vm.alertsToExport).toHaveLength(1);
++    expect(wrapper.vm.alertsToExport[0].name).toBe(row.name);
++    // The exported id belongs to the source alert, not to what this creates.
++    expect(wrapper.vm.alertsToExport[0]).not.toHaveProperty("id");
+   });
+ 
+-  it("exports multiple selected alerts to JSON", async () => {
++  it("opens the export dialog with every selected alert", async () => {
+     const wrapper: any = await mountAlertList();
+     await waitData(wrapper);
+ 
+-    // Select two alerts
+-    wrapper.vm.selectedAlerts = [wrapper.vm.filteredResults[0], wrapper.vm.filteredResults[1]];
++    // Select two alerts. selectedAlerts is a computed over selectedAlertIds whose
++    // setter only handles clearing, so selection has to go through the ids.
++    wrapper.vm.selectedAlertIds = [
++      wrapper.vm.filteredResults[0].alert_id,
++      wrapper.vm.filteredResults[1].alert_id,
++    ];
+     await flushPromises();
++    expect(wrapper.vm.selectedAlerts).toHaveLength(2);
+ 
+-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
+     await wrapper.vm.multipleExportAlert();
+-    expect(createURLSpy).toHaveBeenCalled();
++    await flushPromises();
++
++    expect(wrapper.vm.showExportDialog).toBe(true);
++    expect(wrapper.vm.alertsToExport).toHaveLength(2);
++
++    // The selection clears once the download actually happens.
++    expect(wrapper.vm.selectedAlerts.length).toBe(2);
++    wrapper.vm.onExportDownloaded({ format: "terraform", count: 2 });
++    await flushPromises();
+     expect(wrapper.vm.selectedAlerts.length).toBe(0);
+   });
+ });
+diff --git a/web/src/components/alerts/AlertList.vue b/web/src/components/alerts/AlertList.vue
+index b6149f657c5..36bc4ca0752 100644
+--- a/web/src/components/alerts/AlertList.vue
++++ b/web/src/components/alerts/AlertList.vue
+@@ -26,6 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       icon="shield-alert-outline"
+     >
+       <template #actions>
++        <!-- The provider behind the Terraform export tab, which is otherwise
++             only discoverable once the export dialog is already open. -->
++        <IacRegistryLinks data-test="alert-list-iac-registries" />
+         <!-- Import button -->
+         <OButton
+           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+@@ -805,6 +808,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         data-test="dashboard-move-to-another-folder-dialog"
+       />
+     </template>
++    <ExportResourceDialog
++      v-model:open="showExportDialog"
++      :items="alertsToExport"
++      :terraform="alertsTerraform"
++      :title="
++        t('alerts.exportDialogTitle', { count: alertsToExport.length }, alertsToExport.length)
++      "
++      :sub-title="t('alerts.exportDialogSubtitle')"
++      file-prefix="alerts"
++      data-test="alert-export-dialog"
++      @download="onExportDownloaded"
++    />
+   </div>
+ </template>
+ 
+@@ -875,7 +890,10 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+ import OTag from "@/lib/core/Badge/OTag.vue";
+ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+ import AppTabs from "@/components/common/AppTabs.vue";
++import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
+ import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
++import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
++import { alertsToTerraform } from "@/utils/alerts/alertTerraform";
+ import type { CompositeAlertReference } from "@/ts/interfaces/alert";
+ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+@@ -916,6 +934,8 @@ export default defineComponent({
+     OStatStrip,
+     AppTabs,
+     CompositeReferencesDrawer,
++    ExportResourceDialog,
++    IacRegistryLinks,
+   },
+   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
+   setup() {
+@@ -2573,45 +2593,60 @@ export default defineComponent({
+       });
+     };
+ 
+-    const exportAlert = async (row: any) => {
+-      // Use the /export endpoint — strips runtime fields for anomaly configs, works for regular alerts too
++    // ── Export ────────────────────────────────────────────────────────────────
++    // Export opens a dialog rather than downloading straight away: the same
++    // definition can leave as JSON or as an openobserve_alert Terraform resource,
++    // and the user picks there.
++    const showExportDialog = ref(false);
++    const alertsToExport = ref<Record<string, unknown>[]>([]);
++    // Converted here rather than inside the dialog: each resource type has its
++    // own exporter, and the dialog only renders what it is handed.
++    const alertsTerraform = computed(() =>
++      alertsToTerraform(alertsToExport.value, { folderId: activeFolderId.value }),
++    );
++    const exportLoading = ref(false);
++
++    // The /export endpoint strips runtime fields from anomaly configs and works
++    // for ordinary alerts too.
++    const fetchAlertForExport = async (alertId: string) => {
+       const res = await alertsService.export_by_id(
+         store.state.selectedOrganization.identifier,
+-        row.alert_id,
++        alertId,
+       );
+-      const alertToBeExported = res.data;
++      const data = res.data;
++      // An id belongs to the alert that was exported, not to the one this
++      // definition will create.
++      if (data && Object.prototype.hasOwnProperty.call(data, "id")) delete data.id;
++      return data;
++    };
+ 
+-      if (Object.prototype.hasOwnProperty.call(alertToBeExported, "id")) {
+-        delete alertToBeExported.id;
++    const exportAlert = async (row: any) => {
++      if (exportLoading.value) return;
++      exportLoading.value = true;
++      try {
++        const alert = await fetchAlertForExport(row.alert_id);
++        if (!alert) throw new Error("empty export payload");
++        alertsToExport.value = [alert];
++        showExportDialog.value = true;
++      } catch (error: any) {
++        toast({
++          variant: "error",
++          message:
++            raw(error?.response?.data?.message) ||
++            t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
++        });
++      } finally {
++        exportLoading.value = false;
+       }
++    };
+ 
+-      // Ensure that the alert exists before proceeding
+-      if (alertToBeExported) {
+-        // Convert the alert object to a JSON string
+-        const alertJson = JSON.stringify(alertToBeExported, null, 2);
+-
+-        // Create a Blob from the JSON string
+-        const blob = new Blob([alertJson], { type: "application/json" });
+-
+-        // Create an object URL for the Blob
+-        const url = URL.createObjectURL(blob);
+-
+-        // Create an anchor element to trigger the download
+-        const link = document.createElement("a");
+-        link.href = url;
+-
+-        // Set the filename of the download
+-        link.download = `${alertToBeExported.name}.json`;
+-
+-        // Trigger the download by simulating a click
+-        link.click();
+-
+-        // Clean up the URL object after download
+-        URL.revokeObjectURL(url);
+-      } else {
+-        // Alert not found, handle error or show notification
+-        console.error("Alert not found for UUID:", row.uuid);
+-      }
++    const onExportDownloaded = ({ count }: { format: string; count: number }) => {
++      toast({
++        variant: "success",
++        message: t("toastMessages.alerts.successfullyExportedAlert", { count }, count),
++      });
++      selectedAlerts.value = [];
++      allSelectedAlerts.value = false;
+     };
+ 
+     const triggerAlert = async (row: any) => {
+@@ -2883,55 +2918,46 @@ export default defineComponent({
+     };
+ 
+     const multipleExportAlert = async () => {
++      if (exportLoading.value) return;
++      exportLoading.value = true;
++      const dismiss = toast({
++        variant: "loading",
++        message: t("toastMessages.alerts.exportingAlerts"),
++        timeout: 0, // Set timeout to 0 to keep it showing until dismissed
++      });
+       try {
+-        const dismiss = toast({
+-          variant: "loading",
+-          message: t("toastMessages.alerts.exportingAlerts"),
+-          timeout: 0, // Set timeout to 0 to keep it showing until dismissed
+-        });
+-
+-        const alertToBeExported = [];
+-        const selectedAlertsToExport = selectedAlerts.value.map((alert: any) => alert.alert_id);
+-
+-        const alertsData = await Promise.all(
+-          selectedAlertsToExport.map(async (alertId: string) => {
+-            const res = await alertsService.export_by_id(
+-              store.state.selectedOrganization.identifier,
+-              alertId,
+-            );
+-            const data = res.data;
+-            if (Object.prototype.hasOwnProperty.call(data, "id")) delete data.id;
+-            return data;
+-          }),
++        const selected = selectedAlerts.value as any[];
++        const fetched = await Promise.all(
++          selected.map((alert: any) => fetchAlertForExport(alert.alert_id)),
+         );
+-        alertToBeExported.push(...alertsData);
+-
+-        // Create and download the JSON file
+-        const jsonData = JSON.stringify(alertToBeExported, null, 2);
+-        const blob = new Blob([jsonData], { type: "application/json" });
+-        const url = URL.createObjectURL(blob);
+-        const a = document.createElement("a");
+-        a.href = url;
+-        a.download = `alerts-${new Date().toISOString().split("T")[0]}-${activeFolderId.value}.json`;
+-        a.click();
+-
+-        URL.revokeObjectURL(url);
+-
+-        dismiss();
+-        toast({
+-          variant: "success",
+-          message: t("toastMessages.alerts.successfullyExportedAlert", {
+-            count: selectedAlertsToExport.length,
+-          }),
+-        });
+-        selectedAlerts.value = [];
+-        allSelectedAlerts.value = false;
++        const usable = fetched.filter(Boolean);
++        // Every fetch coming back empty is a failure, not an export of nothing:
++        // without this the dialog opens on a blank definition.
++        if (!usable.length) throw new Error("empty export payload");
++        alertsToExport.value = usable;
++        showExportDialog.value = true;
++
++        // A definition that came back empty is a gap in the export. Dropping it
++        // quietly would leave the success toast reporting the smaller count as
++        // though everything had been exported.
++        const missing = selected.filter((_, i) => !fetched[i]).map((alert: any) => alert.name);
++        if (missing.length) {
++          toast({
++            variant: "warning",
++            message: t("toastMessages.alerts.someAlertsCouldNotBeExported", {
++              names: missing.join(", "),
++            }),
++          });
++        }
+       } catch (error) {
+         console.error("Error exporting alerts:", error);
+         toast({
+           variant: "error",
+           message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
+         });
++      } finally {
++        dismiss();
++        exportLoading.value = false;
+       }
+     };
+     const computedOwner = (owner: string) => {
+@@ -3297,6 +3323,10 @@ export default defineComponent({
+       goToAlertHistory,
+       getTemplates,
+       exportAlert,
++      showExportDialog,
++      alertsToExport,
++      alertsTerraform,
++      onExportDownloaded,
+       triggerAlert,
+       retrainAnomaly,
+       updateActiveFolderId,
+diff --git a/web/src/components/common/ExportResourceDialog.spec.ts b/web/src/components/common/ExportResourceDialog.spec.ts
+new file mode 100644
+index 00000000000..84a293adec2
+--- /dev/null
++++ b/web/src/components/common/ExportResourceDialog.spec.ts
+@@ -0,0 +1,169 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { mount } from "@vue/test-utils";
++import { createI18n } from "vue-i18n";
++import { beforeEach, describe, expect, it, vi } from "vitest";
++
++const copyMock = vi.fn();
++vi.mock("@/utils/clipboard", () => ({
++  copyToClipboard: (...args: unknown[]) => copyMock(...args),
++}));
++
++const downloadMock = vi.fn(() => true);
++vi.mock("@/utils/dom", () => ({ downloadFile: (...args: unknown[]) => downloadMock(...args) }));
++
++import ExportResourceDialog from "./ExportResourceDialog.vue";
++import { raw } from "@/types/i18n";
++
++const i18n = createI18n({
++  locale: "en",
++  messages: {
++    en: {
++      common: {
++        download: "Download",
++        close: "Close",
++        copy: "Copy",
++        copySuccess: "Copied",
++        copyContentError: "Copy failed",
++        exportTerraformTabTooltip: "Works with either tool",
++        exportTerraformEmpty: "No Terraform resource exists",
++        exportTerraformSkipped: "Not included: {names}",
++        exportTerraformDropped: "Left out: {fields}",
++      },
++    },
++  },
++});
++
++// Records what the Monaco wrapper is handed, which is the whole contract here.
++// `readOnly` is declared with its type, as the real component does: a valueless
++// attribute only casts to `true` for a Boolean prop.
++const QueryEditorStub = {
++  name: "QueryEditor",
++  props: {
++    query: { type: String, default: "" },
++    language: { type: String, default: "" },
++    editorId: { type: String, default: "" },
++    readOnly: { type: Boolean, default: false },
++  },
++  template:
++    '<div class="editor" :data-language="language" :data-readonly="String(readOnly)">{{ query }}</div>',
++};
++
++const stubs = {
++  // reka-ui's dialog portals to <body>; a passthrough keeps the body inspectable.
++  ODialog: { template: "<div><slot /></div>" },
++  QueryEditor: QueryEditorStub,
++  OTooltip: true,
++};
++
++const terraform = {
++  hcl: 'resource "openobserve_alert" "x" {}\n',
++  unsupported: [],
++  droppedFields: [],
++};
++
++const mountDialog = (props: Record<string, unknown> = {}) =>
++  mount(ExportResourceDialog, {
++    props: {
++      open: true,
++      items: [{ name: "high error rate" }],
++      terraform,
++      title: raw("Export alert"),
++      subTitle: raw("Review it"),
++      ...props,
++    } as any,
++    global: { plugins: [i18n], stubs },
++  });
++
++const editor = (w: any) => w.find(".editor");
++
++describe("ExportResourceDialog", () => {
++  beforeEach(() => {
++    copyMock.mockClear();
++    downloadMock.mockClear();
++  });
++
++  it("opens on JSON, read-only, with the payload as the editor's content", () => {
++    const wrapper = mountDialog();
++
++    expect(editor(wrapper).attributes("data-language")).toBe("json");
++    expect(editor(wrapper).attributes("data-readonly")).toBe("true");
++    expect(editor(wrapper).text()).toContain('"name": "high error rate"');
++  });
++
++  it("switches the editor to hcl on the Terraform tab", async () => {
++    const wrapper = mountDialog();
++    (wrapper.vm as any).format = "terraform";
++    await wrapper.vm.$nextTick();
++
++    expect(editor(wrapper).attributes("data-language")).toBe("hcl");
++    expect(editor(wrapper).text()).toContain('resource "openobserve_alert"');
++  });
++
++  it("names the file after the item, by format", async () => {
++    const wrapper = mountDialog();
++    expect(wrapper.text()).toContain("high-error-rate.json");
++
++    (wrapper.vm as any).format = "terraform";
++    await wrapper.vm.$nextTick();
++    expect(wrapper.text()).toContain("high-error-rate.tf");
++  });
++
++  it("copies the format currently shown", async () => {
++    const wrapper = mountDialog();
++
++    await wrapper.find('[data-test="export-resource-dialog-copy-btn"]').trigger("click");
++    expect(copyMock.mock.calls[0][0]).toContain('"name": "high error rate"');
++
++    (wrapper.vm as any).format = "terraform";
++    await wrapper.vm.$nextTick();
++    await wrapper.find('[data-test="export-resource-dialog-copy-btn"]').trigger("click");
++    expect(copyMock.mock.calls[1][0]).toContain('resource "openobserve_alert"');
++  });
++
++  it("reports an unconvertible selection instead of showing an empty editor", async () => {
++    const wrapper = mountDialog({
++      terraform: {
++        hcl: "",
++        unsupported: [{ name: "traffic anomaly", reason: "anomaly" }],
++        droppedFields: [],
++      },
++    });
++    (wrapper.vm as any).format = "terraform";
++    await wrapper.vm.$nextTick();
++
++    expect(wrapper.find('[data-test="export-resource-dialog-terraform-empty"]').exists()).toBe(
++      true,
++    );
++    expect(editor(wrapper).exists()).toBe(false);
++  });
++
++  it("surfaces skipped items and dropped fields alongside the config", async () => {
++    const wrapper = mountDialog({
++      terraform: {
++        ...terraform,
++        unsupported: [{ name: "traffic anomaly", reason: "anomaly" }],
++        droppedFields: ["having.ignore_case"],
++      },
++    });
++    (wrapper.vm as any).format = "terraform";
++    await wrapper.vm.$nextTick();
++
++    expect(wrapper.text()).toContain("traffic anomaly");
++    expect(wrapper.text()).toContain("having.ignore_case");
++    expect(editor(wrapper).exists()).toBe(true);
++  });
++});
+diff --git a/web/src/components/common/ExportResourceDialog.vue b/web/src/components/common/ExportResourceDialog.vue
+new file mode 100644
+index 00000000000..1c06e430a10
+--- /dev/null
++++ b/web/src/components/common/ExportResourceDialog.vue
+@@ -0,0 +1,242 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  ExportResourceDialog — shows a definition in both formats it can leave the
++  product in: the JSON the import screens read back, and a Terraform resource for
++  the OpenObserve provider. The user reads it before it leaves, then copies or
++  downloads whichever form they came for.
++
++  The caller owns the conversion (each resource type has its own exporter) and
++  passes the result in, so this component stays presentational.
++-->
++<script setup lang="ts">
++import type { I18nText } from "@/types/i18n";
++import type { TerraformExport } from "@/utils/terraform/hcl";
++import { computed, defineAsyncComponent, ref, watch } from "vue";
++
++import OButton from "@/lib/core/Button/OButton.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OBanner from "@/lib/feedback/Banner/OBanner.vue";
++import OTab from "@/lib/navigation/Tabs/OTab.vue";
++import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
++import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
++import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
++import terraformLogo from "@/assets/images/common/terraform.svg";
++import { raw, useI18nTyped } from "@/types/i18n";
++import { copyToClipboard } from "@/utils/clipboard";
++import { downloadFile } from "@/utils/dom";
++
++// The app's Monaco wrapper, async like every other consumer so the editor is not
++// in the bundle for users who never open an export. It brings what a read-only
++// viewer of a whole file needs and a static block cannot: soft wrapping instead
++// of clipped lines, a real gutter, folding, find, and a layout that follows the
++// dialog rather than a fixed line count.
++const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
++
++const props = withDefaults(
++  defineProps<{
++    open: boolean;
++    /** Payloads as the API returned them — the JSON tab's content. */
++    items: Record<string, unknown>[];
++    /** The same payloads already converted by the resource's own exporter. */
++    terraform: TerraformExport;
++    title: I18nText;
++    subTitle: I18nText;
++    /** Filename stem for a multi-item export, e.g. "alerts". */
++    filePrefix?: string;
++    dataTest?: string;
++  }>(),
++  { filePrefix: "export", dataTest: "export-resource-dialog" },
++);
++
++const emit = defineEmits<{
++  (e: "update:open", value: boolean): void;
++  /** Fired after a file has been written, so the caller owns the toast. */
++  (e: "download", payload: { format: ExportFormat; count: number }): void;
++}>();
++
++const { t } = useI18nTyped();
++
++const terraformIcon = `img:${terraformLogo}`;
++
++type ExportFormat = "json" | "terraform";
++const format = ref<ExportFormat>("json");
++
++// The format is a per-export choice, not a remembered preference, so every open
++// starts on JSON — the format that round-trips through the import screen.
++watch(
++  () => props.open,
++  (open) => {
++    if (open) format.value = "json";
++  },
++);
++
++const isTerraform = computed(() => format.value === "terraform");
++
++const json = computed(() =>
++  JSON.stringify(props.items.length === 1 ? props.items[0] : props.items, null, 2),
++);
++
++const code = computed(() => (isTerraform.value ? props.terraform.hcl : json.value));
++const hasCode = computed(() => code.value.length > 0);
++
++const baseName = computed(() => {
++  if (props.items.length !== 1) {
++    return `${props.filePrefix}-${new Date().toISOString().slice(0, 10)}`;
++  }
++  const name = String(props.items[0]?.name ?? "").replace(/[^A-Za-z0-9._-]+/g, "-");
++  return name || props.filePrefix;
++});
++const fileName = computed(() => `${baseName.value}.${isTerraform.value ? "tf" : "json"}`);
++
++const skippedNames = computed(() =>
++  props.terraform.unsupported
++    .map((entry) => entry.name)
++    .filter(Boolean)
++    .join(", "),
++);
++
++// Monaco owns no copy affordance of its own, and selecting a long file by hand is
++// exactly what a reader should not have to do.
++function copy() {
++  copyToClipboard(code.value, t, {
++    successMessage: t("common.copySuccess"),
++    errorMessage: t("common.copyContentError"),
++  });
++}
++
++function download() {
++  if (!hasCode.value) return;
++  const written = downloadFile(
++    fileName.value,
++    code.value,
++    isTerraform.value ? "text/plain;charset=utf-8" : "application/json",
++  );
++  if (!written) return;
++  emit("download", { format: format.value, count: props.items.length });
++  emit("update:open", false);
++}
++</script>
++
++<template>
++  <ODialog
++    :open="open"
++    size="xl"
++    :title="title"
++    :sub-title="subTitle"
++    :primary-button-label="t('common.download')"
++    :primary-button-disabled="!hasCode"
++    :neutral-button-label="t('common.close')"
++    :data-test="dataTest"
++    @update:open="emit('update:open', $event)"
++    @click:primary="download"
++    @click:neutral="emit('update:open', false)"
++  >
++    <div class="flex flex-col gap-3">
++      <OTabs v-model="format" dense bordered :data-test="`${dataTest}-tabs`">
++        <OTab
++          name="json"
++          :label="raw('JSON')"
++          icon="data-object"
++          :data-test="`${dataTest}-json-tab`"
++        />
++        <!-- The real Terraform mark, not a generic glyph: the tab is the brand's
++             format, and the tooltip says it works with OpenTofu just as well. -->
++        <OTab
++          name="terraform"
++          :label="raw('Terraform')"
++          :icon="terraformIcon"
++          :tooltip="t('common.exportTerraformTabTooltip')"
++          :data-test="`${dataTest}-terraform-tab`"
++        />
++      </OTabs>
++
++      <template v-if="isTerraform">
++        <OBanner
++          v-if="!hasCode"
++          variant="warning"
++          icon="warning-amber"
++          dense
++          :content="t('common.exportTerraformEmpty')"
++          :data-test="`${dataTest}-terraform-empty`"
++        />
++        <template v-else>
++          <OBanner
++            v-if="skippedNames"
++            variant="warning"
++            icon="warning-amber"
++            dense
++            :content="t('common.exportTerraformSkipped', { names: skippedNames })"
++            :data-test="`${dataTest}-terraform-skipped`"
++          />
++          <OBanner
++            v-if="terraform.droppedFields.length"
++            variant="info"
++            icon="info-outline"
++            dense
++            :content="
++              t('common.exportTerraformDropped', { fields: terraform.droppedFields.join(', ') })
++            "
++            :data-test="`${dataTest}-terraform-dropped`"
++          />
++        </template>
++      </template>
++
++      <!-- The height lives here, not on the editor: CodeQueryEditor's root already
++           carries `h-full`, and Tailwind emits `.h-full` after an arbitrary
++           `h-[…]`, so a height passed down would lose the cascade and collapse to
++           zero. The container owns a definite height and the editor fills it. -->
++      <div
++        v-if="hasCode"
++        class="rounded-default border-border-default flex h-[50vh] min-h-0 min-w-0 flex-col overflow-hidden border"
++      >
++        <!-- The filename is the one piece of chrome worth keeping from the static
++             block: it says what the download will be called. -->
++        <div
++          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-2 border-b py-1 pr-1 pl-3"
++        >
++          <OIcon :name="isTerraform ? terraformIcon : 'data-object'" size="xs" />
++          <span class="font-mono text-xs font-semibold opacity-75">{{ fileName }}</span>
++          <div class="flex-1" />
++          <OButton
++            variant="ghost"
++            size="icon-xs-sq"
++            icon-left="content-copy"
++            :aria-label="t('common.copy')"
++            :data-test="`${dataTest}-copy-btn`"
++            @click="copy"
++          >
++            <OTooltip :content="t('common.copy')" side="top" />
++          </OButton>
++        </div>
++
++        <!-- One editor for both tabs. The wrapper retokenizes in place when
++             `language` changes, so switching tabs costs a model update rather
++             than tearing down and recreating Monaco. -->
++        <QueryEditor
++          :editor-id="`${dataTest}-editor`"
++          class="min-h-0 min-w-0 flex-1"
++          :query="code"
++          :language="isTerraform ? 'hcl' : 'json'"
++          read-only
++          :show-auto-complete="false"
++          :data-test="`${dataTest}-${format}`"
++        />
++      </div>
++    </div>
++  </ODialog>
++</template>
+diff --git a/web/src/components/common/IacRegistryLinks.spec.ts b/web/src/components/common/IacRegistryLinks.spec.ts
+new file mode 100644
+index 00000000000..9c7b836c105
+--- /dev/null
++++ b/web/src/components/common/IacRegistryLinks.spec.ts
+@@ -0,0 +1,84 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { mount } from "@vue/test-utils";
++import { createI18n } from "vue-i18n";
++import { describe, expect, it } from "vitest";
++import { createStore } from "vuex";
++
++import IacRegistryLinks from "./IacRegistryLinks.vue";
++
++const i18n = createI18n({
++  locale: "en",
++  messages: {
++    en: { common: { openProviderOnRegistry: "OpenObserve provider on the {registry}" } },
++  },
++});
++
++function mountLinks(theme: "light" | "dark") {
++  return mount(IacRegistryLinks, {
++    global: { plugins: [createStore({ state: { theme } }), i18n] },
++  });
++}
++
++describe("IacRegistryLinks", () => {
++  it("links each registry in a new tab", () => {
++    const links = mountLinks("light").findAll("a");
++
++    expect(links).toHaveLength(2);
++    expect(links[0].attributes("href")).toBe(
++      "https://registry.terraform.io/providers/openobserve/openobserve/latest",
++    );
++    expect(links[1].attributes("href")).toBe(
++      "https://search.opentofu.org/provider/openobserve/openobserve/latest",
++    );
++    for (const link of links) {
++      expect(link.attributes("target")).toBe("_blank");
++      expect(link.attributes("rel")).toBe("noopener noreferrer");
++      expect(link.attributes("aria-label")).toContain("OpenObserve provider on the");
++    }
++  });
++
++  // Regression: the variants were first toggled with `hidden` / `dark:inline-flex`,
++  // which lost to the display utility OIcon's root already carries, so light mode
++  // rendered both OpenTofu marks at once.
++  it("renders exactly one mark per link", () => {
++    for (const theme of ["light", "dark"] as const) {
++      const images = mountLinks(theme).findAll("img");
++      expect(images).toHaveLength(2);
++    }
++  });
++
++  // Vite inlines these SVGs as data URIs, so the assertions read the artwork
++  // itself: the on-light OpenTofu mark carries the navy outline that gives it
++  // definition on a white surface, and the on-dark one is the amber silhouette.
++  it("uses OpenTofu's on-light mark in light mode and its on-dark mark in dark mode", () => {
++    const src = (theme: "light" | "dark") =>
++      (mountLinks(theme).findAll("img")[1].attributes("src") ?? "").toLowerCase();
++
++    expect(src("light")).toContain("%230d1a2b");
++    expect(src("light")).not.toContain("%23ffca28");
++    expect(src("dark")).toContain("%23ffca28");
++    expect(src("dark")).not.toContain("%230d1a2b");
++  });
++
++  it("uses one Terraform mark in both themes", () => {
++    const src = (theme: "light" | "dark") =>
++      (mountLinks(theme).findAll("img")[0].attributes("src") ?? "").toLowerCase();
++
++    expect(src("light")).toContain("%234040b2");
++    expect(src("dark")).toBe(src("light"));
++  });
++});
+diff --git a/web/src/components/common/IacRegistryLinks.vue b/web/src/components/common/IacRegistryLinks.vue
+new file mode 100644
+index 00000000000..86d49a69f42
+--- /dev/null
++++ b/web/src/components/common/IacRegistryLinks.vue
+@@ -0,0 +1,84 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  IacRegistryLinks — the Terraform and OpenTofu marks, each a link to the
++  OpenObserve provider on that registry. Two separate logos rather than one
++  combined badge: they are two distinct destinations, and the pair is also what
++  tells a reader the exported configuration applies to either tool.
++-->
++<script setup lang="ts">
++import { computed } from "vue";
++
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
++import opentofuLogo from "@/assets/images/common/opentofu.svg";
++import opentofuLogoDark from "@/assets/images/common/opentofu_dark.svg";
++import terraformLogo from "@/assets/images/common/terraform.svg";
++import { useTheme } from "@/composables/useTheme";
++import { OPENTOFU_REGISTRY_URL, TERRAFORM_REGISTRY_URL } from "@/utils/terraform/provider";
++import { raw, useI18nTyped } from "@/types/i18n";
++
++withDefaults(defineProps<{ dataTest?: string }>(), { dataTest: "iac-registry-links" });
++
++const { t } = useI18nTyped();
++const { isDark } = useTheme();
++
++// Brand artwork, so the variant is chosen here rather than with `dark:` classes:
++// a second element toggled by `hidden` / `dark:inline-flex` loses to the display
++// utility OIcon's own root carries — Tailwind emits `.inline-flex` after
++// `.hidden`, so both marks rendered at once.
++//
++// OpenTofu ships two: the amber-only silhouette is the on-dark mark and washes
++// out on a light surface, so light mode gets the outlined variant that carries
++// its own definition. Terraform's purple works on either canvas.
++const REGISTRIES = computed(() => [
++  {
++    key: "terraform",
++    name: raw("Terraform Registry"),
++    icon: `img:${terraformLogo}`,
++    url: TERRAFORM_REGISTRY_URL,
++  },
++  {
++    key: "opentofu",
++    name: raw("OpenTofu Registry"),
++    icon: `img:${isDark.value ? opentofuLogoDark : opentofuLogo}`,
++    url: OPENTOFU_REGISTRY_URL,
++  },
++]);
++</script>
++
++<template>
++  <div class="flex items-center gap-2" :data-test="dataTest">
++    <a
++      v-for="registry in REGISTRIES"
++      :key="registry.key"
++      :href="registry.url"
++      target="_blank"
++      rel="noopener noreferrer"
++      :aria-label="t('common.openProviderOnRegistry', { registry: registry.name })"
++      class="rounded-default hover:bg-surface-subtle-hover flex items-center p-1 opacity-80 transition-opacity hover:opacity-100"
++      :data-test="`${dataTest}-${registry.key}`"
++    >
++      <OIcon :name="registry.icon" size="md" />
++      <OTooltip
++        :content="t('common.openProviderOnRegistry', { registry: registry.name })"
++        side="bottom"
++        align="end"
++      />
++    </a>
++  </div>
++</template>
+diff --git a/web/src/lib/core/Code/OCodeBlock.spec.ts b/web/src/lib/core/Code/OCodeBlock.spec.ts
+index b6838e7181c..f15c7dd676d 100644
+--- a/web/src/lib/core/Code/OCodeBlock.spec.ts
++++ b/web/src/lib/core/Code/OCodeBlock.spec.ts
+@@ -127,4 +127,51 @@ describe("OCodeBlock", () => {
+       expect(Number(capped)).toBeCloseTo(4 * lineHeight, 5);
+     });
+   });
++
++  describe("line numbers", () => {
++    const gutter = (w: any) => w.find('[data-test="code-block-line-numbers"]');
++
++    it("has no gutter by default", () => {
++      const wrapper = mountBlock({ code: "a\nb" });
++      expect(gutter(wrapper).exists()).toBe(false);
++      expect(wrapper.find("pre").classes()).not.toContain("o2-code-pre--numbered");
++    });
++
++    it("numbers one line per row when asked", () => {
++      const wrapper = mountBlock({ code: "one\ntwo\nthree", lineNumbers: true });
++
++      expect(wrapper.find("pre").classes()).toContain("o2-code-pre--numbered");
++      expect(gutter(wrapper).text()).toBe("1\n2\n3");
++    });
++
++    it("gives a trailing newline no number of its own", () => {
++      // Generated files end with a newline; numbering it would show a count one
++      // higher than the lines the reader can see.
++      const wrapper = mountBlock({ code: "one\ntwo\n", lineNumbers: true });
++      expect(gutter(wrapper).text()).toBe("1\n2");
++    });
++
++    it("keeps the numbers out of a selection and out of the a11y tree", () => {
++      const wrapper = mountBlock({ code: "a\nb", lineNumbers: true });
++
++      expect(gutter(wrapper).classes()).toContain("select-none");
++      expect(gutter(wrapper).attributes("aria-hidden")).toBe("true");
++    });
++
++    it("suppresses the gutter when wrapping, which would misalign it", () => {
++      const wrapper = mountBlock({ code: "a\nb", lineNumbers: true, wrap: true });
++
++      expect(gutter(wrapper).exists()).toBe(false);
++      expect(wrapper.find("pre").classes()).not.toContain("o2-code-pre--numbered");
++    });
++
++    it("numbers the masked variant it is actually showing", () => {
++      const wrapper = mountBlock({
++        code: "real\nsecret\nlines",
++        codeMasked: "masked",
++        lineNumbers: true,
++      });
++      expect(gutter(wrapper).text()).toBe("1");
++    });
++  });
+ });
+diff --git a/web/src/lib/core/Code/OCodeBlock.types.ts b/web/src/lib/core/Code/OCodeBlock.types.ts
+index 1a2e8883643..f62ae5bf6ba 100644
+--- a/web/src/lib/core/Code/OCodeBlock.types.ts
++++ b/web/src/lib/core/Code/OCodeBlock.types.ts
+@@ -48,6 +48,14 @@ export interface CodeBlockProps {
+    * still showing enough to read at a glance.
+    */
+   maxLines?: number;
++  /**
++   * Show a line-number gutter, for code the reader needs to talk about or scan
++   * by position — a config file, a diff, an error pointing at a line.
++   *
++   * Ignored when `wrap` is set: a wrapped line occupies more rows than its
++   * number accounts for, so the two columns would drift apart.
++   */
++  lineNumbers?: boolean;
+   /**
+    * data-test prefix for the toolbar buttons, e.g. "ai-code" yields
+    * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".
+diff --git a/web/src/lib/core/Code/OCodeBlock.vue b/web/src/lib/core/Code/OCodeBlock.vue
+index 5ea0fec27fa..f0ee6553a84 100644
+--- a/web/src/lib/core/Code/OCodeBlock.vue
++++ b/web/src/lib/core/Code/OCodeBlock.vue
+@@ -30,8 +30,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import { useI18nTyped } from "@/types/i18n";
++import { hclLanguage } from "./hclLanguage";
+ import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBlock.types";
+ 
++// highlight.js has no HCL grammar of its own, so `lang="hcl"` is registered here
++// — once per module, not per instance — and behaves like a built-in from then on.
++if (!hljs.getLanguage("hcl")) hljs.registerLanguage("hcl", hclLanguage);
++
+ const { t } = useI18nTyped();
+ 
+ /**
+@@ -44,6 +49,7 @@ const CODE_LINE_HEIGHT = 1.55;
+ const props = withDefaults(defineProps<CodeBlockProps>(), {
+   wrap: false,
+   copyable: true,
++  lineNumbers: false,
+   dataTest: "code-block",
+ });
+ 
+@@ -105,6 +111,20 @@ const highlightOne = (code: string, lang?: string): string => {
+ // Highlights the DISPLAYED code (masked or real) — copy still uses the real `code`.
+ const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
+ 
++// Wrapping breaks the one-number-per-row assumption a gutter rests on, so the
++// two features are exclusive rather than quietly misaligned.
++const showLineNumbers = computed(() => props.lineNumbers && !props.wrap);
++
++// One number per visible line, as a single pre-formatted string: the gutter is
++// then one text node the browser lays out on the same leading as the code, with
++// no per-line wrapper elements to keep in sync with the highlighted markup.
++// A trailing newline gets no number — it is the end of the last line, not a line.
++const lineNumberText = computed(() => {
++  if (!showLineNumbers.value) return "";
++  const lines = displayCode.value.replace(/\n$/, "").split("\n").length;
++  return Array.from({ length: lines }, (_, i) => String(i + 1)).join("\n");
++});
++
+ const onCopy = () => {
+   copyToClipboard(props.code, t, {
+     successMessage: props.copyMessage ?? t("common.copySuccess"),
+@@ -173,11 +193,23 @@ const onCopy = () => {
+         </OButton>
+       </div>
+     </div>
++    <!-- `text-syntax-text!` — the `!` is load-bearing.
++         `highlight.js/styles/github-dark.css` is imported globally (by O2AIChat)
++         and its unlayered `.hljs { color }` beats anything in @layer utilities,
++         so without it every token hljs leaves unclassed renders in the dark
++         theme's pale grey, unreadable on the light syntax surface.
++         Tag and content stay on one line: Vue preserves whitespace inside
++         <pre>, so a newline here would indent the first line of code. -->
+     <pre
+       class="o2-code-pre"
+-      :class="wrap ? 'o2-code-pre--wrap' : ''"
++      :class="[wrap ? 'o2-code-pre--wrap' : '', showLineNumbers ? 'o2-code-pre--numbered' : '']"
+       :style="preStyle"
+-    ><code class="hljs text-syntax-text" v-html="highlighted"></code></pre>
++    ><span
++      v-if="showLineNumbers"
++      class="o2-code-gutter bg-syntax-bg text-syntax-comment sticky left-0 tabular-nums select-none"
++      aria-hidden="true"
++      :data-test="`${dataTest}-line-numbers`"
++    >{{ lineNumberText }}</span><code class="hljs text-syntax-text!" v-html="highlighted"></code></pre>
+   </div>
+ </template>
+ 
+@@ -223,6 +255,22 @@ const onCopy = () => {
+   padding: 0;
+ }
+ 
++/* Line-number gutter. A flex row rather than a floated or absolutely-placed
++   column, so the numbers cannot overlap the code at any width, and `sticky` keeps
++   them in view while a long line scrolls sideways underneath — which is also why
++   the gutter carries the block's own background. */
++.o2-code-pre--numbered {
++  display: flex;
++}
++
++.o2-code-gutter {
++  flex: none;
++  padding-right: 1rem;
++  text-align: right;
++  /* Muted rather than hidden: the numbers are for reference, not for reading. */
++  opacity: 0.65;
++}
++
+ /* Wrapped mode: break anywhere, because a long SQL string can be one
+    unbroken token and would otherwise still overflow sideways. */
+ .o2-code-pre--wrap {
+diff --git a/web/src/lib/core/Code/hclLanguage.ts b/web/src/lib/core/Code/hclLanguage.ts
+new file mode 100644
+index 00000000000..94ee2dae795
+--- /dev/null
++++ b/web/src/lib/core/Code/hclLanguage.ts
+@@ -0,0 +1,97 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// hclLanguage.ts — a highlight.js grammar for HCL / Terraform.
++//
++// highlight.js ships no HCL grammar, and the near neighbours read badly: `ini`
++// colours `key = value` but leaves `resource "type" "name" {` unclassed, and
++// auto-detection guesses nginx. Registered by OCodeBlock so `lang="hcl"` works
++// like any built-in language.
++
++import type { HLJSApi, Language } from "highlight.js";
++
++/** Block types that introduce a labelled block, plus the value literals. */
++const KEYWORDS = [
++  "resource",
++  "data",
++  "provider",
++  "variable",
++  "output",
++  "module",
++  "locals",
++  "terraform",
++  "dynamic",
++  "provisioner",
++  "lifecycle",
++  "import",
++  "moved",
++  "removed",
++  "check",
++  "for",
++  "in",
++  "if",
++];
++
++/** The functions that actually turn up in generated or hand-written config. */
++const BUILT_INS = [
++  "jsonencode",
++  "jsondecode",
++  "yamlencode",
++  "yamldecode",
++  "base64encode",
++  "base64decode",
++  "file",
++  "templatefile",
++  "format",
++  "join",
++  "split",
++  "lookup",
++  "merge",
++  "concat",
++  "flatten",
++  "keys",
++  "values",
++  "length",
++  "coalesce",
++  "try",
++  "can",
++  "tostring",
++  "tonumber",
++  "tolist",
++  "toset",
++  "tomap",
++  "sensitive",
++  "nonsensitive",
++  "timestamp",
++  "uuid",
++];
++
++export function hclLanguage(hljs: HLJSApi): Language {
++  return {
++    name: "HCL",
++    aliases: ["terraform", "tf", "tofu"],
++    keywords: { keyword: KEYWORDS, literal: ["true", "false", "null"], built_in: BUILT_INS },
++    contains: [
++      hljs.HASH_COMMENT_MODE,
++      hljs.C_LINE_COMMENT_MODE,
++      hljs.C_BLOCK_COMMENT_MODE,
++      {
++        className: "string",
++        begin: /"/,
++        end: /"/,
++        contains: [
++          hljs.BACKSLASH_ESCAPE,
++          // `${…}` is interpolation, not string content — Terraform reads it, so
++          // it should not look like the surrounding literal.
++          { className: "subst", begin: /\$\{/, end: /\}/ },
++        ],
++      },
++      // Attribute name: an identifier immediately left of a single `=`. The
++      // lookahead keeps `==`, `>=` and `=>` out.
++      { className: "attr", begin: /[A-Za-z_][A-Za-z0-9_-]*(?=\s*=[^=>])/ },
++      // Nested block name: an identifier immediately left of `{`. Distinguishes
++      // `trigger_condition {` from the attributes inside it.
++      { className: "title", begin: /[A-Za-z_][A-Za-z0-9_-]*(?=\s*\{)/ },
++      hljs.NUMBER_MODE,
++    ],
++  };
++}
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index cb7156ffb83..4f55993bd3d 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -820,7 +820,13 @@
+     "backTo": "Zurück zu {label}",
+     "boolTrue": "Wahr",
+     "boolFalse": "Falsch",
+-    "browserTimeWithZone": "Browser-Zeit ({zone})"
++    "browserTimeWithZone": "Browser-Zeit ({zone})",
++    "download": "Herunterladen",
++    "openProviderOnRegistry": "OpenObserve-Provider auf {registry}",
++    "exportTerraformTabTooltip": "Die gleiche Konfiguration gilt für Terraform oder OpenTofu.",
++    "exportTerraformEmpty": "Für diese Auswahl existiert keine Terraform-Ressource. Exportieren Sie sie stattdessen als JSON.",
++    "exportTerraformSkipped": "Nicht enthalten: {names}. Der OpenObserve-Terraform-Provider hat keine Ressource für diese.",
++    "exportTerraformDropped": "Ausgelassen – das Provider-Schema kann diese Felder nicht abbilden: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Bedingungstyp",
+     "sloLongWindow": "Langes Zeitfenster",
+     "sloShortWindow": "Kurzes Zeitfenster",
+-    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden."
++    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
++    "exportDialogTitle": "Alert exportieren | {count} Alerts exportieren",
++    "exportDialogSubtitle": "Überprüfen Sie die Definition und laden Sie sie dann als JSON oder als Terraform für den OpenObserve-Provider herunter."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Öffnen",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Alarm erfolgreich gespeichert.",
+       "alertUpdatedSuccessfully": "Alarm erfolgreich aktualisiert.",
+       "openingDedupConfig": "Dedup-Konfiguration für {name} wird geöffnet",
+-      "editingAlert": "Alarm bearbeiten: {name}"
++      "editingAlert": "Alarm bearbeiten: {name}",
++      "someAlertsCouldNotBeExported": "{names} konnten nicht gelesen werden. Die restlichen sind für den Export bereit."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Cipher-Schlüssel erfolgreich aktualisiert",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Dieser Alarm ist diesem SLO nicht mehr zugeordnet.",
+       "describeBurn": "Burn-Rate > {critical} über {long} und {short}",
+       "describeBudget": "Fehlerbudget verbraucht > {critical}%"
+-    }
++    },
++    "exportTitle": "SLO exportieren | {count} SLOs exportieren",
++    "exportSubtitle": "Überprüfen Sie die Definition und laden Sie sie dann als JSON oder als Terraform für den OpenObserve-Provider herunter.",
++    "exportFailed": "Die SLO-Definition konnte nicht gelesen werden. Bitte versuchen Sie es erneut.",
++    "exportPartial": "Konnte {names} nicht lesen. Der Rest ist bereit für den Export.",
++    "exportSucceeded": "{count} SLO exportiert | {count} SLOs exportiert"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 2a171164ed8..373d474dd69 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -625,6 +625,12 @@
+     "delete": "Delete",
+     "remove": "Remove",
+     "export": "Export",
++    "download": "Download",
++    "openProviderOnRegistry": "OpenObserve provider on the {registry}",
++    "exportTerraformTabTooltip": "The same configuration applies with Terraform or OpenTofu.",
++    "exportTerraformEmpty": "No Terraform resource exists for this selection. Export it as JSON instead.",
++    "exportTerraformSkipped": "Not included: {names}. The OpenObserve Terraform provider has no resource for these.",
++    "exportTerraformDropped": "Left out — the provider schema cannot carry these fields: {fields}.",
+     "actions": "Actions",
+     "version": "Version",
+     "updated_at": "Updated At",
+@@ -6156,6 +6162,8 @@
+       "legendNoData": "No data"
+     },
+     "importAlertTitle": "Import Alert",
++    "exportDialogTitle": "Export alert | Export {count} alerts",
++    "exportDialogSubtitle": "Review the definition, then download it as JSON or as Terraform for the OpenObserve provider.",
+     "jsonFilesOnlyHint": ".json files only",
+     "outputMessages": "Output Messages",
+     "destinationsRequiredLabel": "Destinations *",
+@@ -13682,6 +13690,7 @@
+       "resumingAlerts": "Resuming alerts...",
+       "pausingAlerts": "Pausing alerts...",
+       "errorExportingAlertsPleaseTryAgain": "Error exporting alerts. Please try again.",
++      "someAlertsCouldNotBeExported": "Could not read {names}. The rest are ready to export.",
+       "successfullyExportedAlert": "Successfully exported {count} alert | Successfully exported {count} alerts",
+       "exportingAlerts": "Exporting alerts...",
+       "pleaseWaitWhileSearchingForDashboards": "Please wait while searching for dashboards...",
+@@ -14252,6 +14261,11 @@
+     "move": "Move",
+     "moveTitle": "Move {count} SLO(s) to another folder",
+     "moveSelected": "Move {count} selected",
++    "exportTitle": "Export SLO | Export {count} SLOs",
++    "exportSubtitle": "Review the definition, then download it as JSON or as Terraform for the OpenObserve provider.",
++    "exportFailed": "Could not read the SLO definition. Please try again.",
++    "exportPartial": "Could not read {names}. The rest are ready to export.",
++    "exportSucceeded": "Exported {count} SLO | Exported {count} SLOs",
+     "moved": "Moved {count} SLO(s) to {folder}",
+     "moveFailed": "Move failed",
+     "preview": {
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 47bbd3164b6..4eb353478a1 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -820,7 +820,13 @@
+     "backTo": "Volver a {label}",
+     "boolTrue": "Verdadero",
+     "boolFalse": "Falso",
+-    "browserTimeWithZone": "Hora del navegador ({zone})"
++    "browserTimeWithZone": "Hora del navegador ({zone})",
++    "download": "Descargar",
++    "openProviderOnRegistry": "Proveedor de OpenObserve en {registry}",
++    "exportTerraformTabTooltip": "La misma configuración se aplica con Terraform u OpenTofu.",
++    "exportTerraformEmpty": "No existe un recurso de Terraform para esta selección. Exprésalo como JSON en su lugar.",
++    "exportTerraformSkipped": "No incluidos: {names}. El proveedor de OpenObserve para Terraform no tiene un recurso para estos.",
++    "exportTerraformDropped": "Omitidos — el esquema del proveedor no puede contener estos campos: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Tipo de condición",
+     "sloLongWindow": "Ventana larga",
+     "sloShortWindow": "Ventana corta",
+-    "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí."
++    "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí.",
++    "exportDialogTitle": "Exportar alerta | Exportar {count} alertas",
++    "exportDialogSubtitle": "Revisa la definición y luego descárgala como JSON o como Terraform para el proveedor de OpenObserve."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Abrir",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Alerta guardada correctamente.",
+       "alertUpdatedSuccessfully": "Alerta actualizada correctamente.",
+       "openingDedupConfig": "Abriendo configuración de deduplicación para: {name}",
+-      "editingAlert": "Editando alerta: {name}"
++      "editingAlert": "Editando alerta: {name}",
++      "someAlertsCouldNotBeExported": "No se pudieron leer {names}. El resto está listo para exportar."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Clave de cifrado actualizada correctamente",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Esa alerta ya no está en este SLO.",
+       "describeBurn": "Tasa de consumo > {critical} en {long} y {short}",
+       "describeBudget": "Presupuesto de errores consumido > {critical}%"
+-    }
++    },
++    "exportTitle": "Exportar SLO | Exportar {count} SLOs",
++    "exportSubtitle": "Revise la definición, luego descárguela como JSON o como Terraform para el proveedor de OpenObserve.",
++    "exportFailed": "No se pudo leer la definición del SLO. Inténtelo de nuevo.",
++    "exportPartial": "No se pudo leer {names}. El resto está listo para exportar.",
++    "exportSucceeded": "Exportado {count} SLO | Exportados {count} SLOs"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index 31c376245cf..e556c2085c4 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -820,7 +820,13 @@
+     "backTo": "Retour à {label}",
+     "boolTrue": "Vrai",
+     "boolFalse": "Faux",
+-    "browserTimeWithZone": "Heure du navigateur ({zone})"
++    "browserTimeWithZone": "Heure du navigateur ({zone})",
++    "download": "Télécharger",
++    "openProviderOnRegistry": "Fournisseur OpenObserve sur {registry}",
++    "exportTerraformTabTooltip": "La même configuration s'applique avec Terraform ou OpenTofu.",
++    "exportTerraformEmpty": "Aucune ressource Terraform n'existe pour cette sélection. Exportez-la en JSON à la place.",
++    "exportTerraformSkipped": "Non inclus : {names}. Le fournisseur Terraform OpenObserve n'a pas de ressource pour ceux-ci.",
++    "exportTerraformDropped": "Omis — le schéma du fournisseur ne peut pas contenir ces champs : {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Type de condition",
+     "sloLongWindow": "Fenêtre longue",
+     "sloShortWindow": "Fenêtre courte",
+-    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici."
++    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici.",
++    "exportDialogTitle": "Exporter l'alerte | Exporter {count} alertes",
++    "exportDialogSubtitle": "Examinez la définition, puis téléchargez-la au format JSON ou Terraform pour le fournisseur OpenObserve."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Ouvrir",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Alerte enregistrée avec succès.",
+       "alertUpdatedSuccessfully": "Alerte mise à jour avec succès.",
+       "openingDedupConfig": "Ouverture de la configuration de déduplication pour : {name}",
+-      "editingAlert": "Modification de l'alerte : {name}"
++      "editingAlert": "Modification de l'alerte : {name}",
++      "someAlertsCouldNotBeExported": "Impossible de lire {names}. Le reste est prêt à être exporté."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Clé de chiffrement mise à jour avec succès",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Cette alerte ne fait plus partie de ce SLO.",
+       "describeBurn": "Taux de combustion > {critical} sur {long} et {short}",
+       "describeBudget": "Budget d'erreur consommé > {critical}%"
+-    }
++    },
++    "exportTitle": "Exporter le SLO | Exporter {count} SLOs",
++    "exportSubtitle": "Passez en revue la définition, puis téléchargez-la en JSON ou en Terraform pour le fournisseur OpenObserve.",
++    "exportFailed": "Impossible de lire la définition du SLO. Veuillez réessayer.",
++    "exportPartial": "Impossible de lire {names}. Les autres sont prêts à être exportés.",
++    "exportSucceeded": "Exporté {count} SLO | Exportés {count} SLOs"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index 2b950fc1726..937b519537d 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -820,7 +820,13 @@
+     "backTo": "Torna a {label}",
+     "boolTrue": "Vero",
+     "boolFalse": "Falso",
+-    "browserTimeWithZone": "Ora del browser ({zone})"
++    "browserTimeWithZone": "Ora del browser ({zone})",
++    "download": "Scarica",
++    "openProviderOnRegistry": "Provider OpenObserve su {registry}",
++    "exportTerraformTabTooltip": "La stessa configurazione si applica con Terraform o OpenTofu.",
++    "exportTerraformEmpty": "Non esiste alcuna risorsa Terraform per questa selezione. Esportala come JSON.",
++    "exportTerraformSkipped": "Non inclusi: {names}. Il provider Terraform di OpenObserve non ha risorse per questi.",
++    "exportTerraformDropped": "Esclusi — lo schema del provider non può contenere questi campi: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Tipo di condizione",
+     "sloLongWindow": "Finestra lunga",
+     "sloShortWindow": "Finestra breve",
+-    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui."
++    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui.",
++    "exportDialogTitle": "Esporta avviso | Esporta {count} avvisi",
++    "exportDialogSubtitle": "Rivedi la definizione, poi scaricala come JSON o come Terraform per il provider OpenObserve."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Apri",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Avviso salvato con successo.",
+       "alertUpdatedSuccessfully": "Avviso aggiornato con successo.",
+       "openingDedupConfig": "Apertura configurazione di deduplicazione per: {name}",
+-      "editingAlert": "Modifica avviso: {name}"
++      "editingAlert": "Modifica avviso: {name}",
++      "someAlertsCouldNotBeExported": "Impossibile leggere {names}. I restanti sono pronti per l'esportazione."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Chiave di cifratura aggiornata con successo",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Questo avviso non è più su questo SLO.",
+       "describeBurn": "Tasso di consumo > {critical} su {long} e {short}",
+       "describeBudget": "Budget errori consumato > {critical}%"
+-    }
++    },
++    "exportTitle": "Esporta SLO | Esporta {count} SLO",
++    "exportSubtitle": "Rivedi la definizione, quindi scaricala come JSON o come Terraform per il provider OpenObserve.",
++    "exportFailed": "Impossibile leggere la definizione SLO. Riprova.",
++    "exportPartial": "Impossibile leggere {names}. Gli altri sono pronti per l'esportazione.",
++    "exportSucceeded": "Esportato {count} SLO | Esportati {count} SLO"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index 9e82de4f3e8..d5e148bfb94 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -820,7 +820,13 @@
+     "backTo": "{label}に戻る",
+     "boolTrue": "真",
+     "boolFalse": "偽",
+-    "browserTimeWithZone": "ブラウザ時間（{zone}）"
++    "browserTimeWithZone": "ブラウザ時間（{zone}）",
++    "download": "ダウンロード",
++    "openProviderOnRegistry": "{registry} の OpenObserve プロバイダー",
++    "exportTerraformTabTooltip": "同じ設定は Terraform または OpenTofu でも適用されます。",
++    "exportTerraformEmpty": "この選択に対応する Terraform リソースはありません。代わりに JSON としてエクスポートしてください。",
++    "exportTerraformSkipped": "含まれていません: {names}。OpenObserve Terraform プロバイダーにはこれらに対応するリソースがありません。",
++    "exportTerraformDropped": "除外されました — プロバイダースキーマはこれらのフィールドを保持できないため: {fields}。"
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "条件タイプ",
+     "sloLongWindow": "長期ウィンドウ",
+     "sloShortWindow": "短期ウィンドウ",
+-    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。"
++    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
++    "exportDialogTitle": "アラートをエクスポート | アラートを{count}件エクスポート",
++    "exportDialogSubtitle": "定義を確認して、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。"
+   },
+   "alert_dependencies": {
+     "actionOpen": "開く",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "アラートが正常に保存されました。",
+       "alertUpdatedSuccessfully": "アラートが正常に更新されました。",
+       "openingDedupConfig": "重複排除設定を開いています: {name}",
+-      "editingAlert": "アラートを編集中: {name}"
++      "editingAlert": "アラートを編集中: {name}",
++      "someAlertsCouldNotBeExported": "{names} を読み込めませんでした。残りはエクスポートできます。"
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "暗号鍵が正常に更新されました",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "そのアラートはこのSLOにはもうありません。",
+       "describeBurn": "バーンレート > {critical}（{long} と {short} にわたって）",
+       "describeBudget": "エラー予算消費 > {critical}%"
+-    }
++    },
++    "exportTitle": "SLOをエクスポート | {count}個のSLOをエクスポート",
++    "exportSubtitle": "定義を確認し、JSONまたはOpenObserveプロバイダー用のTerraformとしてダウンロードしてください。",
++    "exportFailed": "SLO定義を読み取れませんでした。もう一度お試しください。",
++    "exportPartial": "{names}を読み取れませんでした。残りはエクスポートできます。",
++    "exportSucceeded": "{count}個のSLOをエクスポートしました | {count}個のSLOをエクスポートしました"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index a5468db8e55..a6df0b9c1e6 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -820,7 +820,13 @@
+     "backTo": "{label}로 돌아가기",
+     "boolTrue": "참",
+     "boolFalse": "거짓",
+-    "browserTimeWithZone": "브라우저 시간 ({zone})"
++    "browserTimeWithZone": "브라우저 시간 ({zone})",
++    "download": "다운로드",
++    "openProviderOnRegistry": "{registry}의 OpenObserve 프로바이더",
++    "exportTerraformTabTooltip": "동일한 구성이 Terraform 또는 OpenTofu에 적용됩니다.",
++    "exportTerraformEmpty": "이 선택에 대한 Terraform 리소스가 없습니다. 대신 JSON으로 내보내세요.",
++    "exportTerraformSkipped": "포함되지 않음: {names}. OpenObserve Terraform 프로바이더에는 이에 대한 리소스가 없습니다.",
++    "exportTerraformDropped": "제외됨 — 프로바이더 스키마가 다음 필드를 포함할 수 없습니다: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "조건 유형",
+     "sloLongWindow": "긴 기간",
+     "sloShortWindow": "짧은 기간",
+-    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다."
++    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
++    "exportDialogTitle": "알림 내보내기 | 알림 {count}개 내보내기",
++    "exportDialogSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 프로바이더용 Terraform으로 다운로드하세요."
+   },
+   "alert_dependencies": {
+     "actionOpen": "열기",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "알림이 성공적으로 저장되었습니다.",
+       "alertUpdatedSuccessfully": "알림이 성공적으로 업데이트되었습니다.",
+       "openingDedupConfig": "{name}에 대한 중복 제거 구성 열기",
+-      "editingAlert": "알림 편집 중: {name}"
++      "editingAlert": "알림 편집 중: {name}",
++      "someAlertsCouldNotBeExported": "{names}을(를) 읽을 수 없습니다. 나머지는 내보낼 준비가 되었습니다."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "암호화 키가 성공적으로 업데이트되었습니다.",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "그 알림은 더 이상 이 SLO에 없습니다.",
+       "describeBurn": "소진율 > {critical} ({long} 및 {short} 동안)",
+       "describeBudget": "오류 예산 소비 > {critical}%"
+-    }
++    },
++    "exportTitle": "SLO 내보내기 | {count} SLO 내보내기",
++    "exportSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 공급자용 Terraform으로 다운로드하세요.",
++    "exportFailed": "SLO 정의를 읽을 수 없습니다. 다시 시도하십시오.",
++    "exportPartial": "{names}을(를) 읽을 수 없습니다. 나머지는 내보낼 준비가 되었습니다.",
++    "exportSucceeded": "SLO {count}개 내보냈습니다 | SLO {count}개 내보냈습니다"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index 2d733728a15..88aa184f004 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -820,7 +820,13 @@
+     "backTo": "Terug naar {label}",
+     "boolTrue": "Waar",
+     "boolFalse": "Onwaar",
+-    "browserTimeWithZone": "Browsertijd ({zone})"
++    "browserTimeWithZone": "Browsertijd ({zone})",
++    "download": "Downloaden",
++    "openProviderOnRegistry": "OpenObserve-provider op de {registry}",
++    "exportTerraformTabTooltip": "Dezelfde configuratie is van toepassing met Terraform of OpenTofu.",
++    "exportTerraformEmpty": "Er bestaat geen Terraform-resource voor deze selectie. Exporteer het in plaats daarvan als JSON.",
++    "exportTerraformSkipped": "Niet inbegrepen: {names}. De OpenObserve Terraform-provider heeft hier geen resource voor.",
++    "exportTerraformDropped": "Weggelaten — het provider-schema kan deze velden niet bevatten: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Conditietype",
+     "sloLongWindow": "Lang venster",
+     "sloShortWindow": "Kort venster",
+-    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond."
++    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
++    "exportDialogTitle": "Exporteer alert | Exporteer {count} alerts",
++    "exportDialogSubtitle": "Bekijk de definitie en download deze als JSON of als Terraform voor de OpenObserve-provider."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Openen",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Waarschuwing succesvol opgeslagen.",
+       "alertUpdatedSuccessfully": "Waarschuwing succesvol bijgewerkt.",
+       "openingDedupConfig": "Deduplicatieconfiguratie openen voor: {name}",
+-      "editingAlert": "Waarschuwing bewerken: {name}"
++      "editingAlert": "Waarschuwing bewerken: {name}",
++      "someAlertsCouldNotBeExported": "Kon {names} niet lezen. De rest is klaar om te exporteren."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Coderingssleutel succesvol bijgewerkt",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Die melding staat niet meer op deze SLO.",
+       "describeBurn": "Verbrandingssnelheid > {critical} over {long} en {short}",
+       "describeBudget": "Foutbudget verbruikt > {critical}%"
+-    }
++    },
++    "exportTitle": "Exporteer SLO | Exporteer {count} SLO's",
++    "exportSubtitle": "Bekijk de definitie en download deze vervolgens als JSON of als Terraform voor de OpenObserve-provider.",
++    "exportFailed": "De SLO-definitie kon niet worden gelezen. Probeer het opnieuw.",
++    "exportPartial": "Kon {names} niet lezen. De rest is klaar om te exporteren.",
++    "exportSucceeded": "{count} SLO geëxporteerd | {count} SLO's geëxporteerd"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 8703560778e..cdef24660c2 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -820,7 +820,13 @@
+     "backTo": "Wróć do {label}",
+     "boolTrue": "Prawda",
+     "boolFalse": "Fałsz",
+-    "browserTimeWithZone": "Czas przeglądarki ({zone})"
++    "browserTimeWithZone": "Czas przeglądarki ({zone})",
++    "download": "Pobierz",
++    "openProviderOnRegistry": "Dostawca OpenObserve w {registry}",
++    "exportTerraformTabTooltip": "Ta sama konfiguracja dotyczy Terraform lub OpenTofu.",
++    "exportTerraformEmpty": "Dla tego wyboru nie istnieje zasób Terraform. Wyeksportuj go jako JSON.",
++    "exportTerraformSkipped": "Nieuwzględnione: {names}. Dostawca Terraform OpenObserve nie ma zasobu dla tych elementów.",
++    "exportTerraformDropped": "Pominięto — schemat dostawcy nie może przenosić tych pól: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Typ warunku",
+     "sloLongWindow": "Długie okno",
+     "sloShortWindow": "Krótkie okno",
+-    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować."
++    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
++    "exportDialogTitle": "Eksportuj alert | Eksportuj {count} alertów",
++    "exportDialogSubtitle": "Przejrzyj definicję, a następnie pobierz ją jako JSON lub jako Terraform dla dostawcy OpenObserve."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Otwórz",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Alert został zapisany.",
+       "alertUpdatedSuccessfully": "Alert został zaktualizowany.",
+       "openingDedupConfig": "Otwieranie konfiguracji deduplikacji dla: {name}",
+-      "editingAlert": "Edytowanie alertu: {name}"
++      "editingAlert": "Edytowanie alertu: {name}",
++      "someAlertsCouldNotBeExported": "Nie można odczytać {names}. Pozostałe są gotowe do wyeksportowania."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Klucz szyfrowania został zaktualizowany",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Ten alert nie jest już przypisany do tego SLO.",
+       "describeBurn": "Wskaźnik wypalania > {critical} w ciągu {long} i {short}",
+       "describeBudget": "Zużyty budżet błędów > {critical}%"
+-    }
++    },
++    "exportTitle": "Eksportuj SLO | Eksportuj {count} SLO",
++    "exportSubtitle": "Przejrzyj definicję, a następnie pobierz ją jako JSON lub jako Terraform dla dostawcy OpenObserve.",
++    "exportFailed": "Nie można odczytać definicji SLO. Spróbuj ponownie.",
++    "exportPartial": "Nie można odczytać {names}. Pozostałe są gotowe do eksportu.",
++    "exportSucceeded": "Wyeksportowano {count} SLO | Wyeksportowano {count} SLO"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index 9964cb4dcdf..519fcf4ea00 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -820,7 +820,13 @@
+     "backTo": "Voltar para {label}",
+     "boolTrue": "Verdadeiro",
+     "boolFalse": "Falso",
+-    "browserTimeWithZone": "Horário do navegador ({zone})"
++    "browserTimeWithZone": "Horário do navegador ({zone})",
++    "download": "Baixar",
++    "openProviderOnRegistry": "Provedor do OpenObserve no {registry}",
++    "exportTerraformTabTooltip": "A mesma configuração se aplica ao Terraform ou ao OpenTofu.",
++    "exportTerraformEmpty": "Não existe recurso Terraform para esta seleção. Exporte-o como JSON em vez disso.",
++    "exportTerraformSkipped": "Não incluídos: {names}. O provedor Terraform do OpenObserve não tem recurso para estes.",
++    "exportTerraformDropped": "Omitidos — o esquema do provedor não suporta estes campos: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Tipo de condição",
+     "sloLongWindow": "Janela longa",
+     "sloShortWindow": "Janela curta",
+-    "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui."
++    "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui.",
++    "exportDialogTitle": "Exportar alerta | Exportar {count} alertas",
++    "exportDialogSubtitle": "Revise a definição e baixe-a como JSON ou como Terraform para o provedor OpenObserve."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Abrir",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Alerta salvo com sucesso.",
+       "alertUpdatedSuccessfully": "Alerta atualizado com sucesso.",
+       "openingDedupConfig": "Abrindo configuração de deduplicação para: {name}",
+-      "editingAlert": "Editando alerta: {name}"
++      "editingAlert": "Editando alerta: {name}",
++      "someAlertsCouldNotBeExported": "Não foi possível ler {names}. O restante está pronto para exportar."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Chave de criptografia atualizada com sucesso",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Esse alerta não está mais neste SLO.",
+       "describeBurn": "Taxa de consumo > {critical} em {long} e {short}",
+       "describeBudget": "Orçamento de erros consumido > {critical}%"
+-    }
++    },
++    "exportTitle": "Exportar SLO | Exportar {count} SLOs",
++    "exportSubtitle": "Revise a definição e baixe-a como JSON ou como Terraform para o provedor do OpenObserve.",
++    "exportFailed": "Não foi possível ler a definição do SLO. Tente novamente.",
++    "exportPartial": "Não foi possível ler {names}. O restante está pronto para exportar.",
++    "exportSucceeded": "Exportado {count} SLO | Exportados {count} SLOs"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index 42c46e3134d..0e5f0ccb5a4 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -820,7 +820,13 @@
+     "backTo": "Назад к {label}",
+     "boolTrue": "Истина",
+     "boolFalse": "Ложь",
+-    "browserTimeWithZone": "Время браузера ({zone})"
++    "browserTimeWithZone": "Время браузера ({zone})",
++    "download": "Скачать",
++    "openProviderOnRegistry": "Провайдер OpenObserve в {registry}",
++    "exportTerraformTabTooltip": "Та же конфигурация применима с Terraform или OpenTofu.",
++    "exportTerraformEmpty": "Для этого выбора не существует ресурса Terraform. Экспортируйте его как JSON.",
++    "exportTerraformSkipped": "Не включено: {names}. Провайдер OpenObserve Terraform не имеет ресурса для них.",
++    "exportTerraformDropped": "Исключено — схема провайдера не может содержать эти поля: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Тип условия",
+     "sloLongWindow": "Длинное окно",
+     "sloShortWindow": "Короткое окно",
+-    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда."
++    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда.",
++    "exportDialogTitle": "Экспортировать оповещение | Экспортировать {count} оповещений",
++    "exportDialogSubtitle": "Проверьте определение, затем скачайте его в формате JSON или Terraform для провайдера OpenObserve."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Открыть",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Оповещение успешно сохранено.",
+       "alertUpdatedSuccessfully": "Оповещение успешно обновлено.",
+       "openingDedupConfig": "Открытие конфигурации дедупликации для: {name}",
+-      "editingAlert": "Редактирование оповещения: {name}"
++      "editingAlert": "Редактирование оповещения: {name}",
++      "someAlertsCouldNotBeExported": "Не удалось прочитать {names}. Остальные готовы к экспорту."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Ключ шифрования успешно обновлён",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Это оповещение больше не относится к этому SLO.",
+       "describeBurn": "Скорость выгорания > {critical} за {long} и {short}",
+       "describeBudget": "Израсходовано бюджета ошибок > {critical}%"
+-    }
++    },
++    "exportTitle": "Экспортировать SLO | Экспортировать {count} SLO",
++    "exportSubtitle": "Просмотрите определение, затем скачайте его как JSON или как Terraform для провайдера OpenObserve.",
++    "exportFailed": "Не удалось прочитать определение SLO. Пожалуйста, попробуйте снова.",
++    "exportPartial": "Не удалось прочитать {names}. Остальные готовы к экспорту.",
++    "exportSucceeded": "Экспортировано {count} SLO | Экспортировано {count} SLO"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index c53c692bfb8..00479762c95 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -820,7 +820,13 @@
+     "backTo": "{label} sayfasına geri dön",
+     "boolTrue": "Doğru",
+     "boolFalse": "Yanlış",
+-    "browserTimeWithZone": "Tarayıcı Zamanı ({zone})"
++    "browserTimeWithZone": "Tarayıcı Zamanı ({zone})",
++    "download": "İndir",
++    "openProviderOnRegistry": "{registry} üzerindeki OpenObserve sağlayıcısı",
++    "exportTerraformTabTooltip": "Aynı yapılandırma Terraform veya OpenTofu ile de geçerlidir.",
++    "exportTerraformEmpty": "Bu seçim için Terraform kaynağı mevcut değil. Bunun yerine JSON olarak dışa aktarın.",
++    "exportTerraformSkipped": "Dahil edilmedi: {names}. OpenObserve Terraform sağlayıcısında bunlar için kaynak bulunmuyor.",
++    "exportTerraformDropped": "Dışarıda bırakıldı — sağlayıcı şeması bu alanları taşıyamıyor: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Koşul türü",
+     "sloLongWindow": "Uzun pencere",
+     "sloShortWindow": "Kısa pencere",
+-    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz."
++    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
++    "exportDialogTitle": "Uyarıyı dışa aktar | {count} uyarıyı dışa aktar",
++    "exportDialogSubtitle": "Tanımı gözden geçirin, ardından JSON veya OpenObserve sağlayıcısı için Terraform olarak indirin."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Aç",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Uyarı başarıyla kaydedildi.",
+       "alertUpdatedSuccessfully": "Uyarı başarıyla güncellendi.",
+       "openingDedupConfig": "{name} için tekilleştirme yapılandırması açılıyor",
+-      "editingAlert": "Uyarı düzenleniyor: {name}"
++      "editingAlert": "Uyarı düzenleniyor: {name}",
++      "someAlertsCouldNotBeExported": "{names} okunamadı. Diğerleri dışa aktarılmaya hazır."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Şifre anahtarı başarıyla güncellendi",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Bu uyarı artık bu SLO'da değil.",
+       "describeBurn": "Tükenme oranı > {critical}, {long} ve {short} boyunca",
+       "describeBudget": "Tüketilen hata bütçesi > {critical}%"
+-    }
++    },
++    "exportTitle": "SLO Dışa Aktar | {count} SLO Dışa Aktar",
++    "exportSubtitle": "Tanımı gözden geçirin, ardından OpenObserve sağlayıcısı için JSON veya Terraform olarak indirin.",
++    "exportFailed": "SLO tanımı okunamadı. Lütfen tekrar deneyin.",
++    "exportPartial": "{names} okunamadı. Geri kalanlar dışa aktarılmaya hazır.",
++    "exportSucceeded": "{count} SLO dışa aktarıldı | {count} SLO dışa aktarıldı"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 7d248f807e4..364045cb95b 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -820,7 +820,13 @@
+     "backTo": "Quay lại {label}",
+     "boolTrue": "Đúng",
+     "boolFalse": "Sai",
+-    "browserTimeWithZone": "Giờ trình duyệt ({zone})"
++    "browserTimeWithZone": "Giờ trình duyệt ({zone})",
++    "download": "Tải xuống",
++    "openProviderOnRegistry": "OpenObserve provider trên {registry}",
++    "exportTerraformTabTooltip": "Cấu hình tương tự áp dụng với Terraform hoặc OpenTofu.",
++    "exportTerraformEmpty": "Không có tài nguyên Terraform nào cho lựa chọn này. Hãy xuất nó dưới dạng JSON.",
++    "exportTerraformSkipped": "Không bao gồm: {names}. OpenObserve Terraform provider không có tài nguyên cho các mục này.",
++    "exportTerraformDropped": "Bỏ sót — lược đồ provider không thể chứa các trường này: {fields}."
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "Loại điều kiện",
+     "sloLongWindow": "Cửa sổ dài",
+     "sloShortWindow": "Cửa sổ ngắn",
+-    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây."
++    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
++    "exportDialogTitle": "Xuất cảnh báo | Xuất {count} cảnh báo",
++    "exportDialogSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve."
+   },
+   "alert_dependencies": {
+     "actionOpen": "Mở",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "Đã lưu cảnh báo thành công.",
+       "alertUpdatedSuccessfully": "Đã cập nhật cảnh báo thành công.",
+       "openingDedupConfig": "Đang mở cấu hình khử trùng lặp cho: {name}",
+-      "editingAlert": "Đang chỉnh sửa cảnh báo: {name}"
++      "editingAlert": "Đang chỉnh sửa cảnh báo: {name}",
++      "someAlertsCouldNotBeExported": "Không thể đọc {names}. Phần còn lại đã sẵn sàng để xuất."
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "Đã cập nhật khóa mã hóa thành công",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "Cảnh báo đó không còn trên SLO này.",
+       "describeBurn": "Tỷ lệ đốt > {critical} trong {long} và {short}",
+       "describeBudget": "Ngân sách lỗi đã tiêu thụ > {critical}%"
+-    }
++    },
++    "exportTitle": "Xuất SLO | Xuất {count} SLO",
++    "exportSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve.",
++    "exportFailed": "Không thể đọc định nghĩa SLO. Vui lòng thử lại.",
++    "exportPartial": "Không thể đọc {names}. Phần còn lại đã sẵn sàng để xuất.",
++    "exportSucceeded": "Đã xuất {count} SLO | Đã xuất {count} SLO"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index 9c1f0b108f7..f9756672d21 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -820,7 +820,13 @@
+     "backTo": "返回 {label}",
+     "boolTrue": "真",
+     "boolFalse": "假",
+-    "browserTimeWithZone": "浏览器时间（{zone}）"
++    "browserTimeWithZone": "浏览器时间（{zone}）",
++    "download": "下载",
++    "openProviderOnRegistry": "OpenObserve provider 在 {registry} 上",
++    "exportTerraformTabTooltip": "相同的配置适用于 Terraform 或 OpenTofu。",
++    "exportTerraformEmpty": "该选择没有对应的 Terraform 资源。请改为导出为 JSON。",
++    "exportTerraformSkipped": "未包含：{names}。OpenObserve Terraform provider 没有对应的资源。",
++    "exportTerraformDropped": "已省略 — provider schema 无法承载这些字段：{fields}。"
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7302,7 +7308,9 @@
+     "sloKind": "条件类型",
+     "sloLongWindow": "长窗口",
+     "sloShortWindow": "短窗口",
+-    "sloCloneDisabled": "SLO 警报是在其 SLO 页面上创建的，因此无法从此处克隆。"
++    "sloCloneDisabled": "SLO 警报是在其 SLO 页面上创建的，因此无法从此处克隆。",
++    "exportDialogTitle": "导出告警 | 导出 {count} 条告警",
++    "exportDialogSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform。"
+   },
+   "alert_dependencies": {
+     "actionOpen": "打开",
+@@ -13678,7 +13686,8 @@
+       "alertSavedSuccessfully": "告警保存成功。",
+       "alertUpdatedSuccessfully": "告警更新成功。",
+       "openingDedupConfig": "正在为 {name} 打开去重配置",
+-      "editingAlert": "正在编辑告警：{name}"
++      "editingAlert": "正在编辑告警：{name}",
++      "someAlertsCouldNotBeExported": "无法读取 {names}。其余已准备好导出。"
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "加密密钥更新成功",
+@@ -14248,7 +14257,12 @@
+       "editTargetMissing": "该告警已不在此 SLO 上。",
+       "describeBurn": "燃烧速率 > {critical} 在 {long} 和 {short} 期间",
+       "describeBudget": "错误预算消耗 > {critical}%"
+-    }
++    },
++    "exportTitle": "导出 SLO | 导出 {count} 个 SLO",
++    "exportSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform 格式。",
++    "exportFailed": "无法读取 SLO 定义。请重试。",
++    "exportPartial": "无法读取 {names}。其余已准备好导出。",
++    "exportSucceeded": "已导出 {count} 个 SLO | 已导出 {count} 个 SLO"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 7224e2b2a69..6d6e4cbeb96 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -820,7 +820,13 @@
+     "backTo": "返回 {label}",
+     "boolTrue": "是",
+     "boolFalse": "否",
+-    "browserTimeWithZone": "瀏覽器時間（{zone}）"
++    "browserTimeWithZone": "瀏覽器時間（{zone}）",
++    "download": "下載",
++    "openProviderOnRegistry": "在 {registry} 上的 OpenObserve provider",
++    "exportTerraformTabTooltip": "相同的配置適用於 Terraform 或 OpenTofu。",
++    "exportTerraformEmpty": "此選項沒有對應的 Terraform 資源。請改為以 JSON 匯出。",
++    "exportTerraformSkipped": "未包含：{names}。OpenObserve Terraform provider 沒有這些項目的資源。",
++    "exportTerraformDropped": "已省略 — provider schema 無法承載這些欄位：{fields}。"
+   },
+   "flow": {
+     "stepPicker": {
+@@ -7297,7 +7303,9 @@
+     "sloKind": "條件類型",
+     "sloLongWindow": "長視窗",
+     "sloShortWindow": "短視窗",
+-    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。"
++    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。",
++    "exportDialogTitle": "匯出警示 | 匯出 {count} 個警示",
++    "exportDialogSubtitle": "檢閱定義，然後將其下載為 JSON 或適用於 OpenObserve provider 的 Terraform。"
+   },
+   "alert_dependencies": {
+     "actionOpen": "開啟",
+@@ -13673,7 +13681,8 @@
+       "alertSavedSuccessfully": "警示已成功儲存。",
+       "alertUpdatedSuccessfully": "警示已成功更新。",
+       "openingDedupConfig": "正在開啟 {name} 的重複資料排除設定",
+-      "editingAlert": "正在編輯警示：{name}"
++      "editingAlert": "正在編輯警示：{name}",
++      "someAlertsCouldNotBeExported": "無法讀取 {names}。其餘項目已可匯出。"
+     },
+     "cipherkeys": {
+       "cipherKeyUpdatedSuccessfully": "加密金鑰更新成功",
+@@ -14243,7 +14252,12 @@
+       "editTargetMissing": "該警示已不在這個 SLO 上。",
+       "describeBurn": "燃燒率 > {critical} 在 {long} 和 {short} 期間",
+       "describeBudget": "錯誤預算消耗 > {critical}%"
+-    }
++    },
++    "exportTitle": "匯出 SLO | 匯出 {count} 個 SLO",
++    "exportSubtitle": "檢閱定義，然後以 JSON 或 Terraform 格式下載，用於 OpenObserve provider。",
++    "exportFailed": "無法讀取 SLO 定義。請再試一次。",
++    "exportPartial": "無法讀取 {names}。其餘的已準備好匯出。",
++    "exportSucceeded": "已匯出 {count} 個 SLO | 已匯出 {count} 個 SLO"
+   },
+   "promql": {
+     "operations": {
+diff --git a/web/src/utils/alerts/alertTerraform.spec.ts b/web/src/utils/alerts/alertTerraform.spec.ts
+new file mode 100644
+index 00000000000..f4a7948a0e6
+--- /dev/null
++++ b/web/src/utils/alerts/alertTerraform.spec.ts
+@@ -0,0 +1,290 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// The expected output here is `terraform fmt`-canonical: it was checked by
++// running the generated file through the real terraform CLI and the built
++// provider (`terraform validate`), so these assertions pin both the formatting
++// and the attribute names the provider schema accepts.
++
++import { describe, expect, it } from "vitest";
++
++import { alertsToTerraform } from "./alertTerraform";
++
++const sqlAlert = {
++  id: "2fXkZ8QlmNbYcV1pR3sT",
++  name: "high error rate",
++  org_id: "default",
++  stream_type: "logs",
++  stream_name: "app_logs",
++  is_real_time: false,
++  enabled: true,
++  description: "Error volume above baseline",
++  destinations: ["slack-alerts"],
++  row_template: "",
++  row_template_type: "String",
++  tz_offset: 0,
++  last_triggered_at: 1755000000000000,
++  updated_at: 1755000000000000,
++  last_edited_by: "admin@example.com",
++  query_condition: {
++    type: "sql",
++    sql: 'SELECT count(*) AS total FROM "app_logs"',
++    aggregation: null,
++  },
++  trigger_condition: {
++    period: 15,
++    operator: ">=",
++    threshold: 100,
++    frequency: 5,
++    frequency_type: "minutes",
++    silence: 60,
++    align_time: true,
++  },
++};
++
++describe("alertsToTerraform", () => {
++  it("renders a scheduled SQL alert as canonical, fmt-aligned HCL", () => {
++    const { hcl, unsupported, droppedFields } = alertsToTerraform([sqlAlert]);
++
++    expect(unsupported).toEqual([]);
++    expect(droppedFields).toEqual([]);
++    // Read-only fields, and anything left at a provider default, are absent.
++    expect(hcl.slice(hcl.indexOf("resource"))).toBe(
++      `resource "openobserve_alert" "high_error_rate" {
++  name         = "high error rate"
++  stream_type  = "logs"
++  stream_name  = "app_logs"
++  description  = "Error volume above baseline"
++  enabled      = true
++  destinations = ["slack-alerts"]
++  query_condition {
++    type = "sql"
++    sql  = "SELECT count(*) AS total FROM \\"app_logs\\""
++  }
++  trigger_condition {
++    period    = 15
++    operator  = ">="
++    threshold = 100
++    frequency = 5
++    silence   = 60
++  }
++}
++`,
++    );
++  });
++
++  it("names the provider in a header so the config is usable on its own", () => {
++    const { hcl } = alertsToTerraform([sqlAlert]);
++
++    expect(hcl).toContain('#         source  = "openobserve/openobserve"');
++    expect(hcl).toContain("#     required_providers {");
++  });
++
++  it("passes custom conditions through jsonencode and stringifies numeric thresholds", () => {
++    const { hcl, droppedFields } = alertsToTerraform([
++      {
++        ...sqlAlert,
++        query_condition: {
++          type: "custom",
++          conditions: [{ column: "logtag", operator: "=", value: "F", ignore_case: false }],
++          aggregation: {
++            group_by: ["service"],
++            function: "p95",
++            multi_alert: true,
++            having: { column: "duration_ms", operator: ">", value: 1000, ignore_case: true },
++          },
++        },
++      },
++    ]);
++
++    expect(hcl).toContain("conditions = jsonencode([");
++    expect(hcl).toContain('"column"      = "logtag"');
++    expect(hcl).toContain('group_by    = ["service"]');
++    expect(hcl).toContain('function    = "p95"');
++    expect(hcl).toContain("multi_alert = true");
++    // A JSON number threshold becomes a string, which is what the schema takes.
++    expect(hcl).toContain('value    = "1000"');
++    // The provider's having block has no ignore_case, so the loss is reported.
++    expect(droppedFields).toEqual(["having.ignore_case"]);
++  });
++
++  it("maps wire operators onto the names the provider validator accepts", () => {
++    const { hcl } = alertsToTerraform([
++      {
++        ...sqlAlert,
++        query_condition: {
++          type: "custom",
++          aggregation: {
++            function: "count",
++            having: { column: "msg", operator: "not_contains", value: "healthcheck" },
++          },
++        },
++      },
++    ]);
++
++    expect(hcl).toContain('operator = "NotContains"');
++    expect(hcl).not.toContain("not_contains");
++  });
++
++  it("renames multi_time_range offSet to the schema's offset", () => {
++    const { hcl } = alertsToTerraform([
++      {
++        ...sqlAlert,
++        query_condition: {
++          ...sqlAlert.query_condition,
++          multi_time_range: [{ offSet: "1h" }, { offSet: "1d" }],
++        },
++      },
++    ]);
++
++    expect(hcl).toContain('multi_time_range {\n      offset = "1h"\n    }');
++    expect(hcl).toContain('offset = "1d"');
++    expect(hcl).not.toContain("offSet");
++  });
++
++  it("renders promql and deduplication blocks", () => {
++    const { hcl } = alertsToTerraform([
++      {
++        ...sqlAlert,
++        stream_type: "metrics",
++        query_condition: {
++          type: "promql",
++          promql: 'rate(node_cpu_seconds_total{mode!="idle"}[5m])',
++          promql_condition: { column: "value", operator: ">", value: 0.9 },
++          promql_warning_value: 0.7,
++          promql_multi_alert: true,
++        },
++        deduplication: { enabled: true, fingerprint_fields: ["instance"], time_window_minutes: 30 },
++      },
++    ]);
++
++    expect(hcl).toContain("promql_condition {");
++    expect(hcl).toContain('value    = "0.9"');
++    expect(hcl).toContain("promql_warning_value = 0.7");
++    expect(hcl).toContain("promql_multi_alert   = true");
++    expect(hcl).toContain('fingerprint_fields  = ["instance"]');
++    expect(hcl).toContain("time_window_minutes = 30");
++  });
++
++  it("drops the trigger-side gate on an SLO alert, which the provider rejects", () => {
++    const { hcl } = alertsToTerraform([
++      {
++        ...sqlAlert,
++        query_condition: {
++          type: "slo",
++          slo_condition: {
++            slo_id: "slo-123",
++            kind: "burn_rate",
++            operator: ">",
++            critical: 14.4,
++            long_window_secs: 3600,
++            short_window_secs: 300,
++          },
++        },
++      },
++    ]);
++
++    expect(hcl).toContain('slo_id            = "slo-123"');
++    expect(hcl).toContain("long_window_secs  = 3600");
++    // An SLO alert is thresholded by slo_condition.critical, not by the trigger.
++    expect(hcl).toContain("trigger_condition {\n    period    = 15\n    frequency = 5");
++    expect(hcl).not.toContain("threshold");
++    expect(hcl).not.toMatch(/^\s+operator\s+= ">="/m);
++  });
++
++  it("drops the burn-rate windows on an error-budget alert", () => {
++    const { hcl } = alertsToTerraform([
++      {
++        ...sqlAlert,
++        query_condition: {
++          type: "slo",
++          slo_condition: {
++            slo_id: "slo-123",
++            kind: "error_budget",
++            operator: ">=",
++            critical: 90,
++            long_window_secs: 3600,
++            short_window_secs: 300,
++          },
++        },
++      },
++    ]);
++
++    expect(hcl).toContain('kind     = "error_budget"');
++    expect(hcl).not.toContain("long_window_secs");
++    expect(hcl).not.toContain("short_window_secs");
++  });
++
++  it("drops warning_threshold on an aggregation alert, where warning_value owns it", () => {
++    const { hcl } = alertsToTerraform([
++      {
++        ...sqlAlert,
++        query_condition: {
++          type: "custom",
++          aggregation: {
++            function: "avg",
++            warning_value: 50,
++            having: { column: "latency", operator: ">", value: 100 },
++          },
++        },
++        trigger_condition: { ...sqlAlert.trigger_condition, warning_threshold: 50 },
++      },
++    ]);
++
++    expect(hcl).toContain("warning_value = 50");
++    expect(hcl).not.toContain("warning_threshold");
++  });
++
++  it("escapes interpolation openers so Terraform does not parse them", () => {
++    const { hcl } = alertsToTerraform([
++      { ...sqlAlert, description: 'total ${count} rows for "svc"', row_template: "%{name}" },
++    ]);
++
++    expect(hcl).toContain('description  = "total $${count} rows for \\"svc\\""');
++    expect(hcl).toContain('row_template = "%%{name}"');
++  });
++
++  it("reports anomaly configs and truncated payloads as unsupported", () => {
++    const { hcl, unsupported } = alertsToTerraform([
++      { name: "traffic anomaly", alert_type: "anomaly_detection", stream_name: "app_logs" },
++      { name: "half a payload" },
++      sqlAlert,
++    ]);
++
++    expect(unsupported).toEqual([
++      { name: "traffic anomaly", reason: "anomaly" },
++      { name: "half a payload", reason: "incomplete" },
++    ]);
++    // The convertible alert is still rendered.
++    expect(hcl).toContain('resource "openobserve_alert" "high_error_rate"');
++    expect(hcl).not.toContain("traffic anomaly");
++  });
++
++  it("gives every alert a unique resource label", () => {
++    const { hcl } = alertsToTerraform([
++      sqlAlert,
++      { ...sqlAlert, name: "high/error/rate" },
++      { ...sqlAlert, name: "5xx" },
++    ]);
++
++    expect(hcl).toContain('"openobserve_alert" "high_error_rate" {');
++    expect(hcl).toContain('"openobserve_alert" "high_error_rate_2" {');
++    // A Terraform label may not start with a digit.
++    expect(hcl).toContain('"openobserve_alert" "alert_5xx" {');
++  });
++
++  it("emits folder_id only for a non-default folder", () => {
++    expect(alertsToTerraform([sqlAlert], { folderId: "default" }).hcl).not.toContain("folder_id");
++    expect(alertsToTerraform([sqlAlert], { folderId: "platform" }).hcl).toContain(
++      'folder_id    = "platform"',
++    );
++  });
++
++  it("returns empty output when nothing is convertible", () => {
++    const { hcl, unsupported } = alertsToTerraform([
++      { name: "anomaly", alert_type: "anomaly_detection", stream_name: "s" },
++    ]);
++
++    expect(hcl).toBe("");
++    expect(unsupported).toHaveLength(1);
++  });
++});
+diff --git a/web/src/utils/alerts/alertTerraform.ts b/web/src/utils/alerts/alertTerraform.ts
+new file mode 100644
+index 00000000000..1c5999e2604
+--- /dev/null
++++ b/web/src/utils/alerts/alertTerraform.ts
+@@ -0,0 +1,265 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// alertTerraform.ts — renders an exported alert payload as an `openobserve_alert`
++// resource for the OpenObserve Terraform provider
++// (https://registry.terraform.io/providers/openobserve/openobserve/latest).
++//
++// The input is exactly what `POST /api/v2/{org}/alerts/{id}/export` returns, and
++// the output targets the provider's alert schema. The two vocabularies are close
++// but not identical, which is what this module exists to bridge:
++//
++//   • `multi_time_range[].offSet` is `offset` in the provider schema.
++//   • Operators serialize as `contains` / `not_contains` but the provider's
++//     validator only accepts `Contains` / `NotContains`.
++//   • A condition `value` is a JSON number or string on the wire and always a
++//     string in the provider schema.
++//   • `query_condition.conditions` is free-form JSON, so it goes through
++//     `jsonencode()` — the idiom the provider documents.
++//   • The provider rejects a trigger-side gate on an SLO alert and a
++//     `warning_threshold` on an aggregation alert, both of which the API sends
++//     anyway; they are dropped here.
++//   • Read-only fields (ids, timestamps, last_edited_by) have no place in a
++//     configuration file and are dropped.
++//
++// Attributes that match the provider's own default are omitted, so the output
++// reads like config someone wrote rather than a state dump. `enabled` is the one
++// exception: whether an alert is live is the first thing a reviewer looks for,
++// and leaving it to the default would make a paused alert look identical to a
++// running one.
++
++import type {
++  Node,
++  TerraformExport,
++  TerraformUnsupportedItem,
++  TerraformUnsupportedReason,
++} from "@/utils/terraform/hcl";
++import {
++  INDENT,
++  attr,
++  block,
++  boolWhen,
++  bool,
++  document,
++  isFilled,
++  list,
++  literal,
++  map,
++  num,
++  numUnless,
++  quote,
++  resourceBlock,
++  resourceLabel,
++  str,
++} from "@/utils/terraform/hcl";
++
++export interface AlertTerraformOptions {
++  /** Alert folder the export came from. Emitted only when it is not the default. */
++  folderId?: string;
++}
++
++// `=`, `!=`, `>`, `>=`, `<` and `<=` pass through; only the two word operators
++// are spelled differently on the wire than in the provider's validator.
++const OPERATORS: Record<string, string> = {
++  contains: "Contains",
++  not_contains: "NotContains",
++  Contains: "Contains",
++  NotContains: "NotContains",
++};
++
++function operator(value: unknown): string | null {
++  if (typeof value !== "string" || value === "") return null;
++  return quote(OPERATORS[value] ?? value);
++}
++
++/** A threshold is a JSON number or string on the wire, always a string in HCL. */
++function conditionValue(value: unknown): string | null {
++  if (value === null || value === undefined) return null;
++  if (typeof value === "string") return quote(value);
++  if (typeof value === "number" || typeof value === "boolean") return quote(String(value));
++  return quote(JSON.stringify(value));
++}
++
++function conditionBlock(name: string, source: unknown, dropped: Set<string>): Node[] {
++  if (!source || typeof source !== "object") return [];
++  const c = source as Record<string, unknown>;
++  // The provider's condition block is column/operator/value only.
++  if (c.ignore_case === true) dropped.add(`${name}.ignore_case`);
++  return block(name, [
++    ...attr("column", str(c.column)),
++    ...attr("operator", operator(c.operator)),
++    ...attr("value", conditionValue(c.value)),
++  ]);
++}
++
++function aggregationBlock(source: unknown, dropped: Set<string>): Node[] {
++  if (!source || typeof source !== "object") return [];
++  const a = source as Record<string, unknown>;
++  return block("aggregation", [
++    ...attr("group_by", list(a.group_by)),
++    ...attr("function", str(a.function)),
++    ...attr("warning_value", num(a.warning_value)),
++    ...attr("multi_alert", boolWhen(a.multi_alert, true)),
++    ...conditionBlock("having", a.having, dropped),
++  ]);
++}
++
++function sloConditionBlock(source: unknown): Node[] {
++  if (!source || typeof source !== "object") return [];
++  const s = source as Record<string, unknown>;
++  // The two windows only exist for burn-rate alerts; the provider rejects them on
++  // an error-budget alert, which measures over the SLO's own window.
++  const burnRate = s.kind === "burn_rate";
++  return block("slo_condition", [
++    ...attr("slo_id", str(s.slo_id)),
++    ...attr("kind", str(s.kind)),
++    ...attr("operator", operator(s.operator)),
++    ...attr("critical", num(s.critical)),
++    ...attr("warning", num(s.warning)),
++    ...attr("long_window_secs", burnRate ? num(s.long_window_secs) : null),
++    ...attr("short_window_secs", burnRate ? num(s.short_window_secs) : null),
++    ...attr("multi_alert", boolWhen(s.multi_alert, true)),
++  ]);
++}
++
++function queryConditionBlock(source: unknown, indent: string, dropped: Set<string>): Node[] {
++  if (!source || typeof source !== "object") return [];
++  const q = source as Record<string, unknown>;
++  const historic = Array.isArray(q.multi_time_range) ? q.multi_time_range : [];
++
++  return block("query_condition", [
++    ...attr("type", str(q.type)),
++    ...attr("sql", str(q.sql)),
++    ...attr("promql", str(q.promql)),
++    // Free-form JSON in both the flat and the grouped shape — handed to the
++    // provider as a JSON document, exactly as its schema expects.
++    ...attr(
++      "conditions",
++      isFilled(q.conditions) ? `jsonencode(${literal(q.conditions, `${indent}${INDENT}`)})` : null,
++    ),
++    ...attr("promql_warning_value", num(q.promql_warning_value)),
++    ...attr("promql_multi_alert", boolWhen(q.promql_multi_alert, true)),
++    ...attr("vrl_function", str(q.vrl_function)),
++    ...attr("search_event_type", str(q.search_event_type)),
++    ...conditionBlock("promql_condition", q.promql_condition, dropped),
++    ...aggregationBlock(q.aggregation, dropped),
++    ...sloConditionBlock(q.slo_condition),
++    ...historic.flatMap((entry: unknown) => {
++      const offset = str((entry as Record<string, unknown>)?.offSet);
++      return offset === null ? [] : block("multi_time_range", attr("offset", offset));
++    }),
++  ]);
++}
++
++function triggerConditionBlock(source: unknown, query: Record<string, unknown>): Node[] {
++  if (!source || typeof source !== "object") return [];
++  const t = source as Record<string, unknown>;
++  // An SLO alert has no count gate — it is compared by slo_condition.operator
++  // against slo_condition.critical — and on an aggregation alert the warning level
++  // lives on aggregation.warning_value. The provider rejects the trigger-side
++  // spellings outright, and the API sends them anyway, so they are dropped here.
++  const isSlo = query.type === "slo";
++  const hasAggregation = isFilled(query.aggregation);
++  // period / operator / threshold / frequency are the alert's whole schedule, so
++  // they are written even when they happen to match the provider default.
++  return block("trigger_condition", [
++    ...attr("period", num(t.period)),
++    ...attr("operator", isSlo ? null : operator(t.operator)),
++    ...attr("threshold", isSlo ? null : num(t.threshold)),
++    ...attr("warning_threshold", hasAggregation ? null : num(t.warning_threshold)),
++    ...attr("notify_on_warning", t.notify_on_warning === false ? "false" : null),
++    ...attr("frequency", num(t.frequency)),
++    ...attr("frequency_type", t.frequency_type === "cron" ? quote("cron") : null),
++    ...attr("cron", str(t.cron)),
++    ...attr("silence", numUnless(t.silence, 0)),
++    ...attr("timezone", str(t.timezone)),
++    ...attr("tolerance_in_secs", num(t.tolerance_in_secs)),
++    ...attr("align_time", boolWhen(t.align_time, false)),
++  ]);
++}
++
++function deduplicationBlock(source: unknown): Node[] {
++  if (!source || typeof source !== "object") return [];
++  const d = source as Record<string, unknown>;
++  return block("deduplication", [
++    ...attr("enabled", bool(d.enabled)),
++    ...attr("fingerprint_fields", list(d.fingerprint_fields)),
++    ...attr("time_window_minutes", num(d.time_window_minutes)),
++  ]);
++}
++
++/** Anomaly-detection configs and truncated payloads have no provider resource. */
++function unsupportedReason(alert: Record<string, unknown>): TerraformUnsupportedReason | null {
++  if (alert.alert_type === "anomaly_detection") return "anomaly";
++  if (!alert.stream_name || !alert.trigger_condition) return "incomplete";
++  return null;
++}
++
++function alertResource(
++  alert: Record<string, unknown>,
++  label: string,
++  options: AlertTerraformOptions,
++  dropped: Set<string>,
++): string {
++  const folderId = options.folderId && options.folderId !== "default" ? options.folderId : null;
++  const query = (alert.query_condition ?? {}) as Record<string, unknown>;
++
++  const nodes: Node[] = [
++    ...attr("name", quote(String(alert.name ?? ""))),
++    ...attr("stream_type", quote(String(alert.stream_type ?? "logs"))),
++    ...attr("stream_name", quote(String(alert.stream_name ?? ""))),
++    ...attr("folder_id", folderId === null ? null : quote(folderId)),
++    ...attr("description", str(alert.description)),
++    // Always written, unlike every other defaulted attribute. See the note at
++    // the top of this file, and the header the export carries.
++    ...attr("enabled", String(alert.enabled !== false)),
++    ...attr("is_real_time", boolWhen(alert.is_real_time, true)),
++    ...attr("owner", str(alert.owner)),
++    ...attr("priority", num(alert.priority)),
++    ...attr("tags", list(alert.tags)),
++    // Destination and template names must already exist in the target org, or be
++    // managed by their own openobserve_alert_destination / _template resources.
++    ...attr("destinations", list(alert.destinations)),
++    ...attr("template", str(alert.template)),
++    ...attr("context_attributes", map(alert.context_attributes, INDENT)),
++    ...attr("row_template", str(alert.row_template)),
++    ...attr("row_template_type", alert.row_template_type === "Json" ? quote("Json") : null),
++    ...attr("tz_offset", numUnless(alert.tz_offset, 0)),
++    ...attr("creates_incident", boolWhen(alert.creates_incident, true)),
++    ...attr("workflows", list(alert.workflows)),
++    ...queryConditionBlock(alert.query_condition, INDENT, dropped),
++    ...triggerConditionBlock(alert.trigger_condition, query),
++    ...deduplicationBlock(alert.deduplication),
++  ];
++
++  return resourceBlock("openobserve_alert", label, nodes);
++}
++
++/**
++ * Converts exported alert payloads into `openobserve_alert` resources.
++ *
++ * Alerts with no provider equivalent are reported in `unsupported` rather than
++ * rendered as something that would not apply.
++ */
++export function alertsToTerraform(
++  alerts: Record<string, unknown>[],
++  options: AlertTerraformOptions = {},
++): TerraformExport {
++  const used = new Set<string>();
++  const dropped = new Set<string>();
++  const unsupported: TerraformUnsupportedItem[] = [];
++  const resources: string[] = [];
++
++  for (const alert of alerts) {
++    if (!alert || typeof alert !== "object") continue;
++    const reason = unsupportedReason(alert);
++    if (reason) {
++      unsupported.push({ name: String(alert.name ?? ""), reason });
++      continue;
++    }
++    resources.push(
++      alertResource(alert, resourceLabel(alert.name, used, "alert"), options, dropped),
++    );
++  }
++
++  return { hcl: document(resources), unsupported, droppedFields: [...dropped].sort() };
++}
+diff --git a/web/src/utils/slos/sloTerraform.spec.ts b/web/src/utils/slos/sloTerraform.spec.ts
+new file mode 100644
+index 00000000000..e170a15748c
+--- /dev/null
++++ b/web/src/utils/slos/sloTerraform.spec.ts
+@@ -0,0 +1,227 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// The expected output here is `terraform fmt`-canonical and was checked against
++// the built provider with `terraform validate`, so these assertions pin both the
++// formatting and the attribute names the provider schema accepts.
++
++import { describe, expect, it } from "vitest";
++
++import { slosToTerraform } from "./sloTerraform";
++
++const countSlo = {
++  id: "2fXkZ8QlmNbYcV1pR3sT",
++  org: "default",
++  folder_id: "reliability",
++  name: "checkout availability",
++  description: "Successful checkout requests over 30 days",
++  sli_type: "count",
++  config: {
++    source: {
++      mode: "single_query",
++      query: {
++        stream: "app_logs",
++        stream_type: "logs",
++        scope: "service = 'checkout'",
++        good_expr: "status < 500",
++      },
++    },
++  },
++  window_secs: 2592000,
++  slice_interval_secs: 300,
++  target: 99.9,
++  enabled: true,
++  owner: "sre@example.com",
++  tags: ["prod", "team:checkout"],
++  definition_generation: 3,
++  groups_reserved: 0,
++};
++
++describe("slosToTerraform", () => {
++  it("renders a count SLO as canonical, fmt-aligned HCL", () => {
++    const { hcl, unsupported } = slosToTerraform([countSlo]);
++
++    expect(unsupported).toEqual([]);
++    expect(hcl.slice(hcl.indexOf("resource"))).toBe(
++      `resource "openobserve_slo" "checkout_availability" {
++  name                = "checkout availability"
++  folder_id           = "reliability"
++  description         = "Successful checkout requests over 30 days"
++  enabled             = true
++  target              = 99.9
++  window_secs         = 2592000
++  slice_interval_secs = 300
++  tags                = ["prod", "team:checkout"]
++  owner               = "sre@example.com"
++  count_sli {
++    single_query {
++      stream      = "app_logs"
++      stream_type = "logs"
++      scope       = "service = 'checkout'"
++      good_expr   = "status < 500"
++    }
++  }
++}
++`,
++    );
++  });
++
++  it("omits read-only fields the provider derives or assigns", () => {
++    const { hcl } = slosToTerraform([countSlo]);
++
++    // Matched as whole attributes: a bare "id" substring also occurs in folder_id.
++    for (const field of ["id", "org", "sli_type", "definition_generation", "groups_reserved"]) {
++      expect(hcl).not.toMatch(new RegExp(`^\\s+${field}\\s+=`, "m"));
++    }
++  });
++
++  it("renames the prom_ql source mode to the promql block", () => {
++    const { hcl } = slosToTerraform([
++      {
++        ...countSlo,
++        config: {
++          source: {
++            mode: "prom_ql",
++            query: { good: "sum(increase(ok[5m]))", total: "sum(increase(all[5m]))" },
++          },
++        },
++      },
++    ]);
++
++    expect(hcl).toContain("promql {");
++    expect(hcl).toContain('good  = "sum(increase(ok[5m]))"');
++    expect(hcl).toContain('total = "sum(increase(all[5m]))"');
++    expect(hcl).not.toContain("prom_ql");
++  });
++
++  it("renders a dual-query source as its two nested query blocks", () => {
++    const { hcl } = slosToTerraform([
++      {
++        ...countSlo,
++        config: {
++          source: {
++            mode: "dual_query",
++            query: {
++              good: { stream: "app_logs", stream_type: "logs", sql: "SELECT 1 AS zo_slo_value" },
++              total: { stream: "app_logs", stream_type: "logs", sql: "SELECT 2 AS zo_slo_value" },
++            },
++          },
++        },
++      },
++    ]);
++
++    expect(hcl).toContain("dual_query {");
++    expect(hcl).toMatch(/good \{\n\s+stream\s+= "app_logs"\n\s+stream_type\s+= "logs"/);
++    expect(hcl).toMatch(/total \{\n\s+stream\s+= "app_logs"/);
++    expect(hcl).toMatch(/sql\s+= "SELECT 2 AS zo_slo_value"/);
++  });
++
++  it("renders a time-slice indicator, keeping absent_is_bad on an ungrouped SLO", () => {
++    const { hcl } = slosToTerraform([
++      {
++        ...countSlo,
++        sli_type: "time_slice",
++        config: {
++          stream: "app_logs",
++          stream_type: "logs",
++          query_language: "sql",
++          query: 'SELECT count(_timestamp) AS zo_slo_value FROM "app_logs"',
++          comparator: ">",
++          threshold: 0,
++          absent_is_bad: true,
++        },
++      },
++    ]);
++
++    expect(hcl).toContain("time_slice_sli {");
++    expect(hcl).toContain('query_language = "sql"');
++    expect(hcl).toContain("threshold      = 0");
++    expect(hcl).toContain("absent_is_bad  = true");
++  });
++
++  it("drops absent_is_bad on a grouped SLO, which the provider rejects", () => {
++    const { hcl } = slosToTerraform([
++      {
++        ...countSlo,
++        sli_type: "time_slice",
++        group_by: ["region"],
++        config: {
++          stream: "app_logs",
++          stream_type: "logs",
++          query_language: "sql",
++          query: "SELECT 1 AS zo_slo_value",
++          comparator: ">",
++          threshold: 0,
++          absent_is_bad: true,
++        },
++      },
++    ]);
++
++    expect(hcl).toContain('group_by            = ["region"]');
++    expect(hcl).not.toContain("absent_is_bad");
++  });
++
++  it("renders an alert-derived indicator", () => {
++    const { hcl } = slosToTerraform([
++      { ...countSlo, sli_type: "alert", config: { alert_id: "2abcXYZ" } },
++    ]);
++
++    expect(hcl).toContain('alert_sli {\n    alert_id = "2abcXYZ"\n  }');
++  });
++
++  it("escapes interpolation openers in a query", () => {
++    const { hcl } = slosToTerraform([
++      {
++        ...countSlo,
++        sli_type: "time_slice",
++        config: {
++          stream: "app_logs",
++          stream_type: "logs",
++          query_language: "sql",
++          query: "SELECT ${x} AS zo_slo_value",
++          comparator: ">",
++          threshold: 1,
++        },
++      },
++    ]);
++
++    expect(hcl).toContain('query          = "SELECT $${x} AS zo_slo_value"');
++  });
++
++  it("prefers the SLO's own folder and omits the default one", () => {
++    expect(slosToTerraform([{ ...countSlo, folder_id: "default" }]).hcl).not.toContain("folder_id");
++    // Only a payload with no folder falls back to the caller's active folder.
++    const { hcl } = slosToTerraform([{ ...countSlo, folder_id: undefined }], {
++      folderId: "platform",
++    });
++    expect(hcl).toContain('folder_id           = "platform"');
++  });
++
++  it("reports an SLO with no usable indicator as unsupported", () => {
++    const { hcl, unsupported } = slosToTerraform([
++      { name: "truncated" },
++      { ...countSlo, sli_type: "count", config: {} },
++      { ...countSlo, name: "no target", target: undefined },
++      countSlo,
++    ]);
++
++    expect(unsupported).toEqual([
++      { name: "truncated", reason: "incomplete" },
++      { name: "checkout availability", reason: "incomplete" },
++      { name: "no target", reason: "incomplete" },
++    ]);
++    expect(hcl).toContain('resource "openobserve_slo" "checkout_availability" {');
++  });
++
++  it("gives every SLO a unique resource label", () => {
++    const { hcl } = slosToTerraform([
++      countSlo,
++      { ...countSlo, name: "checkout/availability" },
++      { ...countSlo, name: "99th" },
++    ]);
++
++    expect(hcl).toContain('"openobserve_slo" "checkout_availability" {');
++    expect(hcl).toContain('"openobserve_slo" "checkout_availability_2" {');
++    // A Terraform label may not start with a digit.
++    expect(hcl).toContain('"openobserve_slo" "slo_99th" {');
++  });
++});
+diff --git a/web/src/utils/slos/sloTerraform.ts b/web/src/utils/slos/sloTerraform.ts
+new file mode 100644
+index 00000000000..052a3a8bb2d
+--- /dev/null
++++ b/web/src/utils/slos/sloTerraform.ts
+@@ -0,0 +1,180 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// sloTerraform.ts — renders an SLO payload as an `openobserve_slo` resource for
++// the OpenObserve Terraform provider
++// (https://registry.terraform.io/providers/openobserve/openobserve/latest).
++//
++// The input is what `GET /api/{org}/slos/{id}` returns. The wire format is an
++// adjacently tagged enum and the provider schema is a set of blocks, so the
++// mapping is a shape change rather than a rename:
++//
++//   sli_type: "count"      + config {source: {mode, query}}  →  count_sli { single_query | dual_query | promql }
++//   sli_type: "time_slice" + config {…}                      →  time_slice_sli { … }
++//   sli_type: "alert"      + config {alert_id}               →  alert_sli { alert_id }
++//
++// The count source's `mode` is `prom_ql` on the wire and the block is `promql`,
++// which is the one name that differs. `sli_type` itself is read-only in the
++// provider — it is derived from whichever block is present — as are the id and
++// the definition generation, so none of them are written.
++
++import type { Node, TerraformExport, TerraformUnsupportedItem } from "@/utils/terraform/hcl";
++import {
++  attr,
++  block,
++  boolWhen,
++  document,
++  list,
++  num,
++  quote,
++  resourceBlock,
++  resourceLabel,
++  str,
++} from "@/utils/terraform/hcl";
++
++export interface SloTerraformOptions {
++  /**
++   * Folder the SLO lives in, emitted only when it is not the default. SLOs share
++   * the alert folder namespace; OpenObserve has no separate SLO folder type,
++   * which is why the provider documents `folder_id` as an alert folder.
++   */
++  folderId?: string;
++}
++
++/** `config.source.query` for a count SLI, keyed by the wire's `mode`. */
++function countSourceBlock(source: unknown): Node[] {
++  if (!source || typeof source !== "object") return [];
++  const { mode, query } = source as { mode?: unknown; query?: unknown };
++  if (!query || typeof query !== "object") return [];
++  const q = query as Record<string, unknown>;
++
++  switch (mode) {
++    case "single_query":
++      return block("single_query", [
++        ...attr("stream", str(q.stream)),
++        ...attr("stream_type", str(q.stream_type)),
++        ...attr("scope", str(q.scope)),
++        ...attr("good_expr", str(q.good_expr)),
++      ]);
++    case "dual_query":
++      return block("dual_query", [
++        ...countQueryBlock("good", q.good),
++        ...countQueryBlock("total", q.total),
++      ]);
++    // The block is `promql`; only the wire tag is spelled with an underscore.
++    case "prom_ql":
++      return block("promql", [...attr("good", str(q.good)), ...attr("total", str(q.total))]);
++    default:
++      return [];
++  }
++}
++
++function countQueryBlock(name: string, source: unknown): Node[] {
++  if (!source || typeof source !== "object") return [];
++  const q = source as Record<string, unknown>;
++  return block(name, [
++    ...attr("stream", str(q.stream)),
++    ...attr("stream_type", str(q.stream_type)),
++    ...attr("sql", str(q.sql)),
++  ]);
++}
++
++function timeSliceBlock(config: Record<string, unknown>, groupBy: unknown): Node[] {
++  // A grouped freshness objective can never fire for the absence it watches, so
++  // the provider rejects the combination; group_by is the meaningful half.
++  const grouped = Array.isArray(groupBy) && groupBy.length > 0;
++  return block("time_slice_sli", [
++    ...attr("stream", str(config.stream)),
++    ...attr("stream_type", str(config.stream_type)),
++    ...attr("query_language", str(config.query_language)),
++    ...attr("query", str(config.query)),
++    ...attr("scope", str(config.scope)),
++    ...attr("comparator", str(config.comparator)),
++    ...attr("threshold", num(config.threshold)),
++    ...attr("absent_is_bad", grouped ? null : boolWhen(config.absent_is_bad, true)),
++  ]);
++}
++
++/** The indicator block, chosen by `sli_type`. */
++function indicatorBlock(slo: Record<string, unknown>): Node[] {
++  const config = (slo.config ?? {}) as Record<string, unknown>;
++  switch (slo.sli_type) {
++    case "count":
++      return block("count_sli", countSourceBlock(config.source));
++    case "time_slice":
++      return timeSliceBlock(config, slo.group_by);
++    case "alert":
++      return block("alert_sli", attr("alert_id", str(config.alert_id)));
++    default:
++      return [];
++  }
++}
++
++function sloResource(
++  slo: Record<string, unknown>,
++  label: string,
++  options: SloTerraformOptions,
++): string {
++  // The SLO's own folder wins; the caller's active folder is only a fallback for
++  // a payload that does not carry one.
++  const folder = String(slo.folder_id ?? options.folderId ?? "");
++  const folderId = folder && folder !== "default" ? folder : null;
++
++  const nodes: Node[] = [
++    ...attr("name", quote(String(slo.name ?? ""))),
++    ...attr("folder_id", folderId === null ? null : quote(folderId)),
++    ...attr("description", str(slo.description)),
++    // Always written, for the same reason the alert exporter does it: a paused
++    // objective and a running one should not read the same.
++    ...attr("enabled", String(slo.enabled !== false)),
++    ...attr("target", num(slo.target)),
++    ...attr("window_secs", num(slo.window_secs)),
++    ...attr("slice_interval_secs", num(slo.slice_interval_secs)),
++    ...attr("group_by", list(slo.group_by)),
++    ...attr("tags", list(slo.tags)),
++    ...attr("owner", str(slo.owner)),
++    ...indicatorBlock(slo),
++  ];
++
++  return resourceBlock("openobserve_slo", label, nodes);
++}
++
++/**
++ * An SLO the provider could not accept: without an indicator block the resource
++ * is invalid, and the window and slice interval are what make a slice mean
++ * anything.
++ */
++function isIncomplete(slo: Record<string, unknown>): boolean {
++  return (
++    !slo.name ||
++    !slo.sli_type ||
++    indicatorBlock(slo).length === 0 ||
++    typeof slo.window_secs !== "number" ||
++    typeof slo.slice_interval_secs !== "number" ||
++    typeof slo.target !== "number"
++  );
++}
++
++/**
++ * Converts SLO payloads into `openobserve_slo` resources. SLOs that cannot be
++ * expressed are reported in `unsupported` rather than rendered as something that
++ * would not apply.
++ */
++export function slosToTerraform(
++  slos: Record<string, unknown>[],
++  options: SloTerraformOptions = {},
++): TerraformExport {
++  const used = new Set<string>();
++  const unsupported: TerraformUnsupportedItem[] = [];
++  const resources: string[] = [];
++
++  for (const slo of slos) {
++    if (!slo || typeof slo !== "object") continue;
++    if (isIncomplete(slo)) {
++      unsupported.push({ name: String(slo.name ?? ""), reason: "incomplete" });
++      continue;
++    }
++    resources.push(sloResource(slo, resourceLabel(slo.name, used, "slo"), options));
++  }
++
++  return { hcl: document(resources), unsupported, droppedFields: [] };
++}
+diff --git a/web/src/utils/terraform/hcl.ts b/web/src/utils/terraform/hcl.ts
+new file mode 100644
+index 00000000000..646e4b0429b
+--- /dev/null
++++ b/web/src/utils/terraform/hcl.ts
+@@ -0,0 +1,222 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// hcl.ts — the HCL writer shared by the per-resource Terraform exporters
++// (alerts, SLOs). It knows how to spell values and lay out blocks; the callers
++// own the mapping from an API payload to attribute names.
++//
++// Output is `terraform fmt`-canonical, including `=` alignment, so what a user
++// copies out of the UI is already what fmt would produce.
++
++import { PROVIDER_SOURCE, PROVIDER_VERSION } from "./provider";
++
++/** Why a payload cannot be expressed as a Terraform resource. */
++export type TerraformUnsupportedReason = "anomaly" | "incomplete";
++
++export interface TerraformUnsupportedItem {
++  name: string;
++  reason: TerraformUnsupportedReason;
++}
++
++export interface TerraformExport {
++  /** The rendered configuration. Empty when nothing could be converted. */
++  hcl: string;
++  /** Items with no provider equivalent; these are absent from `hcl`. */
++  unsupported: TerraformUnsupportedItem[];
++  /** Source fields the provider schema cannot carry, e.g. `having.ignore_case`. */
++  droppedFields: string[];
++}
++
++export const INDENT = "  ";
++
++export type Node =
++  { kind: "attr"; name: string; expr: string } | { kind: "block"; name: string; body: Node[] };
++
++/** An attribute, or nothing at all when the value resolved to null. */
++export function attr(name: string, expr: string | null): Node[] {
++  return expr === null ? [] : [{ kind: "attr", name, expr }];
++}
++
++/** A block, or nothing at all when its body is empty. */
++export function block(name: string, body: Node[]): Node[] {
++  return body.length ? [{ kind: "block", name, body }] : [];
++}
++
++export function quote(value: string): string {
++  // HCL template strings treat ${ and %{ as interpolation openers, so a name or
++  // query containing one has to escape it or Terraform fails to parse the file.
++  // Those two replacements use a function, not a string: `$$` in a string
++  // replacement is itself an escape for a literal `$`, which would silently undo
++  // the doubling.
++  const escaped = value
++    .replace(/\\/g, "\\\\")
++    .replace(/"/g, '\\"')
++    .replace(/\n/g, "\\n")
++    .replace(/\r/g, "\\r")
++    .replace(/\t/g, "\\t")
++    .replace(/\$\{/g, () => "$${")
++    .replace(/%\{/g, () => "%%{");
++  return `"${escaped}"`;
++}
++
++/**
++ * Emits `left = right` pairs with the `=` aligned the way `terraform fmt` does:
++ * only consecutive single-line pairs align with each other, and a pair whose
++ * value spans lines stands alone and breaks the run.
++ */
++export function alignedLines(pairs: { left: string; right: string }[], indent: string): string[] {
++  const lines: string[] = [];
++  let run: { left: string; right: string }[] = [];
++  const flush = () => {
++    if (!run.length) return;
++    const width = Math.max(...run.map((p) => p.left.length));
++    run.forEach((p) => lines.push(`${indent}${p.left.padEnd(width)} = ${p.right}`));
++    run = [];
++  };
++  for (const pair of pairs) {
++    if (pair.right.includes("\n")) {
++      flush();
++      lines.push(`${indent}${pair.left} = ${pair.right}`);
++    } else {
++      run.push(pair);
++    }
++  }
++  flush();
++  return lines;
++}
++
++/** Renders any JSON value as an HCL expression. Object keys are always quoted. */
++export function literal(value: unknown, indent: string): string {
++  if (value === null || value === undefined) return "null";
++  if (typeof value === "boolean" || typeof value === "number") return String(value);
++  if (typeof value === "string") return quote(value);
++  const inner = indent + INDENT;
++  if (Array.isArray(value)) {
++    if (!value.length) return "[]";
++    const items = value.map((v) => `${inner}${literal(v, inner)},`).join("\n");
++    return `[\n${items}\n${indent}]`;
++  }
++  const entries = Object.entries(value as Record<string, unknown>);
++  if (!entries.length) return "{}";
++  const pairs = entries.map(([k, v]) => ({ left: quote(k), right: literal(v, inner) }));
++  return `{\n${alignedLines(pairs, inner).join("\n")}\n${indent}}`;
++}
++
++export function render(nodes: Node[], indent: string): string {
++  const lines: string[] = [];
++  let pairs: { left: string; right: string }[] = [];
++  const flush = () => {
++    if (pairs.length) lines.push(...alignedLines(pairs, indent));
++    pairs = [];
++  };
++  for (const node of nodes) {
++    if (node.kind === "attr") {
++      pairs.push({ left: node.name, right: node.expr });
++      continue;
++    }
++    flush();
++    lines.push(`${indent}${node.name} {\n${render(node.body, indent + INDENT)}\n${indent}}`);
++  }
++  flush();
++  return lines.join("\n");
++}
++
++/** Wraps rendered nodes in `resource "<type>" "<label>" { … }`. */
++export function resourceBlock(type: string, label: string, body: Node[]): string {
++  return `resource ${quote(type)} ${quote(label)} {\n${render(body, INDENT)}\n}`;
++}
++
++// ── Value coercion ──────────────────────────────────────────────────────────
++
++/** A non-empty string, quoted; null for anything else (so `attr` drops it). */
++export function str(value: unknown): string | null {
++  if (typeof value !== "string" || value === "") return null;
++  return quote(value);
++}
++
++export function num(value: unknown): string | null {
++  if (typeof value === "number" && Number.isFinite(value)) return String(value);
++  return null;
++}
++
++/** Emits a number only when it differs from the provider's own default. */
++export function numUnless(value: unknown, defaultValue: number): string | null {
++  const rendered = num(value);
++  return rendered === null || value === defaultValue ? null : rendered;
++}
++
++/** Emits the boolean only in its non-default direction. */
++export function boolWhen(value: unknown, emitWhen: boolean): string | null {
++  return value === emitWhen ? String(emitWhen) : null;
++}
++
++export function bool(value: unknown): string | null {
++  return typeof value === "boolean" ? String(value) : null;
++}
++
++/** A single-line list of strings; null when there is nothing to list. */
++export function list(value: unknown): string | null {
++  if (!Array.isArray(value)) return null;
++  const items = value.filter((v): v is string => typeof v === "string" && v !== "");
++  if (!items.length) return null;
++  return `[${items.map(quote).join(", ")}]`;
++}
++
++/** A map of string→string, rendered multi-line. */
++export function map(value: unknown, indent: string): string | null {
++  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
++  const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => v != null);
++  if (!entries.length) return null;
++  const inner = indent + INDENT;
++  const pairs = entries.map(([k, v]) => ({ left: quote(k), right: quote(String(v)) }));
++  return `{\n${alignedLines(pairs, inner).join("\n")}\n${indent}}`;
++}
++
++export function isFilled(value: unknown): boolean {
++  if (value === null || value === undefined) return false;
++  if (Array.isArray(value)) return value.length > 0;
++  if (typeof value === "object") return Object.keys(value as object).length > 0;
++  return true;
++}
++
++// ── Resource labels ─────────────────────────────────────────────────────────
++
++/** Turns a resource name into a Terraform label, unique within the file. */
++export function resourceLabel(name: unknown, used: Set<string>, fallback = "resource"): string {
++  let base = String(name ?? "")
++    .toLowerCase()
++    .replace(/[^a-z0-9_]+/g, "_")
++    .replace(/^_+|_+$/g, "");
++  if (!base || /^[0-9]/.test(base)) base = `${fallback}_${base}`;
++  let label = base;
++  for (let n = 2; used.has(label); n += 1) label = `${base}_${n}`;
++  used.add(label);
++  return label;
++}
++
++/**
++ * The header every export carries: what produced the file, and the provider it
++ * needs. The `terraform` block is commented out because a config that already
++ * declares one cannot take a second `required_providers`.
++ */
++export function providerHeader(): string {
++  return [
++    "# Generated by OpenObserve. Attributes left at their provider default are omitted,",
++    "# apart from `enabled`, which is always written so the state is never implied.",
++    "#",
++    "# Provider setup — skip if your configuration already declares it:",
++    "#",
++    "#   terraform {",
++    "#     required_providers {",
++    "#       openobserve = {",
++    `#         source  = "${PROVIDER_SOURCE}"`,
++    `#         version = "${PROVIDER_VERSION}"`,
++    "#       }",
++    "#     }",
++    "#   }",
++  ].join("\n");
++}
++
++/** Assembles the finished document, or "" when no resource was rendered. */
++export function document(resources: string[]): string {
++  return resources.length ? `${providerHeader()}\n\n${resources.join("\n\n")}\n` : "";
++}
+diff --git a/web/src/utils/terraform/provider.ts b/web/src/utils/terraform/provider.ts
+new file mode 100644
+index 00000000000..c74ab08db2a
+--- /dev/null
++++ b/web/src/utils/terraform/provider.ts
+@@ -0,0 +1,27 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// provider.ts — where the OpenObserve Terraform provider is published, and at
++// which version. Everything that names the provider reads it from here: the
++// header an export writes into a `.tf` file, and the registry links in the UI.
++// One namespace change moves all of them together.
++
++const PROVIDER_NAMESPACE = "openobserve";
++const PROVIDER_NAME = "openobserve";
++
++/** The `source` an exported configuration pins. */
++export const PROVIDER_SOURCE = `${PROVIDER_NAMESPACE}/${PROVIDER_NAME}`;
++
++/**
++ * The `version` constraint an exported configuration pins.
++ *
++ * Checked against what is actually published: the registry lists 1.0.0, 0.0.4
++ * and 0.0.3, so `~> 1.0` resolves to 1.0.0 and `terraform init` succeeds. Raise
++ * it only once a matching release is out, or every exported file will pin a
++ * version nobody can fetch.
++ * https://registry.terraform.io/v1/providers/openobserve/openobserve/versions
++ */
++export const PROVIDER_VERSION = "~> 1.0";
++
++/** Both registries serve the same provider, so both links are derived from it. */
++export const TERRAFORM_REGISTRY_URL = `https://registry.terraform.io/providers/${PROVIDER_SOURCE}/latest`;
++export const OPENTOFU_REGISTRY_URL = `https://search.opentofu.org/provider/${PROVIDER_SOURCE}/latest`;
+diff --git a/web/src/views/slos/SloList.vue b/web/src/views/slos/SloList.vue
+index 0f1f48b0ee0..037b91e7614 100644
+--- a/web/src/views/slos/SloList.vue
++++ b/web/src/views/slos/SloList.vue
+@@ -33,6 +33,9 @@
+     bleed
+   >
+     <template #actions>
++      <!-- The provider behind the Terraform export, which is otherwise only
++           discoverable once the export dialog is already open. -->
++      <IacRegistryLinks data-test="slos-slolist-iac-registries" />
+       <OButton
+         variant="primary"
+         size="sm-action"
+@@ -81,6 +84,17 @@
+           >
+             {{ t("slos.moveSelected", { count: selectedIds.length }) }}
+           </OButton>
++          <OButton
++            v-if="selectedIds.length"
++            variant="outline"
++            size="sm-action"
++            icon-left="download"
++            :loading="exporting"
++            data-test="slos-slolist-export-selected"
++            @click="openExport(selectedRows)"
++          >
++            {{ t("common.export") }}
++          </OButton>
+           <OToggleGroup v-model="typeFilter" data-test="slos-slolist-type-filter">
+             <OToggleGroupItem
+               v-for="opt in typeOptions"
+@@ -259,6 +273,14 @@
+             :data-test="`slos-slolist-toggle-${row.name}`"
+             @click="toggleEnabled(row)"
+           />
++          <OButton
++            variant="ghost"
++            size="icon-sm"
++            icon-left="download"
++            :title="t('common.export')"
++            :data-test="`slos-slolist-export-${row.name}`"
++            @click="openExport([row])"
++          />
+           <OButton
+             variant="ghost"
+             size="icon-sm"
+@@ -366,6 +388,17 @@
+         </OButton>
+       </template>
+     </ODialog>
++
++    <ExportResourceDialog
++      v-model:open="exportDialog"
++      :items="slosToExport"
++      :terraform="slosTerraform"
++      :title="t('slos.exportTitle', { count: slosToExport.length }, slosToExport.length)"
++      :sub-title="t('slos.exportSubtitle')"
++      file-prefix="slos"
++      data-test="slos-slolist-export-dialog"
++      @download="onExported"
++    />
+   </OPageLayout>
+ </template>
+ 
+@@ -375,7 +408,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
+ import { useRoute, useRouter } from "vue-router";
+ import { useStore } from "vuex";
+ 
++import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
+ import FolderList from "@/components/common/sidebar/FolderList.vue";
++import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
+ import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
+ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+@@ -399,6 +434,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
+ import sloService from "@/services/slos";
+ import alertsService from "@/services/alerts";
+ import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
++import { slosToTerraform } from "@/utils/slos/sloTerraform";
+ import {
+   ABSENT,
+   compareByUrgency,
+@@ -439,6 +475,71 @@ const org = computed(() => store.state.selectedOrganization?.identifier);
+ 
+ const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.includes(r.id)));
+ 
++// ── Export ──────────────────────────────────────────────────────────────────
++// The list rows carry measurement status rather than the full definition, so an
++// export re-reads each SLO and shows it as JSON or as an openobserve_slo
++// Terraform resource.
++const exportDialog = ref(false);
++const exporting = ref(false);
++const slosToExport = ref<Record<string, unknown>[]>([]);
++const slosTerraform = computed(() =>
++  slosToTerraform(slosToExport.value, { folderId: activeFolderId.value }),
++);
++
++async function fetchSloForExport(id: string): Promise<Record<string, unknown> | null> {
++  const res = await sloService.get(org.value, id);
++  const body = (res.data ?? {}) as Record<string, unknown>;
++  if (!body.name) return null;
++  // The endpoint flattens the definition alongside `status`, its live
++  // measurement, and carries counters the server assigns. None of that describes
++  // the SLO, and the id belongs to the one this was read from rather than the one
++  // a configuration creates, so an export keeps only the definition.
++  const {
++    id: _id,
++    status: _status,
++    definition_generation: _generation,
++    groups_estimate: _estimate,
++    groups_reserved: _reserved,
++    ...definition
++  } = body;
++  return definition;
++}
++
++async function openExport(items: SloListItem[]) {
++  if (exporting.value || !items.length) return;
++  exporting.value = true;
++  try {
++    const fetched = await Promise.all(items.map((item) => fetchSloForExport(item.id)));
++    const usable = fetched.filter((slo): slo is Record<string, unknown> => slo !== null);
++    if (!usable.length) throw new Error("empty export payload");
++    slosToExport.value = usable;
++    exportDialog.value = true;
++
++    // A definition that came back empty is a gap in the export. Dropping it
++    // quietly would leave the success toast reporting the smaller count as
++    // though everything had been exported.
++    const missing = items.filter((_, i) => fetched[i] === null).map((item) => item.name);
++    if (missing.length) {
++      toast({
++        variant: "warning",
++        message: t("slos.exportPartial", { names: missing.join(", ") }),
++      });
++    }
++  } catch (e: any) {
++    toast({
++      variant: "error",
++      message: raw(e?.response?.data?.message) || t("slos.exportFailed"),
++    });
++  } finally {
++    exporting.value = false;
++  }
++}
++
++function onExported({ count }: { format: string; count: number }) {
++  toast({ variant: "success", message: t("slos.exportSucceeded", { count }, count) });
++  selectedIds.value = [];
++}
++
+ /** Folder ids are opaque; the rail and this column show the human name. */
+ function folderName(folderId: string): string {
+   const folders = store.state.organizationData?.foldersByType?.alerts ?? [];
+diff --git a/web/src/views/slos/SloListExport.spec.ts b/web/src/views/slos/SloListExport.spec.ts
+new file mode 100644
+index 00000000000..737cd999c62
+--- /dev/null
++++ b/web/src/views/slos/SloListExport.spec.ts
+@@ -0,0 +1,171 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++//! Exporting an SLO as JSON or Terraform.
++//!
++//! `GET /slos/{id}` answers with the definition FLATTENED alongside `status`,
++//! its live measurement, plus counters the server assigns. An export is a
++//! definition: a burn rate or an error budget reading is the SLO's current
++//! behaviour, not part of what it is, and pasting one back in describes nothing.
++//! So the payload handed to the dialog has to be stripped, which is what these
++//! tests hold in place.
++
++import { describe, expect, it, beforeEach, vi } from "vitest";
++import { mount, flushPromises } from "@vue/test-utils";
++
++vi.mock("@/services/slos", () => ({
++  default: {
++    list: vi.fn(),
++    get: vi.fn(),
++    delete: vi.fn(),
++    move: vi.fn(),
++    setEnabled: vi.fn(),
++  },
++}));
++
++vi.mock("@/services/alerts", () => ({
++  default: { list_by_slo: vi.fn() },
++}));
++
++import SloList from "@/views/slos/SloList.vue";
++import i18n from "@/locales";
++import store from "@/test/unit/helpers/store";
++import router from "@/test/unit/helpers/router";
++import sloService from "@/services/slos";
++
++const node = document.createElement("div");
++node.setAttribute("id", "app");
++document.body.appendChild(node);
++
++const listRow = {
++  id: "slo-123",
++  name: "checkout-availability",
++  enabled: true,
++  target: 99.9,
++  window_secs: 30 * 86400,
++  slice_interval_secs: 300,
++  tags: [],
++  folder_id: "default",
++  status: { sli: 99.95, error_budget_remaining: 0.6, burn_rate: 0.4, coverage: 1, no_data: false },
++};
++
++/** What the detail endpoint really returns: definition, measurement, counters. */
++const detailPayload = {
++  id: "slo-123",
++  name: "checkout-availability",
++  description: "Successful checkout requests",
++  sli_type: "count",
++  config: {
++    source: {
++      mode: "single_query",
++      query: { stream: "app_logs", stream_type: "logs", good_expr: "status < 500" },
++    },
++  },
++  window_secs: 30 * 86400,
++  slice_interval_secs: 300,
++  target: 99.9,
++  enabled: true,
++  folder_id: "default",
++  definition_generation: 4,
++  groups_estimate: 12,
++  groups_reserved: 20,
++  status: { sli: 99.95, error_budget_remaining: 0.6, burn_rate: 0.4, coverage: 1, no_data: false },
++};
++
++async function mountList() {
++  vi.mocked(sloService.list).mockResolvedValue({ data: { list: [listRow] } } as any);
++
++  const wrapper = mount(SloList, {
++    attachTo: node,
++    global: {
++      plugins: [i18n, store, router],
++      stubs: {
++        FolderList: { template: '<div data-test="stub-folder-list"></div>' },
++        SelectFolderDropDown: true,
++        ODialog: true,
++        ExportResourceDialog: true,
++        IacRegistryLinks: true,
++      },
++    },
++  });
++  await flushPromises();
++  await new Promise((r) => setTimeout(r, 75));
++  await flushPromises();
++  return wrapper;
++}
++
++const exportRow = async (wrapper: any) => {
++  await wrapper.find('[data-test="slos-slolist-export-checkout-availability"]').trigger("click");
++  await flushPromises();
++};
++
++describe("SloList export", () => {
++  beforeEach(() => {
++    vi.mocked(sloService.list).mockReset();
++    vi.mocked(sloService.get).mockReset();
++  });
++
++  it("hands the dialog the definition, with the live measurement stripped", async () => {
++    vi.mocked(sloService.get).mockResolvedValue({ data: detailPayload } as any);
++    const wrapper: any = await mountList();
++
++    await exportRow(wrapper);
++
++    expect(wrapper.vm.exportDialog).toBe(true);
++    const [exported] = wrapper.vm.slosToExport;
++
++    // The definition survives.
++    expect(exported.name).toBe("checkout-availability");
++    expect(exported.sli_type).toBe("count");
++    expect(exported.target).toBe(99.9);
++    expect(exported.config).toBeTruthy();
++
++    // The measurement and everything the server assigns does not.
++    for (const key of [
++      "status",
++      "id",
++      "definition_generation",
++      "groups_estimate",
++      "groups_reserved",
++    ]) {
++      expect(exported, `${key} leaked into the export`).not.toHaveProperty(key);
++    }
++  });
++
++  it("converts the stripped payload into an openobserve_slo resource", async () => {
++    vi.mocked(sloService.get).mockResolvedValue({ data: detailPayload } as any);
++    const wrapper: any = await mountList();
++
++    await exportRow(wrapper);
++
++    const { hcl, unsupported } = wrapper.vm.slosTerraform;
++    expect(unsupported).toEqual([]);
++    expect(hcl).toContain('resource "openobserve_slo" "checkout_availability"');
++    expect(hcl).toContain("count_sli {");
++    // A reading has no place in a configuration file.
++    expect(hcl).not.toContain("burn_rate");
++    expect(hcl).not.toContain("definition_generation");
++  });
++
++  it("does not open the dialog when the definition cannot be read", async () => {
++    vi.mocked(sloService.get).mockResolvedValue({ data: {} } as any);
++    const wrapper: any = await mountList();
++
++    await exportRow(wrapper);
++
++    expect(wrapper.vm.exportDialog).toBe(false);
++    expect(wrapper.vm.slosToExport).toEqual([]);
++  });
++});

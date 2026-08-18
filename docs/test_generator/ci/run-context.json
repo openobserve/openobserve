@@ -1,0 +1,22 @@
+{
+  "feature_slug": "resource-terraform-export",
+  "feature_title": "Export Alerts & SLOs as Terraform (Export Resource Dialog)",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-terraform-export.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-terraform-export.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/common/ExportResourceDialog.vue",
+    "web/src/components/common/IacRegistryLinks.vue",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/views/slos/SloList.vue",
+    "web/src/utils/alerts/alertTerraform.ts",
+    "web/src/utils/slos/sloTerraform.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
