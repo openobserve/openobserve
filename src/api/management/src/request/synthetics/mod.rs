@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod last_check;
+
 use axum::{
     Json,
     extract::{Path, Query},
@@ -319,186 +321,13 @@ pub async fn list_synthetics(
     let params: config::meta::synthetics::ListSyntheticsParams = query.into();
     match openobserve_synthetics::service::list_synthetics(&org_id, &params).await {
         Ok(mut resp) => {
-            // The three run-state columns are region-local; the results stream
-            // is federated. See `enrich_last_check_from_results`.
-            enrich_last_check_from_results(&org_id, &mut resp.checks).await;
+            last_check::enrich(&org_id, &mut resp.checks).await;
             MetaHttpResponse::json(resp)
         }
         Err(e) => {
             tracing::error!("[synthetics] list_synthetics: {e}");
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
-        }
-    }
-}
-
-/// How far back the last-check lookup scans the results stream.
-///
-/// Bounds the scan: without it the query walks every partition the stream has
-/// ever written, and this runs on every list load. A check that has not run
-/// inside the window keeps whatever the DB column held (see below), so the
-/// window trades completeness for a bounded cost — 24 h covers every frequency
-/// the UI offers by a wide margin (the longest is 24 h, and `>=` two runs land
-/// inside a 24 h window for anything faster).
-const LAST_CHECK_LOOKBACK_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
-
-/// Fills `status`, `last_check_at` and `last_response_ms` from the federated
-/// `synthetics_results` stream, overwriting the region-local DB columns.
-///
-/// ## Why this exists
-///
-/// `synthetics.last_check_status` replicates across a super cluster only when
-/// it *changes* (`SetLastCheckStatus`), and `last_triggered_at` — the source of
-/// `last_check_at` — does not replicate at all: it is a runtime column excluded
-/// from `update_mutable_fields`, because it moves on every run and syncing it
-/// would put per-run traffic on the super-cluster queue. `last_response_ms` was
-/// never populated from anywhere. So outside the one region whose scheduler
-/// executes a check, the list showed a stale-or-absent status, a blank Last
-/// check, and a blank response time.
-///
-/// The results stream has all three, is written once per execution, and IS
-/// federated by default — so the data is already correct in every region. This
-/// reads it instead of replicating the columns: no new queue traffic, no schema
-/// change. (Tracker option (b); the alerts equivalent, `alert_states`, instead
-/// pays one cross-region message per evaluation.)
-///
-/// ## Failure behaviour
-///
-/// Best-effort and non-fatal by construction. On a search error, an empty
-/// result, or a check with no run inside [`LAST_CHECK_LOOKBACK_MICROS`], the
-/// item keeps the values `list_synthetics` already put there from the DB. That
-/// degrades to exactly the previous behaviour rather than to an error or a
-/// blank column, which matters because this couples a config-plane list API to
-/// the search path: search being down must not take the list down with it.
-async fn enrich_last_check_from_results(
-    org_id: &str,
-    items: &mut [config::meta::synthetics::SyntheticListItem],
-) {
-    if items.is_empty() {
-        return;
-    }
-
-    // Scoped to this page's ids, not the whole org: the list is paginated, and
-    // an org-wide aggregate would scan (and group) rows for checks the caller
-    // is not going to render.
-    let id_list = items
-        .iter()
-        .map(|i| format!("'{}'", i.id.replace('\'', "''")))
-        .collect::<Vec<_>>()
-        .join(",");
-
-    let end_time = chrono::Utc::now().timestamp_micros();
-    let start_time = end_time - LAST_CHECK_LOOKBACK_MICROS;
-
-    // One row per check — the latest — in a single pass. `row_number()` is what
-    // keeps this one query instead of N point lookups or a self-join, and it is
-    // why the projection can carry status/response alongside the timestamp: a
-    // plain `max(_timestamp) GROUP BY` gives the time but not the row it came
-    // from.
-    //
-    // ⚠️ The projection names four scalar columns deliberately. The stream also
-    // carries `evidence_by_step`, `recorded_steps`, `last_attempt_steps` and
-    // `retry_history`, which are JSON blobs measured at ~20 MB across a 5 000-row
-    // aggregation. Do not widen this to `SELECT *`.
-    let sql = format!(
-        "SELECT synthetics_id, status, response_time_ms, _timestamp FROM (\
-           SELECT synthetics_id, status, response_time_ms, _timestamp, \
-                  row_number() OVER (PARTITION BY synthetics_id ORDER BY _timestamp DESC) AS rn \
-           FROM synthetics_results WHERE synthetics_id IN ({id_list})\
-         ) WHERE rn = 1"
-    );
-
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            // One row per check by construction, so the page size is the cap.
-            size: items.len() as i64,
-            start_time,
-            end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            action_id: None,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        // Empty = every region. This is the whole point: the local region may
-        // not be the one that ran the check.
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        // Off deliberately. The whole point of this query is "what happened most
-        // recently", so a cache hit that predates the last run defeats it — the
-        // column would go stale in exactly the way this function exists to fix.
-        // The query is already narrow (four scalar columns, ids scoped to the
-        // page, bounded window); if list-load cost ever shows up in profiling,
-        // measure before trading freshness back.
-        use_cache: false,
-        clear_cache: false,
-        local_mode: None,
-        agent_options: None,
-    };
-
-    let trace_id = config::ider::uuid();
-    let resp = search_service::cache::search(
-        &trace_id,
-        org_id,
-        config::meta::stream::StreamType::Logs,
-        None,
-        &req,
-        String::new(),
-        false,
-        None,
-        false,
-    )
-    .await;
-
-    let hits = match resp {
-        Ok(v) => v.hits,
-        Err(e) => {
-            // Warn, not error: the list itself succeeded and is being returned.
-            tracing::warn!(
-                "[synthetics] last-check enrichment failed, falling back to region-local columns: {e}"
-            );
-            return;
-        }
-    };
-
-    let mut by_id: std::collections::HashMap<String, &serde_json::Value> =
-        std::collections::HashMap::with_capacity(hits.len());
-    for h in &hits {
-        if let Some(id) = h.get("synthetics_id").and_then(|v| v.as_str()) {
-            by_id.insert(id.to_string(), h);
-        }
-    }
-
-    for item in items.iter_mut() {
-        let Some(hit) = by_id.get(&item.id) else {
-            continue; // no run in the window — keep the DB values
-        };
-        if let Some(status) = hit
-            .get("status")
-            .and_then(|v| v.as_str())
-            .and_then(|s| serde_json::from_value(serde_json::Value::String(s.to_string())).ok())
-        {
-            item.status = status;
-        }
-        if let Some(ts) = hit.get("_timestamp").and_then(|v| v.as_i64()) {
-            item.last_check_at = Some(ts);
-        }
-        if let Some(ms) = hit.get("response_time_ms").and_then(|v| v.as_f64()) {
-            item.last_response_ms = Some(ms);
         }
     }
 }
