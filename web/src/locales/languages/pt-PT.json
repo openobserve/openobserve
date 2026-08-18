@@ -2578,6 +2578,23 @@
     "triggerRequired": "Um Acionador é Obrigatório",
     "addStepRequired": "Adicione pelo Menos Uma Etapa Após o Acionador",
     "connectAllNodes": "Conecte Todos os Nós Antes de Salvar",
+    "finishStepsBeforePublish": "Conclua a configuração de todas as etapas antes de publicar",
+    "draft": "Rascunho",
+    "saveDraft": "Salvar como rascunho",
+    "publish": "Publicar",
+    "draftSaveSuccess": "Rascunho salvo com sucesso",
+    "publishSuccess": "Fluxo de trabalho publicado com sucesso",
+    "publishError": "Erro ao publicar o fluxo de trabalho",
+    "comingSoon": "Isso virá em uma etapa posterior",
+    "triggerType": {
+      "pick": "Escolha um gatilho",
+      "dialogTitle": "Criar um novo fluxo de trabalho",
+      "dialogIntro": "Escolha como este fluxo de trabalho é acionado. Mais tipos de gatilho estão por vir.",
+      "cta": "Criar fluxo de trabalho",
+      "soonCta": "Disponível em uma versão futura",
+      "comingSoon": "Em breve",
+      "soon": "Em breve"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alerta disparado",
@@ -2675,7 +2692,6 @@
       "linkError": "Não foi possível vincular os alertas."
     },
     "chooseTrigger": "Escolher um Gatilho",
-    "edgeDeleteHint": "Pressione Backspace / Delete para remover a conexão",
     "node": {
       "kindTrigger": "Gatilho",
       "kindLogic": "Lógica",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "Para verificar um valor nulo, use null. Exemplo:",
       "conditionNoteCustom": "Para adicionar uma coluna personalizada, digite seu nome e pressione Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Reformate o payload com uma função",
+      "functionBodySet": "Aplica {name}",
+      "functionSelect": "Selecionar função",
+      "functionCreateNew": "Criar nova função",
+      "functionRequired": "A função é obrigatória",
+      "functionLoadError": "Não foi possível carregar funções",
+      "destinationBody": "Enviar para um destino",
+      "destinationBodySet": "Envia para {name}",
+      "destinationSelect": "Destino",
+      "destinationCreateNew": "Criar novo destino",
+      "destinationRequired": "Selecione um destino",
+      "destinationLoadError": "Não foi possível carregar destinos",
+      "namePlaceholder": "Nomeie esta etapa (opcional)",
+      "commentLabel": "Comentário (opcional)",
+      "commentPlaceholder": "Adicione uma nota sobre esta etapa...",
+      "commentAdd": "Adicionar comentário",
+      "disable": "Desativar etapa",
+      "enable": "Ativar etapa",
+      "disabledBadge": "Desativado",
+      "incompleteBadge": "Configurar depois",
+      "destinationSetUpLater": "Configurar depois",
+      "destinationSetUpLaterPrompt": "Ainda não tem um destino? Ative esta opção para configurá-lo depois — você pode salvar um rascunho e testar agora.",
+      "destinationSetUpLaterActive": "O destino é ignorado por enquanto — o nome e o comentário ainda são salvos. Você precisará de um destino antes de publicar.",
+      "functionSetUpLater": "Configurar depois",
+      "functionSetUpLaterPrompt": "Ainda não tem uma função? Ative esta opção para configurá-la depois — você pode salvar um rascunho e testar agora.",
+      "functionSetUpLaterActive": "A função é ignorada por enquanto — o nome e o comentário ainda são salvos. Você precisará de uma função antes de publicar."
     },
-    "commonFieldsAbove": "campos comuns acima"
+    "commonFieldsAbove": "campos comuns acima",
+    "canvas": {
+      "undo": "Desfazer",
+      "tidyUp": "Organizar",
+      "insertStep": "Inserir etapa",
+      "deleteEdge": "Excluir conexão"
+    },
+    "unsaved": {
+      "title": "Alterações não salvas",
+      "message": "Você tem alterações não salvas. Sair agora as descartará.",
+      "discard": "Descartar alterações",
+      "stay": "Continuar editando"
+    },
+    "results": {
+      "title": "Resultados da etapa",
+      "collapse": "Recolher",
+      "expand": "Expandir",
+      "close": "Limpar e Fechar Resultados",
+      "nodesTitle": "Etapas",
+      "empty": "Execute um teste para ver os resultados das etapas aqui."
+    }
   },
   "pipeline": {
     "validation": {

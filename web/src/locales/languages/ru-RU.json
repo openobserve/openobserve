@@ -2578,6 +2578,23 @@
     "triggerRequired": "Требуется триггер",
     "addStepRequired": "Добавьте хотя бы один шаг после триггера",
     "connectAllNodes": "Соедините все узлы перед сохранением",
+    "finishStepsBeforePublish": "Завершите настройку всех шагов перед публикацией",
+    "draft": "Черновик",
+    "saveDraft": "Сохранить как черновик",
+    "publish": "Опубликовать",
+    "draftSaveSuccess": "Черновик успешно сохранён",
+    "publishSuccess": "Рабочий процесс успешно опубликован",
+    "publishError": "Ошибка при публикации рабочего процесса",
+    "comingSoon": "Это появится на более позднем шаге",
+    "triggerType": {
+      "pick": "Выберите триггер",
+      "dialogTitle": "Создать новый рабочий процесс",
+      "dialogIntro": "Выберите, как запускается этот рабочий процесс. Скоро появятся дополнительные типы триггеров.",
+      "cta": "Создать рабочий процесс",
+      "soonCta": "Доступно в будущем релизе",
+      "comingSoon": "Скоро",
+      "soon": "Скоро"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Оповещение сработало",
@@ -2675,7 +2692,6 @@
       "linkError": "Не удалось привязать оповещения."
     },
     "chooseTrigger": "Выберите триггер",
-    "edgeDeleteHint": "Нажмите Backspace / Delete, чтобы удалить соединение",
     "node": {
       "kindTrigger": "Триггер",
       "kindLogic": "Логика",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "Чтобы проверить значение null, используйте null. Пример:",
       "conditionNoteCustom": "Чтобы добавить пользовательский столбец, введите его имя и нажмите Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Изменяйте полезную нагрузку с помощью функции",
+      "functionBodySet": "Применяет {name}",
+      "functionSelect": "Выберите функцию",
+      "functionCreateNew": "Создать новую функцию",
+      "functionRequired": "Функция обязательна",
+      "functionLoadError": "Не удалось загрузить функции",
+      "destinationBody": "Отправить в пункт назначения",
+      "destinationBodySet": "Отправляет в {name}",
+      "destinationSelect": "Пункт назначения",
+      "destinationCreateNew": "Создать новый пункт назначения",
+      "destinationRequired": "Пожалуйста, выберите пункт назначения",
+      "destinationLoadError": "Не удалось загрузить пункты назначения",
+      "namePlaceholder": "Назовите этот шаг (необязательно)",
+      "commentLabel": "Комментарий (необязательно)",
+      "commentPlaceholder": "Добавьте заметку об этом шаге...",
+      "commentAdd": "Добавить комментарий",
+      "disable": "Отключить шаг",
+      "enable": "Включить шаг",
+      "disabledBadge": "Отключено",
+      "incompleteBadge": "Настроить позже",
+      "destinationSetUpLater": "Настроить позже",
+      "destinationSetUpLaterPrompt": "Ещё нет пункта назначения? Включите это, чтобы настроить его позже — вы можете сохранить черновик и протестировать сейчас.",
+      "destinationSetUpLaterActive": "Пункт назначения пока пропускается — имя и комментарий всё равно сохраняются. Вам понадобится пункт назначения перед публикацией.",
+      "functionSetUpLater": "Настроить позже",
+      "functionSetUpLaterPrompt": "Ещё нет функции? Включите это, чтобы настроить её позже — вы можете сохранить черновик и протестировать сейчас.",
+      "functionSetUpLaterActive": "Функция пока пропускается — имя и комментарий всё равно сохраняются. Вам понадобится функция перед публикацией."
     },
-    "commonFieldsAbove": "общие поля выше"
+    "commonFieldsAbove": "общие поля выше",
+    "canvas": {
+      "undo": "Отменить",
+      "tidyUp": "Упорядочить",
+      "insertStep": "Вставить шаг",
+      "deleteEdge": "Удалить соединение"
+    },
+    "unsaved": {
+      "title": "Несохранённые изменения",
+      "message": "У вас есть несохранённые изменения. Если вы уйдёте сейчас, они будут отброшены.",
+      "discard": "Отбросить изменения",
+      "stay": "Продолжить редактирование"
+    },
+    "results": {
+      "title": "Результаты шага",
+      "collapse": "Свернуть",
+      "expand": "Развернуть",
+      "close": "Очистить и закрыть результаты",
+      "nodesTitle": "Шаги",
+      "empty": "Запустите тест, чтобы увидеть здесь результаты шагов."
+    }
   },
   "pipeline": {
     "validation": {

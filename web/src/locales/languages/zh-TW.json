@@ -2578,6 +2578,23 @@
     "triggerRequired": "需要觸發器",
     "addStepRequired": "在觸發器之後至少新增一個步驟",
     "connectAllNodes": "儲存前連接所有節點",
+    "finishStepsBeforePublish": "完成所有步驟的設定後再發布",
+    "draft": "草稿",
+    "saveDraft": "儲存為草稿",
+    "publish": "發布",
+    "draftSaveSuccess": "草稿已成功儲存",
+    "publishSuccess": "工作流程已成功發布",
+    "publishError": "發布工作流程時發生錯誤",
+    "comingSoon": "這將在後續步驟中提供",
+    "triggerType": {
+      "pick": "選擇觸發器",
+      "dialogTitle": "建立新的工作流程",
+      "dialogIntro": "選擇此工作流程的觸發方式。更多觸發器類型即將推出。",
+      "cta": "建立工作流程",
+      "soonCta": "將於未來版本提供",
+      "comingSoon": "即將推出",
+      "soon": "即將"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "警示已觸發",
@@ -2675,7 +2692,6 @@
       "linkError": "無法連結警示。"
     },
     "chooseTrigger": "選擇觸發器",
-    "edgeDeleteHint": "按 Backspace / Delete 以移除連線",
     "node": {
       "kindTrigger": "觸發器",
       "kindLogic": "邏輯",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "若要檢查 null 值，請使用 null。範例：",
       "conditionNoteCustom": "若要新增自訂欄位，請輸入其名稱並按 Enter。",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "使用函數重塑 Payload",
+      "functionBodySet": "套用 {name}",
+      "functionSelect": "選擇函數",
+      "functionCreateNew": "建立新函數",
+      "functionRequired": "必須提供函數",
+      "functionLoadError": "無法載入函數",
+      "destinationBody": "傳送至目的地",
+      "destinationBodySet": "傳送至 {name}",
+      "destinationSelect": "目的地",
+      "destinationCreateNew": "建立新目的地",
+      "destinationRequired": "請選擇目的地",
+      "destinationLoadError": "無法載入目的地",
+      "namePlaceholder": "命名此步驟（選填）",
+      "commentLabel": "備註（選填）",
+      "commentPlaceholder": "新增此步驟的備註...",
+      "commentAdd": "新增備註",
+      "disable": "停用步驟",
+      "enable": "啟用步驟",
+      "disabledBadge": "已停用",
+      "incompleteBadge": "稍後設定",
+      "destinationSetUpLater": "稍後設定",
+      "destinationSetUpLaterPrompt": "還沒有目的地？開啟此選項以稍後設定 — 您現在可以儲存草稿並進行測試。",
+      "destinationSetUpLaterActive": "目的地目前會略過 — 名稱和備註仍會儲存。發布前您需要設定目的地。",
+      "functionSetUpLater": "稍後設定",
+      "functionSetUpLaterPrompt": "還沒有函數？開啟此選項以稍後設定 — 您現在可以儲存草稿並進行測試。",
+      "functionSetUpLaterActive": "函數目前會略過 — 名稱和備註仍會儲存。發布前您需要設定函數。"
     },
-    "commonFieldsAbove": "上方的通用欄位"
+    "commonFieldsAbove": "上方的通用欄位",
+    "canvas": {
+      "undo": "復原",
+      "tidyUp": "整理",
+      "insertStep": "插入步驟",
+      "deleteEdge": "刪除連線"
+    },
+    "unsaved": {
+      "title": "未儲存的變更",
+      "message": "您有未儲存的變更。現在離開將捨棄這些變更。",
+      "discard": "捨棄變更",
+      "stay": "繼續編輯"
+    },
+    "results": {
+      "title": "步驟結果",
+      "collapse": "折叠",
+      "expand": "展开",
+      "close": "清除并关闭结果",
+      "nodesTitle": "步骤",
+      "empty": "运行测试以在此处查看步骤结果。"
+    }
   },
   "pipeline": {
     "validation": {
@@ -4277,7 +4339,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
