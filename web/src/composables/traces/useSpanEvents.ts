@@ -71,34 +71,41 @@ export type SpanEventSeverity = "error" | "warning" | "info";
  * flame graph read as one vocabulary. Colour is never the only channel carrying
  * severity — see the row event-count badge in TraceTree.
  *
- * Info is achromatic on purpose. The waterfall bar is filled with an arbitrary
- * per-service colour, so a hue-based info tick can land invisibly on a same-hue
- * bar; a 50%-alpha modifier holds contrast against any fill. Error and warning
- * keep their hues, where the colour is semantic.
+ * The three tokens alias the app-wide `--color-status-*` family, which is what
+ * the rest of the app and this module already use: TraceTree renders the span
+ * error icon and the event-count error tally with `status-error-text`. Their
+ * light/dark values live in the status tokens, so nothing here is theme-keyed.
+ *
+ * COLOUR CARRIES IDENTITY, NOT CONTRAST. This is the load-bearing idea, and it
+ * replaces an earlier design that asked the fill to do both. No colour clears the
+ * 3:1 non-text threshold against an arbitrary service colour: the span-bar
+ * palette spans the entire hue circle across luminance 0.134-0.849, so the only
+ * values that clear all of it are near-black, and by that darkness they have no
+ * chroma left. Every status token in the codebase was measured as a bar fill and
+ * every one fails on essentially every bar. The fix is not a better colour.
+ *
+ * Visibility comes from geometry instead. The tick is taller than the bar it
+ * marks, so part of it always lands on the row background — a known luminance —
+ * where all three tokens clear 3:1 in both themes. Identity comes from hue: the
+ * span-bar palette is being cleared of the red-to-amber band (OKLab hue
+ * 345°-115°) so that a red or amber tick can only ever mean an event, never a
+ * service. Until that lands, error and warning can still collide with a same-hue
+ * bar; the geometry channel holds on its own in the meantime.
+ *
+ * Info is `status-neutral-text` rather than the standard `status-info-text`,
+ * which is blue — the most heavily represented family in the span-bar palette.
+ * Achromatic needs no reservation to be collision-free: every bar colour is
+ * saturated (min OKLab chroma 0.110 light / 0.096 dark) against neutral's
+ * 0.022 / 0.012, so no service bar is ever grey.
  *
  * No tier carries a halo. `ring-1 ring-surface-base` was tried and removed: a
  * ring is 1px on all four sides, so on a 3px tick it is 40% of the width and
- * most of the area, and it is opaque where the achromatic info fill is not — the
- * outline out-shouted the mark it was outlining, and the marker read as a
- * bordered box rather than a tick.
- *
- * Separation comes from geometry instead. Every tick is 1.5x its surface's bar
- * height and so overhangs it, which puts part of every mark on the row
- * background — a known luminance — rather than leaving it wholly at the mercy of
- * an arbitrary service colour. That is what makes an outline unnecessary, and it
- * is why the halo could be dropped for the saturated tiers and not just for
- * info.
- *
- * The two themes' info values are not mirrors of each other, and should not be
- * "corrected" into a matching pair. Dark mode needs a markedly stronger overlay:
- * span bars carry mid-luminance saturated service colours, and a weak white
- * overlay barely shifts a mid-tone fill, so at parity with light mode the tick
- * washed out rather than reading. The exact alphas live in component.css and
- * dark.css, each with the reasoning for its own side.
+ * most of the area — the outline out-shouted the mark it was outlining, and the
+ * marker read as a bordered box rather than a tick.
  */
 export const SEVERITY_MARKER_CLASS: Record<SpanEventSeverity, string> = {
-  error: "bg-badge-error-solid-bg",
-  warning: "bg-badge-warning-solid-bg",
+  error: "bg-trace-event-error",
+  warning: "bg-trace-event-warning",
   info: "bg-trace-event-info",
 };
 
@@ -110,8 +117,8 @@ export const SEVERITY_MARKER_CLASS: Record<SpanEventSeverity, string> = {
  * surfaces drifting apart.
  */
 export const SEVERITY_MARKER_TOKEN: Record<SpanEventSeverity, string> = {
-  error: "--color-badge-error-solid-bg",
-  warning: "--color-badge-warning-solid-bg",
+  error: "--color-trace-event-error",
+  warning: "--color-trace-event-warning",
   info: "--color-trace-event-info",
 };
 

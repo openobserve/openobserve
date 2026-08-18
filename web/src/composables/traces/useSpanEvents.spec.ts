@@ -517,22 +517,23 @@ describe("summarizeSpanEvents", () => {
 });
 
 describe("marker vocabulary", () => {
-  // The span bar is filled with an arbitrary per-service colour, so a hue-based
-  // info marker can land invisibly on a same-hue bar. An achromatic tick is a
-  // luminance modifier over whatever is beneath it, so contrast holds by
-  // construction. Error and warning keep their hues — there the colour is
-  // semantic, and the ring carries them.
-  it("gives the info tier an achromatic token and keeps hue for error and warning", () => {
-    expect(SEVERITY_MARKER_CLASS.info).toContain("bg-trace-event-info");
-    expect(SEVERITY_MARKER_CLASS.error).toContain("bg-badge-error-solid-bg");
-    expect(SEVERITY_MARKER_CLASS.warning).toContain("bg-badge-warning-solid-bg");
+  // Every tier reads from the app-wide `--color-status-*` family via a thin
+  // trace-event alias, rather than defining marker-only colours. TraceTree
+  // already renders the span error icon and the event-count error tally with
+  // `status-error-text`; a marker that used a different red would mean the same
+  // thing in two colours.
+  it("draws every tier from the shared status vocabulary", () => {
+    expect(SEVERITY_MARKER_CLASS).toEqual({
+      error: "bg-trace-event-error",
+      warning: "bg-trace-event-warning",
+      info: "bg-trace-event-info",
+    });
   });
 
   // No tier carries a halo. A ring is 1px on all four sides, so on a 3px tick it
-  // is 40% of the width and most of the area, and it is opaque where the
-  // achromatic info fill is not — the outline out-shouted the mark it outlined
-  // and the marker read as a bordered box. Separation now comes from the
-  // marker's own form: luminance for info, overhang for error, hue for warning.
+  // is 40% of the width and most of the area — the outline out-shouted the mark
+  // it outlined and the marker read as a bordered box. Separation comes from the
+  // tick overhanging its bar onto the row background instead.
   it("carries no halo on any tier, so the fill is the whole mark", () => {
     for (const className of Object.values(SEVERITY_MARKER_CLASS)) {
       expect(className).not.toContain("ring");
@@ -543,9 +544,20 @@ describe("marker vocabulary", () => {
   // resolves token values at draw time. Both surfaces must name the same tokens.
   it("exposes the same tiers as custom-property names for canvas consumers", () => {
     expect(SEVERITY_MARKER_TOKEN).toEqual({
-      error: "--color-badge-error-solid-bg",
-      warning: "--color-badge-warning-solid-bg",
+      error: "--color-trace-event-error",
+      warning: "--color-trace-event-warning",
       info: "--color-trace-event-info",
     });
+  });
+
+  // The utility class and the custom property must name the same token per tier,
+  // or the canvas and the DOM drift apart silently — the failure mode the two
+  // parallel maps exist to prevent.
+  it("keeps the class map and the token map naming the same token per tier", () => {
+    for (const severity of ["error", "warning", "info"] as const) {
+      expect(SEVERITY_MARKER_CLASS[severity]).toBe(
+        SEVERITY_MARKER_TOKEN[severity].replace("--color-", "bg-"),
+      );
+    }
   });
 });
