@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use arrow::{
     array::{Array, ArrayRef as ArrowArrayRef, Int64Array, RecordBatch, UInt32Array, UInt64Array},
-    compute::{concat_batches, take},
+    compute::{concat_batches, max, min, take},
     datatypes::{DataType, Field},
     ipc::{
         CompressionType,
@@ -69,40 +69,17 @@ pub(super) async fn write_files(
     let mut rows_written = 0_i64;
 
     while let Some(batch) = rx.recv().await {
-        let hashes = batch
-            .column(hash_index)
-            .as_any()
-            .downcast_ref::<UInt64Array>()
-            .ok_or_else(|| {
-                DataFusionError::Plan(format!("TSID-major layout requires UInt64 {HASH_LABEL}"))
-            })?;
-        let timestamps = batch
-            .column(timestamp_index)
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .ok_or_else(|| {
-                DataFusionError::Plan(format!(
-                    "TSID-major layout requires Int64 {TIMESTAMP_COL_NAME}"
-                ))
-            })?;
-
         if batch.num_rows() == 0 {
             continue;
         }
-        if hashes.is_null(0) {
-            return Err(DataFusionError::Execution(format!(
-                "TSID-major layout found null {HASH_LABEL}"
-            )));
-        }
-
+        let hashes = hash_column(&batch, hash_index)?;
+        // the merge query sorts by (__hash__, _timestamp); a null or a
+        // decreasing hash means the input was not the sorted merge output
         let mut last_hash = previous_hash;
-        for row in 0..batch.num_rows() {
-            if hashes.is_null(row) {
-                return Err(DataFusionError::Execution(format!(
-                    "TSID-major layout found null {HASH_LABEL}"
-                )));
-            }
-            let hash = hashes.value(row);
+        for hash in hashes.iter() {
+            let hash = hash.ok_or_else(|| {
+                DataFusionError::Execution(format!("TSID-major layout found null {HASH_LABEL}"))
+            })?;
             if last_hash.is_some_and(|previous| hash < previous) {
                 return Err(DataFusionError::Execution(format!(
                     "TSID-major merge output is not ordered: previous hash {last_hash:?}, current hash {hash}"
@@ -111,30 +88,23 @@ pub(super) async fn write_files(
             last_hash = Some(hash);
         }
 
-        let rotate = active
+        // rotate between input batches once the logical size target is reached
+        if active
             .as_ref()
-            .is_some_and(|writer| writer.estimated_original_size(metadata) >= max_file_size);
-        if rotate {
+            .is_some_and(|writer| writer.estimated_original_size(metadata) >= max_file_size)
+        {
             files.push(active.take().unwrap().finish().await?);
         }
-
-        if active.is_none() {
-            active = Some(ActiveSizeTsidWriter::try_new(
+        let writer = match active.as_mut() {
+            Some(writer) => writer,
+            None => active.insert(ActiveSizeTsidWriter::try_new(
                 schema,
                 bloom_filter_fields,
                 metadata,
-            )?);
-        }
-
-        write_size_tsid_slice(
-            active.as_mut().unwrap(),
-            &batch,
-            hashes,
-            timestamps,
-            0,
-            batch.num_rows(),
-        )
-        .await?;
+                timestamp_index,
+            )?),
+        };
+        writer.write(&batch, hashes).await?;
         rows_written += batch.num_rows() as i64;
         previous_hash = last_hash;
     }
@@ -155,27 +125,23 @@ pub(super) async fn write_files(
     Ok(files)
 }
 
-async fn write_size_tsid_slice(
-    active: &mut ActiveSizeTsidWriter,
-    batch: &RecordBatch,
-    hashes: &UInt64Array,
-    timestamps: &Int64Array,
-    start: usize,
-    end: usize,
-) -> Result<()> {
-    active
-        .writer
-        .write(&batch.slice(start, end - start))
-        .await?;
-    active.series_index.write_slice(batch, hashes, start, end)?;
-    update_tsid_file_meta(&mut active.file_meta, timestamps, start, end);
-    Ok(())
+fn hash_column(batch: &RecordBatch, hash_index: usize) -> Result<&UInt64Array> {
+    batch
+        .column(hash_index)
+        .as_any()
+        .downcast_ref::<UInt64Array>()
+        .ok_or_else(|| {
+            DataFusionError::Plan(format!("TSID-major layout requires UInt64 {HASH_LABEL}"))
+        })
 }
 
+/// One output file in progress: the Parquet writer, its `.sidx` writer and
+/// the running file meta.
 struct ActiveSizeTsidWriter {
     writer: AsyncArrowWriter<Vec<u8>>,
     file_meta: FileMeta,
     series_index: TsidSeriesIndexWriter,
+    timestamp_index: usize,
 }
 
 impl ActiveSizeTsidWriter {
@@ -183,6 +149,7 @@ impl ActiveSizeTsidWriter {
         schema: &Arc<Schema>,
         bloom_filter_fields: &[String],
         metadata: &FileMeta,
+        timestamp_index: usize,
     ) -> Result<Self> {
         let writer = new_parquet_writer(
             Vec::new(),
@@ -192,12 +159,52 @@ impl ActiveSizeTsidWriter {
             false,
             None,
         );
-        let series_index = TsidSeriesIndexWriter::try_new(schema)?;
         Ok(Self {
             writer,
-            file_meta: empty_tsid_file_meta(metadata),
-            series_index,
+            file_meta: FileMeta {
+                min_ts: 0,
+                max_ts: 0,
+                records: 0,
+                original_size: 0,
+                compressed_size: 0,
+                index_size: 0,
+                ..metadata.clone()
+            },
+            series_index: TsidSeriesIndexWriter::try_new(schema)?,
+            timestamp_index,
         })
+    }
+
+    /// Append one (hash, ts)-ordered batch to the data file, its runs to the
+    /// series index and its rows / time range to the file meta.
+    async fn write(&mut self, batch: &RecordBatch, hashes: &UInt64Array) -> Result<()> {
+        self.writer.write(batch).await?;
+        self.series_index.write(batch, hashes)?;
+
+        let timestamps = batch
+            .column(self.timestamp_index)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .ok_or_else(|| {
+                DataFusionError::Plan(format!(
+                    "TSID-major layout requires Int64 {TIMESTAMP_COL_NAME}"
+                ))
+            })?;
+        let meta = &mut self.file_meta;
+        let (mut min_ts, mut max_ts) = if meta.records == 0 {
+            (i64::MAX, i64::MIN)
+        } else {
+            (meta.min_ts, meta.max_ts)
+        };
+        if let (Some(min), Some(max)) = (min(timestamps), max(timestamps)) {
+            min_ts = min_ts.min(min);
+            max_ts = max_ts.max(max);
+        }
+        if min_ts <= max_ts {
+            (meta.min_ts, meta.max_ts) = (min_ts, max_ts);
+        }
+        meta.records += batch.num_rows() as i64;
+        Ok(())
     }
 
     fn estimated_original_size(&self, source_meta: &FileMeta) -> usize {
@@ -212,6 +219,7 @@ impl ActiveSizeTsidWriter {
             mut writer,
             file_meta,
             series_index,
+            ..
         } = self;
         append_metadata(&mut writer, &file_meta)?;
         writer.finish().await?;
@@ -221,40 +229,6 @@ impl ActiveSizeTsidWriter {
             layout: MetricsFileLayout::TsidMajor,
             series_index: Some(series_index.finish()?),
         })
-    }
-}
-
-fn empty_tsid_file_meta(metadata: &FileMeta) -> FileMeta {
-    let mut file_meta = metadata.clone();
-    file_meta.min_ts = 0;
-    file_meta.max_ts = 0;
-    file_meta.records = 0;
-    file_meta.original_size = 0;
-    file_meta.compressed_size = 0;
-    file_meta.index_size = 0;
-    file_meta
-}
-
-fn update_tsid_file_meta(
-    file_meta: &mut FileMeta,
-    timestamps: &Int64Array,
-    start: usize,
-    end: usize,
-) {
-    let first_timestamp = file_meta.records == 0;
-    file_meta.records += (end - start) as i64;
-    for row in start..end {
-        if timestamps.is_null(row) {
-            continue;
-        }
-        let timestamp = timestamps.value(row);
-        if first_timestamp && file_meta.min_ts == 0 && file_meta.max_ts == 0 {
-            file_meta.min_ts = timestamp;
-            file_meta.max_ts = timestamp;
-        } else {
-            file_meta.min_ts = file_meta.min_ts.min(timestamp);
-            file_meta.max_ts = file_meta.max_ts.max(timestamp);
-        }
     }
 }
 
@@ -337,27 +311,25 @@ impl TsidSeriesIndexWriter {
         })
     }
 
-    fn write_slice(
-        &mut self,
-        batch: &RecordBatch,
-        hashes: &UInt64Array,
-        start: usize,
-        end: usize,
-    ) -> Result<()> {
+    /// Record the TSID runs of one hash-ordered batch. `hashes` is the batch's
+    /// `__hash__` column (already validated by the caller).
+    fn write(&mut self, batch: &RecordBatch, hashes: &UInt64Array) -> Result<()> {
+        debug_assert_eq!(hashes.len(), batch.num_rows());
+        let num_rows = batch.num_rows();
         let mut first_rows = Vec::new();
         let mut row_starts = Vec::new();
         let mut row_counts = Vec::new();
-        let mut run_start = start;
-        while run_start < end {
+        let mut run_start = 0;
+        while run_start < num_rows {
             let hash = hashes.value(run_start);
             let mut run_end = run_start + 1;
-            while run_end < end && hashes.value(run_end) == hash {
+            while run_end < num_rows && hashes.value(run_end) == hash {
                 run_end += 1;
             }
             first_rows.push(u32::try_from(run_start).map_err(|_| {
                 DataFusionError::Execution("metrics batch exceeds u32 row index".to_string())
             })?);
-            row_starts.push(self.rows_written + (run_start - start) as u64);
+            row_starts.push(self.rows_written + run_start as u64);
             row_counts.push(u32::try_from(run_end - run_start).map_err(|_| {
                 DataFusionError::Execution("TSID run exceeds u32 row count".to_string())
             })?);
@@ -378,7 +350,7 @@ impl TsidSeriesIndexWriter {
         if self.pending_rows >= TSID_SERIES_INDEX_BATCH_ROWS {
             self.flush_pending()?;
         }
-        self.rows_written += (end - start) as u64;
+        self.rows_written += num_rows as u64;
         Ok(())
     }
 
@@ -544,30 +516,10 @@ mod tests {
 
         let mut writer = TsidSeriesIndexWriter::try_new(&schema).unwrap();
         writer
-            .write_slice(
-                &batch1,
-                batch1
-                    .column_by_name(HASH_LABEL)
-                    .unwrap()
-                    .as_any()
-                    .downcast_ref::<UInt64Array>()
-                    .unwrap(),
-                0,
-                batch1.num_rows(),
-            )
+            .write(&batch1, hash_column(&batch1, 0).unwrap())
             .unwrap();
         writer
-            .write_slice(
-                &batch2,
-                batch2
-                    .column_by_name(HASH_LABEL)
-                    .unwrap()
-                    .as_any()
-                    .downcast_ref::<UInt64Array>()
-                    .unwrap(),
-                0,
-                batch2.num_rows(),
-            )
+            .write(&batch2, hash_column(&batch2, 0).unwrap())
             .unwrap();
 
         let bytes = writer.finish().unwrap();
@@ -643,16 +595,10 @@ mod tests {
             ],
         )
         .unwrap();
-        let hashes = batch
-            .column_by_name(HASH_LABEL)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<UInt64Array>()
-            .unwrap();
-
         let mut writer = TsidSeriesIndexWriter::try_new(&schema).unwrap();
         for row in 0..row_count {
-            writer.write_slice(&batch, hashes, row, row + 1).unwrap();
+            let one = batch.slice(row, 1);
+            writer.write(&one, hash_column(&one, 0).unwrap()).unwrap();
         }
 
         let bytes = writer.finish().unwrap();
