@@ -42,7 +42,10 @@ const stubs = {
       >{{ primaryButtonLabel }}</button>
     </div>`,
   },
-  OForm: { name: "OForm", template: "<form><slot /></form>" },
+  // `defaultValues` is declared because the pre-selected person is only
+  // observable through it: OFormSelect is a stub, so the field itself renders
+  // nothing to read the value off.
+  OForm: { name: "OForm", props: ["defaultValues", "schema"], template: "<form><slot /></form>" },
   OFormSelect: { name: "OFormSelect", template: "<div />" },
   OFormDateTimeRange: { name: "OFormDateTimeRange", template: "<div />" },
   OButton: {
@@ -110,6 +113,45 @@ async function pick(wrapper: any, which: 0 | 1, optionIndex: number) {
 async function intoSwapMode(wrapper: any) {
   await wrapper.find('[data-test="oncall-cover-mode-swap"]').trigger("click");
 }
+
+/// The header's *Take override* opens this dialog on the reader — the answer
+/// they came to give, already filled in. A pre-selection the picker cannot
+/// show is worse than none: the field would read as chosen and submit as
+/// nothing, so the team roster is the gate.
+describe("OnCallCoverForm — a pre-selected person", () => {
+  const MEMBERS = [{ user_email: "ana@o2.ai" }, { user_email: "bo@o2.ai" }];
+
+  function renderCover(defaultUser: string, members = MEMBERS) {
+    return mount(OnCallCoverForm, {
+      props: { open: true, members, timezone: "UTC", shifts: [], defaultUser },
+      global: { plugins: [i18n], stubs },
+    });
+  }
+
+  const filledUser = (wrapper: ReturnType<typeof renderCover>) =>
+    wrapper.findComponent({ name: "OForm" }).props("defaultValues").user_email;
+
+  it("pre-selects somebody on the team", () => {
+    expect(filledUser(renderCover("bo@o2.ai"))).toBe("bo@o2.ai");
+  });
+
+  /// Somebody reading a team they are not on — an admin arranging cover for a
+  /// team elsewhere in the org. There is no option for them, so there is no
+  /// pre-selection either.
+  it("pre-selects nobody when that person is not on this team", () => {
+    expect(filledUser(renderCover("zoe@o2.ai"))).toBe("");
+  });
+
+  /// The value has to BE one of the options, not merely equal-looking: a
+  /// select matches by identity, so the roster's own spelling is what lands.
+  it("fills the roster's spelling, not the caller's", () => {
+    expect(filledUser(renderCover(" Ana@O2.ai "))).toBe("ana@o2.ai");
+  });
+
+  it("pre-selects nobody when the caller named nobody", () => {
+    expect(filledUser(renderCover(""))).toBe("");
+  });
+});
 
 describe("OnCallCoverForm — swapping", () => {
   /// F6: two people trading weeks is ONE errand. Expressed as two covers it is

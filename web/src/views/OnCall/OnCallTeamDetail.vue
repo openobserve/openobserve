@@ -30,19 +30,15 @@
     </template>
 
     <template #actions>
+      <!-- A cover is a shift handed to a person, so it needs a roster to hand
+           it to: on a team with nobody in it this would open on an empty
+           picker, which is a dead end rather than an action. -->
       <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="oncall-team-page-btn"
-        @click="notAvailable('pageThisTeam')"
-      >
-        {{ t("oncall.pageThisTeam") }}
-      </OButton>
-      <OButton
+        v-if="members.length"
         variant="outline"
         size="sm-action"
         data-test="oncall-team-override-btn"
-        @click="notAvailable('takeOverride')"
+        @click="openTakeOverride"
       >
         {{ t("oncall.takeOverride") }}
       </OButton>
@@ -283,7 +279,7 @@
           :segments="segments"
           :timezone="team?.timezone ?? 'UTC'"
           @assign-secondary="onAssignSecondary"
-          @request-swap="coverOpen = true"
+          @request-swap="openCover"
         />
 
         <OContent y class="flex flex-col gap-5">
@@ -301,7 +297,7 @@
             @edit="openScheduleEditor({ mode: 'edit', name: $event })"
             @assign-people="openScheduleEditor({ mode: 'edit', name: $event })"
             @duplicate="openScheduleEditor({ mode: 'duplicate', name: $event })"
-            @override="coverOpen = true"
+            @override="openCover"
             @delete="rotationToDelete = $event"
             @presets="presetsOpen = true"
           />
@@ -406,6 +402,7 @@
       :saving="coverSaving"
       :current-holder="onCallNow[0]?.user_email ?? null"
       :gap="coverGap"
+      :default-user="coverDefaultUser"
       :shifts="swappableShifts"
       @save="saveCover"
       @swap="saveSwap"
@@ -520,6 +517,9 @@ const presetsOpen = ref(false);
 const rotationToDelete = ref<string | null>(null);
 const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);
+/// Who the cover dialog opens pre-selected on. Empty for every opener that has
+/// no opinion about the person.
+const coverDefaultUser = ref("");
 const editingPolicy = ref(false);
 const selectedPriority = ref("P1");
 /// The ladder chips are labels ("P3"); the policy's rungs are numbered. The
@@ -810,15 +810,6 @@ const coverageState = computed<"covered" | "gap" | "unreachable">(() => {
 /// would be worse than no badge.
 const configRiskCount = computed(() => configRisks.value?.total ?? 0);
 
-/// Says so rather than firing a request that 404s. Every one of these is a
-/// design element with no endpoint behind it yet.
-function notAvailable(featureKey: "pageThisTeam" | "takeOverride") {
-  toast({
-    variant: "info",
-    message: t("oncall.notAvailableYet", { feature: t(`oncall.${featureKey}`) }),
-  });
-}
-
 /// The one honest answer to "would a page actually land": send a real one and
 /// report who it reached. `reached_anyone: false` carries the server's own
 /// reason, which is rendered verbatim rather than re-worded.
@@ -928,8 +919,35 @@ async function deleteRotation() {
   }
 }
 
+/// Every way into the cover dialog goes through one of these three, because
+/// the dialog carries state from whoever opened it — a gap to fill, a person
+/// to pre-select — and an opener that sets one without clearing the other
+/// offers the last caller's errand to this one.
+
+/// Somebody else covers a window nobody holds: the hole is known, the person
+/// is the open question.
 function onFillGap(gap: ResolvedSegment) {
   coverGap.value = { from: gap.from, to: gap.to };
+  coverDefaultUser.value = "";
+  coverOpen.value = true;
+}
+
+/// The plain "arrange a cover" entry: neither end is decided.
+function openCover() {
+  coverGap.value = null;
+  coverDefaultUser.value = "";
+  coverOpen.value = true;
+}
+
+/// The header's verb is *take*, so the reader is the person being pre-filled —
+/// the dialog opens on the answer they came to give. The window is left blank
+/// on purpose: "until when" has no safe default, and a cover silently saved
+/// over the wrong hours reassigns a night nobody agreed to. The form drops the
+/// pre-fill when the reader is not on this team, which is why the picker is
+/// still a picker.
+function openTakeOverride() {
+  coverGap.value = null;
+  coverDefaultUser.value = String(store.state.userInfo?.email ?? "");
   coverOpen.value = true;
 }
 

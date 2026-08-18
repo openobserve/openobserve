@@ -291,6 +291,59 @@ describe("OnCallTeamDetail", () => {
     });
   });
 
+  /// The header verb is *take*, so the reader is who it opens on. Three
+  /// openers share this one dialog and each arrives with a different opinion
+  /// about the person and the window — the state one leaves behind is the
+  /// state the next one offers.
+  describe("taking an override from the header", () => {
+    const button = (wrapper: ReturnType<typeof render>) =>
+      wrapper.find('[data-test="oncall-team-override-btn"]');
+    const cover = (wrapper: ReturnType<typeof render>) =>
+      wrapper.findComponent({ name: "OnCallCoverForm" });
+
+    it("opens the cover dialog on the person reading the page", async () => {
+      const wrapper = render();
+      await flushPromises();
+      await button(wrapper).trigger("click");
+
+      expect(cover(wrapper).props("open")).toBe(true);
+      expect(cover(wrapper).props("defaultUser")).toBe("example@gmail.com");
+      // "Until when" has no safe default — a cover saved over hours nobody
+      // chose reassigns a night nobody agreed to.
+      expect(cover(wrapper).props("gap")).toBe(null);
+    });
+
+    /// A cover is a shift handed to somebody. With an empty roster the dialog
+    /// would open on a picker with nothing in it.
+    it("is not offered while the team has nobody in it", async () => {
+      service.listMembers.mockResolvedValue({ data: [] } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(button(wrapper).exists()).toBe(false);
+    });
+
+    /// The schedule tab's opener has no opinion about the person, and must not
+    /// inherit one — nor the window a gap-fill left behind.
+    it("leaves nothing behind for the schedule tab's own opener", async () => {
+      const wrapper = render();
+      await flushPromises();
+      await button(wrapper).trigger("click");
+
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      const timeline = wrapper.findComponent({ name: "OnCallScheduleTimeline" });
+      timeline.vm.$emit("fill-gap", { from: 1_000, to: 2_000 });
+      await flushPromises();
+      expect(cover(wrapper).props("defaultUser")).toBe("");
+
+      timeline.vm.$emit("override");
+      await flushPromises();
+      expect(cover(wrapper).props("gap")).toBe(null);
+      expect(cover(wrapper).props("defaultUser")).toBe("");
+    });
+  });
+
   /// F6: a swap is two writes behind one button, which is exactly where a UI
   /// lies. The second can be refused — the server 409s when somebody already
   /// covers that window — and by then the first has landed.

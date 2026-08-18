@@ -164,6 +164,11 @@ const props = withDefaults(
     /** Pre-fills the window when the caller is covering a known gap. */
     gap?: { from: number; to: number } | null;
     /**
+     * Pre-selects who takes the shift. Ignored when that person is not on this
+     * team — see `prefilledUser`.
+     */
+    defaultUser?: string;
+    /**
      * Upcoming shifts, resolved the way the engine resolves them — the two
      * things a swap trades. Empty hides the swap mode entirely: a team with no
      * rota has no weeks to exchange.
@@ -177,6 +182,7 @@ const props = withDefaults(
     saving: false,
     currentHolder: null,
     gap: null,
+    defaultUser: "",
     shifts: () => [],
   },
 );
@@ -237,8 +243,25 @@ const currentlyOnCall = computed<I18nText | undefined>(() =>
 
 const schema = computed(() => makeOnCallCoverSchema(t));
 
+/// A pre-selected person is only honest if the picker can show them: the caller
+/// passes whoever is reading the page, and a reader who is not on this team has
+/// no option to select — pre-filling them would put a value in the select that
+/// is not in its list, which reads as chosen and submits as nothing.
+///
+/// Matched case-insensitively but resolved back to the member's own spelling,
+/// so what lands in the field IS one of the options rather than something that
+/// merely looks equal to one.
+const prefilledUser = computed(() => {
+  const wanted = props.defaultUser?.trim().toLowerCase();
+  if (!wanted) return "";
+  return (
+    props.members.find((member) => member.user_email.trim().toLowerCase() === wanted)?.user_email ??
+    ""
+  );
+});
+
 const defaultValues = computed(() => ({
-  user_email: "",
+  user_email: prefilledUser.value,
   window: windowValue.value ? { from: windowValue.value.from, to: windowValue.value.to } : undefined,
 }));
 
