@@ -18,11 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   EvidenceEvents — Thin OTable wrapper for evidence bundle rows.
 
   Two modes:
-    inline — inside a step expansion: no step column (the step IS the context),
-             no pagination, shrink to content
-    panel  — the run-level Evidence tab: step column, client pagination, row
-             expansion for the full event detail, an optional wrap toggle, and
-             a labelled footer count
+    inline — a step's own evidence, inside its step expansion: no step column
+             (the step IS the context), and a shorter page
+    panel  — the run-level Evidence tab: every step's events, so the step is a
+             column, and a longer page
+
+  Everything else — header, sorting, row expansion, wrap, pagination — is the
+  same on both. It was not, and the difference was a cap the inline surface no
+  longer has: five ranked rows needed no header and had nothing to page.
 
   One row definition for both surfaces, so a change to a row is a change to
   both. This component owns the OTable configuration and renders cell content
@@ -103,13 +106,6 @@ const isPanel = computed(() => props.mode === "panel");
 const expandedIds = ref<string[]>([]);
 
 /**
- * Headers and sorting are PANEL-only.
- *
- * The panel is one uncapped table where seven unlabelled columns are a puzzle
- * and where sorting is what makes a chronological default recoverable — sort by
- * Type and the old grouped read comes back in place. Inline is five ranked rows
- * inside a card; a header strip there is chrome on a list you can take in whole.
- *
  * `accessorFn` on elapsed/type because neither is a field on the row — without
  * it the sorter reads `row.elapsed`, finds undefined, and silently orders by
  * nothing.
@@ -119,23 +115,25 @@ const columns = computed<OTableColumnDef<EvidenceRow>[]>(() => [
     id: "elapsed",
     header: t("synthetics.evidence.colTime"),
     size: 80,
-    sortable: isPanel.value,
+    sortable: true,
     accessorFn: (row: EvidenceRow) => eventTs(row),
   },
   {
     id: "type",
     header: t("synthetics.evidence.colType"),
     size: 96,
-    sortable: isPanel.value,
+    sortable: true,
     accessorFn: (row: EvidenceRow) => kindLabel(row),
   },
-  { id: "status", header: t("synthetics.evidence.colStatus"), size: 80, sortable: isPanel.value },
+  { id: "status", header: t("synthetics.evidence.colStatus"), size: 80, sortable: true },
   { id: "method", header: t("synthetics.evidence.colMethod"), size: 64 },
   {
     id: "message",
     header: t("synthetics.evidence.colMessage"),
     size: 200,
-    meta: { autoWidth: true },
+    // Bounded elastic: absorbs the leftover and ellipsises, so the table fits
+    // its container and only the FIXED columns can force a horizontal scroll.
+    meta: { autoWidth: true, fillRemaining: true },
   },
   ...(isPanel.value
     ? [
@@ -152,7 +150,7 @@ const columns = computed<OTableColumnDef<EvidenceRow>[]>(() => [
     id: "duration",
     header: t("synthetics.evidence.colDuration"),
     size: 80,
-    sortable: isPanel.value,
+    sortable: true,
     accessorKey: "durationMs",
     // Right-aligned on the COLUMN: a `text-right` class on the cell's inline
     // span does nothing, which is why these read ragged.
@@ -263,10 +261,10 @@ function rowTitle(e: EvidenceEvent): string {
     :data="rows"
     :columns="columns"
     row-key="id"
-    :show-header="isPanel"
-    :pagination="isPanel ? 'client' : 'none'"
-    :page-size="20"
-    :sorting="isPanel ? 'client' : 'none'"
+    show-header
+    pagination="client"
+    :page-size="isPanel ? 20 : 10"
+    sorting="client"
     :show-global-filter="false"
     :dense="true"
     :wrap="wrap"
@@ -275,7 +273,8 @@ function rowTitle(e: EvidenceEvent): string {
     :fill-height="false"
     :frame="false"
     :get-row-status-color="rowStatusColor"
-    :expansion="isPanel ? 'multiple' : 'none'"
+    expansion="multiple"
+    horizontal-scroll
     :expanded-ids="expandedIds"
     @update:expandedIds="(ids: string[]) => (expandedIds = ids)"
     :footer-title="t('synthetics.evidence.footerEvents')"

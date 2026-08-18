@@ -140,14 +140,14 @@ describe("EvidenceEvents", () => {
     expect(fine.props("variant")).toBe(bad.props("variant"));
   });
 
-  it("labels the columns in the panel and stays bare inline", () => {
-    // Seven unlabelled columns are a puzzle in a full table; a header strip on a
-    // five-row card is chrome.
+  it("labels the columns in both the panel and the inline step list", () => {
+    // Seven unlabelled columns are a puzzle either way, now that inline is no
+    // longer a five-row card.
     expect(mountEvents().findComponent(OTable).props("showHeader")).toBe(true);
-    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("showHeader")).toBe(false);
+    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("showHeader")).toBe(true);
   });
 
-  it("lets the panel re-sort, so a chronological default is recoverable", () => {
+  it("lets both surfaces re-sort, so a chronological default is recoverable", () => {
     // Sorting by Type reproduces the old grouped read, in place.
     const table = mountEvents().findComponent(OTable);
     expect(table.props("sorting")).toBe("client");
@@ -155,7 +155,7 @@ describe("EvidenceEvents", () => {
       .filter((c) => c.sortable)
       .map((c) => c.id);
     expect(sortable).toEqual(["elapsed", "type", "status", "step", "duration"]);
-    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("sorting")).toBe("none");
+    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("sorting")).toBe("client");
   });
 
   it("rails only the rows that deserve one", () => {
@@ -172,9 +172,9 @@ describe("EvidenceEvents", () => {
     expect(rail(ev({ status: 302 }))).toBeUndefined();
   });
 
-  it("pages a long list in the panel and leaves the step expansion whole", () => {
+  it("pages a long list in both surfaces, panel wider than inline", () => {
     // The bundle arrives as one NDJSON fetch, so there is no page to ask the
-    // backend for — but a group section can hold 136 rows.
+    // backend for — but a group section can hold 136 rows, hence a page.
     const many = Array.from({ length: 25 }, (_, i) => ev({ ts: i }));
     expect(
       mountEvents({ events: many }).findAll('[data-test="synthetics-evidence-events-row"]'),
@@ -183,7 +183,7 @@ describe("EvidenceEvents", () => {
       mountEvents({ events: many, mode: "inline" }).findAll(
         '[data-test="synthetics-evidence-events-row"]',
       ),
-    ).toHaveLength(25);
+    ).toHaveLength(10);
   });
 
   it("offers a filtered empty state that can clear the filter", async () => {
@@ -201,10 +201,10 @@ describe("EvidenceEvents", () => {
     expect(w.find('[data-test="o2-table-expand-1"]').exists()).toBe(true);
   });
 
-  it("leaves the inline step list unexpandable, where the cap is the point", () => {
+  it("offers an expand control on the inline step list too, now the cap is gone", () => {
     const w = mountEvents({ mode: "inline" });
-    expect(w.find('[data-test="o2-table-expand-cell"]').exists()).toBe(false);
-    expect(w.find('[data-test="o2-table-expand-0"]').exists()).toBe(false);
+    expect(w.find('[data-test="o2-table-expand-cell"]').exists()).toBe(true);
+    expect(w.find('[data-test="o2-table-expand-0"]').exists()).toBe(true);
   });
 
   it("renders the detail panel for an expanded row", async () => {
@@ -279,5 +279,53 @@ describe("EvidenceEvents", () => {
 
   it("labels the footer count instead of leaving a bare number", () => {
     expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("footerTitle")).toBeTruthy();
+  });
+
+  it("gives the inline step list a header, so seven columns are not a puzzle", () => {
+    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("showHeader")).toBe(true);
+  });
+
+  it("lets the inline step list expand a row to the full record", async () => {
+    const w = mountEvents({ mode: "inline" });
+    expect(w.find('[data-test="o2-table-expand-0"]').exists()).toBe(true);
+    await w.find('[data-test="o2-table-expand-0"]').trigger("click");
+    expect(w.findComponent(EvidenceEventDetail).exists()).toBe(true);
+  });
+
+  it("sorts and pages inline too, now that the list is no longer capped", () => {
+    const t = mountEvents({ mode: "inline" }).findComponent(OTable);
+    expect(t.props("sorting")).toBe("client");
+    expect(t.props("pagination")).toBe("client");
+  });
+
+  it("pages inline at 10 and the run-level panel at 20", () => {
+    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("pageSize")).toBe(10);
+    expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("pageSize")).toBe(20);
+  });
+
+  it("still keeps the step column out of the inline list, where the step is the context", () => {
+    const ids = (
+      mountEvents({ mode: "inline" }).findComponent(OTable).props("columns") as Array<{
+        id: string;
+      }>
+    ).map((c) => c.id);
+    expect(ids).not.toContain("step");
+    const panelIds = (
+      mountEvents({ mode: "panel" }).findComponent(OTable).props("columns") as Array<{
+        id: string;
+      }>
+    ).map((c) => c.id);
+    expect(panelIds).toContain("step");
+  });
+
+  it("bounds the message column so the table fits until the fixed columns cannot", () => {
+    const cols = mountEvents().findComponent(OTable).props("columns") as Array<Record<string, any>>;
+    const msg = cols.find((c) => c.id === "message");
+    expect(msg?.meta?.autoWidth).toBe(true);
+    expect(msg?.meta?.fillRemaining).toBe(true);
+  });
+
+  it("scrolls horizontally rather than squeezing columns at narrow widths", () => {
+    expect(mountEvents().findComponent(OTable).props("horizontalScroll")).toBe(true);
   });
 });
