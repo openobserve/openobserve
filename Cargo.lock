@@ -9096,6 +9096,7 @@ version = "0.1.0"
 dependencies = [
  "arrow",
  "async-trait",
+ "bytes",
  "config",
  "datafusion",
  "db",
