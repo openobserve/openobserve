@@ -712,4 +712,57 @@ describe("JourneySteps", () => {
       expect(wrapper.findAll('[data-status-bar="true"]').length).toBe(0);
     });
   });
+
+  // ── Recording marker ──────────────────────────────────────────────
+  // Where recorded steps will land. The row action that sets it costs a full
+  // prefix replay, so the destination has to be legible before the click and
+  // stay legible for the session that follows.
+  describe("recording marker", () => {
+    it("draws a labelled rule above the anchored row and nowhere else", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const labels = wrapper.findAll('[data-test="synthetics-journey-recording-marker"]');
+      expect(labels).toHaveLength(1);
+      expect(labels[0].text()).toBe(enUS.synthetics.journey.newStepsLandHere);
+
+      const rules = wrapper.findAll('[data-test="synthetics-journey-recording-marker-rule"]');
+      expect(rules).toHaveLength(1);
+      // Anchored, not hovered: the rule is solid.
+      expect(rules[0].classes()).toContain("bg-accent");
+      expect(rules[0].classes()).not.toContain("bg-accent/50");
+    });
+
+    it("renders no marker when nothing is anchored", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("lets the label escape the cell it is anchored in", async () => {
+      // The label straddles the row boundary, so the one cell that hosts it must
+      // stop clipping. Every other cell keeps the truncation the table relies on.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const details = wrapper.findAll('[data-test="o2-table-cell-details"]');
+      expect(details[1].attributes("style")).toContain("overflow: visible");
+      expect(details[0].attributes("style") ?? "").not.toContain("overflow: visible");
+      // The pinned actions cell keeps the separator shadow it renders inline.
+      const actions = wrapper.findAll('[data-test="o2-table-cell-actions"]');
+      expect(actions[1].attributes("style") ?? "").not.toContain("overflow: visible");
+    });
+  });
 });

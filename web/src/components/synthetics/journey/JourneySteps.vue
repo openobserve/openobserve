@@ -235,7 +235,10 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
         id: "details",
         header: t("synthetics.journey.stepHeader"),
         size: 200,
-        meta: { autoWidth: true },
+        // `relative` so the recording marker positions against the CELL rather
+        // than the truncating wrapper inside it — the marker sits on the row's
+        // top edge, which only the cell's own box can locate.
+        meta: { autoWidth: true, cellClass: "relative" },
       },
       // Sized to the buttons it holds, which is now four: record-before, insert,
       // duplicate, delete. An `xs` button is h-7 with ps-2.5/pe-2.5 around a 1rem
@@ -270,6 +273,23 @@ const isLocked = computed(() => props.locked);
 /** Whether the recording marker belongs above `row`. */
 function isAnchor(row: TData): boolean {
   return !!props.anchorId && (row as { id?: string }).id === props.anchorId;
+}
+
+/** Which marker a row shows, if any. Hover is a preview; anchor is committed. */
+function markerTone(row: TData): "anchor" | "hover" | null {
+  return isAnchor(row) ? "anchor" : null;
+}
+
+/**
+ * Let the marker's label overhang the row boundary.
+ *
+ * The cell clips by default so long step names truncate, and the label is the one
+ * thing that has to escape — so the clip is lifted only on the row carrying a
+ * marker, and only on the cell hosting it.
+ */
+function markerCellStyle({ columnId, row }: { columnId: string; row: TData }) {
+  if (columnId !== "details" || !markerTone(row)) return {};
+  return { overflow: "visible" };
 }
 
 /**
@@ -331,6 +351,7 @@ function handleUpdateExpanded(ids: string[]) {
     :fill-height="false"
     :expand-on-row-click="true"
     :get-row-status-color="getRowStatusColor"
+    :get-cell-style="markerCellStyle"
     @row-reorder="handleRowReorder"
     @update:selected-ids="handleUpdateSelected"
     @update:expanded-ids="handleUpdateExpanded"
@@ -389,15 +410,6 @@ function handleUpdateExpanded(ids: string[]) {
           />
         </span>
 
-        <!-- Recording marker: new steps land here, above this row. -->
-        <span
-          v-if="isAnchor(row)"
-          class="bg-accent text-accent-foreground rounded-default mr-1 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase"
-          data-test="synthetics-journey-recording-marker"
-        >
-          {{ t("synthetics.journey.recordingHere") }}
-        </span>
-
         <!-- Action label badge -->
         <div class="w-24!">
           <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
@@ -415,6 +427,32 @@ function handleUpdateExpanded(ids: string[]) {
         >
           {{ stepDetail(row) }}
         </span>
+
+        <!-- Insertion marker: recorded steps land ABOVE this row. Absolutely
+             positioned against the cell, so previewing it on hover repaints
+             rather than reflowing — a rule that nudged every row would jitter
+             the whole table as the pointer crossed the action column. Last in
+             the cell so it paints over the step content it straddles. -->
+        <template v-if="markerTone(row)">
+          <span
+            :class="[
+              'absolute inset-x-0 top-0 h-0.5',
+              markerTone(row) === 'hover' ? 'bg-accent/50' : 'bg-accent',
+            ]"
+            data-test="synthetics-journey-recording-marker-rule"
+            aria-hidden="true"
+          />
+          <span
+            :class="[
+              'text-accent-foreground rounded-default text-2xs absolute top-0 left-0',
+              '-translate-y-1/2 px-1.5 py-0.5 font-semibold uppercase',
+              markerTone(row) === 'hover' ? 'bg-accent/50' : 'bg-accent',
+            ]"
+            data-test="synthetics-journey-recording-marker"
+          >
+            {{ t("synthetics.journey.newStepsLandHere") }}
+          </span>
+        </template>
       </div>
     </template>
 
