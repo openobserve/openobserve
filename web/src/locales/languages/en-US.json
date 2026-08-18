@@ -10332,7 +10332,8 @@
     "sections": {
       "monitor": "Monitor",
       "annotate": "Annotate",
-      "evaluate": "Evaluate"
+      "evaluate": "Evaluate",
+      "experiment": "Experiment"
     },
     "nav": {
       "llmInsights": "Insights",
