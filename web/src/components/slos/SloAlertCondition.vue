@@ -106,8 +106,19 @@
              full row. Same for the inside labels — `labelPosition` is the API. -->
         <div class="flex flex-wrap items-center gap-2">
           <span>{{ t("slos.alert.burnRate") }}</span>
-          <OSelect v-model="model.operator" :options="operatorOptions" width="xs" />
-          <OInput v-model.number="model.critical" type="number" step="0.1" width="xs" />
+          <OSelect
+            v-model="model.operator"
+            :options="operatorOptions"
+            width="xs"
+            data-test="slos-sloalertcondition-operator"
+          />
+          <OInput
+            v-model.number="model.critical"
+            type="number"
+            step="0.1"
+            width="xs"
+            data-test="slos-sloalertcondition-critical"
+          />
           <span>{{ t("slos.alert.inBothWindows") }}</span>
           <OInput
             v-model.number="longHours"
@@ -116,6 +127,7 @@
             suffix="h"
             :label="t('slos.alert.long')"
             label-position="inside"
+            data-test="slos-sloalertcondition-long"
           />
           <OInput
             v-model.number="shortMinutes"
@@ -124,6 +136,7 @@
             suffix="min"
             :label="t('slos.alert.short')"
             label-position="inside"
+            data-test="slos-sloalertcondition-short"
           />
         </div>
 

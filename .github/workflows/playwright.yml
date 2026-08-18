@@ -252,6 +252,13 @@ jobs:
         # tests/ui-testing/ci-matrix/ci_matrix.json; shards that omit it get "false".
         env:
           ZO_QUICK_MODE_ENABLED: ${{ matrix.quick_mode_enabled || 'false' }}
+          # Same per-shard rule: how far back (hours) ingestion accepts a record.
+          # The workflow default of 5 DROPS older rows while still answering 200,
+          # so a suite that seeds history (SLO measures a rolling 7-day window)
+          # would fail as "No data" with nothing in the artifacts to explain it.
+          # Set via "ingest_allowed_upto" in ci-matrix/ci_matrix.json; shards that
+          # omit it keep the workflow default.
+          ZO_INGEST_ALLOWED_UPTO: ${{ matrix.ingest_allowed_upto || env.ZO_INGEST_ALLOWED_UPTO }}
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
@@ -355,8 +362,19 @@ jobs:
               FILE_PATHS="$FILE_PATHS $FILE_PATH"
             done
 
-            echo "DEBUG: Final command: npx playwright test $FILE_PATHS"
-            npx playwright test $FILE_PATHS
+            # Optional per-shard worker pin. Empty keeps playwright.config.js's
+            # default; a shard whose specs contend for a shared server-side
+            # resource sets "workers": 1 in ci_matrix.json, because fullyParallel
+            # races separate spec FILES and mode:'serial' only orders tests
+            # within one file.
+            WORKERS_ARG=""
+            if [ -n "${{ matrix.workers }}" ]; then
+              WORKERS_ARG="--workers=${{ matrix.workers }}"
+              echo "DEBUG: pinning workers to ${{ matrix.workers }}"
+            fi
+
+            echo "DEBUG: Final command: npx playwright test $FILE_PATHS $WORKERS_ARG"
+            npx playwright test $FILE_PATHS $WORKERS_ARG
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
           fi

@@ -512,7 +512,7 @@ impl TreeNodeRewriter for AddFstFieldsToProjection {
                 Some(&parquet_projection),
                 empty_exec.filters(),
                 empty_exec.limit(),
-                empty_exec.sorted_by_time(),
+                empty_exec.sort_order(),
                 empty_exec.full_schema(),
             );
 
@@ -545,7 +545,9 @@ mod tests {
     };
 
     use super::*;
-    use crate::datafusion::{table_provider::empty_table::NewEmptyTable, udf::match_all_udf};
+    use crate::datafusion::{
+        sort_order::FileSortOrder, table_provider::empty_table::NewEmptyTable, udf::match_all_udf,
+    };
 
     #[test]
     fn test_rewrite_match_physical_new_name() {
@@ -779,7 +781,7 @@ mod tests {
             Some(&scan_projection),
             &[],
             None,
-            false,
+            FileSortOrder::None,
             full_schema,
         )) as Arc<dyn ExecutionPlan>;
 
