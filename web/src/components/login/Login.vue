@@ -278,7 +278,7 @@ export default defineComponent({
               //if user is authorized, get user info
               if (res.data.status == true) {
                 //get user info from backend and extract auth token and set it into localstorage
-                const authToken = getBasicAuth(name.value, password.value);
+                getBasicAuth(name.value, password.value);
                 const userInfo = {
                   given_name: nameValue,
                   auth_time: Math.floor(Date.now() / 1000),

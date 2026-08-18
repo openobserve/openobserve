@@ -105,6 +105,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('run-query')"
           />
         </div>
+        <!-- Same affordance as the logs table: a long operation name is often
+             the widest thing on a row, and clipping it hides the part that
+             distinguishes one trace or span from the next. -->
+        <OButton
+          variant="outline"
+          size="icon-chip"
+          :active="searchObj.meta.resultGrid.wrapCells"
+          @click.stop="toggleWrapCells"
+          data-test="traces-search-result-wrap-btn"
+        >
+          <OIcon name="wrap-text" size="sm" />
+          <OTooltip :content="t('search.messageWrapContent')" />
+        </OButton>
         <OButton
           variant="outline"
           :size="showActionLabels ? 'chip' : 'icon-chip'"
@@ -170,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <TracesSearchResultList
           :hits="hits"
+          :wrap="searchObj.meta.resultGrid.wrapCells"
           :scroll-el="scrollContainerRef"
           :loading="searchObj.loading"
           :search-performed="searchPerformed"
@@ -226,6 +240,7 @@ import { formatLargeNumber } from "../../utils/zincutils";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useLocalWrapTracesContent } from "@/utils/storage";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -320,6 +335,10 @@ export default defineComponent({
     const showActionLabels = computed(() => containerWidth.value >= 900);
 
     onMounted(() => {
+      // Restore the wrap choice: a preference that resets on every reload is
+      // not much of a preference.
+      searchObj.meta.resultGrid.wrapCells = useLocalWrapTracesContent() === "true";
+
       if (sectionHeaderRef.value) {
         containerWidth.value = sectionHeaderRef.value.getBoundingClientRect().width;
         headerResizeObserver = new ResizeObserver((entries) => {
@@ -354,8 +373,8 @@ export default defineComponent({
         from = spanStart - 60_000_000; // -1 min in µs
         to = spanEnd + 3_600_000_000; // +1 hr in µs
       } else {
-        from = props.trace_start_time - 10000000;
-        to = props.trace_end_time + 10000000;
+        from = props.trace_start_time;
+        to = props.trace_end_time;
       }
 
       router.push({
@@ -430,6 +449,13 @@ export default defineComponent({
       emit("update:sort");
     }
 
+    /** Persisted under its own key: the traces table and the logs table are
+     *  different views, and wrapping one is not a request to wrap the other. */
+    function toggleWrapCells() {
+      searchObj.meta.resultGrid.wrapCells = !searchObj.meta.resultGrid.wrapCells;
+      useLocalWrapTracesContent(searchObj.meta.resultGrid.wrapCells ? "true" : "false");
+    }
+
     function openUnifiedAnalysisDashboard() {
       if (metricsDashboardRef.value) {
         metricsDashboardRef.value.openUnifiedAnalysisDashboard();
@@ -461,6 +487,7 @@ export default defineComponent({
       rowsPerPageOptions,
       totalPages,
       openUnifiedAnalysisDashboard,
+      toggleWrapCells,
       toggleFieldList,
       formatLargeNumber,
     };

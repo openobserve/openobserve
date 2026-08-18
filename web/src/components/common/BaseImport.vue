@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="submit"
           :class="importButtonClass"
           @click="handleImport"
-          :loading="isImporting || $props.isImporting"
-          :disabled="isImporting || $props.isImporting"
+          :loading="isImportingLocal || isImporting"
+          :disabled="isImportingLocal || isImporting"
           :data-test="`${testPrefix}-import-json-btn`"
           >{{ t("dashboard.import") }}</OButton
         >
@@ -334,7 +334,7 @@ export default defineComponent({
     const activeTab = ref(props.defaultActiveTab);
     const splitterModel = ref(60);
     const editorKey = ref(0); // Force editor to re-render when changes
-    const isImporting = ref(false); // Track if import is in progress
+    const isImportingLocal = ref(false); // Track if import is in progress
 
     // Expose methods to allow parent to update jsonStr
     const updateJsonStr = (newJsonStr: string) => {
@@ -344,7 +344,7 @@ export default defineComponent({
     const updateJsonArray = (newJsonArray: any[], skipEditorUpdate = false) => {
       jsonArrayOfObj.value = newJsonArray;
       jsonStr.value = JSON.stringify(newJsonArray, null, 2);
-      if (!skipEditorUpdate && !isImporting.value) {
+      if (!skipEditorUpdate && !isImportingLocal.value) {
         editorKey.value++; // Force editor to update only if not importing
       }
     };
@@ -379,7 +379,7 @@ export default defineComponent({
     };
 
     const handleImport = () => {
-      isImporting.value = true;
+      isImportingLocal.value = true;
       emit("import", {
         jsonStr: jsonStr.value,
         jsonArray: jsonArrayOfObj.value,
@@ -450,13 +450,11 @@ export default defineComponent({
       try {
         if (newVal) {
           const response = await axios.get(newVal);
+          const contentType = response.headers["content-type"] as string | undefined;
 
           // Check if the response body is valid JSON
           try {
-            if (
-              response.headers["content-type"]?.includes("application/json") ||
-              response.headers["content-type"]?.includes("text/plain")
-            ) {
+            if (contentType?.includes("application/json") || contentType?.includes("text/plain")) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
               jsonArrayOfObj.value = Array.isArray(response.data) ? response.data : [response.data];
               emit("update:jsonStr", jsonStr.value);
@@ -513,7 +511,7 @@ export default defineComponent({
     // Cleanup before component unmounts to prevent Monaco editor errors
     onBeforeUnmount(() => {
       // Stop any pending updates
-      isImporting.value = true;
+      isImportingLocal.value = true;
       // Clear the jsonStr to prevent Monaco from trying to update
       jsonStr.value = "";
     });
@@ -529,7 +527,7 @@ export default defineComponent({
       resolvedTabs,
       splitterModel,
       editorKey,
-      isImporting,
+      isImportingLocal,
       handleBack,
       handleCancel,
       handleImport,

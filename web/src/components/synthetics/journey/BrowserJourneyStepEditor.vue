@@ -19,6 +19,7 @@ import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserStep, SettleResponse, StepAssertion, StepLocator } from "@/types/synthetics";
 import {
+  CLICK_TYPE_VALUES,
   DEFAULT_SETTLE_BUDGET_MS,
   MAX_SETTLE_BUDGET_MS,
   MAX_STEP_TIMEOUT_MS,
@@ -27,7 +28,10 @@ import {
   VALUE_LABEL_KEYS,
   VALUE_TOOLTIP_KEYS,
   actionOptions,
+  clickTypeOf,
+  clickTypeOptions,
 } from "@/constants/synthetics";
+import type { ClickType } from "@/constants/synthetics";
 import { applyValueToWire, defaultTimeoutFor } from "@/utils/synthetics/mapRecordedStep";
 import { stepNeedsTarget } from "@/utils/synthetics/stepTarget";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -98,6 +102,10 @@ function update(patch: Partial<BrowserStep>) {
     if (patch.assertion !== undefined) wire.assertion = patch.assertion;
     if (patch.optional !== undefined) wire.optional = patch.optional;
     if (patch.alwaysRun !== undefined) wire.always_run = patch.alwaysRun;
+    // Same names on the extension wire, so no translation — that happens in
+    // buildV2Step, on the way to storage.
+    if (patch.button !== undefined) wire.button = patch.button;
+    if (patch.clickCount !== undefined) wire.clickCount = patch.clickCount;
     if (patch.action !== undefined) wire = undefined; // action changed — wire metadata is no longer accurate
   }
   emit("update:step", { ...props.step, wire, ...patch });
@@ -153,9 +161,29 @@ const actionComputed = computed({
   get: () => props.step.action,
   set: (v: BrowserStep["action"]) => {
     if (v !== props.step.action && props.step.wire) actionChangedFromRecorded.value = true;
-    update({ action: v });
+    // The click fields describe a click and nothing else, so they go the same way
+    // as the wire when the action changes — otherwise a right click renamed to a
+    // hover would still store `button: right` on a step that cannot use it.
+    update(v === "click" ? { action: v } : { action: v, button: undefined, clickCount: undefined });
     emit("action-edited");
   },
+});
+
+const isClickStep = computed(() => props.step.action === "click");
+
+const clickTypeSelectOptions = computed(() => clickTypeOptions(t));
+
+/**
+ * Which button and how many clicks, as the one choice Playwright's action picker
+ * offers rather than as the two fields storage keeps.
+ *
+ * The setter always writes both explicitly. `left`/`1` is the absent-field
+ * default, so `buildV2Step` omits them again and a step returned to a plain click
+ * serialises exactly as one that never left.
+ */
+const clickTypeComputed = computed({
+  get: () => clickTypeOf(props.step.button, props.step.clickCount),
+  set: (v: ClickType) => update(CLICK_TYPE_VALUES[v]),
 });
 
 const nameComputed = computed({
@@ -400,6 +428,23 @@ const hasAdvancedChanges = computed(
         <OIcon name="info-outline" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
         <span>{{ t("synthetics.journey.actionChangedNotice") }}</span>
       </p>
+
+      <!-- Which click, on a step whose action is one. It belongs in this tier
+           rather than behind `Advanced`: a right click is a different
+           interaction, not a tuning knob on the same one — and until it had a
+           control, a recorded right or double click was stored and replayed
+           faithfully while the editor showed the author a plain click. -->
+      <div v-if="isClickStep" class="flex w-full gap-2">
+        <OSelect
+          v-model="clickTypeComputed"
+          :label="t('synthetics.journey.clickTypeLabel')"
+          :options="clickTypeSelectOptions"
+          :helpText="t('synthetics.journey.clickTypeHelp')"
+          class="basis-1/3"
+          data-test="synthetics-journey-step-click-type-select"
+        />
+      </div>
+
       <!-- Value (action-specific label) -->
       <OInput
         v-if="showValue"

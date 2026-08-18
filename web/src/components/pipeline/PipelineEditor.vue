@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="toggleJsonEditorAIChat"
         data-test="menu-link-ai-item"
-        class="group text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+        class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         @mouseenter="isJsonEditorAiHovered = true"
         @mouseleave="isJsonEditorAiHovered = false"
@@ -229,7 +229,6 @@ import {
   pipelineMetaDefaults,
   type PipelineMetaForm,
 } from "./pipelineMeta.schema";
-import jstransform from "@/services/jstransform";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
@@ -1088,31 +1087,6 @@ const isValidNodes = (nodes: any) => {
     return false;
   }
   return true;
-};
-
-// Drag n Drop methods
-
-const onNodeDragStart = (event: any, data: any) => {
-  event.dataTransfer.setData("text", data);
-};
-
-const onNodeDrop = (event: any) => {
-  event.preventDefault();
-  const nodeType = event.dataTransfer.getData("text");
-};
-
-const onNodeDragOver = (event: any) => {
-  event.preventDefault();
-};
-
-const updateNewFunction = (_function: Function) => {
-  if (!functions.value[_function.name]) {
-    // Pipelines execute VRL — a JS function must not enter the options.
-    if (!isJsFunction(_function)) {
-      functions.value[_function.name] = _function;
-      functionOptions.value.push(_function.name);
-    }
-  }
 };
 
 const beforeUnloadHandler = (e: any) => {

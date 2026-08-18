@@ -652,7 +652,7 @@ const pipelineRowStyle = (row: any): Record<string, string> => {
       : s === "paused"
         ? "var(--color-grey-400)"
         : "var(--color-success-500)";
-  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+  return { boxShadow: `var(--shadow-rail-geom) ${color}` };
 };
 
 // ── State facet + summary strip ─────────────────────────────────────────────

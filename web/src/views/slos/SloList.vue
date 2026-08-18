@@ -122,7 +122,7 @@
           icon-left="refresh"
           :loading="loading"
           data-test="slos-slolist-refresh"
-          @click="load"
+          @click="() => load()"
         >
           <OTooltip side="bottom" :content="t('slos.refresh')" />
         </OButton>
@@ -292,6 +292,35 @@
       data-test="slos-slolist-delete-dialog"
     >
       <p>{{ t("slos.deleteConfirmBody", { name: pendingDelete?.name }) }}</p>
+      <!-- The cascade, which is the irreversible part. Deleting an SLO deletes
+           every alert attached to it, and until this said so the dialog warned
+           only about disk. Three states, all distinct: still checking, a known
+           count, and "we could not find out" — silence is reserved for the one
+           case where it truly means nothing happens (zero attached). -->
+      <OBanner
+        v-if="alertCountState === 'loading'"
+        variant="info"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count-loading"
+      >
+        {{ t("slos.deleteAlertsChecking") }}
+      </OBanner>
+      <OBanner
+        v-else-if="alertCountState === 'ready' && alertCount > 0"
+        variant="warning"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count"
+      >
+        {{ t("slos.deleteAlertsNote", { count: alertCount }, alertCount) }}
+      </OBanner>
+      <OBanner
+        v-else-if="alertCountState === 'unknown'"
+        variant="warning"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count-unknown"
+      >
+        {{ t("slos.deleteAlertsUnknown") }}
+      </OBanner>
       <!-- Not a footnote: deleting an SLO does NOT free the storage its slices
            occupy, and the budget stays charged until they age out (S-14c). -->
       <OBanner variant="info" class="mt-3">
@@ -301,7 +330,12 @@
         <OButton variant="outline" size="sm-action" @click="deleteDialog = false">
           {{ t("common.cancel") }}
         </OButton>
-        <OButton variant="destructive" size="sm-action" @click="doDelete">
+        <OButton
+          variant="destructive"
+          size="sm-action"
+          data-test="slos-slolist-delete-confirm"
+          @click="doDelete"
+        >
           {{ t("slos.delete") }}
         </OButton>
       </template>
@@ -363,6 +397,8 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
+import alertsService from "@/services/alerts";
+import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import {
   ABSENT,
   compareByUrgency,
@@ -555,6 +591,7 @@ const stats = computed<StatItem[]>(() => {
   return [
     {
       key: "budget_blown",
+      dataTest: "slos-slolist-stat-budget_blown",
       label: t("slos.health.budget_blown"),
       value: counts.budget_blown,
       icon: "local-fire-department",
@@ -563,6 +600,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "at_risk",
+      dataTest: "slos-slolist-stat-at_risk",
       label: t("slos.health.at_risk"),
       value: counts.at_risk,
       icon: "trending-down",
@@ -571,6 +609,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "meeting",
+      dataTest: "slos-slolist-stat-meeting",
       label: t("slos.health.meeting"),
       value: counts.meeting,
       icon: "check-circle",
@@ -579,13 +618,21 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "no_data",
+      dataTest: "slos-slolist-stat-no_data",
       label: t("slos.health.no_data"),
       value: counts.no_data,
       icon: "help",
       tone: "neutral",
       max: total,
     },
-    { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: false },
+    {
+      key: "total",
+      dataTest: "slos-slolist-stat-total",
+      label: t("slos.totalSlos"),
+      value: total,
+      tone: "primary",
+      selectable: true,
+    },
   ];
 });
 
@@ -607,12 +654,19 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
-async function load() {
+// Both optional: refresh calls `load()` bare and falls back to the current org
+// and active folder — the folder-change path is the only caller that passes a
+// folder the refs have not caught up with yet.
+async function load(orgId?: string | null, folderId?: string) {
   if (!org.value) return;
   loading.value = true;
   error.value = null;
+  // sometimes the folder id might not be updated so passed via
+  // query params.
+  const currentOrg = orgId ?? org.value;
+  const folder = folderId ?? activeFolderId.value;
   try {
-    const res = await sloService.list(org.value, activeFolderId.value);
+    const res = await sloService.list(currentOrg, folder);
     rows.value = res.data?.list ?? [];
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
@@ -630,7 +684,7 @@ function onFolderChange(folderId: string) {
     name: "sloList",
     query: { ...route.query, org_identifier: org.value, folder: folderId },
   });
-  load();
+  load(org.value, folderId);
 }
 
 function openMove(targets: SloListItem[]) {
@@ -681,11 +735,7 @@ function goToEdit(row: SloListItem) {
 }
 
 function onRowClick(row: SloListItem) {
-  router.push({
-    name: "sloDetail",
-    params: { slo_id: row.id },
-    query: { org_identifier: org.value },
-  });
+  router.push(sloDetailRoute(row.id, org.value));
 }
 
 async function toggleEnabled(row: SloListItem) {
@@ -701,9 +751,38 @@ async function toggleEnabled(row: SloListItem) {
   }
 }
 
+// How many alerts this delete would take with it (B2). Fetched LAZILY, here,
+// rather than per row while building the list: the count matters only at the
+// moment of confirming, and resolving it up front would put an N+1 on a page
+// that renders perfectly well without it.
+const alertCount = ref(0);
+const alertCountState = ref<"loading" | "ready" | "unknown">("loading");
+// Only the newest lookup may write. Without this, a slow answer for the SLO the
+// user opened first can land after they moved on and label THIS delete with
+// that SLO's count — and the number is the entire point of the banner.
+let alertCountToken = 0;
+
 function confirmDelete(row: SloListItem) {
   pendingDelete.value = row;
   deleteDialog.value = true;
+
+  alertCount.value = 0;
+  alertCountState.value = "loading";
+  const token = ++alertCountToken;
+  alertsService
+    .list_by_slo(org.value, row.id)
+    .then((res: any) => {
+      if (token !== alertCountToken) return;
+      alertCount.value = res?.data?.list?.length ?? 0;
+      alertCountState.value = "ready";
+    })
+    .catch(() => {
+      if (token !== alertCountToken) return;
+      // Never fall back to "ready, 0": that reads as "nothing else is
+      // destroyed", which is the one answer that could be catastrophically
+      // wrong here. Say the check failed instead.
+      alertCountState.value = "unknown";
+    });
 }
 
 async function doDelete() {

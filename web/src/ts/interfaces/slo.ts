@@ -35,6 +35,53 @@ export interface SloStatus {
   total: number;
   covered_slices: number;
   computed_at: number | null;
+  /** The other freeze door (§2): the source stopped evaluating, so the window
+   *  is pinned and `no_data` — which is the coverage floor and nothing else —
+   *  cannot see it. Absent on responses from before this shipped. */
+  stale_watermark?: boolean;
+  /** How far measurement got, epoch seconds. */
+  watermark_end?: number | null;
+  /** The earliest instant this SLO may measure from, epoch seconds — present
+   *  only while it is LATER than the window's start, i.e. only while it is the
+   *  reason the window is not full. An alert-sourced SLO has no evidence
+   *  before its source's ledger begins, so a low coverage number there is
+   *  expected rather than a symptom. */
+  measuring_since?: number | null;
+}
+
+/** One candidate source alert for an `alert` SLI, as the picker sees it. */
+export interface SloEligibleAlert {
+  alert_id: string;
+  name: string;
+  frequency_secs: number;
+  eligible: boolean;
+  /** The server's own rejection message, verbatim. */
+  reason: string | null;
+}
+
+/** What an alert SLI would have measured over a window. */
+export interface AlertSliPreview {
+  alert_id: string;
+  range_start_secs: number;
+  range_end_secs: number;
+  slice_interval_secs: number;
+  intervals: {
+    level: string | null;
+    frequency_secs: number;
+    from_us: number;
+    to_us: number;
+  }[];
+  /** Percentage 0..100 over measured time; null when nothing was measured. */
+  sli: number | null;
+  good_secs: number;
+  total_secs: number;
+  observed_slices: number;
+  expected_slices: number;
+  /** 0..1 */
+  coverage: number;
+  /** Coverage is under the server's floor, so an SLO on this source would
+   *  report no data rather than the `sli` beside it. */
+  would_freeze: boolean;
 }
 
 export type SliType = "count" | "time_slice" | "alert";

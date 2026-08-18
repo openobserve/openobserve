@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="toolCalls.length > 0" class="thread-tools-thread">
     <!-- One-way reveal: clicking shows the calls and removes the pill. -->
     <button v-if="!shown" class="tt-toggle" @click="shown = true">
-      <span class="tt-zz"></span>
+      <span class="tt-zz bg-border-strong"></span>
       <span class="tt-pill border-border-default bg-surface-base border">
         <span class="tt-count text-text-secondary">
           {{ toolCalls.length }}
@@ -40,9 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
           · {{ formatDuration(totalToolDuration(toolCalls)) }}
         </span>
-        <span class="tt-link">{{ t("traces.threadToolCalls.showCalls") }}</span>
+        <span class="tt-link text-thread-tool-link">{{
+          t("traces.threadToolCalls.showCalls")
+        }}</span>
       </span>
-      <span class="tt-zz"></span>
+      <span class="tt-zz bg-border-strong"></span>
     </button>
 
     <div v-else class="tt-body">
@@ -63,7 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex-1" />
           <span
             class="thread-pill"
-            :class="tool.span_status === 'ERROR' ? 'thread-pill--error' : 'thread-pill--ok'"
+            :class="
+              tool.span_status === 'ERROR'
+                ? 'thread-pill--error text-error-600 dark:text-error-400'
+                : 'thread-pill--ok text-success-600 dark:text-success-400'
+            "
           >
             {{ tool.span_status === "ERROR" ? "ERROR" : "OK" }}
             · {{ formatDuration(tool.duration) }}
@@ -112,7 +118,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getInputRaw, getOutputRaw } from "./threadView.utils";
@@ -123,7 +128,6 @@ defineProps<{
 }>();
 const emit = defineEmits<{ (e: "span-selected", spanId: string): void }>();
 
-const store = useStore();
 const { t } = useI18nTyped();
 
 // One-way reveal for the whole group; per-tool rows expand independently.
@@ -201,7 +205,6 @@ function formatDuration(ns: number): string {
     flex: 1;
     min-width: 1rem;
     height: 0.75rem;
-    background-color: var(--color-border-strong);
     --tt-zz-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12'%3E%3Cpath d='M0 9L4 3L8 9' fill='none' stroke='black' stroke-width='1.4'/%3E%3C/svg%3E")
       repeat-x center;
     -webkit-mask: var(--tt-zz-mask);
@@ -218,15 +221,14 @@ function formatDuration(ns: number): string {
     gap: 0.125rem;
     padding: 0.5rem 1.125rem;
     border-radius: 0.625rem;
-    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes elevation bloom */
-    box-shadow: 0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent);
+    box-shadow: var(--shadow-glow-2xs-geom) color-mix(in srgb, var(--color-black) 4%, transparent);
     transition:
       box-shadow 0.15s ease,
       border-color 0.15s ease;
   }
 
   .tt-toggle:hover .tt-pill {
-    box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 10%, transparent);
+    box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-black) 10%, transparent);
   }
 
   .tt-count {
@@ -237,7 +239,6 @@ function formatDuration(ns: number): string {
 
   .tt-link {
     font-size: var(--text-xs);
-    color: var(--color-primary-500);
     font-weight: 650;
   }
 
@@ -343,14 +344,12 @@ function formatDuration(ns: number): string {
 
 .thread-pill--ok {
   background: color-mix(in srgb, var(--color-success-600) 10%, transparent);
-  color: var(--color-success-600);
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-success-600) 25%, transparent);
 }
 
 .thread-pill--error {
   background: color-mix(in srgb, var(--color-error-600) 10%, transparent);
-  color: var(--color-error-600);
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-error-600) 25%, transparent);
 }
@@ -419,13 +418,11 @@ function formatDuration(ns: number): string {
 .dark .thread-tools-thread {
   .thread-pill--ok {
     background: color-mix(in srgb, var(--color-success-500) 14%, transparent);
-    color: var(--color-success-400);
     border-color: color-mix(in srgb, var(--color-success-500) 30%, transparent);
   }
 
   .thread-pill--error {
     background: color-mix(in srgb, var(--color-error-400) 14%, transparent);
-    color: var(--color-error-400);
     border-color: color-mix(in srgb, var(--color-error-400) 30%, transparent);
   }
 }

@@ -176,41 +176,6 @@ async function multistreamselect(page) {
     await pageManager.logsPage.selectRunQuery();
   });
 
-  // test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
-    
-  //   page,
-  // }) => {
-  //   await multistreamselect(page);
-  //   await page.route("**/logData.ValueQuery", (route) => route.continue());
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] button')
-  //     .click({
-  //       force: true,
-  //     });
-  //   await page
-  //     .locator('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]')
-  //     .click({ force: true });
-  //   await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
-  //     force: true,
-  //   });
-  //   await page.waitForTimeout(1000);
-  //   await expect(page.locator('[role="alert"]')).toContainText(
-  //     "Live mode is enabled"
-  //   );
-  //   await page.waitForTimeout(5000);
-  //   await page
-  //     .locator('[data-test="logs-search-off-refresh-interval"] button')
-  //     .click({ force: true });
-  //   await page
-  //     .locator(
-  //       '[data-test="logs-search-off-refresh-interval"] button'
-  //     )
-  //     .click({ force: true });
-  //   await applyQueryButton(page);
-  // });
-
   test("should redirect to logs after clicking on stream explorer via stream page", {
     tag: ['@navigation', '@streamExplorer', '@multistream', '@all']
   }, async ({ page }) => {
@@ -421,7 +386,7 @@ async function multistreamselect(page) {
     
     // Wait for success message with timeout constant
     try {
-      await page.locator('[data-test-variant="success"]').waitFor({
+      await pageManager.logsPage.getSuccessToastLocator().waitFor({
         state: 'visible',
         timeout: MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING
       });

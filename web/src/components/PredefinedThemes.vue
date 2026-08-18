@@ -71,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-default focus-visible:ring-accent/40 flex w-full cursor-pointer items-center border px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
             :class="
               isThemeApplied(theme, mode)
-                ? 'border-accent ring-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] ring-1 ring-inset'
-                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+                ? 'border-accent ring-accent bg-card-glass-tint-soft ring-1 ring-inset'
+                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isThemeApplied(theme, mode)"
             :aria-label="t('common.applyTheme', { name: themeDisplayName(theme.name) })"
@@ -107,8 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-default focus-visible:ring-accent/40 flex w-full cursor-pointer items-center border border-dashed px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
             :class="
               isCustomThemeApplied(mode)
-                ? 'border-accent ring-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] ring-1 ring-inset'
-                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+                ? 'border-accent ring-accent bg-card-glass-tint-soft ring-1 ring-inset'
+                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isCustomThemeApplied(mode)"
             :aria-label="t('components.predefinedThemes.customThemeColorAriaLabel')"
@@ -286,6 +286,7 @@ watch(dialogOpen, (val) => {
 // Watch activeTab changes and update store.state.theme accordingly
 watch(activeTab, (newTab) => {
   const newTheme = newTab === "dark" ? "dark" : "light";
+  // eslint-disable-next-line no-restricted-syntax -- theme-setting guard, not a theme read: compares the current mode against the target before switching. useTheme().isDark is a boolean and cannot express "is it already this specific mode".
   if (store.state.theme !== newTheme) {
     localStorage.setItem("theme", newTheme);
     // Update store and toggle .dark on <html> (Tailwind dark variant) inside

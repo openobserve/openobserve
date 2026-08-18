@@ -27,7 +27,7 @@
           data-test="alert-conditions-toggle-operator-btn"
           variant="ghost"
           size="icon-circle-sm"
-          class="text-button-primary! h-6.5 flex-shrink-0 hover:bg-[color-mix(in_srgb,var(--color-button-primary)_10%,transparent)]!"
+          class="text-button-primary! hover:bg-button-primary/10! h-6.5 flex-shrink-0"
           @click="toggleOperator"
         >
           <OIcon name="restart-alt" size="sm" />
@@ -162,7 +162,7 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"]);
-const emits = defineEmits(["add", "remove", "input:update", "add-group"]);
+const emits = defineEmits(["input:update"]);
 
 const filteredFields = ref<any[]>(props.streamFields as any[]);
 
@@ -185,19 +185,6 @@ const { t } = useI18nTyped();
 // The injected OForm — condition values are name-bound to it (form mode is the
 // only mode now); also used to write the AND/OR toggle below.
 const form = inject(FORM_CONTEXT_KEY, null);
-
-const deleteApiHeader = (field: any) => {
-  emits("remove", field);
-  emits("input:update", "conditions", field);
-};
-
-const addApiHeader = (groupId: string) => {
-  emits("add", groupId);
-};
-
-const addGroupApiHeader = (groupId: string) => {
-  emits("add-group", groupId);
-};
 
 const computedLabel = computed(() => {
   // First condition in any group should not show AND/OR operator;

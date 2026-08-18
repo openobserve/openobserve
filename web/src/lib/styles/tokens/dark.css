@@ -512,6 +512,7 @@
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-primary-500);
+  --color-progress-bar-success: var(--color-success-500);
   --color-progress-bar-warning: var(--color-warning-400);
   --color-progress-bar-danger: var(--color-error-500);
   --color-progress-bar-track: var(--color-grey-700);
@@ -559,6 +560,7 @@
   /* Shadow scale — dark overrides. The light values are black at 6–10%, which
      is invisible on --d-base; without these every elevated surface reads flat.
      Colours only — geometry stays in semantic.css. */
+  --shadow-xs-c: rgb(0 0 0 / 0.3);
   --shadow-sm-c1: rgb(0 0 0 / 0.4);
   --shadow-sm-c2: rgb(0 0 0 / 0.3);
   --shadow-md-c1: rgb(0 0 0 / 0.45);
@@ -583,6 +585,8 @@
   --color-chart-series-10: #86efac;
   --color-chart-series-11: #f5d0fe;
   --color-chart-series-12: #fef08a;
+
+  --color-chart-markline-shadow: rgba(0, 0, 0, 0.7);
 
   /* Dashboard table row-highlight palette — dark overrides */
   --color-chart-table-1: rgba(255, 100, 180, 0.15);
@@ -767,6 +771,25 @@
   --color-table-sort-icon-active: var(--color-primary-400);
   --color-table-streaming-bar: var(--color-primary-400);
   --color-table-row-expanded-bg: var(--d-overlay);
+
+  /* Chart panel bar (dark) — same trick as the table header: the panel body sits
+     on the content canvas (--d-base), so the bar LIFTS off it rather than going
+     darker. Darker than #0d1117 would read as a hole, not a header.
+
+     A literal, not an alias: this sits one step above --d-overlay (#202020) and
+     below --d-well (#2d2d2d), and both of those carry roles (menus/tooltips,
+     recessed tracks) that this is not. Aliasing either would couple the header
+     to a token that moves for unrelated reasons.
+
+     1.24:1 against the body, deliberately matched to the light side's 1.26:1
+     (grey-200 on white) so the header reads the same weight in both themes —
+     keep the pair in step if either moves.
+
+     Unlike light mode there is no ceiling on the fill here: --d-border is
+     LIGHTER than it, so a darker fill only helps the divider. That is why the
+     border below is unchanged while the light one had to move with the fill. */
+  --color-panel-bar-bg: #252526;
+  --color-panel-bar-border: var(--d-border);
 }
 /* Domain data-viz & color tokens (dark) */
 :root.dark,
@@ -868,4 +891,16 @@
   --color-cancel-query-bg: #7a3838;
   --color-highlight-bg: #747474;
   --color-icon-color: #5e5e5e;
+
+  /* eslint-disable local/no-hardcoded-px -- optical: the 1px contact shadow must stay one device pixel */
+  --shadow-ai-focus:
+    0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
+    0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
+    0 1.125rem 2.75rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 42%, transparent);
+  /* eslint-enable local/no-hardcoded-px */
+
+  --shadow-ai-composer:
+    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 45%, transparent),
+    0 0.5rem 1.375rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
+    0 1.25rem 3rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 45%, transparent);
 }

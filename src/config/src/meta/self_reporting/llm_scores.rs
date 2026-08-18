@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{BTreeMap, btree_map::Entry};
+use std::{
+    collections::{BTreeMap, btree_map::Entry},
+    fmt,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -47,12 +50,80 @@ pub enum LlmScoreDataType {
     Boolean,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreTargetScope {
     Span,
     Trace,
     Session,
+}
+
+impl fmt::Display for LlmScoreTargetScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Span => "span",
+            Self::Trace => "trace",
+            Self::Session => "session",
+        })
+    }
+}
+
+impl From<LlmScoreTargetScope> for LlmScoreDataLevel {
+    fn from(value: LlmScoreTargetScope) -> Self {
+        match value {
+            LlmScoreTargetScope::Span => Self::Span,
+            LlmScoreTargetScope::Trace => Self::Trace,
+            LlmScoreTargetScope::Session => Self::Session,
+        }
+    }
+}
+
+/// Producer identity used to build the read-side deduplication key.
+#[derive(Clone, Copy, Debug)]
+pub enum LlmScoreEvaluationSource<'a> {
+    Automated {
+        job_id: &'a str,
+        scorer_id: &'a str,
+    },
+    Annotation {
+        annotation_id: &'a str,
+        score_config_id: &'a str,
+    },
+}
+
+/// Build the stable JSON identity used to select the latest Score from one
+/// producer for one target. Automated producer IDs come from the evaluation
+/// job; annotation and Score Config IDs are generated or resolved server-side.
+/// The JSON is stored as a string because SQL and OpenTelemetry consume the key
+/// as a scalar.
+pub fn evaluation_key(
+    org_id: &str,
+    source: LlmScoreEvaluationSource<'_>,
+    target_scope: LlmScoreTargetScope,
+    target_id: &str,
+) -> String {
+    match source {
+        LlmScoreEvaluationSource::Automated { job_id, scorer_id } => serde_json::json!({
+            "orgId": org_id,
+            "source": "automated",
+            "jobId": job_id,
+            "scorerId": scorer_id,
+            "scope": target_scope,
+            "targetId": target_id,
+        }),
+        LlmScoreEvaluationSource::Annotation {
+            annotation_id,
+            score_config_id,
+        } => serde_json::json!({
+            "orgId": org_id,
+            "source": "annotation",
+            "annotationId": annotation_id,
+            "scoreConfigId": score_config_id,
+            "scope": target_scope,
+            "targetId": target_id,
+        }),
+    }
+    .to_string()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -67,6 +138,10 @@ pub struct LlmScoreRecord {
     pub target_id: String,
     pub evaluation_key: String,
     pub score_version: i64,
+    /// Timestamp of the evaluated span, trace, or session. This stays distinct
+    /// from `_timestamp`, which records when the Score itself was written.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ref_timestamp: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub span_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -92,6 +167,28 @@ pub struct LlmScoreRecord {
     pub score_config_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score_config_version: Option<String>,
+    /// Physical immutable Score Config row used for this Score. Queue reviews
+    /// use it to prove exact N/N rubric coverage.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score_config_row_id: Option<String>,
+    /// Logical N/N grouping key for authoritative annotation-source Scores.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_submission_id: Option<String>,
+    /// Queue provenance for Workbench review Scores. Together with
+    /// `review_submission_id`, these fields make `_llm_scores` independently
+    /// queryable without a relational Review or Review Score table.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_item_id: Option<String>,
+    /// Distinct physical Score Config rows required for this complete N/N
+    /// review submission.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_submission_score_count: Option<i64>,
+    /// Overall comment for the complete Review Submission. Annotation
+    /// projection repeats this value on each Score in the submission.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_submission_comments: Option<String>,
     pub source_type: LlmScoreDataSourceType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_stream: Option<String>,
@@ -109,6 +206,7 @@ pub struct LlmScoreRecord {
     pub job_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub job_version: Option<i32>,
+    /// Justification for this individual Score dimension.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -118,8 +216,8 @@ pub struct LlmScoreRecord {
     pub _timestamp: i64,
 }
 
-impl LlmScoreRecord {
-    pub fn init_for_reflection() -> Self {
+impl Default for LlmScoreRecord {
+    fn default() -> Self {
         Self {
             id: String::new(),
             task_id: String::new(),
@@ -130,25 +228,67 @@ impl LlmScoreRecord {
             target_id: String::new(),
             evaluation_key: String::new(),
             score_version: 0,
+            ref_timestamp: None,
+            span_id: None,
+            trace_id: None,
+            session_id: None,
+            experiment_id: None,
+            level: LlmScoreDataLevel::Span,
+            name: String::new(),
+            value_numeric: None,
+            value_categorical: None,
+            value_boolean: None,
+            data_type: LlmScoreDataType::Numeric,
+            scorer_id: None,
+            scorer_version: None,
+            score_config_id: None,
+            score_config_version: None,
+            score_config_row_id: None,
+            review_submission_id: None,
+            queue_id: None,
+            queue_item_id: None,
+            review_submission_score_count: None,
+            review_submission_comments: None,
+            source_type: LlmScoreDataSourceType::LlmJudge,
+            source_stream: None,
+            source_stream_type: None,
+            agent_name: None,
+            agent_id: None,
+            agent_env: None,
+            agent_version: None,
+            job_id: None,
+            job_version: None,
+            reasoning: None,
+            metadata: None,
+            author: None,
+            _timestamp: 0,
+        }
+    }
+}
+
+impl LlmScoreRecord {
+    pub fn init_for_reflection() -> Self {
+        Self {
+            ref_timestamp: Some(0),
             span_id: Some(String::new()),
             trace_id: Some(String::new()),
             session_id: Some(String::new()),
             experiment_id: Some(String::new()),
-            level: LlmScoreDataLevel::Span,
-            name: String::new(),
             value_numeric: Some(0.0),
             value_categorical: Some(String::new()),
             value_boolean: Some(false),
-            data_type: LlmScoreDataType::Numeric,
             scorer_id: Some(String::new()),
             scorer_version: Some(String::new()),
             score_config_id: Some(String::new()),
             score_config_version: Some(String::new()),
-            source_type: LlmScoreDataSourceType::LlmJudge,
+            score_config_row_id: Some(String::new()),
+            review_submission_id: Some(String::new()),
+            queue_id: Some(String::new()),
+            queue_item_id: Some(String::new()),
+            review_submission_score_count: Some(0),
+            review_submission_comments: Some(String::new()),
             source_stream: Some(String::new()),
             source_stream_type: Some(String::new()),
-            agent_name: None,
-            agent_id: None,
             agent_env: Some(String::new()),
             agent_version: Some(String::new()),
             job_id: Some(String::new()),
@@ -156,7 +296,7 @@ impl LlmScoreRecord {
             reasoning: Some(String::new()),
             metadata: Some(serde_json::json!({})),
             author: Some(String::new()),
-            _timestamp: 0,
+            ..Self::default()
         }
     }
 
@@ -209,6 +349,7 @@ mod tests {
             target_id: "span-1".to_string(),
             evaluation_key: evaluation_key.to_string(),
             score_version,
+            ref_timestamp: None,
             span_id: Some("span-1".to_string()),
             trace_id: Some("trace-1".to_string()),
             session_id: None,
@@ -223,6 +364,12 @@ mod tests {
             scorer_version: Some("1".to_string()),
             score_config_id: Some("cfg-1".to_string()),
             score_config_version: Some("1".to_string()),
+            score_config_row_id: None,
+            review_submission_id: None,
+            queue_id: None,
+            queue_item_id: None,
+            review_submission_score_count: None,
+            review_submission_comments: None,
             source_type,
             source_stream: Some("traces".to_string()),
             source_stream_type: Some("traces".to_string()),
@@ -242,6 +389,7 @@ mod tests {
     #[test]
     fn test_llm_score_record_round_trip() {
         let record = LlmScoreRecord {
+            ref_timestamp: Some(1699999999000),
             id: "s-1".to_string(),
             task_id: "task-1".to_string(),
             eval_run_id: "run-1".to_string(),
@@ -249,17 +397,21 @@ mod tests {
             org_id: "org-1".to_string(),
             target_scope: LlmScoreTargetScope::Span,
             target_id: "span-1".to_string(),
-            evaluation_key: "org=org-1;job=job-1;scorer=sc-1;scope=span;target=span-1".to_string(),
+            evaluation_key: serde_json::json!({
+                "orgId": "org-1",
+                "source": "automated",
+                "jobId": "job-1",
+                "scorerId": "sc-1",
+                "scope": "span",
+                "targetId": "span-1",
+            })
+            .to_string(),
             score_version: 1700000000000,
             span_id: Some("span-1".to_string()),
             trace_id: Some("trace-1".to_string()),
-            session_id: None,
-            experiment_id: None,
             level: LlmScoreDataLevel::Span,
             name: "faithfulness".to_string(),
             value_numeric: Some(0.95),
-            value_categorical: None,
-            value_boolean: None,
             data_type: LlmScoreDataType::Numeric,
             scorer_id: Some("sc-1".to_string()),
             scorer_version: Some("1".to_string()),
@@ -274,10 +426,8 @@ mod tests {
             agent_version: Some("1.2.0".to_string()),
             job_id: Some("job-1".to_string()),
             job_version: Some(1),
-            reasoning: None,
-            metadata: None,
-            author: None,
             _timestamp: 1700000000000,
+            ..LlmScoreRecord::default()
         };
         let json = serde_json::to_string(&record).unwrap();
         let back: LlmScoreRecord = serde_json::from_str(&json).unwrap();
@@ -286,6 +436,7 @@ mod tests {
         assert_eq!(back.target_scope, LlmScoreTargetScope::Span);
         assert_eq!(back.target_id, "span-1");
         assert_eq!(back.score_version, 1700000000000);
+        assert_eq!(back.ref_timestamp, Some(1699999999000));
         assert_eq!(back.span_id, Some("span-1".to_string()));
         assert_eq!(back.value_numeric, Some(0.95));
         assert_eq!(back.level, LlmScoreDataLevel::Span);
@@ -293,6 +444,29 @@ mod tests {
         assert_eq!(back.source_stream_type, Some("traces".to_string()));
         assert_eq!(back.agent_name, Some("agent-a".to_string()));
         assert_eq!(back.agent_id, Some("agent-1".to_string()));
+    }
+
+    #[test]
+    fn annotation_score_keeps_dimension_reasoning_and_submission_comments_distinct() {
+        let mut record = test_score_record(
+            "annotation-score-1",
+            "org=org-1;submission=submission-1;config=cfg-1;target=span-1",
+            1,
+            1,
+            LlmScoreDataSourceType::Annotation,
+            0.9,
+        );
+        record.review_submission_id = Some("submission-1".to_string());
+        record.reasoning = Some("Reason for this dimension".to_string());
+        record.review_submission_comments = Some("Overall reviewer comment".to_string());
+
+        let json = serde_json::to_value(&record).unwrap();
+        assert_eq!(json["review_submission_id"], "submission-1");
+        assert_eq!(json["reasoning"], "Reason for this dimension");
+        assert_eq!(
+            json["review_submission_comments"],
+            "Overall reviewer comment"
+        );
     }
 
     #[test]
@@ -306,6 +480,7 @@ mod tests {
         assert!(obj.contains_key("target_id"));
         assert!(obj.contains_key("evaluation_key"));
         assert!(obj.contains_key("score_version"));
+        assert!(obj.contains_key("ref_timestamp"));
         assert!(obj.contains_key("span_id"));
         assert!(obj.contains_key("trace_id"));
         assert!(obj.contains_key("session_id"));
@@ -321,6 +496,11 @@ mod tests {
         assert!(obj.contains_key("score_config_id"));
         assert!(!obj.contains_key("score_config_entity_id"));
         assert!(obj.contains_key("score_config_version"));
+        assert!(obj.contains_key("score_config_row_id"));
+        assert!(obj.contains_key("review_submission_id"));
+        assert!(obj.contains_key("queue_id"));
+        assert!(obj.contains_key("queue_item_id"));
+        assert!(obj.contains_key("review_submission_score_count"));
         assert!(obj.contains_key("source_type"));
         assert!(obj.contains_key("source_stream"));
         assert!(obj.contains_key("source_stream_type"));
@@ -330,6 +510,7 @@ mod tests {
         assert!(!obj.contains_key("target_agent_id"));
         assert!(obj.contains_key("job_id"));
         assert!(obj.contains_key("reasoning"));
+        assert!(obj.contains_key("review_submission_comments"));
         assert!(obj.contains_key("metadata"));
         assert!(obj.contains_key("author"));
         assert!(obj.contains_key("_timestamp"));
@@ -345,39 +526,23 @@ mod tests {
             org_id: "org-1".to_string(),
             target_scope: LlmScoreTargetScope::Trace,
             target_id: "trace-1".to_string(),
-            evaluation_key: "org=org-1;job=;scorer=;scope=trace;target=trace-1".to_string(),
-            score_version: 0,
-            span_id: None,
-            trace_id: None,
-            session_id: None,
-            experiment_id: None,
+            evaluation_key: serde_json::json!({
+                "orgId": "org-1",
+                "source": "automated",
+                "jobId": "",
+                "scorerId": "",
+                "scope": "trace",
+                "targetId": "trace-1",
+            })
+            .to_string(),
             level: LlmScoreDataLevel::Trace,
             name: "test".to_string(),
-            value_numeric: None,
-            value_categorical: None,
-            value_boolean: None,
-            data_type: LlmScoreDataType::Numeric,
-            scorer_id: None,
-            scorer_version: None,
-            score_config_id: None,
-            score_config_version: None,
-            source_type: LlmScoreDataSourceType::LlmJudge,
-            source_stream: None,
-            source_stream_type: None,
-            agent_name: None,
-            agent_id: None,
-            agent_env: None,
-            agent_version: None,
-            job_id: None,
-            job_version: None,
-            reasoning: None,
-            metadata: None,
-            author: None,
-            _timestamp: 0,
+            ..LlmScoreRecord::default()
         };
         let json = serde_json::to_value(&record).unwrap();
         let obj = json.as_object().unwrap();
         assert!(!obj.contains_key("span_id"));
+        assert!(!obj.contains_key("ref_timestamp"));
         assert!(!obj.contains_key("trace_id"));
         assert!(!obj.contains_key("session_id"));
         assert!(!obj.contains_key("experiment_id"));
@@ -386,9 +551,11 @@ mod tests {
         assert!(!obj.contains_key("value_boolean"));
         assert!(!obj.contains_key("scorer_id"));
         assert!(!obj.contains_key("score_config_id"));
+        assert!(!obj.contains_key("review_submission_id"));
         assert!(!obj.contains_key("agent_name"));
         assert!(!obj.contains_key("agent_id"));
         assert!(!obj.contains_key("reasoning"));
+        assert!(!obj.contains_key("review_submission_comments"));
         assert!(!obj.contains_key("author"));
     }
 
@@ -511,5 +678,69 @@ mod tests {
             serde_json::to_string(&LlmScoreDataType::Boolean).unwrap(),
             "\"boolean\""
         );
+    }
+
+    #[test]
+    fn target_scope_display_matches_stream_values() {
+        assert_eq!(LlmScoreTargetScope::Span.to_string(), "span");
+        assert_eq!(LlmScoreTargetScope::Trace.to_string(), "trace");
+        assert_eq!(LlmScoreTargetScope::Session.to_string(), "session");
+    }
+
+    #[test]
+    fn evaluation_keys_are_structured_json() {
+        let automated = evaluation_key(
+            "org=1",
+            LlmScoreEvaluationSource::Automated {
+                job_id: "job;1",
+                scorer_id: "scorer%1",
+            },
+            LlmScoreTargetScope::Span,
+            "span=1;2",
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&automated).unwrap(),
+            serde_json::json!({
+                "orgId": "org=1",
+                "source": "automated",
+                "jobId": "job;1",
+                "scorerId": "scorer%1",
+                "scope": "span",
+                "targetId": "span=1;2",
+            })
+        );
+
+        let annotation = evaluation_key(
+            "org-1",
+            LlmScoreEvaluationSource::Annotation {
+                annotation_id: "annotation-1",
+                score_config_id: "config-1",
+            },
+            LlmScoreTargetScope::Trace,
+            "trace-1",
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&annotation).unwrap(),
+            serde_json::json!({
+                "orgId": "org-1",
+                "source": "annotation",
+                "annotationId": "annotation-1",
+                "scoreConfigId": "config-1",
+                "scope": "trace",
+                "targetId": "trace-1",
+            })
+        );
+    }
+
+    #[test]
+    fn score_record_default_is_safe_for_selective_construction() {
+        let record = LlmScoreRecord::default();
+        assert!(record.id.is_empty());
+        assert_eq!(record.target_scope, LlmScoreTargetScope::Span);
+        assert_eq!(record.level, LlmScoreDataLevel::Span);
+        assert_eq!(record.data_type, LlmScoreDataType::Numeric);
+        assert!(record.scorer_id.is_none());
+        assert!(record.agent_id.is_none());
+        assert!(record.ref_timestamp.is_none());
     }
 }

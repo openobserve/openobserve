@@ -292,7 +292,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
-  defineComponent,
   ref,
   onDeactivated,
   onActivated,
@@ -302,8 +301,6 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { subtractRelativeTime } from "@/utils/date";
-import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
@@ -314,10 +311,7 @@ import { contextRegistry, createTracesContextProvider } from "@/composables/cont
 import TransformService from "@/services/jstransform";
 import {
   b64EncodeUnicode,
-  verifyOrganizationStatus,
   b64DecodeUnicode,
-  formatTimeWithSuffix,
-  timestampToTimezoneDate,
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
@@ -334,12 +328,7 @@ import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
-import {
-  applyFieldGrouping,
-  buildSemanticIndex,
-  CATEGORY,
-  type FieldObj,
-} from "@/utils/fieldCategories";
+import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
 import {
   useServiceCorrelation,
   type KeyFieldsConfig,
@@ -352,7 +341,6 @@ import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -603,71 +591,6 @@ function loadStreamLists() {
   }
 }
 
-function getConsumableDateTime() {
-  try {
-    if (searchObj.data.datetime.tab == "relative") {
-      let period = "";
-      let periodValue = 0;
-      // arithmetic on weeks is not supported; convert to days.
-
-      if (searchObj.data.datetime.relative.period.label.toLowerCase() == "weeks") {
-        period = "days";
-        periodValue = searchObj.data.datetime.relative.value * 7;
-      } else {
-        period = searchObj.data.datetime.relative.period.label.toLowerCase();
-        periodValue = searchObj.data.datetime.relative.value;
-      }
-      const subtractObject = '{"' + period + '":' + periodValue + "}";
-
-      let endTimeStamp = new Date();
-      if (searchObj.data.resultGrid.currentPage > 0) {
-        endTimeStamp = searchObj.data.resultGrid.currentDateTime;
-      } else {
-        searchObj.data.resultGrid.currentDateTime = endTimeStamp;
-      }
-
-      const startTimeStamp = subtractRelativeTime(endTimeStamp, JSON.parse(subtractObject));
-
-      return {
-        start_time: startTimeStamp,
-        end_time: endTimeStamp,
-      };
-    } else {
-      let start, end;
-      if (
-        searchObj.data.datetime.absolute.date.from == "" &&
-        searchObj.data.datetime.absolute.startTime == ""
-      ) {
-        start = new Date();
-      } else {
-        start = new Date(
-          searchObj.data.datetime.absolute.date.from +
-            " " +
-            searchObj.data.datetime.absolute.startTime,
-        );
-      }
-      if (
-        searchObj.data.datetime.absolute.date.to == "" &&
-        searchObj.data.datetime.absolute.endTime == ""
-      ) {
-        end = new Date();
-      } else {
-        end = new Date(
-          searchObj.data.datetime.absolute.date.to + " " + searchObj.data.datetime.absolute.endTime,
-        );
-      }
-      const rVal = {
-        start_time: start,
-        end_time: end,
-      };
-      return rVal;
-    }
-  } catch (e) {
-    searchObj.loading = false;
-    console.error("Error while getting consumable date time");
-  }
-}
-
 const getDefaultRequest = () => {
   return {
     query: {
@@ -696,16 +619,12 @@ function buildSearch() {
     req.query.start_time = timestamps.startTime;
     req.query.end_time = timestamps.endTime;
 
-    let parseQuery = query.split("|");
-    let queryFunctions = "";
-    let whereClause = "";
-
-    if (parseQuery.length > 1) {
-      queryFunctions = "," + parseQuery[0].trim();
-      whereClause = parseQuery[1].trim();
-    } else {
-      whereClause = parseQuery[0].trim();
-    }
+    // The whole query IS the where clause. Do not split on "|": the legacy
+    // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
+    // inside a term such as match_all('text | error') would push half the term into
+    // the [QUERY_FUNCTIONS] slot before FROM and leave a broken where clause.
+    const queryFunctions = "";
+    let whereClause = query.trim();
 
     if (whereClause.trim() != "") {
       // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
@@ -823,23 +742,6 @@ function fetchTracesCount() {
   );
 }
 
-const showTraceDetailsError = () => {
-  showErrorNotification(
-    t("traces.index.traceNotFound", {
-      traceId: router.currentRoute.value.query.trace_id,
-    }),
-  );
-  const query = cloneDeep(router.currentRoute.value.query);
-  delete query.trace_id;
-  router.push({
-    name: "traces",
-    query: {
-      ...query,
-    },
-  });
-  return;
-};
-
 const updateFieldValues = (data) => {
   const excludedFields = [store.state.zoConfig.timestamp_column, "_start_time_ns", "_end_time_ns"];
   data.forEach((item) => {
@@ -909,10 +811,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
     // Filters are already in editorValue (set by metrics dashboard brush selections).
-    // Mirror buildSearch: split on | so only the WHERE-clause portion (after the pipe)
-    // is passed to parseDurationWhereClause, not the query-functions prefix.
-    const editorParts = searchObj.data.editorValue.trim().split("|");
-    let filter = (editorParts.length > 1 ? editorParts[1] : editorParts[0]).trim();
+    // Mirror buildSearch: the whole editor value is the where clause. Never split on
+    // "|" — the split is quote-unaware and would truncate a term such as
+    // match_all('text | error') before it reaches parseDurationWhereClause.
+    let filter = searchObj.data.editorValue.trim();
     const filterParseResult = parseDurationWhereClause(
       filter,
       tracesParser.value,
@@ -1178,23 +1080,6 @@ const cancelSearch = () => {
   searchObj.loading = false;
 };
 
-/**
- *
- * @param startTime - start time in microseconds
- * @param endTime - end time in microseconds
- */
-const updateNewDateTime = (startTime: number, endTime: number) => {
-  searchBarRef.value?.updateNewDateTime({
-    startTime: startTime,
-    endTime: endTime,
-  });
-  toast({
-    variant: "success",
-    message: t("traces.timeRangeUpdated"),
-    timeout: 5000,
-  });
-};
-
 async function extractFields() {
   try {
     searchObj.data.stream.selectedStreamFields = [];
@@ -1332,66 +1217,6 @@ async function extractFields() {
   } catch (e) {
     searchObj.loading = false;
     console.error("Error while extracting fields", e);
-  }
-}
-
-function updateGridColumns() {
-  try {
-    searchObj.data.resultGrid.columns = [];
-
-    searchObj.meta.resultGrid.manualRemoveFields = false;
-
-    searchObj.data.resultGrid.columns.push({
-      name: "@timestamp",
-      accessorfn: (row: any) =>
-        timestampToTimezoneDate(
-          row["trace_start_time"],
-          store.state.timezone,
-          "yyyy-MM-dd HH:mm:ss.SSS",
-        ),
-      prop: (row: any) =>
-        timestampToTimezoneDate(
-          row["trace_start_time"],
-          store.state.timezone,
-          "yyyy-MM-dd HH:mm:ss.SSS",
-        ),
-      label: "Start Time",
-      align: "left",
-      sortable: true,
-    });
-
-    searchObj.data.resultGrid.columns.push({
-      name: "operation_name",
-      field: (row: any) => row.operation_name,
-      prop: (row: any) => row.operation_name,
-      label: "Operation",
-      align: "left",
-      sortable: true,
-    });
-
-    searchObj.data.resultGrid.columns.push({
-      name: "service_name",
-      field: (row: any) => row.service_name,
-      prop: (row: any) => row.service_name,
-      label: "Service",
-      align: "left",
-      sortable: true,
-    });
-
-    searchObj.data.resultGrid.columns.push({
-      name: "duration",
-      field: (row: any) => row.duration,
-      prop: (row: any) => row.duration,
-      label: "Duration",
-      align: "left",
-      sortable: true,
-      format: (val) => formatTimeWithSuffix(val),
-    });
-
-    searchObj.loading = false;
-  } catch (e) {
-    searchObj.loading = false;
-    console.error("Error while updating grid columns");
   }
 }
 
@@ -1847,8 +1672,9 @@ const extractTracesColName = (col: any): string | null => {
  * Wraps the traces WHERE clause (stored in editorValue) into a full SQL
  * statement so that fnParsedSQL can parse it.
  *
- * The traces query editor only stores the WHERE portion of the query,
- * optionally pipe-separated (e.g. "| status='200' and duration>100").
+ * The traces query editor stores the WHERE portion of the query in full, so the
+ * whole editor value is the where clause. It is never split on "|" — the split is
+ * quote-unaware and would truncate a term such as match_all('text | error').
  * fnParsedSQL requires a complete SELECT statement, so we synthesise one.
  *
  * Returns an empty string when there is no active WHERE clause.
@@ -1856,8 +1682,7 @@ const extractTracesColName = (col: any): string | null => {
 const buildTracesWhereSQL = (): string => {
   const query = searchObj.data.editorValue?.trim();
   if (!query) return "";
-  const parts = query.split("|");
-  const whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  const whereClause = query;
   if (!whereClause) return "";
   const streamName = searchObj.data.stream.selectedStream?.value || "stream";
   return `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
@@ -2034,35 +1859,15 @@ const onChildStreamChangeRequest = (newStream: string) => {
   }
 };
 
-const collapseFieldList = () => {
-  if (searchObj.meta.showFields) searchObj.meta.showFields = false;
-  else searchObj.meta.showFields = true;
-};
-
 const showFields = computed(() => {
   return searchObj.meta.showFields;
-});
-const showHistogram = computed(() => {
-  return searchObj.meta.showHistogram;
-});
-const showQuery = computed(() => {
-  return searchObj.meta.showQuery;
 });
 const moveSplitter = computed(() => {
   return searchObj.config.splitterModel;
 });
-const changeStream = computed(() => {
-  return searchObj.data.stream.selectedStream;
-});
-const changeRelativeDate = computed(() => {
-  return searchObj.data.datetime.relative.value + searchObj.data.datetime.relative.period.value;
-});
 // const updateSelectedColumns = computed(() => {
 //   return searchObj.data.stream.selectedFields.length;
 // });
-const runQuery = computed(() => {
-  return searchObj.runQuery;
-});
 
 watch(
   () => searchObj.data.stream.selectedStream.value,

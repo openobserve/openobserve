@@ -264,7 +264,6 @@ const isOpen = ref(true);
 // mode; the handlers mutate this clone and emit it, and the ancestor writes it
 // back through the form (which re-syncs via the watch below).
 const groups = ref(cloneDeep(props.group));
-const showPreview = ref(true);
 
 const store = useStore();
 const { isDark } = useTheme();
@@ -340,7 +339,7 @@ function isGroup(item: any) {
 
 // Handlers mutate the clone `groups` (never the readonly `props.group`) and emit
 // it; the ancestor writes it back through the form, re-syncing via the watch above.
-const addCondition = (groupId: string) => {
+const addCondition = (_groupId: string) => {
   // Capture any in-place bare-mode leaf edits before mutating + emitting.
   syncWorkingCopyFromProp();
   // V2: Create condition with filterType and logicalOperator
@@ -357,7 +356,7 @@ const addCondition = (groupId: string) => {
   emit("add-condition", groups.value);
 };
 
-const addGroup = (groupId: string) => {
+const addGroup = (_groupId: string) => {
   // Capture any in-place bare-mode leaf edits before mutating + emitting.
   syncWorkingCopyFromProp();
   // V2: Create group with filterType, logicalOperator, and conditions array
@@ -583,26 +582,3 @@ defineExpose({
   confirmDialog,
 });
 </script>
-
-<style scoped>
-/* keep(scrollbar): ::-webkit-scrollbar pseudo-elements and scrollbar-color have no utility equivalent. */
-
-.group-container {
-  scrollbar-color: var(--color-border-strong) var(--color-surface-base); /* thumb color, track color */
-}
-
-/* For more control using WebKit scrollbar styling */
-.group-container::-webkit-scrollbar {
-  width: 0.5rem;
-  height: 0.25rem !important;
-}
-
-.group-container::-webkit-scrollbar-track {
-  background: var(--color-surface-base);
-}
-
-.group-container::-webkit-scrollbar-thumb {
-  background-color: var(--color-border-strong);
-  border-radius: var(--radius-default);
-}
-</style>

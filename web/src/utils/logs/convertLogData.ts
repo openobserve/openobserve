@@ -103,6 +103,7 @@ export const convertLogData = (
           ? params.itemStyle
           : {
               color: (() => {
+                // eslint-disable-next-line no-restricted-syntax -- reads the applied `dark` class off the document, not store.state.theme. This runs inside an ECharts formatter callback outside any component scope, where useTheme() is not callable.
                 const isDarkMode = document.documentElement.classList.contains("dark");
                 if (isDarkMode) {
                   return getComputedStyle(document.body)

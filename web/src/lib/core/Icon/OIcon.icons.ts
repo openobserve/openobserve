@@ -134,6 +134,7 @@ import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-out
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
 import Bookmark from "~icons/material-symbols/bookmark-outline";
+import BookmarkAdd from "~icons/material-symbols/bookmark-add-outline";
 import Build from "~icons/material-symbols/build-outline";
 import Business from "~icons/material-symbols/business-center-outline";
 import Chat from "~icons/material-symbols/chat-outline";
@@ -236,6 +237,7 @@ import HelpIcon from "~icons/material-symbols/help-outline";
 import HistoryToggleOffIcon from "~icons/material-symbols/history-toggle-off";
 import HomeIcon from "~icons/mdi/home-outline";
 import OrganizationIcon from "~icons/octicon/organization-16";
+import Graph1Icon from "~icons/material-symbols/graph-1";
 import Graph2Icon from "~icons/material-symbols/graph-2";
 import HubIcon from "~icons/material-symbols/hub-outline";
 import ImageIcon from "~icons/material-symbols/image-outline";
@@ -474,6 +476,7 @@ export const iconRegistry = {
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,
   bookmark: Bookmark,
+  "bookmark-add": BookmarkAdd,
   build: Build,
   business: Business,
   chat: Chat,
@@ -485,6 +488,7 @@ export const iconRegistry = {
   dns: Dns,
   "fork-right": ForkRight,
   "git-branch": ForkRight,
+  "graph-1": Graph1Icon,
   "graph-2": Graph2Icon,
   flame: Whatshot,
   whatshot: Whatshot,

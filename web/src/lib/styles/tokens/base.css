@@ -281,6 +281,8 @@
   --color-chart-series-11: #e879f9;
   --color-chart-series-12: #facc15;
 
+  --color-chart-markline-shadow: rgba(255, 255, 255, 0.7);
+
   /* --- Dashboard table row-highlight palette — light values (dark overrides in
      dark.css). Read by colorPalette.ts getColorForTable() via chartColor(). --- */
   --color-chart-table-1: #ffcdee;
@@ -400,6 +402,7 @@
   /* --- Shadow scale — hairline-border philosophy ---
      Only sm/md/lg render real elevation (overlays: dialogs, menus). Cards use a
      1px border, not a drop shadow — a flat surface needs NO shadow class. */
+  --shadow-xs-c: rgb(0 0 0 / 0.08);
   --shadow-sm-c1: rgb(0 0 0 / 0.1);
   --shadow-sm-c2: rgb(0 0 0 / 0.06);
   --shadow-md-c1: rgb(0 0 0 / 0.08);

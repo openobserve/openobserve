@@ -29,7 +29,7 @@
 use config::meta::slo::{SliType, Slo, SloDefinition};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, sea_query::Expr,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait, sea_query::Expr,
 };
 
 use super::entity::{slo_status, slos};
@@ -230,6 +230,98 @@ pub async fn update(
     })
 }
 
+/// Every SLO in `org` whose SLI measures from this alert (S-16 PR 4).
+///
+/// The reverse of `SliConfig::Alert { alert_id }`, and the mirror of
+/// `alerts::list_alerts_by_slo`. There is no `source_alert_id` column to index:
+/// the pointer lives inside `sli_config`, so the query narrows on the
+/// denormalized `sli_type` — which exists for exactly this kind of filtering —
+/// and matches the id in Rust. Alert SLIs are a small minority of a small
+/// table, so the residual scan is over a handful of rows.
+///
+/// Disabled SLOs are included, exactly as `list_alerts_by_slo` includes
+/// disabled alerts: a paused SLO is still measuring from that source the moment
+/// it resumes, and deleting its source would leave it unrecoverable.
+pub async fn list_by_source_alert(
+    db: &DatabaseConnection,
+    org: &str,
+    alert_id: &str,
+) -> Result<Vec<Slo>, Error> {
+    let rows = slos::Entity::find()
+        .filter(slos::Column::Org.eq(org))
+        .filter(slos::Column::SliType.eq(SliType::Alert.storage_id()))
+        // Ordered by name because this feeds a 409 that names the SLOs; a
+        // message whose wording depends on row order is one nobody can write a
+        // runbook against.
+        .order_by_asc(slos::Column::Name)
+        .all(db)
+        .await?;
+    let mut out = Vec::new();
+    for model in rows {
+        let slo = to_slo(model)?;
+        if matches!(
+            &slo.definition.sli_config,
+            config::meta::slo::SliConfig::Alert { alert_id: a } if a == alert_id
+        ) {
+            out.push(slo);
+        }
+    }
+    Ok(out)
+}
+
+/// Bump `definition_generation` because something OUTSIDE the SLO changed what
+/// a slice means — the source alert's condition (D59, S-16 PR 4).
+///
+/// Deliberately not routed through [`update`]: that path diffs a caller-supplied
+/// definition, and here the definition is untouched. Everything else about the
+/// epoch change is identical, and is why this is a transaction rather than a
+/// bare UPDATE — leaving the old aggregates would average two definitions into
+/// one number that describes neither.
+///
+/// Returns `(from, to)`, or `None` when the SLO does not exist.
+pub async fn bump_generation(
+    db: &DatabaseConnection,
+    org: &str,
+    id: &str,
+    now: i64,
+) -> Result<Option<(i32, i32)>, Error> {
+    let txn = db.begin().await?;
+    let Some(existing) = slos::Entity::find_by_id(id.to_string())
+        .filter(slos::Column::Org.eq(org))
+        .one(&txn)
+        .await?
+    else {
+        let _ = txn.rollback().await;
+        return Ok(None);
+    };
+
+    let from = existing.definition_generation;
+    let to = from + 1;
+    let mut active = existing.into_active_model();
+    active.definition_generation = Set(to);
+    // The incremental writer starts its watermark here and backfill owns
+    // strictly before it — the same fence `update` sets on a bump (§6b.9).
+    active.generation_reset_time = Set(Some(now));
+    active.updated_at = Set(now);
+    active.update(&txn).await?;
+
+    slo_status::Entity::delete_many()
+        .filter(slo_status::Column::SloId.eq(id))
+        .exec(&txn)
+        .await?;
+    slo_status::ActiveModel {
+        slo_id: Set(id.to_string()),
+        group_key: Set(slo_status::ROLLUP_GROUP_KEY.to_string()),
+        definition_generation: Set(to),
+        ..Default::default()
+    }
+    .insert(&txn)
+    .await?;
+
+    txn.commit().await?;
+    Ok(Some((from, to)))
+}
+
 /// Delete an SLO and its status rows together.
 ///
 /// Slices are NOT deleted: they age out with the stream's retention, and the
@@ -253,6 +345,33 @@ pub async fn delete(db: &DatabaseConnection, org: &str, id: &str) -> Result<bool
     model.delete(&txn).await?;
     txn.commit().await?;
     Ok(true)
+}
+
+/// The ids of every SLO in an org.
+///
+/// `slo_status` and `slo_backfill_jobs` carry no org column — their only SLO
+/// reference is `slo_id` — so their by-org sweeps resolve the org through here.
+pub(crate) async fn ids_in_org(db: &DatabaseConnection, org: &str) -> Result<Vec<String>, Error> {
+    Ok(slos::Entity::find()
+        .filter(slos::Column::Org.eq(org))
+        .select_only()
+        .column(slos::Column::Id)
+        .into_tuple()
+        .all(db)
+        .await?)
+}
+
+/// Delete every SLO in an org — the org-teardown path.
+///
+/// Only this table. Status rows and backfill jobs are swept by their own
+/// modules, which resolve their org through `ids_in_org` and therefore run
+/// BEFORE this (`org_cleanup::step_delete_db_resources`).
+pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Error> {
+    slos::Entity::delete_many()
+        .filter(slos::Column::Org.eq(org))
+        .exec(db)
+        .await?;
+    Ok(())
 }
 
 /// Toggle `enabled` without touching the definition — never a generation bump.
@@ -391,9 +510,51 @@ fn to_model(slo: &Slo, _now: i64) -> Result<slos::ActiveModel, Error> {
     })
 }
 
+/// Register an SLO for sibling modules' tests.
+///
+/// `slo_status` and `slo_backfill_jobs` carry no org column, so their by-org
+/// sweeps resolve through this table — which means their tests need a real
+/// `slos` row. Goes through `create`, so the fixture is what production
+/// actually writes.
+#[cfg(test)]
+pub(crate) async fn insert_for_test(db: &DatabaseConnection, org: &str, id: &str) {
+    use config::meta::slo::{CountSource, SliConfig};
+    let slo = Slo {
+        id: id.to_string(),
+        org: org.to_string(),
+        folder_id: "default".to_string(),
+        name: format!("slo {id}"),
+        description: String::new(),
+        definition: SloDefinition {
+            sli_config: SliConfig::Count {
+                source: CountSource::SingleQuery {
+                    stream: "requests".into(),
+                    stream_type: "logs".into(),
+                    scope: None,
+                    good_expr: "status < 500".into(),
+                },
+            },
+            group_by: None,
+            window_secs: 30 * 86_400,
+            slice_interval_secs: 60,
+        },
+        target: 99.9,
+        tags: vec![],
+        enabled: true,
+        owner: None,
+        definition_generation: 1,
+        groups_estimate: None,
+        groups_reserved: 1,
+    };
+    create(db, &slo, 1_000, None).await.unwrap();
+}
+
 #[cfg(test)]
 mod tests {
-    use config::meta::slo::{CountSource, SliConfig};
+    use config::meta::{
+        alerts::Operator,
+        slo::{CountSource, QueryLanguage, SliConfig},
+    };
     use sea_orm::Database;
 
     use super::*;
@@ -534,6 +695,84 @@ mod tests {
         );
     }
 
+    /// Pins the ONE lever an operator has to force an SLO to rebuild its
+    /// history, because there is no "recalculate" endpoint, button or CLI
+    /// subcommand: for a non-alert SLI, [`update`] is the only route to a
+    /// generation bump, and the documented repair for an SLO whose stored
+    /// slices were computed by a since-fixed bug is to re-save it with a
+    /// whitespace-only edit to its query.
+    ///
+    /// **Internal** whitespace, not leading or trailing, and that is not a
+    /// detail: the Monaco editor behind the SLO query field trims on blur and
+    /// rewrites its own model before the save reads it
+    /// (`web/src/components/CodeQueryEditor.vue`), so an edit that only adds a
+    /// trailing space never reaches this comparison — the operator would get a
+    /// successful save that rebuilt nothing. A doubled space between two
+    /// tokens survives both that trim and `SloExpressionField`'s newline
+    /// collapse.
+    ///
+    /// Driven through `update` rather than by calling [`definition_changed`]
+    /// directly, so that swapping the CALL SITE breaks it too. The comparison
+    /// has an unreferenced twin in
+    /// `config::meta::slo::generation::requires_new_generation`, whose
+    /// `canonicalize` step collapses whitespace inside every string and whose
+    /// own tests assert that whitespace-only edits do NOT force a rebuild.
+    /// Wiring it in here would look like a tidy-up and would silently turn the
+    /// documented repair into a no-op. If that happens, this test fails and
+    /// the release note has to change with it.
+    #[tokio::test]
+    async fn an_internal_whitespace_query_edit_bumps_the_generation() {
+        fn time_slice_sli(query: &str) -> SliConfig {
+            SliConfig::TimeSlice {
+                stream: "requests".into(),
+                stream_type: "logs".into(),
+                query_language: QueryLanguage::Sql,
+                query: query.to_string(),
+                scope: None,
+                comparator: Operator::LessThan,
+                threshold: 300.0,
+                absent_is_bad: false,
+            }
+        }
+
+        let db = db().await;
+        let mut original = slo();
+        original.definition.sli_config = time_slice_sli("approx_percentile_cont(duration, 0.95)");
+        create(&db, &original, 1_000, None).await.unwrap();
+
+        let mut edited = original.clone();
+        edited.definition.sli_config = time_slice_sli("approx_percentile_cont(duration,  0.95)");
+
+        assert_eq!(
+            update(&db, &edited, 2_000, None).await.unwrap(),
+            GenerationEffect::Bumped { from: 1, to: 2 },
+            "a doubled space must mint a new generation, or the documented repair is a no-op"
+        );
+
+        // The bump is the whole point: the rebuild reads from the re-seeded
+        // status row, so a bump that did not reset it would leave the old
+        // definition's arithmetic in the new epoch's window.
+        let status = slo::load_status(&db, ID, slo_status::ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(status.definition_generation, 2);
+        assert_eq!(status.good, None, "re-seeded, not carried over");
+    }
+
+    /// The control that keeps the repair honest, and the reason it cannot be
+    /// stated as "open the SLO and press Save": an unchanged re-save returns
+    /// `Unchanged` and rebuilds nothing at all.
+    #[tokio::test]
+    async fn re_saving_an_identical_definition_rebuilds_nothing() {
+        let db = db().await;
+        create(&db, &slo(), 1_000, None).await.unwrap();
+        assert_eq!(
+            update(&db, &slo(), 2_000, None).await.unwrap(),
+            GenerationEffect::Unchanged(1)
+        );
+    }
+
     #[tokio::test]
     async fn changing_the_window_or_slice_interval_bumps_the_generation() {
         for mutate in [
@@ -603,6 +842,7 @@ mod tests {
                 }],
                 watermark_end: Some(9_000),
                 trailing_slices: None,
+                burn_windows: None,
                 computed_at: 1_500,
             },
         )
@@ -861,6 +1101,248 @@ mod tests {
         elsewhere.folder_id = "payments".into();
         create(&db, &elsewhere, 1_000, None).await.unwrap();
         assert_eq!(count_in_org(&db, ORG).await.unwrap(), 2);
+    }
+
+    // ===================== org teardown ===================================
+
+    const OTHER_ORG: &str = "globex";
+
+    /// A distinct SLO, in whichever org — the unique index makes the name
+    /// track the id so two fixtures can share a folder.
+    fn slo_in(org: &str, id: &str) -> Slo {
+        let mut s = slo();
+        s.org = org.to_string();
+        s.id = id.to_string();
+        s.name = format!("slo {id}");
+        s
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_removes_every_slo_in_the_org() {
+        let db = db().await;
+        create(&db, &slo_in(ORG, ID), 1_000, None).await.unwrap();
+        create(&db, &slo_in(ORG, "slo11111111111111111111111"), 1_000, None)
+            .await
+            .unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert_eq!(count_in_org(&db, ORG).await.unwrap(), 0);
+    }
+
+    /// Org scoping is a security boundary here too: a teardown must not reach
+    /// past the org being deleted.
+    #[tokio::test]
+    async fn delete_by_org_leaves_other_orgs_slos_alone() {
+        let db = db().await;
+        create(&db, &slo_in(ORG, ID), 1_000, None).await.unwrap();
+        create(
+            &db,
+            &slo_in(OTHER_ORG, "slo11111111111111111111111"),
+            1_000,
+            None,
+        )
+        .await
+        .unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert_eq!(count_in_org(&db, ORG).await.unwrap(), 0);
+        assert_eq!(
+            count_in_org(&db, OTHER_ORG).await.unwrap(),
+            1,
+            "another org's SLO was deleted"
+        );
+    }
+
+    /// Org cleanup retries steps, so the second run must find nothing and
+    /// still succeed.
+    #[tokio::test]
+    async fn delete_by_org_on_an_org_with_no_slos_is_a_no_op() {
+        let db = db().await;
+        create(&db, &slo_in(OTHER_ORG, ID), 1_000, None)
+            .await
+            .unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        delete_by_org(&db, ORG).await.unwrap();
+        assert_eq!(count_in_org(&db, OTHER_ORG).await.unwrap(), 1);
+    }
+
+    // ===================== the reverse lookup (S-16 PR 4) =================
+
+    const ALERT: &str = "2abcdefghijklmnopqrstuvwxyz";
+    const OTHER_ALERT: &str = "2zyxwvutsrqponmlkjihgfedcb";
+
+    fn alert_slo(id: &str, org: &str, alert_id: &str) -> Slo {
+        let mut s = slo_in(org, id);
+        s.definition.sli_config = SliConfig::Alert {
+            alert_id: alert_id.to_string(),
+        };
+        s
+    }
+
+    /// Ordered by name, not by insertion: the 409 this feeds names the SLOs,
+    /// and a message whose wording depends on row order is a message nobody
+    /// can write a test — or a runbook — against.
+    #[tokio::test]
+    async fn the_reverse_lookup_finds_the_slos_measuring_from_an_alert() {
+        let db = db().await;
+        let mut zebra = alert_slo(ID, ORG, ALERT);
+        zebra.name = "zebra availability".into();
+        let mut alpha = alert_slo("slo11111111111111111111111", ORG, ALERT);
+        alpha.name = "alpha availability".into();
+        create(&db, &zebra, 1_000, None).await.unwrap();
+        create(&db, &alpha, 1_000, None).await.unwrap();
+
+        let found = list_by_source_alert(&db, ORG, ALERT).await.unwrap();
+        let names: Vec<&str> = found.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(names, vec!["alpha availability", "zebra availability"]);
+    }
+
+    /// The three ways a row can look like a match and not be one. Getting any
+    /// of them wrong turns the delete guard into a refusal the user cannot
+    /// explain — or, worse, lets a real dependent through.
+    #[tokio::test]
+    async fn the_reverse_lookup_matches_only_this_alert_in_this_org() {
+        let db = db().await;
+        // A non-alert SLI, which carries no alert_id at all.
+        create(&db, &slo_in(ORG, ID), 1_000, None).await.unwrap();
+        // An alert SLI on a DIFFERENT source.
+        create(
+            &db,
+            &alert_slo("slo11111111111111111111111", ORG, OTHER_ALERT),
+            1_000,
+            None,
+        )
+        .await
+        .unwrap();
+        // The same source, in another org.
+        create(
+            &db,
+            &alert_slo("slo22222222222222222222222", OTHER_ORG, ALERT),
+            1_000,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            list_by_source_alert(&db, ORG, ALERT)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    /// A paused SLO still measures from that source the moment it resumes, so
+    /// deleting its source would leave it unrecoverable — exactly the reason
+    /// `list_alerts_by_slo` counts disabled alerts.
+    #[tokio::test]
+    async fn a_disabled_slo_still_counts_as_a_dependent() {
+        let db = db().await;
+        let mut s = alert_slo(ID, ORG, ALERT);
+        s.enabled = false;
+        create(&db, &s, 1_000, None).await.unwrap();
+        assert_eq!(
+            list_by_source_alert(&db, ORG, ALERT).await.unwrap().len(),
+            1
+        );
+    }
+
+    // ===================== the external bump (S-16 PR 4) ==================
+
+    #[tokio::test]
+    async fn an_external_bump_starts_a_new_epoch() {
+        let db = db().await;
+        create(&db, &alert_slo(ID, ORG, ALERT), 1_000, None)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            bump_generation(&db, ORG, ID, 9_000).await.unwrap(),
+            Some((1, 2))
+        );
+        let after = get(&db, ORG, ID).await.unwrap().unwrap();
+        assert_eq!(after.definition_generation, 2);
+        // The fence that keeps the incremental writer and backfill off each
+        // other's slices has to move with the epoch (§6b.9).
+        assert_eq!(generation_reset_time(&db, ID).await.unwrap(), Some(9_000));
+        // The definition itself is untouched — the source moved, not the SLO.
+        assert_eq!(after.definition, alert_slo(ID, ORG, ALERT).definition);
+    }
+
+    /// Leaving the old aggregates would average two definitions into one
+    /// number that describes neither — the one corruption eventual
+    /// consistency does not repair.
+    #[tokio::test]
+    async fn an_external_bump_clears_and_reseeds_the_aggregates() {
+        let db = db().await;
+        create(&db, &alert_slo(ID, ORG, ALERT), 1_000, None)
+            .await
+            .unwrap();
+        let applied = slo::apply_status(
+            &db,
+            &slo::StatusWrite {
+                slo_id: ID.to_string(),
+                definition_generation: 1,
+                writer: config::meta::slo::slice::Writer::Incremental,
+                deltas: vec![slo::GroupDelta {
+                    group_key: slo_status::ROLLUP_GROUP_KEY.to_string(),
+                    good_delta: 90.0,
+                    total_delta: 100.0,
+                    covered_slices_delta: 100,
+                }],
+                watermark_end: Some(5_000),
+                trailing_slices: None,
+                burn_windows: None,
+                computed_at: 5_000,
+            },
+        )
+        .await
+        .unwrap();
+        // Or the aggregates were never written and the assertions below would
+        // hold for a reason that has nothing to do with the bump.
+        assert_eq!(applied, slo::WriteOutcome::Applied);
+        assert_eq!(
+            slo::load_status(&db, ID, slo_status::ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .unwrap()
+                .good,
+            Some(90.0)
+        );
+
+        bump_generation(&db, ORG, ID, 9_000).await.unwrap();
+
+        let rows = slo::load_all_groups(&db, ID).await.unwrap();
+        assert_eq!(rows.len(), 1, "only the rollup seed survives");
+        assert_eq!(rows[0].group_key, slo_status::ROLLUP_GROUP_KEY);
+        assert_eq!(rows[0].definition_generation, 2);
+        assert_eq!(rows[0].good, None, "reseeded, not carried over");
+        assert_eq!(rows[0].total, None);
+    }
+
+    #[tokio::test]
+    async fn bumping_an_slo_that_is_not_there_changes_nothing() {
+        let db = db().await;
+        create(&db, &alert_slo(ID, ORG, ALERT), 1_000, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            bump_generation(&db, "other-org", ID, 9_000).await.unwrap(),
+            None
+        );
+        assert_eq!(
+            bump_generation(&db, ORG, "nope", 9_000).await.unwrap(),
+            None
+        );
+        assert_eq!(
+            get(&db, ORG, ID)
+                .await
+                .unwrap()
+                .unwrap()
+                .definition_generation,
+            1
+        );
     }
 }
 

@@ -184,16 +184,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
 
-          <OButton
-            v-if="showEvaluateButton && canPreviewSpan"
-            variant="primary"
-            size="xs"
-            class="ml-1"
-            data-test="trace-details-sidebar-evaluate-span-btn"
-            @click.stop="evaluateSpan"
-          >
-            {{ t("onlineEvals.manualEvaluation.titles.span") }}
-          </OButton>
+          <!-- LLM workflow actions — icon-only, matching the trace header. The
+               row itself has no gap (its children carry their own margins), so
+               these three are grouped and spaced on the header's rhythm. -->
+          <div class="ml-2 flex items-center gap-2">
+            <OButton
+              v-if="showEvaluateButton && canPreviewSpan"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('onlineEvals.manualEvaluation.titles.span')"
+              data-test="trace-details-sidebar-evaluate-span-btn"
+              @click.stop="evaluateSpan"
+            >
+              <OIcon name="rule" size="sm" />
+              <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.span')" />
+            </OButton>
+
+            <TraceAnnotateMenu
+              v-if="showAnnotateButtons"
+              ref-type="span"
+              :ref-id="String(span.span_id ?? '')"
+              :ref-trace-id="String(span.trace_id ?? '')"
+              :ref-trace-start-time="spanStartTimeUs"
+              :source-stream="spanSourceStream"
+              compact
+              data-test="trace-details-sidebar-annotate-span-btn"
+            />
+
+            <OButton
+              v-if="showAnnotateButtons"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.dataset.button')"
+              data-test="trace-details-sidebar-dataset-span-btn"
+              @click.stop="addSpanToDataset"
+            >
+              <OIcon name="table-chart" size="sm" />
+              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
+            </OButton>
+          </div>
         </div>
       </div>
 
@@ -272,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="px-page-edge span_details_tabs">
       <OTabs
-        :model-value="activeTab"
+        :model-value="activeTabModel"
         @update:model-value="$emit('update:activeTab', $event)"
         dense
         align="left"
@@ -348,13 +377,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden"
       :class="
-        activeTab === 'correlated-logs' || activeTab === 'correlated-metrics'
+        activeTabModel === 'correlated-logs' || activeTabModel === 'correlated-metrics'
           ? ''
           : 'px-page-edge py-2'
       "
     >
       <OTabPanels
-        :model-value="activeTab"
+        :model-value="activeTabModel"
         @update:model-value="$emit('update:activeTab', $event)"
         grow
         class="h-full overflow-y-auto"
@@ -363,13 +392,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel v-if="canPreviewSpan" name="preview" class="llm-preview-panel p-3">
           <div class="llm-preview-container h-full! w-full overflow-hidden overflow-x-auto">
             <!-- Input and Output Side by Side -->
-            <div class="io-container flex h-full! w-full!" ref="ioContainerRef">
+            <div
+              class="io-container flex h-full! w-full!"
+              :class="isFullscreen ? 'bg-surface-panel' : ''"
+              ref="ioContainerRef"
+            >
               <!-- Input Section -->
               <div
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pr-2"
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
                   <div class="flex items-center gap-1">
@@ -442,6 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
                   <div class="flex items-center gap-1">
@@ -693,6 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="(col, index) in linkColumns"
                     :key="'result_' + index"
                     :data-test="`trace-events-table-th-${col.label}`"
+                    class="bg-border-default"
                   >
                     {{ col.label }}
                   </th>
@@ -933,6 +969,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showAnnotateButtons: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -955,6 +995,9 @@ export default defineComponent({
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
     ),
+    TraceAnnotateMenu: defineAsyncComponent(
+      () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
+    ),
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
@@ -975,6 +1018,7 @@ export default defineComponent({
     "apply-filter-immediately",
     "add-field-to-table",
     "evaluate",
+    "add-to-dataset",
     "update:activeTab",
   ],
   setup(props, { emit }) {
@@ -1008,13 +1052,13 @@ export default defineComponent({
       return !isNaN(num) && num > 0 ? num : null;
     });
 
-    const activeTab = computed({
+    const activeTabModel = computed({
       get: () => props.activeTab,
       set: (value: string) => emit("update:activeTab", value),
     });
 
     const navigateToError = () => {
-      activeTab.value = "error";
+      activeTabModel.value = "error";
     };
     const tags: Ref<{ [key: string]: string }> = ref({});
 
@@ -1471,6 +1515,25 @@ export default defineComponent({
       emit("evaluate", props.span);
     };
 
+    /** The trace stream this span was read from — the annotation API needs it. */
+    const spanSourceStream = computed(() => String(props.span?._stream ?? props.streamName ?? ""));
+
+    /** Span start in MICROSECONDS (`start_time` is nanoseconds), widened by 1µs
+     *  so an inclusive lower-bound search can't exclude the span itself. A span
+     *  with no usable start falls back to the trace's own start: the APIs take
+     *  this as a POSITIVE lower bound, so 0 would be rejected. */
+    const spanStartTimeUs = computed(() => {
+      const startNs = Number(props.span?.start_time);
+      if (Number.isFinite(startNs)) return Math.max(1, Math.floor(startNs / 1_000) - 1);
+      return Number(props.baseTracePosition?.startTimeUs) || 1;
+    });
+
+    // The enterprise drawers live in the parent (same shape as evaluate), so the
+    // sidebar only reports which span was acted on.
+    const addSpanToDataset = () => {
+      emit("add-to-dataset", props.span);
+    };
+
     const getStartTime = computed(() => {
       return formatTimeWithSuffix(
         convertTimeFromNsToUs(props.span.start_time) - (props.baseTracePosition?.startTimeUs || 0),
@@ -1809,7 +1872,7 @@ export default defineComponent({
     );
 
     // Load correlation data when user clicks on correlation tabs
-    watch(activeTab, (newTab) => {
+    watch(activeTabModel, (newTab) => {
       if (newTab === "correlated-logs" || newTab === "correlated-metrics") {
         loadCorrelation();
       }
@@ -1970,7 +2033,7 @@ export default defineComponent({
 
     return {
       t,
-      activeTab,
+      activeTabModel,
       filterActions,
       closeSidebar,
       eventColumns,
@@ -1989,6 +2052,9 @@ export default defineComponent({
       getTTFT,
       viewSpanLogs,
       evaluateSpan,
+      addSpanToDataset,
+      spanStartTimeUs,
+      spanSourceStream,
       getStartTime,
       copySpanId,
       copyAttributesToClipboard,
@@ -2103,7 +2169,6 @@ export default defineComponent({
   }
 
   th {
-    background-color: var(--color-surface-panel);
   }
 
   th:first-child,
@@ -2179,7 +2244,6 @@ export default defineComponent({
 /* complex-state — :fullscreen chains on the LLM input/output panes */
 .llm-preview-container {
   .io-container:fullscreen {
-    background-color: var(--color-surface-panel);
     padding: 0.75rem;
     height: 100vh;
     max-height: 100vh;
@@ -2193,7 +2257,6 @@ export default defineComponent({
       flex-direction: column;
 
       .section-label {
-        background: var(--color-surface-panel);
         border-radius: var(--radius-default);
       }
 
@@ -2245,7 +2308,6 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: var(--color-grey-200);
 }
 
 .thead-sticky tr:last-child > * {

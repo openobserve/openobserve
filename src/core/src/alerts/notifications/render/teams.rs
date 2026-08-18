@@ -20,9 +20,9 @@ use config::meta::alerts::level::AlertLevel;
 use serde_json::{Value, json};
 
 use super::{
-    DEFAULT_LINK_LABEL, clamp,
+    DEFAULT_LINK_LABEL, clamp, dispatchable_url,
     markdown::{escape_html, markdown_to_plaintext},
-    safe_url, severity_color,
+    severity_color,
 };
 use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
 
@@ -116,15 +116,19 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
         }));
     }
 
+    // `Action.OpenUrl` requires an absolute http(s) URL: a relative one or the
+    // blocked placeholder makes Teams reject the card (the same failure class
+    // as #13742 on Slack), so an undispatchable link is dropped, not emitted.
     let actions: Vec<Value> = c
         .links
         .iter()
+        .filter_map(|(label, url)| dispatchable_url(url).map(|url| (label, url)))
         .map(|(label, url)| {
             let is_default_link = label.is_empty();
             let mut action = json!({
                 "type": "Action.OpenUrl",
                 "title": if is_default_link { DEFAULT_LINK_LABEL.to_string() } else { card_text(label) },
-                "url": safe_url(url),
+                "url": url,
             });
             // Mirrors the Slack "primary"-style fix: the default
             // "View in OpenObserve" action is the card's primary CTA and
@@ -207,14 +211,18 @@ pub fn render_teams_message_card(c: &RenderedContent) -> Value {
         );
     }
 
+    // `OpenUri` targets must be absolute http(s) URIs — the O365 connector
+    // rejects anything else, so undispatchable links are dropped (see the
+    // Adaptive Card renderer above and #13742).
     let actions: Vec<Value> = c
         .links
         .iter()
+        .filter_map(|(label, url)| dispatchable_url(url).map(|url| (label, url)))
         .map(|(label, url)| {
             json!({
                 "@type": "OpenUri",
                 "name": if label.is_empty() { DEFAULT_LINK_LABEL.to_string() } else { escape_html(label) },
-                "targets": [{"os": "default", "uri": safe_url(url)}],
+                "targets": [{"os": "default", "uri": url}],
             })
         })
         .collect();

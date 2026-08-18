@@ -432,12 +432,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="trigger_condition.operator"
                                   :options="triggerOperators"
-                                  class="w-22! border border-(--color-border-subtle)"
+                                  class="border-border-subtle w-22! border"
                                 />
                               </div>
-                              <div
-                                class="flex items-center border border-l-0 border-(--color-border-subtle)"
-                              >
+                              <div class="border-border-subtle flex items-center border border-l-0">
                                 <div
                                   style="width: 5.5625rem; margin-left: 0 !important"
                                   class="silence-notification-input"
@@ -709,7 +707,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #separator>
             <div
-              class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+              class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
             ></div>
           </template>
           <template #after>
@@ -2422,11 +2420,6 @@ const focusQueryEditor = () => {
   queryEditorPlaceholderFlag.value = false;
 };
 
-const expandLog = (index: any) => {
-  if (expandedLogs.value.includes(index))
-    expandedLogs.value = expandedLogs.value.filter((item) => item != index);
-  else expandedLogs.value.push(index);
-};
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData, t, {

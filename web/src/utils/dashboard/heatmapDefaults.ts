@@ -36,7 +36,7 @@ import { chartColor } from "@/utils/chartTheme";
  * collapses into solid bands — you cannot see where one bucket ends and the
  * next begins.
  */
-export function heatmapCellItemStyle(store: any) {
+export function heatmapCellItemStyle(_store: any) {
   return {
     borderColor: chartColor("--color-surface-base"),
     borderWidth: 1,

@@ -109,6 +109,12 @@ for (const s of include) {
 // carries the key: the workflow feeds it to ZO_QUICK_MODE_ENABLED when starting
 // that shard's OpenObserve process. The flag is read once at server start, so it
 // cannot vary per test — a shard is the smallest unit that can change it.
+//
+// ingest_allowed_upto follows the same rule and for the same reason. It is how
+// far back (HOURS) ingestion accepts a record; the workflow default is 5, which
+// silently DROPS older rows while still returning a success-shaped response. A
+// suite that seeds history — SLOs measure a rolling 7-day window — needs a wider
+// one, and scoping it to those shards keeps every other shard on the default.
 const matrix = include.map((s) => ({
   testfolder: s.testfolder,
   actual_folder: s.actual_folder,
@@ -116,6 +122,18 @@ const matrix = include.map((s) => ({
   run_files: s.run_files,
   quick_mode_enabled:
     s.quick_mode_enabled === true || s.quick_mode_enabled === "true" ? "true" : "false",
+  ingest_allowed_upto:
+    s.ingest_allowed_upto === undefined || s.ingest_allowed_upto === null
+      ? ""
+      : String(s.ingest_allowed_upto),
+  // Per-shard worker count. Empty = use playwright.config.js (5 in CI).
+  //
+  // `fullyParallel` runs separate spec FILES concurrently, and
+  // `test.describe.configure({mode:'serial'})` only orders tests inside one file.
+  // A shard whose specs contend for a shared server-side resource therefore has
+  // to pin workers to 1 — otherwise the files race each other, which is not
+  // something the specs themselves can express.
+  workers: s.workers === undefined || s.workers === null ? "" : String(s.workers),
 }));
 
 process.stdout.write(JSON.stringify({ include: matrix }));

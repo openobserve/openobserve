@@ -23,6 +23,8 @@ use crate::{
 };
 
 pub mod action_scripts;
+pub mod alert_composites;
+pub mod alert_eval_intervals;
 pub mod alert_incidents;
 pub mod alert_states;
 pub mod alerts;
@@ -30,6 +32,8 @@ pub mod anomaly_detection;
 pub mod backfill_jobs;
 pub mod cipher;
 pub mod compactor_manual_jobs;
+#[cfg(test)]
+mod composite_alerts_contract_tests;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;

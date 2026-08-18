@@ -5,6 +5,7 @@ import dashboardChartJsonData from "../../../../test-data/dashboard_chart_json.j
 import sankeyData from "../../../../test-data/sankey_data.json";
 // Fixed testLogger path - updated to use correct relative path
 const testLogger = require('../../utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier, refreshCloudConfig } = require('../../utils/cloud-auth.js');
 
 // Exported function to remove UTF characters
 const removeUTFCharacters = (text) => {
@@ -20,32 +21,58 @@ const getAuthToken = async () => {
   return `Basic ${basicAuthCredentials}`;
 };
 
-// page is passed here to access the page object (currently not used)
+// `page` is used to recover a rotated cloud passcode via its live session (see below)
 export const ingestion = async (page, streamName = "e2e_automate") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+  if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
 
-  const orgId = process.env["ORGNAME"];
-
-  try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
-
-    const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+  // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
+  const post = () =>
+    fetch(
+      `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
       {
         method: "POST",
-        headers,
+        headers: getAuthHeaders(),
         body: JSON.stringify(logsdata),
       }
     );
 
+  const MAX_ATTEMPTS = 3;
+
+  try {
+    let fetchResponse;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      fetchResponse = await post();
+
+      // The per-org cloud passcode can be rotated mid-session (another shard, or expiry).
+      // The 401 leaves no data ingested and surfaces far away as "No dropdown options
+      // appeared for stream", so refresh it from the page's live session and retry.
+      if ((fetchResponse.status === 401 || fetchResponse.status === 403) && page) {
+        testLogger.warn(
+          `Ingestion returned ${fetchResponse.status} — refreshing cloud passcode and retrying`
+        );
+        if (await refreshCloudConfig(page)) continue;
+      }
+
+      // Transient upstream failure (e.g. "502 Proxy request failed") — payload and
+      // credentials are fine, so back off briefly and retry rather than fail beforeEach.
+      if (fetchResponse.status >= 500 && attempt < MAX_ATTEMPTS) {
+        testLogger.warn(
+          `Ingestion returned ${fetchResponse.status} — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+        continue;
+      }
+
+      break;
+    }
+
     if (!fetchResponse.ok) {
+      const body = await fetchResponse.text().catch(() => "");
       throw new Error(
-        `HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`
+        `HTTP error! status: ${fetchResponse.status}, response: ${body.slice(0, 200)}`
       );
     }
 
@@ -60,17 +87,14 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
 
 // Ingestion function for Geomap and Maps chart
 const ingestionForMaps = async (page, streamName = "geojson") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+  if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
 
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
 
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
+    const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
@@ -96,17 +120,14 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
 
 // Ingestion function for Dashboard Chart JSON data
 const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+  if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
 
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
 
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
+    const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
@@ -132,17 +153,14 @@ const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") =
 
 // Ingestion function for Sankey chart data
 const ingestionForSankey = async (streamName = "sankey_data") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+  if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
 
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
 
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
+    const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,

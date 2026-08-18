@@ -523,7 +523,7 @@ const monitorRowStyle = (row: any): Record<string, string> => {
         : status === "passed"
           ? "var(--color-success-500)"
           : "var(--color-grey-400)";
-  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+  return { boxShadow: `var(--shadow-rail-geom) ${color}` };
 };
 
 const props = withDefaults(
@@ -637,15 +637,6 @@ const URL_COL: OTableColumnDef = {
   sortable: false,
   hideable: true,
 };
-const ENDPOINT_COL: OTableColumnDef = {
-  id: "url",
-  header: t("synthetics.table.endpoint"),
-  accessorKey: "url",
-  size: COL.url,
-  minSize: 140,
-  sortable: false,
-  hideable: true,
-};
 const TYPE_COL: OTableColumnDef = {
   id: "type",
   header: t("synthetics.table.type"),
@@ -680,16 +671,6 @@ const PAGE_LOAD_COL: OTableColumnDef = {
   accessorKey: "responseTime",
   size: COL.responseTime,
   minSize: 80,
-  sortable: true,
-  meta: { align: "right" },
-  hideable: true,
-};
-const P50_COL: OTableColumnDef = {
-  id: "responseTime",
-  header: t("synthetics.table.p50"),
-  accessorKey: "responseTime",
-  size: COL.responseTime,
-  minSize: 64,
   sortable: true,
   meta: { align: "right" },
   hideable: true,
@@ -746,24 +727,6 @@ const STEPS_COL: OTableColumnDef = {
   accessorKey: "steps",
   size: COL.steps,
   minSize: 60,
-  sortable: false,
-  hideable: true,
-};
-const METHOD_COL: OTableColumnDef = {
-  id: "method",
-  header: t("synthetics.table.method"),
-  accessorKey: "method",
-  size: COL.method,
-  minSize: 56,
-  sortable: false,
-  hideable: true,
-};
-const ASSERTIONS_COL: OTableColumnDef = {
-  id: "assertions",
-  header: t("synthetics.table.assertions"),
-  accessorKey: "assertions",
-  size: COL.assertions,
-  minSize: 72,
   sortable: false,
   hideable: true,
 };

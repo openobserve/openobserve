@@ -1,13 +1,15 @@
-import { test, expect } from "../baseFixtures.js";
+const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
 const testLogger = require('../utils/test-logger.js');
 
-const randomDashboardName =
+// Each test runs in parallel (mode: "parallel" below), so the name must be
+// generated fresh per test — a single shared name causes cross-test races
+// where one test's create/delete collides with another's mid-flight.
+const generateDashboardName = () =>
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
@@ -15,7 +17,7 @@ test.describe.configure({ mode: "parallel" });
 test.describe("dashboard multi y axis testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
-    await login(page);
+    await navigateToBase(page);
     await page.waitForTimeout(1000);
     await ingestion(page);
     await page.waitForTimeout(2000);
@@ -32,6 +34,7 @@ test.describe("dashboard multi y axis testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -67,27 +70,24 @@ test.describe("dashboard multi y axis testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open the query inspector and verify the SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
     await page.waitForTimeout(1000);
     // Verify the query is displayed in the Query Inspector
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", kubernetes_labels_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
-        })
-        .first()
+      pm.dashboardPanelEdit.getInspectorQueryByText(
+        'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", kubernetes_labels_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC'
+      )
     ).toBeVisible();
 
     // Close the query inspector
-    await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
+    await pm.dashboardPanelEdit.closeQueryInspector();
 
     // Add the panel name and save the panel
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
     // Go back to the dashboard list and delete the created dashboard
-    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
@@ -96,6 +96,7 @@ test.describe("dashboard multi y axis testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("Test_Panel");
@@ -131,19 +132,16 @@ test.describe("dashboard multi y axis testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open the query inspector and verify the SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
     // Verify the query is displayed in the Query Inspector
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", kubernetes_labels_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
-        })
-        .first()
+      pm.dashboardPanelEdit.getInspectorQueryByText(
+        'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", kubernetes_labels_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC'
+      )
     ).toBeVisible();
 
     // Close the query inspector
-    await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
+    await pm.dashboardPanelEdit.closeQueryInspector();
 
     // Edit the panel to add another field to Y-axis
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -160,7 +158,7 @@ test.describe("dashboard multi y axis testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Go back to the dashboard list and delete the created dashboard
-    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 });

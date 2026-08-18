@@ -252,7 +252,7 @@ function goBack() {
 }
 
 function resetBaseImportFlag() {
-  if (baseImportRef.value) baseImportRef.value.isImporting = false;
+  if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
 }
 
 function syncEditor(items: any[]) {

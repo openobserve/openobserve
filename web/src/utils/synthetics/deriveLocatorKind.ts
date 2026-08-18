@@ -32,7 +32,7 @@ import type { LocatorKind } from "@/types/synthetics";
  * **Pure function of the value alone — no configuration.** A rule for bare
  * attribute selectors (`[data-qa="x"]` → `test_attribute`) was specified and
  * removed: it would need the monitor's `testIdAttr`, which the editor cannot see
- * (it reaches only `TestIdMisconfiguredNotice`), and which is mutable config — so
+ * (it reaches only `journeySuggestions`), and which is mutable config — so
  * the same string would classify differently after someone edited it. A bare
  * attribute selector is also genuinely CSS. The self-describing
  * `internal:testid=` form carries the attribute inside the value and is caught by

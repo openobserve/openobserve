@@ -102,6 +102,7 @@ mod tests {
     };
 
     use super::*;
+    use crate::datafusion::sort_order::FileSortOrder;
 
     #[tokio::test]
     async fn test_datafusion_codec() -> Result<()> {
@@ -112,7 +113,7 @@ mod tests {
             Some(&vec![0]),
             &[],
             Some(10),
-            false,
+            FileSortOrder::None,
             Arc::clone(&schema),
         ));
 

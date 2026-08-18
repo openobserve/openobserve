@@ -2068,6 +2068,7 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: config::meta::triggers::TriggerModule::Alert,
             module_key: id.to_string(),
@@ -2128,6 +2129,7 @@ mod tests {
         let id = id.unwrap();
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: config::meta::triggers::TriggerModule::Alert,
             module_key: id.to_string(),
@@ -2195,6 +2197,7 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: config::meta::triggers::TriggerModule::Alert,
             module_key: id.to_string(),
@@ -2445,6 +2448,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: module_key.clone(),
@@ -2509,6 +2513,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 2,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key,
@@ -2556,6 +2561,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 3,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: module_key.clone(),
@@ -2692,6 +2698,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 4,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: module_key.clone(),
@@ -2820,6 +2827,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: format!("logs/e2e/test_invalid_timerange_pipeline/{}", pipeline.id),
@@ -2995,6 +3003,7 @@ mod tests {
 
         let trigger = Trigger {
             id: 3,
+            claim_epoch: 0,
             org: "e2e".to_string(),
             module: TriggerModule::DerivedStream,
             module_key: format!(

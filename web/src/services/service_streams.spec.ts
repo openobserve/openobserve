@@ -18,6 +18,9 @@ import serviceStreams, {
   getSemanticGroups,
   correlate,
   getDimensionAnalytics,
+  buildChipDimensionsFromFilters,
+  type CorrelationResponse,
+  type FieldAlias,
 } from "@/services/service_streams";
 import http from "@/services/http";
 
@@ -254,6 +257,41 @@ describe("service_streams service", () => {
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/acme-corp/service_streams/_analytics",
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("buildChipDimensionsFromFilters", () => {
+    it("dedups same-group fields by declaration order, not alphabetically (F30)", () => {
+      const response: CorrelationResponse = {
+        service_name: "svc",
+        matched_dimensions: {},
+        additional_dimensions: {},
+        related_streams: {
+          logs: [
+            {
+              stream_name: "app_logs",
+              stream_type: "logs",
+              // "z_namespace" is declared FIRST in the group but sorts LAST
+              // alphabetically — the backend picks declaration order.
+              filters: { z_namespace: "prod", a_namespace_alias: "prod" },
+            } as any,
+          ],
+          traces: [],
+          metrics: [],
+        },
+      };
+      const groups: FieldAlias[] = [
+        {
+          id: "k8s-namespace",
+          display: "Namespace",
+          fields: ["z_namespace", "a_namespace_alias"],
+        } as any,
+      ];
+
+      const chips = buildChipDimensionsFromFilters(response, groups);
+
+      expect(chips).toEqual({ z_namespace: "prod" });
     });
   });
 });

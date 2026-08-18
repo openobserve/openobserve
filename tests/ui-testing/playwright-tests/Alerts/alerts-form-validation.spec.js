@@ -433,7 +433,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       // Post-migration the alert form validates on SUBMIT (useOForm/revalidateLogic),
       // not on blur. Submit with an empty condition value so the schema-driven
       // "Field is required!" error surfaces inline on the value OFormInput (R3).
-      await page.locator('[data-test="add-alert-submit-btn"]').click();
+      await fvPage.clickAlertSubmit();
 
       // Value error should become visible
       const valueError = fvPage.getFilterConditionValueErrorLocator().first();

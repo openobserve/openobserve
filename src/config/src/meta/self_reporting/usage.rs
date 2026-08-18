@@ -242,6 +242,8 @@ pub enum TriggerDataType {
     Slo,
     #[serde(rename = "slo_backfill")]
     SloBackfill,
+    #[serde(rename = "composite")]
+    CompositeAlert,
 }
 
 impl TriggerDataType {
@@ -250,7 +252,7 @@ impl TriggerDataType {
     pub fn is_condition_bearing(&self) -> bool {
         matches!(
             self,
-            Self::Alert | Self::DerivedStream | Self::AnomalyDetection
+            Self::Alert | Self::DerivedStream | Self::AnomalyDetection | Self::CompositeAlert
         )
     }
 }

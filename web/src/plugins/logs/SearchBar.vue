@@ -596,7 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn order-4"
+              class="download-logs-btn hover:bg-interactive-hover-bg! order-4"
               variant="outline"
               size="icon-toolbar"
             >
@@ -665,7 +665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] [border:0.063rem_solid_var(--color-card-glass-border)]"
+                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)]"
                 data-test="search-download-submenu"
               >
                 <button
@@ -5223,90 +5223,62 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
-        let currentQuery = this.searchObj.data.query.split("|");
-        if (currentQuery.length > 1) {
-          if (currentQuery[1].trim() != "") {
-            currentQuery[1] += " and " + filter;
-          } else {
-            currentQuery[1] = filter;
+        // Never split the query on "|": the legacy "function | where" syntax is gone,
+        // and the split is quote-unaware, so a pipe inside a term such as
+        // match_all('text | error') would corrupt the query when a filter is added.
+        const currentQuery = [this.searchObj.data.query];
+        let unionType: string = "";
+        if (currentQuery[0].replace("union all", "UNION ALL").includes("UNION ALL")) {
+          unionType = "UNION ALL";
+        } else if (currentQuery[0].replace("union", "UNION").includes("UNION")) {
+          unionType = "UNION";
+        }
+
+        // Use regular expression to match "UNION" or "UNION ALL" (case insensitive)
+        const unionRegex = /\bUNION ALL\b|\bUNION\b/i;
+
+        // Split the string by "UNION" or "UNION ALL" if they are present
+        const queries = currentQuery[0].split(unionRegex);
+
+        // Iterate over each part
+        queries.forEach((query, index) => {
+          let filter = this.searchObj.data.stream.addToFilter;
+
+          const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
+
+          if (isFilterValueNull) {
+            filter = filter
+              .replace(/=|!=/, (match) => {
+                return match === "=" ? " is " : " is not ";
+              })
+              .replace(/'null'/, "null");
           }
-          this.searchObj.data.query = currentQuery.join("| ");
-          this.searchObj.data.editorValue = this.searchObj.data.query;
-        } else {
-          let unionType: string = "";
-          if (currentQuery[0].replace("union all", "UNION ALL").includes("UNION ALL")) {
-            unionType = "UNION ALL";
-          } else if (currentQuery[0].replace("union", "UNION").includes("UNION")) {
-            unionType = "UNION";
-          }
 
-          // Use regular expression to match "UNION" or "UNION ALL" (case insensitive)
-          const unionRegex = /\bUNION ALL\b|\bUNION\b/i;
-
-          // Split the string by "UNION" or "UNION ALL" if they are present
-          const queries = currentQuery[0].split(unionRegex);
-
-          // Iterate over each part
-          queries.forEach((query, index) => {
-            let filter = this.searchObj.data.stream.addToFilter;
-
-            const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
-
-            if (isFilterValueNull) {
-              filter = filter
-                .replace(/=|!=/, (match) => {
-                  return match === "=" ? " is " : " is not ";
-                })
-                .replace(/'null'/, "null");
+          if (this.searchObj.meta.sqlMode == true) {
+            if (unionType == "" && this.searchObj.data.stream.selectedStream.length > 1) {
+              const parsedSQL = this.fnParsedSQL();
+              const streamPrefix: string =
+                parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
+              filter = `"${streamPrefix}".${filter}`;
             }
 
-            if (this.searchObj.meta.sqlMode == true) {
-              if (unionType == "" && this.searchObj.data.stream.selectedStream.length > 1) {
-                const parsedSQL = this.fnParsedSQL();
-                const streamPrefix: string =
-                  parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
-                filter = `"${streamPrefix}".${filter}`;
-              }
-
-              // if query contains order by clause or limit clause then add where clause before that
-              // if query contains where clause then add filter after that with and operator and keep order by or limit after that
-              // if query does not contain where clause then add where clause before filter
-              if (query.toLowerCase().includes("where")) {
-                // Replace an existing condition for this field, or append if none.
-                // In append mode (SearchResult include/exclude), skip the
-                // field-level replace so multiple values for the same field
-                // coexist with AND.
-                const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
-                const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
-                if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
-                  query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
-                } else {
-                  // Find the earliest clause that ends the WHERE conditions.
-                  // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
-                  // We must insert the new filter before whichever comes first so it
-                  // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
-                  const terminatingClauses = ["group by", "having", "order by", "limit"];
-                  const lowerQuery = query.toLowerCase();
-                  let firstClause: string | null = null;
-                  let firstIndex = Infinity;
-                  for (const clause of terminatingClauses) {
-                    const idx = lowerQuery.indexOf(clause);
-                    if (idx !== -1 && idx < firstIndex) {
-                      firstIndex = idx;
-                      firstClause = clause;
-                    }
-                  }
-                  if (firstClause) {
-                    const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
-                    query =
-                      beforeClause.trim() + " AND " + filter + " " + firstClause + afterClause;
-                  } else {
-                    query = query + " AND " + filter;
-                  }
-                }
+            // if query contains order by clause or limit clause then add where clause before that
+            // if query contains where clause then add filter after that with and operator and keep order by or limit after that
+            // if query does not contain where clause then add where clause before filter
+            if (query.toLowerCase().includes("where")) {
+              // Replace an existing condition for this field, or append if none.
+              // In append mode (SearchResult include/exclude), skip the
+              // field-level replace so multiple values for the same field
+              // coexist with AND.
+              const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
+              const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
+              if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
+                query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
               } else {
-                // Find the earliest clause to insert WHERE before.
-                // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
+                // Find the earliest clause that ends the WHERE conditions.
+                // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
+                // We must insert the new filter before whichever comes first so it
+                // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
                 const terminatingClauses = ["group by", "having", "order by", "limit"];
                 const lowerQuery = query.toLowerCase();
                 let firstClause: string | null = null;
@@ -5320,42 +5292,60 @@ export default defineComponent({
                 }
                 if (firstClause) {
                   const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
-                  query =
-                    beforeClause.trim() + " where " + filter + " " + firstClause + afterClause;
+                  query = beforeClause.trim() + " AND " + filter + " " + firstClause + afterClause;
                 } else {
-                  query = query + " where " + filter;
+                  query = query + " AND " + filter;
                 }
               }
-              currentQuery[0] = query;
             } else {
-              const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";
-              const fieldName = appendOnly ? null : getFieldFromExpression(filter);
-              if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
-                currentQuery[0] = replaceExistingFieldCondition(currentQuery[0], fieldName, filter);
+              // Find the earliest clause to insert WHERE before.
+              // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
+              const terminatingClauses = ["group by", "having", "order by", "limit"];
+              const lowerQuery = query.toLowerCase();
+              let firstClause: string | null = null;
+              let firstIndex = Infinity;
+              for (const clause of terminatingClauses) {
+                const idx = lowerQuery.indexOf(clause);
+                if (idx !== -1 && idx < firstIndex) {
+                  firstIndex = idx;
+                  firstClause = clause;
+                }
+              }
+              if (firstClause) {
+                const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
+                query = beforeClause.trim() + " where " + filter + " " + firstClause + afterClause;
               } else {
-                currentQuery[0].length == 0
-                  ? (currentQuery[0] = filter)
-                  : (currentQuery[0] += " and " + filter);
+                query = query + " where " + filter;
               }
             }
-
-            // this.searchObj.data.query = currentQuery[0];
-            queries[index] = currentQuery[0];
-          });
-
-          if (unionType == "") {
-            this.searchObj.data.query = queries.join("");
+            currentQuery[0] = query;
           } else {
-            this.searchObj.data.query = queries.join(` ${unionType} `);
+            const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";
+            const fieldName = appendOnly ? null : getFieldFromExpression(filter);
+            if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
+              currentQuery[0] = replaceExistingFieldCondition(currentQuery[0], fieldName, filter);
+            } else {
+              currentQuery[0].length == 0
+                ? (currentQuery[0] = filter)
+                : (currentQuery[0] += " and " + filter);
+            }
           }
-          this.searchObj.data.editorValue = this.searchObj.data.query;
-          this.searchObj.data.stream.addToFilter = "";
-          this.searchObj.data.stream.addToFilterMode = "replace";
-          if (this.queryEditorRef?.setValue)
-            this.queryEditorRef.setValue(this.searchObj.data.query);
-          if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
-            this.$emit("searchdata");
-          }
+
+          // this.searchObj.data.query = currentQuery[0];
+          queries[index] = currentQuery[0];
+        });
+
+        if (unionType == "") {
+          this.searchObj.data.query = queries.join("");
+        } else {
+          this.searchObj.data.query = queries.join(` ${unionType} `);
+        }
+        this.searchObj.data.editorValue = this.searchObj.data.query;
+        this.searchObj.data.stream.addToFilter = "";
+        this.searchObj.data.stream.addToFilterMode = "replace";
+        if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(this.searchObj.data.query);
+        if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
+          this.$emit("searchdata");
         }
       }
     },
@@ -5458,10 +5448,6 @@ export default defineComponent({
   height: 1.875rem;
   border-radius: var(--radius-default);
   transition: all 0.2s ease;
-}
-
-.logs-search-bar-component .download-logs-btn:hover {
-  background-color: var(--color-interactive-hover-bg);
 }
 
 .logs-search-bar-component .query-editor-container {

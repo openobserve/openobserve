@@ -75,12 +75,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <span
             v-else
-            class="w-full min-w-0 overflow-hidden px-0.5 text-ellipsis whitespace-nowrap"
+            class="min-w-0 flex-1 overflow-hidden px-0.5 text-ellipsis whitespace-nowrap"
             :title="tab?.name"
             :data-test="`dashboard-tab-${tab.tabId}-name`"
             :data-test-tab-name="tab?.name"
             @dblclick="canManage ? startRename(tab) : undefined"
             >{{ tab?.name }}</span
+          >
+          <!-- Panel-count badge: conveys how dense each tab is without opening it.
+               Section headers are layout labels, not panels, so they're excluded. -->
+          <OBadge
+            variant="default"
+            size="xs"
+            shape="rounded"
+            class="ms-1 shrink-0"
+            :aria-label="t('dashboard.tabPanelCount', { count: panelCount(tab) }, panelCount(tab))"
+            :data-test="`dashboard-tab-${tab.tabId}-panel-count`"
+            >{{ panelCount(tab) }}</OBadge
           >
           <!-- Editable affordance: a pencil in the tab's right gutter that
                fades in when the tab is hovered (group/otab comes from OTab) and
@@ -114,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OTab>
     </OTabs>
-    <!-- Always-visible + (Sheets/Datadog-style tab bars keep the add affordance
+    <!-- Always-visible + (spreadsheet-style tab bars keep the add affordance
          persistent, not hover-revealed). -->
     <OButton
       v-if="!viewOnly"
@@ -143,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { computed, inject, nextTick, ref } from "vue";
@@ -161,6 +173,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
+    OBadge,
     OIcon,
     OTooltip,
   },
@@ -197,6 +210,10 @@ export default defineComponent({
     // Reorder and rename affordances are edit-only — a view-only dashboard shows
     // no grip and its names aren't editable.
     const canManage = computed(() => !props.viewOnly);
+
+    // Real panels only — section headers (o2SectionHeader) are layout labels.
+    const panelCount = (tab: any): number =>
+      (tab?.panels ?? []).filter((panel: any) => panel?.o2SectionHeader !== true).length;
 
     const folderId = computed(() => (route.query.folder as string) ?? "default");
 
@@ -318,6 +335,7 @@ export default defineComponent({
       route,
       selectedTabId,
       canManage,
+      panelCount,
       onReorder,
       editingTabId,
       editingName,

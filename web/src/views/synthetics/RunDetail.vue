@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Lambda execution error (no steps) -->
               <div
                 v-else-if="isErrorRun"
-                class="border-badge-error-ol-border/30 rounded-default m-2 overflow-hidden border bg-[var(--color-badge-error-soft-bg)]"
+                class="border-badge-error-ol-border/30 rounded-default bg-badge-error-soft-bg m-2 overflow-hidden border"
                 role="alert"
                 data-test="synthetics-run-detail-steps-error-banner"
               >
@@ -457,9 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default border-badge-error-ol-border/30 overflow-hidden border"
                               :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
                             >
-                              <div
-                                class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
-                              >
+                              <div class="bg-badge-error-soft-bg flex items-center gap-2 px-3 py-2">
                                 <OIcon
                                   name="error"
                                   size="sm"
@@ -578,7 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="errorStep" class="flex h-full flex-col overflow-y-auto p-6">
       <div class="rounded-default border-badge-error-ol-border/30 overflow-hidden border">
-        <div class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-4 py-2.5">
+        <div class="bg-badge-error-soft-bg flex items-center gap-2 px-4 py-2.5">
           <OIcon name="error" size="sm" class="text-status-error-text" aria-hidden="true" />
           <span class="text-text-heading flex-1 text-sm font-semibold">{{
             t("synthetics.results.error")
@@ -1386,9 +1384,6 @@ const infoChips = computed<InfoChip[]>(() => [
       ]
     : []),
 ]);
-
-const initMs = computed(() => synthetics.runDetail.value?.initMs ?? 0);
-const queueDelayMs = computed(() => synthetics.runDetail.value?.queueDelayMs ?? null);
 
 // ── Emit status to parent (for drawer header-right badge) ──────────────────
 watch(

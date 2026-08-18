@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="rounded-default flex h-full flex-col overflow-hidden"
+    class="flex h-full flex-col overflow-hidden"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'drag-allow': !viewOnly && !simplifiedPanelView,
       }"
     >
-      <div
-        class="border-border-default rounded-t-default flex min-h-7 w-full flex-nowrap items-center border-b px-2 py-1"
+      <PanelBar
+        class="w-full flex-nowrap"
         :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="panel-schema-renderer-annotation-button"
         >
           <OIcon
-            :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'"
+            :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'"
             size="sm"
           />
           <OTooltip
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-create-alert-from-panel"
           />
         </ODropdown>
-      </div>
+      </PanelBar>
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
@@ -424,6 +424,7 @@ import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import { getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
@@ -488,6 +489,7 @@ export default defineComponent({
   ],
   components: {
     PanelSchemaRenderer,
+    PanelBar,
     QueryInspector,
     ConfirmDialog,
     SinglePanelMove,

@@ -493,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="border-t-border-default sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3 [box-shadow:var(--color-grey-150)_0_-0.25rem_0.4375rem_0] dark:[box-shadow:var(--color-grey-900)_0_-0.25rem_0.4375rem_0]"
+        class="border-t-border-default shadow-sticky-footer sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3"
       >
         <OButton
           variant="outline"
@@ -526,8 +526,6 @@ import {
   onActivated,
   watch,
   toRef,
-  toRaw,
-  type Ref,
   computed,
   nextTick,
 } from "vue";
@@ -970,7 +968,7 @@ export default defineComponent({
     // Add a watch for selectedTabs
     watch(
       selectedTabs,
-      (newTabs) => {
+      (_newTabs) => {
         if (variableData.scope === "panels") {
           nextTick(() => {
             updatePanels();

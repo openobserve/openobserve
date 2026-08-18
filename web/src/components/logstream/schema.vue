@@ -2592,7 +2592,7 @@ export default defineComponent({
   height: 2.1875rem;
 }
 
-.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td:after) {
+.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td::after) {
   background: none !important;
 }
 
