@@ -80,9 +80,8 @@ pub enum FileSortOrder {
     /// compactor for logs, traces and (non TSID-major) metrics.
     TimestampDesc,
     /// `__hash__ ASC, _timestamp ASC` — TSID-major metrics layout: all samples of
-    /// one series are contiguous and time-ordered inside a file. Only produced
-    /// by the ingester / consumed by the compactor merge; distributed query
-    /// plans never carry it.
+    /// one series are contiguous and time-ordered inside a file. Only used by
+    /// the compactor merge; distributed query plans never carry it.
     HashTimestampAsc,
 }
 
