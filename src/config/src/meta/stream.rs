@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc};
+use std::{cmp::max, fmt::Display, ops::Range, str::FromStr, sync::Arc};
 
 use arrow::buffer::BooleanBuffer;
 use chrono::{DateTime, Duration, TimeZone, Utc};
@@ -278,6 +278,9 @@ pub enum FileSelection {
     /// Row ids matched by the tantivy index, as a per-row bitmap of length
     /// `num_rows` (one bit per parquet row).
     Rows(Arc<BooleanBuffer>),
+    /// Sorted, non-overlapping physical row ranges selected by a compact
+    /// secondary index. This avoids materializing one bitmap bit per row.
+    RowRanges(Arc<Vec<Range<usize>>>),
     /// Row group ids selected by row-group-level sampling.
     RowGroups(Arc<Vec<u32>>),
 }
@@ -2024,6 +2027,15 @@ mod tests {
         )));
         key.with_selection(selection, Some(1024));
         assert!(key.selection.is_some());
+        assert_eq!(key.row_group_size, Some(1024));
+    }
+
+    #[test]
+    fn test_file_key_with_row_range_selection() {
+        let mut key = FileKey::from_file_name("files/k.parquet");
+        let selection = FileSelection::RowRanges(Arc::new(vec![1..4, 8..12]));
+        key.with_selection(selection.clone(), Some(1024));
+        assert_eq!(key.selection, Some(selection));
         assert_eq!(key.row_group_size, Some(1024));
     }
 
