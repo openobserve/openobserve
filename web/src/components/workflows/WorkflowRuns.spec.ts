@@ -91,8 +91,13 @@ const globalCfg = {
     OPageHeader: OPageHeaderStub,
     OButton: OButtonStub,
     WorkflowRunsPanel: RunsPanelStub,
+    // The dock wraps the canvas (its default slot) — render the slot so the
+    // canvas stub still mounts.
+    WorkflowResultsDock: {
+      name: "WorkflowResultsDock",
+      template: `<div class="WorkflowResultsDock"><slot /></div>`,
+    },
     WorkflowCanvas: stub("WorkflowCanvas"),
-    WorkflowStepResultDrawer: stub("WorkflowStepResultDrawer"),
     WorkflowTestDialog: stub("WorkflowTestDialog"),
   },
 };

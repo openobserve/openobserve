@@ -38,6 +38,8 @@ vi.mock("@vue-flow/core", () => ({
     onNodesInitialized: vi.fn(),
     updateNode: vi.fn(),
   }),
+  // makeEdge (via commitNode) reads MarkerType.ArrowClosed for the edge marker.
+  MarkerType: { ArrowClosed: "arrowclosed" },
 }));
 
 const mockToast = vi.fn();
@@ -48,12 +50,21 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import workflowService from "@/services/workflows";
 import useWorkflowCanvas, {
   workflowObj,
+  hydrateWorkflow,
   loadWorkflowRun,
   executeTestRun,
   serializeWorkflow,
   nodeTestInput,
   nodeTestOutputBranches,
   currentTriggerKind,
+  buildStepTree,
+  toggleNodeDisabled,
+  undoWorkflow,
+  pushWorkflowHistory,
+  resetWorkflowHistory,
+  tidyWorkflowLayout,
+  isNodeIncomplete,
+  setNodeIncomplete,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const triggerNode = () => ({
@@ -277,6 +288,14 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     // the disconnected node never ran → no ✓ badge
     expect(res.ranNodeIds).not.toContain("x");
     expect(res.blockedNodeIds).toEqual([]);
+    // ranSteps snapshots the executed-steps tree (structure + frozen data) so the
+    // dock can persist across later edits.
+    expect(res.ranSteps.map((s: any) => s.id)).toEqual(["t", "f", "d"]);
+    expect(res.ranSteps.find((s: any) => s.id === "t")).toMatchObject({
+      depth: 0,
+      childCount: 1,
+    });
+    expect(res.ranSteps.find((s: any) => s.id === "f").data.node_type).toBe("function");
   });
 
   it("sends the whole in-memory graph (test-without-saving), not just an id", async () => {
@@ -331,6 +350,137 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(r.ok).toBe(false);
     expect(r.error).toBe("down");
     expect(workflowObj.testRun.result).toBeNull();
+  });
+});
+
+// The executed-steps tree that the results dock renders (traces-waterfall layout):
+// DFS pre-order, sibling order by canvas position, and per-column connector guides.
+describe("buildStepTree — executed-steps tree structure", () => {
+  const nodes = [
+    { id: "t", position: { x: 0, y: 0 }, data: { node_type: "workflow_trigger" } },
+    { id: "f", position: { x: 0, y: 100 }, data: { node_type: "function" } },
+    { id: "d", position: { x: 0, y: 200 }, data: { node_type: "destination" } },
+    { id: "c", position: { x: 200, y: 100 }, data: { node_type: "condition" } },
+  ];
+  // t fans out to f (x=0) and c (x=200); f -> d.
+  const edges = [
+    { source: "t", target: "f" },
+    { source: "f", target: "d" },
+    { source: "t", target: "c" },
+  ];
+
+  it("computes DFS pre-order, depth, child count and connector guides", () => {
+    const tree = buildStepTree(nodes, edges, ["t", "f", "d", "c"]);
+    // DFS: t, then its children in canvas order (f before c), f's child d nested.
+    expect(tree.map((s) => s.id)).toEqual(["t", "f", "d", "c"]);
+    expect(tree.find((s) => s.id === "t")).toMatchObject({ depth: 0, childCount: 2, guides: [] });
+    // f is the FIRST of two children → its rail continues (guides ends true).
+    expect(tree.find((s) => s.id === "f")).toMatchObject({
+      depth: 1,
+      childCount: 1,
+      guides: [true],
+    });
+    // d carries f's continuing rail (true) then its own last-child elbow (false).
+    expect(tree.find((s) => s.id === "d")).toMatchObject({
+      depth: 2,
+      childCount: 0,
+      guides: [true, false],
+    });
+    // c is the LAST child → elbow, no continuation.
+    expect(tree.find((s) => s.id === "c")).toMatchObject({
+      depth: 1,
+      childCount: 0,
+      guides: [false],
+    });
+  });
+
+  it("bounds the tree to ran nodes and re-roots a replay subset at depth 0", () => {
+    const tree = buildStepTree(nodes, edges, ["f", "d"]);
+    expect(tree.map((s) => s.id)).toEqual(["f", "d"]);
+    expect(tree[0]).toMatchObject({ id: "f", depth: 0 });
+    expect(tree[1]).toMatchObject({ id: "d", depth: 1 });
+  });
+});
+
+// The results dock persists across graph edits: only a new run or the
+// explicit Clear button drops it. Editing/disabling/undoing must NOT null it.
+describe("Test log persistence across graph edits", () => {
+  beforeEach(() => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf",
+      name: "wf",
+      nodes: [
+        { id: "t", data: { node_type: "workflow_trigger" } },
+        { id: "f", data: { node_type: "function" } },
+      ],
+      edges: [{ source: "t", target: "f" }],
+    } as any;
+    workflowObj.readOnly = false;
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: {},
+      ranNodeIds: ["t", "f"],
+      ranSteps: [],
+      blockedNodeIds: [],
+    } as any;
+    resetWorkflowHistory();
+  });
+
+  it("disabling a node keeps the run result (dock stays open)", () => {
+    toggleNodeDisabled("f");
+    expect(workflowObj.testRun.result).not.toBeNull();
+  });
+
+  it("undo keeps the run result", () => {
+    pushWorkflowHistory();
+    workflowObj.currentSelectedWorkflow.nodes.push({
+      id: "g",
+      data: { node_type: "function" },
+    } as any);
+    undoWorkflow();
+    expect(workflowObj.testRun.result).not.toBeNull();
+  });
+
+  it("deleting a node keeps the run result (deleted step stays listed struck-through)", () => {
+    const { deleteNode } = useWorkflowCanvas();
+    deleteNode("f");
+    expect(
+      workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "f"),
+    ).toBeUndefined();
+    expect(workflowObj.testRun.result).not.toBeNull();
+  });
+});
+
+// Tidy lays the main tree top-down; an ORPHAN subtree (unreachable from the trigger,
+// e.g. a node just dragged in and wired up before connecting to the trigger) must
+// keep its own parent→child order + depth, not get flattened/reversed by array order.
+describe("tidyWorkflowLayout — orphan subtree ordering", () => {
+  it("lays an orphan Condition→Function chain parent-above-child (not reversed)", () => {
+    // Orphan chain oc → of, with the CHILD listed BEFORE the parent in the array —
+    // the old array-order stacking would have put the function above the condition.
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf",
+      name: "wf",
+      nodes: [
+        { id: "t", data: { node_type: "workflow_trigger" }, position: { x: 0, y: 0 } },
+        { id: "c1", data: { node_type: "condition" }, position: { x: 0, y: 0 } },
+        { id: "of", data: { node_type: "function" }, position: { x: 0, y: 0 } },
+        { id: "oc", data: { node_type: "condition" }, position: { x: 0, y: 0 } },
+      ],
+      edges: [
+        { source: "t", target: "c1" },
+        { source: "oc", target: "of" }, // orphan subtree, not reachable from the trigger
+      ],
+    } as any;
+    workflowObj.readOnly = false;
+
+    expect(tidyWorkflowLayout()).toBe(true);
+    const pos = (id: string) =>
+      workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === id).position;
+    // Parent condition sits ABOVE its child function (smaller y).
+    expect(pos("oc").y).toBeLessThan(pos("of").y);
+    // The orphan subtree is placed in its own column, clear of the main tree.
+    expect(pos("oc").x).not.toBe(pos("c1").x);
   });
 });
 
@@ -468,8 +618,16 @@ describe("serializeWorkflow — backend Workflow shape", () => {
     expect(wf.created_by).toBe("");
 
     const node = wf.nodes[0];
-    // persisted fields only — runtime state stripped
-    expect(Object.keys(node).sort()).toEqual(["data", "id", "io_type", "meta", "position"]);
+    // persisted fields only — runtime state stripped. is_disabled (T6) is always
+    // emitted at the node root.
+    expect(Object.keys(node).sort()).toEqual([
+      "data",
+      "id",
+      "io_type",
+      "is_disabled",
+      "meta",
+      "position",
+    ]);
     expect(node.io_type).toBe("input");
     // trigger kind carried in meta (NodeData::WorkflowTrigger is a unit variant)
     expect(node.meta.trigger_kind).toBe("alert_fired");
@@ -485,6 +643,77 @@ describe("serializeWorkflow — backend Workflow shape", () => {
     expect(wf.name).toBe("");
     expect(wf.nodes).toEqual([]);
     expect(wf.edges).toEqual([]);
+  });
+});
+
+describe("placeholder / incomplete node (Configure Later)", () => {
+  beforeEach(() => {
+    workflowObj.readOnly = false;
+    workflowObj.dirtyFlag = false;
+  });
+
+  it("isNodeIncomplete reads meta.incomplete === 'true'", () => {
+    expect(isNodeIncomplete({ meta: { incomplete: "true" } })).toBe(true);
+    expect(isNodeIncomplete({ meta: { incomplete: "false" } })).toBe(false);
+    expect(isNodeIncomplete({ meta: {} })).toBe(false);
+    expect(isNodeIncomplete({})).toBe(false);
+    expect(isNodeIncomplete(null)).toBe(false);
+  });
+
+  it("setNodeIncomplete(true) sets meta.incomplete and marks the graph dirty", () => {
+    const node: any = { id: "d1", data: { node_type: "destination", destination_id: "" } };
+    setNodeIncomplete(node, true);
+    expect(node.meta.incomplete).toBe("true");
+    expect(workflowObj.dirtyFlag).toBe(true);
+  });
+
+  it("setNodeIncomplete(false) removes the meta.incomplete key (serializes clean)", () => {
+    const node: any = { id: "d1", meta: { incomplete: "true", label: "Sink" } };
+    setNodeIncomplete(node, false);
+    expect(node.meta.incomplete).toBeUndefined();
+    // other meta keys are preserved
+    expect(node.meta.label).toBe("Sink");
+  });
+
+  it("meta.incomplete round-trips through serializeWorkflow", () => {
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "d1",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination", destination_id: "" },
+          meta: { incomplete: "true" },
+        },
+      ],
+      edges: [],
+    } as any;
+    const wf = serializeWorkflow();
+    expect(wf.nodes[0].meta.incomplete).toBe("true");
+    expect(wf.nodes[0].data.destination_id).toBe("");
+  });
+});
+
+describe("hydrateWorkflow — draft flag normalization", () => {
+  it("normalizes a list row's is_draft:true onto the store's isDraft", () => {
+    hydrateWorkflow({ id: "d1", name: "draft wf", nodes: [], edges: [], is_draft: true });
+    expect(workflowObj.currentSelectedWorkflow.isDraft).toBe(true);
+  });
+
+  it("sets isDraft false for a published row (is_draft:false)", () => {
+    hydrateWorkflow({ id: "w1", name: "wf", nodes: [], edges: [], is_draft: false });
+    expect(workflowObj.currentSelectedWorkflow.isDraft).toBe(false);
+  });
+
+  it("defaults isDraft to false when the row has no is_draft field", () => {
+    hydrateWorkflow({ id: "w1", name: "wf", nodes: [], edges: [] });
+    expect(workflowObj.currentSelectedWorkflow.isDraft).toBe(false);
+  });
+
+  it("flips isEditWorkflow on and preserves the name/graph while normalizing", () => {
+    hydrateWorkflow({ id: "d1", name: "wip", nodes: [], edges: [], is_draft: true });
+    expect(workflowObj.isEditWorkflow).toBe(true);
+    expect(workflowObj.currentSelectedWorkflow.name).toBe("wip");
   });
 });
 
@@ -569,5 +798,118 @@ describe("currentTriggerKind", () => {
       },
     ]);
     expect(currentTriggerKind()).toBe("incident_event");
+  });
+});
+
+describe("addNodeOnEdge — insert-between spacing (T7)", () => {
+  const resetStaged = () => {
+    workflowObj.readOnly = false;
+    workflowObj.currentSelectedNodeData = null;
+    workflowObj.pendingInsert = null;
+    workflowObj.pendingEdge = null;
+    workflowObj.isEditNode = false;
+  };
+
+  it("places the spliced node a row below the source and nudges the target down", () => {
+    const { addNodeOnEdge, commitNode } = useWorkflowCanvas(t);
+    resetStaged();
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "t",
+          type: "input",
+          position: { x: 100, y: 0 },
+          data: { node_type: "workflow_trigger" },
+        },
+        {
+          id: "d",
+          type: "output",
+          position: { x: 100, y: 160 },
+          data: { node_type: "destination" },
+        },
+      ],
+      edges: [{ id: "e1", source: "t", target: "d" }],
+    } as any;
+
+    addNodeOnEdge("e1", "condition");
+    const staged = workflowObj.currentSelectedNodeData;
+    // staged a row below the source, aligned with the target column
+    expect(staged.position.y).toBe(160);
+    expect(staged.position.x).toBe(100);
+
+    commitNode({});
+    const wf = workflowObj.currentSelectedWorkflow;
+    const inserted = wf.nodes.find((n: any) => n.id === staged.id);
+    const target = wf.nodes.find((n: any) => n.id === "d");
+    // new node stays a row below the source; target pushed down a full row below it
+    expect(inserted.position.y).toBe(160);
+    expect(target.position.y).toBe(320);
+    // rewired A→new→B, old edge dropped
+    expect(wf.edges.some((e: any) => e.source === "t" && e.target === staged.id)).toBe(true);
+    expect(wf.edges.some((e: any) => e.source === staged.id && e.target === "d")).toBe(true);
+    expect(wf.edges.some((e: any) => e.id === "e1")).toBe(false);
+  });
+
+  it("also shifts nodes downstream of the target", () => {
+    const { addNodeOnEdge, commitNode } = useWorkflowCanvas(t);
+    resetStaged();
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "t",
+          type: "input",
+          position: { x: 100, y: 0 },
+          data: { node_type: "workflow_trigger" },
+        },
+        {
+          id: "c",
+          type: "default",
+          position: { x: 100, y: 160 },
+          data: { node_type: "condition" },
+        },
+        {
+          id: "d",
+          type: "output",
+          position: { x: 100, y: 320 },
+          data: { node_type: "destination" },
+        },
+      ],
+      edges: [
+        { id: "e1", source: "t", target: "c" },
+        { id: "e2", source: "c", target: "d" },
+      ],
+    } as any;
+
+    // insert on the trigger→condition edge; condition AND its downstream destination shift
+    addNodeOnEdge("e1", "function");
+    const staged = workflowObj.currentSelectedNodeData;
+    commitNode({});
+    const wf = workflowObj.currentSelectedWorkflow;
+    expect(wf.nodes.find((n: any) => n.id === staged.id).position.y).toBe(160);
+    expect(wf.nodes.find((n: any) => n.id === "c").position.y).toBe(320);
+    expect(wf.nodes.find((n: any) => n.id === "d").position.y).toBe(480);
+  });
+
+  it("does not shift a target that already has enough room", () => {
+    const { addNodeOnEdge, commitNode } = useWorkflowCanvas(t);
+    resetStaged();
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "t",
+          type: "input",
+          position: { x: 0, y: 0 },
+          data: { node_type: "workflow_trigger" },
+        },
+        { id: "d", type: "output", position: { x: 0, y: 400 }, data: { node_type: "destination" } },
+      ],
+      edges: [{ id: "e1", source: "t", target: "d" }],
+    } as any;
+
+    addNodeOnEdge("e1", "condition");
+    commitNode({});
+    const wf = workflowObj.currentSelectedWorkflow;
+    // target already 400 below (> new node at 160 + 160 gap), so it stays put
+    expect(wf.nodes.find((n: any) => n.id === "d").position.y).toBe(400);
   });
 });

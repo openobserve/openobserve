@@ -70,6 +70,39 @@
   box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--glow-color) 22%, transparent);
 }
 
+/* Active result node — the step whose Input/Output is showing in the results dock
+   (WorkflowNode marks its card `wf-result-active`). The ring uses the node's TYPE
+   colour (blue trigger / amber logic / green action) so it reads as an emphasis of
+   that node, not a foreign highlight. `!important` so it wins over the type hover
+   shadow while a node is being inspected. */
+.o2vf_node .vue-flow__node-input:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-blue-500) 60%, transparent) !important;
+}
+.o2vf_node .vue-flow__node-default:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-amber-500) 65%, transparent) !important;
+}
+.o2vf_node .vue-flow__node-output:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-success-500) 60%, transparent) !important;
+}
+
+/* Disabled/muted node — the step is toggled off (WorkflowNode marks its card
+   `wf-node-disabled`). The FRAME loses its type colour and shadow (neutral grey);
+   the icon + label are desaturated SEPARATELY (below) rather than filtering the
+   whole node, so the hover action buttons keep their own colours (a CSS `filter`
+   on the wrapper would grey the buttons too — they can't opt out). */
+.o2vf_node .vue-flow__node:has(.wf-node-disabled) {
+  background: color-mix(in srgb, var(--color-grey-500) 8%, var(--color-surface-base)) !important;
+  border-color: var(--color-border-default) !important;
+  box-shadow: none !important;
+}
+/* Desaturate + dim ONLY the type icon (a colour image) and the label — not the
+   action buttons (they sit in a sibling slot, outside these two containers). */
+.o2vf_node .wf-node-disabled .flow-node__icon,
+.o2vf_node .wf-node-disabled .flow-node__container {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
 /* ── Per-type colour: input = blue, default = amber, output = green ──────── */
 .o2vf_node .vue-flow__node-input {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
@@ -213,6 +246,27 @@
   border-color: color-mix(in srgb, var(--color-success-400) 50%, transparent) !important;
   box-shadow: var(--shadow-glow-lg-geom)
     color-mix(in srgb, var(--color-success-500) 20%, transparent) !important;
+}
+
+/* Active result ring in DARK mode — per node TYPE colour. Higher specificity than
+   the dark per-type rules above (and !important to beat their hover shadows) so
+   the ring shows; lighter tints that read on the dark canvas. */
+.dark .o2vf_node .vue-flow__node-input:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-blue-400) 75%, transparent) !important;
+}
+.dark .o2vf_node .vue-flow__node-default:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-orange-400) 80%, transparent) !important;
+}
+.dark .o2vf_node .vue-flow__node-output:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-success-400) 75%, transparent) !important;
+}
+
+/* Disabled node neutral frame in DARK mode (higher specificity than the dark
+   per-type rules above, which would otherwise re-apply the type colour). */
+.dark .o2vf_node .vue-flow__node:has(.wf-node-disabled) {
+  background: color-mix(in srgb, var(--color-white) 5%, var(--color-surface-base)) !important;
+  border-color: var(--color-border-default) !important;
+  box-shadow: none !important;
 }
 
 /* ── Drag-lag suppression (moved out of PipelineEditor.vue's unscoped <style>) ─

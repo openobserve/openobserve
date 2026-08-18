@@ -2406,6 +2406,23 @@
     "triggerRequired": "A Trigger Is Required",
     "addStepRequired": "Add At Least One Step After The Trigger",
     "connectAllNodes": "Connect All Nodes Before Saving",
+    "finishStepsBeforePublish": "Finish configuring all steps before publishing",
+    "draft": "Draft",
+    "saveDraft": "Save as Draft",
+    "publish": "Publish",
+    "draftSaveSuccess": "Draft Saved Successfully",
+    "publishSuccess": "Workflow Published Successfully",
+    "publishError": "Error While Publishing Workflow",
+    "comingSoon": "This Is Coming In A Later Step",
+    "triggerType": {
+      "pick": "Choose A Trigger",
+      "dialogTitle": "Create A New Workflow",
+      "dialogIntro": "Choose How This Workflow Is Triggered. More Trigger Types Are Coming Soon.",
+      "cta": "Create Workflow",
+      "soonCta": "Available In A Future Release",
+      "comingSoon": "Coming Soon",
+      "soon": "Soon"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alert Fired",
@@ -2504,7 +2521,6 @@
       "linkError": "Unable To Link Alerts."
     },
     "chooseTrigger": "Choose a Trigger",
-    "edgeDeleteHint": "Press Backspace / Delete To Remove The Edge",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",
@@ -2531,7 +2547,53 @@
       "conditionNoteNull": "To Check For A Null Value, Use null. Example:",
       "conditionNoteCustom": "To Add A Custom Column, Type Its Name And Press Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Reshape The Payload With A Function",
+      "functionBodySet": "Applies {name}",
+      "functionSelect": "Select Function",
+      "functionCreateNew": "Create New Function",
+      "functionRequired": "Function Is Required",
+      "functionLoadError": "Unable To Load Functions",
+      "destinationBody": "Send To A Destination",
+      "destinationBodySet": "Sends To {name}",
+      "destinationSelect": "Destination",
+      "destinationCreateNew": "Create New Destination",
+      "destinationRequired": "Please Select a Destination",
+      "destinationLoadError": "Unable To Load Destinations",
+      "namePlaceholder": "Name This Step (Optional)",
+      "commentLabel": "Comment (Optional)",
+      "commentPlaceholder": "Add A Note About This Step...",
+      "commentAdd": "Add Comment",
+      "disable": "Disable Step",
+      "enable": "Enable Step",
+      "disabledBadge": "Disabled",
+      "incompleteBadge": "Set up later",
+      "destinationSetUpLater": "Set up later",
+      "destinationSetUpLaterPrompt": "Don't have a destination yet? Turn this on to set it up later — you can save a draft and test now.",
+      "destinationSetUpLaterActive": "The destination is skipped for now — the name and comment still save. You'll need a destination before publishing.",
+      "functionSetUpLater": "Set up later",
+      "functionSetUpLaterPrompt": "Don't have a function yet? Turn this on to set it up later — you can save a draft and test now.",
+      "functionSetUpLaterActive": "The function is skipped for now — the name and comment still save. You'll need a function before publishing."
+    },
+    "canvas": {
+      "undo": "Undo",
+      "tidyUp": "Tidy Up",
+      "insertStep": "Insert Step",
+      "deleteEdge": "Delete Connection"
+    },
+    "unsaved": {
+      "title": "Unsaved Changes",
+      "message": "You have unsaved changes. Leaving now will discard them.",
+      "discard": "Discard Changes",
+      "stay": "Keep Editing"
+    },
+    "results": {
+      "title": "Step Results",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "close": "Clear & Close Results",
+      "nodesTitle": "Steps",
+      "empty": "Run A Test To See Step Results Here."
     }
   },
   "pipeline": {
