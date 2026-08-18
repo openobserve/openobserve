@@ -2578,6 +2578,23 @@
     "triggerRequired": "Cần có một bộ kích hoạt",
     "addStepRequired": "Thêm ít nhất một bước sau bộ kích hoạt",
     "connectAllNodes": "Kết nối tất cả các nút trước khi lưu",
+    "finishStepsBeforePublish": "Hoàn tất cấu hình tất cả các bước trước khi xuất bản",
+    "draft": "Bản nháp",
+    "saveDraft": "Lưu thành bản nháp",
+    "publish": "Xuất bản",
+    "draftSaveSuccess": "Đã lưu bản nháp thành công",
+    "publishSuccess": "Đã xuất bản quy trình thành công",
+    "publishError": "Lỗi khi xuất bản quy trình",
+    "comingSoon": "Điều này sẽ có ở một bước sau",
+    "triggerType": {
+      "pick": "Chọn trình kích hoạt",
+      "dialogTitle": "Tạo quy trình mới",
+      "dialogIntro": "Chọn cách quy trình này được kích hoạt. Sắp có thêm nhiều loại trình kích hoạt.",
+      "cta": "Tạo quy trình",
+      "soonCta": "Khả dụng trong bản phát hành tương lai",
+      "comingSoon": "Sắp ra mắt",
+      "soon": "Sắp có"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Cảnh báo đã kích hoạt",
@@ -2675,7 +2692,6 @@
       "linkError": "Không thể liên kết cảnh báo."
     },
     "chooseTrigger": "Chọn một trình kích hoạt",
-    "edgeDeleteHint": "Nhấn Backspace / Delete để xóa cạnh",
     "node": {
       "kindTrigger": "Trình kích hoạt",
       "kindLogic": "Logic",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "Để kiểm tra giá trị null, sử dụng null. Ví dụ:",
       "conditionNoteCustom": "Để thêm cột tùy chỉnh, nhập tên của nó và nhấn Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Định dạng lại payload bằng hàm",
+      "functionBodySet": "Áp dụng {name}",
+      "functionSelect": "Chọn hàm",
+      "functionCreateNew": "Tạo hàm mới",
+      "functionRequired": "Hàm là bắt buộc",
+      "functionLoadError": "Không thể tải danh sách hàm",
+      "destinationBody": "Gửi đến một đích",
+      "destinationBodySet": "Gửi đến {name}",
+      "destinationSelect": "Đích",
+      "destinationCreateNew": "Tạo đích mới",
+      "destinationRequired": "Vui lòng chọn một đích",
+      "destinationLoadError": "Không thể tải danh sách đích",
+      "namePlaceholder": "Tên bước này (Tùy chọn)",
+      "commentLabel": "Nhận xét (Tùy chọn)",
+      "commentPlaceholder": "Thêm ghi chú về bước này...",
+      "commentAdd": "Thêm nhận xét",
+      "disable": "Vô hiệu hóa bước",
+      "enable": "Kích hoạt bước",
+      "disabledBadge": "Đã tắt",
+      "incompleteBadge": "Thiết lập sau",
+      "destinationSetUpLater": "Thiết lập sau",
+      "destinationSetUpLaterPrompt": "Chưa có đích? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
+      "destinationSetUpLaterActive": "Đích sẽ được bỏ qua trong lúc này — tên và nhận xét vẫn được lưu. Bạn cần một đích trước khi xuất bản.",
+      "functionSetUpLater": "Thiết lập sau",
+      "functionSetUpLaterPrompt": "Chưa có hàm? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
+      "functionSetUpLaterActive": "Hàm sẽ được bỏ qua trong lúc này — tên và nhận xét vẫn được lưu. Bạn cần một hàm trước khi xuất bản."
     },
-    "commonFieldsAbove": "các trường chung ở trên"
+    "commonFieldsAbove": "các trường chung ở trên",
+    "canvas": {
+      "undo": "Hoàn tác",
+      "tidyUp": "Dọn dẹp",
+      "insertStep": "Chèn bước",
+      "deleteEdge": "Xóa kết nối"
+    },
+    "unsaved": {
+      "title": "Các thay đổi chưa lưu",
+      "message": "Bạn có các thay đổi chưa được lưu. Nếu rời khỏi bây giờ, các thay đổi này sẽ bị hủy.",
+      "discard": "Hủy bỏ thay đổi",
+      "stay": "Tiếp tục chỉnh sửa"
+    },
+    "results": {
+      "title": "Kết quả bước",
+      "collapse": "Thu gọn",
+      "expand": "Mở rộng",
+      "close": "Xóa & Đóng Kết Quả",
+      "nodesTitle": "Các bước",
+      "empty": "Chạy một bài kiểm tra để xem kết quả các bước tại đây."
+    }
   },
   "pipeline": {
     "validation": {
@@ -11454,19 +11516,19 @@
           "span": {
             "title": "Các Span Khớp",
             "hint": "Khi bạn đã chọn một luồng và bộ lọc, bảng này sẽ hiển thị số lượng span mà công việc của bạn sẽ khớp.",
-            "matchedSuffix": "các span khớp · 24h qua",
+            "matchedSuffix": "span khớp · 1h qua",
             "matchedLoading": "Đang đếm các span khớp…"
           },
           "trace": {
             "title": "Các Trace Khớp",
             "hint": "Khi bạn đã chọn một luồng và bộ lọc, bảng này sẽ hiển thị số lượng trace mà công việc của bạn sẽ khớp.",
-            "matchedSuffix": "các trace khớp · 24h qua",
+            "matchedSuffix": "trace khớp · 1h qua",
             "matchedLoading": "Đang đếm các trace khớp…"
           },
           "session": {
             "title": "Các Phiên Khớp",
             "hint": "Khi bạn đã chọn một luồng và bộ lọc, bảng này sẽ hiển thị số lượng phiên mà công việc của bạn sẽ khớp.",
-            "matchedSuffix": "các phiên khớp · 24h qua",
+            "matchedSuffix": "phiên khớp · 1h qua",
             "matchedLoading": "Đang đếm các phiên khớp…"
           }
         },
@@ -13992,7 +14054,6 @@
     "rolling": "trượt",
     "totalSlos": "Tổng số SLO",
     "noGrouping": "Không có (một chuỗi tổng thể duy nhất)",
-    "generation": "thế hệ {n}",
     "newAlert": "Cảnh báo mới",
     "overRolling": "trong cửa sổ trượt {window}",
     "searchPlaceholder": "Tìm kiếm SLO hoặc thẻ, ví dụ: team:payments",

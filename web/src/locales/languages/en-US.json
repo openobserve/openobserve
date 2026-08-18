@@ -14050,7 +14050,6 @@
     "rolling": "rolling",
     "totalSlos": "Total SLOs",
     "noGrouping": "None (a single overall series)",
-    "generation": "generation {n}",
     "newAlert": "New alert",
     "overRolling": "over rolling {window}",
     "searchPlaceholder": "Search SLO or tag, e.g. team:payments",

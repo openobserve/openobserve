@@ -2578,6 +2578,23 @@
     "triggerRequired": "Wymagany jest wyzwalacz",
     "addStepRequired": "Dodaj co najmniej jeden krok po wyzwalaczu",
     "connectAllNodes": "Połącz wszystkie węzły przed zapisaniem",
+    "finishStepsBeforePublish": "Skonfiguruj wszystkie kroki przed publikacją",
+    "draft": "Wersja robocza",
+    "saveDraft": "Zapisz jako wersję roboczą",
+    "publish": "Opublikuj",
+    "draftSaveSuccess": "Wersja robocza zapisana pomyślnie",
+    "publishSuccess": "Przepływ pracy opublikowany pomyślnie",
+    "publishError": "Błąd podczas publikowania przepływu pracy",
+    "comingSoon": "To pojawi się w późniejszym kroku",
+    "triggerType": {
+      "pick": "Wybierz wyzwalacz",
+      "dialogTitle": "Utwórz nowy przepływ pracy",
+      "dialogIntro": "Wybierz, jak ten przepływ pracy jest wyzwalany. Wkrótce pojawi się więcej typów wyzwalaczy.",
+      "cta": "Utwórz przepływ pracy",
+      "soonCta": "Dostępne w przyszłej wersji",
+      "comingSoon": "Wkrótce",
+      "soon": "Wkrótce"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alert wyzwolony",
@@ -2675,7 +2692,6 @@
       "linkError": "Nie udało się połączyć alertów."
     },
     "chooseTrigger": "Wybierz wyzwalacz",
-    "edgeDeleteHint": "Naciśnij Backspace / Delete, aby usunąć krawędź",
     "node": {
       "kindTrigger": "Wyzwalacz",
       "kindLogic": "Logika",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "Aby sprawdzić wartość null, użyj null. Przykład:",
       "conditionNoteCustom": "Aby dodać niestandardową kolumnę, wpisz jej nazwę i naciśnij Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Przekształć dane wejściowe za pomocą funkcji",
+      "functionBodySet": "Stosuje {name}",
+      "functionSelect": "Wybierz funkcję",
+      "functionCreateNew": "Utwórz nową funkcję",
+      "functionRequired": "Funkcja jest wymagana",
+      "functionLoadError": "Nie można wczytać funkcji",
+      "destinationBody": "Wyślij do miejsca docelowego",
+      "destinationBodySet": "Wysyła do {name}",
+      "destinationSelect": "Miejsce docelowe",
+      "destinationCreateNew": "Utwórz nowe miejsce docelowe",
+      "destinationRequired": "Wybierz miejsce docelowe",
+      "destinationLoadError": "Nie można wczytać miejsc docelowych",
+      "namePlaceholder": "Nazwij ten krok (opcjonalnie)",
+      "commentLabel": "Komentarz (opcjonalnie)",
+      "commentPlaceholder": "Dodaj notatkę o tym kroku...",
+      "commentAdd": "Dodaj komentarz",
+      "disable": "Wyłącz krok",
+      "enable": "Włącz krok",
+      "disabledBadge": "Wyłączony",
+      "incompleteBadge": "Skonfiguruj później",
+      "destinationSetUpLater": "Skonfiguruj później",
+      "destinationSetUpLaterPrompt": "Nie masz jeszcze miejsca docelowego? Włącz to, aby skonfigurować je później — możesz zapisać wersję roboczą i przetestować teraz.",
+      "destinationSetUpLaterActive": "Miejsce docelowe jest na razie pomijane — nazwa i komentarz nadal zostaną zapisane. Będziesz potrzebować miejsca docelowego przed publikacją.",
+      "functionSetUpLater": "Skonfiguruj później",
+      "functionSetUpLaterPrompt": "Nie masz jeszcze funkcji? Włącz to, aby skonfigurować ją później — możesz zapisać wersję roboczą i przetestować teraz.",
+      "functionSetUpLaterActive": "Funkcja jest na razie pomijana — nazwa i komentarz nadal zostaną zapisane. Będziesz potrzebować funkcji przed publikacją."
     },
-    "commonFieldsAbove": "Wspólne pola powyżej"
+    "commonFieldsAbove": "Wspólne pola powyżej",
+    "canvas": {
+      "undo": "Cofnij",
+      "tidyUp": "Uporządkuj",
+      "insertStep": "Wstaw krok",
+      "deleteEdge": "Usuń połączenie"
+    },
+    "unsaved": {
+      "title": "Niezapisane zmiany",
+      "message": "Masz niezapisane zmiany. Opuszczenie teraz spowoduje ich odrzucenie.",
+      "discard": "Odrzuć zmiany",
+      "stay": "Kontynuuj edycję"
+    },
+    "results": {
+      "title": "Wyniki kroków",
+      "collapse": "Zwiń",
+      "expand": "Rozwiń",
+      "close": "Wyczyść i zamknij wyniki",
+      "nodesTitle": "Kroki",
+      "empty": "Uruchom test, aby zobaczyć wyniki kroków tutaj."
+    }
   },
   "pipeline": {
     "validation": {
@@ -11454,19 +11516,19 @@
           "span": {
             "title": "Dopasowane spany",
             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile spanów dopasuje Twoje zadanie.",
-            "matchedSuffix": "dopasowane spany · ostatnie 24h",
+            "matchedSuffix": "dopasowane spany · ostatnia 1h",
             "matchedLoading": "Liczenie dopasowanych spanów..."
           },
           "trace": {
             "title": "Dopasowane trace'y",
             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile trace'y dopasuje Twoje zadanie.",
-            "matchedSuffix": "dopasowane trace'y · ostatnie 24h",
+            "matchedSuffix": "dopasowane trace'e · ostatnia 1h",
             "matchedLoading": "Liczenie dopasowanych trace'ów..."
           },
           "session": {
             "title": "Dopasowane sesje",
             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile sesji dopasuje Twoje zadanie.",
-            "matchedSuffix": "dopasowane sesje · ostatnie 24h",
+            "matchedSuffix": "dopasowane sesje · ostatnia 1h",
             "matchedLoading": "Liczenie dopasowanych sesji..."
           }
         },
@@ -13992,7 +14054,6 @@
     "rolling": "przesuwne",
     "totalSlos": "Łączna liczba SLO",
     "noGrouping": "Brak (pojedyncza seria ogólna)",
-    "generation": "generacja {n}",
     "newAlert": "Nowy alert",
     "overRolling": "w przesuwnym oknie {window}",
     "searchPlaceholder": "Szukaj SLO lub tagu, np. team:payments",

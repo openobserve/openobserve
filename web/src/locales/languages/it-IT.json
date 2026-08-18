@@ -2578,6 +2578,23 @@
     "triggerRequired": "È richiesto un trigger",
     "addStepRequired": "Aggiungi almeno un passo dopo il trigger",
     "connectAllNodes": "Collega tutti i nodi prima di salvare",
+    "finishStepsBeforePublish": "Completa la configurazione di tutti i passaggi prima di pubblicare",
+    "draft": "Bozza",
+    "saveDraft": "Salva come bozza",
+    "publish": "Pubblica",
+    "draftSaveSuccess": "Bozza salvata correttamente",
+    "publishSuccess": "Workflow pubblicato correttamente",
+    "publishError": "Errore durante la pubblicazione del workflow",
+    "comingSoon": "Questa opzione è prevista in un passaggio successivo",
+    "triggerType": {
+      "pick": "Scegli un trigger",
+      "dialogTitle": "Crea un nuovo workflow",
+      "dialogIntro": "Scegli come viene attivato questo workflow. Altri tipi di trigger sono in arrivo.",
+      "cta": "Crea workflow",
+      "soonCta": "Disponibile in una futura versione",
+      "comingSoon": "Prossimamente",
+      "soon": "Presto"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Avviso scattato",
@@ -2675,7 +2692,6 @@
       "linkError": "Impossibile collegare gli avvisi."
     },
     "chooseTrigger": "Scegli un trigger",
-    "edgeDeleteHint": "Premi Backspace / Canc per rimuovere il collegamento",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "Per controllare un valore nullo, usa null. Esempio:",
       "conditionNoteCustom": "Per aggiungere una colonna personalizzata, digita il suo nome e premi Invio.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Rimodella il payload con una funzione",
+      "functionBodySet": "Applica {name}",
+      "functionSelect": "Seleziona funzione",
+      "functionCreateNew": "Crea nuova funzione",
+      "functionRequired": "La funzione è obbligatoria",
+      "functionLoadError": "Impossibile caricare le funzioni",
+      "destinationBody": "Invia a una destinazione",
+      "destinationBodySet": "Invia a {name}",
+      "destinationSelect": "Destinazione",
+      "destinationCreateNew": "Crea nuova destinazione",
+      "destinationRequired": "Seleziona una destinazione",
+      "destinationLoadError": "Impossibile caricare le destinazioni",
+      "namePlaceholder": "Assegna un nome a questo passaggio (facoltativo)",
+      "commentLabel": "Commento (facoltativo)",
+      "commentPlaceholder": "Aggiungi una nota su questo passaggio...",
+      "commentAdd": "Aggiungi commento",
+      "disable": "Disattiva passaggio",
+      "enable": "Attiva passaggio",
+      "disabledBadge": "Disattivato",
+      "incompleteBadge": "Configura più tardi",
+      "destinationSetUpLater": "Configura più tardi",
+      "destinationSetUpLaterPrompt": "Non hai ancora una destinazione? Attiva questa opzione per configurarla più tardi — puoi salvare una bozza e fare test subito.",
+      "destinationSetUpLaterActive": "La destinazione viene saltata per ora — nome e commento vengono comunque salvati. Ti servirà una destinazione prima di pubblicare.",
+      "functionSetUpLater": "Configura più tardi",
+      "functionSetUpLaterPrompt": "Non hai ancora una funzione? Attiva questa opzione per configurarla più tardi — puoi salvare una bozza e fare test subito.",
+      "functionSetUpLaterActive": "La funzione viene saltata per ora — nome e commento vengono comunque salvati. Ti servirà una funzione prima di pubblicare."
     },
-    "commonFieldsAbove": "campi comuni qui sopra"
+    "commonFieldsAbove": "campi comuni qui sopra",
+    "canvas": {
+      "undo": "Annulla",
+      "tidyUp": "Riordina",
+      "insertStep": "Inserisci passaggio",
+      "deleteEdge": "Elimina connessione"
+    },
+    "unsaved": {
+      "title": "Modifiche non salvate",
+      "message": "Hai modifiche non salvate. Uscendo ora le perderai.",
+      "discard": "Scarta modifiche",
+      "stay": "Continua a modificare"
+    },
+    "results": {
+      "title": "Risultati del passaggio",
+      "collapse": "Comprimi",
+      "expand": "Espandi",
+      "close": "Cancella e chiudi i risultati",
+      "nodesTitle": "Passaggi",
+      "empty": "Esegui un test per vedere i risultati dei passaggi qui."
+    }
   },
   "pipeline": {
     "validation": {
@@ -11454,19 +11516,19 @@
           "span": {
             "title": "Span corrispondenti",
             "hint": "Dopo aver scelto uno stream e un filtro, questo pannello mostrerà quanti span il tuo job corrisponderà.",
-            "matchedSuffix": "span corrispondenti · ultime 24h",
+            "matchedSuffix": "span corrispondenti · ultima 1h",
             "matchedLoading": "Conteggio span corrispondenti…"
           },
           "trace": {
             "title": "Trace corrispondenti",
             "hint": "Dopo aver scelto uno stream e un filtro, questo pannello mostrerà quante trace il tuo job corrisponderà.",
-            "matchedSuffix": "trace corrispondenti · ultime 24h",
+            "matchedSuffix": "tracce corrispondenti · ultima 1h",
             "matchedLoading": "Conteggio trace corrispondenti…"
           },
           "session": {
             "title": "Sessioni corrispondenti",
             "hint": "Dopo aver scelto uno stream e un filtro, questo pannello mostrerà quante sessioni il tuo job corrisponderà.",
-            "matchedSuffix": "sessioni corrispondenti · ultime 24h",
+            "matchedSuffix": "sessioni corrispondenti · ultima 1h",
             "matchedLoading": "Conteggio sessioni corrispondenti…"
           }
         },
@@ -13992,7 +14054,6 @@
     "rolling": "scorrevole",
     "totalSlos": "Totale SLO",
     "noGrouping": "Nessuna (una singola serie complessiva)",
-    "generation": "generazione {n}",
     "newAlert": "Nuovo avviso",
     "overRolling": "su finestra scorrevole {window}",
     "searchPlaceholder": "Cerca SLO o tag, ad es. team:payments",

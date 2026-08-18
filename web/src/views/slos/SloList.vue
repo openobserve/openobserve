@@ -621,7 +621,7 @@ const stats = computed<StatItem[]>(() => {
       dataTest: "slos-slolist-stat-no_data",
       label: t("slos.health.no_data"),
       value: counts.no_data,
-      icon: "help",
+      icon: "help-outline",
       tone: "neutral",
       max: total,
     },

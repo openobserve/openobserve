@@ -2578,6 +2578,23 @@
     "triggerRequired": "Een trigger is vereist",
     "addStepRequired": "Voeg ten minste één stap toe na de trigger",
     "connectAllNodes": "Verbind alle knooppunten voordat u opslaat",
+    "finishStepsBeforePublish": "Voltooi alle stappen voordat u publiceert.",
+    "draft": "Concept",
+    "saveDraft": "Opslaan als concept",
+    "publish": "Publiceren",
+    "draftSaveSuccess": "Concept succesvol opgeslagen",
+    "publishSuccess": "Workflow succesvol gepubliceerd",
+    "publishError": "Fout bij het publiceren van workflow",
+    "comingSoon": "Dit komt in een latere stap",
+    "triggerType": {
+      "pick": "Kies een trigger",
+      "dialogTitle": "Nieuwe workflow maken",
+      "dialogIntro": "Kies hoe deze workflow wordt geactiveerd. Meer triggertypen zijn binnenkort beschikbaar.",
+      "cta": "Workflow maken",
+      "soonCta": "Beschikbaar in een toekomstige release",
+      "comingSoon": "Binnenkort beschikbaar",
+      "soon": "Binnenkort"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alert geactiveerd",
@@ -2675,7 +2692,6 @@
       "linkError": "Kan meldingen niet koppelen."
     },
     "chooseTrigger": "Kies een trigger",
-    "edgeDeleteHint": "Druk op Backspace / Delete om de verbinding te verwijderen",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "Om een null-waarde te controleren, gebruik null. Voorbeeld:",
       "conditionNoteCustom": "Om een aangepaste kolom toe te voegen, typt u de naam en drukt u op Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Vorm de payload om met een functie",
+      "functionBodySet": "Past {name} toe",
+      "functionSelect": "Selecteer functie",
+      "functionCreateNew": "Nieuwe functie maken",
+      "functionRequired": "Functie is vereist",
+      "functionLoadError": "Kan functies niet laden",
+      "destinationBody": "Verzenden naar een bestemming",
+      "destinationBodySet": "Verzendt naar {name}",
+      "destinationSelect": "Bestemming",
+      "destinationCreateNew": "Nieuwe bestemming maken",
+      "destinationRequired": "Selecteer een bestemming",
+      "destinationLoadError": "Kan bestemmingen niet laden",
+      "namePlaceholder": "Geef deze stap een naam (optioneel)",
+      "commentLabel": "Opmerking (optioneel)",
+      "commentPlaceholder": "Voeg een notitie toe over deze stap...",
+      "commentAdd": "Opmerking toevoegen",
+      "disable": "Stap uitschakelen",
+      "enable": "Stap inschakelen",
+      "disabledBadge": "Uitgeschakeld",
+      "incompleteBadge": "Stel later in",
+      "destinationSetUpLater": "Stel later in",
+      "destinationSetUpLaterPrompt": "Nog geen bestemming? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
+      "destinationSetUpLaterActive": "De bestemming wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een bestemming nodig voordat u publiceert.",
+      "functionSetUpLater": "Stel later in",
+      "functionSetUpLaterPrompt": "Nog geen functie? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
+      "functionSetUpLaterActive": "De functie wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een functie nodig voordat u publiceert."
     },
-    "commonFieldsAbove": "algemene velden hierboven"
+    "commonFieldsAbove": "algemene velden hierboven",
+    "canvas": {
+      "undo": "Ongedaan maken",
+      "tidyUp": "Opruimen",
+      "insertStep": "Stap invoegen",
+      "deleteEdge": "Verbinding verwijderen"
+    },
+    "unsaved": {
+      "title": "Niet-opgeslagen wijzigingen",
+      "message": "U hebt niet-opgeslagen wijzigingen. Als u nu weggaat, worden ze verwijderd.",
+      "discard": "Wijzigingen verwerpen",
+      "stay": "Doorgaan met bewerken"
+    },
+    "results": {
+      "title": "Stapresultaten",
+      "collapse": "Inklappen",
+      "expand": "Uitklappen",
+      "close": "Resultaten wissen en sluiten",
+      "nodesTitle": "Stappen",
+      "empty": "Voer een test uit om hier de stapresultaten te zien."
+    }
   },
   "pipeline": {
     "validation": {
@@ -11454,19 +11516,19 @@
           "span": {
             "title": "Overeenkomende spans",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel spans uw taak zal matchen.",
-            "matchedSuffix": "spans gematcht · laatste 24 uur",
+            "matchedSuffix": "overeenkomende spans · laatste 1 uur",
             "matchedLoading": "Overeenkomende spans tellen…"
           },
           "trace": {
             "title": "Overeenkomende traces",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel traces uw taak zal matchen.",
-            "matchedSuffix": "traces gematcht · laatste 24 uur",
+            "matchedSuffix": "overeenkomende traces · laatste 1 uur",
             "matchedLoading": "Overeenkomende traces tellen…"
           },
           "session": {
             "title": "Overeenkomende sessies",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel sessies uw taak zal matchen.",
-            "matchedSuffix": "sessies gematcht · laatste 24 uur",
+            "matchedSuffix": "overeenkomende sessies · laatste 1 uur",
             "matchedLoading": "Overeenkomende sessies tellen…"
           }
         },
@@ -13992,7 +14054,6 @@
     "rolling": "rollend",
     "totalSlos": "Totaal SLO's",
     "noGrouping": "Geen (een enkele overkoepelende reeks)",
-    "generation": "generatie {n}",
     "newAlert": "Nieuw alarm",
     "overRolling": "over rollend {window}",
     "searchPlaceholder": "Zoek SLO of tag, bijv. team:payments",

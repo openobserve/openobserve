@@ -337,7 +337,7 @@ import {
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
-import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -360,6 +360,9 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
 );
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 const ServicesCatalog = defineAsyncComponent(() => import("./ServicesCatalog.vue"));
+
+const supportedTraceSearchMode = (value: unknown): TraceSearchMode =>
+  resolveTraceSearchMode(value, config.isEnterprise === "true");
 
 const store = useStore();
 const activeTab = computed(() => {
@@ -1393,16 +1396,7 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
-  const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
-  if (
-    tab !== undefined &&
-    (["service-graph", "traces", "spans", "services-catalog"] as const).includes(
-      tab as "service-graph" | "traces" | "spans" | "services-catalog",
-    )
-  ) {
-    if (tab === "service-graph" && config.isEnterprise !== "true") return;
-    searchObj.meta.searchMode = tab as TraceSearchMode;
-  }
+  searchObj.meta.searchMode = supportedTraceSearchMode(queryParams.tab);
 
   if (queryParams.stream && searchObj.data.stream.selectedStream.value !== queryParams.stream) {
     searchObj.data.stream.selectedStream = {
@@ -1489,7 +1483,7 @@ const onErrorOnlyToggled = (value: boolean) => {
 };
 
 // Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
-const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "services-catalog") => {
+const onSearchModeChange = (mode: TraceSearchMode) => {
   searchObj.meta.searchMode = mode;
   if (mode === "service-graph" || mode === "services-catalog") return;
   if (
@@ -1510,6 +1504,26 @@ const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "servic
   };
   getQueryData();
 };
+
+watch(
+  () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
+  ([routeName, tab]) => {
+    if (routeName !== "traces") return;
+    const mode = supportedTraceSearchMode(tab);
+    if (mode !== searchObj.meta.searchMode) {
+      onSearchModeChange(mode);
+      return;
+    }
+    if (tab !== mode) {
+      const query = { ...router.currentRoute.value.query };
+      delete query.search_mode;
+      query.tab = mode;
+      router.replace({
+        query,
+      });
+    }
+  },
+);
 
 // Handler for Reset Filters button
 // Clears all filters including brush selections
@@ -1998,15 +2012,8 @@ const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => 
 };
 
 /**
- * Hydrate a handoff from the standalone Service Graph / Services Catalog routes.
- *
- * Those views navigate here with the filter, stream, mode and time range as
- * query params (see `viewTracesQuery` in ./viewTracesHandoff), rather than
- * mutating the shared search state from inside a sibling tab. Applying them
- * here keeps the handoff URL bookmarkable and reload-safe.
- *
- * `restoreUrlQueryParams` already applies `stream`, `from`/`to` and `tab`, so
- * this only adds the prebuilt filter and re-runs the query.
+ * Hydrate a bookmarkable filter handoff. `restoreUrlQueryParams` applies the
+ * stream, time range and tab; this restores the prebuilt filter.
  */
 const applyHandoffFilter = (): boolean => {
   const filter = router.currentRoute.value.query.filter;
@@ -2028,12 +2035,15 @@ const applyHandoffFilter = (): boolean => {
 watch(
   () => searchObj.meta.searchMode,
   (mode) => {
-    const query = { ...router.currentRoute.value.query };
-    if (mode !== "spans") {
-      query.tab = mode;
-    } else {
-      delete query.tab;
+    if (
+      router.currentRoute.value.query.tab === mode &&
+      router.currentRoute.value.query.search_mode === undefined
+    ) {
+      return;
     }
+    const query = { ...router.currentRoute.value.query };
+    delete query.search_mode;
+    query.tab = mode;
     router.replace({ query });
   },
 );

@@ -2578,6 +2578,23 @@
     "triggerRequired": "Un déclencheur est requis",
     "addStepRequired": "Ajoutez au moins une étape après le déclencheur",
     "connectAllNodes": "Connectez tous les nœuds avant d'enregistrer",
+    "finishStepsBeforePublish": "Terminez la configuration de toutes les étapes avant de publier",
+    "draft": "Brouillon",
+    "saveDraft": "Enregistrer comme brouillon",
+    "publish": "Publier",
+    "draftSaveSuccess": "Brouillon enregistré avec succès",
+    "publishSuccess": "Workflow publié avec succès",
+    "publishError": "Erreur lors de la publication du workflow",
+    "comingSoon": "Ceci arrivera dans une étape ultérieure",
+    "triggerType": {
+      "pick": "Choisissez un déclencheur",
+      "dialogTitle": "Créer un nouveau workflow",
+      "dialogIntro": "Choisissez comment ce workflow est déclenché. D'autres types de déclencheurs arrivent bientôt.",
+      "cta": "Créer un workflow",
+      "soonCta": "Disponible dans une version future",
+      "comingSoon": "Bientôt",
+      "soon": "Bientôt"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alerte déclenchée",
@@ -2675,7 +2692,6 @@
       "linkError": "Impossible de lier les alertes."
     },
     "chooseTrigger": "Choisir un déclencheur",
-    "edgeDeleteHint": "Appuyez sur Retour arrière / Suppr pour supprimer la connexion",
     "node": {
       "kindTrigger": "Déclencheur",
       "kindLogic": "Logique",
@@ -2702,9 +2718,55 @@
       "conditionNoteNull": "Pour vérifier une valeur nulle, utilisez null. Exemple :",
       "conditionNoteCustom": "Pour ajouter une colonne personnalisée, tapez son nom et appuyez sur Entrée.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Reformez la charge utile avec une fonction",
+      "functionBodySet": "Applique {name}",
+      "functionSelect": "Sélectionner une fonction",
+      "functionCreateNew": "Créer une nouvelle fonction",
+      "functionRequired": "Une fonction est requise",
+      "functionLoadError": "Impossible de charger les fonctions",
+      "destinationBody": "Envoyer vers une destination",
+      "destinationBodySet": "Envoie vers {name}",
+      "destinationSelect": "Destination",
+      "destinationCreateNew": "Créer une nouvelle destination",
+      "destinationRequired": "Veuillez sélectionner une destination",
+      "destinationLoadError": "Impossible de charger les destinations",
+      "namePlaceholder": "Nommer cette étape (facultatif)",
+      "commentLabel": "Commentaire (facultatif)",
+      "commentPlaceholder": "Ajouter une note à propos de cette étape...",
+      "commentAdd": "Ajouter un commentaire",
+      "disable": "Désactiver l'étape",
+      "enable": "Activer l'étape",
+      "disabledBadge": "Désactivé",
+      "incompleteBadge": "Configurer plus tard",
+      "destinationSetUpLater": "Configurer plus tard",
+      "destinationSetUpLaterPrompt": "Vous n'avez pas encore de destination ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
+      "destinationSetUpLaterActive": "La destination est ignorée pour le moment — le nom et le commentaire sont tout de même enregistrés. Vous aurez besoin d'une destination avant de publier.",
+      "functionSetUpLater": "Configurer plus tard",
+      "functionSetUpLaterPrompt": "Vous n'avez pas encore de fonction ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
+      "functionSetUpLaterActive": "La fonction est ignorée pour le moment — le nom et le commentaire sont tout de même enregistrés. Vous aurez besoin d'une fonction avant de publier."
     },
-    "commonFieldsAbove": "champs communs ci-dessus"
+    "commonFieldsAbove": "champs communs ci-dessus",
+    "canvas": {
+      "undo": "Défaire",
+      "tidyUp": "Nettoyer",
+      "insertStep": "Insérer une étape",
+      "deleteEdge": "Supprimer la connexion"
+    },
+    "unsaved": {
+      "title": "Modifications non enregistrées",
+      "message": "Vous avez des modifications non enregistrées. Si vous quittez maintenant, elles seront perdues.",
+      "discard": "Ignorer les modifications",
+      "stay": "Continuer à modifier"
+    },
+    "results": {
+      "title": "Résultats de l'étape",
+      "collapse": "Réduire",
+      "expand": "Développer",
+      "close": "Effacer et fermer les résultats",
+      "nodesTitle": "Étapes",
+      "empty": "Exécutez un test pour voir les résultats des étapes ici."
+    }
   },
   "pipeline": {
     "validation": {
@@ -11454,19 +11516,19 @@
           "span": {
             "title": "Spans correspondants",
             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de spans que votre job correspondra.",
-            "matchedSuffix": "spans correspondants · dernières 24h",
+            "matchedSuffix": "spans correspondants · dernière 1h",
             "matchedLoading": "Comptage des spans correspondants…"
           },
           "trace": {
             "title": "Traces correspondantes",
             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de traces que votre job correspondra.",
-            "matchedSuffix": "traces correspondantes · dernières 24h",
+            "matchedSuffix": "traces correspondantes · dernière 1h",
             "matchedLoading": "Comptage des traces correspondantes…"
           },
           "session": {
             "title": "Sessions correspondantes",
             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de sessions que votre job correspondra.",
-            "matchedSuffix": "sessions correspondantes · dernières 24h",
+            "matchedSuffix": "sessions correspondantes · dernière 1h",
             "matchedLoading": "Comptage des sessions correspondantes…"
           }
         },
@@ -13992,7 +14054,6 @@
     "rolling": "glissant",
     "totalSlos": "Total des SLOs",
     "noGrouping": "Aucun (une seule série globale)",
-    "generation": "génération {n}",
     "newAlert": "Nouvelle alerte",
     "overRolling": "sur la période glissante {window}",
     "searchPlaceholder": "Rechercher un SLO ou une étiquette, p. ex. team:payments",
