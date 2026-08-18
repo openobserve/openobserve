@@ -954,6 +954,17 @@ export default defineComponent({
     // render (not in getDisplayValue) so already-applied labels compact too
     // when the viewport shrinks.
     const compactRangeLabel = (label: string) => {
+      // Relative ranges use the standard shorthand: "Past 15 Minutes" → "Past 15m".
+      const REL_UNIT: Record<string, string> = {
+        second: "s",
+        minute: "m",
+        hour: "h",
+        day: "d",
+        week: "w",
+        month: "M",
+      };
+      const rel = label.match(/^Past (\d+) ([A-Za-z]+?)s?$/);
+      if (rel) return `Past ${rel[1]}${REL_UNIT[rel[2].toLowerCase()] ?? ` ${rel[2]}`}`;
       let out = label
         .replace(/\b\d{4}\/(\d{2}\/\d{2})\b/g, "$1")
         .replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");
