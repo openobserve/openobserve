@@ -658,7 +658,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-['']"
+              @click.stop="
+                isMobile && !isDownloadDisabled && (showDownloadSubmenu = !showDownloadSubmenu)
+              "
+              class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-[''] max-md:flex-wrap"
               :class="{
                 'text-text-muted cursor-not-allowed! hover:bg-transparent!': isDownloadDisabled,
               }"
@@ -673,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] [border:0.063rem_solid_var(--color-card-glass-border)]"
+                class="search-download-submenu bg-dropdown-bg rounded-default absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] [border:0.063rem_solid_var(--color-card-glass-border)] max-md:static max-md:mt-1 max-md:mr-0 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none"
                 data-test="search-download-submenu"
               >
                 <button
@@ -1927,6 +1930,7 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
+import useBreakpoint from "@/composables/useBreakpoint";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -4338,7 +4342,9 @@ export default defineComponent({
     const downloadCustomFileType = ref("csv");
     // Hover-triggered submenu state for "Download results → CSV/JSON" in the more-options dropdown.
     // Resets automatically when the parent ODropdown closes (via @update:open handler).
+    // Touch has no hover, so < md a tap toggles it instead (inline, not flyout).
     const showDownloadSubmenu = ref(false);
+    const { isMobile } = useBreakpoint();
     const isDownloadDisabled = computed(
       () =>
         !searchObj.data.stream.selectedStream?.length || !searchObj.data.queryResults?.hits?.length,
@@ -4997,6 +5003,7 @@ export default defineComponent({
       confirmDialogVisible,
       confirmCallback,
       showDownloadSubmenu,
+      isMobile,
       isDownloadDisabled,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,

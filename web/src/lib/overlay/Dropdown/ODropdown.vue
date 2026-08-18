@@ -286,12 +286,14 @@ onBeforeUnmount(() => {
         :align="align"
         :side-offset="sideOffset"
         :hide-when-detached="true"
+        :collision-padding="8"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[
           // Layout + stacking — overlay layer 6000 (clears header 2000; ties with
           // drawer/dialog content broken by later DOM order). See tokens/base.css.
-          'z-6000 min-w-40 p-1',
+          // max-w keeps wide menus on-screen on small viewports.
+          'z-6000 max-w-[calc(100vw-1rem)] min-w-40 p-1',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Typography

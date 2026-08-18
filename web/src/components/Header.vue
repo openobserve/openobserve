@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Language selector — nested sub-dropdown (click to open) -->
               <div
                 data-test="header-language-submenu-trigger"
-                class="hover:bg-dropdown-item-hover-bg relative flex cursor-pointer items-center gap-3 px-3 py-1.5 text-sm leading-[1.2] select-none"
+                class="hover:bg-dropdown-item-hover-bg relative flex cursor-pointer items-center gap-3 px-3 py-1.5 text-sm leading-[1.2] select-none max-md:flex-wrap"
                 @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
               >
                 <OIcon size="xs" name="language" class="padding-none" />
@@ -377,10 +377,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OIcon size="xs" name="chevron-right" />
 
-                <!-- Submenu — absolutely positioned to the left of parent dropdown -->
+                <!-- Submenu — flyout to the left of the dropdown; < md there is no
+                     room on either side, so it expands inline below the row. -->
                 <div
                   v-if="showLanguageSubmenu"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 mr-1 min-w-50 border py-1 shadow-lg dark:shadow-lg"
+                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 mr-1 min-w-50 border py-1 shadow-lg max-md:static max-md:mt-1 max-md:mr-0 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none dark:shadow-lg"
                   data-test="language-dropdown-item"
                   @click.stop
                 >
