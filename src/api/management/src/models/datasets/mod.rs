@@ -24,7 +24,7 @@
 
 use openobserve_core::llm_evaluations::datasets::{
     CreateDataset, CreateDatasetItem, Dataset, DatasetItem, DatasetItemPage, DatasetItemSource,
-    ListDatasetItems, PushDatasetItemResult, PushQueueItemToDataset,
+    DatasetSourceCounts, ListDatasetItems, PushDatasetItemResult, PushQueueItemToDataset,
     TelemetryDatasetItemRefType as ServiceRefType, UpdateDataset, UpdateDatasetItem,
     UpsertDatasetItem, UpsertDatasetItemsResult, UpsertOutcome, UpsertedDatasetItem,
 };
@@ -50,6 +50,16 @@ pub struct UpdateDatasetRequestBody {
     pub tags: Vec<String>,
 }
 
+/// Live-Item counts by origin. Buckets can sum to less than `itemCount` if an
+/// Item carries a source this response shape does not name yet.
+#[derive(Clone, Copy, Debug, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetSourceCountsResponseBody {
+    pub trace: i64,
+    pub annotation: i64,
+    pub manual: i64,
+}
+
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetResponseBody {
@@ -59,6 +69,10 @@ pub struct DatasetResponseBody {
     pub description: Option<String>,
     pub tags: Vec<String>,
     pub global_version: i64,
+    /// Live (non-deleted) Items, counted once per logical Item rather than once
+    /// per stored revision.
+    pub item_count: i64,
+    pub sources: DatasetSourceCountsResponseBody,
     pub created_by: String,
     pub created_at: i64,
     pub updated_by: String,
@@ -371,10 +385,22 @@ impl From<Dataset> for DatasetResponseBody {
             description: value.description,
             tags: value.tags,
             global_version: value.global_version,
+            item_count: value.item_count,
+            sources: value.sources.into(),
             created_by: value.created_by,
             created_at: value.created_at,
             updated_by: value.updated_by,
             updated_at: value.updated_at,
+        }
+    }
+}
+
+impl From<DatasetSourceCounts> for DatasetSourceCountsResponseBody {
+    fn from(value: DatasetSourceCounts) -> Self {
+        Self {
+            trace: value.trace,
+            annotation: value.annotation,
+            manual: value.manual,
         }
     }
 }

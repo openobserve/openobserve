@@ -21,7 +21,8 @@ import http from "@/services/http";
 // branch; the list view consumes ONLY the normalized (camelCase) shape below so
 // the eventual snake_case API response is absorbed here, not in the UI.
 
-/** Per-source item counts. Aggregated from `llm_dataset_items.source`. */
+/** Per-source item counts. Aggregated server-side from `llm_dataset_items.source`,
+ *  counting each logical item once rather than once per stored revision. */
 export interface LlmDatasetSourceCounts {
   trace: number;
   annotation: number;
@@ -36,11 +37,13 @@ export interface LlmDataset {
   description: string | null;
   /** Dataset-wide MVCC sequence — bumped on every item insert/edit/delete. */
   globalVersion: number;
-  /** Count of live (non-deleted) items. Derived server-side; 0 until wired. */
+  /** Count of live (non-deleted) items. Derived server-side per read; the
+   *  Dataset row stores no counter, so this cannot drift. */
   itemCount: number;
   /** User-authored labels stored on the Dataset itself. */
   tags: string[];
-  /** Live-item counts by origin. Aggregated from `source` (TODO(BE)). */
+  /** Live-item counts by origin. These can sum to less than `itemCount` if an
+   *  item carries a source this UI does not name yet. */
   sources: LlmDatasetSourceCounts;
   createdBy?: string;
   createdAt?: number;
@@ -224,8 +227,6 @@ function normalizeItem(d: any): LlmDatasetItem {
 }
 
 const llmDatasetsService = {
-  // Dataset-level CRUD is bound to the real API. The response has no
-  // itemCount/sources yet, so normalize() defaults those aggregates.
   async list(orgId: string): Promise<LlmDataset[]> {
     const res = await http().get(base(orgId));
     const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
