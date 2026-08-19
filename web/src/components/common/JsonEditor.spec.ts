@@ -272,8 +272,11 @@ describe("JsonEditor", () => {
     it("clears previous protected-field errors when JSON is valid and no changes", async () => {
       const data = { id: "1", name: "a" };
       wrapper = createWrapper({ data, type: "alerts" });
+      // Seed from the real catalogue: the component matches the *rendered* message
+      // (deliberately, so it works in every locale), so a hardcoded English copy here
+      // silently stops matching the moment the copy is edited.
       (wrapper.vm as any).localValidationErrors = [
-        "Cannot modify id field directly , will be reverted to the original value",
+        i18n.global.t("common.cannotModifyProtectedField", { field: "id" }),
       ];
       const goodJson = JSON.stringify({ id: "1", name: "a" });
       (wrapper.vm as any).handleEditorChange(goodJson);

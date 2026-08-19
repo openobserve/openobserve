@@ -313,11 +313,11 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     rawItems = jsonArray;
   } else {
     try {
-      if (!jsonStr || !jsonStr.trim()) throw new Error("JSON is empty");
+      if (!jsonStr || !jsonStr.trim()) throw new Error(t("onlineEvals.jsonIsEmpty"));
       const parsed = JSON.parse(jsonStr);
       rawItems = Array.isArray(parsed) ? parsed : [parsed];
     } catch (e: any) {
-      toast({ message: e.message || "Invalid JSON format", variant: "error" });
+      toast({ message: e.message || t("onlineEvals.invalidJsonFormat"), variant: "error" });
       resetBaseImportFlag();
       return;
     }
@@ -373,7 +373,7 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
           if (err?.response?.status === 409) {
             return { status: "exists" as const, name: payload.name };
           }
-          const msg = err?.response?.data?.message || err?.message || "Unknown error";
+          const msg = err?.response?.data?.message || err?.message || t("onlineEvals.unknownError");
           return { status: "error" as const, name: payload.name, message: msg };
         },
       ),
@@ -389,19 +389,19 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
       creators.value.push({
         name: v.name,
         status: "success",
-        message: `"${v.name}" created successfully`,
+        message: t("onlineEvals.import.createdSuccessfully", { name: v.name }),
       });
     } else if (v.status === "exists") {
       creators.value.push({
         name: v.name,
         status: "exists",
-        message: `"${v.name}" already exists — skipped`,
+        message: t("onlineEvals.import.alreadyExistsSkipped", { name: v.name }),
       });
     } else {
       creators.value.push({
         name: v.name,
         status: "error",
-        message: `"${v.name}" failed: ${v.message}`,
+        message: t("onlineEvals.import.failedWithReason", { name: v.name, reason: v.message }),
       });
     }
   }

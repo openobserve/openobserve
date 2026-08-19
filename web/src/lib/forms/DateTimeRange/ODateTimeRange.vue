@@ -33,7 +33,7 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
@@ -131,14 +131,16 @@ const RELATIVE_OPTIONS: Record<RelativeUnit, number[]> = {
   months: [1, 2, 3, 4, 5, 6],
 };
 
-const UNIT_LABELS: Record<RelativeUnit, string> = {
-  seconds: "Seconds",
-  minutes: "Minutes",
-  hours: "Hours",
-  days: "Days",
-  weeks: "Weeks",
-  months: "Months",
-};
+// Computed, not a plain const: resolving once at setup would freeze the labels
+// at whatever locale was active when the picker mounted.
+const UNIT_LABELS = computed<Record<RelativeUnit, I18nText>>(() => ({
+  seconds: t("common.seconds"),
+  minutes: t("common.minutes"),
+  hours: t("common.hours"),
+  days: t("common.days"),
+  weeks: t("common.weeks"),
+  months: t("common.months"),
+}));
 
 const UNIT_TO_HOURS: Record<RelativeUnit, number> = {
   seconds: 1 / 3600,
@@ -163,8 +165,8 @@ const timezones = computed((): string[] => {
   return ["", "UTC", ...list.filter((t) => t !== "UTC")];
 });
 
-function tzLabel(tz: string): string {
-  return tz === "" ? "Browser Time" : tz;
+function tzLabel(tz: string): I18nText {
+  return tz === "" ? t("common.browserTime") : raw(tz);
 }
 
 const tzSearch = ref("");
@@ -198,24 +200,20 @@ const triggerLabel = computed((): string => {
   return placeholderText.value;
 });
 
+// One whole-sentence pipe-plural key per unit: the unit noun cannot be appended to
+// a translated "Past" fragment because word order differs across languages, and how
+// many plural forms exist is the message's business, not this file's.
+const RELATIVE_LABEL_KEYS: Record<RelativeUnit, I18nKey> = {
+  seconds: "common.pastSecond",
+  minutes: "common.pastMinute",
+  hours: "common.pastHour",
+  days: "common.pastDay",
+  weeks: "common.pastWeek",
+  months: "common.pastMonth",
+};
+
 function formatRelativeLabel(unit: RelativeUnit, amount: number): string {
-  const singular: Record<RelativeUnit, string> = {
-    seconds: "Second",
-    minutes: "Minute",
-    hours: "Hour",
-    days: "Day",
-    weeks: "Week",
-    months: "Month",
-  };
-  const plural: Record<RelativeUnit, string> = {
-    seconds: "Seconds",
-    minutes: "Minutes",
-    hours: "Hours",
-    days: "Days",
-    weeks: "Weeks",
-    months: "Months",
-  };
-  return `Past ${amount} ${amount === 1 ? singular[unit] : plural[unit]}`;
+  return t(RELATIVE_LABEL_KEYS[unit], { count: amount });
 }
 
 // ── Calendar ───────────────────────────────────────────────────

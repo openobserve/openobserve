@@ -365,7 +365,7 @@ export default defineComponent({
       const n = columnOverrides.value.length;
       if (n === 0) return t("dashboard.columnFormattingNoFieldsToFormat");
       if (n === 1) return t("dashboard.columnFormattingOneFieldToFormat");
-      return `${n} ${t("dashboard.columnFormattingFieldsToFormat")}`;
+      return t("dashboard.columnFormattingFieldsToFormatCount", { count: n });
     });
 
     // Field-type badge colour (num = blue, text = grey).

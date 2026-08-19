@@ -1,3 +1,4 @@
+import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { parseRegexPattern } from "@/utils/dashboard/tableConfigUtils";
@@ -37,21 +38,21 @@ export const findFirstValidMappedValue = (value: any, mappings: any[], fieldToCh
  * @param condition The condition to validate
  * @param errors Array to collect errors
  */
-const validateConditionItem = (condition: any, errors: string[]) => {
+const validateConditionItem = (t: TranslateFn, condition: any, errors: string[]) => {
   if (condition.type === "list" && !condition.values?.length) {
-    errors.push(`Filter: ${condition.column}: Select at least 1 item from the list`);
+    errors.push(t("dashboard.utils.filterSelectAtLeastOne", { column: condition.column }));
   }
 
   if (condition.type === "condition") {
     if (condition.operator == null) {
-      errors.push(`Filter: ${condition.column}: Operator selection required`);
+      errors.push(t("dashboard.utils.filterOperatorRequired", { column: condition.column }));
     }
 
     if (
       !["Is Null", "Is Not Null"].includes(condition.operator) &&
       (condition.value == null || condition.value == "")
     ) {
-      errors.push(`Filter: ${condition.column}: Condition value required`);
+      errors.push(t("dashboard.utils.filterConditionValueRequired", { column: condition.column }));
     }
   }
 };
@@ -63,9 +64,15 @@ const validateConditionItem = (condition: any, errors: string[]) => {
  * @param index Argument index
  * @param errors Array to collect errors
  */
-const validateFieldArgument = (arg: any, fieldPath: string, index: number, errors: string[]) => {
+const validateFieldArgument = (
+  t: TranslateFn,
+  arg: any,
+  fieldPath: string,
+  index: number,
+  errors: string[],
+) => {
   if (!arg.value || typeof arg.value !== "object" || !("field" in arg.value)) {
-    errors.push(`${fieldPath}: Argument ${index + 1} is a field but haven't selected any field`);
+    errors.push(t("dashboard.utils.argFieldNotSelected", { field: fieldPath, index: index + 1 }));
   }
 };
 
@@ -76,11 +83,17 @@ const validateFieldArgument = (arg: any, fieldPath: string, index: number, error
  * @param index Argument index
  * @param errors Array to collect errors
  */
-const validateNumberArgument = (arg: any, fieldPath: string, index: number, errors: string[]) => {
+const validateNumberArgument = (
+  t: TranslateFn,
+  arg: any,
+  fieldPath: string,
+  index: number,
+  errors: string[],
+) => {
   if (arg.value === null || arg.value === undefined || arg.value === "") {
-    errors.push(`${fieldPath}: Argument ${index + 1} is a number but no value entered`);
+    errors.push(t("dashboard.utils.argNumberNoValue", { field: fieldPath, index: index + 1 }));
   } else if (typeof arg.value !== "number" || isNaN(arg.value)) {
-    errors.push(`${fieldPath}: Argument ${index + 1} must be a valid number`);
+    errors.push(t("dashboard.utils.argMustBeValidNumber", { field: fieldPath, index: index + 1 }));
   }
 };
 
@@ -91,11 +104,19 @@ const validateNumberArgument = (arg: any, fieldPath: string, index: number, erro
  * @param index Argument index
  * @param errors Array to collect errors
  */
-const validateStringArgument = (arg: any, fieldPath: string, index: number, errors: string[]) => {
+const validateStringArgument = (
+  t: TranslateFn,
+  arg: any,
+  fieldPath: string,
+  index: number,
+  errors: string[],
+) => {
   if (arg.value === null || arg.value === undefined) {
-    errors.push(`${fieldPath}: Argument ${index + 1} is a string but no value entered`);
+    errors.push(t("dashboard.utils.argStringNoValue", { field: fieldPath, index: index + 1 }));
   } else if (typeof arg.value !== "string" || arg.value.trim() === "") {
-    errors.push(`${fieldPath}: Argument ${index + 1} must be a non-empty string`);
+    errors.push(
+      t("dashboard.utils.argMustBeNonEmptyString", { field: fieldPath, index: index + 1 }),
+    );
   }
 };
 
@@ -107,6 +128,7 @@ const validateStringArgument = (arg: any, fieldPath: string, index: number, erro
  * @param errors Array to collect errors
  */
 const validateHistogramIntervalArgument = (
+  t: TranslateFn,
   arg: any,
   fieldPath: string,
   index: number,
@@ -114,7 +136,12 @@ const validateHistogramIntervalArgument = (
 ) => {
   // if arg value is null, value not present or not a string
   if (!(arg.value === null || !arg.value || typeof arg.value === "string")) {
-    errors.push(`${fieldPath}: Argument ${index + 1} must be a valid histogram interval`);
+    errors.push(
+      t("dashboard.utils.argMustBeValidHistogramInterval", {
+        field: fieldPath,
+        index: index + 1,
+      }),
+    );
   }
 };
 
@@ -123,13 +150,13 @@ const validateHistogramIntervalArgument = (
  * @param conditions the conditions array
  * @param errors the array to push the errors to
  */
-function validateConditions(conditions: any, errors: any) {
+function validateConditions(t: TranslateFn, conditions: any, errors: any) {
   conditions.forEach((it: any) => {
     if (it.filterType === "condition") {
-      validateConditionItem(it, errors);
+      validateConditionItem(t, it, errors);
     } else if (it.filterType === "group") {
       // Recursively validate the conditions in the group
-      validateConditions(it.conditions, errors);
+      validateConditions(t, it.conditions, errors);
     }
   });
 }
@@ -167,10 +194,11 @@ function validateConditions(conditions: any, errors: any) {
  *    - histogramInterval: Must be valid interval string
  *
  * @param funcConfig - The function configuration to validate
- * @param fieldPath - Path for error messages (e.g., "Field", "Field ΓåÆ Arg 2")
+ * @param fieldPath - Path for error messages (e.g., "Field", "Field → Arg 2"), built
+ *                    from the `dashboard.utils.nestedArgPath` key for nested arguments
  * @param errors - Array to collect errors
  */
-const validateFunction = (funcConfig: any, fieldPath: string, errors: string[]) => {
+const validateFunction = (t: TranslateFn, funcConfig: any, fieldPath: string, errors: string[]) => {
   // Handle raw query fields
   if (funcConfig.type === "raw") {
     if (
@@ -178,7 +206,7 @@ const validateFunction = (funcConfig: any, fieldPath: string, errors: string[]) 
       typeof funcConfig.rawQuery !== "string" ||
       funcConfig.rawQuery.trim() === ""
     ) {
-      errors.push(`${fieldPath}: Raw query cannot be empty`);
+      errors.push(t("dashboard.utils.rawQueryCannotBeEmpty", { field: fieldPath }));
     }
     return;
   }
@@ -190,7 +218,7 @@ const validateFunction = (funcConfig: any, fieldPath: string, errors: string[]) 
 
   // If function is not found, push error
   if (!selectedFunction) {
-    errors.push(`${fieldPath}: Invalid aggregation function`);
+    errors.push(t("dashboard.utils.invalidAggregationFunction", { field: fieldPath }));
     return; // Skip further validation if function is invalid
   }
 
@@ -235,7 +263,12 @@ const validateFunction = (funcConfig: any, fieldPath: string, errors: string[]) 
         : args.length;
 
     if (relevantArgsCount < minArgDef.min) {
-      errors.push(`${fieldPath}: Requires at least ${minArgDef.min} arguments`);
+      errors.push(
+        t("dashboard.utils.requiresAtLeastArguments", {
+          field: fieldPath,
+          count: minArgDef.min,
+        }),
+      );
     }
   }
 
@@ -263,7 +296,7 @@ const validateFunction = (funcConfig: any, fieldPath: string, errors: string[]) 
     // Handle out-of-bounds index for non-variable args or unknown formats
     if (argDefIndex >= argsDefinition.length) {
       if (!hasVariableArgs) {
-        errors.push(`${fieldPath}: Too many arguments provided`);
+        errors.push(t("dashboard.utils.tooManyArguments", { field: fieldPath }));
         return;
       }
       // Default to the variable argument definition
@@ -275,29 +308,41 @@ const validateFunction = (funcConfig: any, fieldPath: string, errors: string[]) 
     // Check if current argument type is among the allowed types
     if (arg && !allowedTypes.includes(arg.type)) {
       errors.push(
-        `${fieldPath}: Argument ${index + 1} has invalid type (expected: ${allowedTypes.join(" or ")})`,
+        t("dashboard.utils.argInvalidType", {
+          field: fieldPath,
+          index: index + 1,
+          expected: allowedTypes.join(" or "),
+        }),
       );
       return;
     }
 
     // Handle different argument types
     if (arg.type === "field") {
-      validateFieldArgument(arg, fieldPath, index, errors);
+      validateFieldArgument(t, arg, fieldPath, index, errors);
     } else if (arg.type === "function") {
       // RECURSIVE VALIDATION: If argument is a function, validate it recursively
       if (!arg.value || typeof arg.value !== "object") {
-        errors.push(`${fieldPath}: Argument ${index + 1} is a function but has invalid structure`);
+        errors.push(
+          t("dashboard.utils.argFunctionInvalidStructure", {
+            field: fieldPath,
+            index: index + 1,
+          }),
+        );
       } else {
         // Recursively validate the nested function
-        const nestedPath = `${fieldPath} ΓåÆ Arg ${index + 1}`;
-        validateFunction(arg.value, nestedPath, errors);
+        const nestedPath = t("dashboard.utils.nestedArgPath", {
+          field: fieldPath,
+          index: index + 1,
+        });
+        validateFunction(t, arg.value, nestedPath, errors);
       }
     } else if (arg.type === "number") {
-      validateNumberArgument(arg, fieldPath, index, errors);
+      validateNumberArgument(t, arg, fieldPath, index, errors);
     } else if (arg.type === "string") {
-      validateStringArgument(arg, fieldPath, index, errors);
+      validateStringArgument(t, arg, fieldPath, index, errors);
     } else if (arg.type === "histogramInterval") {
-      validateHistogramIntervalArgument(arg, fieldPath, index, errors);
+      validateHistogramIntervalArgument(t, arg, fieldPath, index, errors);
     }
   });
 
@@ -313,7 +358,9 @@ const validateFunction = (funcConfig: any, fieldPath: string, errors: string[]) 
 
     // Check if required argument is missing or null/undefined
     if (argDef.required && (index >= args.length || !args[index])) {
-      errors.push(`${fieldPath}: Missing required argument at position ${index + 1}`);
+      errors.push(
+        t("dashboard.utils.missingRequiredArgument", { field: fieldPath, index: index + 1 }),
+      );
     }
   });
 };
@@ -328,11 +375,14 @@ const validateFunction = (funcConfig: any, fieldPath: string, errors: string[]) 
  * @param yAxisLabel Optional custom label for Y-Axis in error messages
  */
 const validateChartFieldsConfiguration = (
+  t: TranslateFn,
   chartType: string,
   fields: any,
   errors: string[],
-  xAxisLabel: string = "X-Axis",
-  yAxisLabel: string = "Y-Axis",
+  // Defaults reference the `t` parameter above, so callers that omit the labels
+  // still get translated text in the error message.
+  xAxisLabel: string = t("panel.xAxisShort"),
+  yAxisLabel: string = t("panel.yAxisShort"),
   pageKey: string = "dashboard",
 ) => {
   if (!chartType || !fields) {
@@ -345,16 +395,16 @@ const validateChartFieldsConfiguration = (
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one value field for donut and pie charts";
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addValueFieldForPieDonut");
         errors.push(errorMsg);
       }
 
       if (fields?.x?.length > 1 || fields?.x?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract label field from the query."
-            : "Add one label field for donut and pie charts";
+            ? t("dashboard.utils.unableToExtractLabelField")
+            : t("dashboard.utils.addLabelFieldForPieDonut");
         errors.push(errorMsg);
       }
       break;
@@ -363,16 +413,16 @@ const validateChartFieldsConfiguration = (
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one value field for metric charts";
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addValueFieldForMetric");
         errors.push(errorMsg);
       }
 
       if (fields?.x?.length) {
         const errorMsg =
           pageKey === "logs"
-            ? "Grouping field is not allowed for Metric chart"
-            : `${xAxisLabel} field is not allowed for Metric chart`;
+            ? t("dashboard.utils.groupingNotAllowedForMetric")
+            : t("dashboard.utils.fieldNotAllowedForMetric", { label: xAxisLabel });
         errors.push(errorMsg);
       }
       break;
@@ -381,16 +431,16 @@ const validateChartFieldsConfiguration = (
       if (fields?.y?.length !== 1) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one value field for gauge chart";
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addValueFieldForGauge");
         errors.push(errorMsg);
       }
       // gauge can have zero or one label
       if (fields?.x?.length !== 1 && fields?.x?.length !== 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : "Add one label field for gauge chart";
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addLabelFieldForGauge");
         errors.push(errorMsg);
       }
       break;
@@ -403,16 +453,16 @@ const validateChartFieldsConfiguration = (
       if (fields?.y?.length < 1) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : `Add at least one field for the ${yAxisLabel}`;
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addAtLeastOneFieldFor", { label: yAxisLabel });
         errors.push(errorMsg);
       }
 
       if (fields?.x?.length > 1 || fields?.x?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : `Add one fields for the ${xAxisLabel}`;
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addOneFieldFor", { label: xAxisLabel });
         errors.push(errorMsg);
       }
       break;
@@ -421,8 +471,11 @@ const validateChartFieldsConfiguration = (
       if (fields?.y?.length === 0 && fields?.x?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract fields from the query."
-            : `Add at least one field on ${xAxisLabel} or ${yAxisLabel}`;
+            ? t("dashboard.utils.unableToExtractFields")
+            : t("dashboard.utils.addAtLeastOneFieldOnEither", {
+                xLabel: xAxisLabel,
+                yLabel: yAxisLabel,
+              });
         errors.push(errorMsg);
       }
       break;
@@ -431,24 +484,24 @@ const validateChartFieldsConfiguration = (
       if (fields?.y?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : `Add at least one field for the ${yAxisLabel}`;
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addAtLeastOneFieldFor", { label: yAxisLabel });
         errors.push(errorMsg);
       }
 
       if (fields?.x?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract second level grouping field from the query."
-            : `Add one field for the ${xAxisLabel}`;
+            ? t("dashboard.utils.unableToExtractSecondLevelGroupingField")
+            : t("dashboard.utils.addOneFieldFor", { label: xAxisLabel });
         errors.push(errorMsg);
       }
 
       if (fields?.z?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one field for the Z-Axis";
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addFieldForZAxis");
         errors.push(errorMsg);
       }
       break;
@@ -458,15 +511,15 @@ const validateChartFieldsConfiguration = (
       if (fields?.y?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : `Add at least one field for the ${yAxisLabel}`;
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addAtLeastOneFieldFor", { label: yAxisLabel });
         errors.push(errorMsg);
       }
       if (fields?.x?.length !== 1 || fields?.breakdown?.length !== 1) {
         const breakdownErrMsg =
           pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : `Add exactly one field on the ${xAxisLabel} and breakdown for stacked and h-stacked charts`;
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addExactlyOneFieldStacked", { label: xAxisLabel });
         errors.push(breakdownErrMsg);
       }
       break;
@@ -475,15 +528,15 @@ const validateChartFieldsConfiguration = (
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : `Add exactly one field on ${yAxisLabel} for area-stacked charts`;
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addExactlyOneFieldOnAreaStacked", { label: yAxisLabel });
         errors.push(errorMsg);
       }
       if (fields?.x?.length !== 1 || fields?.breakdown?.length !== 1) {
         const breakdownErrMsg =
           pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : `Add exactly one field on the ${xAxisLabel} and breakdown for area-stacked charts`;
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addExactlyOneFieldAreaStacked", { label: xAxisLabel });
         errors.push(breakdownErrMsg);
       }
       break;
@@ -492,15 +545,15 @@ const validateChartFieldsConfiguration = (
       if (fields?.latitude == null) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract latitude field from the query."
-            : "Add one field for the latitude";
+            ? t("dashboard.utils.unableToExtractLatitudeField")
+            : t("dashboard.utils.addFieldForLatitude");
         errors.push(errorMsg);
       }
       if (fields?.longitude == null) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract longitude field from the query."
-            : "Add one field for the longitude";
+            ? t("dashboard.utils.unableToExtractLongitudeField")
+            : t("dashboard.utils.addFieldForLongitude");
         errors.push(errorMsg);
       }
       break;
@@ -509,22 +562,22 @@ const validateChartFieldsConfiguration = (
       if (fields?.source == null) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract source field from the query."
-            : "Add one field for the source";
+            ? t("dashboard.utils.unableToExtractSourceField")
+            : t("dashboard.utils.addFieldForSource");
         errors.push(errorMsg);
       }
       if (fields?.target == null) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract target field from the query."
-            : "Add one field for the target";
+            ? t("dashboard.utils.unableToExtractTargetField")
+            : t("dashboard.utils.addFieldForTarget");
         errors.push(errorMsg);
       }
       if (fields?.value == null) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one field for the value";
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addFieldForValue");
         errors.push(errorMsg);
       }
       break;
@@ -533,15 +586,15 @@ const validateChartFieldsConfiguration = (
       if (fields?.name == null) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract name field from the query."
-            : "Add one field for the name";
+            ? t("dashboard.utils.unableToExtractNameField")
+            : t("dashboard.utils.addFieldForName");
         errors.push(errorMsg);
       }
       if (fields?.value_for_maps == null) {
         const errorMsg =
           pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one field for the value";
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addFieldForValue");
         errors.push(errorMsg);
       }
       break;
@@ -571,8 +624,8 @@ const validateChartFieldsConfiguration = (
     // compare with function validation schema
     // if validation fails, push error
     aggregationFunctionError?.forEach((it: any) => {
-      const fieldPath = it.alias || "Field";
-      validateFunction(it, fieldPath, errors);
+      const fieldPath = it.alias || t("common.field");
+      validateFunction(t, it, fieldPath, errors);
     });
   }
 };
@@ -587,6 +640,7 @@ const validateChartFieldsConfiguration = (
  * @param {boolean} isFieldsValidationRequired - Whether field validation is required
  */
 export const validateSQLPanelFields = (
+  t: TranslateFn,
   panelData: any,
   queryIndex: number,
   currentXLabel: string,
@@ -603,6 +657,7 @@ export const validateSQLPanelFields = (
   ) {
     // Validate fields configuration based on chart type
     validateChartFieldsConfiguration(
+      t,
       panelData?.type,
       panelData?.queries?.[queryIndex]?.fields ?? {},
       errors,
@@ -619,10 +674,15 @@ export const validateSQLPanelFields = (
  * @param errors Array to collect error messages
  * @param customMessage Optional custom error message
  */
-const validateQueriesNotEmpty = (queries: any[] = [], errors: string[], customMessage?: string) => {
+const validateQueriesNotEmpty = (
+  t: TranslateFn,
+  queries: any[] = [],
+  errors: string[],
+  customMessage?: string,
+) => {
   queries.forEach((q: any, index: number) => {
     if (q && q?.query === "") {
-      errors.push(customMessage || `Query-${index + 1} is empty`);
+      errors.push(customMessage || t("dashboard.utils.queryIsEmpty", { index: index + 1 }));
     }
   });
 };
@@ -644,70 +704,94 @@ const validateContentNotEmpty = (content: string = "", errors: string[], errorMe
  * @param panel The panel to validate
  * @param errors Array to collect error messages
  */
-const validatePanelContentByType = (panel: any, errors: string[]) => {
+const validatePanelContentByType = (t: TranslateFn, panel: any, errors: string[]) => {
   // Check for promQL query type
   if (panel?.queryType === "promql") {
-    validateQueriesNotEmpty(panel?.queries, errors);
+    validateQueriesNotEmpty(t, panel?.queries, errors);
   }
 
   // Check by panel type
   switch (panel?.type) {
     case "geomap":
-      validateQueriesNotEmpty(panel?.queries, errors);
+      validateQueriesNotEmpty(t, panel?.queries, errors);
       break;
     case "html":
-      validateContentNotEmpty(panel?.htmlContent, errors, "Please enter your HTML code");
+      validateContentNotEmpty(panel?.htmlContent, errors, t("dashboard.utils.enterHtmlCode"));
       break;
     case "markdown":
-      validateContentNotEmpty(panel?.markdownContent, errors, "Please enter your markdown code");
+      validateContentNotEmpty(
+        panel?.markdownContent,
+        errors,
+        t("dashboard.utils.enterMarkdownCode"),
+      );
       break;
     case "custom_chart":
-      validateQueriesNotEmpty([panel?.queries?.[0]], errors, "Please enter query for custom chart");
+      validateQueriesNotEmpty(
+        t,
+        [panel?.queries?.[0]],
+        errors,
+        t("dashboard.utils.enterCustomChartQuery"),
+      );
       break;
   }
 };
 
-const validateJoinField = (join: any, errors: string[], joinIndex: number) => {
+const validateJoinField = (t: TranslateFn, join: any, errors: string[], joinIndex: number) => {
   // validate stream
   if (!join?.stream) {
-    errors.push(`Join #${joinIndex + 1}: Stream is required`);
+    errors.push(t("dashboard.utils.joinStreamRequired", { index: joinIndex + 1 }));
   }
 
   // validate join type
   if (!join?.joinType) {
-    errors.push(`Join #${joinIndex + 1}: Join type is required`);
+    errors.push(t("dashboard.utils.joinTypeRequired", { index: joinIndex + 1 }));
   }
 
   // validate clauses
   // at least one clause is required
   // and each clause should have leftField, rightField, operation
   if (!join?.conditions || join?.conditions?.length === 0) {
-    errors.push(`Join #${joinIndex + 1}: At least one clause is required`);
+    errors.push(t("dashboard.utils.joinClauseRequired", { index: joinIndex + 1 }));
   }
 
   // validate each clause
   join?.conditions?.forEach((condition: any, conditionIndex: number) => {
     // validate leftField
     if (!condition?.leftField?.field) {
-      errors.push(`Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Left field is required`);
+      errors.push(
+        t("dashboard.utils.joinClauseLeftFieldRequired", {
+          index: joinIndex + 1,
+          clause: conditionIndex + 1,
+        }),
+      );
     }
 
     // validate rightField
     if (!condition?.rightField?.field) {
-      errors.push(`Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Right field is required`);
+      errors.push(
+        t("dashboard.utils.joinClauseRightFieldRequired", {
+          index: joinIndex + 1,
+          clause: conditionIndex + 1,
+        }),
+      );
     }
 
     // validate operation
     if (!condition?.operation) {
-      errors.push(`Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Operation is required`);
+      errors.push(
+        t("dashboard.utils.joinClauseOperationRequired", {
+          index: joinIndex + 1,
+          clause: conditionIndex + 1,
+        }),
+      );
     }
   });
 };
 
-const validateJoinFields = (joins: any, errors: string[]) => {
+const validateJoinFields = (t: TranslateFn, joins: any, errors: string[]) => {
   // validate join fields
   if (joins) {
-    joins.forEach((join: any, index: number) => validateJoinField(join, errors, index));
+    joins.forEach((join: any, index: number) => validateJoinField(t, join, errors, index));
   }
 };
 
@@ -717,13 +801,13 @@ const validateJoinFields = (joins: any, errors: string[]) => {
  * @param panel The panel to validate
  * @param errors Array to collect error messages
  */
-const validatePanelFields = (panel: any, errors: string[] = []) => {
+const validatePanelFields = (t: TranslateFn, panel: any, errors: string[] = []) => {
   // Check if panel has promQL query type
   const isPromQLMode = panel?.queryType === "promql" || panel?.queryType === "promql-builder";
   const currentQueryIndex = 0; // Default to first query
 
   // Validate panel content based on type
-  validatePanelContentByType(panel, errors);
+  validatePanelContentByType(t, panel, errors);
 
   // validate fields if not promQL mode and customQuery is false
   if (
@@ -733,6 +817,7 @@ const validatePanelFields = (panel: any, errors: string[] = []) => {
   ) {
     // Validate fields configuration based on chart type
     validateChartFieldsConfiguration(
+      t,
       panel?.type,
       panel?.queries?.[currentQueryIndex]?.fields ?? {},
       errors,
@@ -742,6 +827,7 @@ const validatePanelFields = (panel: any, errors: string[] = []) => {
     if (panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions?.length) {
       // Validate the conditions
       validateConditions(
+        t,
         panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions ?? [],
         errors,
       );
@@ -758,12 +844,12 @@ const validatePanelFields = (panel: any, errors: string[] = []) => {
  * @param panel The panel object to validate
  * @returns Array of validation errors
  */
-const validatePanelContent = (panel: any): string[] => {
+const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
   const errors: string[] = [];
 
   // Required fields validation
   if (!panel?.type) {
-    errors.push(`Panel ${panel?.id}: Panel type is required`);
+    errors.push(t("dashboard.utils.panelTypeRequired", { id: panel?.id }));
     return errors;
   }
 
@@ -792,25 +878,27 @@ const validatePanelContent = (panel: any): string[] => {
   ];
 
   if (!allowedTypes.includes(panel?.type)) {
-    errors.push(`Panel ${panel?.id}: Chart type "${panel?.type}" is not supported.`);
+    errors.push(
+      t("dashboard.utils.panelChartTypeUnsupported", { id: panel?.id, type: panel?.type }),
+    );
   }
 
   if (!panel?.title) {
-    errors.push(`Panel ${panel?.id}: Panel title is required`);
+    errors.push(t("dashboard.utils.panelTitleRequired", { id: panel?.id }));
   }
 
   // Layout validation
   if (!panel?.layout) {
-    errors.push(`Panel ${panel?.id}: Layout is required`);
+    errors.push(t("dashboard.utils.panelLayoutRequired", { id: panel?.id }));
   } else {
     if (typeof panel?.layout?.x !== "number")
-      errors.push(`Panel ${panel?.id}: Layout x must be a number`);
+      errors.push(t("dashboard.utils.panelLayoutXMustBeNumber", { id: panel?.id }));
     if (typeof panel?.layout?.y !== "number")
-      errors.push(`Panel ${panel?.id}: Layout y must be a number`);
+      errors.push(t("dashboard.utils.panelLayoutYMustBeNumber", { id: panel?.id }));
     if (typeof panel?.layout?.w !== "number")
-      errors.push(`Panel ${panel?.id}: Layout w must be a number`);
+      errors.push(t("dashboard.utils.panelLayoutWMustBeNumber", { id: panel?.id }));
     if (typeof panel?.layout?.h !== "number")
-      errors.push(`Panel ${panel?.id}: Layout h must be a number`);
+      errors.push(t("dashboard.utils.panelLayoutHMustBeNumber", { id: panel?.id }));
   }
 
   return errors;
@@ -824,6 +912,7 @@ const validatePanelContent = (panel: any): string[] => {
  * @returns {array} An array of validation error messages
  */
 export const validatePanel = (
+  t: TranslateFn,
   panelData: any,
   errors: string[] = [],
   isFieldsValidationRequired: boolean = true,
@@ -840,7 +929,7 @@ export const validatePanel = (
     panelData?.data?.queryType === "promql" || panelData?.data?.queryType === "promql-builder";
 
   // Validate panel content based on type
-  validatePanelContentByType(panelData?.data, errors);
+  validatePanelContentByType(t, panelData?.data, errors);
 
   // Validate timestamp alias for SQL queries with custom query mode
   if (panelData?.data?.queryType === "sql") {
@@ -849,7 +938,7 @@ export const validatePanel = (
     panelData?.data?.queries?.forEach((queryObj: any) => {
       if (queryObj?.query && queryObj?.customQuery) {
         if (!checkTimestampAlias(queryObj.query)) {
-          errors.push(`Alias '${timestampColumn}' is not allowed.`);
+          errors.push(t("dashboard.utils.aliasNotAllowed", { alias: timestampColumn }));
         }
       }
     });
@@ -879,36 +968,36 @@ export const validatePanel = (
       "h-stacked",
     ];
     if (!allowedChartTypes.includes(panelData?.data?.type)) {
-      errors.push("Selected chart type is not supported for PromQL. Only line chart is supported.");
+      errors.push(t("dashboard.utils.promqlChartTypeUnsupported"));
     }
 
     // 2. x axis, y axis, filters should be blank for PromQL
     if (panelData?.data?.queries?.[currentQueryIndex]?.fields?.x?.length > 0) {
-      errors.push("X-Axis is not supported for PromQL. Remove anything added to the X-Axis.");
+      errors.push(t("dashboard.utils.promqlXAxisUnsupported"));
     }
 
     if (panelData?.data?.queries?.[currentQueryIndex]?.fields?.y?.length > 0) {
-      errors.push("Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.");
+      errors.push(t("dashboard.utils.promqlYAxisUnsupported"));
     }
 
     if (panelData?.data?.queries?.[currentQueryIndex]?.fields?.filter?.conditions?.length > 0) {
-      errors.push("Filters are not supported for PromQL. Remove anything added to the Filters.");
+      errors.push(t("dashboard.utils.promqlFiltersUnsupported"));
     }
   } else {
     // Calculate the x and y axis labels based on chart type
     const currentXLabel =
       panelData?.data?.type === "table"
-        ? "First Column"
+        ? t("panel.firstColumn")
         : panelData?.data?.type === "h-bar"
-          ? "Y-Axis"
-          : "X-Axis";
+          ? t("panel.yAxisShort")
+          : t("panel.xAxisShort");
 
     const currentYLabel =
       panelData?.data?.type === "table"
-        ? "Other Columns"
+        ? t("panel.otherColumn")
         : panelData?.data?.type === "h-bar"
-          ? "X-Axis"
-          : "Y-Axis";
+          ? t("panel.xAxisShort")
+          : t("panel.yAxisShort");
 
     // Validate panel fields based on chart type for all queries
     const queries = panelData?.data?.queries ?? [];
@@ -922,6 +1011,7 @@ export const validatePanel = (
 
       // Validate panel fields based on chart type
       validateSQLPanelFields(
+        t,
         panelData?.data,
         queryIndex,
         currentXLabel,
@@ -932,11 +1022,13 @@ export const validatePanel = (
       );
 
       // validate join fields for this query
-      validateJoinFields(query?.joins, queryErrors);
+      validateJoinFields(t, query?.joins, queryErrors);
 
       // Prefix errors with query number when multiple queries exist
       if (hasMultipleQueries) {
-        queryErrors.forEach((err) => errors.push(`Query ${queryIndex + 1}: ${err}`));
+        queryErrors.forEach((err) =>
+          errors.push(t("dashboard.utils.queryErrorPrefix", { index: queryIndex + 1, error: err })),
+        );
       } else {
         errors.push(...queryErrors);
       }
@@ -952,34 +1044,38 @@ export const validatePanel = (
  * @param dashboardJson The dashboard JSON to validate
  * @returns Array of validation errors or empty array if valid
  */
-export const validateDashboardJson = (dashboardJson: any): string[] => {
+export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): string[] => {
   const errors: string[] = [];
 
   // Basic structure validation
   if (!dashboardJson) {
-    errors.push("Dashboard JSON is empty or invalid");
+    errors.push(t("dashboard.utils.dashboardJsonInvalid"));
     return errors;
   }
 
   // Required fields validation
   if (!dashboardJson?.dashboardId) {
-    errors.push("Dashboard ID is required");
+    errors.push(t("dashboard.utils.dashboardIdRequired"));
   }
 
   if (!dashboardJson?.title) {
-    errors.push("Dashboard title is required");
+    errors.push(t("dashboard.utils.dashboardTitleRequired"));
   }
 
   // Version should be present and match current schema version
   if (!dashboardJson?.version) {
-    errors.push("Dashboard version is required");
+    errors.push(t("dashboard.utils.dashboardVersionRequired"));
   } else if (dashboardJson.version !== CURRENT_DASHBOARD_SCHEMA_VERSION) {
-    errors.push(`Dashboard version must be ${CURRENT_DASHBOARD_SCHEMA_VERSION}.`);
+    errors.push(
+      t("dashboard.utils.dashboardVersionMustBe", {
+        version: CURRENT_DASHBOARD_SCHEMA_VERSION,
+      }),
+    );
   }
 
   // Check tabs
   if (!Array.isArray(dashboardJson?.tabs) || dashboardJson?.tabs?.length === 0) {
-    errors.push("Dashboard must have at least one tab");
+    errors.push(t("dashboard.utils.dashboardTabRequired"));
     return errors;
   }
 
@@ -987,15 +1083,15 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
   const tabIds = new Set<string>();
   for (const tab of dashboardJson?.tabs ?? []) {
     if (!tab?.tabId) {
-      errors.push("Each tab must have a tabId");
+      errors.push(t("dashboard.utils.tabIdRequired"));
     } else if (tabIds.has(tab?.tabId)) {
-      errors.push(`Duplicate tab ID found: ${tab?.tabId}`);
+      errors.push(t("dashboard.utils.duplicateTabId", { tabId: tab?.tabId }));
     } else {
       tabIds.add(tab?.tabId);
     }
 
     if (!tab?.name) {
-      errors.push(`Tab ${tab?.tabId} must have a name`);
+      errors.push(t("dashboard.utils.tabMustHaveName", { tabId: tab?.tabId }));
     }
   }
 
@@ -1005,7 +1101,7 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
 
   for (const tab of dashboardJson.tabs) {
     if (!Array.isArray(tab?.panels)) {
-      errors.push(`Tab ${tab?.tabId} must have a panels array`);
+      errors.push(t("dashboard.utils.tabMustHavePanelsArray", { tabId: tab?.tabId }));
       continue;
     }
 
@@ -1015,27 +1111,32 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
     for (const panel of tab.panels) {
       // Check panel ID uniqueness
       if (!panel?.id) {
-        errors.push(`Panel in tab ${tab?.tabId} is missing an ID`);
+        errors.push(t("dashboard.utils.panelMissingId", { tabId: tab?.tabId }));
       } else if (panelIds.has(panel?.id)) {
-        errors.push(`Duplicate panel ID found: ${panel?.id}`);
+        errors.push(t("dashboard.utils.duplicatePanelId", { id: panel?.id }));
       } else {
         panelIds.add(panel?.id);
       }
 
       // Check layout i value uniqueness within the tab
       if (!panel?.layout || !panel?.layout?.i) {
-        errors.push(`Panel ${panel?.id} is missing a layout.i value`);
+        errors.push(t("dashboard.utils.panelMissingLayoutI", { id: panel?.id }));
       } else {
         const tabLayoutValues = layoutIValues.get(tab?.tabId);
         if (tabLayoutValues && tabLayoutValues.has(panel?.layout?.i?.toString())) {
-          errors.push(`Duplicate layout.i value found in tab ${tab?.tabId}: ${panel?.layout?.i}`);
+          errors.push(
+            t("dashboard.utils.duplicateLayoutI", {
+              tabId: tab?.tabId,
+              value: panel?.layout?.i,
+            }),
+          );
         } else if (tabLayoutValues) {
           tabLayoutValues.add(panel?.layout?.i?.toString());
         }
       }
 
       // Validate basic panel structure
-      const panelStructureErrors = validatePanelContent(panel);
+      const panelStructureErrors = validatePanelContent(t, panel);
       errors.push(...panelStructureErrors);
 
       // Validate panel fields but skip stream validation
@@ -1044,20 +1145,27 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
           const panelDetailErrors: string[] = [];
 
           // Only validate the panel fields (not stream field existence)
-          validatePanelFields(panel, panelDetailErrors);
+          validatePanelFields(t, panel, panelDetailErrors);
 
           // Add panel identifier to each error
-          const prefixedErrors = panelDetailErrors.map(
-            (error) => `Panel ${panel?.id || "unknown"}: ${error}`,
+          const prefixedErrors = panelDetailErrors.map((error) =>
+            t("dashboard.utils.panelErrorPrefix", {
+              id: panel?.id || "unknown",
+              error,
+            }),
           );
 
           errors.push(...prefixedErrors);
         } catch (error) {
           // If validation fails
           errors.push(
-            `Panel ${panel?.id || "unknown"}: ${
-              error instanceof Error ? error?.message : "Unable to validate panel configuration"
-            }`,
+            t("dashboard.utils.panelErrorPrefix", {
+              id: panel?.id || "unknown",
+              error:
+                error instanceof Error
+                  ? error?.message
+                  : t("dashboard.utils.unableToValidatePanel"),
+            }),
           );
         }
       }

@@ -205,7 +205,9 @@ describe("WorkflowTestDialog", () => {
     it("lists Beginning first, then the non-trigger steps in flow order", () => {
       const wrapper = mountDialog();
       const opts = selectVm(wrapper).props("options") as any[];
-      expect(opts[0]).toEqual({
+      // Options now also carry a per-type `icon` (rendered via OSelect iconKey), so
+      // match the essential fields rather than the exact object.
+      expect(opts[0]).toMatchObject({
         label: i18n.global.t("workflow.test.runFromBeginning"),
         value: "__beginning__",
       });

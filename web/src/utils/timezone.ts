@@ -2,6 +2,7 @@
 
 import { DateTime } from "luxon";
 import { durationFormatter } from "@/utils/formatters";
+import { gt, raw } from "@/types/i18n";
 
 let moment: any;
 let momentInitialized = false;
@@ -105,7 +106,10 @@ export const resolveBrowserTimezone = (timezone: string): string => {
 };
 
 export const convertDateToTimestamp = (date: string, time: string, timezone: string) => {
-  const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+  // Sentinel, not copy: resolveBrowserTimezone() above matches it with
+  // startsWith("browser time") and several components persist and compare it.
+  const browserTime =
+    raw("Browser Time (") + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
   const [day, month, year] = date.split("-");
   const [hour, minute] = time.split(":");
@@ -203,7 +207,13 @@ export const getFunctionErrorMessage = (
       "yyyy-MM-dd HH:mm:ss",
     );
 
-    return `${message} (Data returned for: ${startTimeFormatted} to ${endTimeFormatted})`;
+    // `message` is backend-authored text we pass through verbatim; only the
+    // range suffix around it is ours to translate.
+    return gt("search.functionErrorDataRange", {
+      message,
+      start: startTimeFormatted,
+      end: endTimeFormatted,
+    });
   } catch (error) {
     return message;
   }

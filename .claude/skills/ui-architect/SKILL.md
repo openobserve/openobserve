@@ -325,6 +325,60 @@ read it once, it is the backbone of everything below.
    >   only the STATIC form is covered, so `:title="'Delete'"` still slips through —
    >   don't reach for it to dodge the error.
    >
+   > **Which translator — `t()` first, `gt()` only when it cannot reach.**
+   >
+   > | Where you are | Use |
+   > |---|---|
+   > | `<script setup>` / inside `setup()` | **`t()`** from `useI18nTyped()` |
+   > | `.ts` module called from a component | **thread `t` in** as a parameter |
+   > | Module scope, nothing to thread from (route guards, registries, import-time singletons) | **`gt()`** |
+   > | A key stored as DATA, resolved later (`titleKey`, `labelKey`) | neither — store `I18nKey`, resolve with `t()` at render |
+   >
+   > `gt()` is the escape hatch, not the default — before reaching for it, ask whether
+   > the function can take `t: TranslateFn` as an argument; usually it can, and the
+   > caller already has one. At module scope, put `gt()` behind a **getter** so it
+   > resolves at read time, not import time:
+   >
+   > ```ts
+   > // WRONG — frozen at whatever locale was loaded when this module was imported
+   > export const destination = { name: gt("alerts.email") };
+   > // RIGHT — resolves when the picker renders
+   > export const destination = { get name() { return gt("alerts.email"); } };
+   > ```
+   >
+   > **What must NEVER enter the catalogue.** A key is a promise that translating the
+   > string is safe. These break that promise — `raw()` them and keep them out:
+   >
+   > | Kind | Examples | What broke when translated |
+   > |---|---|---|
+   > | Values code compares or persists | a sentinel, an enum, a generated name | logic silently stops matching, non-English users only |
+   > | Product / company names | `Kafka`, `Zookeeper`, `NATS`, `Airflow` | shipped as `Zoowärter`, `HORMIGAS` (ants), `Luftstrom` (air current) |
+   > | Acronyms that are names | `RUM`, `DAG`, `IAM`, `AGPL`, `P95` | shipped as `RON` (the drink), `DÍA` (day), `SOY YO` ("I am me") |
+   > | Code the user copies or types | SQL snippets, regexes, model ids, field names, env vars | `gpt-4.*` → `gpt-4. *`; a pasted sample no longer runs |
+   >
+   > The test is **not** "is it user-visible" — all of the above are. It is **"is there
+   > one correct form worldwide?"** If yes, it is not copy.
+   >
+   > **A name INSIDE a sentence: interpolate it out, don't `raw()` the sentence.**
+   >
+   > ```ts
+   > // WRONG — freezes the whole sentence in English
+   > raw("Route all telemetry through the OTel Collector")
+   > // WRONG — the translator mangles the product name
+   > t("traces.noData.otelCollectorDesc")
+   > // RIGHT — catalogue holds "…through the {product}"
+   > t("traces.noData.otelCollectorDesc", { product: raw("OTel Collector") })
+   > ```
+   >
+   > Same for an example token: `"e.g. {example}"` + `{ example: raw("gpt-4.*") }` keeps
+   > *"e.g."* translatable while the token becomes unreachable. Never split a sentence
+   > into fragments you concatenate — word order is per-language.
+   >
+   > **A string that is both a label and an identifier: split it.** Give display and
+   > machine value separate fields — `{ label: t("iam.roleAdmin"), value: "admin" }`.
+   > Before translating any label, check for a sibling `value:`; if the label IS the
+   > value, translating it breaks the comparison.
+   >
    > **Non-translatable text — the ladder.** Decide in this order:
    >
    > 1. **Does code branch on it?** (`"px" | "%"`, `"sm" | "md"`) → it is not text at

@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { buildJobMatchedTargetsSql } from "./useJobMatchedTargets";
+import { buildJobMatchedTargetsSql, buildJobMatchedTargetsTimeRange } from "./useJobMatchedTargets";
+
+describe("buildJobMatchedTargetsTimeRange", () => {
+  it("builds a rolling one-hour preview window", () => {
+    const nowMs = Date.UTC(2026, 7, 18, 8, 0, 0);
+
+    const range = buildJobMatchedTargetsTimeRange(nowMs);
+
+    expect(range.endUs - range.startUs).toBe(60 * 60 * 1_000_000);
+    expect(range.endUs).toBe(nowMs * 1000);
+  });
+});
 
 describe("buildJobMatchedTargetsSql", () => {
   it("counts matching rows for span scope", () => {

@@ -644,7 +644,7 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -762,7 +762,7 @@ export default defineComponent({
       // navigates to the pinned dashboard's CURRENT folder even if it was moved
       // on another system since this tab last loaded.
       const org = store.state.selectedOrganization?.identifier;
-      if (org) useHomeDashboard().load(org);
+      if (org) useHomeDashboard(t).load(org);
       // Favorites are loaded by the landing-view onMounted below, before the
       // favorites-first landing decision needs them.
     });
@@ -1305,7 +1305,7 @@ export default defineComponent({
           // of lingering until the next navigation.
           if (deletedWasHome) {
             const org = store.state.selectedOrganization?.identifier;
-            if (org) useHomeDashboard().load(org);
+            if (org) useHomeDashboard(t).load(org);
           }
         } catch (err) {
           showErrorNotification(
@@ -1638,7 +1638,7 @@ export default defineComponent({
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {
           const org = store.state.selectedOrganization?.identifier;
-          if (org) await useHomeDashboard().load(org);
+          if (org) await useHomeDashboard(t).load(org);
         }
       } catch (error) {
         dismiss();

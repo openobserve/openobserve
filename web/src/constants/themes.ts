@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw } from "@/types/i18n";
 import type { SemanticColors } from "@/utils/theme";
 
 /**
@@ -70,7 +71,7 @@ export const THEME_STORAGE_KEYS = {
 export const PREDEFINED_THEMES: PredefinedTheme[] = [
   {
     id: 10,
-    name: "O2 Signature",
+    name: raw("O2 Signature"),
     light: {
       themeColor: "#6B76E3",
     },
@@ -80,7 +81,7 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
   },
   {
     id: 2,
-    name: "O2 Pulse",
+    name: raw("O2 Pulse"),
     light: {
       themeColor: "#3F7994",
     },
@@ -90,7 +91,7 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
   },
   {
     id: 4,
-    name: "O2 Horizon",
+    name: raw("O2 Horizon"),
     light: {
       themeColor: "#077A7F",
     },
@@ -100,7 +101,7 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
   },
   {
     id: 5,
-    name: "O2 Beacon",
+    name: raw("O2 Beacon"),
     light: {
       themeColor: "#3369D6",
     },
@@ -110,7 +111,7 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
   },
   {
     id: 8,
-    name: "O2 Lens",
+    name: raw("O2 Lens"),
     light: {
       themeColor: "#4682FA",
     },
@@ -120,7 +121,7 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
   },
   {
     id: 14,
-    name: "O2 Crimson Ink",
+    name: raw("O2 Crimson Ink"),
     light: {
       themeColor: "#E11D48",
       semanticColors: {

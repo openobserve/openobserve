@@ -6,13 +6,21 @@
 
 import { z } from "zod";
 
-export const addAnnotationSchema = z.object({
-  title: z.string().trim().min(1, "Title is required."),
-  // Optional annotation description.
-  text: z.string().optional().default(""),
-  // Selected panel ids (the OSelect options use `value: panel.id`, a string).
-  // Empty = annotation applies to all panels of the dashboard.
-  panels: z.array(z.string()).default([]),
-});
+import type { TranslateFn } from "@/types/i18n";
 
-export type AddAnnotationForm = z.infer<typeof addAnnotationSchema>;
+// Factory, not a const: the caller threads its own `t` so messages follow the
+// component locale, matching the makeXSchema(t) convention used by the other forms.
+export const makeAddAnnotationSchema = (t: TranslateFn) =>
+  z.object({
+    title: z
+      .string()
+      .trim()
+      .min(1, { error: () => t("dashboard.dashboards.titleRequired") }),
+    // Optional annotation description.
+    text: z.string().optional().default(""),
+    // Selected panel ids (the OSelect options use `value: panel.id`, a string).
+    // Empty = annotation applies to all panels of the dashboard.
+    panels: z.array(z.string()).default([]),
+  });
+
+export type AddAnnotationForm = z.infer<ReturnType<typeof makeAddAnnotationSchema>>;

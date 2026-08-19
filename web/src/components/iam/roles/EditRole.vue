@@ -114,7 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div></div>
           <div class="flex items-center gap-2">
             <span data-test="edit-role-permissions-count" class="text-sm font-bold">
-              {{ t("iam.editRole.permissionsCount", { count: selectedPermissionsHash.size }) }}
+              {{
+                t("iam.editRole.permissionCountSingular", { count: selectedPermissionsHash.size })
+              }}
             </span>
             <OToggleGroup
               data-test="edit-role-permissions-ui-type-toggle"
@@ -1780,10 +1782,10 @@ const getActionScripts = async () => {
 
 const getStreamsTypes = async () => {
   const streams = [
-    { stream_type: "logs", name: "Logs" },
-    { stream_type: "traces", name: "Traces" },
-    { stream_type: "metrics", name: "Metrics" },
-    { stream_type: "index", name: "Indices" },
+    { stream_type: "logs", name: t("common.logs") },
+    { stream_type: "traces", name: t("common.traces") },
+    { stream_type: "metrics", name: t("common.metrics") },
+    { stream_type: "index", name: t("iam.indices") },
   ];
 
   streams.forEach((stream) => {

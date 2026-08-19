@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import dashboardService from "../../services/dashboards";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
@@ -133,7 +133,11 @@ export default defineComponent({
         tabs: [
           {
             panels: [],
-            name: "Default",
+            // Persisted into the saved dashboard document, not rendered copy —
+            // translating it would bake the creating user's locale into data
+            // every other member of the org then sees. Same reasoning as
+            // convertDashboardSchemaVersion.ts.
+            name: raw("Default"),
             tabId: "default",
           },
         ],

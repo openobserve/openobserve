@@ -26,6 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="shield-alert-outline"
     >
       <template #actions>
+        <!-- The provider behind the Terraform export tab, which is otherwise
+             only discoverable once the export dialog is already open. -->
+        <IacRegistryLinks data-test="alert-list-iac-registries" />
         <!-- Import button -->
         <OButton
           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
@@ -805,6 +808,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-move-to-another-folder-dialog"
       />
     </template>
+    <ExportResourceDialog
+      v-model:open="showExportDialog"
+      :items="alertsToExport"
+      :terraform="alertsTerraform"
+      :title="
+        t('alerts.exportDialogTitle', { count: alertsToExport.length }, alertsToExport.length)
+      "
+      :sub-title="t('alerts.exportDialogSubtitle')"
+      file-prefix="alerts"
+      data-test="alert-export-dialog"
+      @download="onExportDownloaded"
+    />
   </div>
 </template>
 
@@ -875,7 +890,10 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
+import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
+import { alertsToTerraform } from "@/utils/alerts/alertTerraform";
 import type { CompositeAlertReference } from "@/ts/interfaces/alert";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -916,6 +934,8 @@ export default defineComponent({
     OStatStrip,
     AppTabs,
     CompositeReferencesDrawer,
+    ExportResourceDialog,
+    IacRegistryLinks,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
@@ -2271,7 +2291,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "error",
-            message: e?.response?.data?.message || "Failed to clone anomaly detection",
+            message: e?.response?.data?.message || t("alerts.messages.cloneAnomalyFailed"),
           });
         } finally {
           isSubmitting.value = false;
@@ -2435,7 +2455,7 @@ export default defineComponent({
           }
           toast({
             variant: "error",
-            message: err?.data?.message || "Error while deleting alert.",
+            message: err?.data?.message || t("alerts.messages.deleteAlertFailed"),
           });
         });
       if (config.enableAnalytics == "true") {
@@ -2573,45 +2593,60 @@ export default defineComponent({
       });
     };
 
-    const exportAlert = async (row: any) => {
-      // Use the /export endpoint — strips runtime fields for anomaly configs, works for regular alerts too
+    // ── Export ────────────────────────────────────────────────────────────────
+    // Export opens a dialog rather than downloading straight away: the same
+    // definition can leave as JSON or as an openobserve_alert Terraform resource,
+    // and the user picks there.
+    const showExportDialog = ref(false);
+    const alertsToExport = ref<Record<string, unknown>[]>([]);
+    // Converted here rather than inside the dialog: each resource type has its
+    // own exporter, and the dialog only renders what it is handed.
+    const alertsTerraform = computed(() =>
+      alertsToTerraform(alertsToExport.value, { folderId: activeFolderId.value }),
+    );
+    const exportLoading = ref(false);
+
+    // The /export endpoint strips runtime fields from anomaly configs and works
+    // for ordinary alerts too.
+    const fetchAlertForExport = async (alertId: string) => {
       const res = await alertsService.export_by_id(
         store.state.selectedOrganization.identifier,
-        row.alert_id,
+        alertId,
       );
-      const alertToBeExported = res.data;
+      const data = res.data;
+      // An id belongs to the alert that was exported, not to the one this
+      // definition will create.
+      if (data && Object.prototype.hasOwnProperty.call(data, "id")) delete data.id;
+      return data;
+    };
 
-      if (Object.prototype.hasOwnProperty.call(alertToBeExported, "id")) {
-        delete alertToBeExported.id;
+    const exportAlert = async (row: any) => {
+      if (exportLoading.value) return;
+      exportLoading.value = true;
+      try {
+        const alert = await fetchAlertForExport(row.alert_id);
+        if (!alert) throw new Error("empty export payload");
+        alertsToExport.value = [alert];
+        showExportDialog.value = true;
+      } catch (error: any) {
+        toast({
+          variant: "error",
+          message:
+            raw(error?.response?.data?.message) ||
+            t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
+        });
+      } finally {
+        exportLoading.value = false;
       }
+    };
 
-      // Ensure that the alert exists before proceeding
-      if (alertToBeExported) {
-        // Convert the alert object to a JSON string
-        const alertJson = JSON.stringify(alertToBeExported, null, 2);
-
-        // Create a Blob from the JSON string
-        const blob = new Blob([alertJson], { type: "application/json" });
-
-        // Create an object URL for the Blob
-        const url = URL.createObjectURL(blob);
-
-        // Create an anchor element to trigger the download
-        const link = document.createElement("a");
-        link.href = url;
-
-        // Set the filename of the download
-        link.download = `${alertToBeExported.name}.json`;
-
-        // Trigger the download by simulating a click
-        link.click();
-
-        // Clean up the URL object after download
-        URL.revokeObjectURL(url);
-      } else {
-        // Alert not found, handle error or show notification
-        console.error("Alert not found for UUID:", row.uuid);
-      }
+    const onExportDownloaded = ({ count }: { format: string; count: number }) => {
+      toast({
+        variant: "success",
+        message: t("toastMessages.alerts.successfullyExportedAlert", { count }, count),
+      });
+      selectedAlerts.value = [];
+      allSelectedAlerts.value = false;
     };
 
     const triggerAlert = async (row: any) => {
@@ -2631,7 +2666,7 @@ export default defineComponent({
       } catch (error: any) {
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to trigger alert",
+          message: error?.response?.data?.message || t("alerts.messages.triggerAlertFailed"),
         });
       }
     };
@@ -2650,7 +2685,7 @@ export default defineComponent({
       } catch (error: any) {
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to trigger retraining",
+          message: error?.response?.data?.message || t("alerts.messages.triggerRetrainingFailed"),
         });
       }
     };
@@ -2883,55 +2918,46 @@ export default defineComponent({
     };
 
     const multipleExportAlert = async () => {
+      if (exportLoading.value) return;
+      exportLoading.value = true;
+      const dismiss = toast({
+        variant: "loading",
+        message: t("toastMessages.alerts.exportingAlerts"),
+        timeout: 0, // Set timeout to 0 to keep it showing until dismissed
+      });
       try {
-        const dismiss = toast({
-          variant: "loading",
-          message: t("toastMessages.alerts.exportingAlerts"),
-          timeout: 0, // Set timeout to 0 to keep it showing until dismissed
-        });
-
-        const alertToBeExported = [];
-        const selectedAlertsToExport = selectedAlerts.value.map((alert: any) => alert.alert_id);
-
-        const alertsData = await Promise.all(
-          selectedAlertsToExport.map(async (alertId: string) => {
-            const res = await alertsService.export_by_id(
-              store.state.selectedOrganization.identifier,
-              alertId,
-            );
-            const data = res.data;
-            if (Object.prototype.hasOwnProperty.call(data, "id")) delete data.id;
-            return data;
-          }),
+        const selected = selectedAlerts.value as any[];
+        const fetched = await Promise.all(
+          selected.map((alert: any) => fetchAlertForExport(alert.alert_id)),
         );
-        alertToBeExported.push(...alertsData);
+        const usable = fetched.filter(Boolean);
+        // Every fetch coming back empty is a failure, not an export of nothing:
+        // without this the dialog opens on a blank definition.
+        if (!usable.length) throw new Error("empty export payload");
+        alertsToExport.value = usable;
+        showExportDialog.value = true;
 
-        // Create and download the JSON file
-        const jsonData = JSON.stringify(alertToBeExported, null, 2);
-        const blob = new Blob([jsonData], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `alerts-${new Date().toISOString().split("T")[0]}-${activeFolderId.value}.json`;
-        a.click();
-
-        URL.revokeObjectURL(url);
-
-        dismiss();
-        toast({
-          variant: "success",
-          message: t("toastMessages.alerts.successfullyExportedAlert", {
-            count: selectedAlertsToExport.length,
-          }),
-        });
-        selectedAlerts.value = [];
-        allSelectedAlerts.value = false;
+        // A definition that came back empty is a gap in the export. Dropping it
+        // quietly would leave the success toast reporting the smaller count as
+        // though everything had been exported.
+        const missing = selected.filter((_, i) => !fetched[i]).map((alert: any) => alert.name);
+        if (missing.length) {
+          toast({
+            variant: "warning",
+            message: t("toastMessages.alerts.someAlertsCouldNotBeExported", {
+              names: missing.join(", "),
+            }),
+          });
+        }
       } catch (error) {
         console.error("Error exporting alerts:", error);
         toast({
           variant: "error",
           message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
         });
+      } finally {
+        dismiss();
+        exportLoading.value = false;
       }
     };
     const computedOwner = (owner: string) => {
@@ -3166,7 +3192,7 @@ export default defineComponent({
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting alerts. Please try again.";
+          t("alerts.messages.bulkDeleteAlertsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -3297,6 +3323,10 @@ export default defineComponent({
       goToAlertHistory,
       getTemplates,
       exportAlert,
+      showExportDialog,
+      alertsToExport,
+      alertsTerraform,
+      onExportDownloaded,
       triggerAlert,
       retrainAnomaly,
       updateActiveFolderId,

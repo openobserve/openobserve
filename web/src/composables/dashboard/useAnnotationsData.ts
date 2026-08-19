@@ -113,7 +113,7 @@ export const useAnnotationsData = (
     const allPanels: any[] = [];
 
     dashboardData.tabs.forEach((tab: any) => {
-      const tabName = tab.name?.trim() || "Unnamed Tab";
+      const tabName = tab.name?.trim() || t("dashboard.unnamedTab");
 
       if (tab.panels && Array.isArray(tab.panels)) {
         const tabPanels = tab.panels

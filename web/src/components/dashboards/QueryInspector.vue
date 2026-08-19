@@ -206,7 +206,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
@@ -311,11 +311,11 @@ export default defineComponent({
     };
 
     const getQueryTypeDisplay = (queryType: string | undefined) => {
-      if (!queryType) return "SQL";
+      if (!queryType) return raw("SQL");
       const type = queryType.toLowerCase();
-      if (type === "sql") return "SQL";
-      if (type === "promql" || type === "metrics") return "PromQL";
-      return queryType.toUpperCase();
+      if (type === "sql") return raw("SQL");
+      if (type === "promql" || type === "metrics") return raw("PromQL");
+      return raw(queryType.toUpperCase());
     };
 
     const copyText = (text: string | undefined) => {

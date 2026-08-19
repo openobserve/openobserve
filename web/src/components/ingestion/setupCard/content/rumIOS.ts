@@ -173,14 +173,14 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
       label: raw("Swift Package Manager"),
       icon: appleIcon,
       code: { lang: "swift", filename: "Package.swift", raw: spmCode },
-      note: "The session-replay product is optional — drop that line if you do not need screen recording.",
+      note: gt("ingestion.setupCard.iosInstallSpmNote"),
     },
     {
       id: "cocoapods",
       label: raw("CocoaPods"),
       icon: appleIcon,
       code: { lang: "ruby", filename: "Podfile", raw: podCode },
-      note: "The session-replay pod is optional — drop that line if you do not need screen recording.",
+      note: gt("ingestion.setupCard.iosInstallPodNote"),
     },
   ];
 
@@ -193,8 +193,8 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
       tagline: gt("ingestion.setupCard.rumIosTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
-      runtime: "iOS",
-      setupTime: "~5 min",
+      runtime: raw("iOS"),
+      setupTime: gt("ingestion.setupCard.setupTime5Min"),
       metaBadges: [
         gt("rum.sessions"),
         gt("ingestion.setupCard.pillViews"),
@@ -228,8 +228,8 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
           masked: initCode(subs, subs.rumTokenMasked),
         },
         note: subs.insecureHTTP
-          ? "Your endpoint is plain http:// — iOS blocks cleartext by default. Add an App Transport Security exception for your host in Info.plist (`NSAppTransportSecurity` → `NSExceptionDomains`). Prefer HTTPS outside local development."
-          : "Initialize as early as possible — the SDK must be enabled before the screens you want measured appear.",
+          ? gt("ingestion.setupCard.iosInitCleartextNote")
+          : gt("ingestion.setupCard.iosInitNote"),
       },
       {
         id: "session-replay",
@@ -246,7 +246,7 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
           gt("ingestion.setupCard.pillWireframeCapture"),
           gt("ingestion.setupCard.pillPrivacyMasking"),
         ],
-        note: "Privacy levels default to their strictest setting (`.maskAll` / `.hide`). Relax `textAndInputPrivacyLevel`, `imagePrivacyLevel` and `touchPrivacyLevel` only as far as your privacy policy allows.",
+        note: gt("ingestion.setupCard.iosSessionReplayNote"),
       },
       {
         id: "verify",
@@ -280,9 +280,8 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
         "OpenObserveLogs",
         "OpenObserveSessionReplay",
       ],
-      fixTitle: "Give Each Feature Its FULL Intake URL",
-      fixBody:
-        "The native iOS SDK appends nothing to a `customEndpoint` — it posts to exactly the URL you pass. A base URL without the `/rum`, `/logs` or `/replay` suffix silently drops that signal. Use the complete per-feature URLs:",
+      fixTitle: gt("ingestion.setupCard.iosFixTitle"),
+      fixBody: gt("ingestion.setupCard.iosFixBody"),
       fixLang: "bash",
       fixSnippet: `# RUM
 ${rumEndpoint(subs)}
@@ -294,26 +293,29 @@ ${logsEndpoint(subs)}
 ${replayEndpoint(subs)}`,
       troubleshooting: [
         {
-          q: "RUM events arrive but there is no session replay",
-          a: `Almost always the endpoint. Session Replay is enabled separately and does **not** inherit the RUM \`customEndpoint\`. Pass the full URL explicitly: \`customEndpoint: URL(string: "${replayEndpoint(
-            subs,
-          )}")\` — note the trailing \`/replay\`, which the RUM endpoint does not have.`,
+          q: gt("ingestion.setupCard.iosTroubleNoReplayQ"),
+          a: gt("ingestion.setupCard.iosTroubleNoReplayA", {
+            replayUrl: replayEndpoint(subs),
+          }),
         },
         {
-          q: "Nothing arrives over plain HTTP (http://)",
-          a: "iOS blocks cleartext traffic via App Transport Security. There is no SDK flag for this — add an `NSAppTransportSecurity` exception for your host in `Info.plist`. Prefer HTTPS outside local development.",
+          q: gt("ingestion.setupCard.iosTroubleCleartextQ"),
+          a: gt("ingestion.setupCard.iosTroubleCleartextA"),
         },
         {
-          q: "Requests return 401 or 403",
-          a: "The `clientToken` is this org's **RUM token**, not the ingestion passcode. If it was rotated, regenerate it from this page's header and rebuild the app.",
+          q: gt("ingestion.setupCard.iosTrouble401Q"),
+          a: gt("ingestion.setupCard.iosTrouble401A"),
         },
         {
-          q: "Sessions appear but screens are all named the same",
-          a: "Automatic view tracking is not wired up. Pass `uiKitViewsPredicate: DefaultUIKitRUMViewsPredicate()` (UIKit) or a `swiftUIViewsPredicate` (SwiftUI) when building `RUM.Configuration`, or start views manually with `RUMMonitor.shared().startView(...)`.",
+          q: gt("ingestion.setupCard.iosTroubleScreenNamesQ"),
+          a: gt("ingestion.setupCard.iosTroubleScreenNamesA"),
         },
         {
-          q: "The package fails to resolve in Xcode",
-          a: `Confirm the package URL \`${SPM_URL}\` and that the version \`${RUM_IOS_SDK_VERSION}\` exists, then File ▸ Packages ▸ Reset Package Caches and resolve again.`,
+          q: gt("ingestion.setupCard.iosTroublePackageResolveQ"),
+          a: gt("ingestion.setupCard.iosTroublePackageResolveA", {
+            url: SPM_URL,
+            version: RUM_IOS_SDK_VERSION,
+          }),
         },
       ],
     },

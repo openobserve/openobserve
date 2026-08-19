@@ -15,14 +15,45 @@
 
 //! Delayed deletion of compacted files.
 
+use std::borrow::Cow;
+
 use config::{
-    meta::stream::{FileKey, FileMeta},
+    meta::stream::{FileKey, FileListDeleted, FileMeta},
     utils::inverted_index::to_tantivy_name,
 };
 use infra::{file_list as infra_file_list, storage};
 
 // Batch size for deleting files from file_list_deleted table
 const BATCH_SIZE: i64 = 10000;
+
+/// Delete the objects `key` maps the files to from storage, ignoring
+/// `not found` (already deleted, or a derived object that was never written).
+async fn delete_from_storage<'a>(
+    kind: &str,
+    files: &'a [FileListDeleted],
+    key: impl Fn(&'a FileListDeleted) -> Option<Cow<'a, str>>,
+) -> Result<(), anyhow::Error> {
+    let objects = files
+        .iter()
+        .filter_map(|file| key(file).map(|key| (file.account.as_str(), key)))
+        .collect::<Vec<_>>();
+    if objects.is_empty() {
+        return Ok(());
+    }
+    if let Err(e) = storage::del(
+        objects
+            .iter()
+            .map(|(account, key)| (*account, key.as_ref()))
+            .collect(),
+    )
+    .await
+        && !e.to_string().to_lowercase().contains("not found")
+    {
+        log::error!("[COMPACTOR] delete {kind} files from storage failed: {e}");
+        return Err(e.into());
+    }
+    Ok(())
+}
 
 pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     let files = infra_file_list::query_deleted(org_id, time_max, BATCH_SIZE).await?;
@@ -32,84 +63,24 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     let files_num = files.len() as i64;
 
     // delete files from storage
-    if let Err(e) = storage::del(
-        files
-            .iter()
-            .filter_map(|file| {
-                if !ingester::is_wal_file(&file.file) {
-                    Some((file.account.as_str(), file.file.as_str()))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>(),
-    )
-    .await
-    {
-        // maybe the file already deleted, so we just skip the `not found` error
-        if !e.to_string().to_lowercase().contains("not found") {
-            log::error!("[COMPACTOR] delete files from storage failed: {e}");
-            return Err(e.into());
-        }
-    }
+    delete_from_storage("data", &files, |file| {
+        (!ingester::is_wal_file(&file.file)).then_some(Cow::Borrowed(file.file.as_str()))
+    })
+    .await?;
 
-    // delete related inverted index puffin files
-    let inverted_index_files = files
-        .iter()
-        .filter_map(|file| {
-            if file.index_file {
-                to_tantivy_name(&file.file).map(|f| (file.account.to_string(), f))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    if !inverted_index_files.is_empty()
-        && let Err(e) = storage::del(
-            inverted_index_files
-                .iter()
-                .map(|file| (file.0.as_str(), file.1.as_str()))
-                .collect::<Vec<_>>(),
-        )
-        .await
-    {
-        // maybe the file already deleted or there's not related index files,
-        // so we just skip the `not found` error
-        if !e.to_string().to_lowercase().contains("not found") {
-            log::error!("[COMPACTOR] delete files from storage failed: {e}");
-            return Err(e.into());
-        }
-    }
-
-    // delete flattened files from storage
-    let flattened_files = files
-        .iter()
-        .filter_map(|file| {
-            if file.flattened {
-                Some((
-                    file.account.to_string(),
-                    super::flatten::generate_flatten_file_key(&file.file),
-                ))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    if !flattened_files.is_empty()
-        && let Err(e) = storage::del(
-            flattened_files
-                .iter()
-                .map(|file| (file.0.as_str(), file.1.as_str()))
-                .collect::<Vec<_>>(),
-        )
-        .await
-    {
-        // maybe the file already deleted, so we just skip the `not found` error
-        if !e.to_string().to_lowercase().contains("not found") {
-            log::error!("[COMPACTOR] delete files from storage failed: {e}");
-            return Err(e.into());
-        }
-    }
+    // derived objects are not tracked in file_list: delete them together with
+    // their parent data file
+    delete_from_storage("inverted index", &files, |file| {
+        file.index_file
+            .then(|| to_tantivy_name(&file.file).map(Cow::Owned))
+            .flatten()
+    })
+    .await?;
+    delete_from_storage("flattened", &files, |file| {
+        file.flattened
+            .then(|| Cow::Owned(super::flatten::generate_flatten_file_key(&file.file)))
+    })
+    .await?;
 
     // delete files from file_list_deleted table
     if let Err(e) = infra_file_list::batch_remove_deleted(

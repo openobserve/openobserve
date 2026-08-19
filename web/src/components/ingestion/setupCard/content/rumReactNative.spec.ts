@@ -36,6 +36,7 @@ vi.mock("@/utils/zincutils", () => ({
 import rumReactNativeCard, { RUM_RN_SDK_VERSION, rumBaseUrl, replayUrl } from "./rumReactNative";
 import type { RumReactNativeCardSubs } from "./rumReactNative";
 import type { RichCardContent } from "../types";
+import { gt } from "@/types/i18n";
 
 // ── shared substitutions ──────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ const HTTP_SUBS: RumReactNativeCardSubs = {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function buildCard(subs: RumReactNativeCardSubs = BASE_SUBS): RichCardContent {
-  return rumReactNativeCard(subs);
+  return rumReactNativeCard(subs, gt);
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -338,7 +339,7 @@ describe("rumReactNativeCard builder", () => {
         rumToken: "super-secret-token",
         rumTokenMasked: "supe-****-oken",
       };
-      const card = rumReactNativeCard(subs);
+      const card = rumReactNativeCard(subs, gt);
       const init = card.steps.find((s) => s.id === "init")!;
 
       expect(init.code!.masked).toContain("supe-****-oken");
@@ -351,7 +352,7 @@ describe("rumReactNativeCard builder", () => {
         rumToken: "super-secret-token",
         rumTokenMasked: "supe-****-oken",
       };
-      const card = rumReactNativeCard(subs);
+      const card = rumReactNativeCard(subs, gt);
       const init = card.steps.find((s) => s.id === "init")!;
 
       expect(init.code!.raw).not.toContain("supe-****-oken");
@@ -376,7 +377,7 @@ describe("rumReactNativeCard builder", () => {
 
   describe("init step — insecureHTTP", () => {
     it("adds the _dd.needsClearTextHttp additionalConfiguration when insecureHTTP is true", () => {
-      const card = rumReactNativeCard(HTTP_SUBS);
+      const card = rumReactNativeCard(HTTP_SUBS, gt);
       const init = card.steps.find((s) => s.id === "init")!;
 
       expect(init.code!.raw).toContain(
@@ -385,7 +386,7 @@ describe("rumReactNativeCard builder", () => {
     });
 
     it("does not add additionalConfiguration when insecureHTTP is false", () => {
-      const card = rumReactNativeCard(BASE_SUBS);
+      const card = rumReactNativeCard(BASE_SUBS, gt);
       const init = card.steps.find((s) => s.id === "init")!;
 
       expect(init.code!.raw).not.toContain("additionalConfiguration");
@@ -393,7 +394,7 @@ describe("rumReactNativeCard builder", () => {
     });
 
     it("masked variant also reflects insecureHTTP: true", () => {
-      const card = rumReactNativeCard(HTTP_SUBS);
+      const card = rumReactNativeCard(HTTP_SUBS, gt);
       const init = card.steps.find((s) => s.id === "init")!;
 
       expect(init.code!.masked).toContain("needsClearTextHttp");
@@ -424,7 +425,7 @@ describe("rumReactNativeCard builder", () => {
         endpoint: "https://other.example.com",
         org: "other-org",
       };
-      const card = rumReactNativeCard(subs);
+      const card = rumReactNativeCard(subs, gt);
       const replay = card.steps.find((s) => s.id === "session-replay")!;
 
       expect(replay.code!.raw).toContain("https://other.example.com/rum/v1/other-org/replay");
@@ -465,11 +466,14 @@ describe("rumReactNativeCard builder", () => {
 
     it("does not depend on subs (identical raw code across orgs)", () => {
       const card1 = buildCard(BASE_SUBS);
-      const card2 = rumReactNativeCard({
-        ...BASE_SUBS,
-        org: "different-org",
-        endpoint: "https://different.example.com",
-      });
+      const card2 = rumReactNativeCard(
+        {
+          ...BASE_SUBS,
+          org: "different-org",
+          endpoint: "https://different.example.com",
+        },
+        gt,
+      );
 
       const nav1 = card1.steps.find((s) => s.id === "navigation")!;
       const nav2 = card2.steps.find((s) => s.id === "navigation")!;
@@ -557,23 +561,29 @@ describe("rumReactNativeCard builder", () => {
 
   describe("determinism", () => {
     it("calling rumReactNativeCard twice with identical subs returns identical output", () => {
-      const card1 = rumReactNativeCard(BASE_SUBS);
-      const card2 = rumReactNativeCard(BASE_SUBS);
+      const card1 = rumReactNativeCard(BASE_SUBS, gt);
+      const card2 = rumReactNativeCard(BASE_SUBS, gt);
 
       expect(JSON.stringify(card1)).toBe(JSON.stringify(card2));
     });
 
     it("different rumToken values produce different raw init codes", () => {
-      const card1 = rumReactNativeCard({
-        ...BASE_SUBS,
-        rumToken: "token-a",
-        rumTokenMasked: "tok-a",
-      });
-      const card2 = rumReactNativeCard({
-        ...BASE_SUBS,
-        rumToken: "token-b",
-        rumTokenMasked: "tok-b",
-      });
+      const card1 = rumReactNativeCard(
+        {
+          ...BASE_SUBS,
+          rumToken: "token-a",
+          rumTokenMasked: "tok-a",
+        },
+        gt,
+      );
+      const card2 = rumReactNativeCard(
+        {
+          ...BASE_SUBS,
+          rumToken: "token-b",
+          rumTokenMasked: "tok-b",
+        },
+        gt,
+      );
 
       const raw1 = card1.steps.find((s) => s.id === "init")!.code!.raw;
       const raw2 = card2.steps.find((s) => s.id === "init")!.code!.raw;
@@ -598,11 +608,14 @@ describe("rumReactNativeCard builder", () => {
     });
 
     it("empty rumToken produces an empty clientToken string in raw code", () => {
-      const card = rumReactNativeCard({
-        ...BASE_SUBS,
-        rumToken: "",
-        rumTokenMasked: "",
-      });
+      const card = rumReactNativeCard(
+        {
+          ...BASE_SUBS,
+          rumToken: "",
+          rumTokenMasked: "",
+        },
+        gt,
+      );
       const init = card.steps.find((s) => s.id === "init")!;
 
       expect(init.code!.raw).toContain("'', // clientToken");

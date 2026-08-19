@@ -16,6 +16,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import useRoutes from "./router";
 import config from "@/aws-exports";
+import enLocale from "@/locales/languages/en-US.json";
+
+// Routes store an i18n KEY in `meta.titleKey` (src/router/index.ts translates it
+// per navigation), so assert the English copy the key still resolves to — a typo'd
+// or removed key resolves to undefined and fails.
+const enTitle = (titleKey: string) =>
+  titleKey.split(".").reduce<any>((node, part) => node?.[part], enLocale);
 
 // ---------------------------------------------------------------------------
 // Config mock — mutable so individual tests can change isCloud / isEnterprise
@@ -223,7 +230,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have correct meta title for /login", () => {
       const { parentRoutes } = useRoutes();
       const loginRoute = parentRoutes.find((r: any) => r.path === "/login");
-      expect(loginRoute.meta.title).toBe("Login");
+      expect(enTitle(loginRoute.meta.titleKey)).toBe("Login");
     });
   });
 
@@ -350,7 +357,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Login Callback' for /cb route", () => {
       const { parentRoutes } = useRoutes();
       const cbRoute = parentRoutes.find((r: any) => r.path === "/cb");
-      expect(cbRoute.meta.title).toBe("Login Callback");
+      expect(enTitle(cbRoute.meta.titleKey)).toBe("Login Callback");
     });
   });
 
@@ -379,7 +386,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Home' for home route", () => {
       const { homeChildRoutes } = useRoutes();
       const homeRoute = findRoute(homeChildRoutes, "home");
-      expect(homeRoute.meta.title).toBe("Home");
+      expect(enTitle(homeRoute.meta.titleKey)).toBe("Home");
     });
 
     it("should have component defined for home route", () => {
@@ -408,7 +415,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Logs' for logs route", () => {
       const { homeChildRoutes } = useRoutes();
       const logsRoute = findRoute(homeChildRoutes, "logs");
-      expect(logsRoute.meta.title).toBe("Logs");
+      expect(enTitle(logsRoute.meta.titleKey)).toBe("Logs");
     });
 
     it("should have keepAlive true for logs route", () => {
@@ -468,7 +475,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Metrics' for metrics route", () => {
       const { homeChildRoutes } = useRoutes();
       const metricsRoute = findRoute(homeChildRoutes, "metrics");
-      expect(metricsRoute.meta.title).toBe("Metrics");
+      expect(enTitle(metricsRoute.meta.titleKey)).toBe("Metrics");
     });
 
     it("should have beforeEnter guard that calls routeGuard for metrics route", async () => {
@@ -585,7 +592,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Traces' for traces route", () => {
       const { homeChildRoutes } = useRoutes();
       const tracesRoute = findRoute(homeChildRoutes, "traces");
-      expect(tracesRoute.meta.title).toBe("Traces");
+      expect(enTitle(tracesRoute.meta.titleKey)).toBe("Traces");
     });
 
     it("should have beforeEnter guard for traces route", () => {
@@ -606,11 +613,126 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("traces/trace-details");
     });
 
-    it("should include service-graph redirect route", () => {
+    it("redirects the standalone Service Graph path to the canonical query tab", () => {
+      config.isEnterprise = "true";
       const { homeChildRoutes } = useRoutes();
-      const route = homeChildRoutes.find((r: any) => r.path === "service-graph");
-      expect(route).toBeDefined();
-      expect(route.redirect).toBe("/traces");
+      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/service-graph");
+      if (!route || typeof route.redirect !== "function") {
+        throw new Error("Missing Service Graph legacy redirect");
+      }
+
+      expect(
+        route.redirect({
+          query: { org_identifier: "default", period: "7d", search_mode: "spans" },
+        }),
+      ).toEqual({
+        name: "traces",
+        query: { org_identifier: "default", period: "7d", tab: "service-graph" },
+      });
+    });
+
+    it("redirects the standalone Service Graph path to Traces in OSS", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/service-graph");
+      if (!route || typeof route.redirect !== "function") {
+        throw new Error("Missing Service Graph legacy redirect");
+      }
+
+      expect(route.redirect({ query: { org_identifier: "default", stream: "traces" } })).toEqual({
+        name: "traces",
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+      });
+    });
+
+    it("redirects the standalone Service Catalog path to the canonical query tab", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = homeChildRoutes.find((candidate) => candidate.path === "traces/services");
+      if (!route || typeof route.redirect !== "function") {
+        throw new Error("Missing Service Catalog legacy redirect");
+      }
+
+      expect(route.redirect({ query: { org_identifier: "default", from: "1", to: "2" } })).toEqual({
+        name: "traces",
+        query: {
+          org_identifier: "default",
+          from: "1",
+          to: "2",
+          tab: "services-catalog",
+        },
+      });
+    });
+
+    it("keeps the oldest Service Graph path as a query-preserving redirect", () => {
+      config.isEnterprise = "true";
+      const { homeChildRoutes } = useRoutes();
+      const route = homeChildRoutes.find((candidate) => candidate.path === "service-graph");
+      if (!route || typeof route.redirect !== "function") {
+        throw new Error("Missing oldest Service Graph redirect");
+      }
+
+      expect(route.redirect({ query: { org_identifier: "default" } })).toEqual({
+        name: "traces",
+        query: { org_identifier: "default", tab: "service-graph" },
+      });
+    });
+
+    it("normalizes an unsupported Service Graph tab before entering Traces in OSS", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "traces");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        {
+          query: { org_identifier: "default", stream: "traces", tab: "service-graph" },
+          hash: "",
+        },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        name: "traces",
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+        hash: "",
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("removes legacy search_mode from an otherwise valid Traces URL", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "traces");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        {
+          query: {
+            org_identifier: "default",
+            stream: "traces",
+            tab: "spans",
+            search_mode: "traces",
+          },
+          hash: "#results",
+        },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        name: "traces",
+        query: { org_identifier: "default", stream: "traces", tab: "spans" },
+        hash: "#results",
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("does not expose standalone Service Graph or Service Catalog route names", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, "serviceGraph")).toBeUndefined();
+      expect(findRoute(homeChildRoutes, "servicesCatalog")).toBeUndefined();
     });
   });
 
@@ -633,7 +755,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Dashboards' for dashboards route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "dashboards");
-      expect(route.meta.title).toBe("Dashboards");
+      expect(enTitle(route.meta.titleKey)).toBe("Dashboards");
     });
 
     it("should include viewDashboard route", () => {
@@ -698,7 +820,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Streams' for logstreams route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "logstreams");
-      expect(route.meta.title).toBe("Streams");
+      expect(enTitle(route.meta.titleKey)).toBe("Streams");
     });
 
     it("should include streamExplorer route", () => {
@@ -739,7 +861,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'About' for about route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "about");
-      expect(route.meta.title).toBe("About");
+      expect(enTitle(route.meta.titleKey)).toBe("About");
     });
 
     it("should have keepAlive true for about route", () => {
@@ -768,7 +890,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Pipeline' for pipeline route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "pipeline");
-      expect(route.meta.title).toBe("Pipeline");
+      expect(enTitle(route.meta.titleKey)).toBe("Pipeline");
     });
 
     it("should have beforeEnter guard for pipeline route", () => {
@@ -876,7 +998,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Pipeline History' for pipelineHistory route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "pipelineHistory");
-      expect(route.meta.title).toBe("Pipeline History");
+      expect(enTitle(route.meta.titleKey)).toBe("Pipeline History");
     });
 
     it("should include pipelineBackfill route", () => {
@@ -894,7 +1016,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Pipeline Backfill Jobs' for pipelineBackfill route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "pipelineBackfill");
-      expect(route.meta.title).toBe("Pipeline Backfill Jobs");
+      expect(enTitle(route.meta.titleKey)).toBe("Pipeline Backfill Jobs");
     });
 
     it("should call routeGuard in pipeline route beforeEnter", async () => {
@@ -927,7 +1049,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Alerts' for alertList route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "alertList");
-      expect(route.meta.title).toBe("Alerts");
+      expect(enTitle(route.meta.titleKey)).toBe("Alerts");
     });
 
     it("should include addAlert route", () => {
@@ -1169,7 +1291,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Real User Monitoring' for RUM route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "RUM");
-      expect(route.meta.title).toBe("Real User Monitoring");
+      expect(enTitle(route.meta.titleKey)).toBe("Real User Monitoring");
     });
 
     it("should have beforeEnter guard for RUM route", () => {
@@ -1359,7 +1481,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title 'Member Subscription' for member_subscription route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "member_subscription");
-      expect(route.meta.title).toBe("Member Subscription");
+      expect(enTitle(route.meta.titleKey)).toBe("Member Subscription");
     });
   });
 
@@ -1385,7 +1507,7 @@ describe("useRoutes (router.ts)", () => {
       config.isCloud = "false";
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "reports");
-      expect(route.meta.title).toBe("Reports");
+      expect(enTitle(route.meta.titleKey)).toBe("Reports");
     });
 
     it("should have props true for reports route", () => {
@@ -1413,7 +1535,7 @@ describe("useRoutes (router.ts)", () => {
       config.isCloud = "false";
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "createReport");
-      expect(route.meta.title).toBe("Create Report");
+      expect(enTitle(route.meta.titleKey)).toBe("Create Report");
     });
 
     it("should splice reports routes at index 13", () => {
@@ -1519,7 +1641,7 @@ describe("useRoutes (router.ts)", () => {
     it("should have meta title '404 - Not Found' for catch-all route", () => {
       const { homeChildRoutes } = useRoutes();
       const lastRoute = homeChildRoutes[homeChildRoutes.length - 1];
-      expect(lastRoute.meta.title).toBe("404 - Not Found");
+      expect(enTitle(lastRoute.meta.titleKey)).toBe("404 - Not Found");
     });
 
     it("should have keepAlive true for catch-all route", () => {
@@ -1568,7 +1690,7 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "traces");
 
-      const mockTo = {};
+      const mockTo = { query: { tab: "traces" } };
       const mockFrom = {};
       const mockNext = vi.fn();
       route.beforeEnter(mockTo, mockFrom, mockNext);
@@ -1790,6 +1912,27 @@ describe("useRoutes (router.ts)", () => {
         .map((r: any) => r.name);
       const uniqueNames = [...new Set(names)];
       expect(names).toHaveLength(uniqueNames.length);
+    });
+  });
+
+  // Route meta is untyped (`parentRoutes: any`), so a typo in a titleKey cannot be
+  // caught by the compiler — this is the gate instead. An unresolvable key would
+  // put the raw key in the browser tab.
+  describe("meta.titleKey", () => {
+    it("should only use i18n keys that exist in en-US.json", () => {
+      const collect = (routes: any[]): string[] =>
+        routes.flatMap((route) => [
+          ...(route?.meta?.titleKey ? [route.meta.titleKey] : []),
+          ...collect(route?.children ?? []),
+        ]);
+
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const titleKeys = collect([...parentRoutes, ...homeChildRoutes]);
+      expect(titleKeys.length).toBeGreaterThan(0);
+
+      for (const titleKey of titleKeys) {
+        expect(enTitle(titleKey), `no en-US message for "${titleKey}"`).toBeTypeOf("string");
+      }
     });
   });
 });

@@ -117,7 +117,7 @@ export const slackConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.slackChannel",
       type: "text",
       required: false,
-      hint: raw("e.g., #alerts"),
+      hintKey: "alerts.prebuiltDestinations.slackChannelHelp",
     },
   ],
 };
@@ -126,7 +126,7 @@ import slackLogo from "@/assets/images/alerts/destinations/slack.png";
 
 export const slackDestinationType: PrebuiltType = {
   id: "slack",
-  name: "Slack",
+  name: raw("Slack"),
   descriptionKey: "alert_destinations.prebuilt.slackDescription",
   icon: "slack",
   image: slackLogo,

@@ -25,6 +25,7 @@ import MacOSConfig from "./MacOSConfig.vue";
 import macosCard from "@/components/ingestion/setupCard/content/macos";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 import enUS from "@/locales/languages/en-US.json";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -64,7 +65,7 @@ const SUBS = {
 
 describe("macosCard builder", () => {
   it("builds the macOS card metadata and step flow", () => {
-    const card = macosCard(SUBS);
+    const card = macosCard(SUBS, gt);
     expect(card.provider.name).toBe("macOS");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
     expect(card.steps.map((s) => s.id)).toEqual(["install", "verify"]);
@@ -77,20 +78,20 @@ describe("macosCard builder", () => {
 
   it("is a single command with no environment toggle", () => {
     // Unlike Linux/Windows there is no mac/ec2 install script to switch to.
-    const install = macosCard(SUBS).steps[0];
+    const install = macosCard(SUBS, gt).steps[0];
     expect(install.required).toBe(true);
     expect(install.variants).toBeUndefined();
     expect(install.code?.raw).toContain("/mac/install.sh");
   });
 
   it("uses curl, which macOS ships, rather than wget", () => {
-    const install = macosCard(SUBS).steps[0];
+    const install = macosCard(SUBS, gt).steps[0];
     expect(install.code?.raw).toContain("curl -O");
     expect(install.code?.raw).not.toContain("wget");
   });
 
   it("substitutes url/org and masks the ingestion token", () => {
-    const install = macosCard(SUBS).steps[0];
+    const install = macosCard(SUBS, gt).steps[0];
     expect(install.code?.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
     expect(install.code?.raw).toContain(SUBS.token);
     expect(install.code?.raw).not.toContain("[BASIC_PASSCODE]");
@@ -98,7 +99,7 @@ describe("macosCard builder", () => {
   });
 
   it("offers the uninstall command", () => {
-    const uninstall = macosCard(SUBS).extras?.uninstall;
+    const uninstall = macosCard(SUBS, gt).extras?.uninstall;
     expect(uninstall?.code.raw).toContain("/mac/uninstall.sh");
     expect(uninstall?.code.lang).toBe("bash");
     // Takes no arguments, so there is no token to mask.
@@ -108,7 +109,7 @@ describe("macosCard builder", () => {
   });
 
   it("covers the unified log bridge and drops the EC2-only row", () => {
-    const rows = macosCard(SUBS).extras?.troubleshooting ?? [];
+    const rows = macosCard(SUBS, gt).extras?.troubleshooting ?? [];
     const questions = rows.map((r) => r.q).join(" | ");
     expect(questions).toContain("no unified log entries");
     // There is no EC2 variant for macOS, so that symptom would be noise.
@@ -124,7 +125,7 @@ describe("MacOSConfig.vue", () => {
   });
 
   it("renders the shared setup card for the macos slug", () => {
-    expect(getDataSourceCard("macos", SUBS)?.provider.name).toBe("macOS");
+    expect(getDataSourceCard("macos", SUBS, gt)?.provider.name).toBe("macOS");
     wrapper = mount(MacOSConfig, { global: { plugins: [mockStore, mockI18n] } });
     const stub = wrapper.findComponent({ name: "SetupCardRenderer" });
     expect(stub.exists()).toBe(true);

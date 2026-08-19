@@ -64,6 +64,13 @@ The last three exist because a shard is the smallest unit that can change them.
   `workers: 1`; the specs cannot express that themselves. `SLO-Measurement` does,
   because both of its specs wait on the SLO backfill job, which runs with
   `ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1`.
+- `slo_backfill_chunk_secs` — the server default is **86400** (1 day), so a test
+  SLO with a 7-day window backfills in 7 sequential chunks under the concurrency-1
+  rule above. `SLO-Measurement` sets `604800` so each of its 7-day-window SLOs
+  backfills in a single chunk instead. Safe only because no spec in that shard
+  asserts on per-chunk timing or partial coverage — only on the final measured
+  state. If a future spec in this shard needs to see backfill mid-flight, give
+  that spec its own shard rather than lowering this back down.
 
 ## Disabling a spec (JSON has no `//` comments)
 

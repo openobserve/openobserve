@@ -97,8 +97,12 @@ impl MemorySize for Pipeline {
 
 // TODO YJDoc2: in a separate PR, use this fn in the pipeline validation below, so we have
 // same logic for pipelines and workflows as intended
-pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow::Error> {
-    if nodes.len() < 2 || edges.is_empty() {
+pub fn validate_nodes_edges(
+    nodes: &[Node],
+    edges: &[Edge],
+    is_draft: bool,
+) -> Result<(), anyhow::Error> {
+    if nodes.len() < 2 || (!is_draft && edges.is_empty()) {
         return Err(anyhow!(
             "there must be more than 1 node and at least 1 edge"
         ));
@@ -117,7 +121,7 @@ pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow
         }
     }
 
-    if edges.len() < nodes.len().saturating_sub(1) {
+    if !is_draft && edges.len() < nodes.len().saturating_sub(1) {
         return Err(anyhow!(
             "Insufficient number of edges to connect all nodes. Need at least {} for {} nodes, but got {}.",
             nodes.len().saturating_sub(1),
@@ -156,6 +160,7 @@ pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow
         false,
         false,
         &mut visited,
+        is_draft,
     )?;
 
     Ok(())
@@ -297,6 +302,7 @@ impl Pipeline {
             false,
             self.is_evaluation(),
             &mut visited,
+            false, // pipelines are never drafted
         )?;
 
         Ok(())
@@ -521,6 +527,7 @@ fn dfs_traversal_check(
     mut flattened: bool,
     allow_evaluation_leaf: bool,
     visited: &mut HashSet<String>,
+    is_draft: bool,
 ) -> Result<()> {
     if visited.contains(current_id) {
         return Err(anyhow!("Cyclical pipeline detected."));
@@ -546,7 +553,7 @@ fn dfs_traversal_check(
         // Evaluation pipelines publish durable tasks instead of forwarding to a stream.
         let valid_leaf = current_node.is_a_leaf_node()
             || (allow_evaluation_leaf && matches!(current_node, NodeData::LlmEvaluation(_)));
-        if !valid_leaf {
+        if !valid_leaf && !is_draft {
             return Err(anyhow!(
                 "All terminal nodes must be stream nodes or destination nodes"
             ));
@@ -571,6 +578,7 @@ fn dfs_traversal_check(
             flattened,
             allow_evaluation_leaf,
             visited,
+            is_draft,
         )?;
     }
     visited.remove(current_id);
@@ -1558,5 +1566,124 @@ mod tests {
 
         let destinations = pipeline.get_all_destination_streams(&node_map, &graph);
         assert!(destinations.is_empty());
+    }
+
+    // --- validate_nodes_edges / is_draft behavior ---
+
+    fn trigger_node(id: &str) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::WorkflowTrigger,
+            0.0,
+            0.0,
+            "input".to_string(),
+        )
+    }
+
+    fn function_node(id: &str) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Function(components::FunctionParams {
+                name: "fn1".to_string(),
+                after_flatten: false,
+                num_args: 0,
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        )
+    }
+
+    fn destination_node(id: &str) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Destination(components::WorkflowDestination {
+                destination_id: "dest-1".to_string(),
+                template_override: None,
+            }),
+            0.0,
+            0.0,
+            "output".to_string(),
+        )
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_allows_no_edges_strict_rejects() {
+        let nodes = vec![trigger_node("t1"), destination_node("d1")];
+
+        // strict: no edges at all between two nodes is rejected
+        let err = validate_nodes_edges(&nodes, &[], false).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("more than 1 node and at least 1 edge")
+        );
+
+        // draft: same graph, no edges, is tolerated
+        assert!(validate_nodes_edges(&nodes, &[], true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_allows_insufficient_edge_count() {
+        // 3 nodes but only 1 edge (need 2 to connect all of them)
+        let nodes = vec![
+            trigger_node("t1"),
+            function_node("f1"),
+            destination_node("d1"),
+        ];
+        let edges = vec![Edge::new("t1".to_string(), "f1".to_string())];
+
+        let err = validate_nodes_edges(&nodes, &edges, false).unwrap_err();
+        assert!(err.to_string().contains("Insufficient number of edges"));
+
+        assert!(validate_nodes_edges(&nodes, &edges, true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_allows_non_terminal_leaf() {
+        // Trigger -> Function, where Function dead-ends (not Stream/Destination)
+        let nodes = vec![trigger_node("t1"), function_node("f1")];
+        let edges = vec![Edge::new("t1".to_string(), "f1".to_string())];
+
+        let err = validate_nodes_edges(&nodes, &edges, false).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("All terminal nodes must be stream nodes or destination nodes")
+        );
+
+        assert!(validate_nodes_edges(&nodes, &edges, true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_still_rejects_cycles() {
+        // t1 -> f1 -> t1 : cyclical, must be rejected even in draft mode
+        let nodes = vec![trigger_node("t1"), function_node("f1")];
+        let edges = vec![
+            Edge::new("t1".to_string(), "f1".to_string()),
+            Edge::new("f1".to_string(), "t1".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("Cyclical pipeline detected"),
+                "is_draft={is_draft}: expected cycle error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_still_rejects_single_node_graph() {
+        // Documents current behavior: a lone Trigger node is rejected by the
+        // `nodes.len() < 2` floor even with is_draft=true, since that check is not
+        // gated on is_draft (only the edges-related checks below it are). This means
+        // testing a graph that's just a freshly-dropped Trigger node - the first
+        // partial-graph scenario - still fails validation today.
+        let nodes = vec![trigger_node("t1")];
+
+        let err = validate_nodes_edges(&nodes, &[], true).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("more than 1 node and at least 1 edge")
+        );
     }
 }

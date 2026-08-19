@@ -75,7 +75,7 @@ watch(
           msg,
         );
       if (!isIgnorable) {
-        queryError.value = msg || "Query failed";
+        queryError.value = msg || t("synthetics.queryFailed");
       }
     } finally {
       loading.value = false;
