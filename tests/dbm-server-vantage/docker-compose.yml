@@ -192,6 +192,20 @@ services:
       MARIADB_DATABASE: dbmlab
       MARIADB_USER: dbm
       MARIADB_PASSWORD: dbm
+    # A production-shaped host name, in ADDITION to the compose service name --
+    # exactly as `postgres` carries `pg-prod-1` and `mysql` carries `my-prod-1`,
+    # and for the same reason. Whatever the collector connects THROUGH becomes
+    # the instance identity the UI's "database" filter offers, and `mariadb`
+    # reads as a placeholder rather than a server an operator would recognise.
+    # alt-rig.sh gives the collector MARIAHOST=maria-prod-1, which the mariadb
+    # recipes stamp into every row as `server_address` and resource/ident
+    # upserts as server.address/host.name -- ONE value, so one server keeps ONE
+    # identity. The `mariadb` alias is kept so the workload's own MARIA_HOST
+    # keeps resolving unchanged.
+    networks:
+      default:
+        aliases:
+          - maria-prod-1
     ports:
       - "33307:3306"
     volumes:
@@ -216,6 +230,12 @@ services:
       MSSQL_SA_PASSWORD: "dbm_Passw0rd#1"
       MSSQL_PID: Developer
     entrypoint: ["/bin/bash", "/init/entrypoint.sh"]
+    # Same reasoning as `maria-prod-1` above: the connection host becomes the
+    # instance identity in the UI. The `mssql` alias is kept for the workload.
+    networks:
+      default:
+        aliases:
+          - mssql-prod-1
     ports:
       - "14330:1433"
     volumes:

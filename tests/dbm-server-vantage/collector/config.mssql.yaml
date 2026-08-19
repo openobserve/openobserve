@@ -1,0 +1,1432 @@
+# GENERATED FILE -- edit gen-alt-config.py and re-run it, not this file.
+# Derived from collector/config.yaml (kept verbatim upstream of `exporters:`,
+# except resource/ident's PGHOST -> MSSQLHOST).
+# MSSQL ONLY -> org mssql_server on http://host.docker.internal:5080
+# Vantage: SERVER only. Signals: server-vantage logs. NO traces, NO metrics.
+# The receiver DEFINITIONS for the other engines survive in the upstream text
+# below but are inert: OTel only instantiates a receiver a pipeline names.
+#
+# NOTE the asymmetry that bit the MySQL lane: OTel unmarshals and Validate()s
+# EVERY defined receiver and merely skips STARTING the unnamed ones, and
+# postgresqlreceiver rejects empty credentials -- so this config still needs
+# PG* env vars set to something, even though nothing scrapes Postgres here.
+# DBM SERVER-VANTAGE collector — contrib 0.158.0.
+#
+# VERSION NOTES (empirically re-discovered against 0.158.0 via `validate`; the
+# 0.135.0 constraints this file used to document have ALL changed):
+#
+#   * THE BREAKING CHANGE: upstream v0.148.0 flipped db.server.query_sample and
+#     db.server.top_query from default-ON to default-OFF. At 0.135.0 merely putting
+#     the receiver in a LOGS pipeline turned the events on; at 0.158.0 that emits
+#     NOTHING, with no error. The events must be enabled explicitly via a top-level
+#     `events:` block on the receiver (a SIBLING of `metrics:`, never nested inside
+#     query_sample_collection / top_query_collection):
+#         events:
+#           db.server.query_sample: { enabled: true }
+#           db.server.top_query:    { enabled: true }
+#     The block is strictly key-validated — an unknown event name is a fatal
+#     config error, which is how the two names above were confirmed.
+#
+#   * postgresqlreceiver accepted subkeys at 0.158.0:
+#       query_sample_collection: {max_rows_per_query}
+#       top_query_collection:    {top_n_query, max_explain_each_interval,
+#                                 query_plan_cache_size, collection_interval,
+#                                 max_rows_per_query}
+#     CHANGED vs 0.135.0: top_query_collection.collection_interval is now ACCEPTED
+#     (it was rejected). `max_query_length` is STILL rejected on both blocks, and
+#     query_sample_collection still has no collection_interval of its own.
+#
+#   * mysqlreceiver NOW HAS a `top_query_collection` block (it had none at 0.135.0,
+#     which is why this rig grew the authored sqlquery/mysql_digest recipe).
+#       query_sample_collection: {max_rows_per_query}
+#       top_query_collection:    {top_query_count, collection_interval,
+#                                 lookback_time, query_plan_cache_size}
+#     Note the spelling asymmetry with Postgres: mysql says `top_query_count`,
+#     postgres says `top_n_query`. mysql REJECTS max_rows_per_query and
+#     max_explain_each_interval inside top_query_collection.
+#
+#   * Still true at 0.158.0: neither receiver accepts an `enabled` key INSIDE
+#     query_sample_collection / top_query_collection. `enabled` lives only under
+#     the `events:` block.
+
+receivers:
+  # ---------------------------------------------------------------- otlp (client spans)
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+
+  # ---------------------------------------------------------------- postgresqlreceiver
+  # Emits: metrics (Beta) + db.server.top_query / db.server.query_sample logs (Development)
+  postgresql:
+    endpoint: ${env:PGHOST}:${env:PGPORT}
+    transport: tcp
+    username: ${env:PGUSER}
+    password: ${env:PGPASS}
+    databases: [dbmlab]
+    tls:
+      insecure: true
+    collection_interval: 10s
+    query_sample_collection:
+      max_rows_per_query: 1000
+    top_query_collection:
+      top_n_query: 200
+      max_explain_each_interval: 200
+      query_plan_cache_size: 1000
+      collection_interval: 15s
+    # REQUIRED from v0.148.0 onward — without this block both events are OFF and
+    # the receiver silently emits zero logs.
+    events:
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }
+    metrics:
+      # every optional metric this version defines, turned on
+      postgresql.database.locks: { enabled: true }
+      postgresql.deadlocks: { enabled: true }
+      postgresql.sequential_scans: { enabled: true }
+      postgresql.temp_files: { enabled: true }
+      postgresql.temp.io: { enabled: true }
+      postgresql.tup_deleted: { enabled: true }
+      postgresql.tup_fetched: { enabled: true }
+      postgresql.tup_inserted: { enabled: true }
+      postgresql.tup_returned: { enabled: true }
+      postgresql.tup_updated: { enabled: true }
+      postgresql.blks_hit: { enabled: true }
+      postgresql.blks_read: { enabled: true }
+      postgresql.blocks_read: { enabled: true }
+      postgresql.wal.delay: { enabled: true }
+
+  # ---------------------------------------------------------------- mysqlreceiver
+  mysql:
+    endpoint: ${env:MYSQLHOST}:${env:MYSQLPORT}
+    username: ${env:MYSQLUSER}
+    password: ${env:MYSQLPASS}
+    database: ${env:MYSQLDB}
+    collection_interval: 10s
+    query_sample_collection:
+      max_rows_per_query: 1000
+    # NEW at 0.158.0 — mysqlreceiver had no top_query_collection at 0.135.0.
+    top_query_collection:
+      top_query_count: 200
+      collection_interval: 15s
+      lookback_time: 120
+      query_plan_cache_size: 1000
+    events:
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }
+    metrics:
+      mysql.query.slow.count: { enabled: true }
+      mysql.query.count: { enabled: true }
+      mysql.query.client.count: { enabled: true }
+      mysql.commands: { enabled: true }
+      mysql.connection.errors: { enabled: true }
+      mysql.joins: { enabled: true }
+      mysql.mysqlx_worker_threads: { enabled: true }
+      mysql.replica.sql_delay: { enabled: true }
+      mysql.replica.time_behind_source: { enabled: true }
+      mysql.statement_event.count: { enabled: true }
+      mysql.statement_event.wait.time: { enabled: true }
+      mysql.table.lock_wait.read.count: { enabled: true }
+      mysql.table.lock_wait.read.time: { enabled: true }
+      mysql.table.lock_wait.write.count: { enabled: true }
+      mysql.table.lock_wait.write.time: { enabled: true }
+      mysql.table.average_row_length: { enabled: true }
+      mysql.table.rows: { enabled: true }
+      mysql.table.size: { enabled: true }
+      mysql.table_open_cache: { enabled: true }
+      mysql.client.network.io: { enabled: true }
+      mysql.index.io.wait.count: { enabled: true }
+      mysql.index.io.wait.time: { enabled: true }
+      mysql.table.io.wait.count: { enabled: true }
+      mysql.table.io.wait.time: { enabled: true }
+
+  # ============================================================================
+  # sqlqueryreceiver — the roadmap's recipes R1..R4 (PG) + MySQL twins
+  # ============================================================================
+
+  # ---- R1: blocking chains from pg_stat_activity (roadmap §5 R1) ----
+  sqlquery/pg_blocking:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT
+            blocked.pid::text                                          AS blocked_pid,
+            -- Per-session datname, not current_database(): sessions span more
+            -- than the scrape's own database. Mirrors PG_BLOCKING_RECEIVER.
+            coalesce(blocked.datname,'')                               AS pg_db,
+            coalesce(blocked.usename,'')                               AS blocked_user,
+            coalesce(blocked.application_name,'')                      AS blocked_app,
+            coalesce(blocked.query,'')                                 AS blocked_query,
+            coalesce(blocked.wait_event_type,'')                       AS wait_event_type,
+            coalesce(blocked.wait_event,'')                            AS wait_event,
+            coalesce(round(EXTRACT(EPOCH FROM (now()-blocked.query_start))::numeric,3),0)::text AS blocked_wait_s,
+            blocking.pid::text                                         AS blocking_pid,
+            coalesce(blocking.state,'')                                AS blocking_state,
+            coalesce(blocking.application_name,'')                     AS blocking_app,
+            coalesce(blocking.query,'')                                AS blocking_query,
+            coalesce(round(EXTRACT(EPOCH FROM (now()-blocking.xact_start))::numeric,3),0)::text AS blocking_xact_age_s,
+            '${env:PGHOST}'                                            AS server_address,
+            'pg_blocking_chain'                                        AS o2_recipe
+          FROM pg_stat_activity blocked
+          JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS b(pid) ON true
+          JOIN pg_stat_activity blocking ON blocking.pid = b.pid
+        logs:
+          - body_column: blocked_query
+            attribute_columns:
+              [
+                blocked_pid,
+                pg_db,
+                blocked_user,
+                blocked_app,
+                wait_event_type,
+                wait_event,
+                blocked_wait_s,
+                blocking_pid,
+                blocking_state,
+                blocking_app,
+                blocking_query,
+                blocking_xact_age_s,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- R2: ungranted locks from pg_locks (roadmap §5 R2) ----
+  sqlquery/pg_locks:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT l.pid::text                                          AS pid,
+                 l.locktype                                           AS locktype,
+                 coalesce(l.mode,'')                                  AS mode,
+                 coalesce(l.relation::regclass::text, l.locktype)     AS lock_target,
+                 coalesce(a.usename,'')                               AS usename,
+                 coalesce(a.state,'')                                 AS state,
+                 coalesce(a.application_name,'')                      AS app,
+                 coalesce(a.query,'')                                 AS query,
+                 coalesce(round(EXTRACT(EPOCH FROM (now()-a.query_start))::numeric,3),0)::text AS lock_wait_s,
+                 'pg_ungranted_locks'                                 AS o2_recipe
+          FROM pg_locks l
+          JOIN pg_stat_activity a USING (pid)
+          WHERE NOT l.granted
+        logs:
+          - body_column: query
+            attribute_columns:
+              [pid, locktype, mode, lock_target, usename, state, app, lock_wait_s, o2_recipe]
+
+  # ---- ACTIVE SESSIONS / wait events — full pg_stat_activity snapshot (C2/C6) ----
+  sqlquery/pg_activity:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT pid::text                                    AS pid,
+                 coalesce(usename,'')                         AS usename,
+                 coalesce(application_name,'')                AS app,
+                 coalesce(state,'')                           AS state,
+                 coalesce(wait_event_type,'CPU')              AS wait_event_type,
+                 coalesce(wait_event,'CPU')                   AS wait_event,
+                 coalesce(backend_type,'')                    AS backend_type,
+                 coalesce(query,'')                           AS query,
+                 coalesce(round(EXTRACT(EPOCH FROM (now()-query_start))::numeric,3),0)::text AS query_age_s,
+                 coalesce(round(EXTRACT(EPOCH FROM (now()-xact_start))::numeric,3),0)::text  AS xact_age_s,
+                 coalesce(array_length(pg_blocking_pids(pid),1),0)::text AS blocker_count,
+                 coalesce(array_to_string(pg_blocking_pids(pid),','),'') AS blocking_pids,
+                 'pg_activity'                                AS o2_recipe
+          FROM pg_stat_activity
+          WHERE datname = '${env:PGDATABASE}'
+        logs:
+          - body_column: query
+            attribute_columns:
+              [
+                pid,
+                usename,
+                app,
+                state,
+                wait_event_type,
+                wait_event,
+                backend_type,
+                query_age_s,
+                xact_age_s,
+                blocker_count,
+                blocking_pids,
+                o2_recipe,
+              ]
+
+  # ---- pg_stat_statements top queries + temp spill + plan-ish columns (C1/Δ1) ----
+  sqlquery/pg_statements:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 30s
+    queries:
+      - sql: |
+          SELECT s.queryid::text                       AS queryid,
+                 left(s.query, 900)                    AS query,
+                 s.calls::text                         AS calls,
+                 round(s.total_exec_time::numeric,3)::text  AS total_exec_time_ms,
+                 round(s.mean_exec_time::numeric,3)::text   AS mean_exec_time_ms,
+                 round(s.max_exec_time::numeric,3)::text    AS max_exec_time_ms,
+                 round(s.stddev_exec_time::numeric,3)::text AS stddev_exec_time_ms,
+                 s.rows::text                          AS rows,
+                 s.shared_blks_hit::text               AS shared_blks_hit,
+                 s.shared_blks_read::text              AS shared_blks_read,
+                 s.shared_blks_dirtied::text           AS shared_blks_dirtied,
+                 s.shared_blks_written::text           AS shared_blks_written,
+                 s.local_blks_hit::text                AS local_blks_hit,
+                 s.temp_blks_read::text                AS temp_blks_read,
+                 s.temp_blks_written::text             AS temp_blks_written,
+                 round(coalesce(s.blk_read_time,0)::numeric,3)::text  AS blk_read_time_ms,
+                 round(coalesce(s.blk_write_time,0)::numeric,3)::text AS blk_write_time_ms,
+                 round(coalesce(s.temp_blk_read_time,0)::numeric,3)::text  AS temp_blk_read_time_ms,
+                 round(coalesce(s.temp_blk_write_time,0)::numeric,3)::text AS temp_blk_write_time_ms,
+                 coalesce(d.datname,'')                AS datname,
+                 coalesce(r.rolname,'')                AS rolname,
+                 'pg_stat_statements'                  AS o2_recipe
+          FROM pg_stat_statements s
+          LEFT JOIN pg_database d ON d.oid = s.dbid
+          LEFT JOIN pg_roles r    ON r.oid = s.userid
+          WHERE s.calls > 0 AND d.datname = '${env:PGDATABASE}'
+          ORDER BY s.total_exec_time DESC
+          LIMIT 200
+        logs:
+          - body_column: query
+            attribute_columns:
+              [
+                queryid,
+                calls,
+                total_exec_time_ms,
+                mean_exec_time_ms,
+                max_exec_time_ms,
+                stddev_exec_time_ms,
+                rows,
+                shared_blks_hit,
+                shared_blks_read,
+                shared_blks_dirtied,
+                shared_blks_written,
+                local_blks_hit,
+                temp_blks_read,
+                temp_blks_written,
+                blk_read_time_ms,
+                blk_write_time_ms,
+                temp_blk_read_time_ms,
+                temp_blk_write_time_ms,
+                datname,
+                rolname,
+                o2_recipe,
+              ]
+
+  # ---- EXECUTION PLANS (C3) ----
+  # GOTCHA: `EXPLAIN` is not allowed in a subquery, and sqlqueryreceiver can only
+  # run ONE row-returning statement per query — so EXPLAIN cannot be inlined. The
+  # working pattern is a SECURITY DEFINER function (pg/init/01-extensions.sql),
+  # exactly the mechanism Datadog requires via datadog.explain_statement().
+  # This query pulls the CURRENT top statements out of pg_stat_statements and
+  # EXPLAINs each one, so plans track the live workload rather than a fixed list.
+  sqlquery/pg_plans:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          WITH top AS (
+            SELECT s.queryid, s.query, s.calls, s.total_exec_time
+            FROM pg_stat_statements s
+            JOIN pg_database d ON d.oid = s.dbid
+            WHERE d.datname = '${env:PGDATABASE}'
+              AND s.query ILIKE 'SELECT%'
+              AND s.query NOT ILIKE '%pg_stat_%'
+              AND s.query NOT ILIKE '%o2_explain%'
+              AND s.query NOT LIKE '%$%'          -- skip parameterized: no values to plan
+            ORDER BY s.total_exec_time DESC
+            LIMIT 5
+          )
+          -- o2_explain_statement is SET-RETURNING, so it may only appear in a
+          -- LATERAL FROM item (`COALESCE(o2_explain_statement(...))` fails with
+          -- "set-returning functions are not allowed in COALESCE").
+          SELECT top.queryid::text                              AS queryid,
+                 left(top.query, 500)                           AS query_text,
+                 top.calls::text                                AS calls,
+                 round(top.total_exec_time::numeric,2)::text    AS total_exec_time_ms,
+                 e.explain::text                                AS plan_json,
+                 md5(e.explain::text)                           AS plan_hash,
+                 'pg_explain'                                   AS o2_recipe
+          FROM top
+          CROSS JOIN LATERAL o2_explain_statement(top.query) AS e
+        logs:
+          - body_column: plan_json
+            attribute_columns:
+              [queryid, query_text, calls, total_exec_time_ms, plan_hash, o2_recipe]
+
+  # ---- R3: schema / table / index snapshots (C10) ----
+  sqlquery/pg_schema:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 60s
+    queries:
+      # R3a — tables: size, activity, vacuum / bloat inputs
+      - sql: |
+          SELECT n.nspname                                    AS schema_name,
+                 c.relname                                    AS table_name,
+                 pg_total_relation_size(c.oid)::text          AS total_bytes,
+                 pg_relation_size(c.oid)::text                AS heap_bytes,
+                 coalesce(s.seq_scan,0)::text                 AS seq_scan,
+                 coalesce(s.seq_tup_read,0)::text             AS seq_tup_read,
+                 coalesce(s.idx_scan,0)::text                 AS idx_scan,
+                 coalesce(s.n_live_tup,0)::text               AS n_live_tup,
+                 coalesce(s.n_dead_tup,0)::text               AS n_dead_tup,
+                 coalesce(s.n_mod_since_analyze,0)::text      AS n_mod_since_analyze,
+                 coalesce(s.last_vacuum::text,'')             AS last_vacuum,
+                 coalesce(s.last_autovacuum::text,'')         AS last_autovacuum,
+                 coalesce(s.last_analyze::text,'')            AS last_analyze,
+                 coalesce(s.autovacuum_count,0)::text         AS autovacuum_count,
+                 age(c.relfrozenxid)::text                    AS frozen_xid_age,
+                 CASE WHEN coalesce(s.n_live_tup,0) > 0
+                      THEN round(100.0*s.n_dead_tup/(s.n_live_tup+s.n_dead_tup),2)::text
+                      ELSE '0' END                            AS dead_tup_pct,
+                 '${env:PGHOST}'                             AS server_address,
+                 'pg_table_stats'                             AS o2_recipe
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
+          WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog','information_schema')
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [
+                schema_name,
+                total_bytes,
+                heap_bytes,
+                seq_scan,
+                seq_tup_read,
+                idx_scan,
+                n_live_tup,
+                n_dead_tup,
+                n_mod_since_analyze,
+                last_vacuum,
+                last_autovacuum,
+                last_analyze,
+                autovacuum_count,
+                frozen_xid_age,
+                dead_tup_pct,
+                server_address,
+                o2_recipe,
+              ]
+      # R3b — indexes: definition + usage
+      - sql: |
+          SELECT s.schemaname                                  AS schema_name,
+                 s.relname                                     AS table_name,
+                 s.indexrelname                                AS index_name,
+                 coalesce(s.idx_scan,0)::text                  AS idx_scan,
+                 coalesce(s.idx_tup_read,0)::text              AS idx_tup_read,
+                 coalesce(s.idx_tup_fetch,0)::text             AS idx_tup_fetch,
+                 pg_relation_size(s.indexrelid)::text          AS index_bytes,
+                 (i.indisunique OR i.indisprimary)::text       AS is_unique,
+                 coalesce(pg_get_indexdef(s.indexrelid),'')    AS index_def,
+                 '${env:PGHOST}'                               AS server_address,
+                 'pg_index_stats'                              AS o2_recipe
+          FROM pg_stat_user_indexes s
+          JOIN pg_index i ON i.indexrelid = s.indexrelid
+          WHERE s.schemaname NOT IN ('pg_catalog','information_schema')
+        logs:
+          - body_column: index_def
+            attribute_columns:
+              [
+                schema_name,
+                table_name,
+                index_name,
+                index_bytes,
+                idx_scan,
+                idx_tup_read,
+                idx_tup_fetch,
+                is_unique,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- R4: pg_stat_database counters (deadlocks, temp files, cache) ----
+  sqlquery/pg_database:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 30s
+    queries:
+      - sql: |
+          SELECT datname,
+                 numbackends::text     AS numbackends,
+                 xact_commit::text     AS xact_commit,
+                 xact_rollback::text   AS xact_rollback,
+                 blks_read::text       AS blks_read,
+                 blks_hit::text        AS blks_hit,
+                 tup_returned::text    AS tup_returned,
+                 tup_fetched::text     AS tup_fetched,
+                 temp_files::text      AS temp_files,
+                 temp_bytes::text      AS temp_bytes,
+                 deadlocks::text       AS deadlocks,
+                 conflicts::text       AS conflicts,
+                 round(coalesce(blk_read_time,0)::numeric,2)::text  AS blk_read_time_ms,
+                 round(coalesce(blk_write_time,0)::numeric,2)::text AS blk_write_time_ms,
+                 'pg_stat_database'    AS o2_recipe
+          FROM pg_stat_database WHERE datname = '${env:PGDATABASE}'
+        logs:
+          - body_column: datname
+            attribute_columns:
+              [
+                numbackends,
+                xact_commit,
+                xact_rollback,
+                blks_read,
+                blks_hit,
+                tup_returned,
+                tup_fetched,
+                temp_files,
+                temp_bytes,
+                deadlocks,
+                conflicts,
+                blk_read_time_ms,
+                blk_write_time_ms,
+                o2_recipe,
+              ]
+
+  # ---- MySQL: digest stats (top queries — the top_query_collection replacement) ----
+  sqlquery/mysql_digest:
+    driver: mysql
+    datasource: "${env:MYSQLUSER}:${env:MYSQLPASS}@tcp(${env:MYSQLHOST}:${env:MYSQLPORT})/${env:MYSQLDB}"
+    collection_interval: 30s
+    queries:
+      - sql: |
+          SELECT COALESCE(SCHEMA_NAME,'')                    AS schema_name,
+                 COALESCE(DIGEST,'')                         AS digest,
+                 LEFT(COALESCE(DIGEST_TEXT,''), 900)         AS digest_text,
+                 CAST(COUNT_STAR AS CHAR)                    AS calls,
+                 CAST(ROUND(SUM_TIMER_WAIT/1000000000,3) AS CHAR)  AS total_exec_time_ms,
+                 CAST(ROUND(AVG_TIMER_WAIT/1000000000,3) AS CHAR)  AS mean_exec_time_ms,
+                 CAST(ROUND(MAX_TIMER_WAIT/1000000000,3) AS CHAR)  AS max_exec_time_ms,
+                 CAST(ROUND(SUM_LOCK_TIME/1000000000,3) AS CHAR)   AS lock_time_ms,
+                 CAST(SUM_ROWS_SENT AS CHAR)                 AS rows_sent,
+                 CAST(SUM_ROWS_EXAMINED AS CHAR)             AS rows_examined,
+                 CAST(SUM_ROWS_AFFECTED AS CHAR)             AS rows_affected,
+                 CAST(SUM_CREATED_TMP_DISK_TABLES AS CHAR)   AS tmp_disk_tables,
+                 CAST(SUM_CREATED_TMP_TABLES AS CHAR)        AS tmp_tables,
+                 CAST(SUM_SELECT_SCAN AS CHAR)               AS full_scans,
+                 CAST(SUM_NO_INDEX_USED AS CHAR)             AS no_index_used,
+                 CAST(SUM_SORT_MERGE_PASSES AS CHAR)         AS sort_merge_passes,
+                 CAST(SUM_ERRORS AS CHAR)                    AS errors,
+                 'mysql_digest'                              AS o2_recipe
+          FROM performance_schema.events_statements_summary_by_digest
+          WHERE DIGEST IS NOT NULL AND SCHEMA_NAME = '${env:MYSQLDB}'
+          ORDER BY SUM_TIMER_WAIT DESC LIMIT 200
+        logs:
+          - body_column: digest_text
+            attribute_columns:
+              [
+                schema_name,
+                digest,
+                calls,
+                total_exec_time_ms,
+                mean_exec_time_ms,
+                max_exec_time_ms,
+                lock_time_ms,
+                rows_sent,
+                rows_examined,
+                rows_affected,
+                tmp_disk_tables,
+                tmp_tables,
+                full_scans,
+                no_index_used,
+                sort_merge_passes,
+                errors,
+                o2_recipe,
+              ]
+
+  # ---- MySQL: data_lock_waits + innodb_trx (blocking) ----
+  sqlquery/mysql_locks:
+    driver: mysql
+    datasource: "${env:MYSQLUSER}:${env:MYSQLPASS}@tcp(${env:MYSQLHOST}:${env:MYSQLPORT})/${env:MYSQLDB}"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT CAST(w.REQUESTING_ENGINE_TRANSACTION_ID AS CHAR) AS waiting_trx,
+                 CAST(w.BLOCKING_ENGINE_TRANSACTION_ID AS CHAR)   AS blocking_trx,
+                 COALESCE(rt.trx_mysql_thread_id, 0)              AS waiting_thread,
+                 COALESCE(bt.trx_mysql_thread_id, 0)              AS blocking_thread,
+                 COALESCE(LEFT(rt.trx_query,500), '')             AS waiting_query,
+                 COALESCE(LEFT(bt.trx_query,500), '')             AS blocking_query,
+                 COALESCE(rt.trx_state,'')                        AS waiting_state,
+                 COALESCE(bt.trx_state,'')                        AS blocking_state,
+                 CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
+                 -- innodb_trx has no database column; PROCESSLIST.DB is the
+                 -- only per-row database this source can supply.
+                 COALESCE(rp.DB, '')                              AS my_db,
+                 '${env:MYSQLHOST}'                               AS server_address,
+                 'mysql_lock_waits'                               AS o2_recipe
+          FROM performance_schema.data_lock_waits w
+          LEFT JOIN information_schema.innodb_trx rt
+                 ON rt.trx_id = w.REQUESTING_ENGINE_TRANSACTION_ID
+          LEFT JOIN information_schema.innodb_trx bt
+                 ON bt.trx_id = w.BLOCKING_ENGINE_TRANSACTION_ID
+          LEFT JOIN information_schema.PROCESSLIST rp
+                 ON rp.ID = rt.trx_mysql_thread_id
+        logs:
+          - body_column: waiting_query
+            attribute_columns:
+              [
+                waiting_trx,
+                blocking_trx,
+                my_db,
+                waiting_thread,
+                blocking_thread,
+                blocking_query,
+                waiting_state,
+                blocking_state,
+                wait_secs,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- MariaDB: INNODB_LOCK_WAITS + INNODB_TRX (blocking) ----
+  # NOT performance_schema.data_lock_waits — that is MySQL 8.0 only and MariaDB
+  # never adopted it (verified: Error 1146 every cycle against MariaDB 11.8.8).
+  # SQL transcribed VERBATIM from MARIADB_BLOCKING_RECEIVER in
+  # web/src/components/ingestion/setupCard/content/dbmShared.ts — the rig's job is
+  # to exercise what we SHIP, so the query body must not drift from it. The only
+  # edits are the rig's ${env:MARIA*} datasource and its own `server_address`.
+  #
+  # The tag is `mariadb_lock_waits`, NOT `mysql_lock_waits`, even though the query
+  # body is a deliberate copy of MySQL's: detect_engine maps `mysql_lock_waits`
+  # straight to "mysql" (server_vantage.rs:318), so reusing it would file every
+  # MariaDB row under the wrong server.
+  sqlquery/mariadb_locks:
+    driver: mysql
+    datasource: "${env:MARIAUSER}:${env:MARIAPASS}@tcp(${env:MARIAHOST}:${env:MARIAPORT})/${env:MARIADB}"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT CAST(w.requesting_trx_id AS CHAR)                AS waiting_trx,
+                 CAST(w.blocking_trx_id AS CHAR)                  AS blocking_trx,
+                 COALESCE(rt.trx_mysql_thread_id, 0)              AS waiting_thread,
+                 COALESCE(bt.trx_mysql_thread_id, 0)              AS blocking_thread,
+                 COALESCE(LEFT(rt.trx_query,500), '')             AS waiting_query,
+                 COALESCE(LEFT(bt.trx_query,500), '')             AS blocking_query,
+                 COALESCE(rt.trx_state,'')                        AS waiting_state,
+                 COALESCE(bt.trx_state,'')                        AS blocking_state,
+                 CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
+                 '${env:MARIAHOST}'                               AS server_address,
+                 -- See mysql_locks above.
+                 COALESCE(rp.DB, '')                              AS my_db,
+                 'mariadb_lock_waits'                             AS o2_recipe
+          FROM information_schema.INNODB_LOCK_WAITS w
+          LEFT JOIN information_schema.INNODB_TRX rt
+                 ON rt.trx_id = w.requesting_trx_id
+          LEFT JOIN information_schema.INNODB_TRX bt
+                 ON bt.trx_id = w.blocking_trx_id
+          LEFT JOIN information_schema.PROCESSLIST rp
+                 ON rp.ID = rt.trx_mysql_thread_id
+        logs:
+          - body_column: waiting_query
+            attribute_columns:
+              [
+                waiting_trx,
+                blocking_trx,
+                my_db,
+                waiting_thread,
+                blocking_thread,
+                blocking_query,
+                waiting_state,
+                blocking_state,
+                wait_secs,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- MySQL: table / index snapshots (WP2 R3 twins) ----
+  # SQL transcribed VERBATIM from MYSQL_TABLE_STATS_RECEIVER /
+  # MYSQL_INDEX_STATS_RECEIVER in dbmShared.ts — the rig's job is to exercise
+  # what we SHIP. The only edits are the rig's ${env:MYSQL*} datasource and its
+  # own `server_address`. Same column aliases as the PG recipes: one backend
+  # canonicalizer, the tag names the engine.
+  sqlquery/mysql_schema:
+    driver: mysql
+    datasource: "${env:MYSQLUSER}:${env:MYSQLPASS}@tcp(${env:MYSQLHOST}:${env:MYSQLPORT})/${env:MYSQLDB}"
+    collection_interval: 60s
+    queries:
+      # Tables. NO dead-tuple / vacuum / xid aliases: InnoDB has no source for
+      # them, and a zeroed column would fabricate "0% bloat".
+      - sql: |
+          SELECT t.TABLE_SCHEMA                                        AS schema_name,
+                 t.TABLE_NAME                                          AS table_name,
+                 CAST(COALESCE(t.DATA_LENGTH,0) + COALESCE(t.INDEX_LENGTH,0) AS CHAR) AS total_bytes,
+                 CAST(COALESCE(t.DATA_LENGTH,0) AS CHAR)               AS heap_bytes,
+                 CAST(COALESCE(s.n_rows, t.TABLE_ROWS, 0) AS CHAR)     AS n_live_tup,
+                 COALESCE(CAST(s.last_update AS CHAR), '')             AS last_analyze,
+                 '${env:MYSQLHOST}'                                    AS server_address,
+                 'mysql_table_stats'                                   AS o2_recipe
+          FROM information_schema.TABLES t
+          LEFT JOIN mysql.innodb_table_stats s
+                 ON s.database_name = t.TABLE_SCHEMA AND s.table_name = t.TABLE_NAME
+          WHERE t.TABLE_TYPE = 'BASE TABLE'
+            AND t.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [
+                schema_name,
+                total_bytes,
+                heap_bytes,
+                n_live_tup,
+                last_analyze,
+                server_address,
+                o2_recipe,
+              ]
+      # Indexes. idx_scan rides performance_schema's table_io_waits summary —
+      # ON by default on MySQL 8, which is exactly what MariaDB lacks below.
+      # The COLUMN_NAME/EXPRESSION COALESCE is the functional-index fix found
+      # live on this rig: an expression key part has NULL COLUMN_NAME, which
+      # nulls GROUP_CONCAT and then the whole index_def (the body_column).
+      # MySQL-only — MariaDB's STATISTICS has no EXPRESSION column.
+      - sql: |
+          SELECT st.TABLE_SCHEMA                                       AS schema_name,
+                 st.TABLE_NAME                                         AS table_name,
+                 st.INDEX_NAME                                         AS index_name,
+                 CAST(COALESCE(io.COUNT_READ, 0) AS CHAR)              AS idx_scan,
+                 CAST(COALESCE(sz.stat_value, 0) * @@innodb_page_size AS CHAR) AS index_bytes,
+                 CASE WHEN MIN(st.NON_UNIQUE) = 0 THEN 'true' ELSE 'false' END AS is_unique,
+                 CONCAT('INDEX ', st.INDEX_NAME, ' ON ', st.TABLE_SCHEMA, '.', st.TABLE_NAME,
+                        ' (', GROUP_CONCAT(COALESCE(st.COLUMN_NAME, CONCAT('(', st.EXPRESSION, ')'))
+                                           ORDER BY st.SEQ_IN_INDEX SEPARATOR ', '), ')') AS index_def,
+                 '${env:MYSQLHOST}'                                    AS server_address,
+                 'mysql_index_stats'                                   AS o2_recipe
+          FROM information_schema.STATISTICS st
+          LEFT JOIN performance_schema.table_io_waits_summary_by_index_usage io
+                 ON io.OBJECT_SCHEMA = st.TABLE_SCHEMA AND io.OBJECT_NAME = st.TABLE_NAME
+                AND io.INDEX_NAME = st.INDEX_NAME
+          LEFT JOIN mysql.innodb_index_stats sz
+                 ON sz.database_name = st.TABLE_SCHEMA AND sz.table_name = st.TABLE_NAME
+                AND sz.index_name = st.INDEX_NAME AND sz.stat_name = 'size'
+          WHERE st.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+          GROUP BY st.TABLE_SCHEMA, st.TABLE_NAME, st.INDEX_NAME, io.COUNT_READ, sz.stat_value
+        logs:
+          - body_column: index_def
+            attribute_columns:
+              [
+                schema_name,
+                table_name,
+                index_name,
+                idx_scan,
+                index_bytes,
+                is_unique,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- MariaDB: table / index snapshots (WP2 twins, own tags) ----
+  # Transcribed VERBATIM from MARIADB_TABLE_STATS_RECEIVER /
+  # MARIADB_INDEX_STATS_RECEIVER in dbmShared.ts. The index query omits the
+  # performance_schema idx_scan join ENTIRELY: MariaDB ships with
+  # performance_schema OFF, so a COALESCEd COUNT_READ would stamp the
+  # never-scanned FINDING (idx_scan = 0) on every index, fabricated from a
+  # table that was never populated. Absent = honestly unknown.
+  sqlquery/mariadb_schema:
+    driver: mysql
+    datasource: "${env:MARIAUSER}:${env:MARIAPASS}@tcp(${env:MARIAHOST}:${env:MARIAPORT})/${env:MARIADB}"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          SELECT t.TABLE_SCHEMA                                        AS schema_name,
+                 t.TABLE_NAME                                          AS table_name,
+                 CAST(COALESCE(t.DATA_LENGTH,0) + COALESCE(t.INDEX_LENGTH,0) AS CHAR) AS total_bytes,
+                 CAST(COALESCE(t.DATA_LENGTH,0) AS CHAR)               AS heap_bytes,
+                 CAST(COALESCE(s.n_rows, t.TABLE_ROWS, 0) AS CHAR)     AS n_live_tup,
+                 COALESCE(CAST(s.last_update AS CHAR), '')             AS last_analyze,
+                 '${env:MARIAHOST}'                                    AS server_address,
+                 'mariadb_table_stats'                                 AS o2_recipe
+          FROM information_schema.TABLES t
+          LEFT JOIN mysql.innodb_table_stats s
+                 ON s.database_name = t.TABLE_SCHEMA AND s.table_name = t.TABLE_NAME
+          WHERE t.TABLE_TYPE = 'BASE TABLE'
+            AND t.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [
+                schema_name,
+                total_bytes,
+                heap_bytes,
+                n_live_tup,
+                last_analyze,
+                server_address,
+                o2_recipe,
+              ]
+      - sql: |
+          SELECT st.TABLE_SCHEMA                                       AS schema_name,
+                 st.TABLE_NAME                                         AS table_name,
+                 st.INDEX_NAME                                         AS index_name,
+                 CAST(COALESCE(sz.stat_value, 0) * @@innodb_page_size AS CHAR) AS index_bytes,
+                 CASE WHEN MIN(st.NON_UNIQUE) = 0 THEN 'true' ELSE 'false' END AS is_unique,
+                 CONCAT('INDEX ', st.INDEX_NAME, ' ON ', st.TABLE_SCHEMA, '.', st.TABLE_NAME,
+                        ' (', GROUP_CONCAT(st.COLUMN_NAME ORDER BY st.SEQ_IN_INDEX SEPARATOR ', '), ')') AS index_def,
+                 '${env:MARIAHOST}'                                    AS server_address,
+                 'mariadb_index_stats'                                 AS o2_recipe
+          FROM information_schema.STATISTICS st
+          LEFT JOIN mysql.innodb_index_stats sz
+                 ON sz.database_name = st.TABLE_SCHEMA AND sz.table_name = st.TABLE_NAME
+                AND sz.index_name = st.INDEX_NAME AND sz.stat_name = 'size'
+          WHERE st.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+          GROUP BY st.TABLE_SCHEMA, st.TABLE_NAME, st.INDEX_NAME, sz.stat_value
+        logs:
+          - body_column: index_def
+            attribute_columns:
+              [
+                schema_name,
+                table_name,
+                index_name,
+                index_bytes,
+                is_unique,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- SQL Server: blocking chains from sys.dm_exec_requests ----
+  # SQL transcribed VERBATIM from MSSQL_BLOCKING_RECEIVER in dbmShared.ts.
+  # Emits the SAME column aliases as the PG and MySQL blocking recipes, which is
+  # the whole contract `canonicalize_blocking` reads — no engine-specific parser.
+  #
+  # DSN IS ADO/key=value, NOT `sqlserver://` URL — THIS IS LOAD-BEARING, NOT STYLE.
+  # go-mssqldb accepts both forms, but the URL form runs the value through
+  # net/url, where `#` starts a FRAGMENT. MSSQLPASS is `dbm_Passw0rd#1`
+  # (docker-compose.yml), so the URL form silently truncated to
+  # `sqlserver://sa:dbm_Passw0rd` and every scrape failed with
+  #   parse "sqlserver://sa:dbm_Passw0rd": invalid port ":dbm_Passw0rd" after host
+  # while the collector pipeline still reported healthy. Percent-encoding the `#`
+  # would fix this one password and break on the next special character; key=value
+  # has no fragment/userinfo syntax at all, so it is immune by construction — and
+  # it matches how the PG/MySQL/MariaDB datasources above are already written.
+  sqlquery/mssql_blocking:
+    driver: sqlserver
+    datasource: "server=${env:MSSQLHOST};port=${env:MSSQLPORT};user id=${env:MSSQLUSER};password=${env:MSSQLPASS};database=${env:MSSQLDB}"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT CAST(r.session_id AS VARCHAR(20))            AS blocked_pid,
+                 -- Per-request database: a chain can span databases.
+                 -- bracketed: `database` is a T-SQL reserved keyword.
+                 COALESCE(DB_NAME(r.database_id), '')         AS [database],
+                 COALESCE(s.login_name, '')                   AS blocked_user,
+                 COALESCE(s.program_name, '')                 AS blocked_app,
+                 COALESCE(SUBSTRING(t.text, 1, 500), '')      AS blocked_query,
+                 COALESCE(r.wait_type, '')                    AS wait_event_type,
+                 COALESCE(r.wait_resource, '')                AS wait_event,
+                 CAST(r.wait_time / 1000.0 AS VARCHAR(20))    AS blocked_wait_s,
+                 CAST(r.blocking_session_id AS VARCHAR(20))   AS blocking_pid,
+                 COALESCE(bs.status, '')                      AS blocking_state,
+                 COALESCE(bs.program_name, '')                AS blocking_app,
+                 COALESCE(SUBSTRING(bt.text, 1, 500), '')     AS blocking_query,
+                 '${env:MSSQLHOST}'                           AS server_address,
+                 'mssql_blocking_chain'                       AS o2_recipe
+          FROM sys.dm_exec_requests r
+          JOIN sys.dm_exec_sessions s  ON s.session_id  = r.session_id
+          LEFT JOIN sys.dm_exec_sessions bs ON bs.session_id = r.blocking_session_id
+          OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) t
+          LEFT JOIN sys.dm_exec_connections bc ON bc.session_id = r.blocking_session_id
+          OUTER APPLY sys.dm_exec_sql_text(bc.most_recent_sql_handle) bt
+          WHERE r.blocking_session_id <> 0
+        logs:
+          - body_column: blocked_query
+            attribute_columns:
+              [
+                blocked_pid,
+                database,
+                blocked_user,
+                blocked_app,
+                wait_event_type,
+                wait_event,
+                blocked_wait_s,
+                blocking_pid,
+                blocking_state,
+                blocking_app,
+                blocking_query,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- SQL Server: deadlock graphs shredded from system_health ----
+  # SQL transcribed VERBATIM from MSSQL_DEADLOG_RECEIVER in dbmShared.ts.
+  #
+  # A sqlquery receiver, NOT a filelog one — SQL Server keeps deadlocks as XML in
+  # the system_health Extended Events ring buffer, so they are shredded in T-SQL
+  # (`.nodes()`/`.value()`) into the same one-row-per-participant shape the other
+  # engines emit. That is why this recipe is keyed on the `o2_recipe` tag rather
+  # than an o2_*_event field (server_vantage.rs:990).
+  #
+  # `SET QUOTED_IDENTIFIER ON` IS REQUIRED, NOT STYLE: XML methods fail without it
+  # and the sqlqueryreceiver's session does not enable it by default — omit it and
+  # every collection errors with msg 1934 while the pipeline looks healthy.
+  #
+  # DSN is ADO/key=value for the same reason as `sqlquery/mssql_blocking` above:
+  # the `#` in MSSQLPASS is a URL fragment delimiter and truncates a
+  # `sqlserver://` DSN. See the full note there before changing this line.
+  sqlquery/mssql_deadlocks:
+    driver: sqlserver
+    datasource: "server=${env:MSSQLHOST};port=${env:MSSQLPORT};user id=${env:MSSQLUSER};password=${env:MSSQLPASS};database=${env:MSSQLDB}"
+    collection_interval: 30s
+    queries:
+      - sql: |
+          SET QUOTED_IDENTIFIER ON;
+          SET NOCOUNT ON;
+          -- READ ONLY THE CURRENT ROLLOVER FILE, AND PREFILTER BEFORE THE XML CAST.
+          -- BOTH ARE LOAD-BEARING, NOT STYLE.
+          --
+          -- The original form globbed `system_health*.xel` and cast every row to
+          -- XML before filtering on `event/@name`. system_health is a busy ring:
+          -- this rig had 139,040 events across 4 rollover files (162 MB, oldest
+          -- from Aug 11) of which only 4,744 were deadlock reports. That query
+          -- took **3m19s measured** against a 30s collection_interval, so scrapes
+          -- overlapped and never finished and the recipe emitted ZERO rows
+          -- indefinitely — with no error, while the pipeline reported healthy.
+          -- Caught in the act, both collectors stuck mid-scrape:
+          --   session 64 go-mssqldb suspended 39s  SET QUOTED_IDENTIFIER ON; ...WIT
+          --   session 76 go-mssqldb suspended 29s  SET QUOTED_IDENTIFIER ON; ...WIT
+          --
+          -- The glob is the dominant cost: fn_xe_file_target_read_file physically
+          -- reads every matching file each call, so it re-read ~162 MB of history
+          -- every 30s to answer a question about the last 5 MINUTES. Resolve the
+          -- ACTIVE file from the session's target metadata instead — the 5-minute
+          -- window below can only ever be satisfied by the file being written to.
+          -- (Rollover means a deadlock in the seconds around a file switch can be
+          -- missed; that is the right trade for a lab rig, and the alternative is
+          -- a recipe that returns nothing at all.)
+          --
+          -- The LIKE then keeps the XML parser off non-deadlock events. Retain the
+          -- `event/@name` check below as well: LIKE is a substring prefilter, not
+          -- a parser, and must not be the only thing deciding what is a deadlock.
+          DECLARE @f NVARCHAR(400) = (
+            SELECT CAST(t.target_data AS XML).value('(EventFileTarget/File/@name)[1]','nvarchar(400)')
+            FROM sys.dm_xe_session_targets t
+            JOIN sys.dm_xe_sessions s ON s.address = t.event_session_address
+            WHERE s.name = 'system_health' AND t.target_name = 'event_file'
+          );
+          WITH raw AS (
+            SELECT event_data
+            FROM sys.fn_xe_file_target_read_file(@f, NULL, NULL, NULL)
+            WHERE event_data LIKE '%xml_deadlock_report%'
+          ),
+          src AS (
+            SELECT CAST(event_data AS XML) AS x
+            FROM raw
+          ),
+          dl AS (
+            SELECT x.value('(event/@timestamp)[1]','datetime2') AS dl_ts,
+                   x.query('(event/data/value/deadlock)[1]')    AS g
+            FROM src
+            WHERE x.value('(event/@name)[1]','varchar(50)') = 'xml_deadlock_report'
+          ),
+          v AS (
+            SELECT dl_ts, g,
+                   g.value('(deadlock/victim-list/victimProcess/@id)[1]','varchar(64)') AS victim_id
+            FROM dl
+            WHERE dl_ts > DATEADD(minute, -5, SYSUTCDATETIME())
+          )
+          SELECT CONVERT(VARCHAR(30), v.dl_ts, 126)                                      AS mssql_dl_ts,
+                 CAST(p.value('@spid','int') AS VARCHAR(20))                             AS mssql_spid,
+                 CAST(CASE WHEN p.value('@id','varchar(64)') = v.victim_id
+                           THEN 1 ELSE 0 END AS VARCHAR(1))                              AS mssql_is_victim,
+                 COALESCE(p.value('@lockMode','varchar(32)'),'')                         AS mssql_lock_mode,
+                 COALESCE(p.value('@clientapp','varchar(128)'),'')                       AS mssql_app,
+                 COALESCE(p.value('@loginname','varchar(128)'),'')                       AS mssql_user,
+                 COALESCE(p.value('@currentdbname','varchar(128)'),'')                   AS mssql_db,
+                 COALESCE(p.value('(../../resource-list/keylock/@objectname)[1]','varchar(256)'),'') AS mssql_lock_target,
+                 LTRIM(RTRIM(REPLACE(REPLACE(COALESCE(p.value('(inputbuf/text())[1]','varchar(500)'),''), CHAR(13), ' '), CHAR(10), ' '))) AS mssql_query,
+                 '${env:MSSQLHOST}'                                                      AS server_address,
+                 'mssql_deadlock'                                                        AS o2_recipe
+          FROM v
+          CROSS APPLY v.g.nodes('deadlock/process-list/process') AS t(p)
+        logs:
+          - body_column: mssql_query
+            attribute_columns:
+              [
+                mssql_dl_ts,
+                mssql_spid,
+                mssql_is_victim,
+                mssql_lock_mode,
+                mssql_app,
+                mssql_user,
+                mssql_db,
+                mssql_lock_target,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ============================================================================
+  # filelog — the roadmap's C-1: PG deadlock + lock-wait EVENT capture.
+  # Verified against the real log produced by this rig's log_line_prefix:
+  #   2026-08-08 05:01:42.550 UTC [181] dbm@dbmlab app=psql vxid=5/2 txid=794 line=8 \
+  #     DETAIL:  Process 181 waits for ExclusiveLock on tuple (0,1) of relation 16416 \
+  #     of database 16384; blocked by process 179.
+  #   <TAB>Process 179 waits for ShareLock on transaction 793; blocked by process 180.
+  #   <TAB>Process 181: UPDATE accounts SET balance=balance-1 WHERE id=1 ...
+  # Continuation lines start with a TAB -> multiline join on the timestamp prefix.
+  # ============================================================================
+  filelog/pg:
+    include: [/pglogs/postgresql*.log]
+    start_at: beginning
+    storage: file_storage/o2dbm
+    multiline:
+      line_start_pattern: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+ \['
+    operators:
+      # 1) split the prefix off the message
+      - type: regex_parser
+        id: pg_prefix
+        # Session lines carry `user@db app=... vxid=... txid=... line=N`; postmaster
+        # startup/checkpointer lines carry NONE of it (the %q in log_line_prefix
+        # elides everything after it for non-session backends). Both must parse.
+        # `qid=` is OPTIONAL — it appears only under the auto_explain profile's
+        # log_line_prefix (compute_query_id=on + %Q); both prefixes must parse.
+        regex: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+) \[(?P<pg_pid>\d+)\] (?:(?P<pg_user>[^@ ]+)@(?P<pg_db>\S+) app=(?P<pg_app>\S*) vxid=(?P<pg_vxid>\S*) txid=(?P<pg_txid>\S*) line=(?P<pg_line>\d+) (?:qid=(?P<pg_query_id>-?\d+) )?)?(?P<pg_severity>[A-Z][A-Z0-9]*):\s+(?P<pg_message>(?s).*)$'
+        timestamp:
+          parse_from: attributes.ts
+          layout: "%Y-%m-%d %H:%M:%S.%L %Z"
+        severity:
+          parse_from: attributes.pg_severity
+          mapping:
+            error: ERROR
+            fatal: [FATAL, PANIC]
+            warn: WARNING
+            info: [LOG, INFO, NOTICE]
+            debug: [DEBUG1, DEBUG2, DEBUG3, DEBUG4, DEBUG5, STATEMENT, DETAIL, HINT, CONTEXT]
+
+      # 2) classify
+      - type: add
+        field: attributes.o2_pg_event
+        value: other
+      - type: router
+        id: classify
+        routes:
+          # VERSION/FORMAT GOTCHA: Postgres emits the deadlock ERROR line and its
+          # DETAIL block as TWO SEPARATE log entries (each carrying the full
+          # log_line_prefix), not as one multi-line entry. The DETAIL entry is the
+          # one holding the wait cycle + every participant's SQL, so BOTH must be
+          # routed to the deadlock branch and correlated by (pg_pid, txid).
+          - expr: 'attributes.pg_message matches "^deadlock detected"'
+            output: mark_deadlock
+          - expr: 'attributes.pg_severity == "DETAIL" and attributes.pg_message matches "waits for .* blocked by process"'
+            output: mark_deadlock
+          - expr: 'attributes.pg_message matches "still waiting for"'
+            output: mark_lockwait
+          - expr: 'attributes.pg_message matches "acquired .*Lock on"'
+            output: mark_lockacq
+          - expr: 'attributes.pg_message matches "^temporary file:"'
+            output: mark_tempfile
+          # BEFORE the `^duration:` route — an auto_explain entry begins
+          # "duration: N.NNN ms  plan:", so it matches `^duration:` too, and
+          # mark_duration's UNGUARDED parser would log a regex failure on every
+          # plan (the unguarded-parser bug at scale). Order is the discriminator.
+          - expr: 'attributes.pg_message matches "^duration: [\\d.]+ ms\\s+plan:"'
+            output: mark_explain
+          - expr: 'attributes.pg_message matches "^duration:"'
+            output: mark_duration
+        default: emit
+
+      # ---- DEADLOCK ------------------------------------------------------
+      - type: add
+        id: mark_deadlock
+        field: attributes.o2_pg_event
+        value: deadlock
+      # victim pid = the pid on the ERROR line itself (PG aborts the reporting backend)
+      - type: copy
+        from: attributes.pg_pid
+        to: attributes.deadlock_victim_pid
+      # first "Process N waits for <mode> on <resource>; blocked by process M."
+      - type: regex_parser
+        id: dl_first_edge
+        parse_from: attributes.pg_message
+        regex: 'Process (?P<dl_waiter_pid>\d+) waits for (?P<dl_lock_mode>\S+) on (?P<dl_lock_target>[^;]+); blocked by process (?P<dl_blocker_pid>\d+)'
+        on_error: send
+      # second edge of the wait cycle: "Process M waits for ... blocked by process N."
+      - type: regex_parser
+        id: dl_second_edge
+        parse_from: attributes.pg_message
+        regex: '(?s)blocked by process \d+\.\s*\n\s*Process (?P<dl_waiter2_pid>\d+) waits for (?P<dl_lock_mode2>\S+) on (?P<dl_lock_target2>[^;]+); blocked by process (?P<dl_blocker2_pid>\d+)'
+        on_error: send
+      # participant statements: "Process <pid>: <sql>" (one line per participant)
+      - type: regex_parser
+        id: dl_stmt_1
+        parse_from: attributes.pg_message
+        regex: '(?s)Process (?P<dl_p1>\d+): (?P<dl_query_1>[^\n]+)'
+        on_error: send
+      - type: regex_parser
+        id: dl_stmt_2
+        parse_from: attributes.pg_message
+        regex: '(?s)Process \d+: [^\n]+\n\s*Process (?P<dl_p2>\d+): (?P<dl_query_2>[^\n]+)'
+        on_error: send
+      - type: add
+        field: attributes.o2_capability
+        value: deadlock_event
+      - type: move
+        from: attributes.pg_message
+        to: attributes.o2_deadlock_raw
+        output: emit
+
+      # ---- LOCK WAIT -----------------------------------------------------
+      - type: add
+        id: mark_lockwait
+        field: attributes.o2_pg_event
+        value: lock_wait
+      - type: regex_parser
+        parse_from: attributes.pg_message
+        regex: 'process (?P<lw_pid>\d+) still waiting for (?P<lw_lock_mode>\S+) on (?P<lw_lock_target>.+?) after (?P<lw_wait_ms>[\d.]+) ms'
+        on_error: send
+        output: emit
+
+      - type: add
+        id: mark_lockacq
+        field: attributes.o2_pg_event
+        value: lock_acquired
+      - type: regex_parser
+        parse_from: attributes.pg_message
+        regex: 'process (?P<lw_pid>\d+) acquired (?P<lw_lock_mode>\S+) on (?P<lw_lock_target>.+?) after (?P<lw_wait_ms>[\d.]+) ms'
+        on_error: send
+        output: emit
+
+      # ---- TEMP FILE SPILL ----------------------------------------------
+      - type: add
+        id: mark_tempfile
+        field: attributes.o2_pg_event
+        value: temp_file
+      - type: regex_parser
+        parse_from: attributes.pg_message
+        regex: 'temporary file: path "(?P<tmp_path>[^"]+)", size (?P<tmp_size_bytes>\d+)'
+        on_error: send
+        output: emit
+
+      # ---- AUTO_EXPLAIN (real executed plan) -----------------------------
+      # The tag value MUST NOT stay "other": filter/dbm tests the value and
+      # would silently drop every plan while the collector reports healthy.
+      - type: add
+        id: mark_explain
+        field: attributes.o2_pg_event
+        value: explain
+      - type: regex_parser
+        id: ae_header
+        if: 'attributes.pg_message != nil and attributes.pg_message matches "^duration: [\\d.]+ ms\\s+plan:"'
+        parse_from: attributes.pg_message
+        regex: '^duration: (?P<ae_duration_ms>[\d.]+) ms\s+plan:'
+        on_error: send
+      # ONE STRING attribute — a JSON-parsing operator here would emit a nested
+      # value and reject the whole ingest batch (X5). Guarded on `plan: {` so a
+      # JSON truncated below the opening brace fails silently and locally.
+      - type: regex_parser
+        id: ae_plan_json
+        if: 'attributes.pg_message != nil and attributes.pg_message matches "plan:\\s*\\{"'
+        parse_from: attributes.pg_message
+        regex: '(?s)plan:\s*(?P<ae_plan_json>\{.*\})\s*$'
+        on_error: send
+      - type: move
+        from: attributes.pg_message
+        to: attributes.o2_explain_raw
+        output: emit
+
+      # ---- STATEMENT DURATION (log_min_duration_statement=0) -------------
+      - type: add
+        id: mark_duration
+        field: attributes.o2_pg_event
+        value: statement_duration
+      - type: regex_parser
+        parse_from: attributes.pg_message
+        regex: '(?s)^duration: (?P<stmt_duration_ms>[\d.]+) ms\s+(?P<stmt_kind>statement|execute [^:]*|parse [^:]*|bind [^:]*):\s+(?P<stmt_text>.*)$'
+        on_error: send
+        output: emit
+
+      - type: noop
+        id: emit
+
+  # ---- MySQL error log: InnoDB deadlock records (innodb_print_all_deadlocks=ON) ----
+  filelog/mysql:
+    include: [/mysqllogs/error.log]
+    start_at: beginning
+    storage: file_storage/o2dbm
+    multiline:
+      line_start_pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+    operators:
+      - type: regex_parser
+        regex: '^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) (?P<my_thread>\d+) \[(?P<my_severity>\w+)\] \[(?P<my_code>[^\]]+)\] \[(?P<my_subsys>[^\]]+)\] (?P<my_message>(?s).*)$'
+        on_error: send
+        timestamp:
+          parse_from: attributes.ts
+          layout: "%Y-%m-%dT%H:%M:%S.%fZ"
+      - type: add
+        field: attributes.o2_my_event
+        value: other
+      - type: router
+        routes:
+          # FORMAT GOTCHA: MySQL 8.4 splits one InnoDB deadlock across MANY
+          # separately-timestamped entries — MY-012468 is only the "deadlock
+          # detected" banner (119 bytes), while each `*** (N) TRANSACTION:` block
+          # (with the thread id, the SQL, and the RECORD LOCKS detail) is its own
+          # MY-012469 entry. Route BOTH codes to the deadlock branch and correlate
+          # downstream on the ~same timestamp; matching only the word "deadlock"
+          # would capture the banner and drop every participant.
+          - expr: 'attributes.my_code == "MY-012468" or attributes.my_code == "MY-012469"'
+            output: my_dl
+          - expr: 'attributes.my_message != nil and attributes.my_message matches "(?i)deadlock"'
+            output: my_dl
+        default: my_emit
+      - type: add
+        id: my_dl
+        field: attributes.o2_my_event
+        value: deadlock
+      - type: add
+        field: attributes.o2_capability
+        value: deadlock_event
+      # InnoDB writes the deadlock as `*** (1) TRANSACTION:` / `*** (2) TRANSACTION:`
+      # blocks, each with "MySQL thread id N, ... query id N <host> <user> updating"
+      # followed by the SQL, plus the locked index/table on the RECORD LOCKS line.
+      # Each entry carries at most ONE `*** (N) TRANSACTION:` block, so capture the
+      # side number (1|2) generically rather than assuming both are in one entry.
+      - type: regex_parser
+        id: my_dl_trx
+        parse_from: attributes.my_message
+        regex: '(?s)\*\*\* \((?P<my_trx_side>\d+)\) TRANSACTION:\s*\nTRANSACTION (?P<my_trx_id>\d+).*?MySQL thread id (?P<my_trx_thread>\d+),[^\n]*?query id \d+ (?P<my_trx_host>\S+) (?P<my_trx_user>\S+)[^\n]*\n(?P<my_trx_query>[^\n]+)'
+        on_error: send
+      - type: regex_parser
+        id: my_dl_lock
+        parse_from: attributes.my_message
+        # Side + trx id are captured so the lock detail can be JOINED to the
+        # participant: InnoDB writes `*** (N) HOLDS THE LOCK(S)` as its own
+        # timestamped entry, so it never shares a record with the
+        # `*** (N) TRANSACTION:` block that names the thread and statement.
+        regex: '(?s)\*\*\* \((?P<my_lock_side>\d+)\) (?:HOLDS THE LOCK|WAITING FOR THIS LOCK).*?RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<my_lock_index>\S+) of table (?P<my_lock_table>`?(?P<my_db>[^`. ]+)`?\.\S+) trx id (?P<my_lock_trx_id>\d+) (?P<my_lock_mode>lock_mode \S+)'
+        on_error: send
+      # MySQL names the ROLLED BACK transaction explicitly.
+      - type: regex_parser
+        id: my_dl_victim
+        parse_from: attributes.my_message
+        regex: '\*\*\* WE ROLL BACK TRANSACTION \((?P<my_victim_side>\d+)\)'
+        on_error: send
+        output: my_emit
+      - type: noop
+        id: my_emit
+
+  # ---- MariaDB error log: InnoDB deadlock records ----
+  # Transcribed from MARIADB_DEADLOG_RECEIVER in dbmShared.ts. A SEPARATE receiver
+  # from filelog/mysql, not a loosened shared one: the InnoDB body is identical
+  # but the log-line ENVELOPE is a different format entirely —
+  #   MySQL 8.4  2026-08-10T05:43:17.699174Z 0 [Note] [MY-012469] [InnoDB] …
+  #   MariaDB 11 2026-08-10  8:56:56 14 [Note] InnoDB: …
+  # space separator, no `T`, no fractional seconds, no [MY-nnnnnn] code — and the
+  # one body literal that differs is fatal: `MariaDB thread id` vs `MySQL thread id`.
+  #
+  # The key is o2_maria_event, NOT o2_my_event: detect_engine maps any `my_*` key
+  # to MySQL, and stitch_mysql_deadlocks groups on (engine, instance, database),
+  # so under-tagged MariaDB rows could fuse with real MySQL ones and fabricate a
+  # cross-server deadlock.
+  #
+  # `mariadblogs` was already bind-mounted into this collector but nothing tailed
+  # it, so the rig produced zero o2_maria_event records.
+  filelog/mariadb:
+    include: [/mariadblogs/error.log]
+    start_at: beginning
+    storage: file_storage/o2dbm
+    multiline:
+      line_start_pattern: '^\d{4}-\d{2}-\d{2} +\d{1,2}:\d{2}:\d{2} '
+    operators:
+      - type: regex_parser
+        regex: '^(?P<ts>\d{4}-\d{2}-\d{2} +\d{1,2}:\d{2}:\d{2}) (?P<maria_thread>\d+) \[(?P<maria_severity>\w+)\] (?P<maria_message>(?s).*)$'
+        on_error: send
+        timestamp:
+          parse_from: attributes.ts
+          layout: "%Y-%m-%d %H:%M:%S"
+      - type: add
+        field: attributes.o2_maria_event
+        value: other
+      # MariaDB has no [MY-nnnnnn] code to route on, so the deadlock text IS the
+      # only signal. THE "*** (N) TRANSACTION:" ROUTE IS THE LOAD-BEARING ONE:
+      # MariaDB writes the per-side blocks as CONTINUATION lines under an entry
+      # whose own text is a bare "InnoDB:", containing neither the banner nor the
+      # verdict. Routing on only those two phrases captured the verdict and
+      # dropped BOTH sides — "deadlocks with no participants".
+      - type: router
+        routes:
+          - expr: 'attributes.maria_message != nil and attributes.maria_message matches "\\*\\*\\* \\(\\d+\\) TRANSACTION:"'
+            output: maria_dl
+          - expr: 'attributes.maria_message != nil and attributes.maria_message matches "Transactions deadlock detected"'
+            output: maria_dl
+          - expr: 'attributes.maria_message != nil and attributes.maria_message matches "WE ROLL BACK TRANSACTION"'
+            output: maria_dl
+        default: maria_emit
+      - type: add
+        id: maria_dl
+        field: attributes.o2_maria_event
+        value: deadlock
+      - type: add
+        field: attributes.o2_capability
+        value: deadlock_event
+      # ONE side per record — MariaDB splits the capture into eight entries with
+      # side 1, side 2 and the verdict each landing on a DIFFERENT record, so a
+      # second positionally-anchored regex would never fire.
+      - type: regex_parser
+        parse_from: attributes.maria_message
+        regex: '(?s)\*\*\* \((?P<maria_trx_side>\d+)\) TRANSACTION:\s*\nTRANSACTION (?P<maria_trx_id>\d+).*?MariaDB thread id (?P<maria_trx_thread>\d+),[^\n]*?query id \d+ (?P<maria_trx_host>\S+) (?P<maria_trx_user>\S+)[^\n]*\n(?P<maria_trx_query>[^\n]+)'
+        on_error: send
+      - type: regex_parser
+        parse_from: attributes.maria_message
+        # Same join as the MySQL recipe above -- MariaDB splits these records too.
+        regex: '(?s)\*\*\* \((?P<maria_lock_side>\d+)\) (?:HOLDS THE LOCK|WAITING FOR THIS LOCK).*?RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<maria_lock_index>\S+) of table (?P<maria_lock_table>`?(?P<my_db>[^`. ]+)`?\.\S+) trx id (?P<maria_lock_trx_id>\d+) (?P<maria_lock_mode>lock_mode \S+)'
+        on_error: send
+      - type: regex_parser
+        parse_from: attributes.maria_message
+        regex: '\*\*\* WE ROLL BACK TRANSACTION \((?P<maria_victim_side>\d+)\)'
+        on_error: send
+        output: maria_emit
+      - type: noop
+        id: maria_emit
+
+processors:
+  # Keep ONLY the records the Database Monitoring pages read.
+  #
+  # TRANSCRIBED FROM THE SHIPPED CONFIG (dbmShared.ts). The rig must run the
+  # pipeline we ship, not a more permissive one — otherwise it can never
+  # reproduce the one failure this filter itself can cause: a new recipe whose
+  # records the filter silently drops.
+  #
+  # This is load-bearing, not tidiness. The filelog receivers tail the WHOLE
+  # database log, so without it every ordinary log line lands in dbm_server too —
+  # measured on a real deployment, tagged events were 787 rows against 4.8
+  # MILLION untagged ones in the same hour, and the Deadlocks page slowed to
+  # 8-18s because every query scanned all of them.
+  #
+  # A record is ours if a recipe tagged it: sqlquery rows carry o2_recipe,
+  # filelog rows carry o2_pg_event / o2_my_event / o2_maria_event.
+  filter/dbm:
+    error_mode: ignore
+    logs:
+      log_record:
+        # Tests the VALUE, not just presence. Every filelog pipeline stamps its
+        # o2_*_event = "other" on EVERY line before routing (so the router has a
+        # default), which means a nil-check keeps the whole error log — the exact
+        # noise this filter exists to drop.
+        #
+        # o2_maria_event MUST be listed here. It is a separate key from
+        # o2_my_event by design, so omitting it would drop every MariaDB deadlock
+        # while the pipeline looked healthy.
+        - 'attributes["o2_recipe"] == nil and (attributes["o2_pg_event"] == nil or attributes["o2_pg_event"] == "other") and (attributes["o2_my_event"] == nil or attributes["o2_my_event"] == "other") and (attributes["o2_maria_event"] == nil or attributes["o2_maria_event"] == "other")'
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+  resource/ident:
+    attributes:
+      - key: o2_rig
+        value: dbm-server-vantage
+        action: upsert
+      - key: deployment.environment.name
+        value: dbm-sv
+        action: upsert
+      # WHICH SERVER these rows came from — the instance dimension.
+      #
+      # Without this every row stored a NULL `o2_dbm_instance`, so the
+      # "database" filter (the UI's name for the INSTANCE dimension, distinct
+      # from the `namespace`/`o2_dbm_database` a statement ran in) matched
+      # nothing and silently emptied Slowest calls, Deadlocks and Top queries
+      # the moment a reader picked a value. A real deployment always names its
+      # database hosts; a rig that leaves them anonymous cannot exercise the
+      # one filter operators use to tell replicas apart.
+      #
+      # `server.address` is `detect_instance`'s FIRST alias and is
+      # port-stripped on ingest. `host.name` carries the same identity for the
+      # metric streams and for any consumer reading OTel's conventional
+      # attribute rather than ours.
+      #
+      # THE VALUE MUST BE `${env:PGHOST}`, not the container name. One server
+      # has to have ONE identity: the sqlquery recipes below already stamp
+      # `'${env:PGHOST}' AS server_address` into every row they emit, and a
+      # record-level column outranks a resource attribute at ingest. Hardcoding
+      # a different string here split the fleet in two — the recipe rows
+      # (activity, table health, top queries) answered to one instance value
+      # and the filelog rows (slowest calls, deadlocks) to another, so NO
+      # single choice in the instance filter showed a complete server and each
+      # one silently emptied the tabs fed by the other half.
+      - key: server.address
+        value: ${env:MSSQLHOST}
+        action: upsert
+      - key: host.name
+        value: ${env:MSSQLHOST}
+        action: upsert
+  # Give every server-vantage log stream a stable name so the O2 SQL below is simple.
+  transform/tag_source:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["o2_vantage"], "server")
+
+  # memory_limiter: the guard the shared config lacks. MUST be first in every
+  # pipeline's processor list -- a limiter after the batcher never sees the data
+  # that is actually accumulating.
+  memory_limiter/alt:
+    check_interval: 1s
+    limit_mib: 1024
+    spike_limit_mib: 256
+
+exporters:
+  # ---- GENERATED BY gen-alt-config.py -- DO NOT EDIT BY HAND ----
+  # Lane: mssql_server (mssql_server)  engine=mssql  traces=NO
+  #
+  # There is deliberately NO traces exporter and NO metrics exporter here: this
+  # lane ships server-vantage logs only. Absence is the guarantee -- not a
+  # filter that could be misconfigured.
+  otlphttp/alt_logs:
+    logs_endpoint: http://host.docker.internal:5080/api/mssql_server/v1/logs
+    headers:
+      Authorization: Basic ${env:O2_AUTH}
+      stream-name: dbm_server
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 8, queue_size: 5000 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  otlphttp/fan_logs:
+    logs_endpoint: http://host.docker.internal:5080/api/3I75nCL8SYAzp4UHlZYepu5FqC0/v1/logs
+    headers:
+      Authorization: Basic ${env:O2_AUTH}
+      stream-name: dbm_server
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 8, queue_size: 5000 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  debug:
+    verbosity: basic
+  # Raw-evidence sink. The path is OPENED, never CREATED -- /rawout must exist
+  # on the host before start or the collector dies within seconds and `docker
+  # ps` simply shows nothing (check `docker ps -a`). alt-rig.sh pre-creates it.
+  file/raw_events:
+    path: /rawout/receiver-events.jsonl
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  file_storage/o2dbm:
+    directory: /var/lib/otelcol
+    create_directory: true
+
+service:
+  extensions: [health_check, file_storage/o2dbm]
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    # SERVER VANTAGE: this engine's recipes (+ its error log, where it has one).
+    # memory_limiter FIRST, then filter/dbm before the batcher -- dropped
+    # records must never reach the batcher.
+    #
+    # There is NO `logs/receiver_events` pipeline: neither engine has
+    # receiver-native db.server.* events adopted, so there is nothing to put in
+    # one. An empty Activity tab on this lane is the correct answer.
+    logs:
+      receivers:
+        [
+          sqlquery/mssql_blocking,
+          sqlquery/mssql_deadlocks,
+        ]
+      processors: [memory_limiter/alt, filter/dbm, transform/tag_source, resource/ident, batch]
+      exporters: [otlphttp/alt_logs, otlphttp/fan_logs, file/raw_events]
+    # NO `metrics:` PIPELINE -- no metrics receiver is configured for this
+    # engine, and naming one that does not exist fails the collector at startup.
+    # NO `traces:` PIPELINE. Deliberate. A span has no route to this org.
