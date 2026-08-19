@@ -33,6 +33,14 @@ const store = { state: { timezone: "UTC" } };
 
 const field = (alias: string, label = alias.toUpperCase()) => ({ alias, label });
 
+// y fields carry the aggregation that drives duplicate-cell merging; "count"
+// (additive) is the default the sum-asserting tests assume.
+const yField = (alias: string, label = alias.toUpperCase(), functionName: any = "count") => ({
+  alias,
+  label,
+  functionName,
+});
+
 /** Builds a table panel schema in pivot mode (x + breakdown + y all present). */
 const schema = (opts: { x?: any[]; y?: any[]; breakdown?: any[]; config?: any }) => ({
   type: "table",
@@ -40,7 +48,7 @@ const schema = (opts: { x?: any[]; y?: any[]; breakdown?: any[]; config?: any })
     {
       fields: {
         x: opts.x ?? [field("country", "Country")],
-        y: opts.y ?? [field("cnt", "Count")],
+        y: opts.y ?? [yField("cnt", "Count")],
         breakdown: opts.breakdown ?? [field("method", "Method")],
       },
     },
@@ -124,30 +132,67 @@ describe("convertPivotTableData", () => {
   });
 
   describe("duplicate source rows", () => {
-    it("accumulates repeated (x, breakdown) pairs instead of keeping the last", () => {
-      const data = [
-        [
-          { country: "US", method: "GET", cnt: 5 },
-          { country: "US", method: "GET", cnt: 7 },
-        ],
-      ];
-      const result = convertPivotTableData(schema({}), data, store);
+    const dup = (a: number, b: number) => [
+      [
+        { country: "US", method: "GET", cnt: a },
+        { country: "US", method: "GET", cnt: b },
+      ],
+    ];
+
+    it("sums repeated (x, breakdown) pairs for additive aggregations", () => {
+      const result = convertPivotTableData(schema({}), dup(5, 7), store);
       expect(result.rows[0].GET_cnt).toBe(12);
     });
 
-    it("keeps row totals consistent with the accumulated cells", () => {
-      const data = [
-        [
-          { country: "US", method: "GET", cnt: 5 },
-          { country: "US", method: "GET", cnt: 7 },
-        ],
-      ];
+    it("keeps row totals consistent with the merged cells", () => {
       const result = convertPivotTableData(
         schema({ config: { table_pivot_show_row_totals: true } }),
-        data,
+        dup(5, 7),
         store,
       );
       expect(result.rows[0][`${PIVOT_TABLE_TOTAL_LABEL}_cnt`]).toBe(12);
+    });
+
+    it.each([
+      ["min", 5],
+      ["max", 7],
+    ])("merges %s duplicates to the exact bound", (fn, expected) => {
+      const result = convertPivotTableData(
+        schema({ y: [yField("cnt", "Count", fn)] }),
+        dup(5, 7),
+        store,
+      );
+      expect(result.rows[0].GET_cnt).toBe(expected);
+    });
+
+    it.each([["avg"], ["p95"], ["count-distinct"], [null]])(
+      "keeps the first value for non-reconstructable aggregation %s",
+      (fn) => {
+        // Summing an avg/percentile/distinct-count fabricates a value that
+        // never existed; null models custom SQL with no known aggregation.
+        const result = convertPivotTableData(
+          schema({ y: [yField("cnt", "Count", fn)] }),
+          dup(5, 7),
+          store,
+        );
+        expect(result.rows[0].GET_cnt).toBe(5);
+      },
+    );
+
+    it("applies the same merge to groups folded into the Others bucket", () => {
+      // min values from different folded groups: the bucket's min is the true
+      // min of the union, not a sum of per-group minimums.
+      const rows: any[] = [];
+      for (let i = 0; i < PIVOT_TABLE_MAX_COLUMNS + 3; i++) {
+        rows.push({ country: "US", method: `M${i}`, cnt: 100 + i });
+      }
+      const result = convertPivotTableData(
+        schema({ y: [yField("cnt", "Count", "min")] }),
+        [rows],
+        store,
+      );
+      // The 3 smallest totals (100..102) fold into Others; their min is 100.
+      expect(result.rows[0][`${PIVOT_TABLE_OTHERS_LABEL}_cnt`]).toBe(100);
     });
   });
 

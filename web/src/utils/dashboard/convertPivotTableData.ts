@@ -333,6 +333,32 @@ export const convertPivotTableData = (
   }
 
   // --- Step 2: Build pivoted rows ---
+  // When several source rows land in one cell — duplicate (x, breakdown)
+  // pairs from custom SQL with an extra GROUP BY column, or many breakdown
+  // groups folded into the overflow bucket — they merge per the y-field's
+  // aggregation. Additive aggregations combine exactly, min/max keep the
+  // exact bound of the union, and everything else (avg, percentiles,
+  // count-distinct, custom SQL with no functionName) cannot be reconstructed
+  // from the returned values, so the first value is kept rather than a
+  // fabricated combination being displayed.
+  const resolveMergeFn = (functionName: any): ((a: number, b: number) => number) => {
+    switch (functionName) {
+      case "count":
+      case "sum":
+        return (a, b) => a + b;
+      case "min":
+        return Math.min;
+      case "max":
+        return Math.max;
+      default:
+        return (a) => a;
+    }
+  };
+  const mergeFnByAlias: Record<string, (a: number, b: number) => number> = {};
+  for (const yField of yFields) {
+    mergeFnByAlias[yField.alias] = resolveMergeFn(yField.functionName);
+  }
+
   const rowMap: Map<string, any> = new Map();
 
   for (const row of tableRows) {
@@ -354,19 +380,22 @@ export const convertPivotTableData = (
 
     const targetRow = rowMap.get(rowKey)!;
 
+    const bucket = pivotKeySet.has(pivotKey)
+      ? pivotKey
+      : hasOthers
+        ? PIVOT_TABLE_OTHERS_LABEL
+        : null;
+    if (bucket === null) continue;
+
     for (const yAlias of yAliases) {
       const numericValue = Number(getDataValue(row, yAlias)) || 0;
-
-      if (pivotKeySet.has(pivotKey)) {
-        const colKey = `${pivotKey}_${yAlias}`;
-        // Accumulate: a query can return several rows for one (x, breakdown)
-        // pair, and assigning here would silently keep only the last one.
-        // Mirrors the overflow branch below.
-        targetRow[colKey] = (targetRow[colKey] || 0) + numericValue;
-      } else if (hasOthers) {
-        const othersKey = `${PIVOT_TABLE_OTHERS_LABEL}_${yAlias}`;
-        targetRow[othersKey] = (targetRow[othersKey] || 0) + numericValue;
-      }
+      const colKey = `${bucket}_${yAlias}`;
+      const existing = targetRow[colKey];
+      // First write assigns: seeding the merge with 0 would corrupt min/max.
+      targetRow[colKey] =
+        existing === undefined || existing === null
+          ? numericValue
+          : mergeFnByAlias[yAlias](existing, numericValue);
     }
   }
 

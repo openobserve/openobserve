@@ -349,18 +349,17 @@ const { table, effectiveColumns, columnOrder, userReorderedColumns, columnSizing
       },
       // Forwarded for left-pinning of pivot row-field columns — without this
       // the core's pivotRowColumnIds never sees the prop and pinning is inert.
-      // Pin offsets come from TanStack's column sizes (getStart("left")). In
-      // the multi-row pivot-header mode columns render at exactly those sizes,
-      // so every row-field column can pin. In the standard-header mode pivot
-      // columns are auto-width: rendered widths diverge from TanStack's 150px
-      // default, which would misplace every pinned column after the first, so
-      // only the first row-field column pins there — its offset (0) is
-      // width-independent. The row-merge consumer reads props.pivotRowColumns
-      // directly and is unaffected by this narrowing.
+      // Only the first row-field column pins: pin offsets come from TanStack's
+      // nominal column sizes (getStart("left")), but table-auto layout treats
+      // cell width as a suggestion — a long nowrap value renders a column wider
+      // than its nominal size in every header mode — so any offset other than
+      // the first column's width-independent 0 can misplace its pinned cell.
+      // The row-merge consumer reads props.pivotRowColumns directly and is
+      // unaffected by this narrowing.
       get pivotRowColumns() {
         const cols = props.pivotRowColumns;
         if (!cols?.length) return cols;
-        return props.pivotHeaderLevels?.length ? cols : cols.slice(0, 1);
+        return cols.slice(0, 1);
       },
     },
     emit,

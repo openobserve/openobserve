@@ -1787,16 +1787,21 @@ describe("OTable", () => {
       expect(rowFieldTh.attributes("style") ?? "").toContain("position: sticky");
     });
 
-    it("pins only the first row-field column when columns are auto-width", () => {
-      // Standard-header mode (empty pivotHeaderLevels): pivot columns are
-      // auto-width, so TanStack's size-based getStart("left") would misplace
-      // every pinned column after the first. Only the first row field pins —
-      // its offset (0) holds regardless of rendered widths.
+    it.each([
+      ["standard-header mode", []],
+      [
+        "pivot-header mode",
+        [{ isLeaf: true, cells: [{ label: "Count", colspan: 1, _sortColumn: "id" }] }],
+      ],
+    ])("pins only the first row-field column in %s", (_name, pivotHeaderLevels) => {
+      // Pin offsets come from TanStack's nominal sizes, but table-auto layout
+      // can render any column wider than its nominal size, so only the first
+      // row field — whose offset (0) is width-independent — pins.
       wrapper = mount(OTable, {
         props: {
           data: makeRows(2),
           columns: makeColumns(),
-          pivotHeaderLevels: [],
+          pivotHeaderLevels,
           pivotRowColumns: [
             { name: "name", field: "name" },
             { name: "email", field: "email" },
@@ -1808,29 +1813,6 @@ describe("OTable", () => {
       const table: any = header.props("table");
       expect(table.getColumn("name")?.getIsPinned?.()).toBe("left");
       expect(table.getColumn("email")?.getIsPinned?.()).toBe(false);
-    });
-
-    it("pins every row-field column in pivot-header mode", () => {
-      // Multi-row pivot headers render columns at TanStack's fixed sizes, so
-      // offsets for later pinned columns are correct and all row fields pin.
-      wrapper = mount(OTable, {
-        props: {
-          data: makeRows(2),
-          columns: makeColumns(),
-          pivotHeaderLevels: [
-            { isLeaf: true, cells: [{ label: "Count", colspan: 1, _sortColumn: "id" }] },
-          ],
-          pivotRowColumns: [
-            { name: "name", field: "name" },
-            { name: "email", field: "email" },
-          ],
-        },
-      });
-
-      const header = wrapper.findComponent(OTableHeader);
-      const table: any = header.props("table");
-      expect(table.getColumn("name")?.getIsPinned?.()).toBe("left");
-      expect(table.getColumn("email")?.getIsPinned?.()).toBe("left");
     });
 
     it("renders standard header when pivotHeaderLevels is empty", () => {
