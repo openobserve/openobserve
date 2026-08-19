@@ -823,6 +823,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/traces/db_monitoring/server_queries", get(traces::get_dbm_server_queries))
         .route("/{org_id}/traces/db_monitoring/server_samples", get(traces::get_dbm_server_samples))
         .route("/{org_id}/traces/db_monitoring/table_health", get(traces::get_dbm_table_health))
+        .route("/{org_id}/traces/db_monitoring/instances", get(traces::get_dbm_instances))
         .route("/{org_id}/traces/db_monitoring/badges", get(traces::get_dbm_badges))
 
         // LLM Model Pricing
