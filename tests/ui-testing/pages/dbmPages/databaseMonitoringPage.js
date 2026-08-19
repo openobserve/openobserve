@@ -671,6 +671,30 @@ export class DatabaseMonitoringPage {
     await this.page.waitForTimeout(2500);
   }
 
+  /**
+   * Open a query's detail page ON A SPECIFIC TAB.
+   *
+   * The tab must be in the URL rather than clicked: the detail page renders its
+   * panels with `OTabPanel`, which defaults to `v-if`, so a section on an
+   * inactive tab is ABSENT FROM THE DOM rather than merely hidden. A test that
+   * lands on the default tab and asserts on the plans section fails in a way
+   * that reads exactly like the feature is missing.
+   */
+  async openQueryDetailTab(fingerprint, tab, { period = '1h', org, system = 'postgresql' } = {}) {
+    const orgId = org || process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const params = new URLSearchParams({
+      org_identifier: orgId,
+      period,
+      fingerprint,
+      system,
+      tab,
+    });
+    await this.page.goto(`${baseUrl}/web/infra/databases/query?${params}`, { timeout: 60000 });
+    await this.page.waitForLoadState('load', { timeout: 20000 });
+    await this.page.waitForTimeout(2500);
+  }
+
   /** A fingerprint the DATABASE reported — available with or without traces. */
   async firstServerQueryFingerprint({ periodSeconds = 3600 } = {}) {
     const body = await this.dbmApi('server_queries', periodSeconds);
