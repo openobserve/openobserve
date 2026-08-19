@@ -514,7 +514,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :detail="row.evidence"
                               :evidence="row.appEvidence"
                               :truncated="evidenceTruncated"
-                              class="mt-3"
                             />
                             <!-- What the PAGE was doing during this step, as
                                  opposed to what the runner experienced.
@@ -531,7 +530,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :error-kind="evidence.errorKind.value"
                               :truncated="evidence.truncated.value"
                               :unattributed-count="evidence.unattributedCount.value"
-                              class="mt-3"
                               @view-all="openEvidenceForStep"
                               @retry="evidence.load(true)"
                             />
