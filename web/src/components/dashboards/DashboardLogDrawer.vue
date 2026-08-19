@@ -191,7 +191,7 @@ const timelineChartOptions = computed(() => {
   // Touch the theme so colors recompute when it toggles.
   void store.state.theme;
   const accent = readVar("--color-accent", "#7c6cf6");
-  const axisText = readVar("--color-text-tertiary", "#9ca3af");
+  const axisText = readVar("--color-text-secondary", "#9ca3af");
   const axisLine = readVar("--color-border-default", "#e5e7eb");
 
   const times = timeline.value.map((b) => b.keyMs);
@@ -747,10 +747,10 @@ function openInLogs() {
       <template #cell-_timestamp="{ value }">{{ fmtTs(value) }}</template>
       <template #empty>
         <div class="flex flex-col items-center justify-center gap-4 px-6 py-10">
-          <OIcon name="manage-search" size="xl" class="text-text-tertiary opacity-30" />
+          <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
           <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
           <code
-            class="text-text-tertiary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
+            class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
             >{{ customSql }}</code
           >
         </div>
@@ -780,7 +780,7 @@ function openInLogs() {
             <span class="text-text-heading text-xs font-medium tabular-nums">{{
               fmtTs(selectedEvent["_timestamp"])
             }}</span>
-            <span class="text-text-tertiary text-xs">{{ stream }}</span>
+            <span class="text-text-secondary text-xs">{{ stream }}</span>
           </div>
           <OButton size="sm" variant="outline" icon-left="link" @click="copyCurrentUrl()">
             {{ t("panel.logExplorer.detail.copyLink") }}
@@ -823,7 +823,7 @@ function openInLogs() {
                 >
                   <!-- Field name -->
                   <template #cell-fld="{ value }">
-                    <span class="text-text-primary truncate"
+                    <span class="text-text-body truncate"
                       >{{ value }}<OTooltip :content="raw(String(value))"
                     /></span>
                   </template>
@@ -872,7 +872,7 @@ function openInLogs() {
                   class="rounded-default bg-surface-subtle h-14 animate-pulse"
                 />
                 <div v-else-if="!timeline.length" class="flex h-14 items-center justify-center">
-                  <span class="text-text-tertiary text-xs">{{
+                  <span class="text-text-secondary text-xs">{{
                     t("panel.logExplorer.insights.timelineEmpty")
                   }}</span>
                 </div>
@@ -904,7 +904,7 @@ function openInLogs() {
                   />
                 </div>
                 <div v-else-if="!insightPatterns.length" class="px-2 py-3">
-                  <span class="text-text-tertiary text-xs">{{
+                  <span class="text-text-secondary text-xs">{{
                     t("panel.logExplorer.insights.patternsEmpty")
                   }}</span>
                 </div>
@@ -927,7 +927,7 @@ function openInLogs() {
                         }}
                       </OTag>
                       <span
-                        class="text-text-tertiary shrink-0 text-xs font-medium whitespace-nowrap tabular-nums"
+                        class="text-text-primary shrink-0 text-xs font-medium whitespace-nowrap tabular-nums"
                         >{{ p.pct }}%</span
                       >
                       <!-- Pattern template with wildcards -->
@@ -954,7 +954,7 @@ function openInLogs() {
                     <!-- Sample log line -->
                     <p
                       v-if="p.sample"
-                      class="text-text-tertiary truncate font-mono text-xs leading-snug"
+                      class="text-text-secondary truncate font-mono text-xs leading-snug"
                     >
                       {{ p.sample }}<OTooltip :content="raw(p.sample)" max-width="22.5rem" />
                     </p>
@@ -973,7 +973,7 @@ function openInLogs() {
                   side="bottom"
                   max-width="17.5rem"
                 >
-                  <OIcon name="info-outline" size="xs" class="text-text-tertiary cursor-help" />
+                  <OIcon name="info-outline" size="xs" class="text-text-secondary cursor-help" />
                 </OTooltip>
                 <div class="ml-auto shrink-0">
                   <ODropdown side="bottom" align="end">
@@ -1010,7 +1010,7 @@ function openInLogs() {
                   />
                 </div>
                 <div v-else-if="!surroundEvents.length" class="px-2 py-3">
-                  <span class="text-text-tertiary text-xs">{{
+                  <span class="text-text-secondary text-xs">{{
                     t("panel.logExplorer.insights.contextEmpty")
                   }}</span>
                 </div>
@@ -1046,16 +1046,16 @@ function openInLogs() {
                       <div class="flex items-center gap-2">
                         <span
                           :class="[
-                            'w-16 shrink-0 whitespace-nowrap text-xs tabular-nums',
+                            'w-16 shrink-0 text-xs whitespace-nowrap tabular-nums',
                             String(ev._timestamp) === String(selectedEvent!._timestamp)
                               ? 'text-accent font-semibold'
-                              : 'text-text-tertiary',
+                              : 'text-text-secondary',
                           ]"
                         >
                           {{ fmtRelTime(Number(ev._timestamp), Number(selectedEvent!._timestamp)) }}
                         </span>
                         <span
-                          class="text-text-tertiary shrink-0 font-mono text-xs whitespace-nowrap"
+                          class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums"
                           >{{ fmtTsShort(ev._timestamp) }}</span
                         >
                         <span class="dld-ctx-body min-w-0 flex-1 truncate font-mono text-xs">
@@ -1252,7 +1252,7 @@ function openInLogs() {
   line-height: 1.7;
   padding: 0.75rem 1rem;
   background: color-mix(in srgb, var(--color-surface-subtle) 50%, transparent);
-  color: color-mix(in srgb, var(--color-text-primary) 100%, transparent);
+  color: color-mix(in srgb, var(--color-text-body) 100%, transparent);
   border-left: 0.1875rem solid color-mix(in srgb, var(--color-accent) 50%, transparent);
   resize: none;
   width: 100%;
@@ -1288,7 +1288,7 @@ function openInLogs() {
   font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--color-text-primary);
+  color: var(--color-text-body);
 }
 /* Render the leading section OIcon as a small accent chip. */
 .dld-section-header > :first-child {
@@ -1310,7 +1310,7 @@ function openInLogs() {
   font-weight: 400;
   letter-spacing: 0;
   font-size: var(--text-2xs);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   margin-left: auto;
 }
 
@@ -1376,13 +1376,13 @@ function openInLogs() {
   border: none;
   background: transparent;
   cursor: pointer;
-  color: color-mix(in srgb, var(--color-text-tertiary) 100%, transparent);
+  color: color-mix(in srgb, var(--color-text-secondary) 100%, transparent);
   transition:
     color 100ms,
     background 100ms;
 }
 .dld-copy-btn:hover {
-  color: color-mix(in srgb, var(--color-text-primary) 100%, transparent);
+  color: color-mix(in srgb, var(--color-text-body) 100%, transparent);
   background: color-mix(in srgb, var(--color-surface-subtle) 100%, transparent);
 }
 
@@ -1396,13 +1396,13 @@ function openInLogs() {
   border: none;
   background: transparent;
   cursor: pointer;
-  color: color-mix(in srgb, var(--color-text-tertiary) 100%, transparent);
+  color: color-mix(in srgb, var(--color-text-secondary) 100%, transparent);
   transition:
     color 100ms,
     background 100ms;
 }
 .dld-expand-btn:hover {
-  color: color-mix(in srgb, var(--color-text-primary) 100%, transparent);
+  color: color-mix(in srgb, var(--color-text-body) 100%, transparent);
   background: color-mix(in srgb, var(--color-surface-subtle) 100%, transparent);
 }
 
@@ -1414,7 +1414,7 @@ function openInLogs() {
   padding: 3rem 1rem 0.75rem;
   white-space: pre-wrap;
   word-break: break-all;
-  color: color-mix(in srgb, var(--color-text-primary) 100%, transparent);
+  color: color-mix(in srgb, var(--color-text-body) 100%, transparent);
   margin: 0;
 }
 </style>
