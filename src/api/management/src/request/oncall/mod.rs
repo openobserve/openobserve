@@ -4490,6 +4490,80 @@ fn analytics_window(from: Option<i64>, to: Option<i64>) -> Result<(i64, i64), St
         (status = 409, description = "Already an incident", content_type = "application/json", body = Object),
     ),
 )]
+/// Copies what the page knew onto the incident it became.
+///
+/// Best effort throughout: an incident that exists with a thin history is worth
+/// more than one rolled back because a timeline write failed. Every step logs
+/// and continues.
+#[cfg(feature = "enterprise")]
+async fn carry_page_history_into_incident(
+    org_id: &str,
+    response_id: &str,
+    incident_id: &str,
+    record: &config::meta::oncall::Response,
+) {
+    use config::meta::alerts::incidents::IncidentEvent;
+    use config::meta::oncall::ResponseEventKind;
+
+    // One line naming the things a reader of the incident would otherwise have
+    // to open the page to learn. Written first so it heads the timeline.
+    let team = infra::table::oncall_teams::get(org_id, &record.team_id)
+        .await
+        .ok()
+        .flatten()
+        .map(|t| t.name)
+        .unwrap_or_else(|| record.team_id.clone());
+    let mut summary = format!(
+        "Promoted from on-call page {response_id} — paged {team} at P{}",
+        record.priority
+    );
+    match (record.acked_by.as_deref(), record.acked_at) {
+        (Some(who), _) => summary.push_str(&format!(", acknowledged by {who}")),
+        // Worth saying explicitly. "Nobody answered" is the reason a page most
+        // often becomes an incident, and its absence reads as "not recorded".
+        (None, _) => summary.push_str(", never acknowledged"),
+    }
+    if let Some(cause) = record.cause.as_ref() {
+        summary.push_str(&format!(", cause recorded as {}", cause.as_str()));
+    }
+    if let Err(e) =
+        infra::table::incident_events::append(org_id, incident_id, IncidentEvent::comment("o2-engine", summary)).await
+    {
+        tracing::warn!("[oncall] promote summary onto {incident_id}: {e}");
+    }
+
+    let timeline = match infra::table::oncall_responses::list_events(response_id).await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!("[oncall] promote read page timeline {response_id}: {e}");
+            return;
+        }
+    };
+
+    // Notes and the agent's findings, in the order they were written. Pages,
+    // acks and system lines are deliberately left behind: they describe how the
+    // *page* was worked, and the incident has its own timeline for that. What a
+    // human typed, and what the AI SRE concluded, are the parts that carry.
+    for event in timeline.iter().filter(|e| {
+        matches!(e.kind, ResponseEventKind::Note | ResponseEventKind::Rca)
+            && !e.body.trim().is_empty()
+    }) {
+        let prefix = match event.kind {
+            ResponseEventKind::Rca => "AI SRE (from the page): ",
+            _ => "",
+        };
+        if let Err(e) = infra::table::incident_events::append(
+            org_id,
+            incident_id,
+            IncidentEvent::comment(event.actor.clone(), format!("{prefix}{}", event.body)),
+        )
+        .await
+        {
+            tracing::warn!("[oncall] promote note onto {incident_id}: {e}");
+        }
+    }
+}
+
 pub async fn promote_to_incident(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -4594,6 +4668,20 @@ pub async fn promote_to_incident(
                 tracing::warn!("[oncall] promote link alert: {e}");
             }
         }
+
+        // Carry the page's own record across.
+        //
+        // A promotion is the page saying "this is bigger than me" — and the
+        // incident becomes the system of record from that moment. An incident
+        // that opens empty makes the responder re-type what they already wrote,
+        // or worse, lose it: the notes, who was woken, who answered and what the
+        // ladder did all stayed on a page nobody opens again.
+        //
+        // Copied rather than linked, deliberately. This is an audit record of
+        // what was known *at the moment of promotion*, so it must not change
+        // afterwards — and the incident has to be readable on its own, without
+        // the reader knowing there is a page behind it.
+        carry_page_history_into_incident(&org_id, &response_id, &incident.id, &record).await;
 
         match infra::table::oncall_responses::attach_incident(&org_id, &response_id, &incident.id)
             .await
@@ -5129,6 +5217,38 @@ mod tests {
 
     /// A promotion must never lower the severity that already woke somebody,
     /// so an absent `severity` derives it from the record's own priority.
+    /// What a promotion must carry across, expressed as the filter that decides
+    /// it — the copying itself needs a database, but the *choice* of what
+    /// travels is the part worth pinning.
+    ///
+    /// Notes and the agent's findings carry: they are what a human wrote and
+    /// what the analysis concluded, and the incident becomes the system of
+    /// record the moment it exists. Pages, acks, handoffs and system lines stay
+    /// behind: they describe how the *page* was worked, and the incident keeps
+    /// its own timeline of how the incident is worked. Copying those would
+    /// produce two timelines telling the same story in different words.
+    #[test]
+    fn test_only_what_a_human_wrote_carries_into_the_incident() {
+        use config::meta::oncall::ResponseEventKind as K;
+
+        let carries = |kind: K, body: &str| {
+            matches!(kind, K::Note | K::Rca) && !body.trim().is_empty()
+        };
+
+        assert!(carries(K::Note, "rolled back checkout 4.2.1"));
+        assert!(carries(K::Rca, "probable cause: the deploy at 14:02"));
+
+        assert!(!carries(K::Page, "paged ana@o2.ai"));
+        assert!(!carries(K::Ack, "acknowledged by bo@o2.ai"));
+        assert!(!carries(K::Handoff, "handed to payments"));
+        assert!(!carries(K::Sys, "nothing could be delivered to this rung"));
+        assert!(!carries(K::Exhausted, "escalation ladder exhausted"));
+
+        // An empty note is not a note. Copying it would put a blank comment on
+        // the incident with somebody's name against it.
+        assert!(!carries(K::Note, "   "));
+    }
+
     #[test]
     fn test_promote_body_is_entirely_optional() {
         let bare: PromoteRequest = serde_json::from_str("{}").unwrap();
