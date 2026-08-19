@@ -23,6 +23,7 @@ import {
   planEmptyReason,
   planIndentClass,
   planRows,
+  flattenShowPlanXml,
 } from "@/utils/dbm/plans";
 
 const t = (key: string) => i18n.global.t(key);
@@ -282,6 +283,86 @@ describe("planRows", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].nodes).toEqual([]);
     expect(rows[0].planHash).toBe("abc123def4567890");
+  });
+});
+
+describe("flattenShowPlanXml", () => {
+  const NS = 'xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan"';
+
+  /** The shape a real showplan has: RelOps NEST, and each names its own Object. */
+  const nested = `<ShowPlanXML ${NS}><BatchSequence><Batch><Statements><StmtSimple>
+      <QueryPlan>
+        <RelOp NodeId="0" PhysicalOp="Nested Loops" LogicalOp="Inner Join"
+               EstimateRows="42" EstimatedTotalSubtreeCost="0.55">
+          <NestedLoops>
+            <RelOp NodeId="1" PhysicalOp="Clustered Index Seek" LogicalOp="Seek"
+                   EstimateRows="1" EstimatedTotalSubtreeCost="0.003">
+              <IndexScan><Object Table="[accounts]" Index="[PK_accounts]" /></IndexScan>
+            </RelOp>
+            <RelOp NodeId="2" PhysicalOp="Table Scan" LogicalOp="Scan"
+                   EstimateRows="900" EstimatedTotalSubtreeCost="0.31">
+              <TableScan><Object Table="[ledger]" /></TableScan>
+            </RelOp>
+          </NestedLoops>
+        </RelOp>
+      </QueryPlan></StmtSimple></Statements></Batch></BatchSequence></ShowPlanXML>`;
+
+  it("flattens a showplan into the SAME rows the other engines produce", () => {
+    const nodes = flattenShowPlanXml(nested);
+    expect(nodes.map((n) => [n.depth, n.nodeType])).toEqual([
+      [0, "Nested Loops"],
+      [1, "Clustered Index Seek"],
+      [1, "Table Scan"],
+    ]);
+  });
+
+  it("reads the operator's OWN object, not a nested operator's", () => {
+    const [root, seek, scan] = flattenShowPlanXml(nested);
+    // The root has no Object of its own; taking the first descendant blindly
+    // would label the join with its child's table.
+    expect(root.relation, "a join owns no table").toBeNull();
+    expect(seek.relation).toBe("accounts");
+    expect(seek.index).toBe("PK_accounts");
+    expect(scan.relation).toBe("ledger");
+    expect(scan.index, "a table scan uses no index").toBeNull();
+  });
+
+  it("carries cost and row estimates the renderer already draws", () => {
+    const [root, , scan] = flattenShowPlanXml(nested);
+    expect(root.totalCost).toBe(0.55);
+    expect(root.planRows).toBe(42);
+    expect(scan.planRows).toBe(900);
+  });
+
+  it("never claims actual rows — a cached showplan is an ESTIMATE", () => {
+    // The estimate-vs-actual line is the highest-value signal an EXECUTED plan
+    // adds. A plan-cache showplan never ran with these binds, so claiming
+    // actuals would invent the one number a reader would most trust.
+    for (const n of flattenShowPlanXml(nested)) expect(n.actualRows).toBeNull();
+  });
+
+  it("parses a root whose namespace upstream declared TWICE", () => {
+    // sqlserverreceiver 0.158.0 really emits this: the same xmlns twice on the
+    // root. It is malformed however identical the values are, so DOMParser
+    // rejected the whole document and the REAL showplan produced zero nodes
+    // while a hand-written fixture parsed fine — the exact gap that let this
+    // ship as raw XML.
+    const dup = nested.replace(
+      `<ShowPlanXML ${NS}>`,
+      `<ShowPlanXML ${NS} ${NS} Version="1.564">`,
+    );
+    const nodes = flattenShowPlanXml(dup);
+    expect(nodes.length, "a duplicated namespace must not lose the plan").toBe(3);
+    expect(nodes[0].nodeType).toBe("Nested Loops");
+  });
+
+  it("returns nothing for malformed XML, so the raw text can stand in", () => {
+    // DOMParser reports malformed input as a `parsererror` NODE rather than by
+    // throwing, so a try/catch alone would accept garbage and draw an empty
+    // tree over a plan the reader could have read as text.
+    expect(flattenShowPlanXml("<ShowPlanXML><unclosed>")).toEqual([]);
+    expect(flattenShowPlanXml("not xml at all")).toEqual([]);
+    expect(flattenShowPlanXml("")).toEqual([]);
   });
 });
 

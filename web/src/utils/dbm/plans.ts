@@ -284,7 +284,114 @@ function flattenMysqlPlan(queryBlock: unknown): PlanNodeRow[] {
  * supplementary detail beside a query, and a bad one must never take down a
  * page that would otherwise work.
  */
+/**
+ * SQL Server's XML SHOWPLAN, flattened into the same rows the other engines use.
+ *
+ * The showplan already IS a tree — `RelOp` elements nest — and it names exactly
+ * the fields this renderer draws:
+ *
+ *     PhysicalOp                 -> nodeType    ("Clustered Index Update")
+ *     Object/@Table              -> relation
+ *     Object/@Index              -> index
+ *     EstimatedTotalSubtreeCost  -> totalCost
+ *     EstimateRows               -> planRows
+ *
+ * `actualRows` stays null: a showplan captured from the plan cache is an
+ * ESTIMATE, never an execution. That is the same claim the generic Postgres
+ * plan makes, and the renderer already withholds the estimate-vs-actual line
+ * when it is absent.
+ *
+ * Parsed with DOMParser rather than a regex: a showplan nests, and depth is the
+ * one thing the renderer needs to get right. A parse failure returns `[]`, so
+ * the caller falls back to showing the raw text — which is strictly better than
+ * a wrong tree.
+ */
+/**
+ * Ceiling on rendered plan nodes.
+ *
+ * A showplan for a large batch can carry thousands of operators, and every one
+ * becomes a DOM row. The tree is a diagnostic aid, not an archive: past a few
+ * hundred nodes nobody is reading it, and the cost is a frozen tab. The raw
+ * text remains available for anyone who needs the whole document.
+ */
+const MAX_PLAN_NODES = 500;
+
+export function flattenShowPlanXml(xml: string): PlanNodeRow[] {
+  if (typeof xml !== "string" || !xml.trim().startsWith("<ShowPlanXML")) return [];
+  // REPAIR A DUPLICATE `xmlns` BEFORE PARSING.
+  //
+  // sqlserverreceiver 0.158.0 emits the root element with its namespace
+  // declared TWICE — `<ShowPlanXML xmlns="…showplan" xmlns="…showplan" …>` —
+  // which is malformed XML however identical the two values are. DOMParser
+  // rejects the whole document, so the real showplan produced ZERO nodes while
+  // a hand-written fixture parsed perfectly. Measured on the rig: dropping the
+  // second declaration parses the same document into a full tree.
+  //
+  // Repaired rather than rejected because the duplication is upstream's and
+  // carries no meaning: both declarations name the same namespace, so removing
+  // the repeat cannot change what the document says. Anything still malformed
+  // after this falls through to the `parsererror` check below and is shown as
+  // raw text instead.
+  const repaired = xml.replace(
+    /(<ShowPlanXML\b[^>]*?)(\s+xmlns="[^"]*")(?=[^>]*\s+xmlns="[^"]*")/,
+    "$1",
+  );
+  let doc: Document;
+  try {
+    doc = new DOMParser().parseFromString(repaired, "application/xml");
+  } catch {
+    return [];
+  }
+  // DOMParser reports malformed input as a `parsererror` NODE rather than by
+  // throwing, so a try/catch alone would accept garbage and render an empty
+  // tree over a plan the reader could otherwise have read as text.
+  if (doc.getElementsByTagName("parsererror").length) return [];
+
+  const out: PlanNodeRow[] = [];
+  const num = (el: Element, attr: string): number | null => {
+    const raw = el.getAttribute(attr);
+    if (raw === null || raw.trim() === "") return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const walk = (el: Element, depth: number): void => {
+    if (out.length >= MAX_PLAN_NODES) return;
+    // `Object` is a DESCENDANT of the RelOp, but only the one belonging to
+    // THIS operator — a nested RelOp brings its own, and taking the first
+    // descendant blindly would label a parent with its child's table.
+    const object =
+      Array.from(el.getElementsByTagName("Object")).find(
+        (o) => o.parentElement?.closest("RelOp") === el,
+      ) ?? null;
+    out.push({
+      depth,
+      nodeType: el.getAttribute("PhysicalOp") || el.getAttribute("LogicalOp") || "Operation",
+      relation: object?.getAttribute("Table")?.replace(/^\[|\]$/g, "") ?? null,
+      index: object?.getAttribute("Index")?.replace(/^\[|\]$/g, "") ?? null,
+      totalCost: num(el, "EstimatedTotalSubtreeCost"),
+      planRows: num(el, "EstimateRows"),
+      // An estimate, never an execution — see the doc comment.
+      actualRows: null,
+    });
+    for (const child of Array.from(el.getElementsByTagName("RelOp"))) {
+      // Only DIRECT RelOp descendants: `getElementsByTagName` is recursive, so
+      // without this every grandchild is walked again at the wrong depth.
+      if (child.parentElement?.closest("RelOp") !== el) continue;
+      walk(child, depth + 1);
+    }
+  };
+
+  for (const root of Array.from(doc.getElementsByTagName("RelOp"))) {
+    if (root.parentElement?.closest("RelOp")) continue;
+    walk(root, 0);
+  }
+  return out;
+}
+
 export function flattenPlanTree(plan: unknown): PlanNodeRow[] {
+  // SQL Server: an XML showplan string, not JSON.
+  if (typeof plan === "string") return flattenShowPlanXml(plan);
   // MySQL/MariaDB: a single `query_block` object.
   if (plan && typeof plan === "object" && !Array.isArray(plan)) {
     const block = (plan as Record<string, unknown>).query_block;
