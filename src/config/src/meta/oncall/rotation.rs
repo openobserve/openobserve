@@ -360,7 +360,7 @@ impl std::fmt::Display for RotationError {
                 "slot `{s}` is longer than the {MAX_SLOT_CHARS} characters a slot name may have"
             ),
             Self::ZeroSecondaryOffset => f.write_str(
-                "a secondary offset of 0 would make the secondary the person already on call; use 1 for a shadow-then-lead rotation, or leave it unset for half the roster",
+                "a secondary offset of 0 would make the secondary the person already on call; leave it unset for the default of 1 — the person who takes over next — or set a larger number to put more of the roster between them",
             ),
             Self::SecondarySlotIsItsOwn(s) => write!(
                 f,
@@ -4574,10 +4574,30 @@ mod tests {
     fn test_a_zero_offset_is_refused() {
         let r = roster(4).with_secondary_offset(0);
         assert_eq!(r.validate(), Err(RotationError::ZeroSecondaryOffset));
+    }
+
+    /// The refusal has to name the default it is steering somebody towards, and
+    /// name it *correctly*.
+    ///
+    /// It did not. The message advised "leave it unset for half the roster" —
+    /// true under `max(1, len/2)`, wrong from the moment the default became 1,
+    /// and the only place a user ever reads it is the moment they got the field
+    /// wrong. The previous version of this test asserted on the phrase
+    /// "shadow-then-lead", so it pinned the sentence's *shape* while the claim
+    /// inside it went stale.
+    ///
+    /// So this asserts against [`default_secondary_offset`] itself: the text
+    /// cannot contradict the constant without failing here.
+    #[test]
+    fn test_the_zero_offset_refusal_names_the_real_default() {
+        let message = RotationError::ZeroSecondaryOffset.to_string();
         assert!(
-            RotationError::ZeroSecondaryOffset
-                .to_string()
-                .contains("shadow-then-lead")
+            message.contains(&format!("default of {}", default_secondary_offset(4))),
+            "the refusal does not name the default it advises: {message}"
+        );
+        assert!(
+            !message.contains("half the roster"),
+            "the refusal still advises the offset rule that was replaced: {message}"
         );
     }
 

@@ -888,6 +888,14 @@ pub enum PresetInputKind {
     Timezone,
     /// A duration in microseconds.
     DurationMicros,
+    /// An instant, in microseconds since the epoch.
+    ///
+    /// Distinct from [`Self::DurationMicros`] because the controls are not
+    /// interchangeable: a length is a number and a unit, an instant is a date
+    /// and a time read in some zone. `anchor_micros` was declared a duration
+    /// while labelled "First shift begins", so a form generated from this
+    /// catalogue offered "every N hours" for a field that wanted a Tuesday.
+    TimestampMicros,
     /// Free text.
     Text,
     /// An ordered list of member emails.
@@ -1142,7 +1150,7 @@ fn with_common(mut inputs: Vec<PresetInput>) -> Vec<PresetInput> {
     inputs.push(
         PresetInput::new(
             "anchor_micros",
-            PresetInputKind::DurationMicros,
+            PresetInputKind::TimestampMicros,
             "First shift begins",
             "Absent means now, snapped back to the most recent local Monday 00:00 so handovers land on a week boundary.",
         )
@@ -1752,6 +1760,33 @@ mod tests {
         let groups = fts.inputs.iter().find(|i| i.field == "groups").unwrap();
         assert_eq!(groups.min, Some(MIN_FOLLOW_THE_SUN_GROUPS as i64));
         assert_eq!(groups.max, Some(MAX_FOLLOW_THE_SUN_GROUPS as i64));
+    }
+
+    /// A length and an instant are not the same control, and this catalogue is
+    /// the only thing that tells a generated form which to draw.
+    ///
+    /// `anchor_micros` shipped as `DurationMicros` while labelled "First shift
+    /// begins", so a form built from `inputs` — which is the whole point of
+    /// publishing them — offered "every N hours" for a field that wanted a date.
+    /// Nothing caught it because both fields end in `_micros` and both are i64
+    /// on the wire: the bug lived entirely in the kind.
+    #[test]
+    fn test_the_anchor_is_an_instant_and_the_handover_is_a_length() {
+        for e in catalogue() {
+            let kind = |field: &str| e.inputs.iter().find(|i| i.field == field).unwrap().kind;
+            assert_eq!(
+                kind("anchor_micros"),
+                PresetInputKind::TimestampMicros,
+                "{} describes the anchor as something other than an instant",
+                e.id
+            );
+            assert_eq!(
+                kind("handover_micros"),
+                PresetInputKind::DurationMicros,
+                "{} describes the handover as something other than a length",
+                e.id
+            );
+        }
     }
 
     /// The wire shape §C.3 publishes: the preset id sits beside its inputs
