@@ -365,13 +365,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.input") }}</div>
         </div>
         <!-- Just the IMMEDIATE input — no source-chain accordion, node name, or nav
-             arrow. Editable JSON (run Execute This Step against it) ONLY when there are
-             real records to edit; otherwise an empty state (an editable "[]" reads as a
-             bug). Earlier ancestors are inspected via the Steps tree instead. -->
+             arrow. In editor mode this is ALWAYS an editable JSON test input (Run Step
+             runs against it), seeded with the recorded input or the trigger sample.
+             Read-only history shows the recorded input, or an empty state when the step
+             received nothing. Earlier ancestors are inspected via the Steps tree. -->
         <div
           class="border-border-default bg-code-bg rounded-default flex min-h-0 flex-1 flex-col overflow-auto border"
         >
-          <div v-if="immediateSrc && immediateRecords.length" class="flex h-full flex-col pl-2">
+          <div
+            v-if="!canvasReadOnly || (immediateSrc && immediateRecords.length)"
+            class="flex h-full flex-col pl-2"
+          >
             <CodeQueryEditor
               editor-id="workflow-ndv-input-editor"
               language="json"
@@ -387,6 +391,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-input-error-text border-border-default shrink-0 border-t px-2 py-1 text-xs"
             >
               {{ t("workflow.test.invalidJson") }}
+            </div>
+            <!-- Reads as intentional test input (not a stray editable "[]"): says what
+                 the field is and what to do with it. Editor mode only. -->
+            <div
+              v-else-if="!canvasReadOnly"
+              data-test="workflow-ndv-input-hint"
+              class="text-text-secondary border-border-default shrink-0 border-t px-2 py-1 text-xs"
+            >
+              {{ t("workflow.ndv.testInputHint") }}
             </div>
           </div>
           <div
@@ -588,7 +601,7 @@ import useWorkflowCanvas, {
   setNodeComment,
   markWorkflowDirty,
   nodeTestInput,
-  nodeTestOutputBranches,
+  nodeTestOutput,
   executeTestRun,
   currentTriggerKind,
   buildStepTree,
@@ -847,15 +860,27 @@ const inputEmptyMessage = computed<I18nText>(() =>
       : t("workflow.ndv.noRunYet"),
 );
 
-// ── Editable input (test override) ───────────────────────────────────────────
-// The immediate input is editable in JSON view, so a run can be tried against a
-// tweaked payload without leaving the popup. EPHEMERAL: re-seeded from the real
-// input whenever the node changes or a fresh run lands, so it never holds a stale
-// "phantom" input. `Execute This Step` runs with it (see executeStep); an invalid
-// edit disables Execute.
+// ── Editable input (test input for Run Step) ─────────────────────────────────
+// Run Step executes THIS node in isolation, so its input is a test payload the
+// user provides — always editable in editor mode. EPHEMERAL: re-seeded whenever
+// the node changes or a fresh run lands, so it never holds a stale "phantom"
+// input. Run Step runs with it (see executeStep); an invalid edit disables it.
+//
+// Seed order: the real records this step received (a run's recorded input, or the
+// trigger sample when the parent IS the trigger) → else the trigger's sample event
+// (the same base test input for EVERY node, which the user edits to fit this step)
+// → else an empty array. Read-only history shows the recorded input / empty state,
+// so its seed is never displayed.
 const editableInput = ref("");
 const seedEditableInput = () => {
-  editableInput.value = immediateSrc.value ? prettyRecords(immediateRecords.value) : "";
+  if (immediateRecords.value.length) {
+    editableInput.value = prettyRecords(immediateRecords.value);
+    return;
+  }
+  editableInput.value =
+    !canvasReadOnly.value && defaultTriggerSample.value.length
+      ? prettyRecords(defaultTriggerSample.value)
+      : "[]";
 };
 watch([nodeId, () => workflowObj.testRun.result], seedEditableInput, { immediate: true });
 // Parsed edited input: an array of records, or null when the JSON is invalid (blank
@@ -873,10 +898,8 @@ const parsedInput = computed<any[] | null>(() => {
 const inputInvalid = computed(() => parsedInput.value === null);
 
 const outputRecords = computed<any[] | null>(() => {
-  const id = nodeId.value;
-  const branches = nodeTestOutputBranches(id);
-  // Terminal node (no outgoing edge): its output IS what it received.
-  const recs = branches.length ? branches.flatMap((b) => b.records || []) : nodeTestInput(id);
+  // The node's OUTPUT is reported directly by the backend `outputs` map.
+  const recs = nodeTestOutput(nodeId.value);
   if (recs && recs.length) return recs;
   // The trigger has no input — its output IS the event. Show its sample even before a
   // run, so the trigger's Output is always populated (it has no Input pane).
@@ -1075,11 +1098,12 @@ const startResize = (which: "input" | "output", e: MouseEvent) => {
 };
 onBeforeUnmount(onResizeEnd);
 
-// "Execute This Step" — TEMPORARY: today it re-runs the workflow FROM this node using
-// the input it received last run (i.e. replay). A real single-node execution is a
-// backend fast-follow; when it lands, only this handler changes. Commits the current
-// config edits FIRST (without closing) so the run tests the node's current settings;
-// the panel stays open and its Input/Output panes update from the new result.
+// "Run Step" — executes THIS node in isolation: only this node is sent as the
+// workflow (from_node = its id), so nothing upstream/downstream runs — just this
+// step against the input in the Input pane, and its output comes back on its own.
+// Commits the current config edits FIRST (without closing) so the run tests the
+// node's current settings; the panel stays open and its Input/Output panes update
+// from the new result.
 const executing = ref(false);
 const executeStep = async () => {
   const id = nodeId.value;
@@ -1096,6 +1120,7 @@ const executeStep = async () => {
     orgId: store.state.selectedOrganization.identifier,
     inputs: Array.isArray(input) ? input : [],
     fromNode: id,
+    singleNode: true,
   });
   executing.value = false;
   if (!r.ok) toast({ message: raw(r.error || t("workflow.test.runError")), variant: "error" });

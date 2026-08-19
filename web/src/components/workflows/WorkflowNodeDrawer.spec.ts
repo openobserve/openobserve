@@ -349,6 +349,21 @@ describe("WorkflowNodeDrawer", () => {
       expect(wrapper.find('[data-test="workflow-ndv-input"] .code-editor').exists()).toBe(true);
     });
 
+    // Run Step feeds a per-node test input, so in editor mode the Input pane is ALWAYS
+    // an editable editor (seeded with the trigger sample) — even for a deep node that
+    // has never run — with a caption marking it as intentional test input.
+    it("editor mode shows an editable, seeded test input for a deep node with no run", () => {
+      seedGraph();
+      openNode("dest", false); // deep node (parent is cond, not the trigger), no run
+      wrapper = mountDrawer();
+      const input = wrapper.find('[data-test="workflow-ndv-input"]');
+      expect(input.find(".code-editor").exists()).toBe(true); // editor, not empty state
+      expect(wrapper.find('[data-test="workflow-ndv-input-empty"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-ndv-input-hint"]').exists()).toBe(true);
+      // seeded with the trigger's sample event (the base test input), not a bare "[]"
+      expect(input.find(".code-editor").text()).not.toBe("[]");
+    });
+
     // The trigger is the one exception: it has no input (its output IS the event),
     // so Config expands into that space and only Config · Output show.
     it("omits the Input pane for the trigger, keeping Config and Output", () => {

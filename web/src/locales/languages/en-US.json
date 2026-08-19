@@ -2792,7 +2792,8 @@
       "itemN": "Item {n}",
       "executeStep": "Run Step",
       "sample": "Sample",
-      "editStep": "Edit Step"
+      "editStep": "Edit Step",
+      "testInputHint": "Test Input — Edit, Then Run Step."
     },
     "runOverlay": {
       "banner": "Showing step data from a past run ({run}). You can edit freely — this run is never changed.",

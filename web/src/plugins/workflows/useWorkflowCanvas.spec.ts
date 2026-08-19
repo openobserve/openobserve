@@ -55,7 +55,7 @@ import useWorkflowCanvas, {
   executeTestRun,
   serializeWorkflow,
   nodeTestInput,
-  nodeTestOutputBranches,
+  nodeTestOutput,
   currentTriggerKind,
   buildStepTree,
   toggleNodeDisabled,
@@ -314,6 +314,58 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(res.ranNodeIds).not.toContain("t");
   });
 
+  it("Run Step (singleNode) sends ONLY that node as the workflow and marks only it", async () => {
+    mockTest.mockResolvedValue({ data: { errors: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    const arg = mockTest.mock.calls[0][0];
+    // Just the one node, no edges — from_node is that node so it runs in isolation.
+    expect(arg.from_node).toBe("f");
+    expect(arg.workflow.nodes.map((n: any) => n.id)).toEqual(["f"]);
+    expect(arg.workflow.edges).toEqual([]);
+    // Only the run node counts as ran — nothing upstream/downstream executed.
+    const res: any = workflowObj.testRun.result;
+    expect(res.ranNodeIds).toEqual(["f"]);
+  });
+
+  it("Run Step accumulates: a second node's run keeps the first node's result", async () => {
+    // Run Step on "f", then on "d" — d's run must NOT wipe f's input/output.
+    mockTest.mockResolvedValue({ data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ o: 1 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    mockTest.mockResolvedValue({ data: { inputs: { d: [{ b: 2 }] }, outputs: { d: [{ o: 2 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ b: 2 }], fromNode: "d", singleNode: true });
+
+    const res: any = workflowObj.testRun.result;
+    // both nodes' data is retained, and both are marked ran
+    expect(res.inputs).toEqual({ f: [{ a: 1 }], d: [{ b: 2 }] });
+    expect(res.outputs).toEqual({ f: [{ o: 1 }], d: [{ o: 2 }] });
+    expect(res.ranNodeIds.sort()).toEqual(["d", "f"]);
+  });
+
+  it("Run Step refreshes only its own node (re-running clears that node's stale error)", async () => {
+    mockTest.mockResolvedValue({
+      data: { errors: { f: { error_count: 1, errors: [["boom"]] } }, outputs: {} },
+    });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    expect((workflowObj.testRun.result as any).errors.f).toBeTruthy();
+    // re-run f successfully → its error clears, and it stays the only ran node
+    mockTest.mockResolvedValue({ data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ o: 9 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    const res: any = workflowObj.testRun.result;
+    expect(res.errors.f).toBeUndefined();
+    expect(res.outputs.f).toEqual([{ o: 9 }]);
+  });
+
+  it("a FULL run replaces accumulated single-node results", async () => {
+    mockTest.mockResolvedValue({ data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ o: 1 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    // full run (no singleNode) → fresh result, stale single-node data gone
+    mockTest.mockResolvedValue({ data: { inputs: { t: [{ x: 0 }] }, outputs: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ x: 0 }] });
+    const res: any = workflowObj.testRun.result;
+    expect(res.inputs).toEqual({ t: [{ x: 0 }] }); // f's accumulated input is gone
+    expect(res.ranNodeIds.sort()).toEqual(["d", "f", "t"]); // reachable-from-trigger
+  });
+
   it("marks nodes downstream of an errored node as blocked (not passed)", async () => {
     mockTest.mockResolvedValue({
       data: { errors: { f: { error_count: 1, errors: [["boom"]] } } },
@@ -479,10 +531,10 @@ describe("tidyWorkflowLayout — orphan subtree ordering", () => {
   });
 });
 
-// nodeTestInput / nodeTestOutputBranches derive per-node Input and Output from the
-// backend `inputs` map. Output on an edge == the child's input (single-incoming
-// tree), so these two helpers power the whole step-drawer.
-describe("nodeTestInput + nodeTestOutputBranches — per-node I/O derivation", () => {
+// nodeTestInput / nodeTestOutput read per-node Input and Output straight from the
+// backend `inputs` / `outputs` maps (the backend reports each node's output
+// directly). These two helpers power the whole step-drawer.
+describe("nodeTestInput + nodeTestOutput — per-node I/O maps", () => {
   beforeEach(() => {
     // trigger(t) -> function(f) -> destination(d);  t also -> condition(c) (fan-out)
     workflowObj.currentSelectedWorkflow = {
@@ -503,6 +555,7 @@ describe("nodeTestInput + nodeTestOutputBranches — per-node I/O derivation", (
     workflowObj.testRun.result = {
       errors: {},
       inputs: { t: [{ x: 0 }], f: [{ x: 1 }], d: [{ x: 2 }] }, // c got nothing
+      outputs: { t: [{ x: 0 }], f: [{ x: 2 }] }, // f emitted { x: 2 }; c/d emitted nothing
       ranNodeIds: ["t", "f", "c", "d"],
       blockedNodeIds: [],
     } as any;
@@ -519,24 +572,15 @@ describe("nodeTestInput + nodeTestOutputBranches — per-node I/O derivation", (
     expect(nodeTestInput("f")).toBeNull();
   });
 
-  it("nodeTestOutputBranches: a node's output == each child's input", () => {
-    const branches = nodeTestOutputBranches("f");
-    expect(branches).toHaveLength(1);
-    expect(branches[0]).toMatchObject({ targetId: "d", nodeType: "destination" });
-    expect(branches[0].records).toEqual([{ x: 2 }]); // == inputs[d]
+  it("nodeTestOutput returns the records a node emitted, null when absent", () => {
+    expect(nodeTestOutput("f")).toEqual([{ x: 2 }]);
+    expect(nodeTestOutput("c")).toBeNull(); // emitted nothing — not in outputs
+    expect(nodeTestOutput("missing")).toBeNull();
   });
 
-  it("fan-out yields one branch per outgoing edge; a filtered branch has null records", () => {
-    const branches = nodeTestOutputBranches("t");
-    expect(branches.map((b) => b.targetId).sort()).toEqual(["c", "f"]);
-    const toC = branches.find((b) => b.targetId === "c")!;
-    const toF = branches.find((b) => b.targetId === "f")!;
-    expect(toC.records).toBeNull(); // c received nothing
-    expect(toF.records).toEqual([{ x: 1 }]);
-  });
-
-  it("a terminal (destination) has no outgoing edges → no branches", () => {
-    expect(nodeTestOutputBranches("d")).toEqual([]);
+  it("nodeTestOutput is null when there is no run", () => {
+    workflowObj.testRun.result = null as any;
+    expect(nodeTestOutput("f")).toBeNull();
   });
 });
 
@@ -686,6 +730,67 @@ describe("placeholder / incomplete node (Configure Later)", () => {
     const wf = serializeWorkflow();
     expect(wf.nodes[0].meta.incomplete).toBe("true");
     expect(wf.nodes[0].data.destination_id).toBe("");
+  });
+
+  // A never-configured (dummy) node carries only { label, node_type }. serializeNode
+  // must fill a valid NodeData for it or the backend fails deserialization.
+  it("dummy DESTINATION node serializes with an empty destination name", () => {
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "d1",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { label: "d1", node_type: "destination" }, // no destination_id
+          meta: { incomplete: "true" },
+        },
+      ],
+      edges: [],
+    } as any;
+    const { data } = serializeWorkflow().nodes[0];
+    expect(data.destination_id).toBe("");
+    expect(data.template_override).toBeNull();
+  });
+
+  it("dummy CONDITION node serializes as a pass-through v2 rule (column '', '=', 'true')", () => {
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "c1",
+          type: "default",
+          position: { x: 0, y: 0 },
+          data: { label: "c1", node_type: "condition" }, // no conditions
+          meta: { incomplete: "true" },
+        },
+      ],
+      edges: [],
+    } as any;
+    const { data } = serializeWorkflow().nodes[0];
+    expect(data.version).toBe(2);
+    expect(data.conditions.filterType).toBe("group");
+    expect(data.conditions.conditions).toHaveLength(1);
+    expect(data.conditions.conditions[0]).toMatchObject({
+      column: "",
+      operator: "=",
+      value: "true",
+    });
+  });
+
+  it("a CONFIGURED condition node keeps its own rule (no pass-through override)", () => {
+    const conditions = { filterType: "group", logicalOperator: "AND", conditions: [] };
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "c1",
+          type: "default",
+          position: { x: 0, y: 0 },
+          data: { node_type: "condition", version: 2, conditions },
+        },
+      ],
+      edges: [],
+    } as any;
+    const { data } = serializeWorkflow().nodes[0];
+    expect(data.conditions).toEqual(conditions); // untouched
   });
 });
 
