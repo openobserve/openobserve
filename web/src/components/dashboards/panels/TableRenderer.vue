@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-xs-sq"
           :data-test="`dashboard-table-cell-drilldown-${columnId}`"
-          class="h-4! min-h-0! w-4! ml-1 shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
+          class="ml-1 h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
           @click.stop="onCellDrilldown({ columnId, row, value })"
         >
           <OIcon name="search" size="sm" />

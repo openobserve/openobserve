@@ -1034,16 +1034,12 @@ export default defineComponent({
         );
 
         const globalTimeParamsChanged =
-          changedKeys.has("period") ||
-          changedKeys.has("from") ||
-          changedKeys.has("to");
+          changedKeys.has("period") || changedKeys.has("from") || changedKeys.has("to");
 
         // pt-* (panel time) and cell_* (drawer) never affect panel times — don't refresh.
         const onlyIgnorableParamsChanged =
           changedKeys.size > 0 &&
-          [...changedKeys].every(
-            (key) => key.startsWith("pt-") || key.startsWith("cell_"),
-          ) &&
+          [...changedKeys].every((key) => key.startsWith("pt-") || key.startsWith("cell_")) &&
           !globalTimeParamsChanged;
 
         if (!onlyIgnorableParamsChanged) {

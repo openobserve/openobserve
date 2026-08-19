@@ -294,7 +294,6 @@ const TableRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/TableRenderer.vue");
 });
 
-
 const PromQLTableChart = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/PromQLTableChart.vue");
 });
@@ -1359,15 +1358,24 @@ export default defineComponent({
     // Restore the cell drawer when navigating to a URL that already carries cell-explorer params.
     onMounted(() => {
       if (String(route.query.cell_panel) === String(props.panelSchema.id)) {
-        const field   = String(route.query.cell_field ?? "");
-        const value   = String(route.query.cell_value ?? "");
-        const stream  = String(route.query.cell_stream ?? "");
-        const stype   = String(route.query.cell_stype ?? "logs");
-        const t0      = Number(route.query.cell_t0 ?? 0);
-        const t1      = Number(route.query.cell_t1 ?? 0);
-        const where   = String(route.query.cell_where ?? "");
+        const field = String(route.query.cell_field ?? "");
+        const value = String(route.query.cell_value ?? "");
+        const stream = String(route.query.cell_stream ?? "");
+        const stype = String(route.query.cell_stype ?? "logs");
+        const t0 = Number(route.query.cell_t0 ?? 0);
+        const t1 = Number(route.query.cell_t1 ?? 0);
+        const where = String(route.query.cell_where ?? "");
         if (field && stream && t0 && t1) {
-          cellDrawer.value = { open: true, field, value, stream, streamType: stype, startTime: t0, endTime: t1, baseWhere: where };
+          cellDrawer.value = {
+            open: true,
+            field,
+            value,
+            stream,
+            streamType: stype,
+            startTime: t0,
+            endTime: t1,
+            baseWhere: where,
+          };
         }
       }
     });
@@ -1534,30 +1542,30 @@ export default defineComponent({
       drilldownColumnAliases,
       drilldownAllColumns,
     } = usePanelDrilldown({
-        panelSchema,
-        variablesData,
-        selectedTimeObj,
-        metadata,
-        data,
-        panelData,
-        filteredData,
-        resultMetaData,
-        store,
-        route,
-        router,
-        emit,
-        allowAnnotationsAdd,
-        isAddAnnotationMode,
-        editAnnotation,
-        handleAddAnnotation,
-        chartPanelRef,
-        drilldownPopUpRef,
-        annotationPopupRef,
-        selectedAnnotationData,
-        isCursorOverPanel,
-        showErrorNotification,
-        t,
-      });
+      panelSchema,
+      variablesData,
+      selectedTimeObj,
+      metadata,
+      data,
+      panelData,
+      filteredData,
+      resultMetaData,
+      store,
+      route,
+      router,
+      emit,
+      allowAnnotationsAdd,
+      isAddAnnotationMode,
+      editAnnotation,
+      handleAddAnnotation,
+      chartPanelRef,
+      drilldownPopUpRef,
+      annotationPopupRef,
+      selectedAnnotationData,
+      isCursorOverPanel,
+      showErrorNotification,
+      t,
+    });
 
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
@@ -1665,9 +1673,7 @@ export default defineComponent({
 
       // SQL fallback (custom SQL panels): aliases are double-quoted; column may carry a stream prefix.
       const sql: string =
-        metadata.value?.queries?.[0]?.query ??
-        props.panelSchema.queries?.[0]?.query ??
-        "";
+        metadata.value?.queries?.[0]?.query ?? props.panelSchema.queries?.[0]?.query ?? "";
       if (sql) {
         const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const re = new RegExp(
@@ -1723,7 +1729,17 @@ export default defineComponent({
       if (!open) {
         // Clear cell-explorer URL params without touching other query params.
         const q = { ...route.query };
-        for (const k of ["cell_panel", "cell_field", "cell_value", "cell_stream", "cell_stype", "cell_t0", "cell_t1", "cell_where", "cell_event_ts"]) {
+        for (const k of [
+          "cell_panel",
+          "cell_field",
+          "cell_value",
+          "cell_stream",
+          "cell_stype",
+          "cell_t0",
+          "cell_t1",
+          "cell_where",
+          "cell_event_ts",
+        ]) {
           delete (q as any)[k];
         }
         router.replace({ query: q });
@@ -1733,7 +1749,10 @@ export default defineComponent({
     // Panel query's WHERE clause (between WHERE and GROUP/ORDER/LIMIT/HAVING/WINDOW).
     function extractPanelWhere(sql: string): string {
       if (!sql) return "";
-      const m = /\bwhere\b([\s\S]+?)(?:\bgroup\s+by\b|\border\s+by\b|\blimit\b|\bhaving\b|\bwindow\b|$)/i.exec(sql);
+      const m =
+        /\bwhere\b([\s\S]+?)(?:\bgroup\s+by\b|\border\s+by\b|\blimit\b|\bhaving\b|\bwindow\b|$)/i.exec(
+          sql,
+        );
       return m ? m[1].trim() : "";
     }
 
@@ -1748,9 +1767,9 @@ export default defineComponent({
       );
 
       const metaStartµs = Number(metadata.value?.queries?.[0]?.startTime ?? 0);
-      const metaEndµs   = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
-      const selStartµs  = toµs((props.selectedTimeObj as any).start_time);
-      const selEndµs    = toµs((props.selectedTimeObj as any).end_time);
+      const metaEndµs = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
+      const selStartµs = toµs((props.selectedTimeObj as any).start_time);
+      const selEndµs = toµs((props.selectedTimeObj as any).end_time);
 
       openCellDrawer({
         field: realField,

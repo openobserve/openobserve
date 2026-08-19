@@ -261,8 +261,8 @@ export function usePanelDrilldown({
   // SELECT * / dynamic-columns tables: every column id is drillable (see wildcard branch).
   const cellDrilldownWildcard: any = ref(null);
 
-  const drilldownColumnAliases = computed<string[]>(() =>
-    Array.from(cellDrilldownFields.value.keys()) as string[],
+  const drilldownColumnAliases = computed<string[]>(
+    () => Array.from(cellDrilldownFields.value.keys()) as string[],
   );
   const drilldownAllColumns = computed(() => !!cellDrilldownWildcard.value);
 

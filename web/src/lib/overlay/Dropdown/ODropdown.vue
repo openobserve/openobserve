@@ -55,9 +55,7 @@ defineSlots<DropdownSlots>();
 // sits above the surface that owns it instead of a fixed z-6000.
 const drawerDepth = inject<number>("o2DrawerDepth", 0);
 const dialogDepth = inject<number>("o2DialogDepth", 0);
-const contentZIndex = computed(
-  () => 6000 + Math.max(drawerDepth, dialogDepth) * 1000,
-);
+const contentZIndex = computed(() => 6000 + Math.max(drawerDepth, dialogDepth) * 1000);
 
 // Vue boolean-casts absent `open` prop to `false`, which would lock
 // DropdownMenuRoot into controlled-closed mode. We manage state ourselves
