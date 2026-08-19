@@ -1022,6 +1022,14 @@ const {
   // both perspectives, and `BlockingChain` names its fields differently, so
   // the samples are the only ref carrying all three dimensions — and they are
   // the union source both perspectives are built from.
+  // The identity picker describes the ORG's fleet over this window, not this
+  // tab's rows — see `useDbmFleetInstances` for the three ways the rows-derived
+  // list failed.
+  fleetWindow: () => ({
+    org: org.value,
+    startTime: current.value.startTime,
+    endTime: current.value.endTime,
+  }),
   options: () => ({
     system: samples.value.map((s) => s.db_system),
     instance: samples.value.map((s) => s.db_instance),

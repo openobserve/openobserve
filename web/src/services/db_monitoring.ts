@@ -989,6 +989,31 @@ export interface ActivityParams {
   limit?: number;
 }
 
+/**
+ * The scope-picker's identity source. `system` narrows to one engine so the
+ * instance list agrees with an engine chip already applied beside it.
+ */
+export interface InstancesParams {
+  startTime?: number;
+  endTime?: number;
+  stream?: string;
+  system?: string;
+}
+
+/**
+ * One (engine, instance) identity. `db_instance` is null when the rows naming
+ * this engine carry no instance name — the engine is still real, and the
+ * picker offers it as an engine-level choice rather than hiding it.
+ */
+export interface DbmInstanceHit {
+  db_system: string;
+  db_instance: string | null;
+}
+
+export interface InstancesResponse {
+  hits: DbmInstanceHit[];
+}
+
 export interface TableHealthParams {
   startTime?: number;
   endTime?: number;
@@ -1385,6 +1410,29 @@ const dbMonitoringService = {
     put(params, "env", options.env);
     put(params, "service", options.service);
     return http().get<BadgesResponse>(`/api/${orgId}/traces/db_monitoring/badges`, { params });
+  },
+
+  /**
+   * Every (engine, instance) the org knows in this window, across EVERY
+   * server-vantage feed.
+   *
+   * This exists because a tab's own rows are the wrong source for its scope
+   * picker: a feed no engine populates drops that engine entirely (SQL Server
+   * has no session sampler, so Activity could never offer `mssql-prod-1`), a
+   * feed that names no instance leaves the picker empty, and a capped read
+   * (activity stops at 100) makes the list first-page-local. `getDatabases`
+   * cannot stand in either — it is the CLIENT vantage, so a zero-trace org
+   * gets nothing from it while server-vantage data sits one tab away.
+   */
+  getInstances: (orgId: string, options: InstancesParams = {}) => {
+    const params: QueryParams = {};
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    put(params, "stream", options.stream);
+    put(params, "system", options.system);
+    return http().get<InstancesResponse>(`/api/${orgId}/traces/db_monitoring/instances`, {
+      params,
+    });
   },
 };
 
