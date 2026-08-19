@@ -386,7 +386,7 @@ pub const MAX_PARTICIPANT_QUERY: usize = 4096;
 /// leaving them silently "recognized" — silence here would be the W8
 /// wrong-story defect arriving through a new door. If an OSS-owned recipe is
 /// ever added to this array, `classify_recipe` needs a real per-tag distinction.
-pub const RECOGNIZED_RECIPES: [&str; 11] = [
+pub const RECOGNIZED_RECIPES: [&str; 13] = [
     "pg_blocking_chain",
     "mysql_lock_waits",
     "mariadb_lock_waits",
@@ -398,6 +398,12 @@ pub const RECOGNIZED_RECIPES: [&str; 11] = [
     "mysql_index_stats",
     "mariadb_table_stats",
     "mariadb_index_stats",
+    // SQL Server has no autovacuum and no dead-tuple accounting, so its rows
+    // carry sizes, row counts and index usage but no vacuum/bloat columns. The
+    // bloat rules stay quiet there rather than rendering a fabricated 0% that
+    // would read as "healthy".
+    "mssql_table_stats",
+    "mssql_index_stats",
 ];
 
 // ─── A1 · raw deadlock vocabulary (read-time fallback) ───────────────────────
@@ -1041,6 +1047,9 @@ pub fn detect_engine(rec: &Map<String, Value>) -> Option<String> {
         }
         Some("mariadb_table_stats") | Some("mariadb_index_stats") => {
             return Some("mariadb".to_string());
+        }
+        Some("mssql_table_stats") | Some("mssql_index_stats") => {
+            return Some("mssql".to_string());
         }
         _ => {}
     }

@@ -6461,7 +6461,7 @@ fn w8_recognized_recipes_match_the_dispatch_arms() {
 
 /// **The W8 silent-wrong-story the enterprise split reintroduces.**
 ///
-/// All 11 `RECOGNIZED_RECIPES` members are ENTERPRISE-owned. Before this fix an
+/// All 13 `RECOGNIZED_RECIPES` members are ENTERPRISE-owned. Before this fix an
 /// OSS build answered every one of them with silence — `take_unrecognized_recipe`
 /// returns `None` for any array member — while canonicalizing nothing. The row
 /// then carries no `o2_dbm_kind`, so the liveness probe counts it as a
@@ -6478,7 +6478,7 @@ fn w8_every_recognized_recipe_is_enterprise_only_on_oss() {
     assert_eq!(
         server_vantage::RECOGNIZED_RECIPES.len(),
         11,
-        "all 11 shipped recipes are enterprise-owned; if this count changed, \
+        "all 13 shipped recipes are enterprise-owned; if this count changed, \
          `is_enterprise_owned_recipe` needs a real OSS-vs-enterprise distinction \
          rather than 'every array member'"
     );
@@ -6499,7 +6499,7 @@ fn w8_every_recognized_recipe_is_enterprise_only_on_oss() {
 #[cfg(feature = "enterprise")]
 #[test]
 fn w8_every_recognized_recipe_is_handled_on_enterprise() {
-    assert_eq!(server_vantage::RECOGNIZED_RECIPES.len(), 11);
+    assert_eq!(server_vantage::RECOGNIZED_RECIPES.len(), 13);
     for tag in server_vantage::RECOGNIZED_RECIPES {
         assert_eq!(
             server_vantage::classify_recipe(tag),

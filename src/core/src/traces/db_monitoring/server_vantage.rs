@@ -612,7 +612,7 @@ pub fn take_unrecognized_recipe(rec: &Map<String, Value>) -> Option<String> {
 /// [`take_unrecognized_recipe`] returning `None`/`Some` expressed both.
 ///
 /// The split adds a third, and it is the dangerous one. Every one of the 11
-/// [`RECOGNIZED_RECIPES`] is ENTERPRISE-owned, so on an OSS build all 11 tags
+/// [`RECOGNIZED_RECIPES`] is ENTERPRISE-owned, so on an OSS build all 13 tags
 /// dispatch to nothing: the row canonicalizes to zero `o2_dbm_*` columns, no
 /// read endpoint can see it, and the liveness probe counts it as a
 /// `non_event_record` — the "the tail is running and none of those lines was an
@@ -639,12 +639,12 @@ pub enum RecipeStatus {
 }
 
 /// Every [`RECOGNIZED_RECIPES`] member whose canonicalizer lives in
-/// `o2_enterprise`. All 11 of them: the four blocking recipes, `mssql_deadlock`,
-/// and the six table/index-stats recipes.
+/// `o2_enterprise`. All 13 of them: the four blocking recipes, `mssql_deadlock`,
+/// and the eight table/index-stats recipes.
 ///
 /// Kept as a predicate over the array rather than a second list, so it cannot
 /// drift from it. `w8_every_recognized_recipe_is_enterprise_only_on_oss` pins
-/// that all 11 members are covered, count included — if an OSS-owned recipe is
+/// that all 13 members are covered, count included — if an OSS-owned recipe is
 /// ever added to the array, that test fails and this function must grow a real
 /// distinction rather than answering "every member".
 fn is_enterprise_owned_recipe(tag: &str) -> bool {
@@ -1368,7 +1368,9 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
         || recipe == "mariadb_table_stats"
         || recipe == "pg_index_stats"
         || recipe == "mysql_index_stats"
-        || recipe == "mariadb_index_stats";
+        || recipe == "mariadb_index_stats"
+        || recipe == "mssql_table_stats"
+        || recipe == "mssql_index_stats";
     // Same rule as the deadlock markers above: on OSS an enterprise-owned tag
     // ENDS dispatch rather than falling through to the arms below, which is
     // what the enterprise build's `Claim` does for the identical record.
