@@ -4539,6 +4539,7 @@
     "mapsNameLabel": "Location Name Label",
     "mapsMapType": "Map Type",
     "tableAggregations": "Table Aggregations",
+    "tableCellDrilldownTooltip": "Explore matching logs",
     "promqlTableMode": "PromQL Table Mode",
     "visibleColumns": "Visible Columns",
     "hiddenColumns": "Hidden Columns",

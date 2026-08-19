@@ -1063,7 +1063,7 @@ function openInLogs() {
                         </span>
                         <button
                           class="dld-expand-btn shrink-0"
-                          :aria-label="isSurroundExpanded(i) ? 'Collapse' : 'Expand'"
+                          :aria-label="isSurroundExpanded(i) ? t('common.collapse') : t('common.expand')"
                           @click.stop="toggleSurroundExpand(surroundPage * surroundPageSize + i)"
                         >
                           <OIcon
