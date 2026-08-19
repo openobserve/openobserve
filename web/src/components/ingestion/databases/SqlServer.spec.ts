@@ -157,6 +157,81 @@ describe("sqlServerCard builder", () => {
    * `db.server.top_query`, so that one key is what turns the plan tree on —
    * which is why the two events are pinned together rather than separately.
    */
+  /**
+   * THE DEFECT THIS PINS SHIPPED, AND A GREEN SUITE DID NOT NOTICE.
+   *
+   * `index_name` was the `body_column` and was missing from
+   * `attribute_columns`. The canonicalizer reads it as a required ATTRIBUTE and
+   * never from the body, so every row was dropped: measured against a live
+   * SQL Server, 54 `mssql_index_stats` records arrived with `o2_dbm_kind` null
+   * and index health never reached the page — while the collector was healthy,
+   * the rows were in the stream, and the Playwright suite passed 53/53.
+   *
+   * Postgres does not expose this because it has an `index_def` for the body.
+   * SQL Server has no equivalent, so the name is BOTH the body and an
+   * attribute, and the duplication is what makes the row readable.
+   */
+  it("rides every stats alias the canonicalizer reads as an attribute", () => {
+    const card = sqlServerCard(SUBS, gt);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const tableAttrs = config.match(
+      /body_column: table_name\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "schema_name",
+      "total_bytes",
+      "heap_bytes",
+      "n_live_tup",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(tableAttrs, `table alias ${alias} must ride as an attribute`).toContain(alias);
+    }
+
+    // `index_name` first: it is the one that was missing, and the only alias
+    // here that is also the body_column.
+    const indexAttrs = config.match(
+      /body_column: index_name\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "index_name",
+      "schema_name",
+      "table_name",
+      "idx_scan",
+      "index_bytes",
+      "is_unique",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(indexAttrs, `index alias ${alias} must ride as an attribute`).toContain(alias);
+    }
+  });
+
+  /**
+   * A '#' in the SA password truncated the DSN at the URL fragment and every
+   * scrape failed once per interval while the collector's own health stayed
+   * green:
+   *   parse "sqlserver://sa:dbm_Passw0rd": invalid port ":dbm_Passw0rd" after host
+   * Two receivers used the URL form and two already used key-value, so the file
+   * disagreed with itself. All four must stay key-value.
+   */
+  it("uses the key-value DSN on every mssql receiver, never the URL form", () => {
+    const card = sqlServerCard(SUBS, gt);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const datasources = [...config.matchAll(/^\s*datasource: .+$/gm)].map((m) => m[0]);
+    expect(datasources.length).toBeGreaterThanOrEqual(4);
+    for (const ds of datasources) {
+      expect(ds, "a sqlserver:// datasource breaks on '#' in the password").not.toContain(
+        "sqlserver://",
+      );
+      expect(ds).toContain("server={host};port={port}");
+    }
+  });
+
   it("ships the receiver's activity, top-query and plan events on, spelled out", () => {
     const card = sqlServerCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
