@@ -268,31 +268,27 @@ jobs:
         # rather than a service container: these shards run on a self-hosted EKS
         # runner where Docker-in-Docker is not guaranteed, and the app itself is
         # already launched the same way. ~2s, and it makes ZO_SMTP_* real.
+        env:
+          # Pinned, not "latest": an upstream release must never change what this
+          # shard does without a commit here.
+          MAILPIT_VERSION: v1.21.8
         run: |
-          curl -sSL -o mailpit.tar.gz \
-            https://github.com/axllent/mailpit/releases/latest/download/mailpit-linux-amd64.tar.gz
-          tar -xzf mailpit.tar.gz mailpit
-          chmod +x ./mailpit
-          ./mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025 > mailpit.log 2>&1 &
+          set +e
+          curl -fsSL -o mailpit.tar.gz \
+            "https://github.com/axllent/mailpit/releases/download/${MAILPIT_VERSION}/mailpit-linux-amd64.tar.gz" \
+            && tar -xzf mailpit.tar.gz mailpit && chmod +x ./mailpit
+          if [ ! -x ./mailpit ]; then
+            echo "::warning::Mailpit ${MAILPIT_VERSION} could not be fetched; email delivery assertions will skip"
+            exit 0
+          fi
+          # Loopback only — this runner is shared, and delivered alert bodies
+          # should not be readable from the rest of its network.
+          ./mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 > mailpit.log 2>&1 &
           for i in $(seq 1 30); do
             curl -sf http://localhost:8025/api/v1/messages > /dev/null 2>&1 && { echo "Mailpit ready after ${i}s"; exit 0; }
             sleep 1
           done
           echo "::warning::Mailpit did not start; email delivery assertions will skip"
-
-      - name: Start distribution-list relay
-        # Mailpit is a sink: it accepts any address but stores ONE message, so it
-        # can never show what a real distribution list does. This tiny relay sits
-        # in front of it and expands the alias into per-member deliveries, the
-        # same way alerts-content-templates.spec.js stands up an HTTP receiver to
-        # capture what a webhook destination really sent.
-        run: |
-          node tests/ui-testing/scripts/dl-relay.js > dl-relay.log 2>&1 &
-          for i in $(seq 1 20); do
-            (echo > /dev/tcp/127.0.0.1/1026) >/dev/null 2>&1 && { echo "DL relay ready after ${i}s"; exit 0; }
-            sleep 1
-          done
-          echo "::warning::DL relay did not start; the fan-out case will skip"
 
       - name: Start OpenObserve
         # Per-shard override of the workflow-level default. ZO_QUICK_MODE_ENABLED is
@@ -337,6 +333,24 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+
+      - name: Start distribution-list relay
+        # Mailpit is a sink: it accepts any address but stores ONE message, so it
+        # can never show what a real distribution list does. This tiny relay sits
+        # in front of it and expands the alias into per-member deliveries, the
+        # same way alerts-content-templates.spec.js stands up an HTTP receiver to
+        # capture what a webhook destination really sent.
+        run: |
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::warning::node not on PATH; DL fan-out case will skip"
+            exit 0
+          fi
+          node tests/ui-testing/scripts/dl-relay.js > dl-relay.log 2>&1 &
+          for i in $(seq 1 20); do
+            (echo > /dev/tcp/127.0.0.1/1026) >/dev/null 2>&1 && { echo "DL relay ready after ${i}s"; exit 0; }
+            sleep 1
+          done
+          echo "::warning::DL relay did not start; the fan-out case will skip"
 
       - name: Cache Playwright browser
         id: playwright-cache

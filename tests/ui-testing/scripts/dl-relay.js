@@ -110,7 +110,7 @@ const server = net.createServer((sock) => {
   sock.on('error', () => {});
 });
 
-server.listen(LISTEN_PORT, '0.0.0.0', () => {
+server.listen(LISTEN_PORT, '127.0.0.1', () => {   // loopback only: shared runner
   log(`listening on ${LISTEN_PORT}, forwarding to ${FORWARD_HOST}:${FORWARD_PORT}`);
   log(DL_ADDRESS ? `alias ${DL_ADDRESS} -> ${DL_MEMBERS.length} member(s): ${DL_MEMBERS.join(', ')}`
                  : 'no DL_ADDRESS configured — pure pass-through');

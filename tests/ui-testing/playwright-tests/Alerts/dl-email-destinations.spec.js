@@ -346,11 +346,12 @@ test.describe('Email destinations and distribution lists', () => {
     await fillEmailForm(pm, destName, `${ORG_USER},`);
     await pm.alertDestinationsPage.clickSave();
 
+    // The prebuilt validator rejects the trailing separator outright, which is a
+    // correct way to satisfy "no empty recipient". Asserted explicitly rather
+    // than accepting either outcome, which let a rejected save pass vacuously.
     const stored = await api.storedRecipients(destName);
-    if (stored !== null) {
-      expect(stored, 'a trailing comma must not yield an empty recipient')
-        .toEqual([ORG_USER.toLowerCase()]);
-    }
+    expect(stored, 'a trailing comma is rejected rather than stored as an empty recipient')
+      .toBeNull();
   });
 
   test('UI-04 · switching type away from email drops the recipients', {
@@ -435,6 +436,7 @@ test.describe('Email destinations and distribution lists', () => {
   test('UI-11 · dark theme at a narrow viewport keeps the error legible', {
     tag: ['@dlEmailDestinations', '@email', '@P2', '@all'],
   }, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
     await page.setViewportSize({ width: 420, height: 900 });
     const destName = `auto_dest_dl_dark_${RUN}`;
     await fillEmailForm(pm, destName, 'invalid-email-format');
@@ -446,14 +448,20 @@ test.describe('Email destinations and distribution lists', () => {
       'the form must not scroll sideways at 420px').toBe(false);
   });
 
-  // ══ TIER B — require a readable mail sink ════════════════════════════════
+  // ══ TIER B/C — require a readable mail sink ══════════════════════════════
+  // These share ONE inbox, so they clear and count against common state. Nested
+  // serial keeps them in a single worker and in order; the Tier A cases above
+  // never touch the sink and stay parallel.
+  test.describe('delivery', () => {
+    test.describe.configure({ mode: 'serial' });
 
   test('D-04 · envelope headers carry the configured From and only the alias in To', {
     tag: ['@dlEmailDestinations', '@email', '@delivery', '@P1', '@all'],
   }, async () => {
     test.skip(!(await sink.available()), await sink.unavailableReason());
     const destName = uniq('env');
-    await sink.clear();
+    const cleared = await sink.clear();
+    test.skip(!cleared, 'needs a clearable sink so latest() cannot be stale mail (use Mailpit)');
 
     await fillEmailForm(pm, destName, ORG_USER);
     await pm.alertDestinationsPage.clickTest();
@@ -510,6 +518,8 @@ test.describe('Email destinations and distribution lists', () => {
     expect(msg.to.join(',').toLowerCase(), 'To: should carry the alias, not the members')
       .toContain(DL_ADDRESS.split('@')[0].toLowerCase());
   });
+
+  }); // end delivery
 
   // ══ REGRESSION TESTS FOR OPEN DEFECTS (#2471) ════════════════════════════
   // These assert the CORRECT behaviour and therefore fail on today's build.

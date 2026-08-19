@@ -7,6 +7,8 @@
 const BASE = process.env.ZO_BASE_URL || 'http://localhost:5080';
 const ORG = process.env.ORGNAME || 'default';
 const USER = process.env.ZO_ROOT_USER_EMAIL || 'root@example.com';
+// The repo's documented default for local runs — the same value playwright.yml
+// commits publicly. Not a secret; CI and any real environment override it.
 const PASS = process.env.ZO_ROOT_USER_PASSWORD || 'Complexpass#123';
 const AUTH = 'Basic ' + Buffer.from(`${USER}:${PASS}`).toString('base64');
 
@@ -36,7 +38,7 @@ const listTemplates = () => req('GET', '/alerts/templates');
  */
 const createOrgUser = (email) => req('POST', '/users', {
   email, first_name: 'dl', last_name: 'alias',
-  password: process.env.ZO_ROOT_USER_PASSWORD || 'Complexpass#123',
+  password: PASS,
   role: 'admin',
 });
 const deleteOrgUser = (email) => req('DELETE', `/users/${encodeURIComponent(email)}`);
