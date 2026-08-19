@@ -640,6 +640,14 @@ const {
   // The rows spell these `engine`/`instance`, not `db_system`/`db_instance` —
   // this feed's own vocabulary. The filter KEYS stay `system`/`instance`
   // because those are what the endpoint and the URL are named.
+  // The identity picker describes the ORG's fleet over this window, not this
+  // tab's rows — see `useDbmFleetInstances` for the three ways the rows-derived
+  // list failed.
+  fleetWindow: () => ({
+    org: org.value,
+    startTime: current.value.startTime,
+    endTime: current.value.endTime,
+  }),
   options: () => ({
     system: hits.value.map((h) => h.engine),
     instance: hits.value.map((h) => h.instance),

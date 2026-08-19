@@ -1107,6 +1107,14 @@ const {
   // Options come from the EVENTS, not the table rows: `DeadlockRow` drops
   // `db_namespace` in both builders, so deriving from the rendered rows would
   // silently offer an empty schema select.
+  // The identity picker describes the ORG's fleet over this window, not this
+  // tab's rows — see `useDbmFleetInstances` for the three ways the rows-derived
+  // list failed.
+  fleetWindow: () => ({
+    org: org.value,
+    startTime: current.value.startTime,
+    endTime: current.value.endTime,
+  }),
   options: () => ({
     system: events.value.map((e) => e.db_system),
     instance: events.value.map((e) => e.db_instance),

@@ -50,6 +50,7 @@ import { computed, onActivated, ref, type ComputedRef, type Ref } from "vue";
 
 import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import { createDbmFilterEntry, optionsFrom, type DbmFilterEntrySpec } from "@/utils/dbm/filters";
+import { useDbmFleetInstances } from "@/composables/dbm/useDbmFleetInstances";
 import { useI18nTyped } from "@/types/i18n";
 
 /**
@@ -118,6 +119,15 @@ export interface DbmScopeFiltersOptions {
    * getter, because the rows arrive after this composable runs.
    */
   options: () => DbmScopeOptionSource;
+  /**
+   * The window the identity picker should describe, as the page currently
+   * holds it. A getter because the range moves with the picker.
+   *
+   * When omitted the picker falls back to the page's own rows — the old
+   * behaviour, kept only so a caller that has no range still renders something
+   * rather than an empty select.
+   */
+  fleetWindow?: () => { org: string; startTime?: number; endTime?: number };
   /**
    * What a filter change triggers — the page's `syncUrl(); load();` pair,
    * passed once. `createDbmFilterEntry` owns the handler, so no entry can
@@ -252,17 +262,106 @@ export function useDbmScopeFilters(options: DbmScopeFiltersOptions): DbmScopeFil
     if (adopted) options.onScopeAdopted?.();
   });
 
+  /**
+   * The fleet, refetched when the page's window moves.
+   *
+   * Kept out of the `filters` computed on purpose: a computed must not have
+   * side effects, and a fetch inside one would re-fire on every unrelated
+   * dependency change. The picker renders the rows-derived list until this
+   * lands, so it is never empty while the read is in flight.
+   */
+  const fleet = useDbmFleetInstances();
+  let lastFleetKey = "";
+  /**
+   * Fetch the fleet when the window actually moves.
+   *
+   * Called from the `fleetOptions` computed below rather than from a `watch`,
+   * which is the shape you would expect. A watcher was tried and REVERTED: its
+   * source getter reads `options.fleetWindow()`, which closes over refs the
+   * PAGE declares in the same `const { … } = useDbmListPage({…})`
+   * destructuring — so evaluating it during setup (which `watch` does eagerly,
+   * with or without `immediate`) throws "Cannot access before initialization".
+   * That is the same TDZ hazard `useDbmListPage` documents for its own
+   * `ownCounts` watchers, and it broke a real test.
+   *
+   * Calling it from the computed is safe because it is IDEMPOTENT and
+   * key-guarded: a window that has not moved does nothing, and
+   * `useDbmFleetInstances` additionally de-duplicates per (org, window) across
+   * every tab, so the six DBM routes share one request.
+   */
+  const refreshFleet = () => {
+    const window = options.fleetWindow?.();
+    if (!window?.org) return;
+    const key = `${window.org}|${window.startTime ?? ""}|${window.endTime ?? ""}`;
+    if (key === lastFleetKey) return;
+    lastFleetKey = key;
+    void fleet.load(window);
+  };
+
+  /**
+   * The identity dimensions, as the fleet names them. `namespace` is absent
+   * by design: a database genuinely belongs to a feed, not to the fleet, and
+   * claiming otherwise would offer databases that no row on this tab can
+   * match.
+   */
+  const fleetOptions = computed<Partial<Record<DbmScopeDimension, string[]>>>(() => {
+    refreshFleet();
+    const hits = fleet.hits.value;
+    if (!hits.length) return {};
+    const system: string[] = [];
+    const instance: string[] = [];
+    for (const hit of hits) {
+      if (hit.db_system) system.push(hit.db_system);
+      if (hit.db_instance) instance.push(hit.db_instance);
+    }
+    return { system, instance };
+  });
+
+  /**
+   * Prefer the fleet, but never render an EMPTY picker when the page holds
+   * values the fleet has not answered for yet — an in-flight read must not
+   * look like "this org has one instance".
+   *
+   * The page's own values are unioned in rather than discarded: they are
+   * evidence too, and a value the reader can see in a row must always be
+   * selectable.
+   */
+  const mergeIdentityOptions = (
+    fleetValues: string[] | undefined,
+    rowValues: (string | null | undefined)[] | undefined,
+  ): (string | null | undefined)[] => {
+    if (!fleetValues?.length) return rowValues ?? [];
+    return [...fleetValues, ...(rowValues ?? [])];
+  };
+
   const filterEntry = createDbmFilterEntry(options.apply);
 
   const filters = computed<DbmScopeFilter[]>(() => {
     const sources = options.options();
+    // The page's own rows are the WRONG source for the identity dimensions,
+    // and were the cause of a filter that could not filter. A tab shows one
+    // feed; the org has a fleet. Deriving `system`/`instance` from the rows on
+    // screen meant:
+    //   * an engine with no rows on THIS tab was unselectable — SQL Server has
+    //     no session sampler, so Activity's picker omitted `mssql-prod-1`
+    //     while a chip set from Deadlocks still displayed it, leaving a scope
+    //     the reader could neither choose nor clear;
+    //   * a feed naming no instance produced an EMPTY picker (deadlocks);
+    //   * a capped read (activity stops at 100 sampled sessions) made the list
+    //     first-page-local rather than window-local.
+    // `/instances` answers the whole window across every feed, so these two
+    // dimensions come from the fleet and only `namespace` — which is genuinely
+    // per-feed — still comes from the rows.
+    const fleet = fleetOptions.value;
     return dimensions.map((key) => {
+      const source =
+        key === "namespace" ? (sources[key] ?? []) : mergeIdentityOptions(fleet[key], sources[key]);
       const copy = DIMENSION_COPY[key];
       const spec: DbmFilterEntrySpec = {
         key,
         dimension: t(`dbm.filters.dimension.${copy.dimension}`),
         placeholder: t(`dbm.filters.${copy.placeholder}` as "dbm.filters.allEngines"),
-        options: optionsFrom(sources[key] ?? []),
+        options: optionsFrom(source),
         model: models[key],
       };
       return filterEntry(spec);
