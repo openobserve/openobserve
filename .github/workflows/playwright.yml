@@ -40,7 +40,17 @@ env:
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
   ZO_STREAMING_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
+  # SMTP was already enabled here, but with no host/port it fell back to the
+  # server defaults (localhost:25) where nothing listens — so destinations could
+  # be SAVED (the enabled-gate passes) while every send failed silently. The
+  # Mailpit step below gives that flag something to talk to, which also makes the
+  # delivery assertions in Alerts/dl-email-destinations.spec.js runnable.
   ZO_SMTP_ENABLED: true
+  ZO_SMTP_HOST: localhost
+  ZO_SMTP_PORT: 1025
+  ZO_SMTP_FROM_EMAIL: alerts@ci.openobserve.test
+  # Read by tests/ui-testing/playwright-tests/utils/mail-sink.js
+  MAILPIT_URL: http://localhost:8025
   ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
@@ -246,6 +256,23 @@ jobs:
           name: frontend-dist
           path: /tmp/dist
 
+      - name: Start mail sink (Mailpit)
+        # A local SMTP server the tests can also READ. Runs as a static binary
+        # rather than a service container: these shards run on a self-hosted EKS
+        # runner where Docker-in-Docker is not guaranteed, and the app itself is
+        # already launched the same way. ~2s, and it makes ZO_SMTP_* real.
+        run: |
+          curl -sSL -o mailpit.tar.gz \
+            https://github.com/axllent/mailpit/releases/latest/download/mailpit-linux-amd64.tar.gz
+          tar -xzf mailpit.tar.gz mailpit
+          chmod +x ./mailpit
+          ./mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025 > mailpit.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8025/api/v1/messages > /dev/null 2>&1 && { echo "Mailpit ready after ${i}s"; exit 0; }
+            sleep 1
+          done
+          echo "::warning::Mailpit did not start; email delivery assertions will skip"
+
       - name: Start OpenObserve
         # Per-shard override of the workflow-level default. ZO_QUICK_MODE_ENABLED is
         # read once at server start and is global to the process, so a shard is the
@@ -309,6 +336,7 @@ jobs:
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
+          echo "MAILPIT_URL=${MAILPIT_URL}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
 
