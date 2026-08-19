@@ -1218,8 +1218,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
   watch(
     () => [
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query,
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, // Only watch for custom query mode changes
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query,
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery, // Only watch for custom query mode changes
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
       dashboardPanelData.layout.currentQueryIndex,
     ],
@@ -1234,7 +1234,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
       // Only continue if the current mode is "show custom query"
       if (
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery &&
         dashboardPanelData.data.queryType == "sql"
       ) {
         // Call the updateQueryValue function
