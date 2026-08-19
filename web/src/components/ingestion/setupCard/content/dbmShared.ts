@@ -774,6 +774,85 @@ const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
  * every interval — `system_health` retains hours of deadlocks, so without it the
  * same events would be re-emitted every collection.
  */
+/**
+ * SQL Server table + index health (W10/W11).
+ *
+ * The column ALIASES match the pg/mysql/mariadb stats recipes exactly, so one
+ * canonicalizer serves every engine and reads the engine off `o2_recipe` — the
+ * same arrangement the blocking and deadlock recipes already use.
+ *
+ * WHAT IS DELIBERATELY ABSENT: SQL Server has no autovacuum and no dead-tuple
+ * accounting, so there are no vacuum/analyze counters, no timestamps and no
+ * bloat estimate. Those columns are omitted rather than zero-filled — a
+ * fabricated 0% bloat reads as "healthy" and would silence the very rule a
+ * reader is looking at the tab for.
+ */
+const MSSQL_TABLE_STATS_RECEIVER = `  sqlquery/mssql_table_stats:
+    driver: sqlserver
+    datasource: "server={host};port={port};user id=\${env:MSSQL_USER};password=\${env:MSSQL_PASSWORD};database={database}"
+    collection_interval: 60s
+    max_open_conn: 2
+    queries:
+      - sql: |
+          SELECT SCHEMA_NAME(t.schema_id)                              AS schema_name,
+                 t.name                                                AS table_name,
+                 CAST(SUM(a.total_pages) * 8192 AS VARCHAR(32))        AS total_bytes,
+                 -- index_id 0 = heap, 1 = clustered: the TABLE's own pages, so
+                 -- this means what heap_bytes means on every other engine
+                 -- rather than folding every index into the table figure.
+                 CAST(SUM(CASE WHEN i.index_id IN (0,1) THEN a.data_pages ELSE 0 END) * 8192 AS VARCHAR(32)) AS heap_bytes,
+                 -- MAX, not SUM: sys.partitions holds one row per index, so a
+                 -- SUM counts the same rows once per index.
+                 CAST(MAX(p.rows) AS VARCHAR(32))                      AS n_live_tup,
+                 '{host}'                                              AS server_address,
+                 'mssql_table_stats'                                   AS o2_recipe
+          FROM sys.tables t
+          JOIN sys.indexes i          ON i.object_id = t.object_id
+          JOIN sys.partitions p       ON p.object_id = i.object_id AND p.index_id = i.index_id
+          JOIN sys.allocation_units a ON a.container_id = p.partition_id
+          GROUP BY SCHEMA_NAME(t.schema_id), t.name
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [schema_name, total_bytes, heap_bytes, n_live_tup, server_address, o2_recipe]`;
+
+const MSSQL_INDEX_STATS_RECEIVER = `  sqlquery/mssql_index_stats:
+    driver: sqlserver
+    datasource: "server={host};port={port};user id=\${env:MSSQL_USER};password=\${env:MSSQL_PASSWORD};database={database}"
+    collection_interval: 60s
+    max_open_conn: 2
+    queries:
+      - sql: |
+          SELECT SCHEMA_NAME(t.schema_id)                              AS schema_name,
+                 t.name                                                AS table_name,
+                 i.name                                                AS index_name,
+                 -- Seeks + scans + lookups folded into one figure: all three
+                 -- are the index being USED, and the unused-index rule asks
+                 -- only whether anything touched it.
+                 CAST(ISNULL(us.user_seeks,0) + ISNULL(us.user_scans,0) + ISNULL(us.user_lookups,0) AS VARCHAR(32)) AS idx_scan,
+                 CAST(SUM(a.total_pages) * 8192 AS VARCHAR(32))        AS index_bytes,
+                 CASE WHEN i.is_unique = 1 THEN 'true' ELSE 'false' END AS is_unique,
+                 '{host}'                                              AS server_address,
+                 'mssql_index_stats'                                   AS o2_recipe
+          FROM sys.indexes i
+          JOIN sys.tables t           ON t.object_id = i.object_id
+          JOIN sys.partitions p       ON p.object_id = i.object_id AND p.index_id = i.index_id
+          JOIN sys.allocation_units a ON a.container_id = p.partition_id
+          -- LEFT JOIN, scoped to THIS database: the DMV holds no row for an
+          -- index nothing has touched since the last restart, and that index is
+          -- precisely the one the unused-index rule exists to surface. An inner
+          -- join would hide it.
+          LEFT JOIN sys.dm_db_index_usage_stats us
+                 ON us.object_id = i.object_id AND us.index_id = i.index_id
+                AND us.database_id = DB_ID()
+          WHERE i.name IS NOT NULL
+          GROUP BY SCHEMA_NAME(t.schema_id), t.name, i.name,
+                   us.user_seeks, us.user_scans, us.user_lookups, i.is_unique
+        logs:
+          - body_column: index_name
+            attribute_columns:
+              [schema_name, table_name, idx_scan, index_bytes, is_unique, server_address, o2_recipe]`;
+
 const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
     driver: sqlserver
     datasource: "sqlserver://\${env:MSSQL_USER}:\${env:MSSQL_PASSWORD}@{host}:{port}?database={database}"
@@ -1441,8 +1520,14 @@ const RECIPES: Record<"postgres" | "mysql" | "mariadb" | "mssql", DbmRecipeSet> 
       "sqlquery/mariadb_locks, filelog/mariadb_deadlocks, sqlquery/mariadb_table_stats, sqlquery/mariadb_index_stats",
   },
   mssql: {
-    receivers: [MSSQL_BLOCKING_RECEIVER, MSSQL_DEADLOG_RECEIVER],
-    names: "sqlquery/mssql_blocking, sqlquery/mssql_deadlocks",
+    receivers: [
+      MSSQL_BLOCKING_RECEIVER,
+      MSSQL_DEADLOG_RECEIVER,
+      MSSQL_TABLE_STATS_RECEIVER,
+      MSSQL_INDEX_STATS_RECEIVER,
+    ],
+    names:
+      "sqlquery/mssql_blocking, sqlquery/mssql_deadlocks, sqlquery/mssql_table_stats, sqlquery/mssql_index_stats",
   },
 };
 

@@ -855,6 +855,78 @@ receivers:
   # DSN is ADO/key=value for the same reason as `sqlquery/mssql_blocking` above:
   # the `#` in MSSQLPASS is a URL fragment delimiter and truncates a
   # `sqlserver://` DSN. See the full note there before changing this line.
+  # ---- SQL Server: table + index health (W10/W11) ----
+  #
+  # The column ALIASES are shared with the pg/mysql/mariadb schema recipes on
+  # purpose: one enterprise canonicalizer serves all four engines and reads the
+  # engine off the `o2_recipe` tag, exactly as the blocking and deadlock
+  # recipes already do.
+  #
+  # WHAT SQL SERVER CANNOT SUPPLY, and why those columns are simply absent
+  # rather than faked: there is no autovacuum, so no vacuum/analyze counters or
+  # timestamps; and no dead-tuple accounting, so no bloat estimate. Postgres's
+  # bloat rules therefore stay quiet on SQL Server instead of rendering a
+  # fabricated 0% that reads as "healthy". Sizes, row counts and index usage
+  # are real and are what the tabs actually rank on.
+  sqlquery/mssql_schema:
+    driver: sqlserver
+    datasource: "server=${env:MSSQLHOST};port=${env:MSSQLPORT};user id=${env:MSSQLUSER};password=${env:MSSQLPASS};database=${env:MSSQLDB}"
+    collection_interval: 60s
+    queries:
+      # W10 — one row per table.
+      - sql: |
+          SELECT SCHEMA_NAME(t.schema_id)                              AS schema_name,
+                 t.name                                                AS table_name,
+                 CAST(SUM(a.total_pages) * 8192 AS VARCHAR(32))        AS total_bytes,
+                 -- Heap/clustered pages only (index_id 0 = heap, 1 = clustered),
+                 -- so this means the same thing as Postgres's heap_bytes rather
+                 -- than counting every index into the "table" figure.
+                 CAST(SUM(CASE WHEN i.index_id IN (0,1) THEN a.data_pages ELSE 0 END) * 8192 AS VARCHAR(32)) AS heap_bytes,
+                 -- MAX, not SUM: `sys.partitions` carries one row per index, so
+                 -- summing counts the same rows once per index.
+                 CAST(MAX(p.rows) AS VARCHAR(32))                      AS n_live_tup,
+                 '${env:MSSQLHOST}'                                    AS server_address,
+                 'mssql_table_stats'                                   AS o2_recipe
+          FROM sys.tables t
+          JOIN sys.indexes i     ON i.object_id = t.object_id
+          JOIN sys.partitions p  ON p.object_id = i.object_id AND p.index_id = i.index_id
+          JOIN sys.allocation_units a ON a.container_id = p.partition_id
+          GROUP BY SCHEMA_NAME(t.schema_id), t.name
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [schema_name, table_name, total_bytes, heap_bytes, n_live_tup, server_address, o2_recipe]
+      # W11 — one row per index. `idx_scan` folds seeks + scans + lookups: all
+      # three are the index being USED, and the unused-index rule asks only
+      # whether anything touched it.
+      - sql: |
+          SELECT SCHEMA_NAME(t.schema_id)                              AS schema_name,
+                 t.name                                                AS table_name,
+                 i.name                                                AS index_name,
+                 CAST(ISNULL(us.user_seeks,0) + ISNULL(us.user_scans,0) + ISNULL(us.user_lookups,0) AS VARCHAR(32)) AS idx_scan,
+                 CAST(SUM(a.total_pages) * 8192 AS VARCHAR(32))        AS index_bytes,
+                 CASE WHEN i.is_unique = 1 THEN 'true' ELSE 'false' END AS is_unique,
+                 '${env:MSSQLHOST}'                                    AS server_address,
+                 'mssql_index_stats'                                   AS o2_recipe
+          FROM sys.indexes i
+          JOIN sys.tables t      ON t.object_id = i.object_id
+          JOIN sys.partitions p  ON p.object_id = i.object_id AND p.index_id = i.index_id
+          JOIN sys.allocation_units a ON a.container_id = p.partition_id
+          -- LEFT JOIN, and scoped to THIS database: the DMV holds no row for an
+          -- index nothing has touched since the last restart, and that index is
+          -- exactly the one the unused-index rule exists to surface. An inner
+          -- join would hide it.
+          LEFT JOIN sys.dm_db_index_usage_stats us
+                 ON us.object_id = i.object_id AND us.index_id = i.index_id
+                AND us.database_id = DB_ID()
+          WHERE i.name IS NOT NULL
+          GROUP BY SCHEMA_NAME(t.schema_id), t.name, i.name,
+                   us.user_seeks, us.user_scans, us.user_lookups, i.is_unique
+        logs:
+          - body_column: index_name
+            attribute_columns:
+              [schema_name, table_name, index_name, idx_scan, index_bytes, is_unique, server_address, o2_recipe]
+
   sqlquery/mssql_deadlocks:
     driver: sqlserver
     datasource: "server=${env:MSSQLHOST};port=${env:MSSQLPORT};user id=${env:MSSQLUSER};password=${env:MSSQLPASS};database=${env:MSSQLDB}"
@@ -1430,6 +1502,7 @@ service:
           sqlquery/mariadb_schema,
           sqlquery/mssql_blocking,
           sqlquery/mssql_deadlocks,
+          sqlquery/mssql_schema,
           filelog/pg,
           filelog/mysql,
           filelog/mariadb,
