@@ -235,6 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="cellDrawer.open"
       side="right"
       :width="75"
+      bleed
       :title="t('panel.logExplorer.title')"
       data-test="dashboard-cell-explorer-drawer"
       @update:open="onCellDrawerOpenChange"

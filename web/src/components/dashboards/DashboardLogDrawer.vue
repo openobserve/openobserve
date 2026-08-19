@@ -70,19 +70,25 @@ const pageSize  = ref(100);
 const loading   = ref(false);
 const errorMsg  = ref("");
 
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
-const pageTo     = computed(() => Math.min(page.value * pageSize.value + events.value.length, total.value));
-const hasPrev    = computed(() => page.value > 0);
-const hasNext    = computed(() => pageTo.value < total.value);
 
 const cols = computed((): string[] => {
   if (!events.value.length) return [];
   const keys = Object.keys(events.value[0]);
   return [...keys.filter(k => k === "_timestamp"), ...keys.filter(k => k !== "_timestamp" && !k.startsWith("_"))];
 });
+// OTable column defs for the results grid (same table component as the alert list).
+const resultColumns = computed<OTableColumnDef[]>(() =>
+  (cols.value.length ? cols.value : ["_timestamp", "source"]).map((c) => ({
+    id: c,
+    header: c === "_timestamp" ? t("panel.logExplorer.timestamp") : raw(c),
+    accessorKey: c,
+  })),
+);
+const resultPageSizeOptions = [50, 100, 250, 500];
 
 // ── SQL editor ────────────────────────────────────────────────────────────────
 const customSql = ref("");
+const showSql   = ref(false); // query editor is collapsed until the SQL toggle
 
 function escSql(v: string | number): string { return String(v).replace(/'/g, "''"); }
 // Clicked cell predicate: IS NULL for empty, unquoted for numbers, escaped-quote otherwise.
@@ -364,6 +370,14 @@ const detailRows = computed<[string, any][]>(() => {
     ([k, v]) => k.toLowerCase().includes(q) || String(v ?? "").toLowerCase().includes(q),
   );
 });
+// Name/Value grid rendered with OTable (same component as the other tables).
+const detailTableRows = computed(() =>
+  detailRows.value.map(([name, value]) => ({ name, value })),
+);
+const detailColumns = computed<OTableColumnDef[]>(() => [
+  { id: "name", header: t("search.sourceName"), accessorKey: "name", size: 220 },
+  { id: "value", header: t("search.sourceValue"), accessorKey: "value", meta: { autoWidth: true, fillRemaining: true } },
+]);
 
 // JsonPreview's @copy emits an object; stringify non-strings as pretty JSON.
 function copyToClipboard(value: unknown) {
@@ -523,7 +537,7 @@ function openInLogs() {
 
     <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
     <div class="flex flex-col border-b border-border-default shrink-0 min-w-0">
-      <div class="flex items-center gap-2 pt-3 pb-2 min-w-0">
+      <div class="flex items-center gap-2 px-2 pt-3 pb-2 min-w-0">
         <div class="flex-1" />
         <DateTime
           default-type="absolute"
@@ -531,16 +545,20 @@ function openInLogs() {
           data-test-name="dashboard-log-drawer-date-time"
           @on:date-change="onDateChange"
         />
+        <OButton size="sm" :variant="showSql ? 'primary' : 'outline'" icon-left="code"
+          data-test="log-explorer-sql-toggle" @click="showSql = !showSql">
+          {{ t("panel.logExplorer.queryMode") }}
+        </OButton>
         <OButton size="sm" variant="outline" icon-left="open-in-new"
           data-test="log-explorer-open-in-logs" @click="openInLogs">
           {{ t("panel.logExplorer.openInLogs") }}
         </OButton>
-        <OButton size="sm" variant="primary" icon-left="play-arrow" :loading="loading"
+        <OButton size="icon-sm" variant="outline" icon-left="refresh" :loading="loading"
           data-test="log-explorer-run" @click="runQuery">
-          {{ t("panel.logExplorer.runQuery") }}
+          <OTooltip :content="t('panel.logExplorer.runQuery')" />
         </OButton>
       </div>
-      <div class=" pb-2">
+      <div v-if="showSql" class="px-2 pb-2">
         <div class="border-border-default rounded-default overflow-hidden border">
           <QueryEditor
             :query="customSql"
@@ -561,66 +579,46 @@ function openInLogs() {
       <code class="text-xs font-mono text-error-500 whitespace-pre-wrap break-all">{{ errorMsg }}</code>
     </div>
 
-    <template v-else-if="loading && !events.length">
-      <div v-for="n in 14" :key="n" class="dld-skeleton" />
-    </template>
-
-    <div v-else-if="!loading && !events.length && !errorMsg"
-      class="flex flex-col items-center justify-center gap-4 flex-1 px-6">
-      <OIcon name="manage-search" size="xl" class="text-text-tertiary opacity-30" />
-      <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
-      <code class="text-xs text-text-tertiary font-mono bg-surface-subtle rounded-default px-3 py-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all text-center">{{ customSql }}</code>
-    </div>
-
-    <!-- ── Results ──────────────────────────────────────────────────── -->
-    <template v-else-if="events.length">
-      <div class="flex-1 overflow-auto min-h-0 relative">
-        <div v-if="loading" class="dld-progress" />
-        <table class="dld-table">
-          <thead>
-            <tr>
-              <th v-for="col in cols" :key="col" class="dld-th">
-                {{ col === "_timestamp" ? t("panel.logExplorer.timestamp") : col }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(ev, i) in events" :key="i" class="dld-row"
-              :class="{ 'dld-row--active': selectedEvent === ev }"
-              @click="openEventDetail(ev)">
-              <td v-for="col in cols" :key="col" class="dld-td">
-                <template v-if="col === '_timestamp'">{{ fmtTs(ev[col]) }}</template>
-                <template v-else>{{ ev[col] ?? "—" }}</template>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination footer — project-standard controls (matches dashboard tables) -->
-      <div class="border-border-default flex h-10 w-full shrink-0 items-center border-t px-3">
-        <div class="flex-1" />
-        <TablePaginationControls
-          :show-pagination="true"
-          :pagination="{ page: page + 1, rowsPerPage: pageSize }"
-          :total-rows="total"
-          :pages-number="totalPages"
-          :is-first-page="!hasPrev"
-          :is-last-page="!hasNext"
-          @update:rows-per-page="(n) => { pageSize = n; goToPage(0); }"
-          @first-page="goToPage(0)"
-          @prev-page="goToPage(page - 1)"
-          @next-page="goToPage(page + 1)"
-          @last-page="goToPage(totalPages - 1)"
-        />
-      </div>
-    </template>
+    <!-- ── Results — same OTable as the alert list (sticky header, loading
+         skeleton, server pagination); no hand-rolled table/header gap ── -->
+    <OTable
+      v-else
+      class="min-h-0 flex-1"
+      :frame="false"
+      :data="events"
+      :columns="resultColumns"
+      :loading="loading"
+      :horizontal-scroll="true"
+      :row-class="(row: any) => (selectedEvent === row ? 'dld-row--active' : '')"
+      pagination="server"
+      :current-page="page + 1"
+      :total-count="total"
+      :page-size="pageSize"
+      :page-size-options="resultPageSizeOptions"
+      width="100%"
+      :show-global-filter="false"
+      :default-columns="false"
+      data-test="log-explorer-results-table"
+      @update:current-page="(p: number) => goToPage(p - 1)"
+      @update:page-size="(n: number) => { pageSize = n; goToPage(0); }"
+      @row-click="(row: any) => openEventDetail(row)"
+    >
+      <template #cell-_timestamp="{ value }">{{ fmtTs(value) }}</template>
+      <template #empty>
+        <div class="flex flex-col items-center justify-center gap-4 px-6 py-10">
+          <OIcon name="manage-search" size="xl" class="text-text-tertiary opacity-30" />
+          <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
+          <code class="text-xs text-text-tertiary font-mono bg-surface-subtle rounded-default px-3 py-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all text-center">{{ customSql }}</code>
+        </div>
+      </template>
+    </OTable>
 
     <!-- ── Event detail drawer ─────────────────────────────────────── -->
     <ODrawer
       :open="detailOpen"
       side="right"
       :width="55"
+      bleed
       :title="t('panel.logExplorer.detail.drawerTitle')"
       data-test="log-explorer-event-detail-drawer"
       @update:open="v => { if (!v) closeEventDetail(); }"
@@ -628,10 +626,10 @@ function openInLogs() {
       <div v-if="selectedEvent" class="flex flex-col h-full min-h-0">
 
         <!-- Event meta strip -->
-        <div class="flex items-center gap-3 px-4 py-2 border-b border-border-default bg-surface-panel shrink-0">
+        <div class="flex items-center gap-3 px-2 py-2 border-b border-border-default bg-surface-panel shrink-0">
           <div class="flex flex-col min-w-0 flex-1">
-            <span class="text-text-heading text-xs font-medium font-mono tabular-nums">{{ fmtTs(selectedEvent["_timestamp"]) }}</span>
-            <span class="text-text-tertiary text-xs font-mono">{{ stream }}</span>
+            <span class="text-text-heading text-xs font-medium tabular-nums">{{ fmtTs(selectedEvent["_timestamp"]) }}</span>
+            <span class="text-text-tertiary text-xs">{{ stream }}</span>
           </div>
           <OButton size="sm" variant="outline" icon-left="link"
             @click="copyCurrentUrl()">
@@ -640,7 +638,7 @@ function openInLogs() {
         </div>
 
         <!-- Tabs -->
-        <OTabs v-model="detailTab" dense bordered class="px-4 shrink-0 mb-2">
+        <OTabs v-model="detailTab" dense bordered class="px-2 shrink-0 mb-2">
           <OTab name="insights" :label="t('panel.logExplorer.detail.insights')" icon="insights" />
           <OTab name="details"  :label="t('panel.logExplorer.detail.details')" />
           <OTab name="json"     :label="t('panel.logExplorer.detail.json')" />
@@ -661,13 +659,14 @@ function openInLogs() {
                 <span>{{ t("panel.logExplorer.insights.anomalyTitle") }}</span>
                 <span class="dld-section-hint">{{ t("panel.logExplorer.insights.anomalyHint", { n: events.length }) }}</span>
               </header>
-              <div class="px-4 pb-3">
+              <div class="pb-3">
                 <OTable
                   :data="fieldAnomalyProfile"
                   :columns="anomalyColumns"
                   :default-columns="false"
                   :show-global-filter="false"
                   :bordered="true"
+                  :frame="false"
                   pagination="none"
                   sorting="none"
                   :wrap="true"
@@ -705,7 +704,7 @@ function openInLogs() {
                 <span>{{ t("panel.logExplorer.insights.timelineTitle") }}</span>
                 <span class="dld-section-hint">{{ t("panel.logExplorer.insights.timelineHint") }}</span>
               </header>
-              <div class="px-4 pb-3">
+              <div class="px-2 pb-3">
                 <!-- Skeleton while loading -->
                 <div v-if="insightsLoading && !timeline.length" class="h-14 rounded-default bg-surface-subtle animate-pulse" />
                 <div v-else-if="!timeline.length" class="h-14 flex items-center justify-center">
@@ -727,15 +726,15 @@ function openInLogs() {
               </header>
               <div class="flex flex-col divide-y divide-border-default">
                 <div v-if="insightsLoading && !insightPatterns.length"
-                  class="flex flex-col gap-2 px-4 py-3">
+                  class="flex flex-col gap-2 px-2 py-3">
                   <div v-for="n in 3" :key="n" class="h-6 rounded-default bg-surface-subtle animate-pulse" />
                 </div>
-                <div v-else-if="!insightPatterns.length" class="px-4 py-3">
+                <div v-else-if="!insightPatterns.length" class="px-2 py-3">
                   <span class="text-xs text-text-tertiary">{{ t("panel.logExplorer.insights.patternsEmpty") }}</span>
                 </div>
                 <template v-else>
                   <div v-for="p in insightPatterns" :key="p.template"
-                    class="dld-pat-row px-4 py-2 flex flex-col gap-1 transition-colors">
+                    class="dld-pat-row px-2 py-2 flex flex-col gap-1 transition-colors">
                     <div class="flex items-center gap-2">
                       <!-- Anomaly badge if z_score is high -->
                       <OTag v-if="p.z_score > 2" type="fieldRarity"
@@ -790,29 +789,33 @@ function openInLogs() {
               </header>
               <div class="flex flex-col">
                 <div v-if="(insightsLoading || surroundLoading) && !surroundEvents.length"
-                  class="flex flex-col gap-2 px-4 py-3">
+                  class="flex flex-col gap-2 px-2 py-3">
                   <div v-for="n in 5" :key="n" class="h-7 rounded-default bg-surface-subtle animate-pulse" />
                 </div>
-                <div v-else-if="!surroundEvents.length" class="px-4 py-3">
+                <div v-else-if="!surroundEvents.length" class="px-2 py-3">
                   <span class="text-xs text-text-tertiary">{{ t("panel.logExplorer.insights.contextEmpty") }}</span>
                 </div>
                 <template v-else>
                   <div v-for="(ev, i) in surroundPagedEvents" :key="i"
                     :class="['dld-ctx-row cursor-pointer', String(ev._timestamp) === String(selectedEvent!._timestamp) && 'dld-ctx-row--current']"
                     @click="toggleSurroundExpand(surroundPage * surroundPageSize + i)">
-                    <!-- Timeline spine -->
+                    <!-- Timeline spine: line above + dot (centered) + line below -->
                     <div class="dld-ctx-spine">
+                      <div class="dld-ctx-line" :class="{ invisible: i === 0 }" />
                       <div :class="['dld-ctx-dot rounded-full', String(ev._timestamp) === String(selectedEvent!._timestamp) && 'dld-ctx-dot--current']" />
-                      <div v-if="i < surroundPagedEvents.length - 1" class="dld-ctx-line" />
+                      <div class="dld-ctx-line" :class="{ invisible: i === surroundPagedEvents.length - 1 }" />
                     </div>
                     <!-- Content -->
                     <div class="flex flex-col min-w-0 py-2 pr-2 flex-1">
-                      <!-- Row header: rel time + timestamp + expand toggle -->
+                      <!-- Row: rel time + timestamp + body preview (like the Logs page) + expand -->
                       <div class="flex items-center gap-2">
-                        <span :class="['text-2xs font-mono tabular-nums whitespace-nowrap shrink-0', String(ev._timestamp) === String(selectedEvent!._timestamp) ? 'text-accent font-semibold' : 'text-text-tertiary']">
+                        <span :class="['w-16 text-2xs font-mono tabular-nums whitespace-nowrap shrink-0', String(ev._timestamp) === String(selectedEvent!._timestamp) ? 'text-accent font-semibold' : 'text-text-tertiary']">
                           {{ fmtRelTime(Number(ev._timestamp), Number(selectedEvent!._timestamp)) }}
                         </span>
-                        <span class="text-xs text-text-tertiary font-mono truncate flex-1">{{ fmtTsShort(ev._timestamp) }}</span>
+                        <span class="text-xs text-text-tertiary font-mono whitespace-nowrap shrink-0">{{ fmtTsShort(ev._timestamp) }}</span>
+                        <span class="dld-ctx-body min-w-0 flex-1 truncate text-xs font-mono">
+                          <LogsHighLighting :data="ev" :show-braces="true" />
+                        </span>
                         <button class="dld-expand-btn shrink-0"
                           :aria-label="isSurroundExpanded(i) ? 'Collapse' : 'Expand'"
                           @click.stop="toggleSurroundExpand(surroundPage * surroundPageSize + i)">
@@ -820,24 +823,18 @@ function openInLogs() {
                         </button>
                       </div>
 
-                      <!-- Collapsed: 4 fields inline truncated -->
-                      <div v-if="!isSurroundExpanded(i)"
-                        class="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                        <template v-for="col in Object.keys(ev).filter(k => !k.startsWith('_')).slice(0, 4)" :key="col">
-                          <span v-if="ev[col] != null" class="text-xs font-mono">
-                            <span class="text-text-tertiary">{{ col }}=</span>
-                            <span class="text-text-secondary truncate max-w-32 inline-block align-bottom">{{ ev[col] }}</span>
-                          </span>
-                        </template>
-                      </div>
-
-                      <!-- Expanded: all fields as KV list, full values wrap -->
-                      <div v-else class="flex flex-col gap-0.5 mt-1 border-t border-border-default pt-1">
-                        <div v-for="col in Object.keys(ev).filter(k => !k.startsWith('_'))" :key="col"
-                          class="flex gap-2 text-xs font-mono">
-                          <span class="text-text-tertiary shrink-0 w-36 truncate">{{ col }}<OTooltip :content="raw(col)" /></span>
-                          <span class="text-text-secondary break-all">{{ ev[col] ?? "—" }}</span>
-                        </div>
+                      <!-- Expanded: full log detail, same as the Logs page -->
+                      <div v-if="isSurroundExpanded(i)" class="dld-json-preview mt-1 border-t border-border-default pt-1" @click.stop>
+                        <JsonPreview
+                          :value="ev"
+                          mode="sidebar"
+                          :stream-name="stream"
+                          :show-copy-button="true"
+                          hide-view-related
+                          hide-search-term-actions
+                          hide-field-options
+                          @copy="copyToClipboard"
+                        />
                       </div>
                     </div>
                   </div>
@@ -865,7 +862,7 @@ function openInLogs() {
 
           <!-- ═══ DETAILS TAB (searchable Name/Value table) ═════════════ -->
           <OTabPanel name="details" class="px-2 pb-2">
-            <div class="mb-2 flex items-center gap-2">
+            <div class="mb-2 flex items-center gap-2 px-2">
               <OInput
                 v-model="detailFilter"
                 size="sm"
@@ -881,26 +878,28 @@ function openInLogs() {
                 data-test="log-explorer-detail-wrap"
               />
             </div>
-            <table class="dld-kv-table">
-              <thead>
-                <tr class="dld-kv-head-row">
-                  <th class="dld-kv-head dld-kv-head--key">{{ t("search.sourceName") }}</th>
-                  <th class="dld-kv-head">{{ t("search.sourceValue") }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="[k, v] in detailRows" :key="k"
-                  class="dld-kv-row" :class="{ 'dld-kv-row--highlight': k === field }">
-                  <td class="dld-kv-key log-key">{{ k }}</td>
-                  <td class="dld-kv-val">
-                    <pre
-                      class="m-0 block w-full min-w-0 p-0 font-mono font-normal"
-                      :class="wrapDetailValues ? 'whitespace-pre-wrap break-all' : 'overflow-hidden text-ellipsis whitespace-nowrap'"
-                    ><LogsHighLighting :data="getDetailDisplayValue(k, v)" :show-braces="false" /></pre>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+              <OTable
+                :data="detailTableRows"
+                :columns="detailColumns"
+                :default-columns="false"
+                :show-global-filter="false"
+                :bordered="true"
+                :frame="false"
+                pagination="none"
+                sorting="none"
+                :wrap="wrapDetailValues"
+                :row-class="(row: any) => (row.name === field ? 'dld-kv-row--highlight' : '')"
+              >
+                <template #cell-name="{ value }">
+                  <span class="log-key font-mono">{{ value }}</span>
+                </template>
+                <template #cell-value="{ row }">
+                  <pre
+                    class="m-0 block w-full min-w-0 p-0 font-mono font-normal"
+                    :class="wrapDetailValues ? 'whitespace-pre-wrap break-all' : 'overflow-hidden text-ellipsis whitespace-nowrap'"
+                  ><LogsHighLighting :data="getDetailDisplayValue(row.name, row.value)" :show-braces="false" /></pre>
+                </template>
+              </OTable>
           </OTabPanel>
 
           <!-- ═══ JSON TAB (tree — same as Source Details) ═══════════════ -->
@@ -927,17 +926,18 @@ function openInLogs() {
 <style scoped>
 /* keep(keyframes): pulse/progress @keyframes and :deep(OTextarea) SQL chrome cannot be expressed as Tailwind */
 /* Scoped to .dld-json-preview so the shared JsonPreview elsewhere is unaffected. */
+.dld-json-preview { overflow-x: hidden; max-width: 100%; }
 .dld-json-preview :deep(.log_json_content) {
   padding-block: 0.1875rem;
 }
-/* ── Skeletons ────────────────────────────────────────────────────────────── */
-.dld-skeleton {
-  height: 2rem; border-radius: 0.25rem; margin: 0.125rem 1rem;
-  background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
-  animation: dld-pulse 1.4s ease-in-out infinite;
+/* Long values (base64 blobs etc.) must wrap, not force a horizontal scroll. */
+.dld-json-preview :deep(.log_json_content),
+.dld-json-preview :deep(.log_json_content *) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
-@keyframes dld-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.75; } }
-
+/* ── Loading bar ──────────────────────────────────────────────────────────── */
 .dld-progress {
   position: sticky; top: 0; height: 0.125rem; z-index: 10;
   background: color-mix(in srgb, var(--color-accent) 70%, transparent);
@@ -967,30 +967,9 @@ function openInLogs() {
   border-left-color: color-mix(in srgb, var(--color-accent) 90%, transparent); outline: none;
 }
 
-/* ── Log results table ───────────────────────────────────────────────────── */
-.dld-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-.dld-th {
-  position: sticky; top: 0; z-index: 1; padding: 0.375rem 0.75rem;
-  text-align: left; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase;
-  letter-spacing: 0.04em; white-space: nowrap;
-  background: color-mix(in srgb, var(--color-surface-panel) 100%, transparent);
-  color: color-mix(in srgb, var(--color-text-tertiary) 100%, transparent);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1px table header divider */
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 100%, transparent);
-}
-.dld-row {
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1px row divider */
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 100%, transparent);
-  cursor: pointer; transition: background 80ms;
-}
-.dld-row:hover { background: color-mix(in srgb, var(--color-surface-subtle) 100%, transparent); }
+/* Active results row (selected event) — applied to OTable's row via :row-class. */
 .dld-row--active { background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
 .dld-row--active:hover { background: color-mix(in srgb, var(--color-accent) 13%, transparent); }
-.dld-td {
-  padding: 0.375rem 0.75rem; white-space: nowrap; max-width: 20rem;
-  overflow: hidden; text-overflow: ellipsis;
-  color: color-mix(in srgb, var(--color-text-primary) 100%, transparent);
-}
 
 /* ── Insight sections ────────────────────────────────────────────────────── */
 .dld-section {
@@ -1004,7 +983,7 @@ function openInLogs() {
 }
 .dld-section-header {
   display: flex; align-items: center; gap: 0.625rem;
-  padding: 1.25rem 1rem 0.875rem;
+  padding: 1.25rem 0.5rem 0.875rem;
   font-size: var(--text-sm); font-weight: 600; letter-spacing: 0;
   color: var(--color-text-primary);
 }
@@ -1035,7 +1014,7 @@ function openInLogs() {
 
 .dld-ctx-spine {
   display: flex; flex-direction: column; align-items: center; width: 2.5rem;
-  padding-top: 0.625rem; flex-shrink: 0;
+  flex-shrink: 0;
 }
 .dld-ctx-dot {
   width: 0.5rem; height: 0.5rem; flex-shrink: 0;
@@ -1047,27 +1026,13 @@ function openInLogs() {
 }
 .dld-ctx-line {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1px vertical connector line */
-  width: 1px; flex: 1;
+  width: 1px; flex: 1; min-height: 0.25rem;
   background: color-mix(in srgb, var(--color-border-default) 60%, transparent);
-  margin-top: 0.25rem;
 }
 
-/* ── Event detail KV table ───────────────────────────────────────────────── */
-/* eslint-disable-next-line local/no-hardcoded-px -- hairline: table grid line (1 device pixel) */
-.dld-kv-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-xs); border: 1px solid var(--color-border-default); }
-/* eslint-disable-next-line local/no-hardcoded-px -- hairline: header divider (1 device pixel) */
-.dld-kv-head-row { border-bottom: 1px solid var(--color-border-default); }
-.dld-kv-head { padding: 0.35rem 0.5rem; text-align: left; font-weight: 600; color: var(--color-text-secondary); background: var(--color-surface-subtle); }
-.dld-kv-head--key { padding-left: 1rem; width: 38%; }
-/* eslint-disable-next-line local/no-hardcoded-px -- hairline: row divider (1 device pixel) */
-.dld-kv-row { border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 50%, transparent); }
-.dld-kv-row:hover { background: color-mix(in srgb, var(--color-surface-subtle) 100%, transparent); }
+/* ── Event detail KV table (OTable) — selected-field row highlight ────────── */
 .dld-kv-row--highlight { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
 .dld-kv-row--highlight:hover { background: color-mix(in srgb, var(--color-accent) 13%, transparent); }
-/* Key colour from the global `.log-key` class; values coloured by LogsHighLighting. */
-/* eslint-disable-next-line local/no-hardcoded-px -- hairline: column divider (1 device pixel) */
-.dld-kv-key { padding: 0.35rem 0.5rem 0.35rem 1rem; font-family: var(--font-mono); font-weight: normal; white-space: nowrap; width: 38%; vertical-align: top; border-right: 1px solid color-mix(in srgb, var(--color-border-default) 50%, transparent); }
-.dld-kv-val { padding: 0.35rem 0.5rem; vertical-align: top; max-width: 0; }
 .dld-copy-btn {
   display: flex; align-items: center; justify-content: center; padding: 0.25rem;
   border-radius: 0.25rem; border: none; background: transparent; cursor: pointer;
