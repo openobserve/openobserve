@@ -121,7 +121,10 @@ jobs:
         id: app_token
         if: ${{ steps.skip.outputs.skip_review == 'false' && vars.OO_REVIEWER_APP_ID != '' }}
         continue-on-error: true
-        uses: actions/create-github-app-token@v2
+        # Pinned to a full commit SHA (not a mutable tag) because this action receives the app's
+        # signing private key — a repointed/compromised release could exfiltrate it. Same pin
+        # discipline as OPENCODE_VERSION above. Bump deliberately after review.
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
         with:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
