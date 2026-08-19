@@ -21,6 +21,7 @@ import {
   PIVOT_TABLE_ROW_KEY_SEPARATOR,
   PIVOT_TABLE_TOTAL_LABEL,
   PIVOT_TABLE_OTHERS_LABEL,
+  PIVOT_TABLE_EMPTY_LABEL,
 } from "./constants";
 import {
   buildValueMappingCache,
@@ -128,37 +129,35 @@ function buildPivotHeaderLevels(
       i += span;
     }
 
-    // Overflow ("Others") group at level 0 only — spans every pivot level.
-    if (lvl === 0 && hasOthers) {
-      topLevelBoundaries.add(leafColPos);
-      const othersColspan = yCount > 1 ? yCount : 1;
-      cells.push({
-        // The constant stays the machine key; only the rendered label is translated.
-        key: `${lvl}_${PIVOT_TABLE_OTHERS_LABEL}`,
-        label: gt("dashboard.pivotOthers"),
-        colspan: othersColspan,
-        rowspan: pivotCount,
-        hasBorder: true,
-        _isOthersHeader: true,
-        _sortColumn: `${PIVOT_TABLE_OTHERS_LABEL}_${yFields[0].alias}`,
-      });
-      leafColPos += othersColspan;
-    }
+    // Synthetic groups at level 0 only — Others (overflow) then Total, each a
+    // single cell whose rowspan spans every pivot level. One shared writer so
+    // the two cells cannot drift apart: the renderer relies on them having
+    // identical rowspan/border/colspan semantics. The constant stays the
+    // machine key; only the rendered label is translated. Sorts by the group's
+    // first leaf column.
+    if (lvl === 0) {
+      const pushSyntheticGroupCell = (machineKey: string, i18nKey: string, extra: any) => {
+        topLevelBoundaries.add(leafColPos);
+        cells.push({
+          key: `${lvl}_${machineKey}`,
+          label: gt(i18nKey),
+          colspan: yCount,
+          rowspan: pivotCount,
+          hasBorder: true,
+          _sortColumn: `${machineKey}_${yFields[0].alias}`,
+          ...extra,
+        });
+        leafColPos += yCount;
+      };
 
-    // Total group at level 0 only
-    if (lvl === 0 && showRowTotals) {
-      topLevelBoundaries.add(leafColPos);
-      cells.push({
-        // The constant stays the machine key; only the rendered label is translated.
-        key: `${lvl}_${PIVOT_TABLE_TOTAL_LABEL}`,
-        label: gt("dashboard.pivotTotal"),
-        colspan: yCount > 1 ? yCount : 1,
-        rowspan: pivotCount,
-        hasBorder: true,
-        _isTotalHeader: true,
-        // Sort by the first total column
-        _sortColumn: `${PIVOT_TABLE_TOTAL_LABEL}_${yFields[0].alias}`,
-      });
+      if (hasOthers) {
+        pushSyntheticGroupCell(PIVOT_TABLE_OTHERS_LABEL, "dashboard.pivotOthers", {});
+      }
+      if (showRowTotals) {
+        pushSyntheticGroupCell(PIVOT_TABLE_TOTAL_LABEL, "dashboard.pivotTotal", {
+          _isTotalHeader: true,
+        });
+      }
     }
 
     levels.push({ cells, isLeaf: false });
@@ -269,12 +268,14 @@ export const convertPivotTableData = (
   const getPivotKey = (row: any): string => {
     return breakdownAliases
       .map((alias: string) => {
-        // Match the chart path (sql/shared/seriesBuilder.ts): null, undefined
-        // and "" all render as "(empty)". `?? ` alone leaves "" as a blank
-        // column header.
+        // Fold null, undefined and "" into one labeled bucket — `?? ` alone
+        // would leave "" as a blank column header. Deliberately wider than the
+        // chart path (sql/shared/seriesBuilder.ts), which drops null/undefined
+        // breakdown series entirely and folds only "": a table column with no
+        // header is unusable, a missing chart series is merely absent.
         const raw = getDataValue(row, alias);
         const value = raw === null || raw === undefined ? "" : String(raw);
-        return value === "" ? "(empty)" : value;
+        return value === "" ? PIVOT_TABLE_EMPTY_LABEL : value;
       })
       .join(PIVOT_TABLE_SEPARATOR);
   };

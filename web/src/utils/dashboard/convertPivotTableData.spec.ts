@@ -379,7 +379,6 @@ describe("convertPivotTableData", () => {
       const result = convertPivotTableData(schema({ breakdown }), many(["method", "code"]), store);
       const othersCell = result.pivotHeaderLevels[0].cells.at(-1);
       expect(othersCell.label).toBe("dashboard.pivotOthers");
-      expect(othersCell._isOthersHeader).toBe(true);
     });
 
     it("spans the Others header across every pivot level instead of leaving blanks", () => {

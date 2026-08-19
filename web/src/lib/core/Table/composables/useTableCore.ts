@@ -188,7 +188,10 @@ export function useTableCore<TData>(
   const pivotRowColumnIds = computed(() => {
     const raw = (props as any).pivotRowColumns as any[] | undefined;
     if (!raw || !raw.length) return undefined;
-    return raw.map((c: any) => (typeof c === "string" ? c : c.id));
+    // Fall back field-first, matching how consumers derive column ids
+    // (id: field ?? name) — an id-less entry would otherwise pin `undefined`
+    // and silently disable the row-field pinning.
+    return raw.map((c: any) => (typeof c === "string" ? c : (c.id ?? c.field ?? c.name)));
   });
   const rightPinnedIds = computed(() =>
     effectiveColumns.value.filter((c) => c.pinned === "right" || c.isAction).map((c) => c.id),

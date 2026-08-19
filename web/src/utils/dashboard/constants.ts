@@ -14,6 +14,9 @@ export const PIVOT_TABLE_SEPARATOR = "\x00";
 export const PIVOT_TABLE_ROW_KEY_SEPARATOR = "\x00";
 export const PIVOT_TABLE_TOTAL_LABEL = "Total";
 export const PIVOT_TABLE_OTHERS_LABEL = "Others";
+// Machine key + display label for breakdown values that are null, undefined or
+// "". Doubles as the column key ("(empty)_<y>"), like its Total/Others siblings.
+export const PIVOT_TABLE_EMPTY_LABEL = "(empty)";
 export const PIVOT_TABLE_HEADER_ROW_HEIGHT = 28;
 export const PIVOT_TABLE_DEFAULT_HEADER_HEIGHT = 48;
 export const PIVOT_TABLE_TOTAL_COLUMN_WIDTH = 150;

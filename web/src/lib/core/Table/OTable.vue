@@ -347,6 +347,11 @@ const { table, effectiveColumns, columnOrder, userReorderedColumns, columnSizing
       get keepPageOnDataChange() {
         return props.keepPageOnDataChange;
       },
+      // Forwarded for left-pinning of pivot row-field columns — without this
+      // the core's pivotRowColumnIds never sees the prop and pinning is inert.
+      get pivotRowColumns() {
+        return props.pivotRowColumns;
+      },
     },
     emit,
   );
