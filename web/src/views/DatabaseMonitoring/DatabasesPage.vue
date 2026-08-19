@@ -1475,7 +1475,9 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   {
     id: "qps",
     header: t("dbm.databases.columns.qps"),
-    size: 84,
+    // "Per second" plus the sort icon needs ~100; at 84 it ellipsised to
+    // "Per se…".
+    size: 100,
     sortable: true,
     meta: {
       align: "right",
@@ -1494,7 +1496,10 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     id: "p50",
     header: t("dbm.databases.columns.p50"),
     accessorKey: "p50_ns",
-    size: 108,
+    // The label is prose ("Half are under"), not a token, so the width has to
+    // clear the TEXT plus the sort icon plus the cell padding — at 108 the
+    // label overflowed and lost its leading "H".
+    size: 124,
     sortable: true,
     meta: {
       align: "right",
@@ -1518,7 +1523,8 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     id: "p99",
     header: t("dbm.databases.columns.p99"),
     accessorKey: "p99_ns",
-    size: 92,
+    // Same as p50: "Slowest 1%" plus the sort icon did not fit in 92.
+    size: 108,
     sortable: true,
     meta: {
       align: "right",

@@ -253,6 +253,15 @@ function headerTooltip(header: any): I18nText | undefined {
   return (header.column.columnDef.meta as OTableColumnMeta | undefined)?.headerTooltip || undefined;
 }
 
+// A header narrow enough to ellipsise must still be READABLE somewhere, or the
+// column silently renames itself. The native `title` carries the full label on
+// hover; it costs nothing when the label fits and is the only recourse when a
+// column's width is fixed by its `size`.
+function headerTitleAttr(header: any): string | undefined {
+  const h = header.column.columnDef.header;
+  return typeof h === "string" && h.length ? h : undefined;
+}
+
 // Stacking the label turns the row into a COLUMN, where the main axis is
 // vertical — so the horizontal alignment `headerAlignClass` expresses as
 // `justify-*` has to be restated on the cross axis as `items-*`, or a
@@ -581,10 +590,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             "
           >
             <span
-              class="flex min-w-0 flex-col justify-center"
+              class="flex min-w-0 shrink flex-col justify-center"
               :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
             >
-              <span class="min-w-0 truncate leading-tight">
+              <span class="w-full min-w-0 truncate leading-tight" :title="headerTitleAttr(header)">
                 <FlexRender
                   v-if="!header.isPlaceholder"
                   :render="header.column.columnDef.header"
@@ -593,7 +602,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </span>
               <span
                 v-if="headerSubLabel(header)"
-                class="text-text-muted text-2xs min-w-0 truncate leading-tight font-normal normal-case"
+                class="text-text-muted text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
                 :data-test="`o2-table-th-sublabel-${header.id}`"
               >
                 {{ headerSubLabel(header) }}
@@ -642,7 +651,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 : headerAlignClass(header),
             ]"
           >
-            <span class="min-w-0 truncate">
+            <span class="w-full min-w-0 truncate" :title="headerTitleAttr(header)">
               <FlexRender
                 v-if="!header.isPlaceholder"
                 :render="header.column.columnDef.header"
@@ -651,7 +660,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             </span>
             <span
               v-if="headerSubLabel(header)"
-              class="text-text-muted text-2xs min-w-0 truncate leading-tight font-normal normal-case"
+              class="text-text-muted text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
               :data-test="`o2-table-th-sublabel-${header.id}`"
             >
               {{ headerSubLabel(header) }}
@@ -909,10 +918,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             "
           >
             <span
-              class="flex min-w-0 flex-col justify-center"
+              class="flex min-w-0 shrink flex-col justify-center"
               :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
             >
-              <span class="min-w-0 truncate leading-tight">
+              <span class="w-full min-w-0 truncate leading-tight" :title="headerTitleAttr(header)">
                 <FlexRender
                   v-if="!header.isPlaceholder"
                   :render="header.column.columnDef.header"
@@ -921,7 +930,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </span>
               <span
                 v-if="headerSubLabel(header)"
-                class="text-text-muted text-2xs min-w-0 truncate leading-tight font-normal normal-case"
+                class="text-text-muted text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
                 :data-test="`o2-table-th-sublabel-${header.id}`"
               >
                 {{ headerSubLabel(header) }}
