@@ -1380,6 +1380,21 @@ exporters:
     tls: { insecure: true }
     sending_queue: { enabled: true, num_consumers: 2, queue_size: 200 }
     retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+
+  otlphttp/fan_logs:
+    logs_endpoint: http://host.docker.internal:5080/api/3I75nCL8SYAzp4UHlZYepu5FqC0/v1/logs
+    headers:
+      Authorization: Basic ${env:O2_AUTH}
+      stream-name: dbm_server
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 8, queue_size: 5000 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  otlphttp/fan_metrics:
+    metrics_endpoint: http://host.docker.internal:5080/api/3I75nCL8SYAzp4UHlZYepu5FqC0/v1/metrics
+    headers: { Authorization: "Basic ${env:O2_AUTH}" }
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 2, queue_size: 200 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
   debug:
     verbosity: basic
   # Raw-evidence sink. The path is OPENED, never CREATED -- /rawout must exist
@@ -1411,7 +1426,7 @@ service:
     logs/receiver_events:
       receivers: [postgresql]
       processors: [memory_limiter/pg, transform/tag_source, resource/ident, batch]
-      exporters: [otlphttp/pg_logs, file/raw_events]
+      exporters: [otlphttp/pg_logs, otlphttp/fan_logs, file/raw_events]
     # SERVER VANTAGE: pg recipes + pg log tailing.
     # memory_limiter FIRST, then filter/dbm before the batcher -- dropped
     # records must never reach the batcher.
@@ -1428,12 +1443,12 @@ service:
           filelog/pg,
         ]
       processors: [memory_limiter/pg, filter/dbm, transform/tag_source, resource/ident, batch]
-      exporters: [otlphttp/pg_logs]
+      exporters: [otlphttp/pg_logs, otlphttp/fan_logs]
     # Postgres receiver metrics. `otlp` is NOT a receiver here even on the
     # traces lane: its only client is the workload's OTel SDK, which exports
     # spans, not metrics -- listing it would open a metrics path nothing feeds.
     metrics:
       receivers: [postgresql]
       processors: [memory_limiter/pg, resource/ident, batch]
-      exporters: [otlphttp/pg_metrics]
+      exporters: [otlphttp/pg_metrics, otlphttp/fan_metrics]
     # NO `traces:` PIPELINE. Deliberate. A span has no route to this org.
