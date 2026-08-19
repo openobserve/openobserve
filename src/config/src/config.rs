@@ -52,7 +52,11 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 70;
+// 71: apply the Phase 3.0 sea-orm migrations on existing databases —
+// llm_idempotency_records (m20260818_000001) and llm_remote_tasks
+// (m20260818_000002). Both were added at schema version 70, so an already
+// initialized database skips them until this bump forces Migrator::up to run.
+pub const DB_SCHEMA_VERSION: u64 = 71;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
