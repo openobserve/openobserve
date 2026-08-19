@@ -454,13 +454,30 @@ class TraceRecorder {
       return;
     }
 
+    // Bound forceFlush + shutdown so an unreachable endpoint can't stall exit; always shut down in
+    // finally (a thrown forceFlush would otherwise skip it and leak handles that hang the process).
+    // Stay above the configured forceFlush timeout so a healthy-but-slow endpoint isn't cut short.
+    const FLUSH_DEADLINE_MS = Math.max(traceExportTimeoutMs() + 5_000, 15_000);
+    const withDeadline = (label, p) => Promise.race([
+      p,
+      new Promise((_, reject) => {
+        const t = setTimeout(() => reject(new Error(`${label} exceeded ${FLUSH_DEADLINE_MS}ms`)), FLUSH_DEADLINE_MS);
+        if (typeof t.unref === "function") t.unref();
+      }),
+    ]);
+
     try {
       console.log(`[${isoNow()}] Exporting ${this.spanCount} trace spans to OpenObserve with trace ID ${this.traceId}`);
-      await this.provider.forceFlush();
-      await this.provider.shutdown();
+      await withDeadline("trace forceFlush", this.provider.forceFlush());
       console.log(`[${isoNow()}] Exported ${this.spanCount} trace spans to OpenObserve`);
     } catch (err) {
       console.warn(`[${isoNow()}] Trace export failed: ${formatTraceExportError(err)}`);
+    } finally {
+      try {
+        await withDeadline("trace shutdown", this.provider.shutdown());
+      } catch (err) {
+        console.warn(`[${isoNow()}] Trace provider shutdown failed: ${formatTraceExportError(err)}`);
+      }
     }
   }
 }
@@ -1121,18 +1138,30 @@ function postReviewComment(prNumber, body) {
   const tmpFile = `/tmp/review_comment_${randomUUID()}.txt`;
   writeFileSync(tmpFile, body, "utf-8");
   try {
-    gh(`pr comment "${prNumber}" --body-file "${tmpFile}"`);
+    const out = gh(`pr comment "${prNumber}" --body-file "${tmpFile}"`);
+    const m = out.match(/#issuecomment-(\d+)/);
+    return m ? m[1] : null;
   } finally {
     try { unlinkSync(tmpFile); } catch {}
   }
 }
 
-function updateReviewComment(commentId, body) {
+function updateReviewComment(prNumber, commentId, body) {
   const payload = JSON.stringify({ body });
   const tmpFile = `/tmp/review_comment_${randomUUID()}.json`;
   writeFileSync(tmpFile, payload);
   try {
     gh(`api "repos/${process.env.GITHUB_REPOSITORY}/issues/comments/${commentId}" --method PATCH --input "${tmpFile}"`);
+    return { action: "update", id: commentId };
+  } catch (err) {
+    // The comment we captured at the start of the run was deleted mid-run (e.g. someone cleared
+    // the review thread). Post a fresh comment instead of failing the whole review on a 404.
+    const detail = execErrorText(err);
+    if (/HTTP 404|Not Found/i.test(detail)) {
+      console.log(`[${isoNow()}] Review comment #${commentId} no longer exists (404); posting a new comment instead`);
+      return { action: "create", id: postReviewComment(prNumber, body) };
+    }
+    throw err;
   } finally {
     try { unlinkSync(tmpFile); } catch {}
   }
@@ -1357,22 +1386,23 @@ async function main() {
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 
     // 8. Post or update review
-    const commentAction = existingCommentId ? "update" : "create";
+    const requestedAction = existingCommentId ? "update" : "create";
     const commentSpan = TRACE.startSpan("github.pr.review_comment", {
-      "github.pr.comment.action": commentAction,
+      "github.pr.comment.action": requestedAction,
       "github.pr.number": prNumber,
     }, rootSpan);
     try {
+      let commentResult;
       if (existingCommentId) {
         console.log(`[${isoNow()}] Updating existing review comment #${existingCommentId}`);
-        updateReviewComment(existingCommentId, finalReview);
+        commentResult = updateReviewComment(prNumber, existingCommentId, finalReview);
       } else {
         console.log(`[${isoNow()}] Posting new review comment`);
-        postReviewComment(prNumber, finalReview);
+        commentResult = { action: "create", id: postReviewComment(prNumber, finalReview) };
       }
       TRACE.endSpan(commentSpan, {
-        "github.pr.comment.action": commentAction,
-        "github.pr.comment.id": existingCommentId,
+        "github.pr.comment.action": commentResult.action,
+        "github.pr.comment.id": commentResult.id,
       });
     } catch (err) {
       TRACE.endSpan(commentSpan, {}, err);
@@ -1406,6 +1436,13 @@ async function main() {
 
 // ─── Entry point ───────────────────────────────────────────────────────────
 
+// Let the loop drain (so stdout isn't truncated); unref'd 1s backstop forces exit if OTel handles linger.
+function finishAndExit(code) {
+  process.exitCode = code;
+  const t = setTimeout(() => process.exit(code), 1000);
+  if (typeof t.unref === "function") t.unref();
+}
+
 const startTime = Date.now();
 const timeout = setTimeout(() => {
   const err = new Error(`Overall timeout (${OVERALL_TIMEOUT_MS / 1000}s) reached`);
@@ -1424,10 +1461,11 @@ main()
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[${isoNow()}] Total execution time: ${elapsed}s`);
     await TRACE.flush();
+    finishAndExit(0);
   })
   .catch(async err => {
     clearTimeout(timeout);
     if (!err.suppressFatalLog) console.error(`[${isoNow()}] Fatal error:`, err);
-    process.exitCode = 1;
     await TRACE.flush();
+    finishAndExit(1);
   });
