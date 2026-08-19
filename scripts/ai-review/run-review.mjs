@@ -435,12 +435,8 @@ class TraceRecorder {
       return;
     }
 
-    // Bound every export/shutdown step so an unreachable OpenObserve endpoint can't stall the
-    // process: forceFlush() can hang past its own timeout, and if it throws, shutdown() (which
-    // tears down the BatchSpanProcessor timer + exporter sockets) never ran — leaving handles
-    // that keep Node alive until the CI job's 25-min timeout. Race each step against a hard
-    // deadline (its timer .unref()'d so it can't itself keep the loop alive), and ALWAYS attempt
-    // shutdown in finally.
+    // Bound forceFlush + shutdown so an unreachable endpoint can't stall exit; always shut down in
+    // finally (a thrown forceFlush would otherwise skip it and leak handles that hang the process).
     const FLUSH_DEADLINE_MS = 15_000;
     const withDeadline = (label, p) => Promise.race([
       p,
@@ -1408,6 +1404,13 @@ async function main() {
 
 // ─── Entry point ───────────────────────────────────────────────────────────
 
+// Let the loop drain (so stdout isn't truncated); unref'd 1s backstop forces exit if OTel handles linger.
+function finishAndExit(code) {
+  process.exitCode = code;
+  const t = setTimeout(() => process.exit(code), 1000);
+  if (typeof t.unref === "function") t.unref();
+}
+
 const startTime = Date.now();
 const timeout = setTimeout(() => {
   const err = new Error(`Overall timeout (${OVERALL_TIMEOUT_MS / 1000}s) reached`);
@@ -1426,14 +1429,11 @@ main()
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[${isoNow()}] Total execution time: ${elapsed}s`);
     await TRACE.flush();
-    // The review is already posted; exit explicitly so lingering OTel exporter sockets/timers
-    // can't keep the process alive until the CI job's 25-min timeout (which would flip a
-    // successful review to a red "timeout"). Carries any non-fatal exit code set during the run.
-    process.exit(process.exitCode || 0);
+    finishAndExit(0);
   })
   .catch(async err => {
     clearTimeout(timeout);
     if (!err.suppressFatalLog) console.error(`[${isoNow()}] Fatal error:`, err);
     await TRACE.flush();
-    process.exit(1);
+    finishAndExit(1);
   });
