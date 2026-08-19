@@ -3237,6 +3237,52 @@ fn pg_top_query() -> Map<String, Value> {
 /// From `raw/receiver-events.jsonl`: the queryid is NEGATIVE, which is normal
 /// (PG's signed 64-bit hash), and the exec time is a small per-interval delta
 /// rather than the first emission's cumulative backlog.
+/// A SQL Server `db.server.top_query`, with the XML SHOWPLAN its receiver
+/// really emits (prefix captured verbatim off the rig).
+fn mssql_top_query_with_plan() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_787_115_615_903_000i64,
+        "db_system_name": "microsoft.sql_server",
+        "db_query_text": "UPDATE accounts SET balance = balance - ? WHERE id = ?",
+        "sqlserver_query_hash": "113a60cd5aa2d772",
+        "sqlserver_query_plan": "<ShowPlanXML xmlns=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\"><BatchSequence><Batch><Statements/></Batch></BatchSequence></ShowPlanXML>",
+        "service_instance_id": "mssql-prod-1:1433",
+        "o2_event_name": "db.server.top_query",
+        "o2_vantage": "server",
+    }))
+}
+
+/// THE GAP THIS PINS: SQL Server plans were emitted and then dropped.
+///
+/// `sqlserverreceiver` puts an obfuscated XML showplan on every top query, and
+/// the attribute reached the stream — `sqlserver.query_plan` is present in the
+/// raw capture. The canonicalizer read only the Postgres and MySQL names, so
+/// the column stayed null and the Query-plan view had nothing to render on
+/// SQL Server, for want of one entry in a lookup list.
+#[test]
+fn mssql_top_query_plan_is_not_dropped() {
+    let sample = server_vantage::canonicalize_top_query(&mssql_top_query_with_plan())
+        .expect("a SQL Server top query must canonicalize");
+    let plan = sample.plan.as_deref().expect("the XML showplan must be kept");
+    assert!(
+        plan.starts_with("<ShowPlanXML"),
+        "SQL Server ships XML, not JSON — the column holds whichever format the \
+         engine produced, and `o2_dbm_plan_source` records which: got {plan:.40}"
+    );
+    // NO plan hash, and that is the honest answer rather than an oversight.
+    // `plan_hash` canonicalizes a JSON plan by walking its structural fields;
+    // pointed at XML it parses nothing and correctly declines. Minting a hash
+    // some other way — over the raw string, say — would be worse than none: the
+    // XML carries per-execution costs and row estimates, so it changes on
+    // nearly every collection and the hash would report a plan REGRESSION every
+    // interval. A plan you can read beats a change-signal that cries wolf.
+    assert!(
+        sample.plan_hash.is_none(),
+        "an XML showplan must not be hashed by the JSON plan walker — a hash over \
+         raw XML would flip on every execution and fake a plan change"
+    );
+}
+
 fn pg_top_query_empty_plan() -> Map<String, Value> {
     obj(json!({
         "_timestamp": 1_786_415_519_760_246i64,
