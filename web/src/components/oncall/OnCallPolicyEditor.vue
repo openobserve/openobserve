@@ -128,6 +128,20 @@
                   />
                 </span>
 
+                <!-- Same reason, for the slot-naming kinds: a rung pointed at a
+                     slot nobody staffs reaches nobody, and `config-risks`
+                     reports it as `slot_pages_nobody`. Asking here is how it
+                     never gets written. -->
+                <span v-if="pendingSlot?.step === step" class="w-52">
+                  <OSelect
+                    :model-value="''"
+                    :options="slotOptions"
+                    :placeholder="t('oncall.targetPickSlot')"
+                    :data-test="`oncall-policy-pick-slot-${current.priority}-${stepIndex}`"
+                    @update:model-value="(v: any) => addSlot(String(v))"
+                  />
+                </span>
+
                 <OButton
                   variant="ghost"
                   size="icon-sm"
@@ -362,26 +376,42 @@ import type {
   RoutingConfig,
   TeamChannel,
   EscalationTarget,
+  EscalationTargetKind,
   L0Policy,
   LadderStep,
   OnCallPolicy,
   OnCallSlot,
   PriorityRung,
+  SlotTargetKind,
 } from "@/ts/interfaces/oncall";
-import { MICROS_PER_MINUTE, TARGET_KINDS } from "@/ts/interfaces/oncall";
+import {
+  isSlotTarget,
+  MICROS_PER_MINUTE,
+  sameSlot,
+  TARGET_KINDS,
+} from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { DELIVERABLE_CHANNELS, describeTarget, priorityLabel, resolveLadder } from "@/utils/oncall";
 
-const props = defineProps<{
+const props = withDefaults(
+  defineProps<{
   teamId: string;
   policy: OnCallPolicy | null;
   open?: boolean;
   /** The priority the reader had selected — the editor opens on the same one. */
   priority?: number;
-}>();
+  /**
+   * The slots this team staffs, in schedule order. More than one unlocks the
+   * slot-naming targets; the team's own schedule is the authority on which
+   * names are real, so a rung cannot be pointed at a slot nobody staffs.
+   */
+  slots?: string[];
+  }>(),
+  { slots: () => [] },
+);
 const emit = defineEmits<{ saved: []; "update:open": [boolean] }>();
 
 const { t } = useI18nTyped();
@@ -398,6 +428,9 @@ const draft = ref<PriorityRung[]>([]);
 const selected = ref(1);
 const current = computed(() => draft.value.find((r) => r.priority === selected.value) ?? null);
 const pendingUserStep = ref<LadderStep | null>(null);
+/// The step and the kind together: three kinds take a slot, and which one was
+/// picked decides what the slot MEANS — on call in it, next in it, or all of it.
+const pendingSlot = ref<{ step: LadderStep; kind: SlotTargetKind } | null>(null);
 const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
 /// The rotation in force, so the preview names people rather than target
 /// kinds. Empty is a legitimate answer — it means a coverage gap, which the
@@ -505,16 +538,32 @@ const ladderEndLine = computed(() => {
   return t("oncall.policyEndsStops", { count: repeats }, repeats);
 });
 
+/// The slot-naming kinds are offered only where there is a second slot to
+/// name: on a one-slot team "the primary on-call" and "whoever is on call" are
+/// the same person said two ways, and a picker offering both teaches a
+/// distinction that does not exist yet.
 const targetOptions = computed(() =>
-  TARGET_KINDS.map((kind) => ({ label: t(`oncall.target_${kind}`), value: kind })),
+  TARGET_KINDS.filter((kind) => props.slots.length > 1 || !isSlotTarget(kind)).map((kind) => ({
+    label: t(`oncall.target_${kind}`),
+    value: kind,
+  })),
 );
 
-/// A user target needs an email, so it opens a picker rather than adding an
-/// empty chip the policy would reject on save.
+const slotOptions = computed(() =>
+  props.slots.map((slot) => ({ label: raw(slot), value: slot })),
+);
+
+/// A user target needs an email and a slot target needs a slot name, so both
+/// open a picker rather than adding an empty chip the policy would reject on
+/// save.
 function addTarget(step: LadderStep, kind: string) {
   if (!kind) return;
   if (kind === "user") {
     pendingUserStep.value = step;
+    return;
+  }
+  if (isSlotTarget(kind as EscalationTargetKind)) {
+    pendingSlot.value = { step, kind: kind as SlotTargetKind };
     return;
   }
   if (!step.targets.some((x) => x.kind === kind)) {
@@ -528,6 +577,19 @@ function addUser(email: string) {
   if (!step || !email) return;
   if (!step.targets.some((x) => x.kind === "user" && x.email === email)) {
     step.targets.push({ kind: "user", email });
+  }
+}
+
+/// Duplicates are compared on the PAIR. The same kind against two slots is two
+/// different rungs' worth of people — "the primary on-call" and "the secondary
+/// on-call" on one rung is a legitimate, and common, wide first step.
+function addSlot(slot: string) {
+  const pending = pendingSlot.value;
+  pendingSlot.value = null;
+  if (!pending || !slot) return;
+  const { step, kind } = pending;
+  if (!step.targets.some((x) => x.kind === kind && "slot" in x && sameSlot(x.slot, slot))) {
+    step.targets.push({ kind, slot });
   }
 }
 
@@ -583,10 +645,18 @@ function reset() {
     priority: rung.priority,
     // Sorted, because the connectors edit the gaps between NEIGHBOURS — an
     // out-of-order array would show a negative wait.
-    steps: rung.steps.map((step) => ({ ...step })).sort((a, b) => a.after_micros - b.after_micros),
+    // `targets` is copied, not shared. A shallow `{ ...step }` handed the
+    // draft the SAME array the policy prop holds, so adding or removing a
+    // target edited `props.policy` in place — and Cancel, which only throws
+    // the draft away, discarded nothing. The rung read as reverted and the
+    // next save wrote the abandoned edit.
+    steps: rung.steps
+      .map((step) => ({ ...step, targets: [...step.targets] }))
+      .sort((a, b) => a.after_micros - b.after_micros),
     channels: [...rung.channels],
   }));
   pendingUserStep.value = null;
+  pendingSlot.value = null;
   destinations.value = [...(props.policy?.destinations ?? [])];
   l0Draft.value = null;
   l0Touched.value = false;

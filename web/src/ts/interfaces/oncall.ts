@@ -44,14 +44,44 @@ export type EscalationTarget =
   | { kind: "user"; email: string }
   | { kind: SlotTargetKind; slot: string };
 
-/** Offered in the target picker, in the order they are listed. */
+/**
+ * Offered in the target picker, in the order they are listed.
+ *
+ * The unsuffixed three come first because they are what a single-slot team
+ * means. The slot-naming three are offered only where there is a second slot to
+ * name — see `SLOT_TARGET_KINDS`. Leaving them out entirely meant that from
+ * 2026-08-18, when every ≥2-person rotation gained a secondary slot, no rung
+ * could page it.
+ */
 export const TARGET_KINDS: EscalationTargetKind[] = [
   "on_call_now",
   "next_on_call",
   "everyone_on_schedule",
   "user",
   "whole_team",
+  "on_call_in_slot",
+  "next_on_call_in_slot",
+  "everyone_in_slot",
 ];
+
+/**
+ * The kinds that need a slot named before they mean anything.
+ *
+ * They are hidden on a team that staffs one slot: there, *"the primary
+ * on-call"* and *"whoever is on call"* are the same person said two ways, and
+ * offering both is how a picker teaches somebody a distinction that does not
+ * exist yet.
+ */
+export const SLOT_TARGET_KINDS: readonly SlotTargetKind[] = [
+  "on_call_in_slot",
+  "next_on_call_in_slot",
+  "everyone_in_slot",
+];
+
+/** Does this kind carry a `slot`? Narrows, so the caller can read `.slot`. */
+export function isSlotTarget(kind: EscalationTargetKind): kind is SlotTargetKind {
+  return (SLOT_TARGET_KINDS as readonly string[]).includes(kind);
+}
 
 /** Serialized as the integer 1–5, matching `alerts.priority`. */
 export type AlertPriorityValue = 1 | 2 | 3 | 4 | 5;

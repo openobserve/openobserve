@@ -63,12 +63,21 @@ const stubs = {
   },
 };
 
+/// **The shape the server actually sends** — D-33 in the defect register. This
+/// fixture carried a `level: "primary"` field the type dropped long ago and no
+/// `targets` array, which `LadderStep` requires on both sides of the wire. So
+/// every test here drove a policy the server would answer 400 to, and the
+/// editor's own `step.targets` reads had nothing to read.
 const policy: OnCallPolicy = {
   id: "pol_1",
   org_id: "default",
   team_id: "team_1",
   rungs: [
-    { priority: 1, steps: [{ level: "primary", after_micros: 0 }], channels: ["email"] },
+    {
+      priority: 1,
+      steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" }] }],
+      channels: ["email"],
+    },
     { priority: 4, steps: [], channels: [] },
   ],
 };
@@ -194,7 +203,13 @@ describe("OnCallPolicyEditor", () => {
     const webhookPolicy: OnCallPolicy = {
       ...policy,
       rungs: [
-        { priority: 1, steps: [{ level: "primary", after_micros: 0 }], channels: ["webhook"] },
+        {
+          priority: 1,
+          // Same D-33 shape as the fixture above: `level` was dropped from the
+          // type long ago and `targets` is required on the wire.
+          steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" as const }] }],
+          channels: ["webhook" as const],
+        },
       ],
       destinations: ["slack-oncall"],
     };
@@ -481,5 +496,180 @@ describe("OnCallPolicyEditor", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-team-channel-silent"]').exists()).toBe(true);
     });
+  });
+});
+
+/// **The three targets a rung could not name.** `TARGET_KINDS` offered five of
+/// eight, so from 2026-08-18 — when every ≥2-person rotation gained a derived
+/// secondary slot — there was a real, staffed, coverable position that no rung
+/// in any ladder could page. The engine resolved it, the calendar drew it, the
+/// cover dialog could hand it to somebody, and escalation could not reach it.
+describe("targets that name a slot", () => {
+  /// Its own, because this block is a top-level `describe` and the suite above
+  /// does not reach it — without this, `setPolicy.mock.calls[0]` is whichever
+  /// test saved first, not this one's.
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service.getTeamChannel.mockResolvedValue({
+      data: { team_id: "team_1", destinations: [], source: "policy" },
+    } as any);
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
+    } as any);
+    service.setPolicy.mockResolvedValue({ data: {} } as any);
+  });
+
+  function renderWithSlots(slots: string[]) {
+    return mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy, open: true, slots },
+      global: { plugins: [i18n, store], stubs },
+    });
+  }
+
+  const targetPicker = (wrapper: ReturnType<typeof renderWithSlots>) =>
+    wrapper.findComponent('[data-test="oncall-policy-add-target-1-0"]');
+
+  const kinds = (wrapper: ReturnType<typeof renderWithSlots>) =>
+    (targetPicker(wrapper).props("options") as { value: string }[]).map((o) => o.value);
+
+  /// The rung this suite edits, out of the payload the save actually sent.
+  const savedTargets = () => {
+    const { rungs } = (service.setPolicy.mock.calls.at(-1)![0] as any).data;
+    return rungs.find((r: any) => r.priority === 1).steps[0].targets;
+  };
+
+  it("offers the slot-naming kinds once there is a second slot", async () => {
+    const wrapper = renderWithSlots(["primary", "secondary"]);
+    await flushPromises();
+
+    expect(kinds(wrapper)).toEqual([
+      "on_call_now",
+      "next_on_call",
+      "everyone_on_schedule",
+      "user",
+      "whole_team",
+      "on_call_in_slot",
+      "next_on_call_in_slot",
+      "everyone_in_slot",
+    ]);
+  });
+
+  /// On a one-slot team "the primary on-call" and "whoever is on call" are the
+  /// same person said two ways. Offering both teaches a distinction that does
+  /// not exist on this team yet.
+  it("hides them on a team that staffs one slot", async () => {
+    const wrapper = renderWithSlots(["primary"]);
+    await flushPromises();
+
+    expect(kinds(wrapper)).toEqual([
+      "on_call_now",
+      "next_on_call",
+      "everyone_on_schedule",
+      "user",
+      "whole_team",
+    ]);
+  });
+
+  /// A rung pointed at a slot nobody staffs reaches nobody, and the server
+  /// reports it as the `slot_pages_nobody` risk. Picking from the team's own
+  /// schedule is how that never gets written in the first place.
+  it("asks which slot, offering only the ones this team staffs", async () => {
+    const wrapper = renderWithSlots(["primary", "secondary"]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-policy-pick-slot-1-0"]').exists()).toBe(false);
+
+    targetPicker(wrapper).vm.$emit("update:modelValue", "on_call_in_slot");
+    await flushPromises();
+
+    const picker = wrapper.findComponent('[data-test="oncall-policy-pick-slot-1-0"]');
+    expect(picker.exists()).toBe(true);
+    expect((picker.props("options") as { value: string }[]).map((o) => o.value)).toEqual([
+      "primary",
+      "secondary",
+    ]);
+  });
+
+  it("saves the kind and the slot together", async () => {
+    const wrapper = renderWithSlots(["primary", "secondary"]);
+    await flushPromises();
+
+    targetPicker(wrapper).vm.$emit("update:modelValue", "on_call_in_slot");
+    await flushPromises();
+    wrapper
+      .findComponent('[data-test="oncall-policy-pick-slot-1-0"]')
+      .vm.$emit("update:modelValue", "secondary");
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+    await flushPromises();
+
+    expect(savedTargets()).toContainEqual({ kind: "on_call_in_slot", slot: "secondary" });
+  });
+
+  /// One rung naming both slots is a legitimate — and common — wide first
+  /// step, so the duplicate check has to be on the PAIR, not the kind.
+  it("allows one kind against two different slots", async () => {
+    const wrapper = renderWithSlots(["primary", "secondary"]);
+    await flushPromises();
+
+    for (const slot of ["primary", "secondary"]) {
+      targetPicker(wrapper).vm.$emit("update:modelValue", "on_call_in_slot");
+      await flushPromises();
+      wrapper
+      .findComponent('[data-test="oncall-policy-pick-slot-1-0"]')
+      .vm.$emit("update:modelValue", slot);
+      await flushPromises();
+    }
+
+    await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+    await flushPromises();
+
+    const targets = savedTargets();
+    expect(targets.filter((t: any) => t.kind === "on_call_in_slot")).toHaveLength(2);
+  });
+
+  /// The same pair twice is one target. Written twice it pages the same person
+  /// twice on one rung, which reads on the timeline as a retry.
+  it("refuses the same kind and slot twice", async () => {
+    const wrapper = renderWithSlots(["primary", "secondary"]);
+    await flushPromises();
+
+    for (const spelling of ["secondary", " Secondary "]) {
+      targetPicker(wrapper).vm.$emit("update:modelValue", "on_call_in_slot");
+      await flushPromises();
+      wrapper
+        .findComponent('[data-test="oncall-policy-pick-slot-1-0"]')
+        .vm.$emit("update:modelValue", spelling);
+      await flushPromises();
+    }
+
+    await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+    await flushPromises();
+
+    expect(savedTargets().filter((t: any) => t.kind === "on_call_in_slot")).toHaveLength(1);
+  });
+
+  /// Found by this suite leaking between tests: `reset` shallow-copied each
+  /// step, so the draft shared `targets` with `props.policy` and every add or
+  /// remove edited the policy in place. Cancel throws the draft away, which
+  /// discarded nothing — the rung read as reverted and the next save wrote the
+  /// abandoned edit.
+  it("discards target edits on cancel instead of writing them into the policy", async () => {
+    const before = JSON.stringify(policy);
+    const wrapper = renderWithSlots(["primary", "secondary"]);
+    await flushPromises();
+
+    targetPicker(wrapper).vm.$emit("update:modelValue", "on_call_in_slot");
+    await flushPromises();
+    wrapper
+      .findComponent('[data-test="oncall-policy-pick-slot-1-0"]')
+      .vm.$emit("update:modelValue", "secondary");
+    await flushPromises();
+
+    await wrapper.setProps({ open: false });
+    await flushPromises();
+
+    expect(JSON.stringify(policy)).toBe(before);
   });
 });

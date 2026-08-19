@@ -299,6 +299,7 @@
               :priority="selectedPriorityNumber"
               :team-id="teamId"
               :policy="policy"
+              :slots="teamSlots"
               @saved="onPolicySaved"
             />
           </OContent>
