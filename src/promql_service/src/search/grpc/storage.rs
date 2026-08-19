@@ -16,31 +16,27 @@
 use std::sync::Arc;
 
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    get_config,
     meta::{
-        promql::{VALUE_LABEL, tsid_layout::MetricsFileLayout},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
 use datafusion::{
-    arrow::datatypes::Schema,
     error::{DataFusionError, Result},
     sql::TableReference,
 };
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use infra::{
     cache::file_data,
-    schema::{get_partition_time_level, get_stream_setting_index_fields, unwrap_stream_settings},
+    schema::{get_partition_time_level, unwrap_stream_settings},
 };
 use itertools::Itertools;
-use promql_parser::label::{MatchOp, Matchers};
+use promql_parser::label::Matchers;
 use search::{
     datafusion::exec::register_metrics_table,
     file_cache::{cache_files, calc_target_partitions},
-    index::{Condition, IndexCondition},
-    tantivy::tantivy_search,
     types::QueryParams,
 };
 use search_service::match_source;
@@ -81,15 +77,8 @@ pub(crate) async fn create_context(
         return Ok(None);
     }
 
-    // get index fields
-    let stream_settings = unwrap_stream_settings(&schema);
-    let index_fields = get_stream_setting_index_fields(&stream_settings)
-        .into_iter()
-        .filter(|field| schema.field_with_name(field).is_ok())
-        .collect::<HashSet<_>>();
-
     // get partition time level
-    let stream_settings = stream_settings.unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level = get_partition_time_level(stream_type);
 
     // rewrite partition filters
@@ -213,16 +202,14 @@ pub(crate) async fn create_context(
         stream_name: stream_name.to_string(),
         time_range,
         work_group: None,
-        use_inverted_index: true,
+        use_inverted_index: false,
     });
 
-    // Search the TSID-major sidecars at the same stage as Tantivy: both attach
-    // physical row selections to FileKey before the metrics table is built.
-    // The sidecar covers the TSID-major files only; whatever else is in the
-    // file set (legacy or not yet finalized hours) goes through Tantivy.
-    let mut idx_took = 0;
-    let mut is_add_filter_back = true;
-    let series_index_applied = match tsid_series_index::search(
+    // Prune the TSID-major files through their `.sidx` sidecars: matching
+    // physical rows are attached to each FileKey before the metrics table is
+    // built. Files of any other layout (legacy or not yet finalized hours) are
+    // scanned in full; the PromQL matchers are always applied by the query.
+    let idx_took = match tsid_series_index::search(
         query.as_ref(),
         &mut files,
         schema.as_ref(),
@@ -231,53 +218,15 @@ pub(crate) async fn create_context(
     )
     .await
     {
-        Ok(Some(took)) => {
-            idx_took = took;
-            true
-        }
-        Ok(None) => false,
+        Ok(took) => took.unwrap_or_default(),
         Err(error) => {
             log::warn!(
-                "[trace_id {trace_id}] promql->search->storage: TSID series-index query failed, falling back to Tantivy/full scan: {error}"
+                "[trace_id {trace_id}] promql->search->storage: TSID series-index query failed, falling back to a full scan: {error}"
             );
-            false
+            0
         }
     };
 
-    // Tantivy over the files the sidecar did not cover (all of them when no
-    // sidecar applied). Sidecar selections still need the final PromQL filter,
-    // so the filter stays whenever one was applied.
-    let (index_condition, is_full_convert) =
-        convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
-    if !index_condition.conditions.is_empty() && cfg.search.inverted_index_enabled {
-        let (sidecar_files, mut tantivy_files): (Vec<FileKey>, Vec<FileKey>) =
-            if series_index_applied {
-                std::mem::take(&mut files).into_iter().partition(|file| {
-                    MetricsFileLayout::of(&file.key) == MetricsFileLayout::TsidMajor
-                })
-            } else {
-                (Vec::new(), std::mem::take(&mut files))
-            };
-        if !tantivy_files.is_empty() {
-            let (tantivy_took, tantivy_add_filter_back, ..) =
-                tantivy_search(query.clone(), &mut tantivy_files, Some(index_condition), None)
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index error: {e}"
-                        );
-                        DataFusionError::Execution(e.to_string())
-                    })?;
-            idx_took += tantivy_took;
-            is_add_filter_back = tantivy_add_filter_back || series_index_applied;
-            log::info!(
-                "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {tantivy_took} ms, files: {}, is_add_filter_back: {is_add_filter_back}, is_full_convert: {is_full_convert}",
-                tantivy_files.len(),
-            );
-        }
-        files = sidecar_files;
-        files.extend(tantivy_files);
-    }
     scan_stats.idx_took = idx_took as i64;
 
     let session = SearchSession {
@@ -289,14 +238,9 @@ pub(crate) async fn create_context(
 
     let ctx = register_metrics_table(&session, schema.clone(), stream_name, files).await?;
 
-    Ok(Some((
-        ctx,
-        schema,
-        scan_stats,
-        is_add_filter_back
-            || !is_full_convert
-            || !cfg.search.feature_query_remove_filter_with_index,
-    )))
+    // the matchers are always applied by the query: sidecar selections are
+    // exact at series-run granularity only, and other files are scanned in full
+    Ok(Some((ctx, schema, scan_stats, true)))
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]
@@ -337,34 +281,4 @@ async fn get_file_list(
         }
     }
     Ok(files)
-}
-
-fn convert_matchers_to_index_condition(
-    matchers: &Matchers,
-    schema: &Arc<Schema>,
-    index_fields: &HashSet<String>,
-) -> Result<(IndexCondition, bool)> {
-    let mut index_condition = IndexCondition::default();
-    let mut is_full_convert = true;
-    for mat in matchers.matchers.iter() {
-        if mat.name == TIMESTAMP_COL_NAME
-            || mat.name == VALUE_LABEL
-            || !index_fields.contains(&mat.name)
-            || schema.field_with_name(&mat.name).is_err()
-        {
-            is_full_convert = false;
-            continue;
-        }
-        let condition = match &mat.op {
-            MatchOp::Equal => Condition::Equal(mat.name.clone(), mat.value.clone()),
-            MatchOp::NotEqual => Condition::NotEqual(mat.name.clone(), mat.value.clone()),
-            MatchOp::Re(regex) => Condition::Regex(mat.name.clone(), regex.to_string()),
-            _ => {
-                is_full_convert = false;
-                continue;
-            }
-        };
-        index_condition.add_condition(condition);
-    }
-    Ok((index_condition, is_full_convert))
 }
