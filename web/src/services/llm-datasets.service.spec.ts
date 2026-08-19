@@ -282,6 +282,45 @@ describe("llmDatasetsService.getItemVersions", () => {
   });
 });
 
+describe("llmDatasetsService.list", () => {
+  it("carries the server-derived aggregates through onto each row", async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        list: [
+          {
+            id: "dataset-1",
+            orgId: "acme",
+            name: "Goldens",
+            description: null,
+            tags: ["rag"],
+            // 46 stored revisions collapse to 29 live items server-side, so the
+            // count is deliberately unrelated to the version.
+            globalVersion: 46,
+            itemCount: 29,
+            sources: { trace: 4, annotation: 5, manual: 20 },
+          },
+        ],
+      },
+    });
+
+    const [dataset] = await llmDatasetsService.list("acme");
+
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/datasets");
+    expect(dataset.itemCount).toBe(29);
+    expect(dataset.sources).toEqual({ trace: 4, annotation: 5, manual: 20 });
+    expect(dataset.globalVersion).toBe(46);
+  });
+
+  it("shows zeroes rather than blanks when a row omits the aggregates", async () => {
+    mockGet.mockResolvedValue({ data: { list: [{ id: "dataset-1", name: "Goldens" }] } });
+
+    const [dataset] = await llmDatasetsService.list("acme");
+
+    expect(dataset.itemCount).toBe(0);
+    expect(dataset.sources).toEqual({ trace: 0, annotation: 0, manual: 0 });
+  });
+});
+
 describe("llmDatasetsService dataset writes", () => {
   it("sends dataset-level tags on create", async () => {
     mockPost.mockResolvedValue({ data: { id: "dataset-1", name: "Goldens", tags: ["rag"] } });
