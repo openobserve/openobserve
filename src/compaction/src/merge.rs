@@ -22,9 +22,12 @@ use config::{
     FileFormat,
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
-    meta::stream::{
-        FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
-        StreamType,
+    meta::{
+        promql::tsid_layout::MetricsFileLayout,
+        stream::{
+            FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
+            StreamType,
+        },
     },
     metrics,
     utils::{
@@ -426,7 +429,13 @@ pub async fn merge_by_stream(
     // the merge only read it — from the end of the range, so a whole-hour
     // mode applies to the hour as a unit.
     let range_end_ts = job_range_end(offset, partition_time_level);
-    let mode = MergeMode::for_compactor(stream_type, stream_name, range_end_ts, !is_incremental);
+    let mode = MergeMode::for_compactor(
+        stream_type,
+        stream_name,
+        &schema,
+        range_end_ts,
+        !is_incremental,
+    );
     // a whole-hour merge needs every file of the hour, even those already
     // above the size target that a normal merge would leave alone
     let max_original_size = if mode.merges_whole_batch() {
@@ -493,6 +502,16 @@ pub async fn merge_by_stream(
             }
 
             if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
+                return Ok(vec![]);
+            }
+            // A closed TSID-major hour made entirely of `tsid-major-v3-*` files
+            // is finalized: re-running the hour-end job leaves it alone. Any
+            // legacy or `tsid-sorted-*` file makes the whole hour merge again.
+            if mode.is_tsid_major()
+                && files_with_size
+                    .iter()
+                    .all(|f| MetricsFileLayout::of(&f.key) == MetricsFileLayout::TsidMajor)
+            {
                 return Ok(vec![]);
             }
 
@@ -866,8 +885,13 @@ pub async fn merge_files(
         target_partitions: 2,
     };
 
+    let input_sort_order = mode.input_sort_order(&files);
+    log::debug!(
+        "[COMPACTOR:WORKER:{thread_id}] merge [{mode}] input sort order: {input_sort_order}, files: {}",
+        files.len()
+    );
     let tables = match TableBuilder::new()
-        .sort_order(mode.input_sort_order())
+        .sort_order(input_sort_order)
         .build(session, files.clone(), schema.clone())
         .await
     {
@@ -934,6 +958,7 @@ pub async fn merge_files(
     for MergedFile {
         buf,
         meta: mut new_file_meta,
+        layout,
     } in merged_files
     {
         new_file_meta.compressed_size = buf.len() as i64;
@@ -944,7 +969,7 @@ pub async fn merge_files(
         }
 
         let id = ider::generate_file_name();
-        let new_file_key = format!("{prefix}/{id}{}", file_format.extension());
+        let new_file_key = format!("{prefix}/{}", layout.file_name(&id, file_format));
 
         // upload file to storage
         let buf = Bytes::from(buf);
