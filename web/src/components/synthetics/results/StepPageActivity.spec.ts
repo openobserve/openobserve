@@ -62,6 +62,13 @@ const mountActivity = (props: Record<string, unknown> = {}) =>
   });
 
 describe("StepPageActivity", () => {
+  it("offers no step select, because the card's step is already its scope", () => {
+    // The toolbar is shared with the run-level panel; passing no step options
+    // is what keeps the panel-only control off this surface.
+    const w = mountActivity({ events: manyEvents(6) });
+    expect(w.find('[data-test="synthetics-evidence-step-filter"]').exists()).toBe(false);
+  });
+
   it("renders the step's whole bucket, not a top five", () => {
     const w = mountActivity({ events: manyEvents(12) });
     expect(w.findComponent(EvidenceEvents).props("events")).toHaveLength(12);

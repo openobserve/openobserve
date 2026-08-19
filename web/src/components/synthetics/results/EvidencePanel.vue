@@ -43,7 +43,6 @@ import EvidenceFilters from "./EvidenceFilters.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import {
   EVIDENCE_ERROR_MESSAGE,
@@ -273,28 +272,17 @@ const stepSelectOptions = computed<SelectOptionInput[]>(() => {
 
         <!-- D6: the step scope is a control that narrows the list, not a
              caption that only restates it — a select the reader can change,
-             where the old banner could only be dismissed. One row with
-             EvidenceFilters; wraps on narrow widths. -->
-        <div class="flex flex-wrap items-center gap-2">
-          <OSelect
-            v-model="stepFilterModel"
-            :options="stepSelectOptions"
-            size="sm"
-            class="w-56 shrink-0"
-            :searchable="false"
-            data-test="synthetics-evidence-step-filter"
-          />
-          <!-- flex-1 so its own `ml-auto` still pushes the wrap button to the
-               far right: nested inside this row it would otherwise size to
-               content and strand the button mid-row. -->
-          <EvidenceFilters
-            class="flex-1"
-            v-model:view="view"
-            v-model:first-party-only="firstPartyOnly"
-            v-model:wrap="wrap"
-            :views="views"
-          />
-        </div>
+             where the old banner could only be dismissed. It lives in the
+             toolbar with the other filters; passing the options is what turns
+             it on, so the step card (which passes none) never shows it. -->
+        <EvidenceFilters
+          v-model:view="view"
+          v-model:first-party-only="firstPartyOnly"
+          v-model:wrap="wrap"
+          v-model:step-filter="stepFilterModel"
+          :views="views"
+          :step-options="stepSelectOptions"
+        />
 
         <!-- One table for the view. Rows come from the shared component, so the
              step expansion and this panel cannot drift apart; kind and step are

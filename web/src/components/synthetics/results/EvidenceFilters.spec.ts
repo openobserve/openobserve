@@ -33,6 +33,19 @@ const mountFilters = (props: Record<string, unknown> = {}) =>
   });
 
 describe("EvidenceFilters", () => {
+  it("shows the step select only when the caller supplies steps to choose from", () => {
+    // The step card has one step by definition, so it passes none and gets no
+    // control; the run-level panel passes them and does.
+    expect(mountFilters().find('[data-test="synthetics-evidence-step-filter"]').exists()).toBe(
+      false,
+    );
+    expect(
+      mountFilters({ stepOptions: [{ label: raw("All steps (3)"), value: "" }] })
+        .find('[data-test="synthetics-evidence-step-filter"]')
+        .exists(),
+    ).toBe(true);
+  });
+
   it("offers one option per view, each with its count", () => {
     const w = mountFilters();
     for (const v of VIEWS) {
