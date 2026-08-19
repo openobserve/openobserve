@@ -673,3 +673,129 @@ describe("targets that name a slot", () => {
     expect(JSON.stringify(policy)).toBe(before);
   });
 });
+
+/// **What the ladder does when it runs out was read-only.** The editor
+/// rendered a sentence describing `repeat_count` and `final_action`, and warned
+/// that `notify_default_team` had no team nominated — for a value it would not
+/// let anybody set. A screen telling somebody to fix something it will not let
+/// them touch.
+describe("the end of the ladder, as an edit", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service.getTeamChannel.mockResolvedValue({
+      data: { team_id: "team_1", destinations: [], source: "policy" },
+    } as any);
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
+    } as any);
+    service.setPolicy.mockResolvedValue({ data: {} } as any);
+  });
+
+  function renderWith(over: Record<string, unknown> = {}) {
+    return mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy: { ...policy, ...over }, open: true },
+      global: { plugins: [i18n, store], stubs },
+    });
+  }
+
+  const saved = () => (service.setPolicy.mock.calls.at(-1)![0] as any).data;
+
+  async function save(wrapper: ReturnType<typeof renderWith>) {
+    await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+    await flushPromises();
+  }
+
+  it("opens on what the policy already says", async () => {
+    const wrapper = renderWith({ repeat_count: 3, final_action: "notify_default_team" });
+    await flushPromises();
+
+    expect(
+      wrapper.findComponent('[data-test="oncall-policy-repeat-count"]').props("modelValue"),
+    ).toBe(3);
+    expect(
+      wrapper.findComponent('[data-test="oncall-policy-final-action"]').props("modelValue"),
+    ).toBe("notify_default_team");
+  });
+
+  /// `repeat_count` 1 means the ladder runs once; there is no zero.
+  it("defaults to one pass, then stop", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+
+    expect(
+      wrapper.findComponent('[data-test="oncall-policy-repeat-count"]').props("modelValue"),
+    ).toBe(1);
+    expect(
+      wrapper.findComponent('[data-test="oncall-policy-final-action"]').props("modelValue"),
+    ).toBe("stop");
+  });
+
+  it("sends both, so the ladder's end is part of the save", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+
+    wrapper
+      .findComponent('[data-test="oncall-policy-repeat-count"]')
+      .vm.$emit("update:modelValue", 3);
+    wrapper
+      .findComponent('[data-test="oncall-policy-final-action"]')
+      .vm.$emit("update:modelValue", "notify_default_team");
+    await flushPromises();
+    await save(wrapper);
+
+    expect(saved()).toMatchObject({ repeat_count: 3, final_action: "notify_default_team" });
+  });
+
+  /// The sentence has to track the controls, not the last save — otherwise it
+  /// describes a ladder the reader has already changed.
+  it("re-words itself as the controls move", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+    const line = () => wrapper.find('[data-test="oncall-policy-ladder-end"]').text();
+
+    expect(line()).toContain("never answered");
+
+    wrapper
+      .findComponent('[data-test="oncall-policy-final-action"]')
+      .vm.$emit("update:modelValue", "notify_default_team");
+    await flushPromises();
+
+    expect(line()).not.toContain("never answered");
+  });
+
+  /// §G.9 #9: `notify_default_team` with nobody nominated is indistinguishable
+  /// from stop — the ladder ends silently while the policy reads as having a
+  /// safety net. The warning now follows the control instead of the last save.
+  it("warns as soon as the catch-all is chosen and none is nominated", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+    const warning = '[data-test="oncall-policy-no-default-warning"]';
+
+    expect(wrapper.find(warning).exists()).toBe(false);
+
+    wrapper
+      .findComponent('[data-test="oncall-policy-final-action"]')
+      .vm.$emit("update:modelValue", "notify_default_team");
+    await flushPromises();
+
+    expect(wrapper.find(warning).exists()).toBe(true);
+  });
+
+  it("drops an abandoned edit when the drawer is reopened", async () => {
+    const wrapper = renderWith({ repeat_count: 2 });
+    await flushPromises();
+
+    wrapper
+      .findComponent('[data-test="oncall-policy-repeat-count"]')
+      .vm.$emit("update:modelValue", 5);
+    await flushPromises();
+
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(
+      wrapper.findComponent('[data-test="oncall-policy-repeat-count"]').props("modelValue"),
+    ).toBe(2);
+  });
+});

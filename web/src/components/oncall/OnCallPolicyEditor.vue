@@ -183,8 +183,31 @@
             </div>
           </template>
 
-          <!-- What the ladder does when it runs out is part of its shape. -->
-          <div class="border-border-strong ms-3 flex flex-col gap-0.5 border-s py-2 ps-4">
+          <!-- What the ladder does when it runs out is part of its shape, so
+               it is edited here rather than described here. Both fields were
+               read-only — and the warning below fired about a value the editor
+               could not set, which is a screen telling somebody to fix
+               something it will not let them touch. -->
+          <div class="border-border-strong ms-3 flex flex-col gap-2 border-s py-2 ps-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <OText variant="label">{{ t("oncall.policyWhenRungsRunOut") }}</OText>
+              <span class="w-44">
+                <OSelect
+                  :model-value="repeatCount"
+                  :options="repeatOptions"
+                  data-test="oncall-policy-repeat-count"
+                  @update:model-value="(v: unknown) => (repeatCount = Number(v))"
+                />
+              </span>
+              <span class="w-56">
+                <OSelect
+                  :model-value="finalAction"
+                  :options="finalActionOptions"
+                  data-test="oncall-policy-final-action"
+                  @update:model-value="(v: unknown) => (finalAction = v as PolicyFinalAction)"
+                />
+              </span>
+            </div>
             <OText variant="meta" data-test="oncall-policy-ladder-end">
               {{ ladderEndLine }}
             </OText>
@@ -380,6 +403,7 @@ import type {
   LadderStep,
   OnCallPolicy,
   OnCallSlot,
+  PolicyFinalAction,
   PriorityRung,
   SlotTargetKind,
 } from "@/ts/interfaces/oncall";
@@ -436,6 +460,10 @@ const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
 /// preview then reports as a rung reaching nobody.
 const onCallNow = ref<OnCallSlot[]>([]);
 const destinations = ref<string[]>([]);
+/// Both are part of the ladder's shape, so both are draft state — reading them
+/// off `props.policy` is what made them read-only.
+const repeatCount = ref(1);
+const finalAction = ref<PolicyFinalAction>("stop");
 const availableDestinations = ref<string[]>([]);
 const saving = ref(false);
 
@@ -517,7 +545,7 @@ async function fetchRoutingConfig() {
 
 const defaultTeamMissing = computed(
   () =>
-    props.policy?.final_action === "notify_default_team" &&
+    finalAction.value === "notify_default_team" &&
     routingConfig.value !== null &&
     !routingConfig.value.default_team_id,
 );
@@ -526,8 +554,8 @@ const defaultTeamMissing = computed(
 /// the static "decided by the repeat and final action" told the author to go
 /// find out. `repeat_count` 1 means the ladder runs once; there is no zero.
 const ladderEndLine = computed(() => {
-  const repeats = props.policy?.repeat_count ?? 1;
-  const hands = props.policy?.final_action === "notify_default_team";
+  const repeats = repeatCount.value;
+  const hands = finalAction.value === "notify_default_team";
   if (hands) {
     const team = routingConfig.value?.default_team_name;
     return team
@@ -551,6 +579,21 @@ const targetOptions = computed(() =>
 const slotOptions = computed(() =>
   props.slots.map((slot) => ({ label: raw(slot), value: slot })),
 );
+
+/// One to five passes. More than five is a ladder somebody should shorten
+/// rather than repeat, and there is no zero — a policy that runs its ladder no
+/// times is a policy that pages nobody, which is what an empty rung list says.
+const repeatOptions = computed(() =>
+  [1, 2, 3, 4, 5].map((n) => ({
+    label: t("oncall.policyRepeatTimes", { count: n }, n),
+    value: n,
+  })),
+);
+
+const finalActionOptions = computed(() => [
+  { label: t("oncall.policyFinalStop"), value: "stop" },
+  { label: t("oncall.policyFinalNotifyDefault"), value: "notify_default_team" },
+]);
 
 /// A user target needs an email and a slot target needs a slot name, so both
 /// open a picker rather than adding an empty chip the policy would reject on
@@ -657,6 +700,9 @@ function reset() {
   pendingUserStep.value = null;
   pendingSlot.value = null;
   destinations.value = [...(props.policy?.destinations ?? [])];
+  // `repeat_count` 1 means the ladder runs once; there is no zero.
+  repeatCount.value = props.policy?.repeat_count ?? 1;
+  finalAction.value = props.policy?.final_action ?? "stop";
   l0Draft.value = null;
   l0Touched.value = false;
 }
@@ -777,6 +823,8 @@ async function save() {
       data: {
         rungs: draft.value,
         destinations: destinations.value,
+        repeat_count: repeatCount.value,
+        final_action: finalAction.value,
         ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
       },
     });

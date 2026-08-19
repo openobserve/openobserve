@@ -41,6 +41,7 @@ import type {
   EscalationPreview,
   CauseGroup,
   ResolutionCause,
+  SubjectType,
   CoverageGaps,
   DeliveryLedger,
   EscalateResult,
@@ -204,6 +205,9 @@ const oncall = {
       destinations?: string[];
       p1_parallel?: boolean;
       p4_pages?: boolean;
+      /** How many full passes the ladder runs before `final_action`. 1 = once;
+       *  there is no zero. */
+      repeat_count?: number;
       final_action?: PolicyFinalAction;
       /** Absent = unchanged. Only send when the user touched the L0 panel —
        *  editing rungs must not silently un-configure the gate. */
@@ -221,12 +225,31 @@ const oncall = {
     org_identifier,
     team_id,
     include_resolved,
+    cause,
+    subject_type,
+    source_id,
+    ownership_path,
     limit,
     offset,
   }: {
     org_identifier: string;
     team_id?: string;
     include_resolved?: boolean;
+    /**
+     * The structured cause a record was closed with. Only ever matches
+     * resolved records, so it implies `include_resolved`.
+     */
+    cause?: ResolutionCause;
+    /**
+     * **Past firings of one alert.** Sent as a pair with `source_id`; a record
+     * is keyed `(subject_type, source_id, firing)` and each firing is its own
+     * record. Filtering the org's open list client-side instead would silently
+     * miss anything past the 200-row cap.
+     */
+    subject_type?: SubjectType;
+    source_id?: string;
+    /** Everything an ownership rule's path caught, e.g. `k8s-cluster=prod`. */
+    ownership_path?: string;
     /** Server default 100, capped at 200. */
     limit?: number;
     offset?: number;
@@ -234,6 +257,10 @@ const oncall = {
     const params: Record<string, string | number | boolean> = {};
     if (team_id) params.team_id = team_id;
     if (include_resolved) params.include_resolved = true;
+    if (cause) params.cause = cause;
+    if (subject_type) params.subject_type = subject_type;
+    if (source_id) params.source_id = source_id;
+    if (ownership_path) params.ownership_path = ownership_path;
     if (limit !== undefined) params.limit = limit;
     if (offset !== undefined) params.offset = offset;
     return http().get<OnCallResponse[]>(

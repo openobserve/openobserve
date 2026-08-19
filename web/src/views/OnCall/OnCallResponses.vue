@@ -267,7 +267,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="includeResolved"
             :label="t('oncall.showResolved')"
             data-test="oncall-responses-resolved-toggle"
-            @update:model-value="() => fetchResponses()"
+            @update:model-value="onResolvedToggle"
+          />
+          <!-- Only with resolved pages in the list: a cause is written at
+               resolve, so filtering an open list by one can only ever empty
+               it. Server-side, like the team filter — the cause somebody wants
+               is usually months back, past any page cap. -->
+          <OSelect
+            v-if="includeResolved"
+            :model-value="causeFilter"
+            :options="causeOptions"
+            :placeholder="t('oncall.causeFilterAny')"
+            width="sm"
+            data-test="oncall-responses-cause-filter"
+            @update:model-value="onCauseFilter"
           />
           <!-- On by default. A rule firing every minute is one problem, not
                ninety-five, and the ungrouped view is for reading history. -->
@@ -436,11 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-notified="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5">
           <template v-if="isRinging(row)">
-            <OText
-              variant="body-strong"
-              as="span"
-              :data-test="`oncall-ringing-for-${row.rowKey}`"
-            >
+            <OText variant="body-strong" as="span" :data-test="`oncall-ringing-for-${row.rowKey}`">
               {{ ringingFor(row.latest) }}
             </OText>
             <OText variant="meta"
@@ -722,7 +731,9 @@ import type {
   OnCallSchedule,
   OnCallSlot,
   OnCallTeam,
+  ResolutionCause,
 } from "@/ts/interfaces/oncall";
+import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -806,6 +817,10 @@ const mineOnly = ref(false);
 const selectedIds = ref<string[]>([]);
 const grouped = ref(true);
 const includeResolved = ref(false);
+/// Empty means every cause. Cleared whenever resolved pages leave the list,
+/// because a cause filter over open records matches nothing and would read as
+/// "there is nothing here" rather than "this filter cannot apply".
+const causeFilter = ref<ResolutionCause | "">("");
 const busyId = ref("");
 const bulkBusy = ref(false);
 const confirmBulkResolve = ref(false);
@@ -886,7 +901,11 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // a woken engineer nothing. Fall back only when there is no title.
     accessorFn: (row: PageRow) => row.latest.title || row.latest.subject.source_id,
     sortable: true,
-    meta: { isName: true },
+    size: 280,
+    minSize: 200,
+    // The widest thing in the row and the one a reader scans by, so it takes
+    // the table's leftover width rather than leaving it to the trailing spacer.
+    meta: { isName: true, flex: true },
   },
   {
     // Sorts on rungs fired, so "furthest up the ladder" is one click away —
@@ -909,7 +928,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // against, and on a ringing row it is the whole point of the column.
     id: "notified",
     header: t("oncall.ringingAge"),
-    size: 176,
+    size: 144,
     accessorFn: (row: PageRow) => row.latest.opened_at,
     sortable: true,
   },
@@ -1045,6 +1064,23 @@ function toRows(records: OnCallResponse[]): PageRow[] {
 /// headings and the header's own "mine" toggle, so the list narrows from the
 /// header controls alone.
 const rows = computed(() => toRows(scopedResponses.value));
+
+const causeOptions = computed(() => [
+  { label: t("oncall.causeFilterAny"), value: "" },
+  ...RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
+]);
+
+function onCauseFilter(value: unknown) {
+  causeFilter.value = (value as ResolutionCause) || "";
+  void fetchResponses();
+}
+
+/// Turning resolved pages off takes the cause filter with it — left behind it
+/// would narrow an open list to nothing and read as an empty inbox.
+function onResolvedToggle() {
+  if (!includeResolved.value) causeFilter.value = "";
+  void fetchResponses();
+}
 
 const youLabel = computed(() => String(t("oncall.onCallYou")));
 
@@ -1390,6 +1426,7 @@ async function fetchAllPages(): Promise<OnCallResponse[]> {
       // pages were simply not in the list, and the screen said so by showing
       // nothing rather than by saying it was truncated.
       ...(teamFilter.value === "all" ? {} : { team_id: teamFilter.value }),
+      ...(causeFilter.value ? { cause: causeFilter.value } : {}),
       limit: RESPONSE_PAGE_LIMIT,
       offset: page * RESPONSE_PAGE_LIMIT,
     });

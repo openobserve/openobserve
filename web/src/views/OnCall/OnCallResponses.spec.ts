@@ -1227,3 +1227,135 @@ describe("OnCallResponses — the rows' own fields", () => {
     });
   });
 });
+
+/// The server validates `cause`, `subject_type`+`source_id` and
+/// `ownership_path` and the list offered none of them. A cause is the one
+/// worth a control: it is written at resolve, and "what was a config change
+/// last quarter" is a question about records far past any page cap.
+describe("OnCallResponses — filtering by cause", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+    service.listResponses.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
+    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
+    service.getSchedule.mockResolvedValue({ data: null } as any);
+    service.escalationProgress.mockResolvedValue({
+      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
+    } as any);
+    service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
+  });
+
+  /// OCheckbox is not in the shared stub set, and the real one does not put
+  /// the `data-test` where a test can drive it from. Stubbed locally rather
+  /// than globally, so nothing else in this file changes shape.
+  const localStubs = {
+    ...stubs,
+    OCheckbox: {
+      name: "OCheckbox",
+      props: ["modelValue", "label"],
+      emits: ["update:modelValue"],
+      template: `<button @click="$emit('update:modelValue', !modelValue)">{{ label }}</button>`,
+    },
+  };
+
+  /// The `data-test` lands as an ATTRIBUTE on the rendered root rather than on
+  /// the component, which a CSS selector passed to `findComponent` does not
+  /// match.
+  const byTest = (wrapper: any, name: string, test: string) =>
+    wrapper
+      .findAllComponents({ name })
+      .find((c: any) => c.attributes("data-test") === test);
+
+  const cause = (wrapper: any) => byTest(wrapper, "OSelect", "oncall-responses-cause-filter");
+  const resolved = (wrapper: any) =>
+    byTest(wrapper, "OCheckbox", "oncall-responses-resolved-toggle");
+
+  /// With no pages the setup checklist owns the screen and the toolbar is not
+  /// rendered at all, so these tests need something in the list before there
+  /// is a filter to drive.
+  async function open() {
+    service.listResponses.mockResolvedValue({
+      data: [
+        {
+          id: "resp_1",
+          org_id: "default",
+          subject: { subject_type: "alert", source_id: "al_ckt", firing: 1 },
+          team_id: "team_1",
+          priority: 1,
+          state: "triggered",
+          responder_role: "owner",
+          title: "checkout_failing",
+          opened_at: 1_700_000_000_000_000,
+        },
+      ],
+    } as any);
+    const wrapper = mount(OnCallResponses, {
+      global: { plugins: [i18n, store], stubs: localStubs },
+    });
+    await flushPromises();
+    return wrapper;
+  }
+
+  async function showResolved(wrapper: any, on = true) {
+    resolved(wrapper)!.vm.$emit("update:modelValue", on);
+    await flushPromises();
+  }
+
+  /// A cause is written at resolve, so filtering an OPEN list by one can only
+  /// ever empty it — the control would read as "there is nothing here" rather
+  /// than "this filter cannot apply".
+  it("is offered only once resolved pages are in the list", async () => {
+    const wrapper = await open();
+    expect(cause(wrapper)).toBeUndefined();
+
+    await showResolved(wrapper);
+
+    expect(cause(wrapper)).toBeDefined();
+  });
+
+  it("asks the server for the cause rather than narrowing what it loaded", async () => {
+    const wrapper = await open();
+    await showResolved(wrapper);
+
+    service.listResponses.mockClear();
+    cause(wrapper)!.vm.$emit("update:modelValue", "config_change_or_deploy");
+    await flushPromises();
+
+    expect(service.listResponses.mock.calls.at(-1)![0]).toMatchObject({
+      cause: "config_change_or_deploy",
+      include_resolved: true,
+    });
+  });
+
+  it("sends no cause when the filter is cleared", async () => {
+    const wrapper = await open();
+    await showResolved(wrapper);
+    cause(wrapper)!.vm.$emit("update:modelValue", "genuine_defect");
+    await flushPromises();
+
+    service.listResponses.mockClear();
+    cause(wrapper)!.vm.$emit("update:modelValue", "");
+    await flushPromises();
+
+    expect(service.listResponses.mock.calls.at(-1)![0]).not.toHaveProperty("cause");
+  });
+
+  /// Left behind when resolved pages go, it would narrow an open list to
+  /// nothing and read as an empty inbox.
+  it("clears itself when resolved pages leave the list", async () => {
+    const wrapper = await open();
+    await showResolved(wrapper);
+    cause(wrapper)!.vm.$emit("update:modelValue", "noisy_threshold");
+    await flushPromises();
+
+    service.listResponses.mockClear();
+    await showResolved(wrapper, false);
+    await flushPromises();
+
+    expect(service.listResponses.mock.calls.at(-1)![0]).not.toHaveProperty("cause");
+  });
+});
