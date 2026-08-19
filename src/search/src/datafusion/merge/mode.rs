@@ -30,7 +30,7 @@ use config::meta::promql::DownsamplingRule;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::{MetricsFileLayout, metrics_tsid_major_stream},
+        promql::tsid_layout::{MetricsFileLayout, metrics_tsid_major_stream},
         stream::{FileKey, StreamType},
     },
     utils::util::is_trace_time_index_stream,

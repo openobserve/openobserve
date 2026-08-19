@@ -28,8 +28,10 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         promql::{
-            EXEMPLARS_LABEL, HASH_LABEL, MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT,
-            TSID_SERIES_INDEX_ROW_START, VALUE_LABEL,
+            EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL,
+            tsid_layout::{
+                MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT, TSID_SERIES_INDEX_ROW_START,
+            },
         },
         stream::FileMeta,
     },

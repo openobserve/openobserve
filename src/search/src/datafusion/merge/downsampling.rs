@@ -19,7 +19,9 @@ use arrow::array::{Int64Array, RecordBatch};
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::{DownsamplingRule, Function, HASH_LABEL, MetricsFileLayout, VALUE_LABEL},
+        promql::{
+            DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL, tsid_layout::MetricsFileLayout,
+        },
         stream::FileMeta,
     },
     utils::parquet::new_parquet_writer,

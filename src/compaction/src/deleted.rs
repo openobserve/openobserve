@@ -19,7 +19,7 @@ use std::borrow::Cow;
 
 use config::{
     meta::{
-        promql::MetricsFileLayout,
+        promql::tsid_layout::MetricsFileLayout,
         stream::{FileKey, FileListDeleted, FileMeta},
     },
     utils::inverted_index::to_tantivy_name,

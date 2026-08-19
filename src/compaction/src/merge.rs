@@ -23,7 +23,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
-        promql::MetricsFileLayout,
+        promql::tsid_layout::MetricsFileLayout,
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
             StreamType,

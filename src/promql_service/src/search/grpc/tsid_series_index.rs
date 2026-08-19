@@ -29,8 +29,10 @@ use config::{
     PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
     meta::{
         promql::{
-            EXEMPLARS_LABEL, MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT,
-            TSID_SERIES_INDEX_ROW_START, VALUE_LABEL,
+            EXEMPLARS_LABEL, VALUE_LABEL,
+            tsid_layout::{
+                MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT, TSID_SERIES_INDEX_ROW_START,
+            },
         },
         stream::{FileKey, FileSelection},
     },
