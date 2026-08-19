@@ -45,6 +45,8 @@ pub struct InputMap {
     error_node_map: HashMap<String, Vec<Value>>,
     #[serde(default)]
     input_map: HashMap<String, Vec<Value>>,
+    #[serde(default)]
+    output_map: HashMap<String, Vec<Value>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -544,6 +546,7 @@ async fn execute_workflow(
     let ip_map = InputMap {
         error_node_map: errored_input_map,
         input_map: res.inputs,
+        output_map: res.outputs,
     };
 
     // if this is not empty, then some node errored
