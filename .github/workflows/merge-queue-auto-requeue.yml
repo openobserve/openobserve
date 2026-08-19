@@ -14,12 +14,22 @@ name: Auto Merge Queuer
 #
 # Re-queueing uses the PAT (secrets.ORG_ADMIN_TOKEN) on purpose: an enqueue made
 # with the default GITHUB_TOKEN would not re-trigger the merge_group check
-# workflows. This is the repo's standard human-PAT secret.
+# workflows. This is the repo's standard human-PAT secret, so the sticky comment,
+# labels and enqueue are all authored as the human (not github-actions[bot]).
+#
+# REQUIRED — secrets.ORG_ADMIN_TOKEN (fine-grained PAT) permissions:
+#   openobserve:  Pull requests: R/W (enqueuePullRequest + sticky comment)
+#                 Issues:        R/W (label create + add)
+#   NOTE: the `permissions:` block below constrains ONLY the run's GITHUB_TOKEN — it
+#   does NOT scope the PAT. Prefer a fine-grained PAT limited to this repo so its
+#   reach matches the two write scopes above rather than full org-admin.
 
 on:
   pull_request:
     types: [dequeued]
 
+# Applies to the run's GITHUB_TOKEN only (unused for API calls here — those use the
+# PAT); kept minimal so nothing this job doesn't need is granted to GITHUB_TOKEN.
 permissions:
   contents: read
 
