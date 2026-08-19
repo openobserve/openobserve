@@ -9,8 +9,9 @@ export class ServiceGraphPage {
     this.page = page;
 
     // ===== NAVIGATION =====
-    // Service Graph is its own route (/traces/service-graph), reached from the
-    // Traces rail tile's hover flyout — it is no longer a tab on the Traces page.
+    // Service Graph is reached from the Traces rail tile's hover flyout; since #13852 the
+    // flyout item lands on the Traces page's in-page `?tab=service-graph` view (the old
+    // /traces/service-graph route now only exists as a legacy redirect).
     this.tracesRailTile = '[data-test="nav-group-traces"]';
     // #13852 rerouted the flyout children through the Traces page's ?tab= views, so the
     // Service Graph flyout item is now `nav-group-item-traces-service-graph`

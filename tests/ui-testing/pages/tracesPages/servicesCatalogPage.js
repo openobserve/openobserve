@@ -88,8 +88,10 @@ export class ServicesCatalogPage {
     this.sidePanel = page.locator('[data-test="service-graph-side-panel"]');
 
     // =====================================================================
-    // Navigation — Services is its own route (/traces/services), reached from
-    // the Traces rail tile's hover flyout (no longer a tab on the Traces page)
+    // Navigation — Services Catalog is reached from the Traces rail tile's hover
+    // flyout; since #13852 the flyout item lands on the Traces page's in-page
+    // `?tab=services-catalog` view (the old /traces/services route now only
+    // exists as a legacy redirect).
     // =====================================================================
     this.tracesRailTile = page.locator('[data-test="nav-group-traces"]');
     // #13852 rerouted the flyout children through the Traces page's ?tab= views, so the
