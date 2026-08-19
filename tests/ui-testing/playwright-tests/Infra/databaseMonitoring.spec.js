@@ -117,14 +117,28 @@ test.describe('Database Monitoring', () => {
       expect(outcome, `${tab} never settled — neither rows nor an empty state`).not.toBe('timeout');
       testLogger.info(`${tab}: badge=${badge} rows=${rows} outcome=${outcome}`);
 
-      // Both of these tabs DO render a badge (measured: tableHealth "5",
-      // activity "38"). Treating a missing one as "nothing to reconcile" is
-      // how this test passed while comparing nothing at all — so an absent
-      // badge is now a failure, not a silent pass.
-      expect(
-        badge,
-        `${tab} rendered no badge within the timeout — the strip's fan-out never resolved`,
-      ).not.toBeNull();
+      // A badge is expected only where the ENGINE can fill that tab.
+      //
+      // The strip renders a badge when the count is non-null (`v-if="section.count != null"`),
+      // and a count is null when the feed never answered — which is the honest
+      // state for a tab this engine has no recipe for. SQL Server ships only
+      // blocking and deadlock recipes: no activity source exists, so Activity
+      // renders `dbm-activity-not-collecting` and NO badge, and demanding one
+      // there fails a page that is behaving correctly.
+      //
+      // A missing badge is still a failure where the tab HAS data, which is
+      // what this originally caught: treating "no badge" as "nothing to
+      // reconcile" let the test pass while comparing nothing at all.
+      const apiRows = await dbm.apiCount(tab === 'tableHealth' ? 'table_health' : 'activity', {});
+      if (apiRows) {
+        expect(
+          badge,
+          `${tab} has ${apiRows} rows in the API but rendered no badge — the strip's fan-out never resolved`,
+        ).not.toBeNull();
+      } else if (badge === null) {
+        testLogger.info(`${tab}: no data and no badge — this engine has no feed for it`);
+        return;
+      }
 
       // The defect this pins: badge 5, table "No table statistics yet".
       // A non-zero badge over an empty table is always wrong — the badge

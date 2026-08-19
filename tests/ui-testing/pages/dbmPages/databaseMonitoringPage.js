@@ -115,6 +115,16 @@ export class DatabaseMonitoringPage {
     // Query detail — the Callers panel's instructive empty state.
     this.detailCallersEmpty = page.locator('[data-test="dbm-detail-callers-empty"]');
 
+    // The SHARED empty state (DbmEmptyState), used by the overview, Top
+    // queries and Slowest calls. It renders one of two variants depending on
+    // why the list is empty, and neither is named after the page it appears
+    // on — so a tab relying on it has no page-specific empty selector at all.
+    // Missing these is why `waitForSettled` could never resolve on Top queries
+    // for an engine with no query feed: zero rows, and no empty state it knew
+    // to look for.
+    this.emptyStateFiltered = page.locator('[data-test="dbm-empty-state-filtered"]');
+    this.emptyStateDiagnostic = page.locator('[data-test="dbm-empty-state-diagnostic"]');
+
     this.queriesTable = page.locator('[data-test="dbm-queries-table"]');
     this.serverQueriesTable = page.locator('[data-test="dbm-server-queries-table"]');
 
@@ -477,19 +487,27 @@ export class DatabaseMonitoringPage {
       overview: {
         key: 'overview',
         table: this.databasesTable,
-        empties: [this.databasesNoTraffic],
+        empties: [this.databasesNoTraffic, this.emptyStateDiagnostic, this.emptyStateFiltered],
       },
       queries: {
         key: 'queries',
         table: this.queriesTable,
         // Zero-trace deployments answer here with the DATABASE-reported list,
         // so the server table is a legitimate "loaded" state, not an empty one.
-        empties: [this.serverQueriesTable],
+        // The two DbmEmptyState variants cover the engines with no query feed
+        // at all (SQL Server ships only blocking and deadlock recipes).
+        empties: [this.serverQueriesTable, this.emptyStateDiagnostic, this.emptyStateFiltered],
       },
       samples: {
         key: 'samples',
         table: this.samplesTable,
-        empties: [this.samplesNoMatches, this.samplesLogOff, this.serverSamplesSection],
+        empties: [
+          this.samplesNoMatches,
+          this.samplesLogOff,
+          this.serverSamplesSection,
+          this.emptyStateDiagnostic,
+          this.emptyStateFiltered,
+        ],
       },
       activity: {
         key: 'activity',
@@ -591,12 +609,34 @@ export class DatabaseMonitoringPage {
    * exists to catch.
    */
   async firstScopeFromApi({ periodSeconds = 3600 } = {}) {
-    const body = await this.dbmApi('table_health', periodSeconds, { system: null });
-    const hit = (body?.hits || []).find((h) => h && h.instance);
-    return {
-      instance: hit ? String(hit.instance) : '',
-      engine: hit?.engine ? String(hit.engine) : '',
-    };
+    // Try SEVERAL feeds, not just table health.
+    //
+    // Engines fill different tabs: SQL Server ships only blocking and deadlock
+    // recipes, so it has no table-health rows at all. Reading the scope from
+    // one feed meant every scope-dependent test SKIPPED on that engine —
+    // silently removing the coverage instead of exercising it, which is the
+    // failure mode a skip is worst at making visible.
+    //
+    // Field names differ by endpoint (table health spells them
+    // `instance`/`engine`; the event feeds use `db_instance`/`db_system`), so
+    // each candidate names its own.
+    const candidates = [
+      { endpoint: 'table_health', inst: 'instance', eng: 'engine' },
+      { endpoint: 'blocking', inst: 'db_instance', eng: 'db_system' },
+      { endpoint: 'deadlocks', inst: 'db_instance', eng: 'db_system' },
+      { endpoint: 'activity', inst: 'db_instance', eng: 'db_system' },
+    ];
+    for (const c of candidates) {
+      const body = await this.dbmApi(c.endpoint, periodSeconds, { system: null });
+      const hit = (body?.hits || []).find((h) => h && h[c.inst]);
+      if (hit) {
+        return {
+          instance: String(hit[c.inst]),
+          engine: hit[c.eng] ? String(hit[c.eng]) : '',
+        };
+      }
+    }
+    return { instance: '', engine: '' };
   }
 
   /**
