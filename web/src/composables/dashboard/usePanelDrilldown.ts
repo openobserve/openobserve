@@ -256,8 +256,8 @@ export function usePanelDrilldown({
 
   // ── Table cell → Logs drilldown ──
   // Drillable = a plain column_ref (aggregates aren't valid in a WHERE clause).
-  // Keyed by column alias (the table column id).
   const cellDrilldownFields: any = ref(new Map());
+  const cellDrilldownByQuery: any = ref(new Map());
   // SELECT * / dynamic-columns tables: every column id is drillable (see wildcard branch).
   const cellDrilldownWildcard: any = ref(null);
 
@@ -272,10 +272,12 @@ export function usePanelDrilldown({
 
   const computeCellDrilldownFields = async () => {
     const map = new Map<string, any>();
+    const byQuery = new Map<number, Map<string, any>>();
     let wildcard: any = null;
     const schema = panelSchema.value;
     if (!schema || schema.type !== "table" || schema.queryType === "promql") {
       cellDrilldownFields.value = map;
+      cellDrilldownByQuery.value = byQuery;
       cellDrilldownWildcard.value = null;
       return;
     }
@@ -297,29 +299,46 @@ export function usePanelDrilldown({
         return;
       }
       const ast = Array.isArray(parsed) ? parsed[0] : parsed;
-      // Only single-table SELECTs; joins would need qualified predicates.
-      if (!ast || ast.type !== "select" || (ast.from?.length ?? 0) > 1) return;
+      if (!ast || ast.type !== "select") return;
+
+      const isJoin = (ast.from?.length ?? 0) > 1;
+
+      const aliasToStream = new Map<string, string>();
+      (Array.isArray(ast.from) ? ast.from : []).forEach((f: any) => {
+        if (!f?.table) return;
+        if (f.as) aliasToStream.set(f.as, f.table);
+        aliasToStream.set(f.table, f.table);
+      });
 
       const fields = extractFields(ast, "_timestamp", parser);
 
       // SELECT *: resolve drillable columns by id at click time (needs the response).
-      if (!fields.length && singleQuery && isSelectStar(ast)) {
+      if (!fields.length && !isJoin && singleQuery && isSelectStar(ast)) {
         wildcard = { streamName, streamType, query: executedQuery };
         return;
       }
 
+      const perQuery = new Map<string, any>();
       fields.forEach((field: any) => {
         if (field.aggregationFunction || !field.column) return;
-        map.set(field.alias, {
+        const resolvedStream = field.streamAlias
+          ? (aliasToStream.get(field.streamAlias) ?? streamName)
+          : streamName;
+        const entry = {
           column: field.column,
-          streamName,
+          streamName: resolvedStream,
           streamType,
           query: executedQuery,
-        });
+          isJoin,
+        };
+        map.set(field.alias, entry);
+        perQuery.set(field.alias, entry);
       });
+      if (perQuery.size) byQuery.set(queryIndex, perQuery);
     });
 
     cellDrilldownFields.value = map;
+    cellDrilldownByQuery.value = byQuery;
     cellDrilldownWildcard.value = wildcard;
   };
 
@@ -1213,5 +1232,11 @@ export function usePanelDrilldown({
     intervalMicro,
     drilldownColumnAliases,
     drilldownAllColumns,
+    // Per-column drilldown target ({ column, streamName, streamType, query, isJoin }),
+    // join-aware. Looks up the clicked row's OWN query first (multi-query tables that
+    // share an alias), then falls back to the flat any-query map.
+    getCellDrilldownField: (queryIndex: number, alias: string) =>
+      cellDrilldownByQuery.value.get(queryIndex)?.get(alias) ??
+      cellDrilldownFields.value.get(alias),
   };
 }

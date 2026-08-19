@@ -1542,6 +1542,7 @@ export default defineComponent({
       hidePopupsAndOverlays,
       drilldownColumnAliases,
       drilldownAllColumns,
+      getCellDrilldownField,
     } = usePanelDrilldown({
       panelSchema,
       variablesData,
@@ -1762,10 +1763,13 @@ export default defineComponent({
       const qi = Number.isInteger(row?.__q) && queries[row.__q] ? row.__q : 0;
       const query = queries[qi];
       const executedSql = String(metadata.value?.queries?.[qi]?.query ?? query?.query ?? "");
-      const stream = query?.fields?.stream ?? query?.stream ?? "";
-      const streamType = query?.fields?.stream_type ?? query?.stream_type ?? "logs";
-      const realField = resolveAliasToColumn(alias, query, executedSql);
-      const baseWhere = extractPanelWhere(executedSql);
+
+      const cell = getCellDrilldownField(qi, alias);
+      const stream = cell?.streamName ?? query?.fields?.stream ?? query?.stream ?? "";
+      const streamType =
+        cell?.streamType ?? query?.fields?.stream_type ?? query?.stream_type ?? "logs";
+      const realField = cell?.column ?? resolveAliasToColumn(alias, query, executedSql);
+      const baseWhere = cell?.isJoin ? "" : extractPanelWhere(executedSql);
 
       const metaStartµs = Number(metadata.value?.queries?.[qi]?.startTime ?? 0);
       const metaEndµs = Number(metadata.value?.queries?.[qi]?.endTime ?? 0);

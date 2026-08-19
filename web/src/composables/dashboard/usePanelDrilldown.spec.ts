@@ -235,4 +235,24 @@ describe("usePanelDrilldown", () => {
 
     expect(api.drilldownAllColumns.value).toBe(true);
   });
+
+  it("resolves each join column to its own stream (join-aware)", async () => {
+    const deps = makeTableDeps(
+      "select a.svc as svc, b.region as region, count(*) as cnt " +
+        "from stream_a a join stream_b b on a.id = b.id group by svc, region",
+    );
+    const api = usePanelDrilldown(deps as any);
+    await flush();
+
+    // Both dimension columns drillable; the aggregate excluded.
+    expect(api.drilldownColumnAliases.value).toEqual(expect.arrayContaining(["svc", "region"]));
+    expect(api.drilldownColumnAliases.value).not.toContain("cnt");
+
+    // Each column resolves to the stream its alias points at, and is flagged as a join.
+    const svc = api.getCellDrilldownField(0, "svc");
+    const region = api.getCellDrilldownField(0, "region");
+    expect(svc.streamName).toBe("stream_a");
+    expect(region.streamName).toBe("stream_b");
+    expect(svc.isJoin).toBe(true);
+  });
 });
