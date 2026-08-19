@@ -881,13 +881,17 @@ function sanitizeReviewBody(body) {
   cleaned = cleaned.replace(/\\t/g, "\t");
   cleaned = cleaned.replace(/\\"/g, '"');
 
-  // Remove any XML boundary tags that escaped into the output
+  // Remove any XML boundary tags that escaped into the output.
+  // NOTE: "summary" is deliberately NOT in this list — it collides with the HTML
+  // <details><summary> element the review comment itself uses, and stripping it turns the
+  // findings fold's clickable label into bare text. Leaked XML <summary> finding-fields are
+  // already covered because they only appear inside <finding> blocks, which ARE stripped.
   const boundaryTags = ["mr_input", "mr_body", "mr_comments", "mr_details",
     "changed_files", "existing_inline_findings", "previous_review",
     "custom_review_instructions", "review_task", "pr_context", "diff",
     "all_findings", "coordinator_task", "overall_pr_context", "risk_tier",
     "failed_reviewers", "reviewer", "findings", "finding", "no-issues",
-    "category", "severity", "file", "line", "summary", "description", "suggestion"];
+    "category", "severity", "file", "line", "description", "suggestion"];
   const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
   cleaned = cleaned.replace(boundaryPattern, "");
 
