@@ -32,6 +32,7 @@ env:
   ZO_QUICK_MODE_STRATEGY: first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
   ZO_INGEST_ALLOWED_UPTO: 5
+  ZO_SLO_BACKFILL_CHUNK_SECS: 86400 # matches the server default; per-shard override below
   ZO_FEATURE_QUERY_EXCLUDE_ALL: false
   ZO_USAGE_BATCH_SIZE: 200
   ZO_USAGE_PUBLISH_INTERVAL: 2
@@ -259,6 +260,15 @@ jobs:
           # Set via "ingest_allowed_upto" in ci-matrix/ci_matrix.json; shards that
           # omit it keep the workflow default.
           ZO_INGEST_ALLOWED_UPTO: ${{ matrix.ingest_allowed_upto || env.ZO_INGEST_ALLOWED_UPTO }}
+          # Same per-shard rule: how much history one SLO backfill chunk covers.
+          # The production default (86400 = 1 day) makes a 7-day-window test SLO
+          # backfill in 7 sequential chunks under ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1
+          # (SLO-Measurement's shard note above) — no test here asserts on
+          # per-chunk timing or partial coverage, only on the final measured
+          # state, so a shard-only larger chunk is free wall-clock, not a
+          # behavior change. Set via "slo_backfill_chunk_secs" in
+          # ci-matrix/ci_matrix.json; shards that omit it keep the server default.
+          ZO_SLO_BACKFILL_CHUNK_SECS: ${{ matrix.slo_backfill_chunk_secs || env.ZO_SLO_BACKFILL_CHUNK_SECS }}
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start

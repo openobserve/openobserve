@@ -115,6 +115,13 @@ for (const s of include) {
 // silently DROPS older rows while still returning a success-shaped response. A
 // suite that seeds history — SLOs measure a rolling 7-day window — needs a wider
 // one, and scoping it to those shards keeps every other shard on the default.
+//
+// slo_backfill_chunk_secs follows the same rule for the same class of reason:
+// it's how much history one SLO backfill chunk covers, read once at server
+// start. The workflow default (86400 = 1 day) makes a 7-day-window test SLO
+// backfill in 7 sequential chunks under ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1;
+// SLO-Measurement widens it to the full window so its 3 backfilled SLOs don't
+// pay 21 chunks serially.
 const matrix = include.map((s) => ({
   testfolder: s.testfolder,
   actual_folder: s.actual_folder,
@@ -126,6 +133,10 @@ const matrix = include.map((s) => ({
     s.ingest_allowed_upto === undefined || s.ingest_allowed_upto === null
       ? ""
       : String(s.ingest_allowed_upto),
+  slo_backfill_chunk_secs:
+    s.slo_backfill_chunk_secs === undefined || s.slo_backfill_chunk_secs === null
+      ? ""
+      : String(s.slo_backfill_chunk_secs),
   // Per-shard worker count. Empty = use playwright.config.js (5 in CI).
   //
   // `fullyParallel` runs separate spec FILES concurrently, and
