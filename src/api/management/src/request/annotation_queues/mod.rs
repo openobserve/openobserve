@@ -38,6 +38,20 @@ use crate::{
     },
 };
 
+/// If `err`'s root cause is a retryable search-admission error (cancellation or
+/// ratelimit), return the 429 response it should map to instead of a 500.
+fn retryable_search_error_response(err: &anyhow::Error) -> Option<Response> {
+    let infra::errors::Error::ErrorCode(code) = err.downcast_ref::<infra::errors::Error>()? else {
+        return None;
+    };
+    matches!(
+        code,
+        infra::errors::ErrorCodes::SearchCancelQuery(_)
+            | infra::errors::ErrorCodes::RatelimitExceeded(_)
+    )
+    .then(|| MetaHttpResponse::too_many_requests(code.get_message()))
+}
+
 fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
     match value {
         AnnotationQueueError::Database(err) => {
@@ -49,6 +63,12 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
             MetaHttpResponse::internal_error("Failed to publish review Scores")
         }
         AnnotationQueueError::Search(err) => {
+            if let Some(response) = retryable_search_error_response(&err) {
+                log::warn!(
+                    "[AnnotationQueue] Workbench Scores query cancelled/rate-limited: {err}"
+                );
+                return response;
+            }
             log::error!("[AnnotationQueue] failed to query Workbench Scores: {err}");
             MetaHttpResponse::internal_error("Failed to query Workbench Scores")
         }
@@ -69,6 +89,10 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
             MetaHttpResponse::internal_error("Queue Item source stream is ambiguous")
         }
         AnnotationQueueError::Hydration(err) => {
+            if let Some(response) = retryable_search_error_response(&err) {
+                log::warn!("[AnnotationQueue] Queue Item hydration cancelled/rate-limited: {err}");
+                return response;
+            }
             log::error!("[AnnotationQueue] failed to hydrate Queue Item: {err}");
             MetaHttpResponse::internal_error("Failed to hydrate Queue Item")
         }
@@ -757,6 +781,39 @@ mod tests {
                 .status()
                 .as_u16(),
             409
+        );
+    }
+
+    #[test]
+    fn maps_search_cancellation_to_too_many_requests() {
+        let cancelled = || {
+            anyhow::anyhow!(infra::errors::Error::ErrorCode(
+                infra::errors::ErrorCodes::SearchCancelQuery("canceled".to_string())
+            ))
+        };
+        assert_eq!(
+            annotation_queue_error_response(AnnotationQueueError::Search(cancelled()))
+                .status()
+                .as_u16(),
+            429
+        );
+        assert_eq!(
+            annotation_queue_error_response(AnnotationQueueError::Hydration(cancelled()))
+                .status()
+                .as_u16(),
+            429
+        );
+    }
+
+    #[test]
+    fn maps_other_search_errors_to_internal_error() {
+        assert_eq!(
+            annotation_queue_error_response(AnnotationQueueError::Search(anyhow::anyhow!(
+                "unexpected SQL error"
+            )))
+            .status()
+            .as_u16(),
+            500
         );
     }
 }
