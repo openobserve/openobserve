@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -102,7 +102,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/jenkins.svg"),
-        label: t("ingestion.jenkins"),
+        label: raw("Jenkins"),
         contentClass: "tab_content",
       },
       {
@@ -114,7 +114,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/ansible.svg"),
-        label: t("ingestion.ansible"),
+        label: raw("Ansible"),
         contentClass: "tab_content",
       },
       {
@@ -126,7 +126,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/terraform.svg"),
-        label: t("ingestion.terraform"),
+        label: raw("Terraform"),
         contentClass: "tab_content",
       },
       {
@@ -138,7 +138,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/github-actions.svg"),
-        label: t("ingestion.gactions"),
+        label: raw("GitHub Actions"),
         contentClass: "tab_content",
       },
     ];

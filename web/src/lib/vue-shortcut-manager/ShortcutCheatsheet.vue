@@ -273,6 +273,15 @@ interface DisplayModule {
 const groupByPage = new Map(SHORTCUT_REGISTRY.map((g) => [g.pageKey, g]));
 
 /**
+ * Product names inside a page title, supplied from code so translators cannot
+ * touch them (the same reason `ShortcutModule.title` exists — "RUM" came back
+ * as "RON"/"RHUM"). Keyed by `pageKey`; pages absent here take no parameters.
+ */
+const PAGE_TITLE_PARAMS: Partial<Record<string, Record<string, I18nText>>> = {
+  "shortcuts.pages.rumSessions": { product: raw("RUM") },
+};
+
+/**
  * Cheatsheet display combo. Always the Windows/common form — `sym()` renders
  * `ctrl`→`⌘` on Mac, so we never need the explicit `keyForMac` here.
  */
@@ -282,13 +291,13 @@ function entryDisplay(e: ShortcutEntry): string {
 
 const allModules = computed<DisplayModule[]>(() => {
   return SHORTCUT_MODULES.map((m) => ({
-    title: t(m.titleKey),
+    title: m.title ? raw(m.title) : t(m.titleKey),
     sections: m.pages.flatMap((pageKey) => {
       const group = groupByPage.get(pageKey);
       if (!group) return [];
       return [
         {
-          title: t(group.pageKey),
+          title: t(group.pageKey, PAGE_TITLE_PARAMS[group.pageKey] ?? {}),
           entries: group.shortcuts.map((s) => ({
             id: s.id,
             display: entryDisplay(s),

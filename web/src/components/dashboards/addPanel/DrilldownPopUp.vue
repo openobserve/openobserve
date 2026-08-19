@@ -595,11 +595,11 @@ export default defineComponent({
 
       if (dashboardPanelData.data.type === "sankey") {
         selectedValues = [
-          { label: "Edge Source", value: "${edge.__source}" },
-          { label: "Edge Target", value: "${edge.__target}" },
-          { label: "Edge Value", value: "${edge.__value}" },
-          { label: "Node Name", value: "${node.__name}" },
-          { label: "Node Value", value: "${node.__value}" },
+          { label: t("dashboard.edgeSource"), value: "${edge.__source}" },
+          { label: t("dashboard.edgeTarget"), value: "${edge.__target}" },
+          { label: t("dashboard.edgeValue"), value: "${edge.__value}" },
+          { label: t("dashboard.nodeName"), value: "${node.__name}" },
+          { label: t("dashboard.nodeValue"), value: "${node.__value}" },
           ...variableListName,
         ];
       } else if (dashboardPanelData.data.type === "table") {
@@ -620,20 +620,20 @@ export default defineComponent({
         });
       } else if (["pie", "donut", "gauge"].includes(dashboardPanelData.data.type)) {
         selectedValues = [
-          { label: "Series Name", value: "${series.__name}" },
-          { label: "Series Value", value: "${series.__value}" },
+          { label: t("dashboard.seriesName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
           ...variableListName,
         ];
       } else if (dashboardPanelData.data.type === "metric") {
         selectedValues = [
-          { label: "Series Value", value: "${series.__value}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
           ...variableListName,
         ];
       } else {
         selectedValues = [
-          { label: "Series Name", value: "${series.__name}" },
-          { label: "Series Value", value: "${series.__value}" },
-          { label: "Axis Value", value: "${series.__axisValue}" },
+          { label: t("dashboard.seriesName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          { label: t("dashboard.axisValue"), value: "${series.__axisValue}" },
           ...variableListName,
         ];
       }

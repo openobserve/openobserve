@@ -435,13 +435,15 @@ const getCurrentTime = (): string => {
 
 // Get destination type display name
 const getDestinationTypeName = (type: string): string => {
+  // Vendor product names shown in the preview header — brands, identical in
+  // every locale.
   const typeNames: Record<string, string> = {
-    slack: "Slack",
-    msteams: "Microsoft Teams",
-    email: "Email",
-    pagerduty: "PagerDuty",
-    servicenow: "ServiceNow",
-    opsgenie: "Opsgenie",
+    slack: raw("Slack"),
+    msteams: raw("Microsoft Teams"),
+    email: raw("Email"),
+    pagerduty: raw("PagerDuty"),
+    servicenow: raw("ServiceNow"),
+    opsgenie: raw("Opsgenie"),
   };
   return typeNames[type] || type;
 };

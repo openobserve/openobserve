@@ -266,10 +266,10 @@ mod tests {
 
     #[test]
     fn test_output_ordering_follows_sort_order() {
-        use config::{TIMESTAMP_COL_NAME, meta::promql::HASH_LABEL};
+        use config::TIMESTAMP_COL_NAME;
 
         let schema = Arc::new(Schema::new(vec![
-            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new("k", DataType::UInt64, false),
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("v", DataType::Float64, true),
         ]));
@@ -288,28 +288,17 @@ mod tests {
             ordering(FileSortOrder::TimestampDesc),
             Some(vec![("_timestamp@1".to_string(), true)])
         );
-        assert_eq!(
-            ordering(FileSortOrder::HashTimestampAsc),
-            Some(vec![
-                ("__hash__@0".to_string(), false),
-                ("_timestamp@1".to_string(), false)
-            ])
-        );
 
-        // a sort column missing from the projected schema: no ordering is declared
-        let no_hash = Arc::new(Schema::new(vec![Field::new(
-            TIMESTAMP_COL_NAME,
-            DataType::Int64,
-            false,
-        )]));
+        // the sort column missing from the projected schema: no ordering is declared
+        let no_ts = Arc::new(Schema::new(vec![Field::new("v", DataType::Float64, true)]));
         let exec = NewEmptyExec::new(
             "t",
-            no_hash.clone(),
+            no_ts.clone(),
             None,
             &[],
             None,
-            FileSortOrder::HashTimestampAsc,
-            no_hash,
+            FileSortOrder::TimestampDesc,
+            no_ts,
         );
         assert!(exec.properties().output_ordering().is_none());
     }

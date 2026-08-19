@@ -247,7 +247,7 @@ export default defineComponent({
     ]);
 
     const formatTimestamp = (timestamp: number) => {
-      if (!timestamp) return "N/A";
+      if (!timestamp) return raw("N/A");
       return formatToReadable(timestamp);
     };
 

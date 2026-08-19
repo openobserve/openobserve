@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   :name="`cli.credFiles[${idx}].key`"
                   :label="t('aiToolset.credEnvVar')"
-                  :helpText="raw('e.g. KUBECONFIG')"
+                  :helpText="t('aiToolset.credEnvVarHint', { example: 'KUBECONFIG' })"
                   class="o2-input w-48"
                 />
                 <OButton
@@ -463,7 +463,9 @@ export default defineComponent({
       } catch (err: any) {
         const msg =
           err?.response?.data?.message ||
-          (isEditing.value ? t("aiToolset.updateFailed") : t("aiToolset.createFailed"));
+          (isEditing.value
+            ? t("aiToolset.updateFailed", { product: raw("AI Toolset") })
+            : t("aiToolset.createFailed", { product: raw("AI Toolset") }));
         toast({ variant: "error", message: msg });
       }
     };

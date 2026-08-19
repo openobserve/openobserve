@@ -3,6 +3,19 @@
  * Generates human-readable paragraph summaries of alert configurations with clickable segments
  */
 
+import { gt } from "@/types/i18n";
+
+/**
+ * Translator accepted by the summary helpers.
+ *
+ * The optional arguments mirror `TranslateFn` from `@/types/i18n`: named
+ * interpolation values, then a plural choice. Both are load-bearing here — every
+ * sentence this file produces is ONE message with its values interpolated into
+ * it, never a phrase concatenated out of translated words, because word order
+ * and plural forms are the translator's to choose.
+ */
+type SummaryTranslate = (key: string, named?: Record<string, unknown>, plural?: number) => string;
+
 export interface SummarySegment {
   text: string;
   fieldId?: string; // Optional field ID for clickable segments
@@ -22,7 +35,7 @@ export interface SummarySegment {
 export function generateAlertSummary(
   formData: any,
   destinations: any[],
-  t?: (key: string) => string,
+  t?: SummaryTranslate,
   _wizardStep: number = 6,
   previewQuery: string = "",
   generatedSqlQuery: string = "",
@@ -37,31 +50,12 @@ export function generateAlertSummary(
     return "";
   }
 
-  // Default translation function if not provided.
-  const translate =
-    t ||
-    ((key: string) => {
-      const fallbacks: Record<string, string> = {
-        "alerts.summary.monitors": "Monitors",
-        "alerts.summary.from": "from",
-        "alerts.summary.inRealTime": "in real-time",
-        "alerts.summary.ofData": "of data",
-        "alerts.summary.triggersWhen": "Triggers when",
-        "alerts.summary.queryConditions": "query conditions",
-        "alerts.summary.areMet": "are met",
-        "alerts.summary.eventsDetected": "events detected",
-        "alerts.summary.sendsTo": "Sends to",
-        "alerts.summary.noDestination": "No destination",
-        "alerts.summary.notSetupYet": "(not set up yet)",
-        "alerts.summary.cooldown": "Cooldown",
-        "alerts.summary.betweenAlerts": "between alerts",
-        "alerts.summary.alertName": "Alert Name",
-        "alerts.summary.streamInfo": "Data Source",
-        "alerts.summary.alertType": "Alert Type",
-        "alerts.summary.queryCondition": "Query Condition",
-      };
-      return fallbacks[key] || key;
-    });
+  // Default translation function if not provided. `gt` rather than a table of
+  // English fallbacks: this module is Vue-less, so it cannot call `useI18n()`, and
+  // `gt` is exactly the sanctioned escape hatch for that. It also covers EVERY key
+  // (the old table covered a third of them and echoed the raw key for the rest) and
+  // does so in the user's locale instead of always in English.
+  const translate: SummaryTranslate = t ?? gt;
 
   const parts: string[] = [];
   const isRealTime = formData.is_real_time === "true" || formData.is_real_time === true;
@@ -82,7 +76,8 @@ export function generateAlertSummary(
 
   // Build the bullet-point summary
   const streamType = formData.stream_type || "logs";
-  const streamName = formData.stream_name || "the selected stream";
+  // Guaranteed non-empty by the early return above.
+  const streamName = formData.stream_name;
 
   // Basic alert info (stream type, stream name, alert type)
   const displayStreamType = streamType.charAt(0).toUpperCase() + streamType.slice(1);
@@ -91,11 +86,11 @@ export function generateAlertSummary(
   );
   if (isRealTime) {
     parts.push(
-      `✓ ${translate("alerts.summary.alertType")}: ${clickable("Real-Time", "alertType")}`,
+      `✓ ${translate("alerts.summary.alertType")}: ${clickable(translate("alerts.summary.alertTypeRealTime"), "alertType")}`,
     );
   } else {
     parts.push(
-      `✓ ${translate("alerts.summary.alertType")}: ${clickable("Scheduled", "alertType")}`,
+      `✓ ${translate("alerts.summary.alertType")}: ${clickable(translate("alerts.summary.alertTypeScheduled"), "alertType")}`,
     );
   }
 
@@ -150,6 +145,7 @@ export function generateAlertSummary(
         period = getMultiTimeRangeText(
           formData.query_condition.multi_time_range,
           formData.trigger_condition.period,
+          translate,
         );
         fieldId = "multiwindow"; // Focus on Compare with Past section
       } else {
@@ -217,14 +213,16 @@ export function generateAlertSummary(
 /**
  * Get operator symbol for readable text
  */
-function getOperatorSymbol(operator: string, t: (key: string) => string): string {
+function getOperatorSymbol(operator: string, t: SummaryTranslate): string {
+  // `|| "equal to"` was dead: a missing key resolves to the key path, which is
+  // truthy, so the English never showed. The gloss is a whole message either way.
   const operatorMap: { [key: string]: string } = {
-    "=": `(=) ${t("alerts.summary.equalTo") || "equal to"}`,
-    "!=": `(≠) ${t("alerts.summary.notEqualTo") || "not equal to"}`,
-    ">": `(>) ${t("alerts.summary.orMore") || "or more"}`,
-    ">=": `(≥) ${t("alerts.summary.orMore") || "or more"}`,
-    "<": `(<) ${t("alerts.summary.orLess") || "or less"}`,
-    "<=": `(≤) ${t("alerts.summary.orLess") || "or less"}`,
+    "=": `(=) ${t("alerts.summary.equalTo")}`,
+    "!=": `(≠) ${t("alerts.summary.notEqualTo")}`,
+    ">": `(>) ${t("alerts.summary.orMore")}`,
+    ">=": `(≥) ${t("alerts.summary.orMore")}`,
+    "<": `(<) ${t("alerts.summary.orLess")}`,
+    "<=": `(≤) ${t("alerts.summary.orLess")}`,
   };
 
   return operatorMap[operator] || operator;
@@ -233,33 +231,28 @@ function getOperatorSymbol(operator: string, t: (key: string) => string): string
 /**
  * Get period text (e.g., "the last 30 minutes", "the last 1 hour")
  */
-function getPeriodText(period: number, t: (key: string) => string): string {
-  if (!period) return "recent data";
+function getPeriodText(period: number, t: SummaryTranslate): string {
+  if (!period) return t("alerts.recentData");
 
   const minutes = period;
-  const minuteText = t("alerts.summary.minute") || "minute";
-  const minutesText = t("alerts.summary.minutes") || "minutes";
-  const hourText = t("alerts.summary.hour") || "hour";
-  const hoursText = t("alerts.summary.hours") || "hours";
 
-  if (minutes < 60) {
-    return minutes === 1 ? `the last ${minuteText}` : `the last ${minutes} ${minutesText}`;
-  }
+  if (minutes < 60) return t("alerts.summary.theLastMinute", { count: minutes });
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return hours === 1 ? `the last ${hourText}` : `the last ${hours} ${hoursText}`;
-  }
+  if (hours < 24) return t("alerts.summary.theLastHour", { count: hours });
 
-  const days = Math.floor(hours / 24);
-  return days === 1 ? "the last day" : `the last ${days} days`;
+  return t("alerts.theLastDay", { count: Math.floor(hours / 24) });
 }
 
 /**
  * Get multi-window time range text (e.g., "3 time ranges (30m, 1h, 2h)")
  * Includes current window period plus all comparison windows
  */
-function getMultiTimeRangeText(timeRanges: any[], currentPeriod: number): string {
+function getMultiTimeRangeText(
+  timeRanges: any[],
+  currentPeriod: number,
+  t: SummaryTranslate,
+): string {
   if (!timeRanges || timeRanges.length === 0) return "";
 
   // Parse offSet strings (e.g., "3d", "1h", "30m", "2w", "1M") to minutes
@@ -304,31 +297,40 @@ function getMultiTimeRangeText(timeRanges: any[], currentPeriod: number): string
   });
 
   const rangeList = rangeTexts.join(", ");
-  return `${count} time ${count === 1 ? "range" : "ranges"} (${rangeList})`;
+  return t("alerts.summary.timeRangeCount", { n: count, ranges: rangeList }, count);
 }
 
 /**
  * Get silence/cooldown text (e.g., "10 minutes", "2 hours")
  */
-function getSilenceText(silence: number, t: (key: string) => string): string {
-  const noCooldown = t("alerts.summary.noCooldown") || "No cooldown";
-  const minuteText = t("alerts.summary.minute") || "minute";
-  const minutesText = t("alerts.summary.minutes") || "minutes";
-  const hourText = t("alerts.summary.hour") || "hour";
-  const hoursText = t("alerts.summary.hours") || "hours";
-
-  if (silence === 0) return noCooldown;
-  if (silence === 1) return `1 ${minuteText}`;
-  if (silence < 60) return `${silence} ${minutesText}`;
+function getSilenceText(silence: number, t: SummaryTranslate): string {
+  if (silence === 0) return t("alerts.summary.noCooldown");
+  if (silence < 60) return minutesText(silence, t);
 
   const hours = Math.floor(silence / 60);
   const remainingMinutes = silence % 60;
 
-  if (remainingMinutes === 0) {
-    return hours === 1 ? `1 ${hourText}` : `${hours} ${hoursText}`;
-  }
+  if (remainingMinutes === 0) return hoursText(hours, t);
 
+  // A compact duration in unit SYMBOLS ("2h 30m") — the same token in every locale.
   return `${hours}h ${remainingMinutes}m`;
+}
+
+/**
+ * "1 minute" / "30 minutes", as a plural MESSAGE.
+ *
+ * `t(key, named, choice)` rather than `n === 1 ? singular : plural`: how many
+ * forms a language has, and where the number sits in them, is the translation's
+ * business. The explicit `choice` (1 or 2, never the raw value) preserves the
+ * behaviour the ternary had for a non-numeric `n`, which the form can produce.
+ */
+function minutesText(n: number, t: SummaryTranslate): string {
+  return t("alerts.summary.minuteCount", { n }, n === 1 ? 1 : 2);
+}
+
+/** "1 hour" / "2 hours". See {@link minutesText}. */
+function hoursText(n: number, t: SummaryTranslate): string {
+  return t("alerts.summary.hourCount", { n }, n === 1 ? 1 : 2);
 }
 
 /**
@@ -338,24 +340,15 @@ function generatePlainEnglishSummary(
   formData: any,
   destinations: any[],
   isRealTime: boolean,
-  t: (key: string) => string,
+  t: SummaryTranslate,
 ): string {
   if (!formData || !formData.stream_name) return "";
 
   const parts: string[] = [];
-  const eventsPlural = t("alerts.summary.plainEnglish.eventsPlural") || "events";
-  const eventSingular = t("alerts.summary.plainEnglish.eventSingular") || "event";
-  const minuteText = t("alerts.summary.minute") || "minute";
-  const minutesText = t("alerts.summary.minutes") || "minutes";
-  const hourText = t("alerts.summary.hour") || "hour";
-  const hoursText = t("alerts.summary.hours") || "hours";
 
   // Show full alert logic
   if (isRealTime) {
-    parts.push(
-      t("alerts.summary.plainEnglish.realTime") ||
-        "Alert me immediately when matching events occur in real-time",
-    );
+    parts.push(t("alerts.summary.plainEnglish.realTime"));
   } else {
     // Get threshold and operator
     const threshold = formData.trigger_condition?.threshold;
@@ -363,63 +356,51 @@ function generatePlainEnglishSummary(
     const period = formData.trigger_condition?.period;
 
     if (threshold !== undefined && operator && period) {
-      // Build the condition phrase
-      let conditionPhrase = "";
+      // One whole message per operator, each carrying the threshold as a VALUE.
+      // "more than 5 events" and "5 events or more" put the number in different
+      // places, so the phrase cannot be assembled here out of a word and a number.
+      const conditionKeys: Record<string, string> = {
+        ">=": "alerts.summary.plainEnglish.conditionAtLeast",
+        ">": "alerts.summary.plainEnglish.conditionMoreThan",
+        "<=": "alerts.summary.plainEnglish.conditionOrFewer",
+        "<": "alerts.summary.plainEnglish.conditionFewerThan",
+        "!=": "alerts.summary.plainEnglish.conditionNot",
+      };
+      const conditionPhrase =
+        operator === "="
+          ? t(
+              "alerts.summary.plainEnglish.conditionExactly",
+              { threshold },
+              threshold === 1 ? 1 : 2,
+            )
+          : conditionKeys[operator]
+            ? t(conditionKeys[operator], { threshold })
+            : t("alerts.summary.plainEnglish.conditionOther", { threshold, operator });
 
-      if (operator === ">=") {
-        conditionPhrase = `${threshold}+ ${eventsPlural}`;
-      } else if (operator === ">") {
-        const moreThan = t("alerts.summary.plainEnglish.moreThan") || "more than";
-        conditionPhrase = `${moreThan} ${threshold} ${eventsPlural}`;
-      } else if (operator === "=") {
-        const exactly = t("alerts.summary.plainEnglish.exactly") || "exactly";
-        conditionPhrase = `${exactly} ${threshold} ${threshold !== 1 ? eventsPlural : eventSingular}`;
-      } else if (operator === "<=") {
-        const orFewer = t("alerts.summary.plainEnglish.orFewer") || "or fewer";
-        conditionPhrase = `${threshold} ${orFewer} ${eventsPlural}`;
-      } else if (operator === "<") {
-        const fewerThan = t("alerts.summary.plainEnglish.fewerThan") || "fewer than";
-        conditionPhrase = `${fewerThan} ${threshold} ${eventsPlural}`;
-      } else if (operator === "!=") {
-        const not = t("alerts.summary.plainEnglish.not") || "not";
-        conditionPhrase = `${not} ${threshold} ${eventsPlural}`;
-      } else {
-        conditionPhrase = `${threshold} ${eventsPlural} (${operator})`;
-      }
-
-      // Build the time period phrase
-      let periodPhrase = "";
-      if (period < 60) {
-        periodPhrase = period === 1 ? `1-${minuteText}` : `${period}-${minuteText}`;
-      } else {
-        const hours = Math.floor(period / 60);
-        periodPhrase = hours === 1 ? `1-${hourText}` : `${hours}-${hourText}`;
-      }
-
-      const occurInAny = t("alerts.summary.plainEnglish.occurInAny") || "occur in any";
-      const periodWord = t("alerts.summary.plainEnglish.period") || "period";
-      const alertMeWhen = t("alerts.summary.plainEnglish.alertMeWhen") || "Alert me when";
-      parts.push(`${alertMeWhen} ${conditionPhrase} ${occurInAny} ${periodPhrase} ${periodWord}`);
+      // The window is part of the sentence rather than a fragment glued into it:
+      // "10-minute" is an English compound, so minutes and hours get a message each.
+      const inMinutes = period < 60;
+      parts.push(
+        t(
+          inMinutes
+            ? "alerts.summary.plainEnglish.alertMeWhenMinutes"
+            : "alerts.summary.plainEnglish.alertMeWhenHours",
+          {
+            condition: conditionPhrase,
+            count: inMinutes ? period : Math.floor(period / 60),
+          },
+        ),
+      );
 
       // Add cooldown phrase if configured
       const silence = formData.trigger_condition?.silence;
       if (silence && silence > 0) {
-        const butNoMoreThan =
-          t("alerts.summary.plainEnglish.butNoMoreThan") || ", but no more than once every";
-        if (silence < 60) {
-          const silenceText = silence === 1 ? `1 ${minuteText}` : `${silence} ${minutesText}`;
-          parts.push(`${butNoMoreThan} ${silenceText}`);
-        } else {
-          const hours = Math.floor(silence / 60);
-          const hoursCount = hours === 1 ? `1 ${hourText}` : `${hours} ${hoursText}`;
-          parts.push(`${butNoMoreThan} ${hoursCount}`);
-        }
+        const cooldown =
+          silence < 60 ? minutesText(silence, t) : hoursText(Math.floor(silence / 60), t);
+        parts.push(t("alerts.summary.plainEnglish.cooldownClause", { cooldown }));
       }
     } else {
-      parts.push(
-        t("alerts.summary.plainEnglish.defaultConditions") ||
-          "Alert me when the configured conditions are met",
-      );
+      parts.push(t("alerts.summary.plainEnglish.defaultConditions"));
     }
   }
 

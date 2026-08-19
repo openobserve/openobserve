@@ -19,7 +19,7 @@
 // (generic host vs AWS EC2), the EC2 IAM prerequisite and the detection config
 // live here rather than being duplicated in both cards.
 
-import { type I18nKey } from "@/types/i18n";
+import { type I18nKey, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardDetect, RichCardExtras } from "../types";
@@ -36,8 +36,7 @@ export type AgentEnv = "generic" | "ec2";
  * identifier, which needs an instance role — without it the agent installs but
  * every host shows up under its opaque instance id instead.
  */
-export const EC2_IAM_NOTE =
-  "Requires an IAM role on the instance with ec2:DescribeTags and ec2:DescribeInstances, so the agent can read the Name tag and use it as the host identifier.";
+export const EC2_IAM_NOTE_KEY: I18nKey = "ingestion.setupCard.ec2IamNote";
 
 /** Icon shown on the generic/EC2 toggle. */
 export const envIcons = () => ({
@@ -114,25 +113,28 @@ export function agentUninstall(os: AgentOs): NonNullable<RichCardExtras["uninsta
  * (macOS), where an EC2-only symptom would just be noise.
  */
 export function sharedAgentTroubleshooting(
+  t: TranslateFn,
   serviceHint: string,
   { includeEc2 = true }: { includeEc2?: boolean } = {},
 ): NonNullable<RichCardExtras["troubleshooting"]> {
   return [
     {
-      q: "The install script runs but no data arrives",
-      a: `Check the agent is running with ${serviceHint}. A 401 in its logs means the ingestion token is stale — re-copy the command from this page, which always carries this organization's current token.`,
+      q: t("ingestion.setupCard.agentTroubleNoDataQ"),
+      a: t("ingestion.setupCard.agentTroubleNoDataA", { hint: serviceHint }),
     },
     ...(includeEc2
       ? [
           {
-            q: "Hosts show up under an instance id instead of a name",
-            a: `That is the EC2 variant without its IAM role. ${EC2_IAM_NOTE} Attach the role, then restart the agent.`,
+            q: t("ingestion.setupCard.agentTroubleInstanceIdQ"),
+            a: t("ingestion.setupCard.agentTroubleInstanceIdA", {
+              iamNote: t(EC2_IAM_NOTE_KEY),
+            }),
           },
         ]
       : []),
     {
-      q: "The endpoint is unreachable from the host",
-      a: "The agent needs outbound access to this OpenObserve endpoint. Confirm with `curl -v` from the host itself — a proxy or egress firewall is the usual cause.",
+      q: t("ingestion.setupCard.agentTroubleUnreachableQ"),
+      a: t("ingestion.setupCard.agentTroubleUnreachableA"),
     },
   ];
 }

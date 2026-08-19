@@ -104,7 +104,7 @@ const deltaCaption = (delta: number | null | undefined, fallback: string, suffix
   if (delta === null || delta === undefined || delta === 0)
     return { caption: fallback, captionClass: "" };
   return {
-    caption: `${signed(delta, suffix)} ${t("rum.vsPreviousPeriod")}`,
+    caption: t("rum.deltaVsPreviousPeriod", { delta: signed(delta, suffix) }),
     // More sessions is neutral; more errors/frustration is bad, fewer is good.
     captionClass:
       suffix === "%"
@@ -149,7 +149,7 @@ const cards = computed(() => [
     value: formatMs(props.avgDurationMs),
     valueClass: "text-text-body",
     rate: "",
-    caption: `${t("rum.median")} ${formatMs(props.medianDurationMs)}`,
+    caption: t("rum.medianDuration", { duration: formatMs(props.medianDurationMs) }),
     captionClass: "",
     selectable: false,
   },

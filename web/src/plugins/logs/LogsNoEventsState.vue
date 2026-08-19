@@ -39,7 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #description>
       <!-- Filter applied within an overlapping window: relax the query. -->
-      <span v-if="windowHasStreamData && hasFilters" v-html="t('logs.noEvents.descWithFilters')" />
+      <span
+        v-if="windowHasStreamData && hasFilters"
+        v-html="DOMPurify.sanitize(t('logs.noEvents.descWithFilters'))"
+      />
       <!-- We know where the stream's last data is: offer to jump to it. -->
       <span v-else-if="jumpTarget">{{ t("logs.noEvents.descOutOfRange") }}</span>
       <!-- No stream stats: generic fallback. -->
@@ -98,6 +101,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { useAiIcon } from "@/composables/useAiIcon";
 import { DateTime } from "luxon";
 import { periodToLabel } from "@/composables/useWidenRange";
+import DOMPurify from "dompurify";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 // Backend uses exclusive end boundary, so nudge end by 1s to include the record at doc_time_max.

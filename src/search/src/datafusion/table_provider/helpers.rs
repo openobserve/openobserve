@@ -68,6 +68,15 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
                     file.extensions.insert(access_plan);
                 }
             }
+            FileSelection::RowRanges(ranges) => {
+                if let Some(access_plan) = generate_parquet_access_plan_from_ranges(
+                    file,
+                    ranges.iter().cloned(),
+                    row_group_size,
+                ) {
+                    file.extensions.insert(access_plan);
+                }
+            }
             #[cfg(feature = "enterprise")]
             FileSelection::RowGroups(row_group_ids) => {
                 if let Some((num_rows, row_group_size)) = parquet_file_layout(file, row_group_size)
@@ -89,8 +98,9 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
                     file.extensions.insert(access_plan);
                 }
             }
-            // row-group sampling is parquet only; vortex falls back to a full scan
-            FileSelection::RowGroups(_) => {}
+            // compact row ranges and row-group sampling are parquet only;
+            // vortex falls back to a full scan
+            FileSelection::RowRanges(_) | FileSelection::RowGroups(_) => {}
         },
     }
 }
@@ -100,6 +110,21 @@ fn generate_parquet_access_plan(
     row_ids: &BooleanBuffer,
     row_group_size: Option<u32>,
 ) -> Option<ParquetAccessPlan> {
+    generate_parquet_access_plan_from_ranges(
+        file,
+        row_ids.set_slices().map(|(start, end)| start..end),
+        row_group_size,
+    )
+}
+
+/// Build a Parquet access plan directly from sorted, non-overlapping row
+/// ranges. This avoids allocating a bitmap proportional to a high-cardinality
+/// metrics file when a series index already stores compact contiguous runs.
+fn generate_parquet_access_plan_from_ranges(
+    file: &PartitionedFile,
+    ranges: impl IntoIterator<Item = Range<usize>>,
+    row_group_size: Option<u32>,
+) -> Option<ParquetAccessPlan> {
     let (num_rows, row_group_size) = parquet_file_layout(file, row_group_size)?;
     let row_group_count = num_rows.div_ceil(row_group_size);
 
@@ -107,12 +132,15 @@ fn generate_parquet_access_plan(
     let mut row_group_selection =
         RowGroupSelectionBuilder::new(&mut access_plan, row_group_size, num_rows);
 
-    for (start, end) in row_ids.set_slices() {
-        if end > num_rows {
-            unreachable!("row_ids set slice end {end} exceeds num_rows {num_rows}");
-        }
-
-        row_group_selection.push_selected_range(start, end);
+    let mut previous_end = 0;
+    for range in ranges {
+        assert!(
+            previous_end <= range.start && range.start < range.end && range.end <= num_rows,
+            "invalid sorted row range {range:?} for file {} with {num_rows} rows",
+            file.path().as_ref()
+        );
+        previous_end = range.end;
+        row_group_selection.push_selected_range(range.start, range.end);
     }
     row_group_selection.finish();
 
@@ -342,6 +370,44 @@ mod tests {
         expected.scan(1);
         expected.scan_selection(1, RowSelection::from(vec![RowSelector::select(4)]));
         assert_eq!(plan, expected);
+    }
+
+    #[test]
+    fn test_generate_parquet_access_plan_from_series_ranges() {
+        let file = make_partitioned_file(12);
+        let plan =
+            generate_parquet_access_plan_from_ranges(&file, [1..3, 5..8, 10..12], Some(4)).unwrap();
+
+        let mut expected = ParquetAccessPlan::new_none(3);
+        expected.scan(0);
+        expected.scan_selection(
+            0,
+            RowSelection::from(vec![
+                RowSelector::skip(1),
+                RowSelector::select(2),
+                RowSelector::skip(1),
+            ]),
+        );
+        expected.scan(1);
+        expected.scan_selection(
+            1,
+            RowSelection::from(vec![RowSelector::skip(1), RowSelector::select(3)]),
+        );
+        expected.scan(2);
+        expected.scan_selection(
+            2,
+            RowSelection::from(vec![RowSelector::skip(2), RowSelector::select(2)]),
+        );
+        assert_eq!(plan, expected);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid sorted row range")]
+    fn test_generate_parquet_access_plan_rejects_out_of_bounds_row_ids() {
+        let file = make_partitioned_file(4);
+        let row_ids = BooleanBuffer::from_iter((0..5).map(|i| i == 4));
+
+        generate_parquet_access_plan(&file, &row_ids, Some(4));
     }
 
     #[test]

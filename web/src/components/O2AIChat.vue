@@ -1425,7 +1425,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
+import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -1601,8 +1601,8 @@ export default defineComponent({
     });
     const inputPlaceholder = computed(() =>
       props.centeredStart && chatMessages.value.length === 0
-        ? typewriterPlaceholder.value || "Write your prompt"
-        : "Write your prompt",
+        ? typewriterPlaceholder.value || t("common.writeYourPrompt")
+        : t("common.writeYourPrompt"),
     );
 
     // Chat history composable
@@ -1616,6 +1616,7 @@ export default defineComponent({
     } = useChatHistory(
       () => store.state.userInfo.email ?? "",
       () => store.state.selectedOrganization.identifier ?? "",
+      t,
     );
 
     const currentChatTimestamp = ref<string | null>(null);
@@ -1728,26 +1729,26 @@ export default defineComponent({
 
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
-      "Analyzing...",
-      "Thinking...",
-      "Processing...",
-      "Examining data...",
-      "Reviewing context...",
-      "Formulating response...",
-      "Checking details...",
-      "Gathering insights...",
-      "Evaluating options...",
-      "Synthesizing information...",
-      "Working on it...",
-      "Almost there...",
-      "Diving deeper...",
-      "Connecting the dots...",
-      "Crunching numbers...",
-      "Exploring possibilities...",
-      "Refining answer...",
-      "Still thinking...",
-      "Making progress...",
-      "Piecing together...",
+      t("aiAssistant.aiChat.analyzingMessages.analyzing"),
+      t("aiAssistant.aiChat.analyzingMessages.thinking"),
+      t("aiAssistant.aiChat.analyzingMessages.processing"),
+      t("aiAssistant.aiChat.analyzingMessages.examiningData"),
+      t("aiAssistant.aiChat.analyzingMessages.reviewingContext"),
+      t("aiAssistant.aiChat.analyzingMessages.formulatingResponse"),
+      t("aiAssistant.aiChat.analyzingMessages.checkingDetails"),
+      t("aiAssistant.aiChat.analyzingMessages.gatheringInsights"),
+      t("aiAssistant.aiChat.analyzingMessages.evaluatingOptions"),
+      t("aiAssistant.aiChat.analyzingMessages.synthesizingInformation"),
+      t("aiAssistant.aiChat.analyzingMessages.workingOnIt"),
+      t("aiAssistant.aiChat.analyzingMessages.almostThere"),
+      t("aiAssistant.aiChat.analyzingMessages.divingDeeper"),
+      t("aiAssistant.aiChat.analyzingMessages.connectingTheDots"),
+      t("aiAssistant.aiChat.analyzingMessages.crunchingNumbers"),
+      t("aiAssistant.aiChat.analyzingMessages.exploringPossibilities"),
+      t("aiAssistant.aiChat.analyzingMessages.refiningAnswer"),
+      t("aiAssistant.aiChat.analyzingMessages.stillThinking"),
+      t("aiAssistant.aiChat.analyzingMessages.makingProgress"),
+      t("aiAssistant.aiChat.analyzingMessages.piecingTogether"),
     ];
     const currentAnalyzingMessage = ref(ANALYZING_MESSAGES[0]);
     const analyzingRotationInterval = ref<NodeJS.Timeout | null>(null);
@@ -2151,7 +2152,10 @@ export default defineComponent({
           // Create a reference chip from the context
           const contextChip: ReferenceChip = {
             id: `context-${Date.now()}`,
-            filename: "Log Entry",
+            // Not translated: this filename is spliced verbatim into the
+            // `--- Log Entry ---` delimiter of the prompt sent to the LLM, so the
+            // delimiter must stay stable across locales.
+            filename: raw("Log Entry"),
             preview: createPreview(newAiChatInputContext, 10),
             fullContent: newAiChatInputContext,
             charCount: newAiChatInputContext.length,
@@ -2454,7 +2458,9 @@ export default defineComponent({
                     pendingConfirmation.value = {
                       tool: data.tool,
                       args: data.args || {},
-                      message: data.message || `Confirm execution of ${data.tool}?`,
+                      message:
+                        data.message ||
+                        t("aiAssistant.aiChat.confirmToolExecution", { tool: data.tool }),
                     };
                     await scrollToBottom();
                     continue;
@@ -2524,13 +2530,19 @@ export default defineComponent({
 
                     // Format error message with suggestion if available
                     // Handle case where error/message might be an object instead of string
-                    const rawError = data.error ?? data.message ?? "An unexpected error occurred";
+                    const rawError =
+                      data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
                     const errorText =
                       typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
                     // Check if this is an authorization/access error
                     const authErr = isAuthError(errorText, data.error_type);
-                    let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
+                    // Widened to `string`: the branded `I18nText` from t() does not survive
+                    // the `+=` below, and `data.suggestion` is server prose appended as a
+                    // separate paragraph, not a spliced sentence fragment.
+                    let errorMessage: string = authErr
+                      ? t(UNAUTHORIZED_MESSAGE_KEY)
+                      : t("common.errorPrefix", { message: errorText });
                     if (data.suggestion && !authErr) {
                       errorMessage += `\n\n${data.suggestion}`;
                     }
@@ -2764,7 +2776,7 @@ export default defineComponent({
                       const confirmBlock: ContentBlock = {
                         type: "tool_call",
                         tool: "navigation_action",
-                        message: data.label || "Navigate",
+                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
                         context: { navAction },
                         pendingConfirmation: true,
                         confirmationMessage: data.label,
@@ -2789,7 +2801,7 @@ export default defineComponent({
                       pendingConfirmation.value = {
                         tool: "navigation_action",
                         args: data.target || {},
-                        message: data.label || "Navigate",
+                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
                       };
 
                       // Store the navigation action for later execution
@@ -2818,7 +2830,7 @@ export default defineComponent({
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id,
                         success: false,
-                        resultMessage: data.message || "Tool execution failed",
+                        resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
                         errorType: data.error_type || undefined,
                         suggestion: data.suggestion || undefined,
                       };
@@ -2833,11 +2845,12 @@ export default defineComponent({
                     }
 
                     // Add inline error block
-                    const rawErrorMessage = data.message || data.error || "An error occurred";
+                    const rawErrorMessage =
+                      data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
                     const authErr = isAuthError(rawErrorMessage, data.error_type);
                     const errorBlock: ContentBlock = {
                       type: "error",
-                      message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
+                      message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
                       errorType: data.error_type || undefined,
                       suggestion: authErr ? undefined : data.suggestion || undefined,
                       recoverable: authErr ? false : (data.recoverable ?? undefined),
@@ -3058,13 +3071,17 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const rawError = data.error ?? data.message ?? "An unexpected error occurred";
+                  const rawError =
+                    data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
                   const errorText =
                     typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
                   // Check if this is an authorization/access error
                   const authErr = isAuthError(errorText, data.error_type);
-                  let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
+                  // Widened to `string` — see the note on the sibling handler above.
+                  let errorMessage: string = authErr
+                    ? t(UNAUTHORIZED_MESSAGE_KEY)
+                    : t("common.errorPrefix", { message: errorText });
                   if (data.suggestion && !authErr) {
                     errorMessage += `\n\n${data.suggestion}`;
                   }
@@ -3211,7 +3228,7 @@ export default defineComponent({
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id,
                       success: false,
-                      resultMessage: data.message || "Tool execution failed",
+                      resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
                       errorType: data.error_type || undefined,
                       suggestion: data.suggestion || undefined,
                     };
@@ -3225,11 +3242,12 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const rawErrorMessage = data.message || data.error || "An error occurred";
+                  const rawErrorMessage =
+                    data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
                   const authErr = isAuthError(rawErrorMessage, data.error_type);
                   const errorBlock: ContentBlock = {
                     type: "error",
-                    message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
+                    message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
                     errorType: data.error_type || undefined,
                     suggestion: authErr ? undefined : data.suggestion || undefined,
                     recoverable: authErr ? false : (data.recoverable ?? undefined),
@@ -3623,7 +3641,7 @@ export default defineComponent({
               block.pendingConfirmation = false;
               if (!approved) {
                 block.success = false;
-                block.resultMessage = "Action cancelled by user";
+                block.resultMessage = t("aiAssistant.aiChat.actionCancelledByUser");
               }
               return;
             }
@@ -4340,7 +4358,10 @@ export default defineComponent({
           } catch (_) {
             // body may not be JSON
           }
-          const err: any = new Error(errorBody?.message || `Server error (${response.status})`);
+          const err: any = new Error(
+            errorBody?.message ||
+              t("aiAssistant.aiChat.serverErrorStatus", { status: response.status }),
+          );
           err.status = response.status;
           err.errorBody = errorBody;
           throw err;
@@ -4440,11 +4461,11 @@ export default defineComponent({
         }
         let errorMessage: string;
         if (error.status === 403) {
-          errorMessage = UNAUTHORIZED_MESSAGE;
+          errorMessage = t(UNAUTHORIZED_MESSAGE_KEY);
         } else if (error.message && error.message !== "No response body") {
           errorMessage = error.message;
         } else {
-          errorMessage = "Error: Unable to get response from the server. Please try again later.";
+          errorMessage = t("aiAssistant.aiChat.serverResponseError");
         }
         chatMessages.value.push({
           role: "assistant",
@@ -5657,62 +5678,81 @@ export default defineComponent({
       return getToolCallDisplayData(block.context) !== null;
     };
 
+    // Splits an already-interpolated sentence around the value that renders bold,
+    // so the header stays ONE translatable sentence instead of two fragments.
+    const splitAroundHighlight = (full: string, highlight: string) => {
+      const at = full.indexOf(highlight);
+      if (at < 0) return { text: full, highlight: null as string | null, suffix: "" };
+      return {
+        text: full.slice(0, at),
+        highlight: highlight as string | null,
+        suffix: full.slice(at + highlight.length),
+      };
+    };
+
     const formatToolCallMessage = (block: ContentBlock & { response?: Record<string, any> }) => {
       // Show error message for failed tools
       // Tool-specific messages (both success and error)
       if (block.tool === "testFunction") {
         if (block.success === false) {
-          return { text: "VRL validation failed", highlight: null, suffix: "" };
+          return {
+            text: t("aiAssistant.aiChat.toolVrlValidationFailed"),
+            highlight: null,
+            suffix: "",
+          };
         }
-        return { text: "Validated VRL", highlight: null, suffix: "" };
+        return { text: t("aiAssistant.aiChat.toolVrlValidated"), highlight: null, suffix: "" };
       }
       if (block.tool === "SearchSQL") {
         if (block.success === false) {
-          return { text: "Query failed", highlight: null, suffix: "" };
+          return {
+            text: t("aiAssistant.aiChat.toolQueryFailed"),
+            highlight: null,
+            suffix: "",
+          };
         }
         if (block.response?.total !== undefined) {
           const streamType = block.context?.type || "logs";
           return {
-            text: `Queried ${streamType} `,
-            highlight: `(${block.response.total} results)`,
+            text: t("aiAssistant.aiChat.toolQueriedStream", { type: streamType }),
+            highlight: t("aiAssistant.aiChat.toolResultsCount", {
+              count: block.response.total,
+            }),
             suffix: "",
           };
         }
       }
       if (block.tool === "StreamSchema" && block.context?.stream_name) {
-        return {
-          text: "Fetched ",
-          highlight: block.context.stream_name,
-          suffix: " stream schema",
-        };
+        const streamName = block.context.stream_name;
+        return splitAroundHighlight(
+          t("aiAssistant.aiChat.toolStreamSchema", { name: streamName }),
+          streamName,
+        );
       }
       if (block.tool === "GetIncident" && block.context?.incident_id) {
-        return {
-          text: "Retrieved incident ",
-          highlight: block.context.incident_id,
-          suffix: "",
-        };
+        const incidentId = block.context.incident_id;
+        return splitAroundHighlight(
+          t("aiAssistant.aiChat.toolGetIncident", { id: incidentId }),
+          incidentId,
+        );
       }
       if (block.tool === "GetAlert" && block.context?.alert_id) {
-        return {
-          text: "Fetched alert ",
-          highlight: block.context.alert_id,
-          suffix: "",
-        };
+        const alertId = block.context.alert_id;
+        return splitAroundHighlight(t("aiAssistant.aiChat.toolGetAlert", { id: alertId }), alertId);
       }
       if (block.tool === "GetDashboard" && block.context?.dashboard_id) {
-        return {
-          text: "Fetched dashboard ",
-          highlight: block.context.dashboard_id,
-          suffix: "",
-        };
+        const dashboardId = block.context.dashboard_id;
+        return splitAroundHighlight(
+          t("aiAssistant.aiChat.toolGetDashboard", { id: dashboardId }),
+          dashboardId,
+        );
       }
       // List tools: show count from normalized { total, items } response
       if (block.response?.total !== undefined && block.success !== false) {
-        const base = block.message || block.tool || "Listed";
+        const base = block.message || block.tool || t("aiAssistant.aiChat.toolListedFallback");
         return {
           text: base + " ",
-          highlight: `(Found ${block.response.total})`,
+          highlight: t("aiAssistant.aiChat.toolFoundCount", { count: block.response.total }),
           suffix: "",
         };
       }
@@ -5726,10 +5766,10 @@ export default defineComponent({
         return { text: msg, highlight: null, suffix: "" };
       }
       if (block.success !== false && block.summary?.count !== undefined) {
-        const base = block.message || block.tool || "Tool";
+        const base = block.message || block.tool || t("aiAssistant.aiChat.toolFallback");
         return {
           text: base + " ",
-          highlight: `(${block.summary.count} results)`,
+          highlight: t("aiAssistant.aiChat.toolResultsCount", { count: block.summary.count }),
           suffix: "",
         };
       }
@@ -5737,7 +5777,7 @@ export default defineComponent({
     };
 
     const formatTimestamp = (timestamp: number) => {
-      if (!timestamp || timestamp === 0) return "Not specified";
+      if (!timestamp || timestamp === 0) return t("aiAssistant.aiChat.notSpecified");
       // Timestamp is in microseconds, convert to milliseconds
       const ms = timestamp > 1e15 ? timestamp / 1000 : timestamp;
       const date = new Date(ms);

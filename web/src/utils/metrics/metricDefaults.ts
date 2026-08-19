@@ -28,7 +28,7 @@
  * silently. It is a bare enum in a types module with no imports of its own.
  */
 
-import { raw, type I18nKey, type I18nText } from "@/types/i18n";
+import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 
 import { PromqlStepId } from "@/components/promql/types";
 import type { PromqlBuilderQuery, PromqlLabelMatcher, PromqlStep } from "@/components/promql/types";
@@ -69,7 +69,9 @@ interface VariantQuery {
  * Variant names are stored as `labelKey` and translated at render time by
  * `FunctionConfigDialog.vue` — this module is Vue-free and loads at import, so
  * resolving text here would freeze it at the boot locale. `label` remains for
- * names built from live data (`Top 5 by ${label}`); `labelKey` wins if both set.
+ * names built from live data ("Top 5 by {label}"), which have no static key to
+ * defer: those resolve through `gt` inside `buildVariants` — call time, not
+ * import time — so they follow the locale too. `labelKey` wins if both are set.
  */
 interface Variant {
   id: string;
@@ -1173,8 +1175,11 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
       if (topkLabel) {
         variants.push({
           id: "topk",
-          footerLabel: `topk(5) by ${topkLabel}`,
-          label: raw(`Top 5 by ${topkLabel}`),
+          // Displayed on the card, but stays English: it names the PromQL the
+          // card runs (`topk(5) by <label>`) plus a raw metric label name — the
+          // same reason `raw("avg by quantile")` below is not translated.
+          footerLabel: raw(`topk(5) by ${topkLabel}`),
+          label: gt("metrics.explorer.variants.topkBy", { label: topkLabel }),
           queries: [
             q(
               `topk(5, sum by (${topkLabel}) (rate(${sel}[${w}])))`,
@@ -1225,7 +1230,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         },
         {
           id: "count-rate",
-          footerLabel: "sum(rate) of count",
+          footerLabel: raw("sum(rate) of count"),
           labelKey: "metrics.explorer.variants.rateOfCount",
           queries: [
             q(
@@ -1249,7 +1254,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
       return [
         {
           id: "count-rate",
-          footerLabel: "sum(rate) of count",
+          footerLabel: raw("sum(rate) of count"),
           labelKey: "metrics.explorer.variants.rateOfCount",
           queries: [
             q(
@@ -1285,7 +1290,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         },
         {
           id: "count-rate",
-          footerLabel: "sum(rate) of count",
+          footerLabel: raw("sum(rate) of count"),
           labelKey: "metrics.explorer.variants.rateOfCount",
           queries: [
             q(
@@ -1305,7 +1310,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
       return [
         {
           id: "avg-quantiles",
-          footerLabel: "avg by quantile",
+          footerLabel: raw("avg by quantile"),
           // Averaging pre-computed quantiles across targets is NOT statistically
           // mergeable. The copy says "avg of reported quantiles" and the pXX
           // vocabulary is deliberately withheld — that is reserved for
@@ -1322,7 +1327,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         },
         {
           id: "raw-quantiles",
-          footerLabel: "raw quantiles",
+          footerLabel: raw("raw quantiles"),
           labelKey: "metrics.explorer.variants.reportedQuantilesRaw",
           // {quantile} alone would duplicate legend names across targets.
           queries: [q(sel, "{instance} {quantile}", b(metricName, []))],

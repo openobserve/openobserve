@@ -520,7 +520,7 @@ export default defineComponent({
       if (value.userChangedValue) fetchSearchHistory();
     };
     const formatTime = (took) => {
-      return `${took.toFixed(2)} sec`;
+      return t("logs.searchHistory.tookSeconds", { seconds: took.toFixed(2) });
     };
     const calculateDuration = (startTime, endTime) => {
       const durationMicroseconds = endTime - startTime;
@@ -529,45 +529,52 @@ export default defineComponent({
       // Store the raw duration in a separate property
       const rawDuration = durationSeconds;
 
-      let result = "";
+      // One whole-sentence key per unit combination — the remainder clause cannot
+      // be appended as a translated fragment without breaking other locales.
+      let result: string = "";
 
       if (durationSeconds < 60) {
-        result = `${durationSeconds.toFixed(2)} seconds`;
+        result = t("logs.searchHistory.durationSeconds", {
+          seconds: durationSeconds.toFixed(2),
+        });
       } else if (durationSeconds < 3600) {
         const minutes = Math.floor(durationSeconds / 60);
         const seconds = durationSeconds % 60;
-        result = `${minutes} minutes`;
-        if (seconds > 0) {
-          result += ` and ${seconds.toFixed(2)} seconds`;
-        }
+        result =
+          seconds > 0
+            ? t("logs.searchHistory.durationMinutesSeconds", {
+                minutes,
+                seconds: seconds.toFixed(2),
+              })
+            : t("logs.searchHistory.durationMinutes", { minutes });
       } else if (durationSeconds < 86400) {
         const hours = Math.floor(durationSeconds / 3600);
         const minutes = Math.floor((durationSeconds % 3600) / 60);
-        result = `${hours} hours`;
-        if (minutes > 0) {
-          result += ` and ${minutes} minutes`;
-        }
+        result =
+          minutes > 0
+            ? t("logs.searchHistory.durationHoursMinutes", { hours, minutes })
+            : t("logs.searchHistory.durationHours", { hours });
       } else if (durationSeconds < 2592000) {
         const days = Math.floor(durationSeconds / 86400);
         const hours = Math.floor((durationSeconds % 86400) / 3600);
-        result = `${days} days`;
-        if (hours > 0) {
-          result += ` and ${hours} hours`;
-        }
+        result =
+          hours > 0
+            ? t("logs.searchHistory.durationDaysHours", { days, hours })
+            : t("logs.searchHistory.durationDays", { days });
       } else if (durationSeconds < 31536000) {
         const months = Math.floor(durationSeconds / 2592000);
         const days = Math.floor((durationSeconds % 2592000) / 86400);
-        result = `${months} months`;
-        if (days > 0) {
-          result += ` and ${days} days`;
-        }
+        result =
+          days > 0
+            ? t("logs.searchHistory.durationMonthsDays", { months, days })
+            : t("logs.searchHistory.durationMonths", { months });
       } else {
         const years = Math.floor(durationSeconds / 31536000);
         const months = Math.floor((durationSeconds % 31536000) / 2592000);
-        result = `${years} years`;
-        if (months > 0) {
-          result += ` and ${months} months`;
-        }
+        result =
+          months > 0
+            ? t("logs.searchHistory.durationYearsMonths", { years, months })
+            : t("logs.searchHistory.durationYears", { years });
       }
 
       return { formatted: result, raw: rawDuration };

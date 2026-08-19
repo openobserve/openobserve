@@ -427,7 +427,7 @@ export default defineComponent({
 
     // Set/remove this dashboard as the single org-wide home dashboard, shared
     // reactive state with the dashboard list and HomeView via the composable.
-    const { isHome, setHomeDashboard, clearHomeDashboard } = useHomeDashboard();
+    const { isHome, setHomeDashboard, clearHomeDashboard } = useHomeDashboard(t);
     const toggleHomeDashboard = () => {
       const id = dashboardId.value as string | undefined;
       if (!id) return;

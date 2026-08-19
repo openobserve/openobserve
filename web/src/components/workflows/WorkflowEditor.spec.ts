@@ -29,7 +29,12 @@ const { mockRouter, mockToast, uuidState } = vi.hoisted(() => ({
   uuidState: { n: 0 },
 }));
 
-vi.mock("vue-router", () => ({ useRouter: () => mockRouter }));
+vi.mock("vue-router", () => ({
+  useRouter: () => mockRouter,
+  // The editor registers an unsaved-changes route-leave guard (T8); the mock must
+  // provide the export or mounting throws before any assertion runs.
+  onBeforeRouteLeave: () => {},
+}));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: any[]) => mockToast(...a),
@@ -55,6 +60,7 @@ vi.mock("@/services/workflows", () => ({
     listWorkflows: vi.fn(),
     createWorkflow: vi.fn(),
     updateWorkflow: vi.fn(),
+    promoteWorkflow: vi.fn(),
     getWorkflowRun: vi.fn(),
     testWorkflow: vi.fn(),
   },
@@ -69,7 +75,11 @@ const { stub } = vi.hoisted(() => ({
 vi.mock("@/plugins/workflows/WorkflowCanvas.vue", () => stub("WorkflowCanvas"));
 vi.mock("./WorkflowNodeDrawer.vue", () => stub("WorkflowNodeDrawer"));
 vi.mock("./WorkflowTestDialog.vue", () => stub("WorkflowTestDialog"));
-vi.mock("./WorkflowStepResultDrawer.vue", () => stub("WorkflowStepResultDrawer"));
+vi.mock("./WorkflowResultsDock.vue", () =>
+  stub("WorkflowResultsDock", {
+    template: `<div data-test="WorkflowResultsDock"><slot /></div>`,
+  }),
+);
 vi.mock("./WorkflowLinkAlertsDialog.vue", () =>
   stub("WorkflowLinkAlertsDialog", {
     props: ["workflowId", "workflowName"],
@@ -104,6 +114,7 @@ const t = (k: string, v?: any) => i18n.global.t(k, v ?? {});
 const listWorkflows = workflowService.listWorkflows as any;
 const createWorkflow = workflowService.createWorkflow as any;
 const updateWorkflow = workflowService.updateWorkflow as any;
+const promoteWorkflow = workflowService.promoteWorkflow as any;
 const getWorkflowRun = workflowService.getWorkflowRun as any;
 
 const { resetWorkflowData } = useWorkflowCanvas(t);
@@ -191,8 +202,20 @@ const openRail = async (w: any) => {
 };
 const linkDialog = (w: any) => w.findComponent({ name: "WorkflowLinkAlertsDialog" });
 
+// The toolbar's primary commit action. On a published workflow it's the single
+// "Save"; on a new or draft workflow it's "Publish" (validated create/promote —
+// same behaviour the old lone Save had on a brand-new workflow). Click whichever
+// is rendered so the existing create/update assertions keep exercising the
+// validated persist path.
 const clickSave = async (w: any) => {
-  await w.find('[data-test="workflow-editor-save"]').trigger("click");
+  const publish = w.find('[data-test="workflow-editor-publish"]');
+  const btn = publish.exists() ? publish : w.find('[data-test="workflow-editor-save"]');
+  await btn.trigger("click");
+  await flushPromises();
+};
+
+const clickSaveDraft = async (w: any) => {
+  await w.find('[data-test="workflow-editor-save-draft"]').trigger("click");
   await flushPromises();
 };
 
@@ -234,6 +257,7 @@ describe("WorkflowEditor", () => {
     listWorkflows.mockResolvedValue({ data: [] });
     createWorkflow.mockResolvedValue({ data: { id: "new-id" } });
     updateWorkflow.mockResolvedValue({ data: {} });
+    promoteWorkflow.mockResolvedValue({ data: {} });
     getWorkflowRun.mockResolvedValue({ data: {} });
   });
 
@@ -576,6 +600,9 @@ describe("WorkflowEditor", () => {
         show: false,
         source: "",
         handle: "out",
+        // `edgeId` carries the target edge in insert-on-edge mode (T7); reset with
+        // the rest of the picker state.
+        edgeId: "",
         mode: "next",
         position: null,
         anchor: null,
@@ -728,6 +755,54 @@ describe("WorkflowEditor", () => {
 
       expect(createWorkflow).toHaveBeenCalled();
     });
+
+    it("blocks Publish when a node is still an incomplete placeholder", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      const triggerId = placeTrigger();
+      wf().name = "wf";
+      // A connected graph, but the destination is a placeholder (meta.incomplete).
+      wf().nodes = [
+        ...wf().nodes,
+        {
+          id: "d1",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination", destination_id: "" },
+          meta: { incomplete: "true" },
+        },
+      ];
+      wf().edges = [{ id: "e1", source: triggerId, target: "d1" }];
+
+      await clickSave(wrapper);
+
+      expect(mockToast).toHaveBeenCalledWith({
+        message: t("workflow.finishStepsBeforePublish"),
+        variant: "warning",
+      });
+      expect(createWorkflow).not.toHaveBeenCalled();
+    });
+
+    it("publishes once the placeholder is resolved (no meta.incomplete)", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      const triggerId = placeTrigger();
+      wf().name = "wf";
+      wf().nodes = [
+        ...wf().nodes,
+        {
+          id: "d1",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination", destination_id: "sink" },
+        },
+      ];
+      wf().edges = [{ id: "e1", source: triggerId, target: "d1" }];
+
+      await clickSave(wrapper);
+
+      expect(createWorkflow).toHaveBeenCalled();
+    });
   });
 
   // ── serialization + create ─────────────────────────────────────────────────
@@ -798,6 +873,8 @@ describe("WorkflowEditor", () => {
           trigger_kind: "alert_fired",
           alert_ids: [],
         },
+        // is_disabled (T6) is serialized at the node root, defaulting to false.
+        is_disabled: false,
         meta: { trigger_kind: "alert_fired" },
       });
       // runtime-only VueFlow fields are dropped
@@ -811,6 +888,7 @@ describe("WorkflowEditor", () => {
         io_type: "output",
         position: { x: 5, y: 6 },
         data: { label: "d1", node_type: "destination", destination_id: "sink" },
+        is_disabled: false,
         meta: { custom: "keep" },
         style: { width: "200px" },
       });
@@ -852,6 +930,7 @@ describe("WorkflowEditor", () => {
         io_type: "default",
         position: { x: 0, y: 0 },
         data: {},
+        is_disabled: false,
       });
       expect(bare).not.toHaveProperty("meta");
       expect(bare).not.toHaveProperty("style");
@@ -972,9 +1051,10 @@ describe("WorkflowEditor", () => {
       await flushPromises();
       seedValidCreate();
 
-      wrapper.find('[data-test="workflow-editor-save"]').trigger("click");
+      // Create mode's primary action is Publish (validated create).
+      wrapper.find('[data-test="workflow-editor-publish"]').trigger("click");
       await nextTick();
-      wrapper.find('[data-test="workflow-editor-save"]').trigger("click");
+      wrapper.find('[data-test="workflow-editor-publish"]').trigger("click");
       await nextTick();
 
       expect(createWorkflow).toHaveBeenCalledTimes(1);
@@ -1074,22 +1154,208 @@ describe("WorkflowEditor", () => {
     });
   });
 
+  // ── draft & publish ──────────────────────────────────────────────────────────
+
+  describe("draft & publish", () => {
+    const saveBtn = (w: any) => w.find('[data-test="workflow-editor-save"]');
+    const draftBtn = (w: any) => w.find('[data-test="workflow-editor-save-draft"]');
+    const publishBtn = (w: any) => w.find('[data-test="workflow-editor-publish"]');
+
+    // A new workflow with a name but an INCOMPLETE graph: a trigger plus an
+    // orphan destination with no connecting edge. Fails the full graph check
+    // (orphan / needs-a-step) but is a legal draft.
+    const seedIncompleteNew = () => {
+      const triggerId = placeTrigger();
+      wf().name = "wip workflow";
+      wf().nodes = [
+        wf().nodes[0],
+        {
+          id: "d1",
+          type: "output",
+          position: { x: 5, y: 6 },
+          data: { label: "d1", node_type: "destination", destination_id: "sink" },
+        },
+      ];
+      wf().edges = []; // d1 is orphaned
+      return triggerId;
+    };
+
+    const openDraft = async (overrides: any = {}) => {
+      hydrateWorkflow(savedGraph({ is_draft: true, ...overrides }));
+      mockRouter.currentRoute.value = { query: { id: "wf-1" } };
+      wrapper = mountEditor();
+      await flushPromises();
+    };
+
+    describe("toolbar buttons are contextual", () => {
+      it("shows Save as Draft + Publish (not Save) for a new workflow", async () => {
+        wrapper = mountEditor();
+        await flushPromises();
+
+        expect(draftBtn(wrapper).exists()).toBe(true);
+        expect(publishBtn(wrapper).exists()).toBe(true);
+        expect(saveBtn(wrapper).exists()).toBe(false);
+      });
+
+      it("shows Save as Draft + Publish (not Save) for a saved draft", async () => {
+        await openDraft();
+
+        expect(draftBtn(wrapper).exists()).toBe(true);
+        expect(publishBtn(wrapper).exists()).toBe(true);
+        expect(saveBtn(wrapper).exists()).toBe(false);
+      });
+
+      it("shows a single Save (no draft actions) for a published workflow", async () => {
+        hydrateWorkflow(savedGraph()); // no is_draft → published
+        mockRouter.currentRoute.value = { query: { id: "wf-1" } };
+        wrapper = mountEditor();
+        await flushPromises();
+
+        expect(saveBtn(wrapper).exists()).toBe(true);
+        expect(draftBtn(wrapper).exists()).toBe(false);
+        expect(publishBtn(wrapper).exists()).toBe(false);
+      });
+    });
+
+    describe("Save as Draft", () => {
+      it("creates a draft (draft:true) even when the graph is incomplete", async () => {
+        wrapper = mountEditor();
+        await flushPromises();
+        seedIncompleteNew();
+
+        await clickSaveDraft(wrapper);
+
+        expect(createWorkflow).toHaveBeenCalledTimes(1);
+        expect(createWorkflow.mock.calls[0][0].draft).toBe(true);
+        // graph validation is skipped for drafts — no orphan/step warning
+        expect(mockToast).not.toHaveBeenCalledWith({
+          message: t("workflow.connectAllNodes"),
+          variant: "warning",
+        });
+        expect(mockToast).toHaveBeenCalledWith({
+          message: t("workflow.draftSaveSuccess"),
+          variant: "success",
+        });
+        expect(wrapper.emitted("saved")).toHaveLength(1);
+      });
+
+      it("still requires a name for a draft", async () => {
+        wrapper = mountEditor();
+        await flushPromises();
+        placeTrigger();
+        wf().name = "   "; // blank
+
+        await clickSaveDraft(wrapper);
+
+        expect(createWorkflow).not.toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith({
+          message: t("workflow.nameRequired"),
+          variant: "warning",
+        });
+      });
+
+      it("updates the draft row (draft:true) when re-saving an existing draft", async () => {
+        await openDraft();
+
+        await clickSaveDraft(wrapper);
+
+        expect(updateWorkflow).toHaveBeenCalledTimes(1);
+        expect(updateWorkflow.mock.calls[0][0]).toMatchObject({ id: "wf-1", draft: true });
+        expect(promoteWorkflow).not.toHaveBeenCalled();
+      });
+
+      it("Publish on the SAME incomplete new graph is blocked by validation", async () => {
+        wrapper = mountEditor();
+        await flushPromises();
+        seedIncompleteNew();
+
+        await clickSave(wrapper); // clicks Publish in create mode
+
+        // full validation runs on publish — orphan node stops the create
+        expect(createWorkflow).not.toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith({
+          message: t("workflow.connectAllNodes"),
+          variant: "warning",
+        });
+      });
+    });
+
+    describe("Publish a draft (promote)", () => {
+      it("flushes the draft then promotes it with the derived trigger_type", async () => {
+        await openDraft();
+
+        await publishBtn(wrapper).trigger("click");
+        await flushPromises();
+
+        // draft flushed first (promote reads the DB row, not the request body)
+        expect(updateWorkflow).toHaveBeenCalledTimes(1);
+        expect(updateWorkflow.mock.calls[0][0]).toMatchObject({ id: "wf-1", draft: true });
+        // then promoted
+        expect(promoteWorkflow).toHaveBeenCalledTimes(1);
+        expect(promoteWorkflow.mock.calls[0][0]).toMatchObject({
+          org_identifier: "default",
+          id: "wf-1",
+          trigger_type: "AlertFired",
+        });
+        expect(mockToast).toHaveBeenCalledWith({
+          message: t("workflow.publishSuccess"),
+          variant: "success",
+        });
+        expect(wrapper.emitted("saved")).toHaveLength(1);
+      });
+
+      it("blocks promote when the draft graph is still invalid", async () => {
+        await openDraft({ edges: [] }); // destination orphaned
+
+        await publishBtn(wrapper).trigger("click");
+        await flushPromises();
+
+        expect(promoteWorkflow).not.toHaveBeenCalled();
+        expect(updateWorkflow).not.toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith({
+          message: t("workflow.connectAllNodes"),
+          variant: "warning",
+        });
+      });
+
+      it("surfaces the backend 400 validation message from promote", async () => {
+        await openDraft();
+        promoteWorkflow.mockRejectedValue({
+          response: { data: { message: "A Trigger Is Required" } },
+        });
+
+        await publishBtn(wrapper).trigger("click");
+        await flushPromises();
+
+        expect(mockToast).toHaveBeenCalledWith({
+          message: "A Trigger Is Required",
+          variant: "error",
+        });
+        expect(wrapper.emitted("saved")).toBeUndefined();
+      });
+    });
+  });
+
   // ── cancel / back ──────────────────────────────────────────────────────────
 
   describe("cancel", () => {
-    it("resets the shared state and returns to the list", async () => {
+    it("returns to the list and resets state on unmount", async () => {
       wrapper = mountEditor();
       await flushPromises();
       wf().name = "dirty";
 
       await wrapper.find('[data-test="workflow-editor-cancel"]').trigger("click");
 
-      expect(wf().name).toBe("");
-      expect(wf().nodes).toEqual([]);
+      // Cancel navigates immediately; the shared state is reset on UNMOUNT (not
+      // before push) so the unsaved-changes route guard can still read dirtyFlag.
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
         query: { org_identifier: "default" },
       });
+
+      wrapper.unmount();
+      expect(wf().name).toBe("");
+      expect(wf().nodes).toEqual([]);
     });
 
     it("returns to the list from the header back chevron", async () => {
@@ -1190,8 +1456,8 @@ describe("WorkflowEditor", () => {
       });
     });
 
-    it("blocks Test with a warning when a node is left unconnected (orphan)", async () => {
-      // trigger + a destination that has NO incoming edge -> orphan.
+    it("blocks Test when nothing is connected to the trigger", async () => {
+      // trigger + a destination but NO edges -> nothing runs from the trigger.
       wrapper = mountEditor();
       await flushPromises();
       hydrateWorkflow(savedGraph({ id: "", name: "", edges: [] }));
@@ -1199,11 +1465,44 @@ describe("WorkflowEditor", () => {
 
       await clickTest(wrapper);
 
+      // Relaxed Test validation (T5) needs a trigger + at least one connected step;
+      // with no edges it blocks with addStepRequired (not connectAllNodes).
       expect(workflowObj.testRun.show).toBe(false);
       expect(mockToast).toHaveBeenCalledWith({
-        message: t("workflow.connectAllNodes"),
+        message: t("workflow.addStepRequired"),
         variant: "warning",
       });
+    });
+
+    it("allows Test with an unwired orphan node when the chain is connected (T5)", async () => {
+      // trigger -> destination (connected) PLUS an extra orphan step with no edge.
+      wrapper = mountEditor();
+      await flushPromises();
+      const base = savedGraph({ id: "", name: "" });
+      hydrateWorkflow({
+        ...base,
+        nodes: [
+          ...base.nodes,
+          {
+            id: "orphan",
+            io_type: "default",
+            position: { x: 600, y: 240 },
+            data: { label: "orphan", node_type: "condition" },
+          },
+        ],
+      });
+      await nextTick();
+
+      await clickTest(wrapper);
+
+      // Orphans are excluded from the run, not blockers — Test proceeds.
+      expect(workflowObj.testRun.show).toBe(true);
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: t("workflow.connectAllNodes") }),
+      );
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: t("workflow.addStepRequired") }),
+      );
     });
 
     it("does not require a name to test a connected draft", async () => {
@@ -1221,15 +1520,12 @@ describe("WorkflowEditor", () => {
       );
     });
 
-    it("renders the per-step result drawer when a node's badge opens it", async () => {
+    it("mounts the results dock (which hosts the step Input/Output) instead of an overlay drawer", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      expect(wrapper.find('[data-test="WorkflowStepResultDrawer"]').exists()).toBe(false);
-
-      workflowObj.testRun.resultDrawer = { show: true, nodeId: "n1" };
-      await nextTick();
-
-      expect(wrapper.find('[data-test="WorkflowStepResultDrawer"]').exists()).toBe(true);
+      // The editor docks results below the canvas via WorkflowResultsDock; a node
+      // badge selects a step inside the dock rather than opening an overlay drawer.
+      expect(wrapper.find('[data-test="WorkflowResultsDock"]').exists()).toBe(true);
     });
   });
 

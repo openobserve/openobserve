@@ -80,7 +80,8 @@ pub enum FileSortOrder {
     /// compactor for logs, traces and (non TSID-major) metrics.
     TimestampDesc,
     /// `__hash__ ASC, _timestamp ASC` — TSID-major metrics layout: all samples of
-    /// one series are contiguous and time-ordered inside a file.
+    /// one series are contiguous and time-ordered inside a file. Only used by
+    /// the compactor merge; distributed query plans never carry it.
     HashTimestampAsc,
 }
 
@@ -154,23 +155,6 @@ impl FileSortOrder {
             });
         }
         LexOrdering::new(exprs)
-    }
-
-    /// Wire representation used by the distributed plan protobuf.
-    pub fn to_proto(&self) -> proto::cluster_rpc::FileSortOrder {
-        match self {
-            Self::None => proto::cluster_rpc::FileSortOrder::None,
-            Self::TimestampDesc => proto::cluster_rpc::FileSortOrder::TimestampDesc,
-            Self::HashTimestampAsc => proto::cluster_rpc::FileSortOrder::HashTimestampAsc,
-        }
-    }
-
-    pub fn from_proto(value: proto::cluster_rpc::FileSortOrder) -> Self {
-        match value {
-            proto::cluster_rpc::FileSortOrder::None => Self::None,
-            proto::cluster_rpc::FileSortOrder::TimestampDesc => Self::TimestampDesc,
-            proto::cluster_rpc::FileSortOrder::HashTimestampAsc => Self::HashTimestampAsc,
-        }
     }
 }
 
@@ -282,16 +266,5 @@ mod tests {
                 .physical_ordering(&schema)
                 .is_some()
         );
-    }
-
-    #[test]
-    fn test_proto_roundtrip() {
-        for order in [
-            FileSortOrder::None,
-            FileSortOrder::TimestampDesc,
-            FileSortOrder::HashTimestampAsc,
-        ] {
-            assert_eq!(FileSortOrder::from_proto(order.to_proto()), order);
-        }
     }
 }

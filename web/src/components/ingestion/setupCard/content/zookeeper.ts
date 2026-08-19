@@ -17,7 +17,7 @@
 // https://openobserve.ai/blog/how-to-monitor-zookeeper-with-openteletemtry
 // (zookeeper receiver). No monitoring user needed.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -40,17 +40,17 @@ service:
       receivers: [zookeeper]
       exporters: [otlphttp/openobserve]`;
 
-export default function zookeeperCard(subs: CardSubstitutions): RichCardContent {
+export default function zookeeperCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Zookeeper",
-      tagline: gt("ingestion.setupCard.zookeeperTagline"),
+      name: raw("Zookeeper"),
+      tagline: t("ingestion.setupCard.zookeeperTagline"),
       logo: getImageURL("images/ingestion/zookeeper.png"),
       tone: "#FF9900",
-      metaBadges: [gt("common.metrics")],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
-      collectorInstallStep(),
+      collectorInstallStep(t),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -92,15 +92,15 @@ export default function zookeeperCard(subs: CardSubstitutions): RichCardContent 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // ZooKeeper `mntr` stat names (zookeeper.connection.active,
-        // zookeeper.latency.avg, zookeeper.request.active, zookeeper.watch.count,
-        // zookeeper.znode.count) — untranslated so the pills match the data.
+        // These are Title-Cased prose, NOT the `mntr` stat names (the receiver emits
+        // zookeeper.connection.active / zookeeper.request.active / zookeeper.watch.count /
+        // zookeeper.znode.count), so they are translated. Shared pills reuse common keys.
         pills: [
-          raw("Connections"),
-          raw("Latency"),
-          raw("Outstanding Requests"),
-          raw("Watches"),
-          raw("Znodes"),
+          t("ingestion.setupCard.pillConnections"),
+          t("ingestion.setupCard.pillLatency"),
+          t("ingestion.setupCard.pillOutstandingRequests"),
+          t("ingestion.setupCard.pillWatches"),
+          t("ingestion.setupCard.pillZnodes"),
         ],
       },
     ],

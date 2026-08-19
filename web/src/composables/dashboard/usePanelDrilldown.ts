@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, computed, watch, nextTick, onBeforeMount, onUnmounted } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
@@ -45,6 +46,7 @@ export function usePanelDrilldown({
   selectedAnnotationData,
   isCursorOverPanel,
   showErrorNotification,
+  t,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -68,6 +70,7 @@ export function usePanelDrilldown({
   selectedAnnotationData: any;
   isCursorOverPanel: any;
   showErrorNotification: any;
+  t: TranslateFn;
 }) {
   // Cross-linking: store cross-links from result_schema response
   const crossLinksData: any = ref({ stream_links: [], org_links: [] });
@@ -1035,7 +1038,7 @@ export function usePanelDrilldown({
         try {
           navigateToLogs();
         } catch (error) {
-          showErrorNotification("Failed to navigate to logs");
+          showErrorNotification(t("dashboard.failedToNavigateToLogs"));
         }
       } else if (drilldownData.type == "byDashboard") {
         // we have folder, dashboard and tabs name

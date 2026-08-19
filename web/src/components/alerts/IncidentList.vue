@@ -675,7 +675,7 @@ export default defineComponent({
 
     const formatDimensions = (dimensions: Record<string, string> | undefined) => {
       if (!dimensions || Object.keys(dimensions).length === 0) {
-        return "Unknown";
+        return t("common.unknown");
       }
       return Object.entries(dimensions)
         .map(([k, v]) => `${k}=${v}`)

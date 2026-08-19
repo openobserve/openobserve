@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nText } from "@/types/i18n";
+import { gt, type I18nText } from "@/types/i18n";
 
 import { ref } from "vue";
 import { useStore } from "vuex";
@@ -266,7 +266,7 @@ export function useSessions() {
         e?.response?.data?.message ||
         e?.response?.data?.error ||
         e?.message ||
-        "Failed to fetch sessions";
+        gt("traces.failedToFetchSessions");
       error.value = serverMsg;
       console.error("Sessions fetch error:", e?.response?.data ?? e);
     } finally {

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="right"
     :width="90"
     :title="t('correlation.correlatedStreamsFor', { service: serviceName })"
-    :sub-title="raw(formatTimeRange(timeRange))"
+    :sub-title="formatTimeRange(timeRange)"
     @update:open="(v) => !v && onClose()"
   >
     <template #header-left>
@@ -1161,7 +1161,7 @@ const { showErrorNotification } = useNotifications();
 const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
-const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard();
+const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard(t);
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
 const { formatTracesMetaData } = useTraces();
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
@@ -2026,7 +2026,9 @@ const getDimensionOptions = (key: string, currentValue: string) => {
   // Add the original value option if it exists and is not already SELECT_ALL_VALUE
   if (originalValue && originalValue !== SELECT_ALL_VALUE) {
     options.push({
-      label: raw(isUnstable ? `${originalValue} (current)` : originalValue),
+      label: isUnstable
+        ? t("correlation.currentValueOption", { value: originalValue })
+        : raw(originalValue),
       value: originalValue,
     });
   }
@@ -2383,7 +2385,11 @@ const formatTimeRange = (range: TimeRange) => {
   const durationMicros = range.endTime - range.startTime;
   const durationMinutes = Math.round(durationMicros / 1000 / 60000);
 
-  return `${formatTime(range.startTime)} - ${formatTime(range.endTime)} (${durationMinutes} min)`;
+  return t("correlation.timeRangeWithDuration", {
+    start: formatTime(range.startTime),
+    end: formatTime(range.endTime),
+    minutes: durationMinutes,
+  });
 };
 
 // ============= TRACE CORRELATION FUNCTIONS =============

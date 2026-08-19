@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { gt } from "@/types/i18n";
 import { nextTick } from "vue";
 import { usePanelDrilldown } from "./usePanelDrilldown";
 
@@ -127,6 +128,7 @@ describe("usePanelDrilldown", () => {
       selectedAnnotationData: { value: null },
       isCursorOverPanel: { value: true },
       showErrorNotification: vi.fn(),
+      t: gt,
     };
   };
 

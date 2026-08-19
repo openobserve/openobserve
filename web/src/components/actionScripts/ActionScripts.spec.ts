@@ -1075,7 +1075,10 @@ describe("ActionScripts", () => {
 
       const row = wrapper.vm.actionsScriptRows.find((r: any) => r.name === "Repeat Action");
       if (row) {
-        expect(row.execution_details_type).toBe("Cron Job");
+        // The server's token survives — OTag resolves colour from it, and it is
+        // what any filter or persisted state has to match on.
+        expect(row.execution_details_type).toBe("repeat");
+        expect(row.execution_details_label).toBe("Cron Job");
       }
     });
 
@@ -1096,7 +1099,8 @@ describe("ActionScripts", () => {
 
       const row = wrapper.vm.actionsScriptRows.find((r: any) => r.name === "Service Action");
       if (row) {
-        expect(row.execution_details_type).toBe("Real Time");
+        expect(row.execution_details_type).toBe("service");
+        expect(row.execution_details_label).toBe("Real Time");
       }
     });
 
@@ -1117,7 +1121,8 @@ describe("ActionScripts", () => {
 
       const row = wrapper.vm.actionsScriptRows.find((r: any) => r.name === "Once Action");
       if (row) {
-        expect(row.execution_details_type).toBe("Once");
+        expect(row.execution_details_type).toBe("once");
+        expect(row.execution_details_label).toBe("Once");
       }
     });
   });

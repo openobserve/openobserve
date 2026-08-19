@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? t('functions.newCsvFileUrl')
                 : t('functions.replacementCsvFileUrl')
             "
-            :placeholder="t('function.csvUrlPlaceholder')"
+            :placeholder="raw('https://example.com/data.csv')"
             :help-text="
               formData.updateMode === 'append'
                 ? t('functions.newCsvFileUrlHelp')
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="url"
             data-test="add-enrichment-table-url"
             :label="t('function.csvFileUrlLabel')"
-            :placeholder="t('function.csvUrlPlaceholder')"
+            :placeholder="raw('https://example.com/data.csv')"
             :help-text="t('function.csvUrlHelpText')"
           />
 
@@ -442,11 +442,14 @@ export default defineComponent({
                 : t("toastMessages.functions.enrichmentJobStarted"),
           });
         } catch (err: any) {
-          compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
+          compilationErr.value =
+            err.response?.data?.["message"] || err.message || t("common.unknownError");
           if (err.response?.status != 403) {
             toast({
               variant: "error",
-              message: err.response?.data?.["message"] || "Enrichment Table creation failed",
+              message:
+                err.response?.data?.["message"] ||
+                t("toastMessages.functions.enrichmentCreationFailed"),
             });
           }
           dismiss();
@@ -488,7 +491,8 @@ export default defineComponent({
             message: res.data.message,
           });
         } catch (err: any) {
-          compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
+          compilationErr.value =
+            err.response?.data?.["message"] || err.message || t("common.unknownError");
           if (err.response?.status != 403) {
             toast({
               variant: "error",
@@ -516,6 +520,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       disableColor,
       formData,
       store,

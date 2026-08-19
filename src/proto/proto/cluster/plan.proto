@@ -26,24 +26,14 @@ message Uint64List {
     repeated uint64 values = 1;
 }
 
-// Physical sort order of the files behind a table.
-enum FileSortOrder {
-    FILE_SORT_ORDER_NONE               = 0;
-    FILE_SORT_ORDER_TIMESTAMP_DESC     = 1;
-    FILE_SORT_ORDER_HASH_TIMESTAMP_ASC = 2;
-}
-
 message NewEmptyExecNode {
     string                                 name = 1;
     datafusion_common.Schema             schema = 2;
     optional Uint64List              projection = 3;
     repeated datafusion.LogicalExprNode filters = 4;
     optional uint64                       limit = 5;
-    // Legacy flag, kept for rolling upgrades: true == FILE_SORT_ORDER_TIMESTAMP_DESC.
-    // Readers prefer `sort_order` when it is set to anything but NONE.
     bool                         sorted_by_time = 6;
     datafusion_common.Schema        full_schema = 7;
-    FileSortOrder                    sort_order = 8;
 }
 
 message TmpExecNode {

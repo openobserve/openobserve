@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import type { QualityScope } from "../utils/qualityScope";
+import { gt } from "@/types/i18n";
 import { useQualityConfigDetail } from "./useQualityConfigDetail";
 import { useQualityDetailCharts } from "./useQualityDetailCharts";
 
@@ -42,7 +43,7 @@ describe("Quality detail scope queries", () => {
       healthyThreshold: { healthy_categories: ["high"] },
     });
     const scope = ref<QualityScope>("trace");
-    const detail = useQualityConfigDetail(config, ref(DATE_WINDOW), ref(null), scope);
+    const detail = useQualityConfigDetail(config, ref(DATE_WINDOW), ref(null), scope, gt);
 
     await detail.refresh();
 

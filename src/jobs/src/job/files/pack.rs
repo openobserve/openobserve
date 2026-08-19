@@ -42,7 +42,7 @@ use infra::{
 };
 use ingester::{PackSegment, PendingStreamStats};
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::merge::{self, MergeParquetResult};
+use search::datafusion::merge::{self, MergeMode, MergeOutput};
 use tantivy_utils::index_builder::create_tantivy_index;
 use tokio::sync::{Mutex, RwLock};
 
@@ -433,27 +433,17 @@ async fn upload_chunk(
             ..Default::default()
         };
         let merge_result = merge::merge_parquet_files(
-            stream_type,
-            stream_name,
             union_schema,
             tables,
             &bloom_filter_fields,
             new_file_meta,
-            true,
+            &MergeMode::for_ingester(stream_type, stream_name),
+            MergeOutput::for_ingester(stream_type),
         )
         .await?;
-        match merge_result {
-            MergeParquetResult::Single {
-                buf,
-                file_meta,
-                file_format,
-            } => (Bytes::from(buf), file_meta, file_format),
-            MergeParquetResult::Multiple { .. } => {
-                return Err(anyhow::anyhow!(
-                    "merge_parquet_files error: unexpected multiple files on ingester"
-                ));
-            }
-        }
+        // the ingester always merges into exactly one file
+        let (merged, file_format) = merge_result.into_single()?;
+        (Bytes::from(merged.buf), merged.meta, file_format)
     };
 
     if new_file_meta.compressed_size == 0 {

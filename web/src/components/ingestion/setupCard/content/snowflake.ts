@@ -18,7 +18,7 @@
 // The snowflake receiver is account-based (no host/port) and the guide pins the
 // collector to v0.92.0 (newer builds have a known float→int conversion bug).
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -52,17 +52,17 @@ service:
       receivers: [snowflake]
       exporters: [otlphttp/openobserve]`;
 
-export default function snowflakeCard(subs: CardSubstitutions): RichCardContent {
+export default function snowflakeCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Snowflake",
-      tagline: gt("ingestion.setupCard.snowflakeTagline"),
+      name: raw("Snowflake"),
+      tagline: t("ingestion.setupCard.snowflakeTagline"),
       logo: getImageURL("images/ingestion/snowflake.svg"),
       tone: "#29B5E8",
-      metaBadges: [gt("common.metrics")],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
-      collectorInstallStep(SNOWFLAKE_COLLECTOR_VERSION),
+      collectorInstallStep(t, SNOWFLAKE_COLLECTOR_VERSION),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -73,7 +73,7 @@ export default function snowflakeCard(subs: CardSubstitutions): RichCardContent 
         variantGroup: "os",
         variantToggle: false,
         variants: writeConfigVariants(CONFIG_YAML, subs),
-        note: "Snowflake needs collector v0.92.0 — newer builds have a known bug.",
+        note: t("ingestion.setupCard.snowflakeCollectorVersionNote"),
       },
       {
         id: "run",
@@ -90,15 +90,16 @@ export default function snowflakeCard(subs: CardSubstitutions): RichCardContent 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // snowflake receiver metric names (snowflake.storage.storage_bytes.total,
-        // snowflake.billing.*, snowflake.logins.total, …) — kept untranslated so the
-        // pills match the ingested metrics.
+        // What the verify step will show, in prose. These are NOT the ingested metric
+        // names (those are snowflake.storage.storage_bytes.total, snowflake.billing.*,
+        // snowflake.logins.total, …) — they are a plain-English summary of them, so
+        // they are translated.
         pills: [
-          raw("Storage Bytes"),
-          raw("Query Count"),
-          raw("Billing Credits"),
-          raw("Logins"),
-          raw("Warehouse Usage"),
+          t("ingestion.setupCard.pillStorageBytes"),
+          t("ingestion.setupCard.pillQueryCount"),
+          t("ingestion.setupCard.pillBillingCredits"),
+          t("ingestion.setupCard.pillLogins"),
+          t("ingestion.setupCard.pillWarehouseUsage"),
         ],
       },
     ],

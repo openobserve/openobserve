@@ -36,9 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-// @ts-nocheck
-import { defineComponent, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { defineComponent, computed, type PropType } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
@@ -47,11 +46,13 @@ export default defineComponent({
   components: { ODialog, OBanner },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
-    title: { type: String },
-    message: { type: String },
-    warningMessage: { type: String },
+    title: { type: String as unknown as PropType<I18nText> },
+    message: { type: String as unknown as PropType<I18nText> },
+    warningMessage: { type: String as unknown as PropType<I18nText> },
     modelValue: { type: Boolean, default: false },
-    okLabel: { type: String, default: "" },
+    // No `default: ""` — an empty-string default would need a cast to I18nText,
+    // and `okLabelComputed` already falls back when the prop is absent.
+    okLabel: { type: String as unknown as PropType<I18nText> },
     okColor: { type: String, default: "primary" },
   },
   setup(props, { emit }) {
