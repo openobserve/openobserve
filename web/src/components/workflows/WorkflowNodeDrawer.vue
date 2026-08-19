@@ -143,7 +143,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="truncate">{{ t("workflow.ndv.runLabel") }} · {{ historyRunId }}</span>
             </span>
 
-            <ODropdown v-model:open="runMenuOpen" align="start" side="bottom">
+            <WorkflowRunSwitcher
+              :current-run-id="historyRunId"
+              :org-id="store.state.selectedOrganization.identifier"
+              :workflow-id="workflowObj.currentSelectedWorkflow?.id || ''"
+              @select="switchRun"
+            >
               <template #trigger>
                 <OButton
                   variant="outline"
@@ -155,37 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('workflow.ndv.switchRun')" side="bottom" />
                 </OButton>
               </template>
-              <div class="max-h-80 w-72 overflow-auto py-1">
-                <ODropdownItem
-                  v-for="run in sortedRuns"
-                  :key="run.run_id"
-                  :data-test="`workflow-ndv-run-${run.run_id}`"
-                  @click="switchRun(run.run_id)"
-                >
-                  <div class="flex w-full items-center justify-between gap-2">
-                    <span class="flex min-w-0 items-center gap-1.5">
-                      <OIcon
-                        v-if="run.run_id === historyRunId"
-                        name="check"
-                        size="xs"
-                        class="text-accent shrink-0"
-                      />
-                      <span v-else class="w-3.5 shrink-0" aria-hidden="true"></span>
-                      <OTimeCell
-                        :value="run.start_time"
-                        unit="us"
-                        mode="absolute"
-                        :timezone="store.state.timezone"
-                        :empty-label="raw('—')"
-                      />
-                    </span>
-                    <OBadge :variant="run.error ? 'error-soft' : 'success-soft'" size="xs">
-                      {{ run.error ? t("workflow.history.failed") : t("workflow.history.success") }}
-                    </OBadge>
-                  </div>
-                </ODropdownItem>
-              </div>
-            </ODropdown>
+            </WorkflowRunSwitcher>
           </template>
         </div>
       </div>
@@ -581,10 +556,7 @@ import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
-import workflowService from "@/services/workflows";
-import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import WorkflowRunSwitcher from "./WorkflowRunSwitcher.vue";
 import WorkflowTrigger from "@/plugins/workflows/nodes/WorkflowTrigger.vue";
 import WorkflowCondition from "@/plugins/workflows/nodes/WorkflowCondition.vue";
 import WorkflowFunction from "@/plugins/workflows/nodes/WorkflowFunction.vue";
@@ -704,44 +676,11 @@ const editThisStep = () => {
   });
 };
 
-// ── Run label + switcher (read-only history) ─────────────────────────────────
-// The label just shows the run id — it's already on `testRun.result`, so NO api call
-// (the NDV remounts on every node-detail open; fetching the run list there hit the
-// history endpoint each time). The switcher's run LIST is fetched only when the user
-// OPENS the menu — and freshly each time, so a long-open panel still sees new runs.
-const runMenuOpen = ref(false);
-const runsMeta = ref<any[]>([]);
-const loadingRuns = ref(false);
-const fetchRuns = async () => {
-  if (loadingRuns.value) return; // avoid a concurrent duplicate; still refetches on reopen
-  const workflowId = workflowObj.currentSelectedWorkflow?.id;
-  if (!workflowId) return;
-  loadingRuns.value = true;
-  try {
-    // The history endpoint windows by time (the Runs panel passes a picker range);
-    // omitting it can come back empty. Pass a very wide window (10y) so EVERY run
-    // available (bounded only by retention) is listed.
-    const nowUs = Date.now() * 1000;
-    const res = await workflowService.getWorkflowHistory({
-      org_identifier: store.state.selectedOrganization.identifier,
-      id: workflowId,
-      start_time: nowUs - 10 * 365 * 24 * 60 * 60 * 1_000_000,
-      end_time: nowUs,
-    });
-    runsMeta.value = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-  } catch {
-    /* non-fatal — the menu just stays empty */
-  } finally {
-    loadingRuns.value = false;
-  }
-};
-watch(runMenuOpen, (open) => open && fetchRuns());
-// ALL runs (newest first) — the menu scrolls; bounded only by history retention.
-const sortedRuns = computed(() =>
-  [...runsMeta.value].sort((a: any, b: any) => (b.start_time || 0) - (a.start_time || 0)),
-);
+// ── Run switcher (read-only history) ─────────────────────────────────────────
+// The chip shows the loaded run id (already on `testRun.result`, no api call). The
+// switcher dropdown (shared WorkflowRunSwitcher) reuses the runs list the Runs page
+// already fetched and loads whichever run the user picks onto THIS node.
 const switchRun = async (runId: string) => {
-  runMenuOpen.value = false;
   const id = workflowObj.currentSelectedWorkflow?.id;
   if (!runId || !id || runId === historyRunId.value) return;
   await loadWorkflowRun({

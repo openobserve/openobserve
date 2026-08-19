@@ -24,7 +24,7 @@ import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
 
 vi.mock("@/services/workflows", () => ({
-  default: { getWorkflowRun: vi.fn(), testWorkflow: vi.fn() },
+  default: { getWorkflowRun: vi.fn(), testWorkflow: vi.fn(), getWorkflowHistory: vi.fn() },
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -52,6 +52,7 @@ import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
   loadWorkflowRun,
+  loadRunsHistory,
   executeTestRun,
   serializeWorkflow,
   nodeTestInput,
@@ -76,6 +77,41 @@ const triggerNode = () => ({
 
 const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<typeof vi.fn>;
 const mockTest = workflowService.testWorkflow as unknown as ReturnType<typeof vi.fn>;
+const mockHistory = workflowService.getWorkflowHistory as unknown as ReturnType<typeof vi.fn>;
+
+describe("loadRunsHistory — shared runs list for the Runs page + NDV switcher", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workflowObj.runsHistory = {
+      list: [],
+      fetchedAt: 0,
+      params: { start: 0, end: 0 },
+      loading: false,
+    };
+  });
+
+  it("stores the fetched list, the window, and a fetchedAt stamp", async () => {
+    const runs = [{ run_id: "r1", start_time: 10 }];
+    mockHistory.mockResolvedValue({ data: runs });
+    const r = await loadRunsHistory({ orgId: "o", workflowId: "wf1", start: 100, end: 200 });
+    expect(r.ok).toBe(true);
+    expect(workflowObj.runsHistory.list).toEqual(runs);
+    expect(workflowObj.runsHistory.params).toEqual({ start: 100, end: 200 });
+    expect(workflowObj.runsHistory.fetchedAt).toBeGreaterThan(0);
+    expect(workflowObj.runsHistory.loading).toBe(false);
+    // called with the passed window
+    expect(mockHistory.mock.calls[0][0]).toMatchObject({ start_time: 100, end_time: 200 });
+  });
+
+  it("keeps the previous list on failure (a failed refresh must not blank it)", async () => {
+    workflowObj.runsHistory.list = [{ run_id: "old" }] as any;
+    mockHistory.mockRejectedValue({ response: { status: 500 } });
+    const r = await loadRunsHistory({ orgId: "o", workflowId: "wf1", start: 1, end: 2 });
+    expect(r).toEqual({ ok: false, status: 500 });
+    expect(workflowObj.runsHistory.list).toEqual([{ run_id: "old" }]); // untouched
+    expect(workflowObj.runsHistory.loading).toBe(false);
+  });
+});
 
 describe("loadWorkflowRun — history run response mapping", () => {
   beforeEach(() => {

@@ -2571,6 +2571,7 @@
       "success": "Success",
       "failed": "Failed",
       "open": "History",
+      "openFullView": "Open Full Runs View",
       "loadError": "Error While Loading Executions",
       "loadRunError": "Error While Loading This Run"
     },
@@ -2793,7 +2794,8 @@
       "executeStep": "Run Step",
       "sample": "Sample",
       "editStep": "Edit Step",
-      "testInputHint": "Test Input — Edit, Then Run Step."
+      "testInputHint": "Test Input — Edit, Then Run Step.",
+      "noRunsList": "No Runs Yet."
     },
     "runOverlay": {
       "banner": "Showing step data from a past run ({run}). You can edit freely — this run is never changed.",

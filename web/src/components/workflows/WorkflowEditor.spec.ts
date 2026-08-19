@@ -152,6 +152,15 @@ const globalStubs = {
     template:
       '<input class="o-input" v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
   },
+  // The History dropdown — render its trigger + footer slots so the History button
+  // and the "Open Full Runs View" link are present for the toolbar tests.
+  WorkflowRunSwitcher: {
+    name: "WorkflowRunSwitcher",
+    props: ["currentRunId", "orgId", "workflowId"],
+    emits: ["select"],
+    template:
+      '<div class="workflow-run-switcher"><slot name="trigger" /><slot name="footer" /></div>',
+  },
 };
 
 const mountEditor = () =>
@@ -1559,10 +1568,10 @@ describe("WorkflowEditor", () => {
       await flushPromises();
     };
 
-    it("navigates to the Runs view from the toolbar History button", async () => {
+    it("navigates to the Runs view from the History dropdown's 'Open Full Runs View'", async () => {
       await openSaved();
 
-      await wrapper.find('[data-test="workflow-editor-history"]').trigger("click");
+      await wrapper.find('[data-test="workflow-editor-open-runs-view"]').trigger("click");
 
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflowRuns",
@@ -1594,32 +1603,32 @@ describe("WorkflowEditor", () => {
       expect(workflowObj.testRun.result).toBeNull();
     });
 
-    it("shows the provenance banner while a run overlay is active", async () => {
+    it("shows the provenance chip while a run overlay is active", async () => {
       await openSaved({ id: "wf-1", run_id: "run-7" });
-      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-editor-run-chip"]').exists()).toBe(true);
     });
 
-    it("has no banner on a normal edit session", async () => {
+    it("has no run chip on a normal edit session", async () => {
       await openSaved({ id: "wf-1" });
-      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-editor-run-chip"]').exists()).toBe(false);
     });
 
-    // The banner is the ONLY thing separating historical from live data, so it
+    // The chip is the ONLY thing separating historical from live data, so it
     // must disappear the moment a real Test writes the same key. A Test result
     // carries no `mode`, which is what makes this automatic.
-    it("drops the banner when a test result replaces the overlay", async () => {
+    it("drops the chip when a test result replaces the overlay", async () => {
       await openSaved({ id: "wf-1", run_id: "run-7" });
       workflowObj.testRun.result = { errors: {}, inputs: {}, ranNodeIds: [], blockedNodeIds: [] };
       await nextTick();
-      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-editor-run-chip"]').exists()).toBe(false);
     });
 
-    it("clears the overlay from the banner", async () => {
+    it("clears the overlay from the chip", async () => {
       await openSaved({ id: "wf-1", run_id: "run-7" });
-      await wrapper.find('[data-test="workflow-editor-run-overlay-clear"]').trigger("click");
+      await wrapper.find('[data-test="workflow-editor-run-chip-clear"]').trigger("click");
       await nextTick();
       expect(workflowObj.testRun.result).toBeNull();
-      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-editor-run-chip"]').exists()).toBe(false);
     });
 
     it("opens the node named by ?node_id", async () => {
@@ -1649,7 +1658,7 @@ describe("WorkflowEditor", () => {
       getWorkflowRun.mockRejectedValue({ response: { data: { message: "nope" } } });
       await openSaved({ id: "wf-1", run_id: "run-7" });
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
-      expect(wrapper.find('[data-test="workflow-editor-run-overlay"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-editor-run-chip"]').exists()).toBe(false);
     });
   });
 

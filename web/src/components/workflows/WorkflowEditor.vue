@@ -82,17 +82,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            it's managed from the list, same as pipelines. -->
 
       <template #actions>
-        <!-- History (Runs) — only meaningful for a published, saved workflow.
-             Drafts have no run history by design, so it's hidden for them. -->
-        <OButton
-          v-if="workflowObj.isEditWorkflow && !workflowObj.currentSelectedWorkflow.isDraft"
-          variant="outline"
-          size="sm-action"
-          data-test="workflow-editor-history"
-          @click="openRuns"
+        <!-- Past-run chip — shown when a run is loaded onto the canvas (arrived via
+             "Fix This Step" or picked from History). Compact provenance in place of
+             the old full-width banner: the tooltip carries "edit freely — never
+             changed", and ✕ clears the run data. -->
+        <span
+          v-if="runOverlay"
+          data-test="workflow-editor-run-chip"
+          class="border-border-default text-text-secondary rounded-default inline-flex max-w-[16rem] shrink-0 items-center gap-1 border px-1.5 py-0.5 text-xs"
+          :title="t('workflow.runOverlay.banner', { run: runOverlay.runId })"
         >
-          {{ t("workflow.history.open") }}
-        </OButton>
+          <OIcon name="history" size="xs" class="shrink-0" />
+          <span class="truncate">{{ t("workflow.ndv.runLabel") }} · {{ runOverlay.runId }}</span>
+          <button
+            type="button"
+            data-test="workflow-editor-run-chip-clear"
+            class="text-text-secondary hover:text-text-body -mr-0.5 flex shrink-0 items-center"
+            :aria-label="t('workflow.runOverlay.clear')"
+            @click="clearRunOverlay"
+          >
+            <OIcon name="close" size="xs" />
+          </button>
+        </span>
+
+        <!-- History — published, saved workflows only (drafts have no runs). Opens
+             the runs list as a minified dropdown (same as the NDV: a titled header
+             with the refresh + "last refreshed" time built in), with "Open Full Runs
+             View" for the full inspection surface. Picking a run loads it. -->
+        <WorkflowRunSwitcher
+          v-if="showHistory"
+          :current-run-id="runOverlay?.runId || ''"
+          :org-id="orgId()"
+          :workflow-id="workflowObj.currentSelectedWorkflow.id || ''"
+          @select="switchEditorRun"
+        >
+          <template #trigger>
+            <OButton variant="outline" size="sm-action" data-test="workflow-editor-history">
+              {{ t("workflow.history.open") }}
+            </OButton>
+          </template>
+          <template #footer>
+            <button
+              type="button"
+              data-test="workflow-editor-open-runs-view"
+              class="text-accent flex w-full items-center justify-center text-xs font-medium hover:underline"
+              @click="openRuns"
+            >
+              {{ t("workflow.history.openFullView") }}
+            </button>
+          </template>
+        </WorkflowRunSwitcher>
         <OButton
           variant="outline"
           size="sm-action"
@@ -147,30 +186,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
     </OPageHeader>
-
-    <!-- Provenance for the run overlay. Not decoration — it is the only thing
-         separating "this is a past run's data" from "this is my last test", and
-         it disappears by itself the moment a real Test replaces the result. -->
-    <OBanner
-      v-if="runOverlay"
-      variant="info"
-      icon="history"
-      dense
-      inline-actions
-      data-test="workflow-editor-run-overlay"
-      :content="t('workflow.runOverlay.banner', { run: runOverlay.runId })"
-    >
-      <template #actions>
-        <OButton
-          variant="ghost-muted"
-          size="sm-action"
-          data-test="workflow-editor-run-overlay-clear"
-          @click="clearRunOverlay"
-        >
-          {{ t("workflow.runOverlay.clear") }}
-        </OButton>
-      </template>
-    </OBanner>
 
     <!-- workspace: docked palette + canvas (+ drawer region for node forms). The
          history drawer portals in here (below the toolbar) so it can sit
@@ -265,7 +280,7 @@ import { useRouter, onBeforeRouteLeave, type RouteLocationRaw } from "vue-router
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
@@ -273,6 +288,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
+import WorkflowRunSwitcher from "./WorkflowRunSwitcher.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
@@ -333,6 +349,10 @@ const runOverlay = computed(() =>
 const clearRunOverlay = () => {
   workflowObj.testRun.result = null;
 };
+// History is only meaningful for a published, saved workflow — drafts have no runs.
+const showHistory = computed(
+  () => workflowObj.isEditWorkflow && !workflowObj.currentSelectedWorkflow.isDraft,
+);
 
 // Docked palette items, grouped into sections (Transform / Destination) to
 // mirror the pipeline sidebar. The trigger is pre-placed and not addable, so
@@ -865,6 +885,18 @@ const applyRunOverlay = async (workflowId: string, runId?: string, nodeId?: stri
   );
   if (exists) editNode(nodeId);
   else toast({ message: t("workflow.runOverlay.missingNode"), variant: "warning" });
+};
+
+// Pick a run from the History dropdown → load it onto the canvas and reflect it in
+// the URL, so a refresh reloads the same run. No node is opened (unlike arriving via
+// "Fix This Step"); the user is switching which run's data the editor overlays.
+const switchEditorRun = async (runId: string) => {
+  const id = workflowObj.currentSelectedWorkflow?.id;
+  if (!id || !runId || runId === (runOverlay.value?.runId || "")) return;
+  await applyRunOverlay(id, runId);
+  router.replace({
+    query: { ...router.currentRoute.value.query, run_id: runId },
+  });
 };
 
 onBeforeUnmount(() => {

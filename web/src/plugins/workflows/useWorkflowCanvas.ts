@@ -242,6 +242,16 @@ const defaultObject = {
   // when incomplete (dummy) nodes block publishing, so the user sees exactly which
   // steps. Transient: the canvas frames them and clears this after a few seconds.
   incompleteHighlight: <string[]>[],
+  // Runs list, fetched ONCE by the Runs page (WorkflowRunsPanel) and SHARED so the
+  // NDV's run switcher reuses it instead of re-hitting /history on every open. The
+  // user reaches the NDV from that list, so it's already loaded; a manual Refresh
+  // (with `fetchedAt` shown) re-pulls the same window when they want the latest.
+  runsHistory: {
+    list: <any[]>[],
+    fetchedAt: 0, // ms epoch of the last successful fetch; 0 = never
+    params: { start: 0, end: 0 }, // the time window the list was fetched for (µs)
+    loading: false,
+  },
 };
 
 const workflowObj = reactive(Object.assign({}, defaultObject));
@@ -789,6 +799,37 @@ export const nodeTestOutput = (nodeId: string): any[] | null => {
   const outputs = workflowObj.testRun.result?.outputs;
   const v = outputs?.[nodeId];
   return Array.isArray(v) ? v : null;
+};
+
+// Fetch the runs list into SHARED state (workflowObj.runsHistory), so the Runs page
+// and the NDV's run switcher read one source. Stores the window it fetched for
+// (`params`) and a `fetchedAt` stamp, so a later Refresh can re-pull the same
+// window. On error the previous list is kept (a failed refresh shouldn't blank the
+// switcher); the caller gets {ok,status} to surface load-error / permission UI.
+export const loadRunsHistory = async (opts: {
+  orgId: string;
+  workflowId: string;
+  start: number;
+  end: number;
+}): Promise<{ ok: boolean; status?: number }> => {
+  const rh = workflowObj.runsHistory;
+  rh.loading = true;
+  try {
+    const res = await workflowService.getWorkflowHistory({
+      org_identifier: opts.orgId,
+      id: opts.workflowId,
+      start_time: opts.start,
+      end_time: opts.end,
+    });
+    rh.list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    rh.params = { start: opts.start, end: opts.end };
+    rh.fetchedAt = Date.now();
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, status: e?.response?.status };
+  } finally {
+    rh.loading = false;
+  }
 };
 
 // Load a PAST run (from the Executions history) into the same testRun.result the
@@ -1513,6 +1554,12 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     workflowObj.nameErrorMessage = "";
     workflowObj.deleteConfirm = { show: false, nodeId: "" };
     workflowObj.incompleteHighlight = [];
+    workflowObj.runsHistory = {
+      list: [],
+      fetchedAt: 0,
+      params: { start: 0, end: 0 },
+      loading: false,
+    };
     workflowObj.testRun = {
       show: false,
       input: "",
