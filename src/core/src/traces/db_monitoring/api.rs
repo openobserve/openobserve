@@ -6064,7 +6064,13 @@ pub(crate) fn build_dbm_plans_sql(
     preds: &str,
     present: &HashSet<String>,
 ) -> Option<String> {
-    if !present.contains(server_vantage::O2_DBM_PLAN_HASH) {
+    // The PLAN is what this view exists to show; the hash is how identical
+    // plans are collapsed. A stream carrying plans but no hash column is
+    // therefore still answerable, and refusing it here would hide every plan on
+    // an engine whose plans cannot be hashed.
+    if !present.contains(server_vantage::O2_DBM_PLAN)
+        && !present.contains(server_vantage::O2_DBM_PLAN_HASH)
+    {
         return None;
     }
     // Optional columns: a stream can carry the hash without the others if it was
@@ -6121,19 +6127,81 @@ pub(crate) fn build_dbm_plans_sql(
     } else {
         String::new()
     };
+    // GROUP BY THE HASH WHERE THERE IS ONE, and by the plan text where there is
+    // not.
+    //
+    // Grouping on the hash alone made every HASHLESS plan invisible: they all
+    // collapsed into a single NULL bucket that the detail page cannot key a
+    // card on. That is not a hypothetical — `plan_hash` canonicalizes a plan by
+    // walking its JSON structure, and SQL Server ships XML, so EVERY SQL Server
+    // plan is hashless. They were stored correctly and then never rendered.
+    //
+    // The fallback is the plan TEXT itself, so two identical showplans still
+    // collapse to one row and two different ones stay apart — which is the only
+    // job the group key has here. It is deliberately NOT a hash we mint
+    // ourselves over the raw XML: the showplan embeds per-execution costs and
+    // row estimates, so such a key would change almost every collection and
+    // report a plan regression that never happened. `plan_hash` stays NULL on
+    // these rows, and the drift rules that read it keep correctly declining to
+    // claim drift.
+    //
+    // The COALESCE is CONDITIONAL on the hash column existing in the schema.
+    // Naming a column the stream has never written is not a null — it is
+    // `unknown field`, which fails the whole query. A SQL Server-only stream
+    // has no `o2_dbm_plan_hash` at all (nothing there can produce one), so on
+    // that stream the group key is the plan text alone.
+    let has_hash = present.contains(server_vantage::O2_DBM_PLAN_HASH);
+    let has_plan = present.contains(server_vantage::O2_DBM_PLAN);
+    let group_key = match (has_hash, has_plan) {
+        (true, true) => format!(
+            "COALESCE({hash}, {plan})",
+            hash = server_vantage::O2_DBM_PLAN_HASH,
+            plan = server_vantage::O2_DBM_PLAN,
+        ),
+        (true, false) => server_vantage::O2_DBM_PLAN_HASH.to_string(),
+        // No hash column on this stream: group by the plan itself.
+        (false, _) => server_vantage::O2_DBM_PLAN.to_string(),
+    };
+    // Only name the hash in the GROUP BY when the stream carries it.
+    let hash_group = if has_hash {
+        format!(", {}", server_vantage::O2_DBM_PLAN_HASH)
+    } else {
+        String::new()
+    };
+    // Same rule for the projection: a stream with no hash column still owes the
+    // caller a `plan_hash` FIELD, so the DTO shape is stable — it is simply
+    // null, which is the honest value for a plan that cannot be hashed.
+    let hash_select = if has_hash {
+        server_vantage::O2_DBM_PLAN_HASH.to_string()
+    } else {
+        "NULL".to_string()
+    };
     Some(format!(
-        "SELECT {hash} AS plan_hash, {plan_col}, {version_col}, {calls_col}, \
+        "SELECT {hash_select} AS plan_hash, {plan_col}, {version_col}, {calls_col}, \
          MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen{source_col}{duration_cols} \
          FROM \"{stream}\"\n\
-         WHERE {kind} IN ('{kind_top}', '{kind_explain}')\n    AND {fp} = '{fp_val}'{preds}\n\
-         GROUP BY {hash}{source_group}\nORDER BY last_seen DESC",
-        hash = server_vantage::O2_DBM_PLAN_HASH,
+         WHERE {kind} IN ('{kind_top}', '{kind_explain}')\n    AND {fp} = '{fp_val}'\n\
+    AND {plan_not_null}{preds}\n\
+         GROUP BY {group_key}{hash_group}{source_group}\nORDER BY last_seen DESC",
+        group_key = group_key,
+        hash_group = hash_group,
+        hash_select = hash_select,
         stream = escape_ident(stream_name),
         kind = server_vantage::O2_DBM_KIND,
         kind_top = escape_sq(server_vantage::KIND_TOP_QUERY),
         kind_explain = escape_sq(server_vantage::KIND_EXPLAIN),
         fp = server_vantage::O2_DBM_FINGERPRINT,
         fp_val = escape_sq(fingerprint),
+        // A row with NO plan is not a plan row. Rows for the same statement
+        // that carry only metrics used to form their own group, so the view
+        // rendered an empty card beside the real one — and on SQL Server, where
+        // there is no hash to distinguish them, the empty group could sort
+        // first and be the only thing a reader saw.
+        plan_not_null = if has_plan {
+            format!("{} IS NOT NULL", server_vantage::O2_DBM_PLAN)
+        } else {
+            "1 = 1".to_string()
+        },
     ))
 }
 
@@ -6167,9 +6235,28 @@ fn plan_row_to_dto(row: &Value) -> Value {
         // The PARSED tree, so the UI renders a structure rather than re-parsing
         // a string. Malformed input reads as absent rather than failing the
         // read — a bad plan must never break a page that would otherwise work.
+        //
+        // NOT EVERY PLAN IS JSON. SQL Server ships an XML showplan, which
+        // `plan_of` cannot parse and correctly declines — and returning null
+        // there meant the plans view showed an empty card for a plan that was
+        // stored, read and grouped perfectly well. A plan we cannot parse is
+        // still a plan a reader can READ, so the raw text is passed through
+        // when parsing fails. The UI already renders a string plan verbatim.
         "plan": server_vantage::plan_of(&json!({
             server_vantage::O2_DBM_PLAN: row.get("plan").cloned().unwrap_or(Value::Null)
         }))
+        .or_else(|| {
+            // ONLY a recognisable XML showplan, never arbitrary unparsed text.
+            // The rule this must not break: malformed input reads as ABSENT so
+            // a bad plan cannot fail a read. `{not json` is garbage and stays
+            // null; `<ShowPlanXML …>` is a plan in a format we do not parse,
+            // which is a different thing and worth showing.
+            row.get("plan")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|p| p.starts_with("<ShowPlanXML"))
+                .map(|p| Value::String(p.to_string()))
+        })
         .unwrap_or(Value::Null),
         "plan_hash_version": row.get("plan_hash_version").and_then(Value::as_i64),
         "first_seen": get_i64(row, "first_seen"),
@@ -14700,8 +14787,12 @@ mod tests {
             .expect("the plans query must build when the columns are present");
 
         assert!(
-            sql.contains(&format!("GROUP BY {}", server_vantage::O2_DBM_PLAN_HASH)),
+            sql.contains("GROUP BY COALESCE("),
             "distinct plans come from a GROUP BY, not a row fetch folded in Rust: {sql}"
+        );
+        assert!(
+            sql.contains(server_vantage::O2_DBM_PLAN_HASH),
+            "the hash is still the grouping key wherever a plan HAS one: {sql}"
         );
         assert!(
             sql.contains(&format!(
@@ -14781,12 +14872,47 @@ mod tests {
     /// never ingested plans has none of these columns.
     #[test]
     fn test_plans_sql_skips_when_the_plan_columns_are_absent() {
+        // BOTH must be missing to skip. The hash alone is not the feature — the
+        // PLAN is — and refusing to answer without a hash column hid every plan
+        // on an engine whose plans cannot be hashed (SQL Server ships XML,
+        // which the JSON plan walker correctly declines).
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_PLAN_HASH);
+        without.remove(server_vantage::O2_DBM_PLAN);
         assert_eq!(
             build_dbm_plans_sql("dbm_server", "fp", "", &without),
             None,
-            "a stream with no plan_hash column must skip the query, not 500 the endpoint"
+            "a stream with neither plan column must skip the query, not 500 the endpoint"
+        );
+    }
+
+    #[test]
+    fn test_plans_sql_still_answers_when_only_the_hash_is_missing() {
+        // The SQL Server case. Every one of its plans is hashless, so a query
+        // that bails without the hash column renders an empty plans view for a
+        // statement whose plan is sitting in the stream.
+        let mut without = all_cols();
+        without.remove(server_vantage::O2_DBM_PLAN_HASH);
+        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &without)
+            .expect("plans without a hash are still plans worth showing");
+        assert!(sql.contains(server_vantage::O2_DBM_PLAN), "the plan must be projected: {sql}");
+    }
+
+    #[test]
+    fn test_plans_sql_groups_hashless_plans_by_their_text() {
+        // Two identical showplans must collapse to ONE row and two different
+        // ones must stay apart — the only job the group key has. Falling back
+        // to the plan text does that without minting a hash over raw XML, which
+        // would change on nearly every collection (the showplan embeds
+        // per-execution costs) and fake a plan regression every interval.
+        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &all_cols()).expect("plans sql");
+        assert!(
+            sql.contains(&format!(
+                "COALESCE({}, {})",
+                server_vantage::O2_DBM_PLAN_HASH,
+                server_vantage::O2_DBM_PLAN
+            )),
+            "a hashless plan must group by its own text, not collapse into one NULL bucket: {sql}"
         );
     }
 
@@ -14976,13 +15102,17 @@ mod tests {
     #[test]
     fn test_plans_sql_groups_by_plan_source_only_when_present() {
         let sql = build_dbm_plans_sql("dbm_server", "fp", "", &all_cols()).expect("plans sql");
+        // The producer is still part of the key — the group list now begins
+        // with the hash-or-text fallback, so this asserts the SOURCE is present
+        // in the GROUP BY rather than pinning the exact prefix.
+        let group_by = sql.split("GROUP BY").nth(1).expect("a GROUP BY clause");
         assert!(
-            sql.contains(&format!(
-                "GROUP BY {}, {}",
-                server_vantage::O2_DBM_PLAN_HASH,
-                server_vantage::O2_DBM_PLAN_SOURCE
-            )),
+            group_by.contains(server_vantage::O2_DBM_PLAN_SOURCE),
             "same hash + different producer must stay two rows: {sql}"
+        );
+        assert!(
+            group_by.contains(server_vantage::O2_DBM_PLAN_HASH),
+            "the hash must still group plans that have one: {sql}"
         );
 
         let mut without = all_cols();
