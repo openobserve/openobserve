@@ -8031,6 +8031,203 @@ fn table_health_row_to_dto(row: &Value) -> Value {
     })
 }
 
+// ─── Instances (`/instances`) — the fleet's identity list ────────────────────
+//
+// WHAT THIS IS FOR, and why no existing endpoint answers it.
+//
+// Every DBM tab renders a scope filter whose "database" (instance) picker must
+// offer every instance the org HAS — not merely the ones whose rows happen to
+// be on screen. Each page used to derive its options from its own loaded rows,
+// which fails in three separate ways that all look like "the filter is broken":
+//
+//   * a feed that names no instance leaves the picker EMPTY (deadlocks return
+//     no identity of their own),
+//   * a feed no engine populates DROPS that engine (SQL Server has no session
+//     sampler, so Activity could never offer `mssql-prod-1` — while a chip set
+//     from another tab still displayed it, unselectable and unclearable),
+//   * a CAPPED read (activity stops at 100 sampled sessions) makes the list
+//     first-page-local rather than window-local.
+//
+// `/databases` cannot stand in: it is the CLIENT vantage (spans), so on a
+// zero-trace org it returns nothing at all while server-vantage data sits one
+// tab away. And no per-feed union is complete either — measured on the rig,
+// activity named 2 of 4 engines, table_health 2 of 4, deadlocks 0 of 4.
+//
+// So this is one DISTINCT over the identity columns with NO kind predicate:
+// every server-vantage record carries `(engine, instance)` whatever feed wrote
+// it, which makes the union complete BY CONSTRUCTION instead of by remembering
+// to add each new feed to a client-side merge.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Deserialize)]
+pub struct DbmInstancesQuery {
+    pub stream: Option<String>,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    /// Narrow to one engine. The picker uses this when a `system` chip is
+    /// already applied, so the instance list agrees with the engine filter
+    /// beside it rather than offering instances that chip excludes.
+    pub system: Option<String>,
+}
+
+/// GET /{org_id}/traces/db_monitoring/instances — every (engine, instance).
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/instances",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringInstances",
+    summary = "Database Monitoring: every database instance the org knows",
+    description = "The distinct (engine, instance) identities the server-vantage stream carries in the window, across EVERY feed — sessions, blocking, deadlocks, table stats and statement lists. Feeds the scope filter's instance picker, which must offer instances that have no rows on the current tab.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("system" = Option<String>, Query, description = "Restrict to one engine"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    )
+)]
+#[cfg(feature = "enterprise")]
+pub async fn get_dbm_instances(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<DbmInstancesQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    match read_dbm_instances_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The distinct identities, as [`get_dbm_instances`] returns them.
+///
+/// An instance whose rows carry an engine but no instance name degrades to a
+/// `null` instance rather than being dropped: it is the only evidence that
+/// engine exists, and the picker renders it as an engine-level choice.
+#[cfg(feature = "enterprise")]
+async fn read_dbm_instances_body(
+    org_id: &str,
+    user_id: &str,
+    q: &DbmInstancesQuery,
+) -> Result<Value, HttpResponse> {
+    let stream = q
+        .stream
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_SERVER_STREAM);
+    // Auth BEFORE range parsing, so stream existence cannot be probed by a
+    // caller who may not read it — the same ordering every sibling uses.
+    if !can_read_stream(
+        org_id,
+        user_id,
+        stream,
+        required_stream_for(DbmVantage::Server),
+    )
+    .await
+    {
+        return Err(unauthorized_response());
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
+    }
+    // A failed schema read is reported, never absorbed into an empty set: an
+    // empty picker and a broken picker must not look alike. Same rule as
+    // `read_table_health_body`.
+    let present = match present_dbm_columns(org_id, stream).await {
+        Ok(present) => present,
+        Err(e) => {
+            log::error!("[DbMonitoring] instances schema read failed for {org_id}/{stream}: {e}");
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+    // The stream has never carried DBM identity columns — an empty list, not
+    // an error: nothing has been ingested yet is a real, renderable answer.
+    if !present.contains(server_vantage::O2_DBM_ENGINE) {
+        return Ok(json!({ "hits": [] }));
+    }
+
+    let hits = match build_dbm_instances_sql(stream, q.system.as_deref(), &present) {
+        Some(sql) => run_events_search(org_id, stream, sql, start_time, end_time)
+            .await
+            .map_err(|e| {
+                log::error!("[DbMonitoring] instances search failed for {org_id}/{stream}: {e}");
+                MetaHttpResponse::internal_error(e)
+            })?,
+        None => Vec::new(),
+    };
+
+    // Project onto the wire names the fleet union already speaks, so the
+    // client needs no second vocabulary for the same identity.
+    let out: Vec<Value> = hits
+        .iter()
+        .filter_map(|row| {
+            let engine = row
+                .get(server_vantage::O2_DBM_ENGINE)
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())?;
+            let instance = row
+                .get(server_vantage::O2_DBM_INSTANCE)
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+            Some(json!({ "db_system": engine, "db_instance": instance }))
+        })
+        .collect();
+    Ok(json!({ "hits": out }))
+}
+
+/// `SELECT DISTINCT engine, instance` over the server stream.
+///
+/// Deliberately NO `o2_dbm_kind` predicate. Every feed's records carry the
+/// identity columns, so filtering to one kind is exactly the per-feed
+/// incompleteness this endpoint exists to remove.
+#[cfg(feature = "enterprise")]
+pub(crate) fn build_dbm_instances_sql(
+    stream_name: &str,
+    system: Option<&str>,
+    present: &HashSet<String>,
+) -> Option<String> {
+    if !present.contains(server_vantage::O2_DBM_ENGINE) {
+        return None;
+    }
+    let engine = server_vantage::O2_DBM_ENGINE;
+    // The instance column can be absent on a partially-upgraded cluster.
+    // Project a literal NULL so the row shape is stable either way.
+    let instance_col = if present.contains(server_vantage::O2_DBM_INSTANCE) {
+        server_vantage::O2_DBM_INSTANCE.to_string()
+    } else {
+        format!("CAST(NULL AS VARCHAR) AS {}", server_vantage::O2_DBM_INSTANCE)
+    };
+    // `escape_ident`, not raw interpolation: a stream name carrying a double
+    // quote would otherwise terminate the identifier. Same helper every
+    // sibling builder uses.
+    let mut sql = format!(
+        "SELECT DISTINCT {engine}, {instance_col} FROM \"{stream}\" WHERE {engine} IS NOT NULL",
+        stream = escape_ident(stream_name),
+    );
+    if let Some(system) = system.map(str::trim).filter(|s| !s.is_empty()) {
+        // Same escaping rule the sibling builders use for a user-supplied
+        // literal: double any quote so it cannot terminate the string.
+        sql.push_str(&format!(
+            " AND {engine} = '{}'",
+            system.replace('\'', "''")
+        ));
+    }
+    sql.push_str(&format!(" ORDER BY {engine}"));
+    Some(sql)
+}
+
 #[cfg(feature = "enterprise")]
 #[derive(Debug, Deserialize)]
 pub struct TableHealthQuery {
@@ -15397,6 +15594,80 @@ mod tests {
             None,
             "a stream with no relation column must skip the query, not 500 the endpoint"
         );
+    }
+
+    // ── Instances (`/instances`) — the scope picker's identity source ───────
+
+    #[cfg(feature = "enterprise")]
+    /// The whole point of this endpoint: NO kind predicate.
+    ///
+    /// Every feed's records carry the identity columns, so filtering to one
+    /// kind reintroduces exactly the per-feed incompleteness this exists to
+    /// remove. Measured on the rig before the fix, a per-feed list named 2 of
+    /// 4 engines from activity, 2 of 4 from table_health and 0 of 4 from
+    /// deadlocks — so a tab could not offer an instance it had no rows for.
+    #[test]
+    fn test_instances_sql_unions_every_feed() {
+        let sql = build_dbm_instances_sql("dbm_server", None, &all_cols())
+            .expect("instances sql");
+        assert!(
+            sql.contains("SELECT DISTINCT"),
+            "the identity list must be a distinct scan, not a row read"
+        );
+        assert!(
+            !sql.contains(server_vantage::O2_DBM_KIND),
+            "filtering by kind would drop every engine whose feed is not that kind — \
+             the exact defect this endpoint removes"
+        );
+        assert!(sql.contains(server_vantage::O2_DBM_ENGINE));
+        assert!(sql.contains(server_vantage::O2_DBM_INSTANCE));
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// A `system` chip must narrow the instance list beside it.
+    #[test]
+    fn test_instances_sql_narrows_by_engine() {
+        let sql = build_dbm_instances_sql("dbm_server", Some("mssql"), &all_cols())
+            .expect("instances sql");
+        assert!(sql.contains("= 'mssql'"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// A partially-upgraded stream has the engine but not the instance column.
+    /// The row SHAPE must stay stable so the client needs no second branch.
+    #[test]
+    fn test_instances_sql_survives_a_missing_instance_column() {
+        let mut without = all_cols();
+        without.remove(server_vantage::O2_DBM_INSTANCE);
+        let sql = build_dbm_instances_sql("dbm_server", None, &without)
+            .expect("engine alone is still a usable identity list");
+        assert!(
+            sql.contains("CAST(NULL AS VARCHAR)"),
+            "the instance column must be projected as NULL, not omitted"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// No engine column at all — nothing to list, and that is not an error.
+    #[test]
+    fn test_instances_sql_skips_when_the_stream_has_no_identity() {
+        let mut without = all_cols();
+        without.remove(server_vantage::O2_DBM_ENGINE);
+        assert_eq!(
+            build_dbm_instances_sql("dbm_server", None, &without),
+            None,
+            "a stream with no engine column must skip the query, not 500 the endpoint"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// Injection-safe, like every other builder here.
+    #[test]
+    fn test_instances_sql_escapes_its_inputs() {
+        let sql = build_dbm_instances_sql("ev\"il", Some("pg' OR '1'='1"), &all_cols())
+            .expect("instances sql");
+        assert!(sql.contains("'pg'' OR ''1''=''1'"));
+        assert!(sql.contains("\"ev\"\"il\""));
     }
 
     #[cfg(feature = "enterprise")]
