@@ -1137,3 +1137,113 @@ describe("OnCallResponses", () => {
   });
 
 });
+
+/// Two things the triage list already held and did not use.
+describe("OnCallResponses — the rows' own fields", () => {
+  const stubsForList = stubs;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+    service.listResponses.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
+    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
+    service.getSchedule.mockResolvedValue({ data: null } as any);
+    service.escalationProgress.mockResolvedValue({
+      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
+    } as any);
+    service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
+  });
+
+  function row(over: Record<string, unknown> = {}) {
+    return {
+      id: "resp_1",
+      org_id: "default",
+      // Distinct per row: the list groups by subject, so two rows sharing a
+      // source_id collapse into one and only the latest firing renders.
+      subject: { subject_type: "alert", source_id: String(over.id ?? "al_ckt"), firing: 1 },
+      team_id: "team_1",
+      priority: 1,
+      state: "triggered",
+      responder_role: "owner",
+      title: "checkout_failing",
+      opened_at: 1_700_000_000_000_000,
+      ...over,
+    };
+  }
+
+  async function withRows(rows: Record<string, unknown>[]) {
+    service.listResponses.mockResolvedValue({ data: rows } as any);
+    const wrapper = mount(OnCallResponses, {
+      global: { plugins: [i18n, store], stubs: stubsForList },
+    });
+    await flushPromises();
+    return wrapper;
+  }
+
+  /// A page you fix and a blast radius you contain are different errands, and
+  /// the field that tells them apart was on every row already. Without it the
+  /// two are indistinguishable until you open one.
+  describe("impacted rows", () => {
+    it("badges a row that hangs off somebody else's record", async () => {
+      const wrapper = await withRows([
+        row({ id: "resp_1" }),
+        row({ id: "resp_2", responder_role: "impacted", origin_response_id: "resp_1" }),
+      ]);
+
+      expect(wrapper.find('[data-test="oncall-impacted-resp_1"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-impacted-resp_2"]').exists()).toBe(true);
+    });
+
+    /// Either marker is enough, so a record carrying one and not the other —
+    /// the shape a partial write leaves — still reads as what it is.
+    it("badges on either marker", async () => {
+      const wrapper = await withRows([
+        row({ id: "resp_3", responder_role: "impacted" }),
+        row({ id: "resp_4", origin_response_id: "resp_1" }),
+      ]);
+
+      expect(wrapper.find('[data-test="oncall-impacted-resp_3"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-impacted-resp_4"]').exists()).toBe(true);
+    });
+  });
+
+  /// The filter narrowed the rows this page happened to have walked. Past the
+  /// fetch cap, a team's older pages were simply not in the list — and the
+  /// screen reported that by showing nothing rather than by saying so.
+  describe("the team filter", () => {
+    it("asks the server rather than filtering what it already loaded", async () => {
+      service.listTeams.mockResolvedValue({
+        data: [{ id: "team_1", name: "Platform" }],
+      } as any);
+      const wrapper = await withRows([row()]);
+
+      service.listResponses.mockClear();
+      wrapper
+        .findComponent('[data-test="oncall-responses-team-filter"]')
+        .vm.$emit("update:modelValue", "team_1");
+      await flushPromises();
+
+      expect(service.listResponses).toHaveBeenCalled();
+      expect(service.listResponses.mock.calls.at(-1)![0]).toMatchObject({ team_id: "team_1" });
+    });
+
+    it("sends no team_id when the filter is cleared", async () => {
+      service.listTeams.mockResolvedValue({
+        data: [{ id: "team_1", name: "Platform" }],
+      } as any);
+      const wrapper = await withRows([row()]);
+
+      service.listResponses.mockClear();
+      wrapper
+        .findComponent('[data-test="oncall-responses-team-filter"]')
+        .vm.$emit("update:modelValue", "all");
+      await flushPromises();
+
+      expect(service.listResponses.mock.calls.at(-1)![0]).not.toHaveProperty("team_id");
+    });
+  });
+});

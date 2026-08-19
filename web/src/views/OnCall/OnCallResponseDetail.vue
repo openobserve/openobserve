@@ -557,6 +557,7 @@ import oncallService from "@/services/oncall";
 import type {
   DeliveryRecord,
   CauseGroup,
+  EscalateResult,
   EscalationProgress,
   OnCallPolicy,
   OnCallResponse,
@@ -845,6 +846,18 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "oncall-stat-ttr",
     },
     {
+      // How deep the ladder actually went. It was in every payload this page
+      // fetches and rendered nowhere, so "was anybody past the first rung ever
+      // called?" — the question that decides whether to escalate again — was
+      // only answerable by reading the timeline.
+      key: "reachedRung",
+      label: t("oncall.statReachedRung"),
+      value: reachedRung.value,
+      icon: "arrow-upward",
+      tone: r?.reached_rung_micros === undefined ? "neutral" : "warning",
+      dataTest: "oncall-stat-reached-rung",
+    },
+    {
       key: "firing",
       label: t("oncall.firing"),
       value: r ? `#${r.subject.firing}` : ABSENT,
@@ -853,6 +866,26 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "oncall-stat-firing",
     },
   ];
+});
+
+/// How far up the ladder a page got, said as the rung rather than as a delay.
+///
+/// **`reached_rung_micros` is omitted when no page went out, and `0` is a real
+/// and common value** meaning it never left the first rung — so `if (micros)`
+/// is a bug here and the test is for `undefined`.
+///
+/// The number on the wire is the rung's `after_micros`, which is a delay, not
+/// an index. Matching it back against the policy's own steps is what turns it
+/// into "rung 2 of 5"; without a policy to match against, the delay is still
+/// more honest than nothing.
+const reachedRung = computed<I18nText | string>(() => {
+  const micros = response.value?.reached_rung_micros;
+  if (micros === undefined || micros === null) return ABSENT;
+  const steps = policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)
+    ?.steps;
+  const index = steps?.findIndex((step) => step.after_micros === micros) ?? -1;
+  if (index < 0 || !steps) return raw(`+${formatMicrosDuration(micros)}`);
+  return t("oncall.statReachedRungOf", { n: index + 1, total: steps.length });
 });
 
 const routingReason = computed(() => routingReasonOf(events.value));
@@ -1212,17 +1245,44 @@ async function fetchLatestEvaluation() {
   }
 }
 
+/// What the escalation actually did, from the response the verb already sends.
+///
+/// "Escalated" alone is a claim; the person who pressed it wants to know which
+/// phone is ringing. The 200 body carries `recipients`, `chased` (reached again
+/// although a page had already landed on them) and `deduplicated` (skipped for
+/// the same reason), and all four fields were being thrown away for a fixed
+/// sentence.
+///
+/// `ladder_exhausted` arrives as a 200, deliberately — "there is nobody above
+/// you" is an answer, not a failure — so it is said plainly rather than as an
+/// error, which would read as though the press failed and invite a second one.
+function escalateOutcome(result: EscalateResult | undefined): I18nText {
+  if (result?.escalated_to === "ladder_exhausted") {
+    return t("oncall.escalateExhausted", { team: teamName.value });
+  }
+  const reached = result?.escalated_to === "rung" ? [...result.recipients, ...result.chased] : [];
+  if (!reached.length) {
+    // A rung that resolved to nobody is a real outcome and the one worth
+    // saying loudest: the ladder moved and no phone rang.
+    return t("oncall.escalatedNobody", { team: teamName.value });
+  }
+  return t("oncall.escalatedTo", {
+    team: teamName.value,
+    who: raw(reached.join(", ")),
+  });
+}
+
 /// Wakes the next rung now instead of when the timer says so. Ownership does
 /// not move — this is asking for more hands, which is what separates it from
 /// a handoff.
 async function escalateNow() {
   escalatingNow.value = true;
   try {
-    await oncallService.escalateNow({
+    const res = await oncallService.escalateNow({
       org_identifier: orgId.value,
       response_id: responseId.value,
     });
-    toast({ variant: "success", message: t("oncall.escalated", { team: teamName.value }) });
+    toast({ variant: "success", message: escalateOutcome(res.data) });
     await fetchResponse();
   } catch (err: any) {
     toast({

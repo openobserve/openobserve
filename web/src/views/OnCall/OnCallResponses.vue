@@ -220,6 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- `width` is a PROP, not a class: OSelect merges an incoming class
                with its own width class, so a `w-56` here lost to the default
                `w-full` and stacked the whole toolbar into three rows. -->
+          <!-- Refetches, because the server does this filter now: narrowing
+               the rows this page happened to have walked hid a team's older
+               pages entirely past the fetch cap. -->
           <OSelect
             v-model="teamFilter"
             :options="teamOptions"
@@ -227,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="teamsAvailable ? undefined : t('oncall.teamFilterUnavailable')"
             width="sm"
             data-test="oncall-responses-team-filter"
+            @update:model-value="() => fetchResponses()"
           />
           <OSelect
             v-model="priorityFilter"
@@ -365,6 +369,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
             </OTag>
             <OTag v-else variant="error-soft" size="sm">{{ t("oncall.statUnrouted") }}</OTag>
+            <!-- This row is somebody else's outage reaching this team's
+                 service, and the difference decides what the reader does with
+                 it: a page you fix, or a blast radius you contain and confirm
+                 recovery on. `origin_response_id` is already on every row, so
+                 the two were indistinguishable in a list only because nothing
+                 read it. -->
+            <OTag
+              v-if="isImpactedRow(row.latest)"
+              variant="info-outline"
+              size="sm"
+              :data-test="`oncall-impacted-${row.latest.id}`"
+            >
+              {{ t("oncall.liaisonTag") }}
+            </OTag>
             <OTag v-if="row.latest.incident_id" variant="amber-soft" size="sm">
               {{ raw(row.latest.incident_id) }}
             </OTag>
@@ -1026,6 +1044,17 @@ const rows = computed(() => toRows(scopedResponses.value));
 
 const youLabel = computed(() => String(t("oncall.onCallYou")));
 
+/// Is this row somebody else's outage reaching this team's service?
+///
+/// Either marker is enough. `responder_role` is what the record says it is;
+/// `origin_response_id` is the owner record it hangs off, and it is present on
+/// exactly the same rows. Reading both means a record that carries one and not
+/// the other — the shape a partial write leaves behind — still reads as what
+/// it is rather than as an ordinary page.
+function isImpactedRow(record: OnCallResponse): boolean {
+  return record.responder_role === "impacted" || !!record.origin_response_id;
+}
+
 /// How fast the page was answered, for a row that already has been.
 function ackedInMicros(record: OnCallResponse): number | null {
   return record.acked_at ? record.acked_at - record.opened_at : null;
@@ -1365,6 +1394,12 @@ async function fetchAllPages(): Promise<OnCallResponse[]> {
     const res = await oncallService.listResponses({
       org_identifier: orgId.value,
       include_resolved: includeResolved.value,
+      // Filtered by the SERVER once a team is chosen. Filtering client-side
+      // narrowed the rows this fetch happened to have walked — capped at
+      // MAX_PAGES × RESPONSE_PAGE_LIMIT — so on a busy org the team's older
+      // pages were simply not in the list, and the screen said so by showing
+      // nothing rather than by saying it was truncated.
+      ...(teamFilter.value === "all" ? {} : { team_id: teamFilter.value }),
       limit: RESPONSE_PAGE_LIMIT,
       offset: page * RESPONSE_PAGE_LIMIT,
     });

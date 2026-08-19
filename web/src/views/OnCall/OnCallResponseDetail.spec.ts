@@ -52,6 +52,10 @@ vi.mock("@/services/alerts", () => ({
   default: { get_by_alert_id: vi.fn(), getHistory: vi.fn() },
 }));
 
+/// Escalate's whole point is what it reports back, and the report is a toast.
+const toastSpy = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...args: unknown[]) => toastSpy(...args) }));
+
 const push = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: { responseId: "resp_1" } }),
@@ -968,5 +972,148 @@ describe("OnCallResponseDetail", () => {
     const ack = items.find((i) => i.key === "ack")!;
     expect(ack.label).toBe("Time to ack");
     expect(ack.value).toContain("1h");
+  });
+});
+
+/// §L.2 — three facts already in payloads this page fetches and rendered
+/// nowhere. None of them needs a request.
+describe("OnCallResponseDetail — what the payload already knew", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service.getTeam.mockResolvedValue({ data: { name: "Platform" } } as any);
+    service.listMembers.mockResolvedValue({ data: [] } as any);
+    service.priorCauses.mockResolvedValue({ data: [] } as any);
+    service.responseHistory.mockResolvedValue({ data: [] } as any);
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.escalationProgress.mockResolvedValue({
+      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
+    } as any);
+    service.listDeliveries.mockResolvedValue({ data: { total: 0, deliveries: [] } } as any);
+    service.getPolicy.mockResolvedValue({ data: null } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    alerts.get_by_alert_id.mockResolvedValue({ data: {} } as any);
+  });
+
+  const stat = async (wrapper: any, key: string) =>
+    (wrapper.findComponent({ name: "OStatStrip" }).props("items") as { key: string; value: unknown }[])
+      .find((i) => i.key === key)?.value;
+
+  /// **`0` is a real and common value** — it means the page never left the
+  /// first rung — so `if (micros)` is a bug here. The absent case is the one
+  /// that reads as a dash: no page went out at all.
+  describe("the rung the ladder reached", () => {
+    it("says which rung of how many, matched against the team's own ladder", async () => {
+      service.getPolicy.mockResolvedValue({
+        data: {
+          rungs: [
+            {
+              priority: 2,
+              channels: ["email"],
+              steps: [
+                { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+                { after_micros: 300_000_000, targets: [{ kind: "next_on_call" }] },
+                { after_micros: 900_000_000, targets: [{ kind: "whole_team" }] },
+              ],
+            },
+          ],
+        },
+      } as any);
+
+      const wrapper = await renderWith({ priority: 2, reached_rung_micros: 300_000_000 });
+      expect(await stat(wrapper, "reachedRung")).toBe("2 of 3");
+    });
+
+    it("treats never leaving the first rung as a rung, not as nothing", async () => {
+      service.getPolicy.mockResolvedValue({
+        data: {
+          rungs: [
+            {
+              priority: 2,
+              channels: ["email"],
+              steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" }] }],
+            },
+          ],
+        },
+      } as any);
+
+      const wrapper = await renderWith({ priority: 2, reached_rung_micros: 0 });
+      expect(await stat(wrapper, "reachedRung")).toBe("1 of 1");
+    });
+
+    it("reads a dash only when no page went out at all", async () => {
+      const wrapper = await renderWith({ priority: 2 });
+      expect(await stat(wrapper, "reachedRung")).toBe("—");
+    });
+
+    /// With no policy to match against, the delay is still more honest than
+    /// nothing — the reader learns the ladder got 5m deep.
+    it("falls back to the delay when the ladder cannot be matched", async () => {
+      const wrapper = await renderWith({ priority: 2, reached_rung_micros: 300_000_000 });
+      expect(await stat(wrapper, "reachedRung")).toBe("+5m");
+    });
+  });
+
+  /// "Escalated" alone is a claim. The person who pressed it wants to know
+  /// which phone is ringing, and the 200 body says.
+  describe("what Escalate reports back", () => {
+    it("names who the rung reached", async () => {
+      const wrapper = await renderWith();
+      service.escalateNow.mockResolvedValue({
+        data: {
+          escalated_to: "rung",
+          rung_micros: 300_000_000,
+          recipients: ["ana@o2.ai"],
+          chased: ["bo@o2.ai"],
+          deduplicated: [],
+          response: {},
+        },
+      } as any);
+
+      await wrapper.find('[data-test="oncall-response-escalate-btn"]').trigger("click");
+      await flushPromises();
+
+      const message = String(toastSpy.mock.calls.at(-1)![0].message);
+      expect(message).toContain("ana@o2.ai");
+      // Chased counts as reached: a second page landed on them.
+      expect(message).toContain("bo@o2.ai");
+    });
+
+    /// A rung that resolved to nobody is a real outcome, and the one worth
+    /// saying loudest: the ladder moved and no phone rang.
+    it("says so when the rung reached nobody", async () => {
+      const wrapper = await renderWith();
+      service.escalateNow.mockResolvedValue({
+        data: {
+          escalated_to: "rung",
+          rung_micros: 0,
+          recipients: [],
+          chased: [],
+          deduplicated: ["ana@o2.ai"],
+          response: {},
+        },
+      } as any);
+
+      await wrapper.find('[data-test="oncall-response-escalate-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(String(toastSpy.mock.calls.at(-1)![0].message)).toContain("reached nobody");
+    });
+
+    /// `ladder_exhausted` is a 200 on purpose — "there is nobody above you" is
+    /// an answer, not a failure. Reporting it as an error reads as though the
+    /// press failed and invites a second one.
+    it("reports an exhausted ladder as an answer, not a failure", async () => {
+      const wrapper = await renderWith();
+      service.escalateNow.mockResolvedValue({
+        data: { escalated_to: "ladder_exhausted", response: {} },
+      } as any);
+
+      await wrapper.find('[data-test="oncall-response-escalate-btn"]').trigger("click");
+      await flushPromises();
+
+      const call = toastSpy.mock.calls.at(-1)![0];
+      expect(call.variant).toBe("success");
+      expect(String(call.message)).toContain("last step");
+    });
   });
 });
