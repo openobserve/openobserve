@@ -480,3 +480,60 @@ describe("click fidelity survives the storage round trip", () => {
     expect(step.clickCount).toBeUndefined();
   });
 });
+
+describe("stored journeys with mid-journey navigates", () => {
+  // The recorder used to emit runs of navigate steps (see
+  // docs/synthetics/navigation-steps-research.md Appendix A). Journeys carrying them are
+  // in production. Nothing in the loading path may merge, reorder or drop one: a step an
+  // author has seen and saved is their data, however it got there.
+  //
+  // This is the real path a saved journey takes - mapResponseToBrowserCheck loads
+  // `config.steps` straight through mapWireSteps (buildPayload.ts).
+  const stored: WireStep[] = [
+    { id: "s1", action: "navigate", name: "open", url: "https://app.test/login" },
+    { id: "s2", action: "navigate", name: "redirect", url: "https://app.test/" },
+    { id: "s3", action: "navigate", name: "landing", url: "https://app.test/home" },
+    { id: "s4", action: "click", name: "menu" },
+  ] as unknown as WireStep[];
+
+  it("loads every navigate step, in order", () => {
+    const loaded = mapWireSteps(stored);
+
+    expect(loaded).toHaveLength(4);
+    expect(loaded.map((s) => s.action)).toEqual([
+      "navigate",
+      "navigate",
+      "navigate",
+      "click",
+    ]);
+  });
+
+  it("keeps each navigate's URL", () => {
+    // A navigate carries its URL in `value` on the UI side - mapWireStep reads
+    // `wire.url ?? wire.value` and buildWireFromStep writes `url: step.value` back.
+    const loaded = mapWireSteps(stored);
+
+    expect(loaded.slice(0, 3).map((s) => s.value)).toEqual([
+      "https://app.test/login",
+      "https://app.test/",
+      "https://app.test/home",
+    ]);
+  });
+
+  it("sends every navigate back to the wire with its URL intact", () => {
+    const wires = journeyToWireSteps(mapWireSteps(stored));
+
+    expect(wires).toHaveLength(4);
+    expect(wires.map((w) => w.action)).toEqual([
+      "navigate",
+      "navigate",
+      "navigate",
+      "click",
+    ]);
+    expect(wires.slice(0, 3).map((w) => w.url)).toEqual([
+      "https://app.test/login",
+      "https://app.test/",
+      "https://app.test/home",
+    ]);
+  });
+});
