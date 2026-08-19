@@ -2797,11 +2797,8 @@ async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
 async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let cfg = get_config();
 
-    // Handle file_list, file_list_history, and (only when enabled) file_list_dump_stats
-    let mut tables = vec!["file_list", "file_list_history"];
-    if cfg.compact.file_list_dump_enabled {
-        tables.push("file_list_dump_stats");
-    }
+    // Handle file_list, file_list_history, and file_list_dump_stats
+    let tables = vec!["file_list", "file_list_history", "file_list_dump_stats"];
     for table in &tables {
         let relkind = get_table_relkind(pool, table).await?;
         match relkind.as_deref() {
