@@ -109,6 +109,144 @@ export class AlertDestinationsPage {
         this.addDestinationLoadingIndicator = '[data-test="add-destination-loading-indicator"]';
         this.dialogCloseBtn = '[data-test="o-dialog-close-btn"]';
         this.checkmarkIcon = '[name="check-circle"]';
+
+        // ── Email / DL destination locators (added for the DL suite) ──────────
+        // The custom (non-prebuilt) email path collects recipients through an
+        // ORG-USER PICKER, not a free-text field — a different control from the
+        // prebuilt Email tile, which is why both are addressed separately.
+        this.customEmailsSelect = '[data-test="add-destination-emails-select"]';
+        this.customEmailsSelectTrigger = '[data-test="add-destination-emails-select-trigger"]';
+        this.customEmailsSelectSearch = '[data-test="add-destination-emails-select-search"]';
+        this.prebuiltTemplateSelectTrigger = '[data-test="add-destination-prebuilt-template-select-trigger"]';
+        this.skipTlsVerifyToggle = '[data-test="add-destination-skip-tls-verify-toggle-btn"]';
+        this.previewButton = '[data-test="destination-preview-button"]';
+        this.previewDialog = '[role="dialog"]';
+        this.updateDestinationButton = '[data-test="alert-destination-list-{destinationName}-update-destination"]';
+        this.typeCard = '[data-test="destination-type-card"]';
+        this.selectOption = '[role="option"], [data-test$="-option"]';
+        this.visibleFieldError = '[data-test$="-error"]:visible';
+    }
+
+    // ========================================================================
+    // EMAIL / DISTRIBUTION-LIST HELPERS
+    // ========================================================================
+
+    /** True while the add/edit destination form is open — a rejected save keeps it open. */
+    async isFormOpen() {
+        return await this.page.locator(this.addDestinationTitle).isVisible().catch(() => false);
+    }
+
+    async expectFormOpen() {
+        await expect(this.page.locator(this.addDestinationTitle)).toBeVisible();
+    }
+
+    /** Current value of the prebuilt recipients field (edit-mode prefill checks). */
+    async getEmailRecipientsValue() {
+        return await this.page.locator(this.recipientsInputField).first().inputValue().catch(() => '');
+    }
+
+    /** Open an existing destination for editing, by name. */
+    async openDestinationForEdit(destinationName) {
+        const btn = this.page.locator(this.updateDestinationButton.replace('{destinationName}', destinationName));
+        await btn.waitFor({ state: 'visible', timeout: 15000 });
+        await btn.click();
+        await this.page.locator(this.recipientsInputField).first().waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /** Text of every visible field-level validation error. */
+    async getVisibleErrors() {
+        return await this.page.locator(this.visibleFieldError).allInnerTexts().catch(() => []);
+    }
+
+    /**
+     * Whole-page text — for asserting that a backend message surfaced somewhere
+     * the user can actually see it, without coupling to which element renders it.
+     */
+    async getPageText() {
+        return await this.page.locator('body').innerText();
+    }
+
+    /** Text of every toast currently on screen. */
+    async getToastMessages() {
+        return await this.page.locator(this.toastMessage).allInnerTexts().catch(() => []);
+    }
+
+    /** Switch the form to a given prebuilt/custom type card without filling anything. */
+    async clickDestinationTypeCard(type) {
+        await this.page.locator(`${this.typeCard}[data-type="${type}"]`).click();
+        await this.page.waitForTimeout(2000);
+    }
+
+    /** Custom (non-prebuilt) destination → Email tab. Uses the org-user picker. */
+    async openCustomEmailPath() {
+        await this.clickDestinationTypeCard('custom');
+        await this.page.getByText('Email', { exact: true }).last().click();
+        await this.page.waitForTimeout(2000);
+    }
+
+    async isCustomEmailsPickerPresent() {
+        return (await this.page.locator(this.customEmailsSelect).count()) > 0;
+    }
+
+    async isPrebuiltRecipientsFieldPresent() {
+        return (await this.page.locator(this.recipientsInputField).count()) > 0;
+    }
+
+    /** Options offered by the custom path's org-user picker, optionally filtered by a search term. */
+    async getCustomEmailPickerOptions(searchTerm = null) {
+        await this.page.locator(this.customEmailsSelectTrigger).first().click();
+        await this.page.waitForTimeout(1500);
+        if (searchTerm) {
+            const search = this.page.locator(this.customEmailsSelectSearch).first();
+            if (await search.isVisible().catch(() => false)) {
+                await search.fill(searchTerm);
+                await this.page.waitForTimeout(1200);
+            }
+        }
+        return await this.page.locator(this.selectOption).allInnerTexts().catch(() => []);
+    }
+
+    /** Template names an EMAIL destination is allowed to pick. */
+    async getTemplateOptionsForEmail() {
+        await this.page.locator(this.prebuiltTemplateSelectTrigger).first().click();
+        await this.page.waitForTimeout(1800);
+        return await this.page.locator(this.selectOption).allInnerTexts().catch(() => []);
+    }
+
+    async isSkipTlsToggleVisible() {
+        return await this.page.locator(this.skipTlsVerifyToggle).first().isVisible().catch(() => false);
+    }
+
+    /** Open the Destination Preview dialog and return its rendered text. */
+    async openPreviewAndGetText() {
+        await this.page.locator(this.previewButton).first().click();
+        await this.page.waitForTimeout(2500);
+        return await this.page.locator(this.previewDialog).first().innerText().catch(() => '');
+    }
+
+    /** Tab from the name field until focus lands on recipients. Returns true if reached. */
+    async tabToRecipientsField(maxTabs = 12) {
+        await this.page.locator(this.destinationNameInputField).first().focus();
+        const field = this.page.locator(this.recipientsInputField).first();
+        for (let i = 0; i < maxTabs; i++) {
+            await this.page.keyboard.press('Tab');
+            if (await field.evaluate((el) => el === document.activeElement).catch(() => false)) return true;
+        }
+        return false;
+    }
+
+    /** Computed focus styling of the recipients field's wrapper — for focus-visible checks. */
+    async getRecipientsFocusStyle() {
+        return await this.page.locator(this.recipientsInputField).first().evaluate((el) => {
+            const s = getComputedStyle(el.parentElement || el);
+            return { shadow: s.boxShadow, border: s.borderColor };
+        });
+    }
+
+    /** True when the page overflows horizontally — a layout-break signal. */
+    async isPageScrolledHorizontally() {
+        return await this.page.evaluate(
+            () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
     }
 
     // ============================================================================

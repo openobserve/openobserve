@@ -1,0 +1,43 @@
+/**
+ * Thin authenticated REST client for the destination/template/user endpoints.
+ * Used by the DL suite to verify what the UI actually persisted — the form can
+ * echo your input while the stored value differs (trimming, lowercasing,
+ * empty entries), so every storage assertion reads the API, not the field.
+ */
+const BASE = process.env.ZO_BASE_URL || 'http://localhost:5080';
+const ORG = process.env.ORGNAME || 'default';
+const USER = process.env.ZO_ROOT_USER_EMAIL || 'root@example.com';
+const PASS = process.env.ZO_ROOT_USER_PASSWORD || 'Complexpass#123';
+const AUTH = 'Basic ' + Buffer.from(`${USER}:${PASS}`).toString('base64');
+
+async function req(method, path, body) {
+  const res = await fetch(`${BASE}/api/${ORG}${path}`, {
+    method,
+    headers: { Authorization: AUTH, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch (_) { /* non-JSON body */ }
+  return { status: res.status, body: json, text };
+}
+
+const getDestination = (name) => req('GET', `/alerts/destinations/${name}`);
+const listDestinations = () => req('GET', '/alerts/destinations');
+const createDestination = (payload) => req('POST', '/alerts/destinations', payload);
+const deleteDestination = (name) => req('DELETE', `/alerts/destinations/${name}`);
+const testDestination = (payload) => req('POST', '/alerts/destinations/test', payload);
+const listTemplates = () => req('GET', '/alerts/templates');
+const getTemplate = (name) => req('GET', `/alerts/templates/${name}`);
+
+/** Stored recipients for a destination, or null when it does not exist. */
+async function storedRecipients(name) {
+  const r = await getDestination(name);
+  if (r.status !== 200 || !r.body) return null;
+  return r.body.emails;
+}
+
+module.exports = {
+  BASE, ORG, req, getDestination, listDestinations, createDestination,
+  deleteDestination, testDestination, listTemplates, getTemplate, storedRecipients,
+};

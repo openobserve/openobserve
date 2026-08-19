@@ -8,6 +8,7 @@
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
       "alerts-destinations-prebuilt.spec.js",
+      "dl-email-destinations.spec.js",
       "alerts-vrl-encoding.spec.js",
       "alerts-history.spec.js",
       "alerts-template-prebuilt-guard.spec.js",
