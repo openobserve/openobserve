@@ -1046,7 +1046,7 @@ function openInLogs() {
                       <div class="flex items-center gap-2">
                         <span
                           :class="[
-                            'text-2xs w-16 shrink-0 font-mono whitespace-nowrap tabular-nums',
+                            'w-16 shrink-0 whitespace-nowrap text-xs tabular-nums',
                             String(ev._timestamp) === String(selectedEvent!._timestamp)
                               ? 'text-accent font-semibold'
                               : 'text-text-tertiary',
