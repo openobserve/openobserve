@@ -422,7 +422,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </div>
 
-                          <div class="flex flex-1 flex-col gap-4">
+                          <!-- min-w-0: a flex item defaults to `min-width: auto` and so
+                               refuses to shrink below its content, which lets one long URL
+                               or the evidence table push this column past the expansion. -->
+                          <div class="flex min-w-0 flex-1 flex-col gap-4">
                             <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
                               <dt
                                 class="text-text-secondary text-sm font-semibold tracking-wide capitalize"

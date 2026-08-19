@@ -454,6 +454,20 @@ describe("RunDetail — per-step page activity", () => {
     w.unmount();
   });
 
+  /**
+   * A flex item defaults to `min-width: auto`, so it refuses to shrink below its
+   * content. Without the clamp, one long URL or the evidence table's own
+   * content width pushes this column past the expansion and every card in it
+   * overflows — and `truncate` and `overflow-x-auto` both go inert, because each
+   * needs a bounded parent to act on.
+   */
+  it("clamps the expansion's content column so wide content scrolls instead of overflowing", async () => {
+    const w = await mountWithRun({ ...mockFailedWithEvidence });
+    const column = w.find('[data-test="synthetics-step-page-activity"]').element.parentElement;
+    expect(column?.className).toContain("min-w-0");
+    w.unmount();
+  });
+
   it("sends view-all to the Evidence tab filtered to that step", async () => {
     const w = await mountWithRun({ ...mockFailedWithEvidence });
     w.findComponent(StepPageActivity).vm.$emit("view-all", "s19");
