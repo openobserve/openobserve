@@ -6,13 +6,11 @@
 -->
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-schedule-editor">
-    <p
+    <OText variant="body"
       v-if="!drawerOnly && !props.members.length"
-      class="text-text-secondary text-sm"
-      data-test="oncall-schedule-no-members"
-    >
+      data-test="oncall-schedule-no-members">
       {{ t("oncall.scheduleNeedsMembers") }}
-    </p>
+    </OText>
 
     <!-- No second drawing of the week here. This one resolved who was on call
          CLIENT-side, so it could not see overrides, absences or slots, and it
@@ -49,9 +47,9 @@
         <template #cell-people="{ row }">
           <span class="flex flex-wrap items-center gap-1">
             <OUserCell v-for="m in row.members" :key="m" :value="m" />
-            <span v-if="!row.members.length" class="text-text-muted text-sm">
+            <OText variant="body" as="span" v-if="!row.members.length">
               {{ t("oncall.rotationEmpty") }}
-            </span>
+            </OText>
           </span>
         </template>
 
@@ -247,7 +245,7 @@
         <section class="flex flex-col gap-4">
           <OText variant="section">{{ t("oncall.rotationSectionApplies") }}</OText>
 
-          <p class="text-text-secondary text-sm">{{ t("oncall.rotationRestrictionHint") }}</p>
+          <OText variant="body">{{ t("oncall.rotationRestrictionHint") }}</OText>
 
           <div
             v-for="(window, index) in active.restrictions ?? []"
@@ -374,9 +372,9 @@
 
           <!-- An empty preview is the most common state of a NEW rotation, and
                saying why beats showing nothing. -->
-          <p v-else class="text-text-secondary text-sm" data-test="oncall-schedule-preview-empty">
+          <OText variant="body" v-else data-test="oncall-schedule-preview-empty">
             {{ t("oncall.rotationPreviewEmpty") }}
-          </p>
+          </OText>
         </section>
       </div>
 

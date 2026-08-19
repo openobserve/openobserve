@@ -175,17 +175,15 @@
       data-test="oncall-members-load"
     >
       <template v-if="loadSummary">
-        <span class="text-text-secondary text-xs">{{ t("oncall.loadUnevenLabel") }}</span>
+        <OText variant="meta">{{ t("oncall.loadUnevenLabel") }}</OText>
         <span class="text-text-heading text-xs font-medium">{{ loadSummary }}</span>
       </template>
-      <span
+      <OText variant="meta"
         v-for="line in fairness"
         :key="line.rotation"
-        class="text-text-secondary text-xs"
-        :data-test="`oncall-members-fairness-${line.rotation}`"
-      >
+        :data-test="`oncall-members-fairness-${line.rotation}`">
         {{ raw(`${line.rotation}: ${line.summary}`) }}
-      </span>
+      </OText>
       <OButton
         variant="ghost"
         size="xs"
@@ -283,6 +281,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";

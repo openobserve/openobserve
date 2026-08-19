@@ -59,9 +59,9 @@
           <template v-for="(step, stepIndex) in current.steps" :key="stepIndex">
             <!-- Connector: the wait that puts this rung where it is. -->
             <div class="border-border-strong ms-3 flex items-center gap-2 border-s py-2 ps-4">
-              <span class="text-text-label text-xs">
+              <OText variant="label">
                 {{ stepIndex === 0 ? t("oncall.policyFirstPage") : t("oncall.policyIfNoAck") }}
-              </span>
+              </OText>
               <span class="w-44">
                 <OSelect
                   :model-value="gapBefore(current, stepIndex)"
@@ -85,7 +85,7 @@
                       : t("oncall.ladderNow")
                   }}
                 </OTag>
-                <span class="text-text-label text-xs">{{ t("oncall.rungPages") }}</span>
+                <OText variant="label">{{ t("oncall.rungPages") }}</OText>
 
                 <OTag
                   v-for="(target, ti) in step.targets"
@@ -157,22 +157,20 @@
                    force right now — the question the ladder is built out of
                    target KINDS never answers. -->
               <div class="flex flex-wrap items-center gap-2">
-                <span class="text-text-label text-xs">{{ t("oncall.policyRightNow") }}</span>
+                <OText variant="label">{{ t("oncall.policyRightNow") }}</OText>
                 <template
                   v-for="(line, i) in [resolveLadder(current, onCallNow)[stepIndex]]"
                   :key="i"
                 >
                   <OUserCell v-for="email in line?.people ?? []" :key="email" :value="email" />
-                  <span v-if="line?.wholeTeam" class="text-text-body text-sm">
+                  <OText variant="body" as="span" v-if="line?.wholeTeam">
                     {{ t("oncall.target_whole_team") }}
-                  </span>
-                  <span
+                  </OText>
+                  <OText variant="body" as="span"
                     v-for="pool in line?.pools ?? []"
-                    :key="pool"
-                    class="text-text-body text-sm"
-                  >
+                    :key="pool">
                     {{ t("oncall.ladderPoolEveryone", { slot: raw(pool) }) }}
-                  </span>
+                  </OText>
                   <span
                     v-if="line && !line.people.length && !line.wholeTeam && !line.pools.length"
                     class="text-status-warning-text text-sm"
@@ -187,9 +185,9 @@
 
           <!-- What the ladder does when it runs out is part of its shape. -->
           <div class="border-border-strong ms-3 flex flex-col gap-0.5 border-s py-2 ps-4">
-            <span class="text-text-secondary text-xs" data-test="oncall-policy-ladder-end">
+            <OText variant="meta" data-test="oncall-policy-ladder-end">
               {{ ladderEndLine }}
-            </span>
+            </OText>
             <!-- §G.9 #9: notify_default_team with nobody nominated is
                  indistinguishable from stop — the ladder ends silently while
                  the policy reads as having a safety net. Said HERE, where the
@@ -205,9 +203,9 @@
           </div>
         </div>
 
-        <p v-else class="text-text-secondary text-sm" data-test="oncall-policy-silent">
+        <OText variant="body" v-else data-test="oncall-policy-silent">
           {{ t("oncall.policyPrioritySilent", { priority: raw(priorityLabel(current.priority)) }) }}
-        </p>
+        </OText>
 
         <div class="flex flex-wrap items-center gap-2">
           <OButton
@@ -224,8 +222,8 @@
         <!-- Channels apply to everyone paged at this priority; the primary
              and the secondary are not treated differently. -->
         <div class="flex flex-col gap-1">
-          <span class="text-text-label text-xs">{{ t("oncall.channels") }}</span>
-          <span class="text-text-muted text-xs">{{ t("oncall.channelsAvailableHint") }}</span>
+          <OText variant="label">{{ t("oncall.channels") }}</OText>
+          <OText variant="meta">{{ t("oncall.channelsAvailableHint") }}</OText>
           <div class="flex flex-wrap gap-2">
             <OCheckbox
               v-for="channel in CHANNELS"
@@ -245,8 +243,8 @@
            it the channel is on and delivers nowhere, which looks identical
            to working. -->
       <div v-if="webhookEnabled" class="flex flex-col gap-1">
-        <span class="text-text-label text-xs">{{ t("oncall.policyDestinations") }}</span>
-        <span class="text-text-muted text-xs">{{ t("oncall.policyDestinationsHint") }}</span>
+        <OText variant="label">{{ t("oncall.policyDestinations") }}</OText>
+        <OText variant="meta">{{ t("oncall.policyDestinationsHint") }}</OText>
         <OSelect
           v-model="destinations"
           :options="destinationOptions"
@@ -272,7 +270,7 @@
            here, not by paging somebody to find out. -->
       <div class="flex flex-col gap-1" data-test="oncall-team-channel">
         <span class="flex items-center gap-2">
-          <span class="text-text-label text-xs">{{ t("oncall.teamChannelTitle") }}</span>
+          <OText variant="label">{{ t("oncall.teamChannelTitle") }}</OText>
           <OTag
             v-if="teamChannel"
             :variant="teamChannel.source === 'team' ? 'primary-soft' : 'default-soft'"
@@ -289,7 +287,7 @@
         <!-- One post per firing, not a live room: the only transport is an
              HTTP destination, which cannot edit what it already sent. Said
              here so nobody designs an expectation the engine cannot meet. -->
-        <span class="text-text-muted text-xs">{{ t("oncall.teamChannelHint") }}</span>
+        <OText variant="meta">{{ t("oncall.teamChannelHint") }}</OText>
         <OSelect
           v-model="teamChannelDraft"
           :options="destinationOptions"
@@ -362,6 +360,7 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";

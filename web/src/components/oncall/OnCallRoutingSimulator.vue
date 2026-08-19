@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default rounded-default flex items-center gap-1 border px-2 py-1"
         :data-test="`oncall-simulator-chip-${pair.name}`"
       >
-        <span class="text-text-secondary text-xs">{{ displayOf(pair.name) }}</span>
+        <OText variant="meta">{{ displayOf(pair.name) }}</OText>
         <span class="text-text-body text-compact font-medium">{{ raw(pair.value) }}</span>
         <OButton
           variant="ghost"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default rounded-default flex items-center gap-1 border px-2 py-1"
         data-test="oncall-simulator-chip-priority"
       >
-        <span class="text-text-secondary text-xs">{{ t("oncall.priority") }}</span>
+        <OText variant="meta">{{ t("oncall.priority") }}</OText>
         <span class="text-text-body text-compact font-medium">{{ raw(priority) }}</span>
         <OButton
           variant="ghost"
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-simulator-result"
     >
       <span class="flex flex-col">
-        <span class="text-text-secondary text-xs">{{ matchedLabel }}</span>
+        <OText variant="meta">{{ matchedLabel }}</OText>
         <code class="text-text-body text-compact">{{ matchedPath }}</code>
       </span>
 
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <span class="flex flex-col" data-test="oncall-simulator-team">
         <span class="text-text-heading text-sm font-medium">{{ teamLabel }}</span>
-        <span class="text-text-secondary text-xs">{{ teamNote }}</span>
+        <OText variant="meta">{{ teamNote }}</OText>
       </span>
 
       <template v-if="ladderEntry">

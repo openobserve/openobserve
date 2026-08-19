@@ -165,9 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            one at a time to claim them is not triage. -->
       <template #toolbar>
         <div v-if="selectedIds.length" class="flex w-full flex-wrap items-center gap-2">
-          <span class="text-text-body text-sm" data-test="oncall-bulk-count">
+          <OText variant="body" as="span" data-test="oncall-bulk-count">
             {{ t("oncall.selectedCount", { count: selectedIds.length }) }}
-          </span>
+          </OText>
           <OButton
             variant="primary"
             size="sm-action"
@@ -296,9 +296,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
             {{ raw(String(sectionCounts[sectionKey] ?? 0)) }}
           </OTag>
-          <span class="text-text-secondary text-xs">
+          <OText variant="meta">
             {{ t(`oncall.sectionHint_${sectionKey}`) }}
-          </span>
+          </OText>
 
           <!-- The one action the whole section shares, at its trailing edge. -->
           <OButton
@@ -325,9 +325,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag v-if="row.firings.length > 1" variant="default-soft" size="sm">
           {{ t("oncall.firingCount", { count: row.firings.length }) }}
         </OTag>
-        <span v-else class="text-text-muted text-sm">
+        <OText variant="body" as="span" v-else>
           {{ raw(`#${row.latest.subject.firing}`) }}
-        </span>
+        </OText>
       </template>
 
       <!-- A snoozed page is still open, so it would otherwise look exactly
@@ -438,13 +438,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ ringingFor(row.latest) }}
             </span>
-            <span
+            <OText variant="meta"
               v-if="ladderStarted(row.latest)"
-              class="text-text-secondary text-xs"
-              :data-test="`oncall-ladder-started-${row.rowKey}`"
-            >
+              :data-test="`oncall-ladder-started-${row.rowKey}`">
               {{ ladderStarted(row.latest) }}
-            </span>
+            </OText>
           </template>
           <OTimeCell v-else :value="row.latest.opened_at" unit="us" />
         </span>
@@ -682,6 +680,7 @@ import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
