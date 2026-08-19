@@ -18,7 +18,7 @@
 // Redis needs no monitoring user — the receiver connects with an optional AUTH
 // password — so there is no "prepare" step.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -50,17 +50,17 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function redisCard(subs: CardSubstitutions): RichCardContent {
+export default function redisCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "Redis",
-      tagline: gt("ingestion.setupCard.redisTagline"),
+      name: raw("Redis"),
+      tagline: t("ingestion.setupCard.redisTagline"),
       logo: getImageURL("images/ingestion/redis.svg"),
       tone: "#DC382D",
-      metaBadges: [gt("common.metrics")],
+      metaBadges: [t("common.metrics")],
     },
     steps: [
-      collectorInstallStep(),
+      collectorInstallStep(t),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -97,7 +97,7 @@ export default function redisCard(subs: CardSubstitutions): RichCardContent {
           lang: "bash",
           raw: "REDIS_PASSWORD='yourpassword' ./otelcol-contrib --config ./config.yaml",
         },
-        note: "Use REDIS_PASSWORD='' if Redis has no auth.",
+        note: t("ingestion.setupCard.redisNoAuthNote"),
       },
       {
         id: "verify",
@@ -106,10 +106,16 @@ export default function redisCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // Redis INFO / redis-receiver stat names (redis.commands, redis.memory.used,
-        // redis.clients.connected, redis.keyspace.hits …) — kept untranslated so the
-        // pills match the ingested metrics.
-        pills: [raw("Commands"), raw("Memory"), raw("Clients"), raw("Keyspace"), raw("Hit Rate")],
+        // These are Title-Cased prose, NOT the ingested metric names (the receiver emits
+        // redis.commands / redis.clients.connected / redis.keyspace.hits), so they are
+        // translated. Shared pills like "Memory" reuse the key linux/macos/windows use.
+        pills: [
+          t("ingestion.setupCard.pillCommands"),
+          t("ingestion.setupCard.pillMemory"),
+          t("ingestion.setupCard.pillClients"),
+          t("ingestion.setupCard.pillKeyspace"),
+          t("ingestion.setupCard.pillHitRate"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "redis", filter: "" },

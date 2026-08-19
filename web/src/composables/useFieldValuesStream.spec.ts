@@ -47,6 +47,7 @@ vi.mock("@/utils/zincutils", () => ({
 // ---------------------------------------------------------------------------
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { gt } from "@/types/i18n";
 import { isRef } from "vue";
 import useFieldValuesStream from "./useFieldValuesStream";
 
@@ -63,7 +64,7 @@ describe("useFieldValuesStream", () => {
 
   describe("return value structure", () => {
     it("returns fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues", () => {
-      const result = useFieldValuesStream();
+      const result = useFieldValuesStream(gt);
       expect(result).toHaveProperty("fieldValues");
       expect(result).toHaveProperty("fetchFieldValues");
       expect(result).toHaveProperty("cancelFieldStream");
@@ -71,17 +72,17 @@ describe("useFieldValuesStream", () => {
     });
 
     it("fieldValues is a Vue ref", () => {
-      const { fieldValues } = useFieldValuesStream();
+      const { fieldValues } = useFieldValuesStream(gt);
       expect(isRef(fieldValues)).toBe(true);
     });
 
     it("fieldValues starts as an empty object", () => {
-      const { fieldValues } = useFieldValuesStream();
+      const { fieldValues } = useFieldValuesStream(gt);
       expect(fieldValues.value).toEqual({});
     });
 
     it("fetchFieldValues, cancelFieldStream, resetFieldValues are functions", () => {
-      const { fetchFieldValues, cancelFieldStream, resetFieldValues } = useFieldValuesStream();
+      const { fetchFieldValues, cancelFieldStream, resetFieldValues } = useFieldValuesStream(gt);
       expect(typeof fetchFieldValues).toBe("function");
       expect(typeof cancelFieldStream).toBe("function");
       expect(typeof resetFieldValues).toBe("function");
@@ -92,7 +93,7 @@ describe("useFieldValuesStream", () => {
 
   describe("resetFieldValues", () => {
     it("initialises field state with isLoading=false by default", () => {
-      const { fieldValues, resetFieldValues } = useFieldValuesStream();
+      const { fieldValues, resetFieldValues } = useFieldValuesStream(gt);
 
       resetFieldValues("status");
 
@@ -105,7 +106,7 @@ describe("useFieldValuesStream", () => {
     });
 
     it("initialises field state with isLoading=true when second arg is true", () => {
-      const { fieldValues, resetFieldValues } = useFieldValuesStream();
+      const { fieldValues, resetFieldValues } = useFieldValuesStream(gt);
 
       resetFieldValues("level", true);
 
@@ -113,7 +114,7 @@ describe("useFieldValuesStream", () => {
     });
 
     it("resets existing field state to fresh empty state", () => {
-      const { fieldValues, resetFieldValues } = useFieldValuesStream();
+      const { fieldValues, resetFieldValues } = useFieldValuesStream(gt);
 
       // Put some data in first
       resetFieldValues("host", true);
@@ -127,7 +128,7 @@ describe("useFieldValuesStream", () => {
     });
 
     it("can reset multiple different fields independently", () => {
-      const { fieldValues, resetFieldValues } = useFieldValuesStream();
+      const { fieldValues, resetFieldValues } = useFieldValuesStream(gt);
 
       resetFieldValues("field-a", true);
       resetFieldValues("field-b", false);
@@ -141,14 +142,14 @@ describe("useFieldValuesStream", () => {
 
   describe("cancelFieldStream", () => {
     it("is a no-op when field has no registered trace IDs", () => {
-      const { cancelFieldStream } = useFieldValuesStream();
+      const { cancelFieldStream } = useFieldValuesStream(gt);
 
       expect(() => cancelFieldStream("no-traces-field")).not.toThrow();
       expect(mockCancelStreamQuery).not.toHaveBeenCalled();
     });
 
     it("calls cancelStreamQueryBasedOnRequestId for each trace ID registered to the field", () => {
-      const { fetchFieldValues, cancelFieldStream } = useFieldValuesStream();
+      const { fetchFieldValues, cancelFieldStream } = useFieldValuesStream(gt);
 
       // Each fetchFieldValues call registers a traceId for the field
       fetchFieldValues({ fields: ["environment"], stream_name: "logs" });
@@ -168,7 +169,7 @@ describe("useFieldValuesStream", () => {
     });
 
     it("clears the traceId list after cancellation", () => {
-      const { fetchFieldValues, cancelFieldStream } = useFieldValuesStream();
+      const { fetchFieldValues, cancelFieldStream } = useFieldValuesStream(gt);
 
       fetchFieldValues({ fields: ["service"], stream_name: "logs" });
       cancelFieldStream("service");
@@ -185,7 +186,7 @@ describe("useFieldValuesStream", () => {
   describe("fetchFieldValues", () => {
     it("calls generateTraceContext to obtain a trace ID", async () => {
       const { generateTraceContext } = await import("@/utils/zincutils");
-      const { fetchFieldValues } = useFieldValuesStream();
+      const { fetchFieldValues } = useFieldValuesStream(gt);
 
       fetchFieldValues({ fields: ["method"], stream_name: "logs" });
 
@@ -193,7 +194,7 @@ describe("useFieldValuesStream", () => {
     });
 
     it("calls fetchQueryDataWithHttpStream with a payload containing traceId and org_id", () => {
-      const { fetchFieldValues } = useFieldValuesStream();
+      const { fetchFieldValues } = useFieldValuesStream(gt);
 
       fetchFieldValues({ fields: ["path"], stream_name: "traces" });
 
@@ -213,7 +214,7 @@ describe("useFieldValuesStream", () => {
     });
 
     it("passes the full payload as queryReq and meta in the ws payload", () => {
-      const { fetchFieldValues } = useFieldValuesStream();
+      const { fetchFieldValues } = useFieldValuesStream(gt);
 
       const payload = { fields: ["region"], stream_name: "infra", from: 0 };
       fetchFieldValues(payload);
@@ -224,7 +225,7 @@ describe("useFieldValuesStream", () => {
     });
 
     it("registers the returned traceId for the first field in the payload", () => {
-      const { fetchFieldValues, cancelFieldStream } = useFieldValuesStream();
+      const { fetchFieldValues, cancelFieldStream } = useFieldValuesStream(gt);
 
       fetchFieldValues({ fields: ["datacenter"], stream_name: "logs" });
 

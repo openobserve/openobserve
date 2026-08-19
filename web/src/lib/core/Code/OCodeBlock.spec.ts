@@ -127,4 +127,51 @@ describe("OCodeBlock", () => {
       expect(Number(capped)).toBeCloseTo(4 * lineHeight, 5);
     });
   });
+
+  describe("line numbers", () => {
+    const gutter = (w: any) => w.find('[data-test="code-block-line-numbers"]');
+
+    it("has no gutter by default", () => {
+      const wrapper = mountBlock({ code: "a\nb" });
+      expect(gutter(wrapper).exists()).toBe(false);
+      expect(wrapper.find("pre").classes()).not.toContain("o2-code-pre--numbered");
+    });
+
+    it("numbers one line per row when asked", () => {
+      const wrapper = mountBlock({ code: "one\ntwo\nthree", lineNumbers: true });
+
+      expect(wrapper.find("pre").classes()).toContain("o2-code-pre--numbered");
+      expect(gutter(wrapper).text()).toBe("1\n2\n3");
+    });
+
+    it("gives a trailing newline no number of its own", () => {
+      // Generated files end with a newline; numbering it would show a count one
+      // higher than the lines the reader can see.
+      const wrapper = mountBlock({ code: "one\ntwo\n", lineNumbers: true });
+      expect(gutter(wrapper).text()).toBe("1\n2");
+    });
+
+    it("keeps the numbers out of a selection and out of the a11y tree", () => {
+      const wrapper = mountBlock({ code: "a\nb", lineNumbers: true });
+
+      expect(gutter(wrapper).classes()).toContain("select-none");
+      expect(gutter(wrapper).attributes("aria-hidden")).toBe("true");
+    });
+
+    it("suppresses the gutter when wrapping, which would misalign it", () => {
+      const wrapper = mountBlock({ code: "a\nb", lineNumbers: true, wrap: true });
+
+      expect(gutter(wrapper).exists()).toBe(false);
+      expect(wrapper.find("pre").classes()).not.toContain("o2-code-pre--numbered");
+    });
+
+    it("numbers the masked variant it is actually showing", () => {
+      const wrapper = mountBlock({
+        code: "real\nsecret\nlines",
+        codeMasked: "masked",
+        lineNumbers: true,
+      });
+      expect(gutter(wrapper).text()).toBe("1");
+    });
+  });
 });

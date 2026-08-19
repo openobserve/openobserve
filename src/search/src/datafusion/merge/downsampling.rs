@@ -26,11 +26,8 @@ use config::{
 };
 use datafusion::{
     arrow::datatypes::Schema,
-    catalog::TableProvider,
     error::{DataFusionError, Result},
-    physical_plan::execute_stream,
 };
-use futures::TryStreamExt;
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
@@ -42,75 +39,25 @@ use vortex::{
 };
 
 use crate::datafusion::{
-    exec::DataFusionContextBuilder,
-    merge::{MergeParquetResult, append_metadata},
-    sort_order::FileSortOrder,
-    table_provider::uniontable::NewUnionTable,
+    merge::{MergedFile, append_metadata},
     vortex::{VORTEX_RUNTIME, vortex_write_strategy},
 };
 
 const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
 
-pub async fn merge_parquet_files_with_downsampling(
-    schema: Arc<Schema>,
-    tables: Vec<Arc<dyn TableProvider>>,
+/// Write the downsampled batches into size-split files of `file_format`.
+pub(super) async fn write_files(
+    schema: &Arc<Schema>,
     bloom_filter_fields: &[String],
-    rule: &DownsamplingRule,
     metadata: &FileMeta,
     file_format: FileFormat,
-) -> Result<MergeParquetResult> {
-    let start = std::time::Instant::now();
+    rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    read_task: tokio::task::JoinHandle<Result<()>>,
+) -> Result<Vec<MergedFile>> {
     let cfg = get_config();
-    let sql = generate_downsampling_sql(&schema, rule);
-
-    log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
-
-    // create datafusion context
-    let ctx = DataFusionContextBuilder::new()
-        .trace_id("merge_parquet_files_with_downsampling")
-        .sort_order(FileSortOrder::TimestampDesc)
-        .build(get_config().limit.datafusion_min_partition_num)
-        .await?;
-    // register union table
-    let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
-    ctx.register_table("tbl", union_table)?;
-
-    let plan = ctx.state().create_logical_plan(&sql).await?;
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    let schema = physical_plan.schema();
-
-    // write result to parquet or vortex file based on config
-    let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-
-    // Create a shared channel for streaming batches
-    let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-
-    // Spawn task to read from batch_stream and send to channel
-    let read_task = tokio::task::spawn(async move {
-        loop {
-            match batch_stream.try_next().await {
-                Ok(None) => break,
-                Ok(Some(batch)) => {
-                    if let Err(e) = tx.send(batch).await {
-                        log::error!(
-                            "merge_parquet_files_with_downsampling send to channel error: {e}"
-                        );
-                        return Err(DataFusionError::External(Box::new(e)));
-                    }
-                }
-                Err(e) => {
-                    log::error!("merge_parquet_files_with_downsampling execute stream error: {e}");
-                    return Err(e);
-                }
-            }
-        }
-        Ok(())
-    });
-
-    // Write batches to the appropriate format
     let (bufs, file_metas) = match file_format {
         FileFormat::Parquet => {
-            write_downsampled_parquet(rx, &schema, bloom_filter_fields, metadata, &cfg).await?
+            write_downsampled_parquet(rx, schema, bloom_filter_fields, metadata, &cfg).await?
         }
         FileFormat::Vortex => {
             write_downsampled_vortex(rx, schema.clone(), cfg.compact.max_file_size as i64).await?
@@ -122,16 +69,11 @@ pub async fn merge_parquet_files_with_downsampling(
         .await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
 
-    log::debug!(
-        "merge_parquet_files_with_downsampling took {} ms",
-        start.elapsed().as_millis()
-    );
-
-    Ok(MergeParquetResult::Multiple {
-        bufs,
-        file_metas,
-        file_format,
-    })
+    Ok(bufs
+        .into_iter()
+        .zip(file_metas)
+        .map(|(buf, meta)| MergedFile { buf, meta })
+        .collect())
 }
 
 async fn write_downsampled_parquet(
@@ -283,7 +225,7 @@ async fn write_downsampled_vortex(
         .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
 }
 
-fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> String {
+pub(super) fn generate_downsampling_sql(schema: &Schema, rule: &DownsamplingRule) -> String {
     let step = rule.step;
     let fields = schema
         .fields()

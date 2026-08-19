@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchHistogramManager } from "./useSearchHistogramManager";
+import { gt } from "@/types/i18n";
 import { logsUtils } from "./logsUtils";
 
 // Create a shared mock state
@@ -94,7 +95,7 @@ describe("useSearchHistogramManager", () => {
     mockHistogramFunctions.generateHistogramSkeleton.mockClear();
     mockHistogramFunctions.setMultiStreamHistogramQuery.mockClear();
     mockHistogramFunctions.isHistogramEnabled.mockReturnValue(true);
-    histogramManager = useSearchHistogramManager();
+    histogramManager = useSearchHistogramManager(gt);
   });
 
   describe("isHistogramDataMissing", () => {

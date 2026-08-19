@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw, type TranslateFn } from "@/types/i18n";
 import type { SloStatus } from "@/ts/interfaces/slo";
 
 /** The four states a user sees, in the order the list sorts them.
@@ -49,13 +50,13 @@ export function healthTone(health: SloHealth): string {
 export function healthIcon(health: SloHealth): string {
   switch (health) {
     case "budget_blown":
-      return "local_fire_department";
+      return "local-fire-department";
     case "at_risk":
-      return "trending_down";
+      return "trending-down";
     case "meeting":
-      return "check_circle";
+      return "check-circle";
     default:
-      return "help";
+      return "help-outline";
   }
 }
 
@@ -102,7 +103,7 @@ export function formatWindow(secs: number): string {
 }
 
 export function formatSlice(secs: number): string {
-  return secs === 60 ? "1 min" : `${Math.round(secs / 60)} min`;
+  return raw(secs === 60 ? "1 min" : `${Math.round(secs / 60)} min`);
 }
 
 /** How long until the budget is gone, at the current burn. */
@@ -115,16 +116,17 @@ export function formatTimeToExhaust(secs: number | null | undefined): string {
   return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
 }
 
-export function sliTypeLabel(t: string): string {
-  switch (t) {
+export function sliTypeLabel(sliType: string, t: TranslateFn): string {
+  switch (sliType) {
     case "count":
-      return "Count";
+      return t("slos.type.count");
     case "time_slice":
-      return "Time slice";
+      return t("slos.type.timeSlice");
     case "alert":
-      return "Alert-based";
+      return t("slos.type.alert");
     default:
-      return t;
+      // An SLI type the UI does not know about — echo the server's token.
+      return sliType;
   }
 }
 

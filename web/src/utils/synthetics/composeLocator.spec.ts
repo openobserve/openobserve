@@ -18,7 +18,6 @@ import {
   canDefaultToAnd,
   composeLocator,
   decomposeLocator,
-  describeComposite,
   isBareFilterEngine,
   isCompositeSelector,
   type CompositePart,
@@ -210,24 +209,5 @@ describe("canDefaultToAnd", () => {
 
   it("is false for no parts at all", () => {
     expect(canDefaultToAnd([], recorded)).toBe(false);
-  });
-});
-
-describe("describeComposite", () => {
-  it("reads as prose, not as escaped selector syntax", () => {
-    expect(
-      describeComposite([
-        { value: ROW },
-        { relation: "has", value: TEXT },
-        { relation: "descendant", value: "button" },
-      ]),
-    ).toBe(`${ROW} containing ${TEXT} inside button`);
-  });
-
-  it("handles has_not and an empty list", () => {
-    expect(describeComposite([{ value: ROW }, { relation: "has_not", value: TEXT }])).toBe(
-      `${ROW} not containing ${TEXT}`,
-    );
-    expect(describeComposite([])).toBe("");
   });
 });

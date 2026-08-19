@@ -57,6 +57,6 @@ const detailParts = computed(() => {
   const parts = [props.column.city, props.column.browser, props.column.os]
     .map((part) => (part || "").trim())
     .filter(Boolean);
-  return parts.length ? parts : ["Unknown"];
+  return parts.length ? parts : [t("common.unknown")];
 });
 </script>

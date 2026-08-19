@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import type { DestinationData, Headers } from "@/ts/interfaces";
@@ -950,106 +950,109 @@ const prevStep = () => {
 };
 
 // Connection notes for each destination type (form-owned read).
-const connectionNotes = computed(() => {
+// `example` values are literal endpoint/URL samples the user copies verbatim —
+// code tokens, not prose, hence raw().
+const connectionNotes = computed<{ title: I18nText; steps: I18nText[]; example: I18nText }>(() => {
   switch (destinationType.value) {
     case "openobserve":
       return {
-        title: "OpenObserve Connection Details",
+        title: t("pipeline.destinationNotes.openobserveTitle"),
         steps: [
-          "Log in to your OpenObserve instance",
-          "Copy your base URL (e.g., https://your-instance.openobserve.ai)",
-          "The endpoint path is prefilled as: /api/{org}/{stream}/_json",
-          "Replace {org} with your organization identifier",
-          "Replace {stream} with your stream name",
-          "Add authentication header: Authorization: Basic <OpenObserve_Token>",
+          t("pipeline.destinationNotes.openobserveStep1"),
+          t("pipeline.destinationNotes.openobserveStep2"),
+          t("pipeline.destinationNotes.openobserveStep3"),
+          t("pipeline.destinationNotes.openobserveStep4"),
+          t("pipeline.destinationNotes.openobserveStep5"),
+          t("pipeline.destinationNotes.openobserveStep6"),
         ],
-        example:
+        example: raw(
           "Base URL: https://your-instance.openobserve.ai | Endpoint: /api/default/default/_json",
+        ),
       };
     case "splunk":
       return {
-        title: "Splunk HEC Connection Details",
+        title: t("pipeline.destinationNotes.splunkTitle"),
         steps: [
-          "Log in to your Splunk instance as an admin",
-          "Go to Settings → Data Inputs → HTTP Event Collector",
-          "Click 'New Token' to create a new HEC token",
-          "Configure the token settings and save",
-          "Use your Splunk HEC endpoint URL",
-          "Add the HEC token in the Headers section (Authorization: Splunk <token>)",
+          t("pipeline.destinationNotes.splunkStep1"),
+          t("pipeline.destinationNotes.splunkStep2"),
+          t("pipeline.destinationNotes.splunkStep3"),
+          t("pipeline.destinationNotes.splunkStep4"),
+          t("pipeline.destinationNotes.splunkStep5"),
+          t("pipeline.destinationNotes.splunkStep6"),
         ],
-        example: "https://your-splunk.com:8088",
+        example: raw("https://your-splunk.com:8088"),
       };
     case "elasticsearch":
       return {
-        title: "Elasticsearch Connection Details",
+        title: t("pipeline.destinationNotes.elasticsearchTitle"),
         steps: [
-          "Locate your Elasticsearch cluster endpoint",
-          "Ensure the cluster is accessible from this network",
-          "Create an API key or use basic authentication",
-          "For Cloud: Get the endpoint from your cloud console",
-          "For self-hosted: Use your cluster URL with port (typically 9200)",
-          "Add authentication in the Headers section",
+          t("pipeline.destinationNotes.elasticsearchStep1"),
+          t("pipeline.destinationNotes.elasticsearchStep2"),
+          t("pipeline.destinationNotes.elasticsearchStep3"),
+          t("pipeline.destinationNotes.elasticsearchStep4"),
+          t("pipeline.destinationNotes.elasticsearchStep5"),
+          t("pipeline.destinationNotes.elasticsearchStep6"),
         ],
-        example: "https://your-cluster.es.io:9200",
+        example: raw("https://your-cluster.es.io:9200"),
       };
     case "datadog":
       return {
-        title: "Datadog Connection Details",
+        title: t("pipeline.destinationNotes.datadogTitle"),
         steps: [
-          "Log in to your Datadog account",
-          "Navigate to Organization Settings → API Keys",
-          "Create a new API key or copy an existing one",
-          "Use the Datadog intake URL for your region",
-          "US: https://http-intake.logs.datadoghq.com",
-          "EU: https://http-intake.logs.datadoghq.eu",
-          "Add the API key in Headers: DD-API-KEY: <your-key>",
+          t("pipeline.destinationNotes.datadogStep1"),
+          t("pipeline.destinationNotes.datadogStep2"),
+          t("pipeline.destinationNotes.datadogStep3"),
+          t("pipeline.destinationNotes.datadogStep4"),
+          t("pipeline.destinationNotes.datadogStep5"),
+          t("pipeline.destinationNotes.datadogStep6"),
+          t("pipeline.destinationNotes.datadogStep7"),
         ],
-        example: "https://http-intake.logs.datadoghq.com",
+        example: raw("https://http-intake.logs.datadoghq.com"),
       };
     case "dynatrace":
       return {
-        title: "Dynatrace Connection Details",
+        title: t("pipeline.destinationNotes.dynatraceTitle"),
         steps: [
-          "Log in to your Dynatrace environment",
-          "Navigate to Settings → Integration → Dynatrace API",
-          "Create a new API token with logs.ingest permission",
-          "Use your environment URL",
-          "Format: https://{your-environment-id}.live.dynatrace.com",
-          "Add the token in Headers: Authorization: Api-Token <token>",
+          t("pipeline.destinationNotes.dynatraceStep1"),
+          t("pipeline.destinationNotes.dynatraceStep2"),
+          t("pipeline.destinationNotes.dynatraceStep3"),
+          t("pipeline.destinationNotes.dynatraceStep4"),
+          t("pipeline.destinationNotes.dynatraceStep5"),
+          t("pipeline.destinationNotes.dynatraceStep6"),
         ],
-        example: "https://abc12345.live.dynatrace.com",
+        example: raw("https://abc12345.live.dynatrace.com"),
       };
     case "newrelic":
       return {
-        title: "New Relic Connection Details",
+        title: t("pipeline.destinationNotes.newrelicTitle"),
         steps: [
-          "Log in to your New Relic account",
-          "Navigate to API Keys section",
-          "Create or copy a License Key (Ingest - License)",
-          "US endpoint: https://log-api.newrelic.com",
-          "EU endpoint: https://log-api.eu.newrelic.com",
-          "Add the license key in Headers: Api-Key: <your-license-key>",
+          t("pipeline.destinationNotes.newrelicStep1"),
+          t("pipeline.destinationNotes.newrelicStep2"),
+          t("pipeline.destinationNotes.newrelicStep3"),
+          t("pipeline.destinationNotes.newrelicStep4"),
+          t("pipeline.destinationNotes.newrelicStep5"),
+          t("pipeline.destinationNotes.newrelicStep6"),
         ],
-        example: "https://log-api.newrelic.com",
+        example: raw("https://log-api.newrelic.com"),
       };
     case "custom":
       return {
-        title: "Custom Endpoint Connection",
+        title: t("pipeline.destinationNotes.customTitle"),
         steps: [
-          "Enter your custom endpoint URL",
-          "Ensure the endpoint accepts HTTP/HTTPS requests",
-          "Select the appropriate HTTP method (GET, POST, PUT)",
-          "Configure any required headers for authentication",
-          "Choose the output format (JSON or NDJSON)",
-          "Test the connection to verify it works",
+          t("pipeline.destinationNotes.customStep1"),
+          t("pipeline.destinationNotes.customStep2"),
+          t("pipeline.destinationNotes.customStep3"),
+          t("pipeline.destinationNotes.customStep4"),
+          t("pipeline.destinationNotes.customStep5"),
+          t("pipeline.destinationNotes.customStep6"),
         ],
-        example: "https://your-custom-endpoint.com/logs",
+        example: raw("https://your-custom-endpoint.com/logs"),
       };
     default:
       return {
-        title: "Connection Details",
-        steps: ["Select a destination type to see specific instructions"],
-        example: "",
+        title: t("pipeline.destinationNotes.defaultTitle"),
+        steps: [t("pipeline.destinationNotes.defaultStep1")],
+        example: raw(""),
       };
   }
 });

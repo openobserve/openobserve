@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { gt } from "@/types/i18n";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { ref } from "vue";
 import { createStore } from "vuex";
@@ -968,7 +969,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should call generateDashboard and populate dashboardData", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard();
+      const { generateDashboard } = useLatencyInsightsDashboard(gt);
       wrapper.vm.dashboardData = null;
       await wrapper.vm.loadAnalysis();
       await flushPromises();
@@ -986,7 +987,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should call showErrorNotification when generateDashboard throws", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       (generateDashboard as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
         throw new Error("dashboard generation failed");
       });
@@ -998,7 +999,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should use durationFilter config when activeAnalysisType is 'duration'", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       wrapper.vm.activeAnalysisType = "duration";
       const durationFilter = { start: 100, end: 500 };
       await wrapper.setProps({ durationFilter });
@@ -1012,7 +1013,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should use rateFilter config when activeAnalysisType is 'volume'", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       wrapper.vm.activeAnalysisType = "volume";
       const rateFilter = { start: 10, end: 50 };
       await wrapper.setProps({ rateFilter });
@@ -1026,7 +1027,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should use errorFilter config when activeAnalysisType is 'error'", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       wrapper.vm.activeAnalysisType = "error";
       const errorFilter = { start: 1, end: 20 };
       await wrapper.setProps({ errorFilter });
@@ -1040,7 +1041,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should override selectedTimeRange with rateFilter time when rateFilter has timeStart", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       await wrapper.setProps({
         rateFilter: { start: 1, end: 5, timeStart: 3_000_000, timeEnd: 4_000_000 },
       });
@@ -1057,7 +1058,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should pass selectedDimensions to generateDashboard config", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       wrapper.vm.selectedDimensions = ["service_name", "http_method"];
       await wrapper.vm.loadAnalysis();
       await flushPromises();
@@ -1068,7 +1069,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should build mockAnalyses with one entry per selected dimension", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       wrapper.vm.selectedDimensions = ["service_name"];
       await wrapper.vm.loadAnalysis();
       await flushPromises();
@@ -1092,7 +1093,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should call loadAnalysis when analysisType is 'duration' and dashboardData is null", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
       wrapper.vm.activeAnalysisType = "duration";
       wrapper.vm.dashboardData = null;
@@ -1106,7 +1107,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should NOT call loadAnalysis when dashboardData is already populated", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       wrapper.vm.dashboardData = { tabs: [{ panels: [] }] };
       const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
       wrapper.vm.activeAnalysisType = "duration";
@@ -1209,7 +1210,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should call loadAnalysis when activeAnalysisType changes", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
       wrapper.vm.activeAnalysisType = "volume";
       await flushPromises();
@@ -1226,7 +1227,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should call loadAnalysis when a dimension is removed", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
 
       // Ensure there are at least 2 dimensions to allow removal
       wrapper.vm.selectedDimensions = ["service_name", "span_status"];
@@ -1249,7 +1250,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should call loadAnalysis when timeRange prop changes", async () => {
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
       await wrapper.setProps({
         timeRange: { startTime: 9_000_000, endTime: 10_000_000 },
@@ -1331,7 +1332,7 @@ describe("TracesAnalysisDashboard", () => {
       // Edge: confirm error path does not re-throw (component stays stable)
       const { useLatencyInsightsDashboard } =
         await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard() as any;
+      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       (generateDashboard as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
         throw new Error("boom");
       });

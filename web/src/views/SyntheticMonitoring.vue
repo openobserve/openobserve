@@ -444,12 +444,12 @@ function formatFrequency(f: ApiMonitorFrequency): string {
 function formatTimeAgo(microseconds: number): string {
   const diffMs = Date.now() - Math.floor(microseconds / 1000);
   const s = Math.floor(diffMs / 1000);
-  if (s < 60) return `${s}s ago`;
+  if (s < 60) return t("synthetics.secondsAgo", { count: s });
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return t("synthetics.minutesAgo", { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return t("synthetics.hoursAgo", { count: h });
+  return t("synthetics.daysAgo", { count: Math.floor(h / 24) });
 }
 
 function mapMonitor(m: ApiMonitor) {

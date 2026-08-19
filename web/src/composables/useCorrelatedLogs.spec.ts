@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { gt } from "@/types/i18n";
 import { nextTick } from "vue";
 import { useCorrelatedLogs } from "./useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "./useCorrelatedLogs";
@@ -97,7 +98,7 @@ describe("useCorrelatedLogs", () => {
 
   describe("Initialization", () => {
     it("should initialize with default values", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       expect(composable.loading.value).toBe(false);
       expect(composable.error.value).toBe(null);
@@ -107,7 +108,7 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should initialize currentFilters with matched and additional dimensions", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       expect(composable.currentFilters.value).toEqual({
         service: "api",
@@ -117,20 +118,20 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should initialize with correct time range", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       expect(composable.currentTimeRange.value).toEqual(props.timeRange);
     });
 
     it("should expose logStreamsCount correctly", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       expect(composable.logStreamsCount.value).toBe(2);
     });
 
     it("should expose logStreamsCount as 0 when empty", () => {
       const propsWithEmpty = { ...props, logStreams: [] };
-      const composable = useCorrelatedLogs(propsWithEmpty);
+      const composable = useCorrelatedLogs(propsWithEmpty, gt);
       expect(composable.logStreamsCount.value).toBe(0);
     });
   });
@@ -153,14 +154,14 @@ describe("useCorrelatedLogs", () => {
         return Promise.resolve();
       });
 
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
       await composable.fetchCorrelatedLogs();
 
       expect(composable.hasResults.value).toBe(true);
     });
 
     it("should compute hasResults correctly when no results", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       expect(composable.hasResults.value).toBe(false);
     });
@@ -177,7 +178,7 @@ describe("useCorrelatedLogs", () => {
         });
       });
 
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       const searchPromise = composable.fetchCorrelatedLogs();
       expect(composable.isLoading.value).toBe(true);
@@ -194,20 +195,20 @@ describe("useCorrelatedLogs", () => {
         return Promise.resolve();
       });
 
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
       await composable.fetchCorrelatedLogs();
 
       expect(composable.hasError.value).toBe(true);
     });
 
     it("should compute hasError correctly when no error", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       expect(composable.hasError.value).toBe(false);
     });
 
     it("should compute isEmpty correctly", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       // Empty when no results and not loading
       expect(composable.isEmpty.value).toBe(true);
@@ -223,7 +224,7 @@ describe("useCorrelatedLogs", () => {
         return Promise.resolve();
       });
 
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
       await composable.fetchCorrelatedLogs();
 
       expect(composable.isEmpty.value).toBe(false);
@@ -232,7 +233,7 @@ describe("useCorrelatedLogs", () => {
 
   describe("Filter Management", () => {
     it("should update single filter", async () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       composable.updateFilter("service", "new-api");
       await nextTick();
@@ -241,7 +242,7 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should update multiple filters at once", async () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       composable.updateFilters({
         service: "updated-api",
@@ -256,7 +257,7 @@ describe("useCorrelatedLogs", () => {
 
   describe("Dimension Helpers", () => {
     it("should identify matched dimensions correctly", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       expect(composable.isMatchedDimension("service")).toBe(true);
       expect(composable.isMatchedDimension("environment")).toBe(true);
@@ -265,7 +266,7 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should identify additional dimensions correctly", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       expect(composable.isAdditionalDimension("region")).toBe(true);
       expect(composable.isAdditionalDimension("service")).toBe(false);
@@ -277,7 +278,7 @@ describe("useCorrelatedLogs", () => {
         ...props,
         additionalDimensions: undefined,
       };
-      const composable = useCorrelatedLogs(propsWithoutAdditional);
+      const composable = useCorrelatedLogs(propsWithoutAdditional, gt);
 
       expect(composable.isAdditionalDimension("region")).toBe(false);
     });
@@ -290,7 +291,7 @@ describe("useCorrelatedLogs", () => {
         return Promise.resolve();
       });
 
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
       const newStartTime = Date.now() - 7200000;
       const newEndTime = Date.now();
 
@@ -304,7 +305,7 @@ describe("useCorrelatedLogs", () => {
 
   describe("Query Building", () => {
     it("should build queries for all log streams", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       // logStreamsCount reflects the number of correlated streams
       expect(composable.logStreamsCount.value).toBe(2);
@@ -318,7 +319,7 @@ describe("useCorrelatedLogs", () => {
         callbacks.complete(null);
       });
 
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       const searchPromise = composable.fetchCorrelatedLogs();
       expect(composable.loading.value).toBe(true);
@@ -333,7 +334,7 @@ describe("useCorrelatedLogs", () => {
         return Promise.resolve();
       });
 
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       await composable.fetchCorrelatedLogs();
 
@@ -347,7 +348,7 @@ describe("useCorrelatedLogs", () => {
         callbacks.error(null, { content: { message: "Previous error" } });
         return Promise.resolve();
       });
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
       await composable.fetchCorrelatedLogs();
       expect(composable.hasError.value).toBe(true);
 
@@ -369,7 +370,7 @@ describe("useCorrelatedLogs", () => {
 
   describe("Refresh", () => {
     it("should execute search when refresh is called", async () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       // Clear call history but keep the implementation
       mockFetchQueryDataWithHttpStream.mockClear();
@@ -382,7 +383,7 @@ describe("useCorrelatedLogs", () => {
 
   describe("Props Reactivity", () => {
     it("should reset filters when matchedDimensions prop changes", async () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       // Modify filters
       composable.updateFilter("service", "modified");
@@ -395,7 +396,7 @@ describe("useCorrelatedLogs", () => {
           environment: "dev",
         },
       };
-      const newComposable = useCorrelatedLogs(newProps);
+      const newComposable = useCorrelatedLogs(newProps, gt);
 
       expect(newComposable.currentFilters.value.service).toBe("new-api");
       expect(newComposable.currentFilters.value.environment).toBe("dev");
@@ -409,7 +410,7 @@ describe("useCorrelatedLogs", () => {
         logStreams: [],
       };
 
-      const composable = useCorrelatedLogs(propsWithEmptyStreams);
+      const composable = useCorrelatedLogs(propsWithEmptyStreams, gt);
       expect(composable.logStreamsCount.value).toBe(0);
     });
 
@@ -419,7 +420,7 @@ describe("useCorrelatedLogs", () => {
         ftsFields: undefined,
       };
 
-      const composable = useCorrelatedLogs(propsWithoutFts);
+      const composable = useCorrelatedLogs(propsWithoutFts, gt);
       expect(composable).toBeDefined();
     });
 
@@ -429,12 +430,12 @@ describe("useCorrelatedLogs", () => {
         availableDimensions: undefined,
       };
 
-      const composable = useCorrelatedLogs(propsWithoutAvailable);
+      const composable = useCorrelatedLogs(propsWithoutAvailable, gt);
       expect(composable).toBeDefined();
     });
 
     it("should handle filter with special characters", async () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       composable.updateFilter("special-key", "special@value#123");
       await nextTick();
@@ -443,7 +444,7 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should handle very long filter values", async () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
       const longValue = "a".repeat(10000);
 
       composable.updateFilter("longField", longValue);
@@ -455,7 +456,7 @@ describe("useCorrelatedLogs", () => {
 
   describe("Multiple Filter Operations", () => {
     it("should handle rapid filter updates", async () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       composable.updateFilter("key1", "value1");
       composable.updateFilter("key2", "value2");
@@ -469,7 +470,7 @@ describe("useCorrelatedLogs", () => {
     });
 
     it("should preserve unmodified filters when updating", () => {
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       composable.updateFilter("service", "new-service");
 
@@ -485,7 +486,7 @@ describe("useCorrelatedLogs", () => {
         return Promise.resolve();
       });
 
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
 
       await composable.fetchCorrelatedLogs();
       await nextTick();
@@ -516,7 +517,7 @@ describe("useCorrelatedLogs", () => {
         return Promise.resolve();
       });
 
-      const composable = useCorrelatedLogs(props);
+      const composable = useCorrelatedLogs(props, gt);
       composable.updateFilter("service", "test-service");
 
       await composable.fetchCorrelatedLogs();

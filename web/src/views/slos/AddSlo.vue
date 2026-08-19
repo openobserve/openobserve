@@ -540,7 +540,7 @@
         <OFormSection :title="t('slos.section.summary')" class="h-fit">
           <dl class="text-compact grid grid-cols-[8rem_1fr] gap-y-2">
             <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
-            <dd>{{ sliTypeLabel(form.sli_type) }}</dd>
+            <dd>{{ sliTypeLabel(form.sli_type, t) }}</dd>
 
             <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
             <dd>{{ formatTarget(form.target || 0) }}</dd>

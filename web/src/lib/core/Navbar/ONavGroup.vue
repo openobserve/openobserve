@@ -44,8 +44,8 @@ const openGroupKey = moduleRef<string | null>(null);
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter } from "vue-router";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useRouter, type LocationQueryRaw } from "vue-router";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import config from "@/aws-exports";
@@ -160,7 +160,7 @@ function clearTimers() {
 }
 
 // ── Active state ──────────────────────────────────────────────────────────
-// Active by route name (and tab, for query-param sub-views like AI evals).
+// Active by route name and tab for query-param sub-views.
 // Resolve a child's route name to its canonical path (for sub-route matching).
 function childPath(name: string): string | null {
   if (!router.hasRoute(name)) return null;
@@ -181,21 +181,16 @@ function childPath(name: string): string | null {
 const activeChild = computed<SubnavChild | null>(() => {
   const route = router.currentRoute.value;
 
-  // A tab-alias match wins over everything: the child's own route is elsewhere,
-  // but the CURRENT route is showing its view via a query tab (e.g.
-  // /traces?tab=service-graph renders the Service Graph in-page). Checked
-  // before the exact-name pass so the aliased route's own child (Traces)
-  // doesn't claim the highlight.
-  const tabAlias = props.children.find(
-    (c) =>
-      c.activeOnTab && route.name === c.activeOnTab.name && route.query.tab === c.activeOnTab.tab,
+  const exactTab = props.children.find(
+    (c) => c.tab && route.name === c.name && route.query.tab === c.tab,
   );
-  if (tabAlias) return tabAlias;
+  if (exactTab) return exactTab;
 
-  const exact = props.children.find(
-    (c) => route.name === c.name && (!c.tab || route.query.tab === c.tab),
-  );
+  const exact = props.children.find((c) => route.name === c.name && !c.tab);
   if (exact) return exact;
+
+  const routeDefault = props.children.find((c) => c.defaultForRoute && route.name === c.name);
+  if (routeDefault) return routeDefault;
 
   let best: SubnavChild | null = null;
   let bestLen = 0;
@@ -220,10 +215,18 @@ const isGroupActive = computed(() => activeChild.value !== null);
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
 function childTo(child: SubnavChild) {
-  const query: Record<string, string> = {};
+  const route = router.currentRoute.value;
+  const query: LocationQueryRaw = route.name === child.name ? { ...route.query } : {};
   if (orgIdentifier.value) query.org_identifier = orgIdentifier.value;
-  if (child.tab) query.tab = child.tab;
+  if (child.tab) {
+    delete query.search_mode;
+    query.tab = child.tab;
+  }
   return { name: child.name, query };
+}
+
+function childDataTest(child: SubnavChild): string {
+  return `nav-group-item-${child.name}${child.tab ? `-${child.tab}` : ""}`;
 }
 
 function focusTile() {
@@ -444,7 +447,7 @@ function onChildMouseenter(event: MouseEvent) {
           </div>
           <router-link
             v-else
-            :data-test="`nav-group-item-${row.child.name}`"
+            :data-test="childDataTest(row.child)"
             role="menuitem"
             :to="childTo(row.child)"
             class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2"
@@ -461,7 +464,9 @@ function onChildMouseenter(event: MouseEvent) {
             <!-- Icon color is locked to the text color so it never picks up a
                  primary tint via currentColor inheritance. -->
             <OIcon :name="row.child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
-            <span class="leading-none">{{ t(row.child.titleKey) }}</span>
+            <span class="leading-none">{{
+              row.child.title ? raw(row.child.title) : t(row.child.titleKey)
+            }}</span>
           </router-link>
         </template>
       </div>

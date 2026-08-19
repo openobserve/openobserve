@@ -262,13 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         whiteSpace: 'nowrap',
                       }"
                       :title="
-                        getEventCount((spans as any[])[virtualRow.index]) > 1
-                          ? t('traces.traceTree.spanEvents', {
-                              count: getEventCount((spans as any[])[virtualRow.index]),
-                            })
-                          : t('traces.traceTree.spanEvent', {
-                              count: getEventCount((spans as any[])[virtualRow.index]),
-                            })
+                        t('traces.traceTree.spanEvent', {
+                          count: getEventCount((spans as any[])[virtualRow.index]),
+                        })
                       "
                       :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >

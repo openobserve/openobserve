@@ -72,6 +72,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import { restoreLogsStream } from "@/utils/streamPersist";
+import DOMPurify from "dompurify";
 
 const props = defineProps<{
   /** Org identifier — used to look up recently used streams from localStorage. */
@@ -92,7 +93,7 @@ const recentStreams = computed<string[]>(() => {
 });
 
 // Uses v-html — content is fully i18n-controlled, no user input.
-const description = computed(() => t("logs.noStream.description"));
+const description = computed(() => DOMPurify.sanitize(t("logs.noStream.description")));
 
 const openQueryGuide = () => {
   window.open("https://openobserve.ai/docs/example-queries/", "_blank", "noopener,noreferrer");

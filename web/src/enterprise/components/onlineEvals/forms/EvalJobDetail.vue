@@ -965,12 +965,12 @@ function relativeTime(timestampMs: number): string {
   const diff = Date.now() - timestampMs;
   if (diff < 0 || !Number.isFinite(diff)) return "—";
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
   const day = Math.floor(hr / 24);
-  return `${day}d ago`;
+  return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
 }
 </script>

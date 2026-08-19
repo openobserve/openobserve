@@ -37,6 +37,8 @@
  *     snippets).
  */
 
+import { gt, raw } from "@/types/i18n";
+
 /** Names of monaco's CompletionItemKind members that we actually use. */
 export type CompletionKindName =
   "Function" | "Keyword" | "Operator" | "Field" | "Value" | "Variable" | "Snippet" | "Text";
@@ -98,18 +100,26 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
     label: "and",
     kind: "Keyword",
     insertText: "and ",
-    detail: "logical AND",
+    get detail() {
+      return gt("sqlEditor.completion.andDetail");
+    },
     sortText: SORT_LANE.predicate + "and",
-    documentation: "Both conditions must hold.",
+    get documentation() {
+      return gt("sqlEditor.completion.andDoc");
+    },
   },
   {
     name: "or",
     label: "or",
     kind: "Keyword",
     insertText: "or ",
-    detail: "logical OR",
+    get detail() {
+      return gt("sqlEditor.completion.orDetail");
+    },
     sortText: SORT_LANE.predicate + "or",
-    documentation: "Either condition may hold.",
+    get documentation() {
+      return gt("sqlEditor.completion.orDoc");
+    },
   },
   {
     name: "like",
@@ -117,9 +127,13 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
     kind: "Keyword",
     insertText: "like '%${1:params}%' ",
     insertTextRules: SNIPPET,
-    detail: "pattern match",
+    get detail() {
+      return gt("sqlEditor.completion.likeDetail");
+    },
     sortText: SORT_LANE.predicate + "like",
-    documentation: "SQL pattern match; % matches any run of characters and _ matches one.",
+    get documentation() {
+      return gt("sqlEditor.completion.likeDoc");
+    },
   },
   {
     name: "in",
@@ -127,19 +141,27 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
     kind: "Keyword",
     insertText: "in ('${1:params}') ",
     insertTextRules: SNIPPET,
-    detail: "value in list",
+    get detail() {
+      return gt("sqlEditor.completion.inDetail");
+    },
     sortText: SORT_LANE.predicate + "in",
-    documentation: "True when the value appears in the supplied list.",
+    get documentation() {
+      return gt("sqlEditor.completion.inDoc");
+    },
   },
   {
     name: "not in",
-    label: "not in",
+    label: raw("not in"),
     kind: "Keyword",
     insertText: "not in ('${1:params}') ",
     insertTextRules: SNIPPET,
-    detail: "value not in list",
+    get detail() {
+      return gt("sqlEditor.completion.notInDetail");
+    },
     sortText: SORT_LANE.predicate + "not in",
-    documentation: "True when the value does NOT appear in the supplied list.",
+    get documentation() {
+      return gt("sqlEditor.completion.notInDoc");
+    },
   },
   {
     name: "between",
@@ -147,44 +169,58 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
     kind: "Keyword",
     insertText: "between '${1:params}' and '${2:params}' ",
     insertTextRules: SNIPPET,
-    detail: "inclusive range",
+    get detail() {
+      return gt("sqlEditor.completion.betweenDetail");
+    },
     sortText: SORT_LANE.predicate + "between",
-    documentation: "Inclusive range test — equivalent to `>= low AND <= high`.",
+    get documentation() {
+      return gt("sqlEditor.completion.betweenDoc");
+    },
   },
   {
     name: "not between",
-    label: "not between",
+    label: raw("not between"),
     kind: "Keyword",
     insertText: "not between '${1:params}' and '${2:params}' ",
     insertTextRules: SNIPPET,
-    detail: "outside range",
+    get detail() {
+      return gt("sqlEditor.completion.notBetweenDetail");
+    },
     sortText: SORT_LANE.predicate + "not between",
-    documentation: "True when the value falls outside the inclusive range.",
+    get documentation() {
+      return gt("sqlEditor.completion.notBetweenDoc");
+    },
   },
   {
     name: "is null",
-    label: "is null",
+    label: raw("is null"),
     kind: "Keyword",
     insertText: "is null ",
-    detail: "is NULL",
+    detail: raw("is NULL"),
     sortText: SORT_LANE.predicate + "is null",
-    documentation: "Matches rows where the field has no value. `= NULL` never matches.",
+    get documentation() {
+      return gt("sqlEditor.completion.isNullDoc");
+    },
   },
   {
     name: "is not null",
-    label: "is not null",
+    label: raw("is not null"),
     kind: "Keyword",
     insertText: "is not null ",
-    detail: "is not NULL",
+    detail: raw("is not NULL"),
     sortText: SORT_LANE.predicate + "is not null",
-    documentation: "Matches rows where the field has any value.",
+    get documentation() {
+      return gt("sqlEditor.completion.isNotNullDoc");
+    },
   },
   {
     name: ">",
     label: ">",
     kind: "Operator",
     insertText: "> ",
-    detail: "greater than",
+    get detail() {
+      return gt("dashboard.opGreaterThan");
+    },
     sortText: SORT_LANE.predicate + ">",
   },
   {
@@ -192,7 +228,9 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
     label: "<",
     kind: "Operator",
     insertText: "< ",
-    detail: "less than",
+    get detail() {
+      return gt("dashboard.opLessThan");
+    },
     sortText: SORT_LANE.predicate + "<",
   },
   {
@@ -200,7 +238,9 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
     label: ">=",
     kind: "Operator",
     insertText: ">= ",
-    detail: "greater or equal",
+    get detail() {
+      return gt("sqlEditor.completion.greaterOrEqualDetail");
+    },
     sortText: SORT_LANE.predicate + ">=",
   },
   {
@@ -208,7 +248,9 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
     label: "<=",
     kind: "Operator",
     insertText: "<= ",
-    detail: "less or equal",
+    get detail() {
+      return gt("sqlEditor.completion.lessOrEqualDetail");
+    },
     sortText: SORT_LANE.predicate + "<=",
   },
   {
@@ -216,7 +258,9 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
     label: "<>",
     kind: "Operator",
     insertText: "<> ",
-    detail: "not equal",
+    get detail() {
+      return gt("sqlEditor.completion.notEqualDetail");
+    },
     sortText: SORT_LANE.predicate + "<>",
   },
   {
@@ -224,26 +268,34 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
     label: "=",
     kind: "Operator",
     insertText: "= ",
-    detail: "equal",
+    get detail() {
+      return gt("sqlEditor.completion.equalDetail");
+    },
     sortText: SORT_LANE.predicate + "=",
   },
   {
     name: "!=",
-    label: "!=",
+    label: raw("!="),
     kind: "Operator",
     insertText: "!= ",
-    detail: "not equal",
+    get detail() {
+      return gt("sqlEditor.completion.notEqualDetail");
+    },
     sortText: SORT_LANE.predicate + "!=",
   },
   {
     name: "()",
-    label: "()",
+    label: raw("()"),
     kind: "Keyword",
     insertText: "(${1:condition}) ",
     insertTextRules: SNIPPET,
-    detail: "grouping",
+    get detail() {
+      return gt("sqlEditor.completion.parenGroupDetail");
+    },
     sortText: SORT_LANE.predicate + "()",
-    documentation: "Group conditions to control precedence.",
+    get documentation() {
+      return gt("sqlEditor.completion.parenGroupDoc");
+    },
   },
 ];
 
@@ -260,8 +312,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "SELECT",
     label: "SELECT",
     kind: "Keyword",
-    detail: "choose columns",
-    documentation: "Choose which columns the query returns. `SELECT *` returns every column.",
+    get detail() {
+      return gt("sqlEditor.completion.selectDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.selectDoc");
+    },
     insertText: "SELECT ${1:*}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "SELECT",
@@ -270,8 +326,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "FROM",
     label: "FROM",
     kind: "Keyword",
-    detail: "source stream",
-    documentation: "Names the stream the query reads from.",
+    get detail() {
+      return gt("sqlEditor.completion.fromDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.fromDoc");
+    },
     insertText: "FROM ${1:stream}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "FROM",
@@ -280,28 +340,40 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "WHERE",
     label: "WHERE",
     kind: "Keyword",
-    detail: "filter rows",
-    documentation: "Filters rows before grouping. Applied to individual rows.",
+    get detail() {
+      return gt("sqlEditor.completion.whereDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.whereDoc");
+    },
     insertText: "WHERE ${1:condition}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "WHERE",
   },
   {
     name: "GROUP BY",
-    label: "GROUP BY",
+    label: raw("GROUP BY"),
     kind: "Keyword",
-    detail: "aggregate by",
-    documentation: "Collapses rows sharing the listed values into one row per group.",
+    get detail() {
+      return gt("sqlEditor.completion.groupByDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.groupByDoc");
+    },
     insertText: "GROUP BY ${1:field}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "GROUP BY",
   },
   {
     name: "ORDER BY",
-    label: "ORDER BY",
+    label: raw("ORDER BY"),
     kind: "Keyword",
-    detail: "sort results",
-    documentation: "Sorts the result set. Combine with ASC or DESC.",
+    get detail() {
+      return gt("sqlEditor.completion.orderByDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.orderByDoc");
+    },
     insertText: "ORDER BY ${1:field} ${2:DESC}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "ORDER BY",
@@ -310,8 +382,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "HAVING",
     label: "HAVING",
     kind: "Keyword",
-    detail: "filter groups",
-    documentation: "Filters AFTER grouping — use it on aggregates, where WHERE cannot reach.",
+    get detail() {
+      return gt("sqlEditor.completion.havingDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.havingDoc");
+    },
     insertText: "HAVING ${1:condition}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "HAVING",
@@ -320,8 +396,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "LIMIT",
     label: "LIMIT",
     kind: "Keyword",
-    detail: "cap row count",
-    documentation: "Caps how many rows are returned.",
+    get detail() {
+      return gt("sqlEditor.completion.limitDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.limitDoc");
+    },
     insertText: "LIMIT ${1:100}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "LIMIT",
@@ -330,8 +410,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "OFFSET",
     label: "OFFSET",
     kind: "Keyword",
-    detail: "skip rows",
-    documentation: "Skips the first N rows, usually paired with LIMIT for paging.",
+    get detail() {
+      return gt("sqlEditor.completion.offsetDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.offsetDoc");
+    },
     insertText: "OFFSET ${1:0}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "OFFSET",
@@ -340,8 +424,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "DISTINCT",
     label: "DISTINCT",
     kind: "Keyword",
-    detail: "unique values",
-    documentation: "Removes duplicate rows from the result.",
+    get detail() {
+      return gt("sqlEditor.completion.distinctDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.distinctDoc");
+    },
     insertText: "DISTINCT ${1:field}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "DISTINCT",
@@ -350,8 +438,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "AS",
     label: "AS",
     kind: "Keyword",
-    detail: "alias",
-    documentation: "Renames a column or stream for the rest of the query.",
+    get detail() {
+      return gt("sqlEditor.completion.asDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.asDoc");
+    },
     insertText: "AS ${1:alias}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "AS",
@@ -360,8 +452,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "WITH",
     label: "WITH",
     kind: "Keyword",
-    detail: "common table expression",
-    documentation: "Defines a named subquery you can reference below, for readability.",
+    get detail() {
+      return gt("sqlEditor.completion.withDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.withDoc");
+    },
     insertText: "WITH ${1:name} AS (${2:SELECT ...})",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "WITH",
@@ -370,56 +466,80 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "UNION",
     label: "UNION",
     kind: "Keyword",
-    detail: "combine, dedup",
-    documentation: "Combines two result sets and removes duplicate rows.",
+    get detail() {
+      return gt("sqlEditor.completion.unionDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.unionDoc");
+    },
     insertText: "UNION",
     sortText: SORT_LANE.clause + "UNION",
   },
   {
     name: "UNION ALL",
-    label: "UNION ALL",
+    label: raw("UNION ALL"),
     kind: "Keyword",
-    detail: "combine, keep dups",
-    documentation: "Combines two result sets keeping every row. Cheaper than UNION.",
+    get detail() {
+      return gt("sqlEditor.completion.unionAllDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.unionAllDoc");
+    },
     insertText: "UNION ALL",
     sortText: SORT_LANE.clause + "UNION ALL",
   },
   {
     name: "INNER JOIN",
-    label: "INNER JOIN",
+    label: raw("INNER JOIN"),
     kind: "Keyword",
-    detail: "matching rows only",
-    documentation: "Returns only rows with a match on both sides of the join.",
+    get detail() {
+      return gt("sqlEditor.completion.innerJoinDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.innerJoinDoc");
+    },
     insertText: "INNER JOIN ${1:stream} ON ${2:condition}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "INNER JOIN",
   },
   {
     name: "LEFT JOIN",
-    label: "LEFT JOIN",
+    label: raw("LEFT JOIN"),
     kind: "Keyword",
-    detail: "all left rows",
-    documentation: "Returns every left-hand row, filling unmatched right columns with NULL.",
+    get detail() {
+      return gt("sqlEditor.completion.leftJoinDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.leftJoinDoc");
+    },
     insertText: "LEFT JOIN ${1:stream} ON ${2:condition}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "LEFT JOIN",
   },
   {
     name: "RIGHT JOIN",
-    label: "RIGHT JOIN",
+    label: raw("RIGHT JOIN"),
     kind: "Keyword",
-    detail: "all right rows",
-    documentation: "Returns every right-hand row, filling unmatched left columns with NULL.",
+    get detail() {
+      return gt("sqlEditor.completion.rightJoinDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.rightJoinDoc");
+    },
     insertText: "RIGHT JOIN ${1:stream} ON ${2:condition}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "RIGHT JOIN",
   },
   {
     name: "FULL OUTER JOIN",
-    label: "FULL OUTER JOIN",
+    label: raw("FULL OUTER JOIN"),
     kind: "Keyword",
-    detail: "all rows both sides",
-    documentation: "Returns rows from both sides, filling unmatched columns with NULL.",
+    get detail() {
+      return gt("sqlEditor.completion.fullOuterJoinDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.fullOuterJoinDoc");
+    },
     insertText: "FULL OUTER JOIN ${1:stream} ON ${2:condition}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "FULL OUTER JOIN",
@@ -428,8 +548,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "ON",
     label: "ON",
     kind: "Keyword",
-    detail: "join condition",
-    documentation: "States which columns a join matches on.",
+    get detail() {
+      return gt("sqlEditor.completion.onDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.onDoc");
+    },
     insertText: "ON ${1:left} = ${2:right}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "ON",
@@ -438,8 +562,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "CASE",
     label: "CASE",
     kind: "Keyword",
-    detail: "conditional expression",
-    documentation: "Inline conditional. Each WHEN is tested in order; ELSE supplies the fallback.",
+    get detail() {
+      return gt("sqlEditor.completion.caseDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.caseDoc");
+    },
     insertText: "CASE WHEN ${1:condition} THEN ${2:result} ELSE ${3:fallback} END",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "CASE",
@@ -448,8 +576,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "WHEN",
     label: "WHEN",
     kind: "Keyword",
-    detail: "case branch",
-    documentation: "One branch of a CASE expression, tested in order.",
+    get detail() {
+      return gt("sqlEditor.completion.whenDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.whenDoc");
+    },
     insertText: "WHEN ${1:condition} THEN ${2:result}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "WHEN",
@@ -458,8 +590,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "THEN",
     label: "THEN",
     kind: "Keyword",
-    detail: "case result",
-    documentation: "The value a CASE branch produces when its condition holds.",
+    get detail() {
+      return gt("sqlEditor.completion.thenDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.thenDoc");
+    },
     insertText: "THEN ${1:result}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "THEN",
@@ -468,8 +604,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "ELSE",
     label: "ELSE",
     kind: "Keyword",
-    detail: "case fallback",
-    documentation: "The value a CASE produces when no branch matched.",
+    get detail() {
+      return gt("sqlEditor.completion.elseDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.elseDoc");
+    },
     insertText: "ELSE ${1:fallback}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "ELSE",
@@ -478,8 +618,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "END",
     label: "END",
     kind: "Keyword",
-    detail: "close case",
-    documentation: "Closes a CASE expression.",
+    get detail() {
+      return gt("sqlEditor.completion.endDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.endDoc");
+    },
     insertText: "END",
     sortText: SORT_LANE.clause + "END",
   },
@@ -487,8 +631,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "CAST",
     label: "CAST",
     kind: "Keyword",
-    detail: "convert type",
-    documentation: "Converts a value to another type, e.g. `CAST(code AS VARCHAR)`.",
+    get detail() {
+      return gt("sqlEditor.completion.castDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.castDoc");
+    },
     insertText: "CAST(${1:expr} AS ${2:type})",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "CAST",
@@ -497,18 +645,26 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "OVER",
     label: "OVER",
     kind: "Keyword",
-    detail: "window frame",
-    documentation: "Turns an aggregate into a window function computed across related rows.",
+    get detail() {
+      return gt("sqlEditor.completion.overDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.overDoc");
+    },
     insertText: "OVER (PARTITION BY ${1:field} ORDER BY ${2:field})",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "OVER",
   },
   {
     name: "PARTITION BY",
-    label: "PARTITION BY",
+    label: raw("PARTITION BY"),
     kind: "Keyword",
-    detail: "window grouping",
-    documentation: "Splits a window function's input into independent groups.",
+    get detail() {
+      return gt("sqlEditor.completion.partitionByDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.partitionByDoc");
+    },
     insertText: "PARTITION BY ${1:field}",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "PARTITION BY",
@@ -517,8 +673,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "ASC",
     label: "ASC",
     kind: "Keyword",
-    detail: "ascending",
-    documentation: "Sorts smallest first. The default for ORDER BY.",
+    get detail() {
+      return gt("sqlEditor.completion.ascDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.ascDoc");
+    },
     insertText: "ASC",
     sortText: SORT_LANE.clause + "ASC",
   },
@@ -526,26 +686,38 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "DESC",
     label: "DESC",
     kind: "Keyword",
-    detail: "descending",
-    documentation: "Sorts largest first — usually what you want for timestamps.",
+    get detail() {
+      return gt("sqlEditor.completion.descDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.descDoc");
+    },
     insertText: "DESC",
     sortText: SORT_LANE.clause + "DESC",
   },
   {
     name: "NULLS FIRST",
-    label: "NULLS FIRST",
+    label: raw("NULLS FIRST"),
     kind: "Keyword",
-    detail: "nulls before values",
-    documentation: "Places NULLs at the start of the sort order.",
+    get detail() {
+      return gt("sqlEditor.completion.nullsFirstDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.nullsFirstDoc");
+    },
     insertText: "NULLS FIRST",
     sortText: SORT_LANE.clause + "NULLS FIRST",
   },
   {
     name: "NULLS LAST",
-    label: "NULLS LAST",
+    label: raw("NULLS LAST"),
     kind: "Keyword",
-    detail: "nulls after values",
-    documentation: "Places NULLs at the end of the sort order.",
+    get detail() {
+      return gt("sqlEditor.completion.nullsLastDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.nullsLastDoc");
+    },
     insertText: "NULLS LAST",
     sortText: SORT_LANE.clause + "NULLS LAST",
   },
@@ -553,8 +725,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "EXISTS",
     label: "EXISTS",
     kind: "Keyword",
-    detail: "subquery has rows",
-    documentation: "True when the subquery returns at least one row.",
+    get detail() {
+      return gt("sqlEditor.completion.existsDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.existsDoc");
+    },
     insertText: "EXISTS (${1:SELECT ...})",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "EXISTS",
@@ -563,8 +739,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "ANY",
     label: "ANY",
     kind: "Keyword",
-    detail: "matches any",
-    documentation: "True when the comparison holds for at least one value returned.",
+    get detail() {
+      return gt("sqlEditor.completion.anyDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.anyDoc");
+    },
     insertText: "ANY (${1:SELECT ...})",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "ANY",
@@ -573,8 +753,12 @@ export const SQL_CLAUSE_KEYWORDS: SqlCompletionEntry[] = [
     name: "ALL",
     label: "ALL",
     kind: "Keyword",
-    detail: "matches all",
-    documentation: "True when the comparison holds for every value returned.",
+    get detail() {
+      return gt("sqlEditor.completion.allDetail");
+    },
+    get documentation() {
+      return gt("sqlEditor.completion.allDoc");
+    },
     insertText: "ALL (${1:SELECT ...})",
     insertTextRules: SNIPPET,
     sortText: SORT_LANE.clause + "ALL",
@@ -596,7 +780,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "match_all",
     kind: "Function",
     detail: "(term)",
-    documentation: "Full-text search for a term across all indexed fields of the stream.",
+    get documentation() {
+      return gt("sqlEditor.completion.matchAllDoc");
+    },
     insertText: "match_all('${1:value}')",
     insertTextRules: SNIPPET,
   },
@@ -605,8 +791,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "match_all_raw",
     kind: "Function",
     detail: "(term)",
-    documentation:
-      "Deprecated alias for `match_all` — the query planner rewrites it before execution. Prefer `match_all`.",
+    get documentation() {
+      return gt("sqlEditor.completion.matchAllRawDoc");
+    },
     insertText: "match_all_raw('${1:value}')",
     insertTextRules: SNIPPET,
     deprecated: true,
@@ -616,8 +803,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "match_all_raw_ignore_case",
     kind: "Function",
     detail: "(term)",
-    documentation:
-      "Deprecated alias for `match_all` — the query planner rewrites it before execution. Prefer `match_all`.",
+    get documentation() {
+      return gt("sqlEditor.completion.matchAllRawIgnoreCaseDoc");
+    },
     insertText: "match_all_raw_ignore_case('${1:value}')",
     insertTextRules: SNIPPET,
     deprecated: true,
@@ -626,8 +814,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "re_match",
     label: "re_match",
     kind: "Function",
-    detail: "(field, regex)",
-    documentation: "Return rows where the field matches the regular expression.",
+    detail: raw("(field, regex)"),
+    get documentation() {
+      return gt("sqlEditor.completion.reMatchDoc");
+    },
     insertText: "re_match(${1:field}, '${2:regex}')",
     insertTextRules: SNIPPET,
   },
@@ -635,8 +825,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "re_not_match",
     label: "re_not_match",
     kind: "Function",
-    detail: "(field, regex)",
-    documentation: "Return rows where the field does NOT match the regular expression.",
+    detail: raw("(field, regex)"),
+    get documentation() {
+      return gt("sqlEditor.completion.reNotMatchDoc");
+    },
     insertText: "re_not_match(${1:field}, '${2:regex}')",
     insertTextRules: SNIPPET,
   },
@@ -644,8 +836,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "str_match",
     label: "str_match",
     kind: "Function",
-    detail: "(field, value)",
-    documentation: "Case-sensitive substring match against a field.",
+    detail: raw("(field, value)"),
+    get documentation() {
+      return gt("sqlEditor.completion.strMatchDoc");
+    },
     insertText: "str_match(${1:field}, '${2:value}')",
     insertTextRules: SNIPPET,
   },
@@ -653,8 +847,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "str_match_ignore_case",
     label: "str_match_ignore_case",
     kind: "Function",
-    detail: "(field, value)",
-    documentation: "Case-insensitive substring match against a field.",
+    detail: raw("(field, value)"),
+    get documentation() {
+      return gt("sqlEditor.completion.strMatchIgnoreCaseDoc");
+    },
     insertText: "str_match_ignore_case(${1:field}, '${2:value}')",
     insertTextRules: SNIPPET,
   },
@@ -663,7 +859,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "arr_descending",
     kind: "Function",
     detail: "(field)",
-    documentation: "Sort the elements of an array field in descending order.",
+    get documentation() {
+      return gt("sqlEditor.completion.arrDescendingDoc");
+    },
     insertText: "arr_descending(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -672,7 +870,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "arrcount",
     kind: "Function",
     detail: "(field)",
-    documentation: "Number of elements in an array field.",
+    get documentation() {
+      return gt("sqlEditor.completion.arrcountDoc");
+    },
     insertText: "arrcount(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -681,7 +881,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "arrsort",
     kind: "Function",
     detail: "(field)",
-    documentation: "Sort the elements of an array field in ascending order.",
+    get documentation() {
+      return gt("sqlEditor.completion.arrsortDoc");
+    },
     insertText: "arrsort(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -690,7 +892,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "cast_to_arr",
     kind: "Function",
     detail: "(field)",
-    documentation: "Cast a field value to an array so the arr* functions can operate on it.",
+    get documentation() {
+      return gt("sqlEditor.completion.castToArrDoc");
+    },
     insertText: "cast_to_arr(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -698,8 +902,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "arrindex",
     label: "arrindex",
     kind: "Function",
-    detail: "(field, start, end)",
-    documentation: "Slice an array field by an inclusive index range.",
+    detail: raw("(field, start, end)"),
+    get documentation() {
+      return gt("sqlEditor.completion.arrindexDoc");
+    },
     insertText: "arrindex(${1:field}, ${2:1}, ${3:10})",
     insertTextRules: SNIPPET,
   },
@@ -707,8 +913,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "arrjoin",
     label: "arrjoin",
     kind: "Function",
-    detail: "(field, delimiter)",
-    documentation: "Join the elements of an array field into a single string.",
+    detail: raw("(field, delimiter)"),
+    get documentation() {
+      return gt("sqlEditor.completion.arrjoinDoc");
+    },
     insertText: "arrjoin(${1:field}, '${2:delimiter}')",
     insertTextRules: SNIPPET,
   },
@@ -716,8 +924,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "arrzip",
     label: "arrzip",
     kind: "Function",
-    detail: "(field1, field2, delimiter)",
-    documentation: "Pair up two array fields element by element, joined by the delimiter.",
+    detail: raw("(field1, field2, delimiter)"),
+    get documentation() {
+      return gt("sqlEditor.completion.arrzipDoc");
+    },
     insertText: "arrzip(${1:field1}, ${2:field2}, '${3:delimiter}')",
     insertTextRules: SNIPPET,
   },
@@ -725,9 +935,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "spath",
     label: "spath",
     kind: "Function",
-    detail: "(field, path)",
-    documentation:
-      "Extract a nested value from a structured field using a dotted path, e.g. `spath(body, 'user.id')`.",
+    detail: raw("(field, path)"),
+    get documentation() {
+      return gt("sqlEditor.completion.spathDoc");
+    },
     insertText: "spath(${1:field}, '${2:path}')",
     insertTextRules: SNIPPET,
   },
@@ -736,7 +947,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "to_array_string",
     kind: "Function",
     detail: "(field)",
-    documentation: "Render an array field as its string representation.",
+    get documentation() {
+      return gt("sqlEditor.completion.toArrayStringDoc");
+    },
     insertText: "to_array_string(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -745,8 +958,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "unnest",
     kind: "Function",
     detail: "(array)",
-    documentation:
-      "Expand an array into one row per element, e.g. `unnest(flatten(cast_to_arr(field)))`.",
+    get documentation() {
+      return gt("sqlEditor.completion.unnestDoc");
+    },
     insertText: "unnest(${1:array})",
     insertTextRules: SNIPPET,
   },
@@ -754,10 +968,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "array_extract",
     label: "array_extract",
     kind: "Function",
-    detail: "(array, index)",
-    documentation:
-      "Extract a single element from an array by 1-based index, e.g. " +
-      "`array_extract(regexp_match(log, '...'), 1)`.",
+    detail: raw("(array, index)"),
+    get documentation() {
+      return gt("sqlEditor.completion.arrayExtractDoc");
+    },
     insertText: "array_extract(${1:array}, ${2:1})",
     insertTextRules: SNIPPET,
   },
@@ -766,7 +980,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "sum",
     kind: "Function",
     detail: "(field)",
-    documentation: "Sum of all values in the field. Aggregate — pair with GROUP BY.",
+    get documentation() {
+      return gt("sqlEditor.completion.sumDoc");
+    },
     insertText: "sum(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -775,7 +991,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "avg",
     kind: "Function",
     detail: "(field)",
-    documentation: "Arithmetic mean of the field. Aggregate — pair with GROUP BY.",
+    get documentation() {
+      return gt("sqlEditor.completion.avgDoc");
+    },
     insertText: "avg(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -784,7 +1002,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "count",
     kind: "Function",
     detail: "(field)",
-    documentation: "Number of rows. Aggregate — pair with GROUP BY.",
+    get documentation() {
+      return gt("sqlEditor.completion.countDoc");
+    },
     insertText: "count(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -793,7 +1013,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "max",
     kind: "Function",
     detail: "(field)",
-    documentation: "Largest value in the field. Aggregate — pair with GROUP BY.",
+    get documentation() {
+      return gt("sqlEditor.completion.maxDoc");
+    },
     insertText: "max(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -802,7 +1024,9 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     label: "min",
     kind: "Function",
     detail: "(field)",
-    documentation: "Smallest value in the field. Aggregate — pair with GROUP BY.",
+    get documentation() {
+      return gt("sqlEditor.completion.minDoc");
+    },
     insertText: "min(${1:field})",
     insertTextRules: SNIPPET,
   },
@@ -810,9 +1034,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "histogram",
     label: "histogram",
     kind: "Function",
-    detail: "(field, interval)",
-    documentation:
-      "Bucket a timestamp column into fixed intervals, e.g. `histogram(_timestamp, '30 second')`. Use as the x-axis of a time series.",
+    detail: raw("(field, interval)"),
+    get documentation() {
+      return gt("sqlEditor.completion.histogramDoc");
+    },
     insertText: "histogram(${1:_timestamp}, '${2:30 second}')",
     insertTextRules: SNIPPET,
   },
@@ -820,9 +1045,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "approx_topk",
     label: "approx_topk",
     kind: "Function",
-    detail: "(field, k)",
-    documentation:
-      "Approximate the k most frequent values of a field. Much cheaper than an exact GROUP BY ... ORDER BY count DESC on high-cardinality fields.",
+    detail: raw("(field, k)"),
+    get documentation() {
+      return gt("sqlEditor.completion.approxTopkDoc");
+    },
     insertText: "approx_topk(${1:field}, ${2:10})",
     insertTextRules: SNIPPET,
   },
@@ -830,9 +1056,10 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "approx_topk_distinct",
     label: "approx_topk_distinct",
     kind: "Function",
-    detail: "(field, distinct_field, k)",
-    documentation:
-      "Approximate the k values of `field` with the highest distinct count of `distinct_field`.",
+    detail: raw("(field, distinct_field, k)"),
+    get documentation() {
+      return gt("sqlEditor.completion.approxTopkDistinctDoc");
+    },
     insertText: "approx_topk_distinct(${1:field}, ${2:field2}, ${3:10})",
     insertTextRules: SNIPPET,
   },

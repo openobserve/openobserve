@@ -528,6 +528,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         stream_type: StreamType,
         stream_name: &str,
         date_range: (String, String),
+        max_original_size: i64,
     ) -> Result<Vec<FileKey>> {
         let start = std::time::Instant::now();
         let (date_start, date_end) = date_range;
@@ -541,8 +542,6 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .with_label_values(&["query_for_merge", "file_list"])
             .inc();
 
-        let cfg = get_config();
-        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let sql = r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
@@ -552,7 +551,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
-            .bind(max_size)
+            .bind(max_original_size)
             .fetch_all(&pool)
             .await;
         let time = start.elapsed().as_secs_f64();
@@ -2798,11 +2797,8 @@ async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
 async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let cfg = get_config();
 
-    // Handle file_list, file_list_history, and (only when enabled) file_list_dump_stats
-    let mut tables = vec!["file_list", "file_list_history"];
-    if cfg.compact.file_list_dump_enabled {
-        tables.push("file_list_dump_stats");
-    }
+    // Handle file_list, file_list_history, and file_list_dump_stats
+    let tables = vec!["file_list", "file_list_history", "file_list_dump_stats"];
     for table in &tables {
         let relkind = get_table_relkind(pool, table).await?;
         match relkind.as_deref() {

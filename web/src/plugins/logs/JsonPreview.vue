@@ -255,7 +255,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -777,7 +777,10 @@ export default {
 
     const createRegexPatternFromLogs = (key: string, value: string) => {
       emit("closeTable");
-      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      // Prompt text handed to the assistant — model input, deliberately English.
+      const promptToBeAdded = raw(
+        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
 
       router.push({
         path: "/settings/regex_patterns",
@@ -801,7 +804,9 @@ export default {
       emit("closeTable");
       // inputMessage.value = `Create a regex pattern for ${store.state.organizationData.customRegexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.customRegexPatternFromLogs.value}" which should be a type of ${store.state.organizationData.customRegexPatternFromLogs.type} from the ${store.state.organizationData.customRegexPatternFromLogs.stream} stream`;
 
-      const PromptToBeAdded = `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      const PromptToBeAdded = raw(
+        `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
 
       store.state.organizationData.regexPatternPrompt = PromptToBeAdded;
       store.state.organizationData.regexPatternTestValue = selectedText.value;

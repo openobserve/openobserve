@@ -95,7 +95,7 @@ export interface RichCardStepVariant {
   iconInvertDark?: boolean;
   code: RichCardCode;
   /** Optional note rendered under the code for this variant only. */
-  note?: string;
+  note?: I18nText;
 }
 
 /**
@@ -153,7 +153,7 @@ export interface RichCardStep {
    */
   inputs?: RichCardInput[];
   /** Small muted note rendered under the code (e.g. the load_dotenv caveat). */
-  note?: string;
+  note?: I18nText;
   /** Monospace pills rendered after the description (e.g. captured attributes). */
   pills?: I18nText[];
   /**
@@ -200,9 +200,9 @@ export interface RichCardExtras {
   fixSnippet?: string;
   /** Heading of the fix box (after "Most Likely Fix —"). Defaults to the
    *  instrument-ordering wording. */
-  fixTitle?: string;
+  fixTitle?: I18nText;
   /** Explanatory paragraph above the fix snippet. Has a sensible default. */
-  fixBody?: string;
+  fixBody?: I18nText;
   /** Highlight language for the fix snippet (e.g. "bash"). Default "python". */
   fixLang?: string;
   /**
@@ -240,7 +240,7 @@ export interface RichCardExtras {
     descriptionKey?: I18nKey;
     code: RichCardCode;
   };
-  troubleshooting?: { q: string; a: string }[];
+  troubleshooting?: { q: I18nText; a: I18nText }[];
 }
 
 export interface RichCardProvider {
@@ -252,8 +252,8 @@ export interface RichCardProvider {
   logoDark?: string;
   /** Brand accent (clay etc.) — reserved for future per-provider theming. */
   tone: string;
-  runtime?: string;
-  setupTime?: string;
+  runtime?: I18nText;
+  setupTime?: I18nText;
   /**
    * Hero capability chips shown after runtime/setupTime. When undefined the card
    * keeps the legacy AI "Cost & Tokens Captured" badge; pass an explicit list
@@ -325,7 +325,7 @@ export interface RichCardContent {
    * Google Workspace pages). Without this they end up as unclickable text
    * inside a collapsed accordion, which is how they get lost.
    */
-  docLinks?: { label: string; url: string }[];
+  docLinks?: { label: I18nText; url: string }[];
   slackUrl?: string;
 }
 

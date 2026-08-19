@@ -371,7 +371,7 @@ const maxBurn = computed(() => {
 
 const defaultShortLabel = computed(() => {
   const long = model.value.long_window_secs ?? 3600;
-  return `${Math.round(long / 12 / 60)} min`;
+  return t("slos.alert.minutesShort", { count: Math.round(long / 12 / 60) });
 });
 
 /** How long the budget lasts at the configured rate — the number that makes a

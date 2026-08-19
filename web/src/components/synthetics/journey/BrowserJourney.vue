@@ -36,7 +36,9 @@ import {
   deriveJourneySuggestions,
   type JourneySuggestionActionKind,
 } from "@/utils/synthetics/journeySuggestions";
-import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
+// Chrome UI element names stay in English in every locale — they name the
+// actual Chrome interface the user is looking at.
+import { CHROME_UI_LABELS, DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
 import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
@@ -182,7 +184,8 @@ const deleteConfirm = ref<{ show: boolean; step: BrowserStep | null }>({
 
 const deleteConfirmMessage = computed(() => {
   const step = deleteConfirm.value.step;
-  if (!step) return "";
+  // raw("") is only the empty placeholder for "no step selected".
+  if (!step) return raw("");
   const label = step.name || `#${props.modelValue.indexOf(step) + 1}`;
   return t("synthetics.journey.confirmDeleteMessage", { label });
 });
@@ -350,7 +353,7 @@ const multiSelectEnabled = computed(
 // reflects its reactive state and merges the result into the journey on stop.
 const { t } = useI18nTyped();
 
-const recorder = useSyntheticsRecorder();
+const recorder = useSyntheticsRecorder(t);
 const isRecording = recorder.isRecording;
 /**
  * The restore's own phase and failure, from THIS component's recorder instance.
@@ -1346,7 +1349,11 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         }}</span>
       </div>
       <p class="text-text-secondary m-0 text-xs">
-        {{ t("synthetics.journey.incognitoDescription") }}
+        {{
+          t("synthetics.journey.incognitoDescription", {
+            product: CHROME_UI_LABELS.recorderName,
+          })
+        }}
       </p>
       <div class="flex items-center gap-2">
         <OButton
@@ -1598,9 +1605,9 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
           <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="text-text-muted text-xs"
-          >{{ capturedSteps.length }} {{ t("synthetics.table.stepsSuffix") }}</span
-        >
+        <span class="text-text-muted text-xs">{{
+          t("synthetics.table.stepsCount", { count: capturedSteps.length })
+        }}</span>
       </div>
 
       <JourneySteps

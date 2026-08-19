@@ -263,7 +263,7 @@ const {
   errorBannerTitle,
   errorBannerMessage,
   statusCodeTitle,
-} = useTraceDetails(spanRef);
+} = useTraceDetails(spanRef, t);
 
 const timestampColumn = computed(() => store.state.zoConfig.timestamp_column);
 
