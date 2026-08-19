@@ -103,12 +103,6 @@ const stubs = {
       <slot v-if="error" name='error' />
     </div>`,
   },
-  OStatStrip: {
-    name: "OStatStrip",
-    props: ["items", "selectedKey"],
-    emits: ["select"],
-    template: "<div />",
-  },
   OnCallSetupChecklist: {
     name: "OnCallSetupChecklist",
     props: [
@@ -219,16 +213,8 @@ describe("OnCallResponses", () => {
     return wrapper;
   }
 
-  const stats = (w: any) =>
-    Object.fromEntries(
-      (w.findComponent({ name: "OStatStrip" }).props("items") as any[]).map((i) => [
-        i.key,
-        i.value,
-      ]),
-    );
-
-  /// The state counts the section headings carry. State left the stat strip when
-  /// the list gained sections, so this is where "how many are ringing" is read.
+  /// The state counts the section headings carry — the only counts on the
+  /// screen now that the P1/Mine/Unrouted tiles are gone.
   const sections = (w: any) =>
     Object.fromEntries(
       ["ringing", "snoozed", "handled"]
@@ -272,97 +258,6 @@ describe("OnCallResponses", () => {
       "oncall-section-header-snoozed",
       "oncall-section-header-handled",
     ]);
-  });
-
-  /// "What is on me" is the second question anybody opening this list has, and
-  /// it was answerable only by reading the Acknowledged-by column row by row.
-  /// A handoff to a person acknowledges as the new owner, so acked_by is the
-  /// owner either way.
-  it("counts and filters the pages the signed-in user owns", async () => {
-    const wrapper = await withPages([
-      page({ id: "a", acked_by: "example@gmail.com", state: "acknowledged" }),
-      page({ id: "b", acked_by: "someone.else@corp.com", state: "acknowledged" }, "al_pay"),
-      page({ id: "c" }, "al_ord"),
-    ]);
-
-    expect(stats(wrapper).mine).toBe(1);
-
-    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", "mine");
-    await flushPromises();
-
-    const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-    expect(data).toHaveLength(1);
-    expect(data[0].latest.id).toBe("a");
-  });
-
-  // The server lowercases an email on handoff but not on a self-ack, so the
-  // comparison cannot be case-sensitive.
-  it("matches the owner regardless of case", async () => {
-    const wrapper = await withPages([
-      page({ id: "a", acked_by: "Example@Gmail.com", state: "acknowledged" }),
-    ]);
-    expect(stats(wrapper).mine).toBe(1);
-  });
-
-  // A tile that can only ever read zero is noise, so it is not rendered at all.
-  it("omits the tile when nobody is signed in", async () => {
-    const original = store.state.userInfo;
-    store.state.userInfo = {};
-    try {
-      const wrapper = await withPages([page()]);
-      expect(stats(wrapper)).not.toHaveProperty("mine");
-    } finally {
-      store.state.userInfo = original;
-    }
-  });
-
-  /// A record with no team paged nobody at all. It is the one facet that is a
-  /// configuration bug rather than a state somebody is working through.
-  it("counts and filters pages that routed to no team", async () => {
-    const wrapper = await withPages([page({ id: "a" }), page({ id: "b", team_id: "" }, "al_pay")]);
-
-    expect(stats(wrapper).unrouted).toBe(1);
-
-    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", "unrouted");
-    await flushPromises();
-
-    const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-    expect(data).toHaveLength(1);
-    expect(data[0].latest.id).toBe("b");
-  });
-
-  /// Re-clicking the live tile is the only way back to the full list now that
-  /// the state tiles — and with them the "All" tile — belong to the sections.
-  it("toggles a facet off by re-clicking it", async () => {
-    const wrapper = await withPages([page()]);
-    const strip = wrapper.findComponent({ name: "OStatStrip" });
-
-    strip.vm.$emit("select", "p1");
-    await flushPromises();
-    expect(strip.props("selectedKey")).toBe("p1");
-
-    strip.vm.$emit("select", "p1");
-    await flushPromises();
-    expect(strip.props("selectedKey")).toBe(null);
-  });
-
-  /// The tile counts must not move as you click them, or the strip becomes
-  /// unreadable — they answer to the other filters, not to their own facet.
-  it("keeps the tile counts steady while a facet is applied", async () => {
-    const wrapper = await withPages([
-      page({ id: "a" }),
-      page(
-        { id: "b", priority: 3, state: "acknowledged", acked_by: "engineer@example.com" },
-        "al_pay",
-      ),
-    ]);
-    const before = stats(wrapper);
-
-    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", "p1");
-    await flushPromises();
-
-    expect(stats(wrapper)).toEqual(before);
-    expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
   });
 
   /// A resolved record has no severity left to signal; a stale rail would say
@@ -432,63 +327,26 @@ describe("OnCallResponses", () => {
   });
 
   describe("the standing summary", () => {
-    /// The two cards answer the questions the list answers per row. Neither
-    /// means anything on an org that has never paged, so both wait until there
+    /// The strip answers a question the list answers per row, and it has no
+    /// answer at all on an org that has never paged — so it waits until there
     /// is something to describe.
     it("stays hidden while setup owns the screen", async () => {
       const wrapper = render();
       await flushPromises();
 
       expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-attention-card"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallNowStrip" }).exists()).toBe(false);
     });
 
-    it("counts pages nobody has taken, and names the oldest", async () => {
-      // Pinned rather than derived from `Date.now()` twice — the two reads
-      // land on different milliseconds and the assertion would flake.
-      const oldest = 1_700_000_000_000_000;
-      const wrapper = await withPages([
-        page({ id: "resp_1", opened_at: oldest }, "al_a"),
-        page({ id: "resp_2", opened_at: oldest + 6 * 60_000_000 }, "al_b"),
-      ]);
-
-      const banner = wrapper.findComponent({ name: "OnCallRingingBanner" });
-      expect(banner.props("ringing")).toBe(2);
-      expect(banner.props("oldestOpenedAt")).toBe(oldest);
-      // The second action goes to the record that has waited longest.
-      expect(banner.props("oldestId")).toBe("resp_1");
-    });
-
-    /// Records, not rows: a grouped row standing for ninety-five firings is
-    /// still ninety-five pages nobody took.
-    it("counts records rather than grouped rows", async () => {
-      const wrapper = await withPages([
-        page({ id: "resp_1" }, "al_same"),
-        page({ id: "resp_2" }, "al_same"),
-      ]);
-
-      expect(wrapper.findComponent({ name: "OnCallRingingBanner" }).props("ringing")).toBe(2);
-    });
-
-    it("leaves an acknowledged page out of the count", async () => {
+    /// "Is anything waiting on a person" is the ringing section of the list
+    /// itself, not a second count above it — so a page somebody has claimed
+    /// leaves that run rather than being subtracted from a separate total.
+    it("leaves an acknowledged page out of the ringing run", async () => {
       const wrapper = await withPages([
         page({ id: "resp_1", state: "acknowledged", acked_by: "ana@o2.ai" }),
       ]);
 
-      expect(wrapper.findComponent({ name: "OnCallRingingBanner" }).props("ringing")).toBe(0);
-    });
-
-    /// There is no assignee on a record. "Yours" is the team's rotation
-    /// resolving to you, which is the only fact the server actually holds.
-    it("counts a page as yours when your team's rotation resolves to you", async () => {
-      service.whoIsOnCall.mockResolvedValue({
-        data: [{ rotation: "Primary", user_email: "example@gmail.com" }],
-      } as any);
-      const wrapper = await withPages([page()]);
-
-      expect(wrapper.findComponent({ name: "OnCallRingingBanner" }).props("assignedToMe")).toBe(
-        1,
-      );
+      expect(sections(wrapper)).toEqual({ handled: 1 });
     });
 
     it("hands the on-call strip each team's rotation", async () => {
@@ -1017,6 +875,23 @@ describe("OnCallResponses", () => {
       expect(data.map((row) => row.latest.id)).toEqual(["b"]);
     });
 
+    // The server lowercases an email on handoff but not on a self-ack, so the
+    // owner comparison cannot be case-sensitive.
+    it("matches the owner regardless of case", async () => {
+      const wrapper = await withMyShift([
+        page(
+          { id: "b", team_id: "team_other", acked_by: "Example@Gmail.com", state: "acknowledged" },
+          "al_pay",
+        ),
+      ]);
+
+      await wrapper.find(mineBtn).trigger("click");
+      await flushPromises();
+
+      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+      expect(data.map((row) => row.latest.id)).toEqual(["b"]);
+    });
+
     it("is a toggle, so the second click gives the full list back", async () => {
       const wrapper = await withMyShift([
         page({ id: "a" }),
@@ -1239,9 +1114,11 @@ describe("OnCallResponses", () => {
   });
 
   describe("clearing the ringing set", () => {
-    /// The banner and the section heading both state a count, and the count they
-    /// state is the set they act on — so it cannot require selecting rows first.
-    it("acknowledges every ringing page from the banner", async () => {
+    /// The heading states a count and acts on exactly that set, so claiming the
+    /// whole run cannot require selecting its rows first. It is also the only
+    /// place the count lives now: a second copy above the list was read before
+    /// the stat filter, so a filtered list could disagree with it.
+    it("acknowledges every ringing page from the section heading", async () => {
       service.acknowledgeResponse.mockResolvedValue({} as any);
       const wrapper = await withPages([
         page({ id: "a" }),
@@ -1249,43 +1126,13 @@ describe("OnCallResponses", () => {
         page({ id: "c", state: "acknowledged", acked_by: "someone@o2.ai" }, "al_ord"),
       ]);
 
-      wrapper.findComponent({ name: "OnCallRingingBanner" }).vm.$emit("acknowledge-all");
+      await wrapper.find("[data-test='oncall-section-ack-all']").trigger("click");
       await flushPromises();
 
       // The acknowledged one is left alone.
       expect(service.acknowledgeResponse).toHaveBeenCalledTimes(2);
       const ids = service.acknowledgeResponse.mock.calls.map((c: any[]) => c[0].response_id);
       expect(ids.sort()).toEqual(["a", "b"]);
-    });
-
-    it("acknowledges the ringing section from its own heading", async () => {
-      service.acknowledgeResponse.mockResolvedValue({} as any);
-      const wrapper = await withPages([page({ id: "a" })]);
-
-      await wrapper.find("[data-test='oncall-section-ack-all']").trigger("click");
-      await flushPromises();
-
-      expect(service.acknowledgeResponse).toHaveBeenCalledTimes(1);
-    });
-
-    /// A bulk handoff is not offered — the people a page can be handed to are
-    /// per team — so the second action opens the record that needs the decision.
-    it("opens the longest-ringing record", async () => {
-      const oldest = 1_700_000_000_000_000;
-      const wrapper = await withPages([
-        page({ id: "newer", opened_at: oldest + 60_000_000 }, "al_a"),
-        page({ id: "older", opened_at: oldest }, "al_b"),
-      ]);
-
-      wrapper.findComponent({ name: "OnCallRingingBanner" }).vm.$emit("open-oldest");
-      await flushPromises();
-
-      expect(push).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "onCallResponseDetail",
-          params: { responseId: "older" },
-        }),
-      );
     });
   });
 

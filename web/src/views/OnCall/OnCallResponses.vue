@@ -105,27 +105,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @create-team="createTeam"
     />
 
-    <!-- The two standing questions, above the list that answers them per row:
-         is anything waiting on a person, and would a page reach anyone. Hidden
-         only while setup owns the screen: on an org that has never paged,
-         neither question has an answer yet.
+    <!-- The standing question, above the list that answers it per row: would a
+         page reach anyone. Hidden only while setup owns the screen — on an org
+         that has never paged it has no answer yet.
 
-         These were three equal cards in a grid. A grid gives the same weight to
-         the one fact somebody has to act on and the two they check once, and it
-         spent a third of the first screen doing it — so the urgent one is a
-         banner with its own action and the standing two are a single line. -->
-    <OContent v-if="!setupOnly && !unavailable" class="flex flex-col gap-2 pt-2">
-      <OnCallRingingBanner
-        :ringing="attention.unacked"
-        :exhausted="attention.exhausted"
-        :oldest-opened-at="attention.oldestOpenedAt"
-        :assigned-to-me="attention.assignedToMe"
-        :oldest-id="attention.oldestId"
-        :can-act="attention.unacked > 0"
-        :busy="bulkBusy"
-        @acknowledge-all="acknowledgeAllRinging"
-        @open-oldest="openOldestRinging"
-      />
+         "Is anything waiting on a person" used to be a banner here as well. The
+         ringing run is the first section of the list directly below, with the
+         same count and the same acknowledge-all on its heading, so the banner
+         was that heading said twice — and its count was taken before the stat
+         filter, so a filtered list could disagree with it. -->
+    <OContent v-if="!setupOnly && !unavailable" class="pt-2">
       <OnCallNowStrip
         :teams="teams"
         :slots-by-team="slotsByTeam"
@@ -172,23 +161,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:expanded-ids="expandedIds"
       @row-click="openResponse"
     >
-      <!-- Counts describe the filtered list below, which is honest here only
-           because everything the filters see is already loaded. -->
-      <template #subheader>
-        <div
-          class="px-page-edge border-table-row-divider border-b py-1.5"
-          data-test="oncall-responses-summary"
-        >
-          <OStatStrip
-            :items="summaryStats"
-            :loading="loading"
-            selectable
-            :selected-key="stateFilter"
-            @select="onStatSelect"
-          />
-        </div>
-      </template>
-
       <!-- During an incident the list IS the work surface. Opening 200 pages
            one at a time to claim them is not triage. -->
       <template #toolbar>
@@ -687,7 +659,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OnCallNowStrip from "@/components/oncall/OnCallNowStrip.vue";
 import OnCallPageContext from "@/components/oncall/OnCallPageContext.vue";
-import OnCallRingingBanner from "@/components/oncall/OnCallRingingBanner.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
@@ -713,8 +684,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
-import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
@@ -808,7 +777,6 @@ const unavailable = ref(false);
 const search = ref("");
 const teamFilter = ref("all");
 const priorityFilter = ref("all");
-const stateFilter = ref<string | null>(null);
 /// `?mine=1` opens the list already narrowed. It is what the retired
 /// `oncall/me` page now redirects to, so a bookmark from before still lands on
 /// the answer instead of a stub that told everybody they were on no team.
@@ -857,7 +825,6 @@ const isFiltered = computed(
     !!search.value ||
     teamFilter.value !== "all" ||
     priorityFilter.value !== "all" ||
-    stateFilter.value !== null ||
     mineScope.value,
 );
 
@@ -1013,9 +980,8 @@ function isMine(record: OnCallResponse): boolean {
   );
 }
 
-// Everything except the state facet, so the strip counts what the rest of the
-// filters allow — a tile that changed its own number as you clicked it would
-// be unreadable.
+// Every filter the header offers, applied to the records before they are
+// grouped into rows.
 const scopedResponses = computed(() => {
   const q = search.value.trim().toLowerCase();
   return responses.value.filter((row) => {
@@ -1032,34 +998,6 @@ const scopedResponses = computed(() => {
     );
   });
 });
-
-/**
- * Asked of a ROW, not a record, so the strip counts the same things the table
- * shows.
- *
- * State is no longer among these. The section headings say which run a row is
- * in and carry their own counts, so a tile that filtered to "snoozed" was a
- * second way to say what the reader could already see. What is left are the
- * slices that cut ACROSS the sections.
- */
-function matchesStateFacet(row: PageRow, facet: string | null): boolean {
-  switch (facet) {
-    case "p1":
-      return row.latest.priority === 1 && row.escalating.length > 0;
-    // Whoever acknowledged it owns it: a handoff to a person acknowledges as
-    // the new owner, so this is the same field either way.
-    case "mine":
-      return row.firings.some(
-        (r) => !!r.acked_by && r.acked_by.toLowerCase() === viewerEmail.value,
-      );
-    // A record with no team paged nobody. The one facet that is a
-    // configuration bug rather than a state somebody is working through.
-    case "unrouted":
-      return !row.latest.team_id;
-    default:
-      return true;
-  }
-}
 
 /// Grouped or not, downstream code sees one shape.
 function toRows(records: OnCallResponse[]): PageRow[] {
@@ -1080,48 +1018,11 @@ function toRows(records: OnCallResponse[]): PageRow[] {
   }));
 }
 
-const scopedRows = computed(() => toRows(scopedResponses.value));
-
-const rows = computed(() =>
-  scopedRows.value.filter((row) => matchesStateFacet(row, stateFilter.value)),
-);
-
-// The slices that cut across the sections, since the sections themselves now
-// carry the state counts. P1 first: a P1 in the handled run still outranks a P4
-// that is ringing.
-const summaryStats = computed<StatItem[]>(() => {
-  const all = scopedRows.value;
-  const count = (facet: string) => all.filter((r) => matchesStateFacet(r, facet)).length;
-  const items: StatItem[] = [
-    {
-      key: "p1",
-      label: t("oncall.statP1"),
-      value: count("p1"),
-      icon: "warning-amber",
-      tone: "orange",
-      dataTest: "oncall-stat-p1",
-    },
-    {
-      key: "mine",
-      label: t("oncall.statMine"),
-      value: count("mine"),
-      icon: "person",
-      tone: "info",
-      dataTest: "oncall-stat-mine",
-    },
-    {
-      key: "unrouted",
-      label: t("oncall.statUnrouted"),
-      value: count("unrouted"),
-      icon: "help-outline",
-      tone: "error",
-      dataTest: "oncall-stat-unrouted",
-    },
-  ];
-  // Dropped entirely when we do not know who is signed in, rather than left as
-  // a tile that can only ever read zero.
-  return viewerEmail.value ? items : items.filter((item) => item.key !== "mine");
-});
+/// The rows the table shows. There is no facet between these and the scoped
+/// records: the tiles that used to sit above the table restated the section
+/// headings and the header's own "mine" toggle, so the list narrows from the
+/// header controls alone.
+const rows = computed(() => toRows(scopedResponses.value));
 
 const youLabel = computed(() => String(t("oncall.onCallYou")));
 
@@ -1159,50 +1060,6 @@ function totalRungsFor(record: OnCallResponse): number | null {
   const rungs = policyByTeam.value[record.team_id]?.rungs ?? [];
   return rungs.find((rung) => rung.priority === record.priority)?.steps.length ?? null;
 }
-
-/// Everything the attention card states, derived from what is already loaded.
-/// Records rather than rows: "2 unacknowledged" counts pages, and a grouped row
-/// standing for ninety-five firings is still ninety-five pages nobody took.
-const attention = computed(() => {
-  const nowMicros = Date.now() * 1000;
-  const open = scopedResponses.value.filter(
-    (r) => isEscalating(r.state) && !r.acked_by && !isSnoozed(r, nowMicros),
-  );
-
-  // "Assigned to you" is the team's rotation resolving to the viewer — there is
-  // no assignee on a record, and an unacknowledged page has no owner yet.
-  const mine = viewerEmail.value
-    ? open.filter((r) =>
-        (slotsByTeam.value[r.team_id] ?? []).some(
-          (slot) => slot.user_email.toLowerCase() === viewerEmail.value,
-        ),
-      ).length
-    : 0;
-
-  const pending = open
-    .map((r) => progressById.value[r.id]?.next_at ?? null)
-    .filter((at): at is number => !!at && at > nowMicros);
-
-  // The ladder having finished is the fact that changes what to do: a ringing
-  // page with rungs left will wake somebody on its own, and one without never
-  // will. Counted only over the pages whose ladder we actually read.
-  const exhausted = open.filter((r) => progressById.value[r.id]?.exhausted).length;
-
-  const oldest = open.length
-    ? open.reduce((worst, r) => (r.opened_at < worst.opened_at ? r : worst))
-    : null;
-
-  return {
-    unacked: open.length,
-    escalating: pending.length,
-    nextEscalationAt: pending.length ? Math.min(...pending) : null,
-    assignedToMe: mine,
-    oldestOpenedAt: oldest?.opened_at ?? null,
-    /// So the banner's second action can open the record that needs a decision.
-    oldestId: oldest?.id ?? null,
-    exhausted,
-  };
-});
 
 /// When each team's current shift hands over.
 ///
@@ -1416,8 +1273,8 @@ async function bulkResolve() {
  * Acknowledges every ringing page, not just the selected ones.
  *
  * The selection-driven bulk action still exists for a chosen subset. This is the
- * banner's and the section heading's action: the count they state is the set
- * they act on, so claiming it cannot require selecting the rows first.
+ * ringing section heading's action: the count it states is the set it acts on,
+ * so claiming it cannot require selecting the rows first.
  */
 async function acknowledgeAllRinging() {
   const ids = rows.value
@@ -1430,25 +1287,6 @@ async function acknowledgeAllRinging() {
     "bulkAckDone",
     "bulkAckPartial",
   );
-}
-
-/// The record that has waited longest, where handoff, escalate-now and promote
-/// live. A bulk handoff is not offered: the people a page can be handed to are
-/// per team, and the ringing pages need not share one.
-function openOldestRinging() {
-  const id = attention.value.oldestId;
-  if (!id) return;
-  router.push({
-    name: "onCallResponseDetail",
-    params: { responseId: id },
-    query: { org_identifier: orgId.value },
-  });
-}
-
-// Re-clicking the live tile clears it — there is no "All" tile to clear from
-// now that the sections carry the state counts.
-function onStatSelect(key: string) {
-  stateFilter.value = stateFilter.value === key ? null : key;
 }
 
 /// Which run a row belongs to. Asked of the row rather than the record so a
@@ -1765,7 +1603,6 @@ function onEmptyAction(id?: string) {
     search.value = "";
     teamFilter.value = "all";
     priorityFilter.value = "all";
-    stateFilter.value = null;
     mineOnly.value = false;
   }
 }
