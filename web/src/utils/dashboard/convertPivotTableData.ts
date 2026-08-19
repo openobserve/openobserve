@@ -45,6 +45,7 @@ function buildPivotHeaderLevels(
   showRowTotals: boolean,
   timestampFieldAliases: Set<string>,
   timezone: string,
+  hasOthers: boolean,
 ): any[] {
   const pivotCount = breakdownFields.length;
   const yCount = yFields.length;
@@ -56,7 +57,12 @@ function buildPivotHeaderLevels(
 
   // Parse pivot keys into per-level values
   // e.g., "GET\x00200" → ["GET", "200"]
-  const parsedKeys = allPivotKeys.map((pk) => pk.split(PIVOT_TABLE_SEPARATOR));
+  // The synthetic overflow bucket is excluded: it is a single app-authored
+  // label, not a breakdown tuple, so splitting it would yield `undefined` at
+  // every level below the first. It is emitted separately at level 0 with a
+  // rowspan covering all pivot levels (the same shape as the Total group).
+  const realPivotKeys = hasOthers ? allPivotKeys.slice(0, -1) : allPivotKeys;
+  const parsedKeys = realPivotKeys.map((pk) => pk.split(PIVOT_TABLE_SEPARATOR));
 
   // Track top-level (level 0) group boundary positions (leaf column indices)
   // These propagate down so borders align across all header rows.
@@ -112,14 +118,31 @@ function buildPivotHeaderLevels(
         colspan,
         hasBorder,
         // Sort by the first leaf column under this group header.
-        // allPivotKeys[i] is the first pivot key in this group.
-        _sortColumn: `${allPivotKeys[i]}_${yFields[0].alias}`,
+        // realPivotKeys[i] is the first pivot key in this group.
+        _sortColumn: `${realPivotKeys[i]}_${yFields[0].alias}`,
       };
 
       cells.push(cell);
 
       leafColPos += colspan;
       i += span;
+    }
+
+    // Overflow ("Others") group at level 0 only — spans every pivot level.
+    if (lvl === 0 && hasOthers) {
+      topLevelBoundaries.add(leafColPos);
+      const othersColspan = yCount > 1 ? yCount : 1;
+      cells.push({
+        // The constant stays the machine key; only the rendered label is translated.
+        key: `${lvl}_${PIVOT_TABLE_OTHERS_LABEL}`,
+        label: gt("dashboard.pivotOthers"),
+        colspan: othersColspan,
+        rowspan: pivotCount,
+        hasBorder: true,
+        _isOthersHeader: true,
+        _sortColumn: `${PIVOT_TABLE_OTHERS_LABEL}_${yFields[0].alias}`,
+      });
+      leafColPos += othersColspan;
     }
 
     // Total group at level 0 only
@@ -245,7 +268,14 @@ export const convertPivotTableData = (
 
   const getPivotKey = (row: any): string => {
     return breakdownAliases
-      .map((alias: string) => String(getDataValue(row, alias) ?? "(empty)"))
+      .map((alias: string) => {
+        // Match the chart path (sql/shared/seriesBuilder.ts): null, undefined
+        // and "" all render as "(empty)". `?? ` alone leaves "" as a blank
+        // column header.
+        const raw = getDataValue(row, alias);
+        const value = raw === null || raw === undefined ? "" : String(raw);
+        return value === "" ? "(empty)" : value;
+      })
       .join(PIVOT_TABLE_SEPARATOR);
   };
 
@@ -320,7 +350,10 @@ export const convertPivotTableData = (
 
       if (pivotKeySet.has(pivotKey)) {
         const colKey = `${pivotKey}_${yAlias}`;
-        targetRow[colKey] = numericValue;
+        // Accumulate: a query can return several rows for one (x, breakdown)
+        // pair, and assigning here would silently keep only the last one.
+        // Mirrors the overflow branch below.
+        targetRow[colKey] = (targetRow[colKey] || 0) + numericValue;
       } else if (hasOthers) {
         const othersKey = `${PIVOT_TABLE_OTHERS_LABEL}_${yAlias}`;
         targetRow[othersKey] = (targetRow[othersKey] || 0) + numericValue;
@@ -513,6 +546,7 @@ export const convertPivotTableData = (
     showRowTotals,
     breakdownTimestampAliases,
     timezone,
+    hasOthers,
   );
 
   // --- Step 7: Separate sticky total row if needed ---
