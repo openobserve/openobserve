@@ -102,7 +102,7 @@ pub fn validate_nodes_edges(
     edges: &[Edge],
     is_draft: bool,
 ) -> Result<(), anyhow::Error> {
-    if nodes.len() < 2 || (!is_draft && edges.is_empty()) {
+    if !is_draft && (nodes.len() < 2 || edges.is_empty()) {
         return Err(anyhow!(
             "there must be more than 1 node and at least 1 edge"
         ));
