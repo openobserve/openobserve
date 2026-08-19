@@ -500,12 +500,7 @@ describe("stored journeys with mid-journey navigates", () => {
     const loaded = mapWireSteps(stored);
 
     expect(loaded).toHaveLength(4);
-    expect(loaded.map((s) => s.action)).toEqual([
-      "navigate",
-      "navigate",
-      "navigate",
-      "click",
-    ]);
+    expect(loaded.map((s) => s.action)).toEqual(["navigate", "navigate", "navigate", "click"]);
   });
 
   it("keeps each navigate's URL", () => {
@@ -524,12 +519,7 @@ describe("stored journeys with mid-journey navigates", () => {
     const wires = journeyToWireSteps(mapWireSteps(stored));
 
     expect(wires).toHaveLength(4);
-    expect(wires.map((w) => w.action)).toEqual([
-      "navigate",
-      "navigate",
-      "navigate",
-      "click",
-    ]);
+    expect(wires.map((w) => w.action)).toEqual(["navigate", "navigate", "navigate", "click"]);
     expect(wires.slice(0, 3).map((w) => w.url)).toEqual([
       "https://app.test/login",
       "https://app.test/",
