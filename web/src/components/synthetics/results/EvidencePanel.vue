@@ -29,7 +29,8 @@
  * error, not a cosmetic one.
  */
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 
 import {
   evidenceOriginTs,
@@ -42,6 +43,7 @@ import EvidenceFilters from "./EvidenceFilters.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import {
   EVIDENCE_ERROR_MESSAGE,
@@ -68,8 +70,12 @@ const props = withDefaults(
     truncated?: boolean;
     /** Scope every row and every count to one step. Null shows the whole run. */
     stepFilter?: string | null;
-    /** Display name for the filtered step, for the banner. */
-    stepFilterName?: string;
+    /**
+     * Steps to offer in the scope select, in journey order. The panel resolves
+     * numbers, names and per-step counts from this plus `events` — it does not
+     * take a resolved name for the current filter.
+     */
+    stepOptions?: { stepId: string; number: number; name: string }[];
     /** Whether capture is switched off for this check, vs merely not kept. */
     captureOff?: boolean;
     /** Whether the run passed — evidence is retained for failures by default. */
@@ -78,14 +84,20 @@ const props = withDefaults(
   {
     truncated: false,
     stepFilter: null,
-    stepFilterName: "",
+    stepOptions: () => [],
     captureOff: false,
     runPassed: false,
     errorKind: null,
   },
 );
 
-const emit = defineEmits<{ (e: "clear-step-filter"): void; (e: "retry"): void }>();
+const emit = defineEmits<{
+  (e: "update:stepFilter", value: string | null): void;
+  (e: "retry"): void;
+}>();
+
+/** Sentinel for "events with no step_id" — a real value, not a magic null. */
+const UNATTRIBUTED_STEP = "__unattributed__";
 
 const { t } = useI18nTyped();
 
@@ -112,9 +124,14 @@ function reloadPage() {
  * The badges are folded from this, not from the whole run: a badge that counts
  * the run while the list shows one step is a lie, not a shortcut.
  */
-const scopedEvents = computed(() =>
-  props.stepFilter ? props.events.filter((e) => e.stepId === props.stepFilter) : props.events,
-);
+const scopedEvents = computed(() => {
+  if (props.stepFilter === UNATTRIBUTED_STEP) {
+    return props.events.filter((e) => e.stepId === null);
+  }
+  return props.stepFilter
+    ? props.events.filter((e) => e.stepId === props.stepFilter)
+    : props.events;
+});
 
 const bundle = computed(() =>
   foldEvidenceBundle(scopedEvents.value, props.stepDefs, props.truncated),
@@ -136,6 +153,48 @@ const originTs = computed(() => evidenceOriginTs(props.events));
 const { view, firstPartyOnly, wrap, views, visibleEvents } = useEvidenceFilters(
   computed(() => bundle.value.events),
 );
+
+/** OSelect emits its own model type; the panel's contract with its owner is `string | null`. */
+const stepFilterModel = computed({
+  get: () => props.stepFilter,
+  set: (value: string | null) => emit("update:stepFilter", value),
+});
+
+/**
+ * Options for the step-scope select: All steps, then one per step that owns
+ * at least one event (journey order, per `stepOptions`), then unattributed
+ * if any event has no step. A journey runs ~13 steps and typically only 2-3
+ * own events — listing the rest would be dead options selecting an empty
+ * table.
+ *
+ * Counts read `props.events`, not `scopedEvents` or the folded bundle: they
+ * describe the ATTEMPT so the option a reader is not currently on does not
+ * appear to change count as they filter — same principle as the view-toggle
+ * badges above.
+ */
+const stepSelectOptions = computed<SelectOptionInput[]>(() => {
+  const options: SelectOptionInput[] = [
+    { value: null, label: raw(`${t("synthetics.evidence.allSteps")} (${props.events.length})`) },
+  ];
+  for (const step of props.stepOptions) {
+    const count = props.events.filter((e) => e.stepId === step.stepId).length;
+    if (count === 0) continue;
+    options.push({
+      value: step.stepId,
+      label: raw(
+        `${t("synthetics.evidence.stepOption", { number: step.number, name: step.name })} (${count})`,
+      ),
+    });
+  }
+  const unattributedCount = props.events.filter((e) => e.stepId === null).length;
+  if (unattributedCount > 0) {
+    options.push({
+      value: UNATTRIBUTED_STEP,
+      label: raw(`${t("synthetics.evidence.unattributed")} (${unattributedCount})`),
+    });
+  }
+  return options;
+});
 </script>
 
 <template>
@@ -201,28 +260,6 @@ const { view, firstPartyOnly, wrap, views, visibleEvents } = useEvidenceFilters(
       </OBanner>
 
       <template v-else>
-        <!-- Scoped to one step, arrived at from a step expansion. Dismissible,
-             because the run-level view is the other half of the question. -->
-        <OBanner
-          v-if="stepFilter"
-          variant="info"
-          dense
-          inline-actions
-          :content="t('synthetics.evidence.stepFilterBanner', { step: stepFilterName })"
-          data-test="synthetics-evidence-step-filter"
-        >
-          <template #actions>
-            <OButton
-              variant="ghost"
-              size="xs"
-              data-test="synthetics-evidence-clear-step-filter-btn"
-              @click="emit('clear-step-filter')"
-            >
-              {{ t("synthetics.evidence.clearStepFilter") }}
-            </OButton>
-          </template>
-        </OBanner>
-
         <!-- X-8.2: reduced fidelity is reported. A silently short list reads as a
              quiet run. -->
         <div
@@ -234,12 +271,26 @@ const { view, firstPartyOnly, wrap, views, visibleEvents } = useEvidenceFilters(
           {{ t("synthetics.evidence.truncated") }}
         </div>
 
-        <EvidenceFilters
-          v-model:view="view"
-          v-model:first-party-only="firstPartyOnly"
-          v-model:wrap="wrap"
-          :views="views"
-        />
+        <!-- D6: the step scope is a control that narrows the list, not a
+             caption that only restates it — a select the reader can change,
+             where the old banner could only be dismissed. One row with
+             EvidenceFilters; wraps on narrow widths. -->
+        <div class="flex flex-wrap items-center gap-2">
+          <OSelect
+            v-model="stepFilterModel"
+            :options="stepSelectOptions"
+            size="sm"
+            class="min-w-48"
+            :searchable="false"
+            data-test="synthetics-evidence-step-filter"
+          />
+          <EvidenceFilters
+            v-model:view="view"
+            v-model:first-party-only="firstPartyOnly"
+            v-model:wrap="wrap"
+            :views="views"
+          />
+        </div>
 
         <!-- One table for the view. Rows come from the shared component, so the
              step expansion and this panel cannot drift apart; kind and step are
@@ -252,7 +303,7 @@ const { view, firstPartyOnly, wrap, views, visibleEvents } = useEvidenceFilters(
           :filtered="!!stepFilter"
           :origin-ts="originTs"
           :wrap="wrap"
-          @clear-filters="emit('clear-step-filter')"
+          @clear-filters="emit('update:stepFilter', null)"
         />
       </template>
     </template>

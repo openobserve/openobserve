@@ -21,6 +21,8 @@ import EvidencePanel from "./EvidencePanel.vue";
 import EvidenceEvents from "./EvidenceEvents.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import {
   foldEvidenceBundle,
   isEvidenceAnomaly,
@@ -175,11 +177,28 @@ describe("EvidencePanel", () => {
   const OTHER_STEP =
     '{"ts":1785356287000,"kind":"response","method":"GET","url":"https://o2.example.dev/api/late","status":404,"initiated_ts":1785356286900,"first_party":true,"step_id":"fa1"}';
 
+  // No step_id at all — the "not attributed to a step" case.
+  const UNATTRIBUTED_EVENT =
+    '{"ts":1785356287500,"kind":"console","level":"error","text":"orphan"}';
+
   const named = () =>
     parseEvidenceNdjson(`${NDJSON}\n${OTHER_STEP}`).map((e) => ({
       ...e,
       stepName: e.stepId ? STEP_DEFS.get(e.stepId)?.name || e.stepId : null,
     }));
+
+  const namedWithUnattributed = () =>
+    parseEvidenceNdjson(`${NDJSON}\n${OTHER_STEP}\n${UNATTRIBUTED_EVENT}`).map((e) => ({
+      ...e,
+      stepName: e.stepId ? STEP_DEFS.get(e.stepId)?.name || e.stepId : null,
+    }));
+
+  // Mirrors STEP_DEFS's two steps (s19, fa1) plus a third that never runs, so
+  // "steps with zero events are omitted" has something to omit.
+  const STEP_OPTIONS = [
+    { stepId: "s19", number: 19, name: "Navigate to /web/login" },
+    { stepId: "fa1", number: 20, name: 'Assert visible [data-test="element-that-never-exists"]' },
+  ];
 
   const mountPanel = (props: Record<string, unknown> = {}) =>
     mount(EvidencePanel, {
@@ -191,7 +210,7 @@ describe("EvidencePanel", () => {
         error: null,
         truncated: false,
         stepFilter: null,
-        stepFilterName: "",
+        stepOptions: STEP_OPTIONS,
         ...props,
       },
       global: { plugins: [i18n] },
@@ -270,23 +289,83 @@ describe("EvidencePanel", () => {
   it("narrows both the rows and the badge counts to the filtered step", () => {
     // A badge that counts the whole run while the list shows one step is a lie.
     const all = mountPanel();
-    const scoped = mountPanel({ stepFilter: "s19", stepFilterName: "Navigate to /web/login" });
+    const scoped = mountPanel({ stepFilter: "s19" });
     expect(scoped.find('[data-test="synthetics-evidence-filter-all"]').text()).not.toBe(
       all.find('[data-test="synthetics-evidence-filter-all"]').text(),
     );
-    expect(scoped.find('[data-test="synthetics-evidence-step-filter"]').text()).toContain(
-      "Navigate to /web/login",
+    expect(scoped.findComponent(OSelect).props("modelValue")).toBe("s19");
+  });
+
+  // D6: the step scope is a control the reader can change, not a caption they
+  // can only dismiss — so a select replaces the old banner+Clear pair.
+  it("renders a step-filter select instead of a dismissible banner", () => {
+    const unfiltered = mountPanel();
+    expect(unfiltered.find('[data-test="synthetics-evidence-step-filter"]').exists()).toBe(true);
+    expect(unfiltered.findComponent(OBanner).exists()).toBe(false);
+
+    const scoped = mountPanel({ stepFilter: "s19" });
+    expect(scoped.findComponent(OBanner).exists()).toBe(false);
+  });
+
+  it("lists only steps that own at least one event, in stepOptions order", () => {
+    const w = mountPanel({
+      stepOptions: [...STEP_OPTIONS, { stepId: "zz9", number: 5, name: "Never reached" }],
+    });
+    const options = w.findComponent(OSelect).props("options") as { value: unknown }[];
+    // "All steps" first, then s19 and fa1 (both own events, journey order),
+    // never zz9 — a journey has ~13 steps and most own nothing.
+    expect(options.map((o) => o.value)).toEqual([null, "s19", "fa1"]);
+  });
+
+  it("labels each step option with its number, name and its own event count", () => {
+    const w = mountPanel();
+    const options = w.findComponent(OSelect).props("options") as {
+      value: unknown;
+      label: string;
+    }[];
+    expect(options[0]).toMatchObject({ value: null, label: "All steps (5)" });
+    expect(options.find((o) => o.value === "s19")?.label).toBe("19 · Navigate to /web/login (4)");
+    expect(options.find((o) => o.value === "fa1")?.label).toBe(
+      '20 · Assert visible [data-test="element-that-never-exists"] (1)',
     );
   });
 
-  it("clears the step filter on request", async () => {
-    const w = mountPanel({ stepFilter: "s19", stepFilterName: "Navigate to /web/login" });
-    await w.find('[data-test="synthetics-evidence-clear-step-filter-btn"]').trigger("click");
-    expect(w.emitted("clear-step-filter")).toBeTruthy();
+  it("emits update:stepFilter with the chosen step's id", async () => {
+    const w = mountPanel();
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", "fa1");
+    expect(w.emitted("update:stepFilter")?.[0]).toEqual(["fa1"]);
   });
 
-  it("shows no step-filter banner when unfiltered", () => {
-    expect(mountPanel().find('[data-test="synthetics-evidence-step-filter"]').exists()).toBe(false);
+  it("emits update:stepFilter(null) when All steps is chosen", async () => {
+    const w = mountPanel({ stepFilter: "s19" });
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", null);
+    expect(w.emitted("update:stepFilter")?.[0]).toEqual([null]);
+  });
+
+  it("emits update:stepFilter(null) when the table's own clear-filters fires", async () => {
+    // EvidenceEvents' empty-state "clear filters" action used to clear the
+    // banner; it now goes through the same v-model as the select.
+    const w = mountPanel({ stepFilter: "s19" });
+    await w.findComponent(EvidenceEvents).vm.$emit("clear-filters");
+    expect(w.emitted("update:stepFilter")?.[0]).toEqual([null]);
+  });
+
+  it("offers an unattributed option only when such events exist", () => {
+    const optionsOf = (w: ReturnType<typeof mountPanel>) =>
+      w.findComponent(OSelect).props("options") as { value: unknown; label: string }[];
+
+    expect(optionsOf(mountPanel()).some((o) => o.value === "__unattributed__")).toBe(false);
+
+    const withOrphan = optionsOf(mountPanel({ events: namedWithUnattributed() }));
+    expect(withOrphan.find((o) => o.value === "__unattributed__")?.label).toBe(
+      "Not attributed to a step (1)",
+    );
+  });
+
+  it("scopes the list to events with no step when the unattributed option is active", () => {
+    const w = mountPanel({ events: namedWithUnattributed(), stepFilter: "__unattributed__" });
+    expect(w.findAll('[data-test="synthetics-evidence-events-row"]')).toHaveLength(1);
+    expect(w.find('[data-test="synthetics-evidence-filter-all"]').text()).toContain("1");
   });
 
   it("reports a failed load instead of rendering a quiet run", () => {

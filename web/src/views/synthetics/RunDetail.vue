@@ -215,10 +215,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :error="evidence.error.value"
                 :error-kind="evidence.errorKind.value"
                 :truncated="evidence.truncated.value"
-                :step-filter="evidenceStepFilter"
-                :step-filter-name="evidenceStepFilterName"
+                v-model:step-filter="evidenceStepFilter"
+                :step-options="evidenceStepOptions"
                 :run-passed="currentRun.status === 'pass'"
-                @clear-step-filter="evidenceStepFilter = null"
                 @retry="evidence.load(true)"
               />
             </OTabPanel>
@@ -1135,12 +1134,6 @@ const evidence = useSyntheticEvidence(
 /** Which step the Evidence tab is scoped to. Null shows the whole run. */
 const evidenceStepFilter = ref<string | null>(null);
 
-const evidenceStepFilterName = computed(() =>
-  evidenceStepFilter.value
-    ? (evidenceStepDefs.value.get(evidenceStepFilter.value)?.name ?? evidenceStepFilter.value)
-    : "",
-);
-
 /**
  * The step is a filter over the run log, not a second copy of it — so "view all"
  * scopes the existing panel rather than opening a second list.
@@ -1253,6 +1246,22 @@ const steps = computed<StepRow[]>(() => {
   }
   return [];
 });
+
+/**
+ * Options for the evidence step select, sourced from `steps` — the EXECUTED
+ * steps this attempt actually ran — not from `evidenceStepDefs`
+ * (`recordedSteps`). `StepRow.id` (idx+1 over `steps`) is the number "Failed
+ * at Step N" and the Steps tab badge both use; a journey often records more
+ * steps than a given attempt executes, so numbering from `recordedSteps`
+ * position would disagree with them on any run where the two diverge.
+ */
+const evidenceStepOptions = computed(() =>
+  steps.value.map((row) => ({
+    stepId: row.stepId,
+    number: row.id,
+    name: row.name || row.action || row.stepId,
+  })),
+);
 
 /** Collapsible step error state (show-more / show-less for long Playwright logs). */
 const expandedStepErrors = ref(new Set<number>());

@@ -478,6 +478,33 @@ describe("RunDetail — per-step page activity", () => {
     w.unmount();
   });
 
+  it("numbers evidence step options from the executed steps list, not recordedSteps position", async () => {
+    // recordedSteps carries a step (s1) that never actually ran this attempt —
+    // a journey typically has ~13 recorded steps and only a few execute. If the
+    // select's numbering came from recordedSteps position, s19 here would read
+    // "Step 2" (its position in recordedSteps) instead of "Step 1" (its
+    // position among the steps that actually ran, which is what the Steps tab
+    // and "Failed at Step N" both show).
+    const w = await mountWithRun({
+      ...mockFailedWithEvidence,
+      recordedSteps: [
+        { id: "s1", action: "click", name: "Go home", selector: null, url: "" },
+        ...mockFailedWithEvidence.recordedSteps,
+      ],
+    });
+    // EvidencePanel only mounts on the Evidence tab (v-if, not v-show).
+    w.findComponent(StepPageActivity).vm.$emit("view-all", "s19");
+    await flushPromises();
+    const panel = w.findComponent(EvidencePanel);
+    const stepOptions = panel.props("stepOptions") as {
+      stepId: string;
+      number: number;
+      name: string;
+    }[];
+    expect(stepOptions).toEqual([{ stepId: "s19", number: 1, name: "Click Sign In" }]);
+    w.unmount();
+  });
+
   it("issues no bundle request when the attempt has no evidence", async () => {
     const w = await mountWithRun({ ...mockFailedWithEvidence, evidenceKey: null });
     expect(globalThis.fetch).not.toHaveBeenCalled();
