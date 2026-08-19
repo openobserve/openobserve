@@ -81,15 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
     </div>
 
-    <OForm
-      v-else
-      :id="FORM_ID"
-      :key="formKey"
-      :schema="schema"
-      :default-values="defaultValues"
-      class="flex flex-col gap-5"
-      @submit="onSubmit"
-    >
+    <OForm v-else :id="FORM_ID" :form="form" class="flex flex-col gap-5">
       <OFormSelect
         name="user_email"
         :label="t('oncall.coverWho')"
@@ -150,8 +142,10 @@ import { computed, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import type { DateTimeRangeValue } from "@/lib/forms/DateTime/OFormDateTimeRange.types";
 import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -164,6 +158,19 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import type { Shift as UpcomingShift } from "@/utils/oncall";
 import { formatInZone } from "@/utils/oncall";
 import { makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
+
+/**
+ * What the cover half of this dialog holds.
+ *
+ * Deliberately **not** `OnCallCoverValue` (the schema's output type): the form
+ * holds the window while it is still half-picked and while it is still absent,
+ * which is exactly the state the schema exists to reject.
+ */
+interface OnCallCoverFormValues extends Record<string, unknown> {
+  user_email: string;
+  slot: string;
+  window?: DateTimeRangeValue;
+}
 
 const props = withDefaults(
   defineProps<{
@@ -229,10 +236,6 @@ const { t } = useI18nTyped();
 
 const FORM_ID = "oncall-cover-form";
 
-/// Remounts OForm on open so the defaults re-read the gap the caller passed.
-const formKey = ref(0);
-const windowValue = ref<{ from: number; to: number } | null>(null);
-
 /// Which errand this dialog is doing. Declared here rather than beside the swap
 /// helpers below, because the open watcher resets it.
 const mode = ref<"cover" | "swap">("cover");
@@ -243,8 +246,7 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    windowValue.value = props.gap ? { from: props.gap.from, to: props.gap.to } : null;
-    formKey.value += 1;
+    resetForm();
     // A gap is a hole to fill, never a week to trade — opening on Swap would
     // answer a question the caller did not ask.
     mode.value = "cover";
@@ -263,8 +265,6 @@ const currentlyOnCall = computed<I18nText | undefined>(() =>
     : undefined,
 );
 
-const schema = computed(() => makeOnCallCoverSchema(t));
-
 /// A pre-selected person is only honest if the picker can show them: the caller
 /// passes whoever is reading the page, and a reader who is not on this team has
 /// no option to select — pre-filling them would put a value in the select that
@@ -282,11 +282,38 @@ const prefilledUser = computed(() => {
   );
 });
 
-const defaultValues = computed(() => ({
-  user_email: prefilledUser.value,
-  slot: props.slots[0] ?? DEFAULT_SLOT,
-  window: windowValue.value ? { from: windowValue.value.from, to: windowValue.value.to } : undefined,
-}));
+/// The form is created here rather than inside `<OForm>` because the summary
+/// below has to read the window the reader actually picked. It used to read a
+/// separate `windowValue` ref that only the presets and the gap prop ever
+/// wrote, so choosing a range in the picker left the summary showing the old
+/// one — or nothing at all. Two sources of truth for one field is also what
+/// produced the save bug this component is named for, so there is now one.
+const form = useOForm<OnCallCoverFormValues>({
+  defaultValues: initialValues(),
+  schema: makeOnCallCoverSchema(t),
+  onSubmit: onSubmit,
+});
+
+function initialValues(): OnCallCoverFormValues {
+  return {
+    user_email: prefilledUser.value,
+    slot: props.slots[0] ?? DEFAULT_SLOT,
+    window: props.gap ? { from: props.gap.from, to: props.gap.to } : undefined,
+  };
+}
+
+/// Re-seeds from the props the caller opened with, and clears the errors from
+/// a previous attempt — reopening on a fresh gap must not inherit the last
+/// one's complaints.
+function resetForm() {
+  form.reset(initialValues());
+}
+
+/// The live window, for the summary and nothing else. `useStore` keeps it in
+/// step with the field on every change, which a mirrored ref could not.
+const windowValue = form.useStore(
+  (state: { values: OnCallCoverFormValues }) => state.values.window,
+);
 
 const PRESETS = [
   { key: "rest-of-day", labelKey: "oncall.coverRestOfDay" },
@@ -307,13 +334,14 @@ function applyPreset(key: (typeof PRESETS)[number]["key"]) {
     tomorrow: { from: dayStart + MICROS_PER_DAY, to: dayStart + 2 * MICROS_PER_DAY },
     "next-7-days": { from: now, to: now + 7 * MICROS_PER_DAY },
   };
-  windowValue.value = ranges[key];
-  formKey.value += 1;
+  form.setFieldValue("window", ranges[key]);
 }
 
 const summary = computed<I18nText | "">(() => {
   const window = windowValue.value;
-  if (!window) return "";
+  // A half-picked range is not a sentence yet — the picker reports one end at
+  // a time, and "Sat 18:00 – Invalid Date" is worse than nothing.
+  if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
   const fmt = (micros: number) =>
     formatInZone(micros, props.timezone, {
       weekday: "short",
@@ -445,11 +473,16 @@ function close() {
   emit("update:open", false);
 }
 
-function onSubmit(value: Record<string, unknown>) {
-  const window = value.window as { from?: number; to?: number } | undefined;
-  if (!window?.from || !window?.to) return;
-  // Explicit keys, never a spread: the form value carries whatever the schema
-  // and the controls put on it, and the API takes exactly three fields.
+/// Where the form's shape becomes the request's shape. The range picker holds
+/// one `window`; the API takes `start_at` and `end_at`. Mapping here — rather
+/// than asking the schema to validate a pair no control renders — is what makes
+/// Save fire at all.
+///
+/// Explicit keys, never a spread: the form value also carries the picker's own
+/// `type`/`period` bookkeeping, and the API takes exactly four fields.
+function onSubmit(value: OnCallCoverFormValues) {
+  const window = value.window;
+  if (typeof window?.from !== "number" || typeof window?.to !== "number") return;
   emit("save", {
     user_email: String(value.user_email ?? ""),
     start_at: window.from,

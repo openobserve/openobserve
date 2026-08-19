@@ -13,15 +13,48 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
+import { inject } from "vue";
 import { describe, expect, it } from "vitest";
 
 import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import i18n from "@/locales";
-import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { Shift } from "@/utils/oncall";
 
 const FROM = 1_700_000_000_000_000;
+
+/**
+ * What a stubbed field shares with a real one: it reads its value and **its
+ * error** from the form context, and writes back through `setFieldValue`.
+ *
+ * Rendering the error is the part that matters. "Save does nothing" and "Save
+ * refuses and says why" look identical to a test that cannot see the message,
+ * and the first of those is the defect this file was rewritten for.
+ */
+function useStubbedField(name: string) {
+  const form = inject<any>(FORM_CONTEXT_KEY);
+  return {
+    // `useStore`, not a `computed` over `form.state`: the latter reads the
+    // store once and never hears about the validation that follows a submit,
+    // so the error would be permanently empty and every refusal test would
+    // pass by describing a blank field.
+    value: form.useStore((state: any) => state.values?.[name] ?? ""),
+    // Read from `errorMap`, not `errors`: TanStack keys issues by the
+    // validator that raised them (`onDynamic` here, since the schema is the
+    // single source), and the flat `errors` array is shaped differently.
+    error: form.useStore((state: any) =>
+      Object.values(state.fieldMeta?.[name]?.errorMap ?? {})
+        .flat()
+        .map((issue: unknown) =>
+          typeof issue === "string" ? issue : ((issue as { message?: string })?.message ?? ""),
+        )
+        .join(" "),
+    ),
+    set: (range: { from: number; to: number }) => form?.setFieldValue(name, range),
+  };
+}
 
 const stubs = {
   // Renders the body and exposes the primary click, which is what drives a
@@ -42,12 +75,34 @@ const stubs = {
       >{{ primaryButtonLabel }}</button>
     </div>`,
   },
-  // `defaultValues` is declared because the pre-selected person is only
-  // observable through it: OFormSelect is a stub, so the field itself renders
-  // nothing to read the value off.
-  OForm: { name: "OForm", props: ["defaultValues", "schema"], template: "<form><slot /></form>" },
-  OFormSelect: { name: "OFormSelect", template: "<div />" },
-  OFormDateTimeRange: { name: "OFormDateTimeRange", template: "<div />" },
+  // **OForm is NOT stubbed.** Stubbing it is how "Save issues no request"
+  // shipped: the schema required `start_at`/`end_at` while the form carried a
+  // single `window`, zod failed on two keys with no rendered control, and
+  // `@submit` never fired — invisible to every test here, because none of them
+  // ran a validator. The real OForm runs the real schema over the real values.
+  //
+  // The FIELDS stay stubbed, and that is sound: TanStack validates
+  // `state.values` as a whole, so the schema is exercised whether or not a
+  // control rendered. These stubs read and write the form through the same
+  // context a real field uses, so a test can see what the reader would.
+  OFormSelect: {
+    name: "OFormSelect",
+    props: ["name"],
+    setup(props: { name: string }) {
+      return useStubbedField(props.name);
+    },
+    template: `<div :data-test-field="name" :data-test-value="value">{{ error }}</div>`,
+  },
+  OFormDateTimeRange: {
+    name: "OFormDateTimeRange",
+    props: ["name"],
+    template: `<button :data-test-field="name" @click="set({ from: ${FROM}, to: ${FROM} + 3600000000 })">
+      {{ error }}
+    </button>`,
+    setup(props: { name: string }) {
+      return useStubbedField(props.name);
+    },
+  },
   OButton: {
     name: "OButton",
     emits: ["click"],
@@ -128,8 +183,10 @@ describe("OnCallCoverForm — a pre-selected person", () => {
     });
   }
 
+  /// Read off the field itself rather than the form's config: what matters is
+  /// what the control would show the reader.
   const filledUser = (wrapper: ReturnType<typeof renderCover>) =>
-    wrapper.findComponent({ name: "OForm" }).props("defaultValues").user_email;
+    wrapper.find('[data-test-field="user_email"]').attributes("data-test-value");
 
   it("pre-selects somebody on the team", () => {
     expect(filledUser(renderCover("bo@o2.ai"))).toBe("bo@o2.ai");
@@ -299,5 +356,127 @@ describe("OnCallCoverForm — swapping", () => {
     await wrapper.setProps({ open: true });
 
     expect(wrapper.find('[data-test="oncall-swap-form"]').exists()).toBe(false);
+  });
+});
+
+/// **The half of this dialog nothing tested.** The swap tab bypasses OForm
+/// entirely, so all the coverage above ran against a code path that was
+/// working — while `Request cover → Save` issued no HTTP request at all,
+/// because the schema demanded `start_at`/`end_at` and the form rendered one
+/// `window`. Zod failed on two keys with no control to attach an error to, so
+/// nothing surfaced on screen and `@submit` never fired.
+///
+/// Submitting the real `<form>` is the point of every test below: it runs the
+/// real validators over the real values, which is the one thing a stubbed
+/// OForm cannot do.
+describe("OnCallCoverForm — taking a cover", () => {
+  const MEMBERS = [{ user_email: "ana@o2.ai" }, { user_email: "bo@o2.ai" }];
+  const GAP = { from: FROM, to: FROM + MICROS_PER_DAY };
+
+  function renderCover(props: Record<string, unknown> = {}) {
+    return mount(OnCallCoverForm, {
+      props: {
+        open: true,
+        members: MEMBERS,
+        timezone: "UTC",
+        shifts: [],
+        defaultUser: "ana@o2.ai",
+        ...props,
+      },
+      global: { plugins: [i18n], stubs },
+    });
+  }
+
+  /// TanStack runs the schema through `onDynamicAsync` as well as `onDynamic`,
+  /// so a submit settles a macrotask later — one `flushPromises` reads the
+  /// form mid-validation and every assertion below would pass for the wrong
+  /// reason.
+  async function save(wrapper: ReturnType<typeof renderCover>) {
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+    return wrapper.emitted("save")?.[0]?.[0] as
+      | { user_email: string; start_at: number; end_at: number; slot?: string }
+      | undefined;
+  }
+
+  it("emits the window as the start_at / end_at pair the API takes", async () => {
+    const saved = await save(renderCover({ gap: GAP }));
+
+    expect(saved).toMatchObject({
+      user_email: "ana@o2.ai",
+      start_at: GAP.from,
+      end_at: GAP.to,
+    });
+  });
+
+  /// A preset is the answer almost every time, and it writes the field through
+  /// the form rather than a mirror beside it.
+  it("saves a window chosen from a quick range", async () => {
+    const wrapper = renderCover();
+    await wrapper.find('[data-test="oncall-cover-preset-next-7-days"]').trigger("click");
+
+    const saved = await save(wrapper);
+    expect(saved?.end_at).toBeGreaterThan(saved!.start_at);
+    expect(saved!.end_at - saved!.start_at).toBe(7 * MICROS_PER_DAY);
+  });
+
+  /// The failure that made this dialog look broken rather than incomplete: no
+  /// request, no message, nothing on screen. An unfilled window must refuse
+  /// *visibly*.
+  it("refuses to save with no window, and says so on the control", async () => {
+    const wrapper = renderCover();
+
+    expect(await save(wrapper)).toBeUndefined();
+    expect(wrapper.text()).toContain("Pick when the cover starts and ends");
+  });
+
+  it("refuses a window that ends before it starts", async () => {
+    const wrapper = renderCover({ gap: { from: FROM + MICROS_PER_DAY, to: FROM } });
+
+    expect(await save(wrapper)).toBeUndefined();
+    expect(wrapper.text()).toContain("The end must be after the start");
+  });
+
+  /// The server refuses a span over 90 days; saying so here costs a round trip
+  /// less than finding out.
+  it("refuses a span the server would reject", async () => {
+    const wrapper = renderCover({ gap: { from: FROM, to: FROM + 91 * MICROS_PER_DAY } });
+
+    expect(await save(wrapper)).toBeUndefined();
+    expect(wrapper.text()).toContain("at most 90 days");
+  });
+
+  /// The summary read a ref that only the presets and the gap prop ever wrote,
+  /// so a range picked by hand left it showing the previous window — the one
+  /// element whose whole job is "what this will actually do".
+  it("summarises the window the reader picked, not the one a preset last set", async () => {
+    const wrapper = renderCover();
+    expect(wrapper.find('[data-test="oncall-cover-summary"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test-field="window"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-cover-summary"]').exists()).toBe(true);
+  });
+
+  /// Reopening on a different gap must not inherit the last one's window or
+  /// its complaints.
+  it("re-seeds from the gap it was reopened on", async () => {
+    const wrapper = renderCover({ gap: GAP });
+    expect(await save(wrapper)).toMatchObject({ start_at: GAP.from });
+
+    const next = { from: FROM + MICROS_PER_WEEK, to: FROM + MICROS_PER_WEEK + MICROS_PER_DAY };
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true, gap: next });
+    await flushPromises();
+
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+    const second = wrapper.emitted("save")?.[1]?.[0] as { start_at: number };
+    expect(second.start_at).toBe(next.from);
   });
 });
