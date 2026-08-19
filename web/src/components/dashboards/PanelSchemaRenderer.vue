@@ -249,7 +249,6 @@ import { useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
-import { collectSearchWarnings } from "@/utils/dashboard/searchWarnings";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
@@ -1048,14 +1047,8 @@ export default defineComponent({
 
           panelData.value = result;
 
-          // Series-limit warning (set during conversion) and search-side warnings
-          // share the panel's one warning affordance, which renders pre-wrapped.
-          limitNumberOfSeriesWarningMessage.value = [
-            panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "",
-            ...collectSearchWarnings(resultMetaData.value),
-          ]
-            .filter(Boolean)
-            .join("\n");
+          limitNumberOfSeriesWarningMessage.value =
+            panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
 
           errorDetail.value = {
             message: "",
