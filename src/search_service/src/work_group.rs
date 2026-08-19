@@ -212,18 +212,24 @@ pub async fn work_group_checking(
     caller: &str,
 ) -> Result<()> {
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    if SEARCH_SERVER
+    if let Err(err) = SEARCH_SERVER
         .insert_sender(trace_id, abort_sender, false)
         .await
-        .is_err()
     {
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .dec();
         dist_lock::unlock_with_trace_id(trace_id, locker).await?;
-        log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
+        // Not a queue-capacity rejection: this means the entry `search()`'s own
+        // top-level registration should have created for `trace_id` is missing
+        // (never registered, or already removed by a concurrent/finished query
+        // that shares the same trace_id). Real capacity waits/timeouts are a
+        // separate branch below (`work_group_need_wait`).
+        log::warn!(
+            "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
+        );
         return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-            "[trace_id {trace_id}] search->cluster: request canceled before enter queue"
+            "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
         ))));
     }
     tokio::select! {
