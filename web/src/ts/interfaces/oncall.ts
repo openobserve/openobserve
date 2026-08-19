@@ -1121,6 +1121,34 @@ export interface TestPageResult {
   attempts: TestPageAttempt[];
 }
 
+/**
+ * What `POST .../escalate` answers with.
+ *
+ * **Not the bare record.** The verb reports what it did — who it woke, who it
+ * chased a second time, and who it skipped because a page had already landed
+ * on them — and `response` carries the record alongside. A screen that patches
+ * a row from `res.data` rather than `res.data.response` writes the envelope
+ * into the row.
+ *
+ * `ladder_exhausted` arrives as a **200**, deliberately: "there is nobody above
+ * you" is an answer, not a failure, and rendering it as an error invites a
+ * second press.
+ */
+export type EscalateResult =
+  | { escalated_to: "ladder_exhausted"; response: OnCallResponse }
+  | {
+      escalated_to: "rung";
+      /** Which rung was reached, as its delay from the ladder anchor. */
+      rung_micros: number;
+      /** Who the rung was dispatched to. */
+      recipients: string[];
+      /** Reached again although they had already been paged on this run. */
+      chased: string[];
+      /** Skipped: a page for this run had already landed on them. */
+      deduplicated: string[];
+      response: OnCallResponse;
+    };
+
 export const MICROS_PER_MINUTE = 60_000_000;
 export const MICROS_PER_HOUR = 60 * MICROS_PER_MINUTE;
 export const MICROS_PER_DAY = 24 * MICROS_PER_HOUR;

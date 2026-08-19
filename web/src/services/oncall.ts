@@ -43,6 +43,7 @@ import type {
   ResolutionCause,
   CoverageGaps,
   DeliveryLedger,
+  EscalateResult,
   EscalationProgress,
   MyOnCall,
   Override,
@@ -619,15 +620,25 @@ const oncall = {
 
   /// Advances THIS team's ladder by one rung. Ownership does not move — the
   /// caller is asking for more hands, not handing the page away.
+  ///
+  /// The body is **not** optional to send, even though every field in it is.
+  /// The handler extracts `Json<Option<EscalateRequest>>`, and that extractor
+  /// refuses a request with no `Content-Type: application/json` before it ever
+  /// looks at whether the body is empty — so posting nothing answered **415**
+  /// on every screen and manual escalation was unreachable product-wide.
   escalateNow: ({
     org_identifier,
     response_id,
+    note,
   }: {
     org_identifier: string;
     response_id: string;
+    /** Why more hands are needed. Lands on the timeline beside the rung. */
+    note?: string;
   }) =>
-    http().post<OnCallResponse>(
+    http().post<EscalateResult>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/escalate`,
+      note ? { note } : {},
     ),
 
   /// The teams whose schedule would page nobody at `at`. The standing banner
