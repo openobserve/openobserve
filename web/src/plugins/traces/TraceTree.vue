@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <div class="sticky right-0 flex items-center">
+                  <div class="sticky right-0 flex items-center gap-1">
                     <!-- Hidden at rest, not merely invisible: `invisible` would keep
                          the box in layout and reserve a permanent gutter to the left
                          of the badges, which is the thing this arrangement exists to
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                     >
                       <OButton
-                        variant="ghost"
+                        variant="outline"
                         size="icon"
                         :title="t('traces.viewLogs')"
                         @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"
@@ -267,28 +267,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Honest fallback for the event markers: a marker can only
                          be drawn for an event that positions inside the trace
                          window, and a sub-pixel span has nowhere to draw one at
-                         all. This count is always true. The error tally is
-                         spelled out rather than tinted, so severity does not
-                         rest on colour alone. -->
-                    <span
+                         all. This count is always true.
+
+                         Two tallies, each with its own glyph: the badge's icon
+                         counts every event, the trailing segment counts the
+                         subset that failed. Severity therefore still travels on
+                         a non-colour channel — the glyph, and the icon's own
+                         `label`, which is what a screen reader reads — rather
+                         than on the error variant's red alone. -->
+                    <OBadge
                       v-if="getEventSummary((spans as any[])[virtualRow.index]).total > 0"
-                      class="text-3xs flex items-center gap-0.5 leading-none whitespace-nowrap"
-                      :class="
+                      size="xs"
+                      shape="square"
+                      :variant="
                         getEventSummary((spans as any[])[virtualRow.index]).errors > 0
-                          ? 'text-status-error-text'
-                          : 'text-text-secondary'
+                          ? 'error-outline'
+                          : 'default-outline'
                       "
+                      icon="event-note"
+                      class="mr-1 rounded!"
                       :title="getEventCountLabel((spans as any[])[virtualRow.index])"
                       data-test="span-event-count-badge"
                       :data-test-span="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >
-                      <OIcon name="event-note" size="xs" />
-                      {{
-                        getEventSummary((spans as any[])[virtualRow.index]).errors > 0
-                          ? getEventCountLabel((spans as any[])[virtualRow.index])
-                          : getEventSummary((spans as any[])[virtualRow.index]).total
-                      }}
-                    </span>
+                      {{ getEventSummary((spans as any[])[virtualRow.index]).total }}
+                      <template
+                        v-if="getEventSummary((spans as any[])[virtualRow.index]).errors > 0"
+                        #trailing
+                      >
+                        <span class="flex items-center gap-0.5" data-test="span-event-error-count">
+                          <OIcon
+                            name="error"
+                            size="xs"
+                            :label="getEventErrorLabel((spans as any[])[virtualRow.index])"
+                          />
+                          {{ getEventSummary((spans as any[])[virtualRow.index]).errors }}
+                        </span>
+                      </template>
+                    </OBadge>
                   </div>
                 </div>
               </div>
@@ -354,6 +370,7 @@ import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/co
 import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer, type VirtualItem } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import config from "@/aws-exports";
@@ -807,8 +824,8 @@ export default defineComponent({
     /**
      * The badge is the honest fallback: markers can only show events that
      * position inside the trace window, and 10.3% of spans in the `default`
-     * stream render narrower than one pixel. The error tally is spelled out
-     * rather than tinted, because a tint would carry severity by colour alone.
+     * stream render narrower than one pixel. The badge shows the two tallies
+     * as icon-and-number pairs, so this full sentence is what its tooltip says.
      */
     const getEventCountLabel = (span: any): string => {
       const { total, errors } = getEventSummary(span);
@@ -819,6 +836,18 @@ export default defineComponent({
       return errors === 1
         ? t("traces.spanEventCountWithErrors", { count: total, errors })
         : t("traces.spanEventCountWithErrorsPlural", { count: total, errors });
+    };
+
+    /**
+     * The error icon's accessible name. Without it the error tally reaches a
+     * screen reader as a bare number beside a red glyph — severity by colour
+     * alone, which is the defect the badge exists to fix.
+     */
+    const getEventErrorLabel = (span: any): string => {
+      const { errors } = getEventSummary(span);
+      return errors === 1
+        ? t("traces.spanEventErrorCount", { errors })
+        : t("traces.spanEventErrorCountPlural", { errors });
     };
 
     return {
@@ -846,6 +875,7 @@ export default defineComponent({
       getChildCount,
       getEventSummary,
       getEventCountLabel,
+      getEventErrorLabel,
       formatTokens,
       formatCost,
       isLLMTrace,
@@ -863,7 +893,7 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge, OButton, OIcon },
+  components: { SpanBlock, SpanKindBadge, OBadge, OButton, OIcon },
 });
 </script>
 

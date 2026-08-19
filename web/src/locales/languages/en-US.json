@@ -9459,6 +9459,8 @@
     "spanEventCountPlural": "{count} events",
     "spanEventCountWithErrors": "{count} · {errors} error",
     "spanEventCountWithErrorsPlural": "{count} · {errors} errors",
+    "spanEventErrorCount": "{errors} error",
+    "spanEventErrorCountPlural": "{errors} errors",
     "eventClusterAriaLabel": "{count} events, {errors} error",
     "eventClusterAriaLabelPlural": "{count} events, {errors} errors",
     "eventMarkerTooltip": "Event: {name}",

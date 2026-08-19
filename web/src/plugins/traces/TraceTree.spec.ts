@@ -1420,15 +1420,31 @@ describe("TraceTree span event count badge", () => {
     expect(badges(wrapper)[0].text()).toContain("2");
   });
 
-  // This text is the non-colour channel for severity. A tint alone would be
-  // colour-only, which is the defect the badge exists to fix.
-  it("states the error count in words, not by colour alone", () => {
+  // The error glyph and its accessible name are the non-colour channels for
+  // severity. A red tint alone would be colour-only, which is the defect the
+  // badge exists to fix.
+  it("tallies errors under their own icon, not by colour alone", () => {
     const wrapper = mountWithEvents([
       { name: "a", level: "INFO", _timestamp: 1752490492900000000 },
       { name: "b", level: "ERROR", _timestamp: 1752490492950000000 },
     ]);
 
-    expect(badges(wrapper)[0].text()).toMatch(/error/i);
+    const errorTally = badges(wrapper)[0].find('[data-test="span-event-error-count"]');
+    expect(errorTally.exists()).toBe(true);
+    expect(errorTally.text()).toBe("1");
+    expect(errorTally.find('[role="img"]').attributes("aria-label")).toBe("1 error");
+  });
+
+  it("shows the total beside the error tally, not the error count alone", () => {
+    const wrapper = mountWithEvents([
+      { name: "a", level: "INFO", _timestamp: 1752490492900000000 },
+      { name: "b", level: "ERROR", _timestamp: 1752490492950000000 },
+      { name: "c", level: "ERROR", _timestamp: 1752490492960000000 },
+    ]);
+
+    const badge = badges(wrapper)[0];
+    expect(badge.find('[data-test="span-event-error-count"]').text()).toBe("2");
+    expect(badge.text()).toContain("3");
   });
 
   it("shows a plain count when no event is an error", () => {
@@ -1436,7 +1452,9 @@ describe("TraceTree span event count badge", () => {
       { name: "a", level: "INFO", _timestamp: 1752490492900000000 },
     ]);
 
-    expect(badges(wrapper)[0].text()).not.toMatch(/error/i);
+    const badge = badges(wrapper)[0];
+    expect(badge.find('[data-test="span-event-error-count"]').exists()).toBe(false);
+    expect(badge.text()).not.toMatch(/error/i);
   });
 
   // The badge is the honest fallback for the 10.3% of default-stream spans that
