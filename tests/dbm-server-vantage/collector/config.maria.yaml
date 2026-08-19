@@ -1282,6 +1282,23 @@ receivers:
       - type: noop
         id: maria_emit
 
+  mysql/alt:
+    endpoint: ${env:MARIAHOST}:${env:MARIAPORT}
+    username: ${env:MARIAUSER}
+    password: ${env:MARIAPASS}
+    database: ${env:MARIADB}
+    collection_interval: 10s
+    query_sample_collection:
+      max_rows_per_query: 1000
+    top_query_collection:
+      top_query_count: 200
+      collection_interval: 15s
+      lookback_time: 120
+      query_plan_cache_size: 1000
+    events:
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }
+
 processors:
   # Keep ONLY the records the Database Monitoring pages read.
   #
@@ -1427,6 +1444,16 @@ service:
           filelog/mariadb,
         ]
       processors: [memory_limiter/alt, filter/dbm, transform/tag_source, resource/ident, batch]
+      exporters: [otlphttp/alt_logs, otlphttp/fan_logs, file/raw_events]
+    # RECEIVER-NATIVE EVENTS -> Activity + Top queries.
+    # The receiver adopts `db.server.query_sample` / `db.server.top_query`, which
+    # is what the backend actually builds activity records from -- a sqlquery
+    # recipe emitting the same columns would NOT populate the Activity tab.
+    # No `filter/dbm`: that processor gates the sqlquery recipe rows, and these
+    # records arrive already shaped by the receiver.
+    logs/receiver_events:
+      receivers: [mysql/alt]
+      processors: [memory_limiter/alt, transform/tag_source, resource/ident, batch]
       exporters: [otlphttp/alt_logs, otlphttp/fan_logs, file/raw_events]
     # NO `metrics:` PIPELINE -- no metrics receiver is configured for this
     # engine, and naming one that does not exist fails the collector at startup.
