@@ -281,7 +281,23 @@ export class LogsPage {
         this.xAxisItemsAny = `${this.xAxisLayout} [data-test^="dashboard-x-item-"]`;
         this.yAxisItemsAny = `${this.yAxisLayout} [data-test^="dashboard-y-item-"]`;
 
-        // Field list for builder
+        // Field list for builder.
+        // Scoped under [data-test="logs-build-query-page"]: the Visualize tab mounts a
+        // SECOND PanelEditor (pageType="logs") that Index.vue keeps in the DOM with
+        // v-show, so both tabs render an `index-dropdown-stream` and an unscoped
+        // locator is a strict-mode violation.
+        this.buildStreamTypeDropdown = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream_type"]';
+        this.buildStreamTypeTrigger = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream_type-trigger"]';
+        this.buildStreamDropdown = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream"]';
+        this.buildStreamTrigger = '[data-test="logs-build-query-page"] [data-test="index-dropdown-stream-trigger"]';
+        // OSelect popovers teleport to <body>, so popover/option/search locators are
+        // NOT scoped to the build page — only one popover is ever open at a time.
+        this.buildStreamPopover = '[data-test="index-dropdown-stream-popover"]';
+        this.buildStreamSearch = '[data-test="index-dropdown-stream-search"]';
+        this.buildStreamOptions = '[data-test="index-dropdown-stream-popover"] [data-test="index-dropdown-stream-option"]';
+        this.buildStreamOption = (name) => `[data-test="index-dropdown-stream-option"][data-test-value="${name}"]`;
+        this.buildStreamTypePopover = '[data-test="index-dropdown-stream_type-popover"]';
+        this.buildStreamTypeOption = (type) => `[data-test="index-dropdown-stream_type-popover"] [data-test="index-dropdown-stream_type-option"][data-test-value="${type}"]`;
         this.streamTypeDropdown = '[data-test="index-dropdown-stream_type"]';
         this.streamDropdown = '[data-test="index-dropdown-stream"]';
         this.addToXAxis = '[data-test="dashboard-add-x-data"]';
@@ -9476,6 +9492,87 @@ export class LogsPage {
     async clickBuildToggle() {
         await this.page.locator(this.buildToggle).click();
         testLogger.info('Clicked Build tab toggle');
+    }
+
+    // ── Build tab: panel field list stream selectors ────────────────────────
+    // PanelFieldList (pageKey "build") owns these. Unlike the Visualize tab's
+    // copy (pageKey "logs", read-only), both selects here are the user's own.
+
+    /** Selected stream on the LOGS page's own picker; '' when nothing is picked. */
+    async getLogsSelectedStream() {
+        const trigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        await trigger.first().waitFor({ state: 'visible', timeout: 20000 });
+        return (await trigger.first().getAttribute('data-test-selected-value')) ?? '';
+    }
+
+    /** Selected stream on the Build tab's field list; '' when nothing is picked. */
+    async getBuildSelectedStream() {
+        const trigger = this.page.locator(this.buildStreamTrigger);
+        await trigger.waitFor({ state: 'visible', timeout: 20000 });
+        return (await trigger.getAttribute('data-test-selected-value')) ?? '';
+    }
+
+    /** Selected stream type on the Build tab's field list. */
+    async getBuildSelectedStreamType() {
+        const trigger = this.page.locator(this.buildStreamTypeTrigger);
+        await trigger.waitFor({ state: 'visible', timeout: 20000 });
+        return (await trigger.getAttribute('data-test-selected-value')) ?? '';
+    }
+
+    /** True when the Build tab's stream select accepts input (it must not be read-only). */
+    async isBuildStreamDropdownEnabled() {
+        const trigger = this.page.locator(this.buildStreamTrigger);
+        await trigger.waitFor({ state: 'visible', timeout: 20000 });
+        return await trigger.isEnabled();
+    }
+
+    async openBuildStreamDropdown() {
+        const dropdown = this.page.locator(this.buildStreamDropdown);
+        await dropdown.waitFor({ state: 'visible', timeout: 20000 });
+        await dropdown.click();
+        await this.page.locator(this.buildStreamPopover).waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Opened Build tab stream dropdown');
+    }
+
+    async closeBuildStreamDropdown() {
+        await this.page.keyboard.press('Escape');
+        await this.page.locator(this.buildStreamPopover)
+            .waitFor({ state: 'hidden', timeout: 10000 })
+            .catch(() => {});
+    }
+
+    /**
+     * Filter the open stream dropdown. The option list is virtualised, so
+     * filtering — not scrolling — is the only reliable way to assert that a
+     * specific stream is present or absent.
+     */
+    async filterBuildStreamOptions(text) {
+        const search = this.page.locator(this.buildStreamSearch);
+        await search.waitFor({ state: 'visible', timeout: 10000 });
+        await search.fill(text);
+    }
+
+    /** Change the Build tab's Stream Type. Clears the stream by design. */
+    async selectBuildStreamType(type) {
+        await this.page.locator(this.buildStreamTypeDropdown).click();
+        const popover = this.page.locator(this.buildStreamTypePopover);
+        await popover.waitFor({ state: 'visible', timeout: 10000 });
+        await popover.locator(`[data-test="index-dropdown-stream_type-option"][data-test-value="${type}"]`).first().click();
+        await popover.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        testLogger.info(`Selected Build tab stream type: ${type}`);
+    }
+
+    /** Pick a stream from the Build tab's field list (opens, filters, clicks). */
+    async selectBuildStream(name) {
+        await this.openBuildStreamDropdown();
+        await this.filterBuildStreamOptions(name);
+        const option = this.page.locator(this.buildStreamOption(name)).first();
+        await option.waitFor({ state: 'visible', timeout: 15000 });
+        await option.click();
+        await this.page.locator(this.buildStreamPopover)
+            .waitFor({ state: 'hidden', timeout: 10000 })
+            .catch(() => {});
+        testLogger.info(`Selected Build tab stream: ${name}`);
     }
 
     /**
