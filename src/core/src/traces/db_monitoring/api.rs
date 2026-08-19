@@ -7904,9 +7904,18 @@ pub(crate) fn plans_envelope(
 ///
 /// Postgres (`pg_table_stats` over `pg_class`/`pg_stat_user_tables`), MySQL
 /// (`mysql_table_stats` over `information_schema.TABLES` +
-/// `mysql.innodb_table_stats`) and MariaDB (`mariadb_table_stats`, the same
-/// catalogs) all ship recipes. SQL Server exposes schema statistics through
-/// `sys.dm_db_partition_stats`, which no shipped recipe reads yet.
+/// `mysql.innodb_table_stats`), MariaDB (`mariadb_table_stats`, the same
+/// catalogs) and SQL Server (`mssql_table_stats` over
+/// `sys.tables`/`sys.partitions`/`sys.allocation_units`) all ship recipes.
+///
+/// **`supported` is a claim about the SIGNAL, not about every column.** SQL
+/// Server has no autovacuum and no dead-tuple accounting, so its rows carry
+/// sizes and row counts but NO vacuum/analyze counters, no vacuum timestamps
+/// and no bloat estimate. The recipe omits those columns rather than
+/// zero-filling them, and they must render as ABSENT — a fabricated `0` reads
+/// as "0% bloat, last vacuumed just now", which is the healthy-looking lie this
+/// module exists to prevent. Coverage `supported` therefore means "these rows
+/// are real", not "every cell is populated".
 ///
 /// This exists so the UI can distinguish "no tables have problems" from "this
 /// signal was never collected for your engine". Rendering an empty table for an
@@ -7918,7 +7927,7 @@ pub(crate) fn plans_envelope(
 #[cfg(feature = "enterprise")]
 pub(crate) fn table_health_engine_support(engine: &str) -> &'static str {
     match engine {
-        "postgresql" | "mysql" | "mariadb" => "supported",
+        "postgresql" | "mysql" | "mariadb" | "mssql" => "supported",
         "" => "unknown",
         // Named negatively rather than by an allowlist of the engines we know:
         // a fourth engine with no recipe is also unsupported, and defaulting a
@@ -8007,24 +8016,31 @@ pub(crate) fn build_dbm_table_health_sql(
 // ─── W11 · Index health read API ─────────────────────────────────────────────
 //
 // One row per INDEX, from the index-stats recipes (`pg_index_stats` /
-// `mysql_index_stats` / `mariadb_index_stats`). The companion to table
-// health, and the source of the never-scanned signal: `idx_scan = 0` on an
-// index means the planner has not chosen it since the counters were last reset.
+// `mysql_index_stats` / `mariadb_index_stats` / `mssql_index_stats`). The
+// companion to table health, and the source of the never-scanned signal:
+// `idx_scan = 0` on an index means the planner has not chosen it since the
+// counters were last reset.
 //
 // The counters are LIFETIME totals exactly as the table ones are, and the
 // envelope re-states it so the UI cannot render "never scanned" as a claim
 // about the selected window.
 
 /// Which engines this signal is collected for. Postgres (`pg_index_stats`),
-/// MySQL (`mysql_index_stats`) and MariaDB (`mariadb_index_stats`) all ship
-/// recipes — MariaDB's honestly omits the usage counter, but size and
-/// definition still make its rows worth collecting. See
+/// MySQL (`mysql_index_stats`), MariaDB (`mariadb_index_stats`) and SQL Server
+/// (`mssql_index_stats`, over `sys.indexes` left-joined to
+/// `sys.dm_db_index_usage_stats`) all ship recipes.
+///
+/// As with [`table_health_engine_support`], `supported` is a claim about the
+/// SIGNAL and not about every column: MariaDB's recipe honestly omits the usage
+/// counter, and SQL Server — having no autovacuum and no dead-tuple accounting
+/// — carries index size and usage but none of the vacuum or bloat columns its
+/// table rows also lack. Those cells must render ABSENT rather than zero. See
 /// [`table_health_engine_support`] for why the empty filter answers `unknown`
 /// rather than guessing.
 #[cfg(feature = "enterprise")]
 pub(crate) fn index_health_engine_support(engine: &str) -> &'static str {
     match engine {
-        "postgresql" | "mysql" | "mariadb" => "supported",
+        "postgresql" | "mysql" | "mariadb" | "mssql" => "supported",
         "" => "unknown",
         _ => "unsupported",
     }
@@ -14337,12 +14353,14 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
-    /// Index health is collected for the three engines with index-stats
+    /// Index health is collected for the four engines with index-stats
     /// recipes, and the envelope must say so per engine — an empty list for an
-    /// unsupported engine's user reads as "no problems found".
+    /// unsupported engine's user reads as "no problems found", and claiming
+    /// `unsupported` for an engine whose rows ARE arriving is the same lie
+    /// pointing the other way.
     #[test]
     fn test_index_health_engine_support_names_the_recipe_engines() {
-        for supported in ["postgresql", "mysql", "mariadb"] {
+        for supported in ["postgresql", "mysql", "mariadb", "mssql"] {
             assert_eq!(
                 index_health_engine_support(supported),
                 "supported",
@@ -14350,9 +14368,10 @@ mod tests {
             );
         }
         assert_eq!(
-            index_health_engine_support("mssql"),
+            index_health_engine_support("oracle"),
             "unsupported",
-            "no mssql index-stats recipe ships yet"
+            "no oracle index-stats recipe ships, and the UI must say \
+             'not collected for this engine' rather than render an empty list"
         );
         assert_eq!(
             index_health_engine_support(""),
@@ -16083,21 +16102,23 @@ mod tests {
     #[cfg(feature = "enterprise")]
     /// **Per-engine honesty: the surface must SAY which engines collect this.**
     ///
-    /// Postgres, MySQL and MariaDB all ship table-stats recipes; SQL Server
-    /// has no equivalent in this recipe set. A user filtering to an engine with
-    /// no recipe must be told the signal is not collected for their engine — an
-    /// empty table with no explanation reads as "no problems found", which is
-    /// the single most dangerous empty state this feature can render.
+    /// Postgres, MySQL, MariaDB and SQL Server all ship table-stats recipes. A
+    /// user filtering to an engine with no recipe must be told the signal is
+    /// not collected for their engine — an empty table with no explanation
+    /// reads as "no problems found", which is the single most dangerous empty
+    /// state this feature can render. The inverse is just as wrong: SQL Server
+    /// rows DO arrive, so answering `unsupported` for `mssql` would hide real
+    /// data behind "not collected for your engine".
     #[test]
     fn test_table_health_reports_engine_support_rather_than_an_empty_table() {
-        for supported in ["postgresql", "mysql", "mariadb"] {
+        for supported in ["postgresql", "mysql", "mariadb", "mssql"] {
             assert_eq!(
                 table_health_engine_support(supported),
                 "supported",
                 "`{supported}` ships a table-stats recipe"
             );
         }
-        for unsupported in ["mssql", "oracle"] {
+        for unsupported in ["oracle"] {
             assert_eq!(
                 table_health_engine_support(unsupported),
                 "unsupported",

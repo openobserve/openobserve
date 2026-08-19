@@ -97,7 +97,7 @@ describe("postgresCard builder", () => {
   // canonicalizes on these exact keys, so a rename here silently produces
   // records the backend skips.
   it("ships a Database Monitoring config the ingest parser can read", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
 
     const grant = card.steps.find((s) => s.id === "dbm-grant")!;
     expect(grant.variants!.find((v) => v.id === "psql")!.code.raw).toContain("pg_monitor");
@@ -158,7 +158,7 @@ describe("postgresCard builder", () => {
    * explicit and a user trimming collection cost flips one visible line.
    */
   it("ships the receiver's activity and top-query events on, spelled out", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -227,7 +227,7 @@ describe("postgresCard builder", () => {
    * stores, and the Table health tab renders nothing.
    */
   it("ships the table and index health recipes with every alias the canonicalizers read", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -305,7 +305,7 @@ describe("postgresCard builder", () => {
   // one bucket and two servers' deadlocks can fuse into one fabricated event.
   // server_address is the key detect_instance reads first.
   it("tags every server-vantage record with the host, so two servers never fuse", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -337,7 +337,7 @@ describe("postgresCard builder", () => {
    * nothing, because it costs them the restart to find out.
    */
   it("tells a managed-database user this step cannot work for them", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const note = card.steps.find((s) => s.id === "dbm-logging")!.note!;
 
     expect(note).toMatch(/RDS/);
@@ -356,7 +356,7 @@ describe("postgresCard builder", () => {
   });
 
   it("ships the Postgres logging prerequisites the deadlock parser depends on", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const logging = card.steps.find((s) => s.id === "dbm-logging")!;
     const conf = logging.code!.raw;
 
@@ -414,7 +414,7 @@ describe("postgresCard builder", () => {
    *    lines from users running log_min_duration_statement.
    */
   it("routes a real auto_explain entry to the explain branch and nothing else", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -473,7 +473,7 @@ describe("postgresCard builder", () => {
    * in isolation. This test runs the SHIPPED filter condition, not a copy.
    */
   it("keeps explain rows alive through the shipped filter/dbm condition", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -517,7 +517,7 @@ describe("postgresCard builder", () => {
    *    begins `duration:` too, and claiming it here would steal every plan.
    */
   it("routes a real statement-duration line to the duration branch and parses it", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -565,7 +565,7 @@ describe("postgresCard builder", () => {
    * comments and the verify step checking it took effect.
    */
   it("ships log_min_duration_statement with a nonzero recommended threshold", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const logging = card.steps.find((s) => s.id === "dbm-logging")!;
     expect(logging.code!.raw).toContain("log_min_duration_statement = 100ms");
     expect(logging.code!.raw).toMatch(/0 logs EVERYTHING/);
@@ -592,7 +592,7 @@ describe("postgresCard builder", () => {
    * compared the value to the sentence above it.
    */
   it("ships auto_explain values that match the advice printed beside them", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const step = card.steps.find((s) => s.id === "dbm-auto-explain")!;
     const conf = step.code!.raw;
 
@@ -628,7 +628,7 @@ describe("postgresCard builder", () => {
    * this pins is two of them being fixed and the third being missed.
    */
   it("ships every sqlquery datasource with TLS required, not disabled", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -662,7 +662,7 @@ describe("postgresCard builder", () => {
    * and silently dropping the blocking rows the tab is made of.
    */
   it("filters pg_blocking to lock waiters without losing a contract column", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -712,7 +712,7 @@ describe("postgresCard builder", () => {
    * schema state that moves hourly at most.
    */
   it("bounds the table and index stats recipes without a nondeterministic LIMIT", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -771,7 +771,7 @@ describe("postgresCard builder", () => {
    * unbounded growth this guards against did not reproduce.
    */
   it("caps every sqlquery receiver's connections with the singular option name", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -807,7 +807,7 @@ describe("postgresCard builder", () => {
    * would miss.
    */
   it("ships a collector that sheds rather than OOMs the database host", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -860,7 +860,7 @@ describe("postgresCard builder", () => {
    * config whose numbers and whose stated reasoning have drifted apart.
    */
   it("documents why the top-query cadence deviates from upstream, beside the value", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -892,7 +892,7 @@ describe("postgresCard builder", () => {
    * taken) and without (only the logging step taken).
    */
   it("parses both log_line_prefix shapes, capturing the queryid when present", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const explainStep = card.steps.find((s) => s.id === "dbm-auto-explain")!;
     // The step prescribes the queryid prefix and the setting that computes it.
     expect(explainStep.code!.raw).toContain("compute_query_id = on");
@@ -940,7 +940,7 @@ describe("postgresCard builder", () => {
    * hides that gets recipes disabled by the first incident review.
    */
   it("presents auto_explain as optional, after the logging step, with its cost stated", () => {
-    const card = postgresCard(SUBS);
+    const card = postgresCard(SUBS, gt);
     const ids = card.steps.map((s) => s.id);
     expect(ids.indexOf("dbm-auto-explain")).toBeGreaterThan(ids.indexOf("dbm-logging"));
 

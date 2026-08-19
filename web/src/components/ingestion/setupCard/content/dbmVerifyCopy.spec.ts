@@ -37,6 +37,7 @@
 import { describe, it, expect } from "vitest";
 
 import messages from "@/locales/languages/en-US.json";
+import { gt } from "@/types/i18n";
 
 import { dbmVerifyStep } from "./dbmShared";
 import postgresCard from "./postgres";
@@ -88,7 +89,7 @@ const yamlOf = (card: unknown): string =>
 
 describe("the DBM verify step promises the wait each engine really has", () => {
   it("gives Postgres the five-minute table-health wording, not the 60-second one", () => {
-    const step = verifyStepOf(postgresCard(SUBS));
+    const step = verifyStepOf(postgresCard(SUBS, gt));
     expect(step, "postgres must render a verify-dbm step").toBeTruthy();
     expect(
       step?.descriptionKey,
@@ -97,20 +98,27 @@ describe("the DBM verify step promises the wait each engine really has", () => {
   });
 
   it("keeps the 60-second wording for MySQL, where it is true", () => {
-    const step = verifyStepOf(mysqlCard(SUBS));
+    const step = verifyStepOf(mysqlCard(SUBS, gt));
     expect(step?.descriptionKey).toBe("ingestion.setupCard.dbmVerifyFullDesc");
   });
 
-  it("tells MariaDB about the Table health tab it actually gets", () => {
-    // MariaDB ships the table/index recipes and renders the pill, but used to
-    // get the generic "events appear" sentence that never mentioned them.
-    const step = verifyStepOf(mariadbCard(SUBS));
-    expect(step?.descriptionKey).toBe("ingestion.setupCard.dbmVerifyTableHealthDesc");
+  it("gives MariaDB the variant that discloses the missing sample text", () => {
+    // MariaDB now fills Activity and Top queries too (mysqlreceiver's events),
+    // so the generic sentence would UNDER-promise. But the MySQL variant would
+    // mis-promise in the other direction: it names the MySQL 8.0.22 plan floor,
+    // a version a MariaDB user has no way to check. MariaDB's own variant
+    // carries the one real gap the receiver discloses — no sampled statement
+    // text — so an empty query column reads as documented, not broken.
+    const step = verifyStepOf(mariadbCard(SUBS, gt));
+    expect(step?.descriptionKey).toBe("ingestion.setupCard.dbmVerifyFullNoSampleTextDesc");
   });
 
-  it("leaves SQL Server on the generic wording — it ships no table health", () => {
-    const step = verifyStepOf(sqlServerCard(SUBS));
-    expect(step?.descriptionKey).toBe("ingestion.setupCard.dbmVerifyDesc");
+  it("gives SQL Server the full wording with no engine-version caveat", () => {
+    // SQL Server ships table health AND sqlserverreceiver's events, so the
+    // generic "events appear" sentence under-promised three tabs. It has no
+    // version floor on plans, so it must not inherit MySQL's 8.0.22 sentence.
+    const step = verifyStepOf(sqlServerCard(SUBS, gt));
+    expect(step?.descriptionKey).toBe("ingestion.setupCard.dbmVerifyFullPlainPlansDesc");
   });
 });
 
@@ -119,21 +127,42 @@ describe("the verify copy stays consistent with the shipped recipes", () => {
     expect(setupCard.dbmVerifyFullSlowTableHealthDesc).toContain("five minutes");
     expect(setupCard.dbmVerifyFullSlowTableHealthDesc).not.toContain("60-second");
 
-    for (const key of ["dbmVerifyFullDesc", "dbmVerifyTableHealthDesc"]) {
+    for (const key of [
+      "dbmVerifyFullDesc",
+      "dbmVerifyTableHealthDesc",
+      "dbmVerifyFullNoSampleTextDesc",
+      "dbmVerifyFullPlainPlansDesc",
+    ]) {
       expect(setupCard[key], `${key} should promise the 60s snapshot`).toContain("60-second");
       expect(setupCard[key], `${key} must not promise minutes`).not.toContain("five minutes");
     }
   });
 
   it("does not promise Table health where none is collected", () => {
-    // SQL Server renders no Table health pill, so its copy must not name the tab.
+    // Every shipped card now renders the Table health pill, but this key is
+    // still the fallback for a config without the table/index recipes — so it
+    // must keep NOT naming a tab such a config would never fill.
     expect(setupCard.dbmVerifyDesc).not.toContain("Table health");
   });
 
-  it("discloses the MySQL version floor for estimated plans", () => {
+  it("discloses the MySQL version floor for estimated plans, and only there", () => {
     // MySQL's plan path needs 8.0.22; below it the section is permanently
     // empty, which without this sentence reads as a broken setup.
     expect(setupCard.dbmVerifyFullDesc).toContain("8.0.22");
+    // …and NOT on the engines that have no such floor. A MariaDB or SQL Server
+    // user reading a MySQL version number learns nothing and doubts the rest.
+    for (const key of ["dbmVerifyFullNoSampleTextDesc", "dbmVerifyFullPlainPlansDesc"]) {
+      expect(setupCard[key], `${key} must not cite a MySQL version floor`).not.toContain("8.0.22");
+    }
+  });
+
+  // The MariaDB variant exists for ONE sentence: the receiver's own disclosure
+  // that it cannot capture sampled statement text on MariaDB. If that sentence
+  // is ever dropped, the variant has no reason to exist and the card should go
+  // back to a shared key rather than keep a near-duplicate string.
+  it("keeps the MariaDB sample-text disclosure in the variant that exists for it", () => {
+    expect(setupCard.dbmVerifyFullNoSampleTextDesc).toMatch(/statement text/i);
+    expect(setupCard.dbmVerifyFullNoSampleTextDesc).toMatch(/MariaDB/);
   });
 
   it("points every variant at the section's real location", () => {
@@ -145,6 +174,8 @@ describe("the verify copy stays consistent with the shipped recipes", () => {
       "dbmVerifyFullSlowTableHealthDesc",
       "dbmVerifyTableHealthDesc",
       "dbmVerifyBlockingDesc",
+      "dbmVerifyFullNoSampleTextDesc",
+      "dbmVerifyFullPlainPlansDesc",
     ]) {
       expect(setupCard[key], `${key} names the wrong nav path`).not.toContain("Traces → Databases");
       expect(setupCard[key]).toContain("Infra → Databases");
@@ -171,6 +202,35 @@ describe("dbmVerifyStep maps its arguments to the right key", () => {
     expect(dbmVerifyStep("both", false, "300s").descriptionKey).toBe(
       "ingestion.setupCard.dbmVerifyDesc",
     );
+  });
+
+  it("selects the plan sentence from the plans argument", () => {
+    expect(dbmVerifyStep("full", true, "60s", "noSampleText").descriptionKey).toBe(
+      "ingestion.setupCard.dbmVerifyFullNoSampleTextDesc",
+    );
+    expect(dbmVerifyStep("full", true, "60s", "plain").descriptionKey).toBe(
+      "ingestion.setupCard.dbmVerifyFullPlainPlansDesc",
+    );
+    // The default stays MySQL's, so no existing caller changes meaning.
+    expect(dbmVerifyStep("full", true).descriptionKey).toBe(
+      "ingestion.setupCard.dbmVerifyFullDesc",
+    );
+    // The 300s table-health wait still wins: that sentence is about a wait the
+    // reader will actually sit through, and Postgres is the only engine on it.
+    expect(dbmVerifyStep("full", true, "300s", "plain").descriptionKey).toBe(
+      "ingestion.setupCard.dbmVerifyFullSlowTableHealthDesc",
+    );
+  });
+
+  it("gives every 'full' engine the Activity pill", () => {
+    for (const plans of ["mysqlFloor", "noSampleText", "plain"] as const) {
+      expect(dbmVerifyStep("full", true, "60s", plans).pills).toEqual([
+        "Deadlocks",
+        "Blocked queries",
+        "Activity",
+        "Table health",
+      ]);
+    }
   });
 });
 

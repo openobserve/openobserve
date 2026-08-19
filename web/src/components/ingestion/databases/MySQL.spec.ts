@@ -80,7 +80,7 @@ describe("mysqlCard builder", () => {
   // Field names here are a CONTRACT with server_vantage.rs — see the Postgres
   // spec for the same reasoning.
   it("ships a Database Monitoring config the ingest parser can read", () => {
-    const card = mysqlCard(SUBS);
+    const card = mysqlCard(SUBS, gt);
 
     // Without this, MySQL keeps only the most recent deadlock and history is
     // lost before the collector can read it.
@@ -124,7 +124,7 @@ describe("mysqlCard builder", () => {
    * top-level, where nesting it deeper is a fatal config error.
    */
   it("ships the receiver's activity and top-query events on, spelled out", () => {
-    const card = mysqlCard(SUBS);
+    const card = mysqlCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -172,7 +172,7 @@ describe("mysqlCard builder", () => {
    * receiver's presence.
    */
   it("ships a metrics-mode limits recipe whose endpoint column can join", () => {
-    const card = mysqlCard(SUBS);
+    const card = mysqlCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -204,7 +204,7 @@ describe("mysqlCard builder", () => {
    * as the Postgres spec pins its own.
    */
   it("ships the table and index health recipes with every alias the canonicalizers read", () => {
-    const card = mysqlCard(SUBS);
+    const card = mysqlCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -281,7 +281,7 @@ describe("mysqlCard builder", () => {
    * wrong number, it is the two receivers being edited as though they were one.
    */
   it("ships mysqlreceiver's own max_rows_per_query, not the Postgres receiver's", () => {
-    const card = mysqlCard(SUBS);
+    const card = mysqlCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -315,7 +315,7 @@ describe("mysqlCard builder", () => {
    * upstream of it.
    */
   it("caps connections and protects the collector on the MySQL config too", () => {
-    const card = mysqlCard(SUBS);
+    const card = mysqlCard(SUBS, gt);
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
 
@@ -352,7 +352,7 @@ describe("mysqlCard builder", () => {
    * plus the two version/retention caveats that travel with the events.
    */
   it("tells a managed-database user which half works for them", () => {
-    const card = mysqlCard(SUBS);
+    const card = mysqlCard(SUBS, gt);
     const note = card.steps.find((s) => s.id === "dbm-configure")!.note!;
 
     expect(note).toMatch(/RDS/);

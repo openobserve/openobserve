@@ -15,13 +15,6 @@
 
 // MariaDB data-source setup card.
 //
-// The user-facing surface for the backend's MariaDB support
-// (`canonicalize_mariadb_deadlock`, the `mariadb_lock_waits` recipe tag, and
-// the `o2_maria_event` filelog tag): the content module, registry key and
-// route through which a user reaches it. `MARIADB_DBM_CONFIG_YAML` was
-// verified against a live MariaDB 11.8 on the rig, and the collector config
-// this file hands out is the same one dbmMariadb.spec.ts pins.
-//
 // MariaDB is wire-compatible with MySQL, so the metrics half reuses the
 // `mysql` receiver and the `mysql` driver. The DBM half deliberately does NOT
 // reuse MySQL's receivers: `detect_engine` maps the `mysql_lock_waits` tag and
@@ -30,7 +23,7 @@
 // database) — could merge two different servers' sides into one fabricated
 // deadlock.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -46,8 +39,6 @@ const USER_SQL = `CREATE USER 'otel'@'localhost' IDENTIFIED BY 'yourpassword';
 GRANT SELECT, PROCESS, REPLICATION CLIENT ON *.* TO 'otel'@'localhost';
 FLUSH PRIVILEGES;`;
 
-// The SQL runs INSIDE MariaDB — step 1 offers runnable mariadb / Docker
-// commands that pass it via -e, plus the raw SQL for a GUI client.
 const applyUser = (connect: string) => `${connect} -e "
 ${USER_SQL}
 "`;
@@ -82,19 +73,19 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function mariadbCard(subs: CardSubstitutions): RichCardContent {
+export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
   return {
     provider: {
       name: "MariaDB",
-      tagline: gt("ingestion.setupCard.mariadbTagline"),
+      tagline: t("ingestion.setupCard.mariadbTagline"),
       // No MariaDB mark ships with the app yet; MySQL's is the honest stand-in
       // for a fork of MySQL, and beats a broken image.
       logo: getImageURL("images/ingestion/mysql.svg"),
       tone: "#C0765A",
       // Logs too: the optional Database Monitoring steps ship deadlock and
       // blocking events into the dbm_server logs stream.
-      metaBadges: [gt("common.metrics"), gt("common.logs")],
+      metaBadges: [t("common.metrics"), t("common.logs")],
     },
     steps: [
       {
@@ -128,10 +119,8 @@ export default function mariadbCard(subs: CardSubstitutions): RichCardContent {
           },
         ],
       },
-      // Pinned to the release the MariaDB recipes were verified against
-      // (contrib v0.158.0, MariaDB 11.8) so all four Tier-1 cards install the
-      // same verified collector.
-      collectorInstallStep(gt, DBM_CONTRIB_VERSION),
+      // Pinned so all four Tier-1 cards install the same collector.
+      collectorInstallStep(t, DBM_CONTRIB_VERSION),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -255,7 +244,7 @@ export default function mariadbCard(subs: CardSubstitutions): RichCardContent {
             masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
           },
         })),
-        note: "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Deadlock capture tails the MariaDB error log on disk, so it is not available on managed MariaDB (RDS, Azure Database for MariaDB): those platforms give the collector no file to read. Blocking chains work there normally. Table and index health work everywhere, with one honest gap: MariaDB ships with performance_schema off, so index USAGE counts are not collected — index sizes and definitions still are, and the Table health tab reports usage as unknown rather than inventing a zero.",
+        note: "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Deadlock capture tails the MariaDB error log on disk, so it is not available on managed MariaDB (RDS, Azure Database for MariaDB): those platforms give the collector no file to read. Blocking chains, activity samples and top queries work there normally. Activity and top queries come from the mysql receiver pointed at MariaDB — MariaDB speaks the MySQL protocol, and the receiver identifies it correctly — with one honest gap it reports itself: MariaDB does not expose the sampled statement text, so an Activity row names the session without its SQL. Top queries carry their digests normally. Table and index health work everywhere, with a second gap: MariaDB ships with performance_schema off, so index USAGE counts are not collected — index sizes and definitions still are, and the Table health tab reports usage as unknown rather than inventing a zero.",
       },
       {
         id: "dbm-run",
@@ -269,7 +258,10 @@ export default function mariadbCard(subs: CardSubstitutions): RichCardContent {
         },
         note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
       },
-      dbmVerifyStep("both", true),
+      // "full": Activity and Top queries fill from mysqlreceiver's events.
+      // Table health stays on the 60-second wording —
+      // MARIADB_TABLE_STATS_RECEIVER runs at collection_interval: 60s.
+      dbmVerifyStep("full", true, "60s", "noSampleText"),
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },
     docUrl: "https://openobserve.ai/blog/monitor-mysql-metrics-otel",

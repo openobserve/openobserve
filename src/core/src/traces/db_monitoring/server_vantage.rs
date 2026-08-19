@@ -361,6 +361,33 @@ fn parse_blocking_pids(raw: &str) -> Vec<i32> {
         .collect()
 }
 
+/// Whether a MySQL `wait_type` names a LOCK wait, as opposed to I/O, a mutex or
+/// the receiver's own non-instrument placeholders.
+///
+/// `mysqlreceiver` fills this from `events_waits_current.event_name`, whose
+/// instruments are namespaced (`wait/lock/table/sql/handler`,
+/// `wait/synch/mutex/...`, `wait/io/file/...`). Only the lock family answers the
+/// question Blocked queries asks, so only it may contribute a wait duration.
+///
+/// `wait/synch/` is EXCLUDED even though it is contention: a mutex or rwlock is
+/// internal server serialization with no session on the other side to name as
+/// the blocker, so ranking it beside row-lock waits would put an un-actionable
+/// row at the top of a page whose whole purpose is naming who to terminate.
+///
+/// The receiver also emits two values that are not instrument names at all —
+/// `CPU` (the wait already ended) and `other`/`User sleep` (no wait row joined).
+/// Neither is a wait being served, and neither starts with `wait/`, so the
+/// prefix test rejects them without needing to enumerate them.
+fn is_mysql_lock_wait(wait_type: Option<&str>) -> bool {
+    wait_type.is_some_and(|w| {
+        let w = w.trim().to_ascii_lowercase();
+        // `wait/lock/` is the documented family root; MariaDB reports the same
+        // namespace. Anchored, so a table named "wait/lock" inside some other
+        // instrument's path cannot match.
+        w.starts_with("wait/lock/")
+    })
+}
+
 /// Canonicalize one `db.server.query_sample` row into an [`ActivitySample`].
 ///
 /// Follows the module invariants (Invariant 1: vendor names in, canonical names
@@ -509,8 +536,27 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
         // `total_elapsed_time` is also 11.839 ms). The same `> 0.0` filter
         // applies to both — a zero wait is the COALESCE sentinel, not a
         // measurement.
+        // MYSQL IS GATED ON THE WAIT CLASS, and that is the whole point of the
+        // arm rather than an extra safeguard on it.
+        //
+        // Postgres and SQL Server publish a duration that is already specific
+        // to a LOCK wait. MySQL's `events_waits_current.timer_wait` is the
+        // current wait of ANY performance_schema instrument, so the same column
+        // carries `wait/io/file/innodb/innodb_data_file` and
+        // `wait/synch/mutex/...` alongside `wait/lock/...`. `wait_seconds` is
+        // read only by Blocked queries — it ranks contention severity and picks
+        // out the notably-longest waiter — so an ungated map would let a slow
+        // disk read present as a lock wait and outrank a genuine blocker.
+        //
+        // `mysql_wait_type` is the instrument name the same sample already
+        // carries, so the class is decided by the row itself, not inferred.
         wait_seconds: first_f64(rec, &["postgresql_blocking_wait_duration"])
             .or_else(|| first_f64(rec, &["sqlserver_wait_time"]).map(|ms| ms / 1000.0))
+            .or_else(|| {
+                is_mysql_lock_wait(first_str(rec, &["mysql_wait_type"]).as_deref())
+                    .then(|| first_f64(rec, &["mysql_events_waits_current_timer_wait"]))
+                    .flatten()
+            })
             .filter(|w| *w > 0.0),
         server_query_id: first_str(
             rec,

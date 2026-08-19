@@ -237,12 +237,22 @@ describe("collectInstanceMetrics", () => {
     expect((read as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(DBM_INSTANCE_METRICS.length);
   });
 
-  it("reads every stream in the catalog exactly once", async () => {
+  /**
+   * Once per SPEC, not once per stream. MySQL's two cache roles share
+   * `mysql_buffer_pool_operations` and are separated by a `filter` on the
+   * `operation` dimension, so each needs its own query — deduplicating by
+   * stream here would read one operation and hand the same rows to both roles,
+   * making the hit ratio `1 - x/x = 0` on every MySQL instance.
+   */
+  it("reads once per catalog spec, including specs that share a stream", async () => {
     const read = readerFor({});
     await collectInstanceMetrics(read, WINDOW);
     const streamsRead = (read as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
-    const expected = [...new Set(DBM_INSTANCE_METRICS.map((s) => s.stream))];
+    const expected = DBM_INSTANCE_METRICS.map((s) => s.stream);
     expect(streamsRead.slice().sort()).toEqual(expected.slice().sort());
+
+    const shared = streamsRead.filter((s) => s === "mysql_buffer_pool_operations");
+    expect(shared).toHaveLength(2);
   });
 
   // Every call, not one spot-check: a collector that builds the SQL once and

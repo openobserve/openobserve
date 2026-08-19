@@ -93,7 +93,7 @@ describe("sqlServerCard builder", () => {
   // silently drops, which is exactly the "collecting but empty" trap the lock
   // empty-states exist to prevent.
   it("ships a Database Monitoring config the ingest parser can read", () => {
-    const card = sqlServerCard(SUBS);
+    const card = sqlServerCard(SUBS, gt);
 
     const grant = card.steps.find((s) => s.id === "dbm-grant")!;
     const grantSql = grant.variants!.find((v) => v.id === "sqlcmd")!.code.raw;
@@ -140,16 +140,67 @@ describe("sqlServerCard builder", () => {
     expect(config).toContain("mssql_spid");
     expect(config).toContain("mssql_query");
 
-    // Both pills now: this config can populate both tabs. NOT Activity — the
-    // upstream sqlserverreceiver's events are unadopted, so promising a third
-    // tab would be the "collecting but empty" trap.
+    // EVERY pill this config can fill. Activity and Table health JOINED this
+    // list when sqlserverreceiver's events and the mssql table/index-stats
+    // recipes were wired in; before that the card promised two tabs and
+    // shipped a config that left the others permanently empty.
     const verify = card.steps.find((s) => s.id === "verify-dbm")!;
-    expect(verify.pills).toEqual(["Deadlocks", "Blocked queries"]);
-    // And no receiver-native events block for the same reason: on SQL Server
-    // there is no receiver to enable, so an events: key here would be a lie
-    // the collector cannot even validate.
-    expect(config).not.toContain("db.server.query_sample");
-    expect(config).not.toContain("db.server.top_query");
+    expect(verify.pills).toEqual(["Deadlocks", "Blocked queries", "Activity", "Table health"]);
+  });
+
+  /**
+   * ACTIVITY, TOP QUERIES AND EXECUTION PLANS, from the stock
+   * `sqlserverreceiver`. Measured on the rig against SQL Server 2022: 21
+   * top_query and 4 query_sample records per window, both previously ZERO.
+   *
+   * The plans the Top queries detail page renders ride on
+   * `db.server.top_query`, so that one key is what turns the plan tree on —
+   * which is why the two events are pinned together rather than separately.
+   */
+  it("ships the receiver's activity, top-query and plan events on, spelled out", () => {
+    const card = sqlServerCard(SUBS, gt);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    expect(config).toContain("sqlserver/dbm_events:");
+    expect(config).toContain("db.server.query_sample: { enabled: true }");
+    expect(config).toContain("db.server.top_query: { enabled: true }");
+
+    // `events:` must be TOP-LEVEL on the receiver (a sibling of the collection
+    // blocks) — nesting it inside them is a fatal config error. Upstream
+    // v0.148.0 flipped both default-OFF, so without this block the collector
+    // looks healthy and emits nothing.
+    expect(config).toMatch(/\n {4}events:\n/);
+
+    // SHAPE, and it is NOT mysqlreceiver's. sqlserverreceiver splits `server`
+    // and `port` where mysqlreceiver takes one `endpoint`, and it takes NO
+    // `database` at all — it reads across the whole instance. These blocks are
+    // strictly key-validated, so a key copied across receivers is fatal at
+    // startup rather than merely ignored.
+    const receiver = config.slice(config.indexOf("sqlserver/dbm_events:"));
+    const receiverBlock = receiver.slice(0, receiver.indexOf("\nprocessors:"));
+    expect(receiverBlock).toMatch(/\n {4}server:/);
+    expect(receiverBlock).toMatch(/\n {4}port:/);
+    expect(receiverBlock).not.toMatch(/\n {4}endpoint:/);
+    expect(receiverBlock).not.toMatch(/\n {4}database:/);
+    // top_query_count is the key this receiver takes; the mysql block's extra
+    // knobs are not copied across.
+    expect(receiverBlock).toContain("top_query_count:");
+    expect(receiverBlock).not.toContain("lookback_time:");
+
+    // The events pipeline must BYPASS filter/dbm: receiver-native events carry
+    // no o2_recipe tag, so the filter would silently drop every one.
+    // memory_limiter must still be FIRST — anything ahead of it is outside the
+    // OOM guard.
+    expect(config).toMatch(/logs\/dbm_events:\n\s+receivers: \[sqlserver\/dbm_events\]/);
+    expect(config).toMatch(/logs\/dbm_events:[\s\S]*?processors: \[memory_limiter, batch\]/);
+    const eventsProcessors = config.match(/logs\/dbm_events:[\s\S]*?processors: \[([^\]]+)\]/)![1];
+    expect(eventsProcessors).not.toContain("filter/dbm");
+
+    // NO engine-identity transform here, unlike MariaDB: sqlserverreceiver is
+    // SQL Server's own receiver and stamps the right engine itself. Only the
+    // borrowed mysqlreceiver on the MariaDB lane misreports.
+    expect(config).not.toContain("transform/");
   });
 
   /**
@@ -159,7 +210,7 @@ describe("sqlServerCard builder", () => {
    * via sqlcmd hit the QUOTED_IDENTIFIER default-off trap.
    */
   it("states the managed-instance scope and the deadlock-text limits", () => {
-    const card = sqlServerCard(SUBS);
+    const card = sqlServerCard(SUBS, gt);
     const note = card.steps.find((s) => s.id === "dbm-configure")!.note!;
 
     // Opposite of the PG/MySQL/MariaDB caveat: SQL polling DOES work managed…

@@ -16,10 +16,6 @@
 // SQL Server data-source setup card. Shared collector scaffolding (install +
 // write-config command) comes from ./otelShared; this file holds the SQL Server
 // specifics (grant SQL, receiver config, detection).
-//
-// Based on a VERIFIED local run: the two grants below let the OTel `sqlserver`
-// receiver connect, the single-receiver config exports, and `sqlserver_*` metric
-// streams land in OpenObserve. Reference: https://openobserve.ai/blog/monitor-sql-server-with-otel/
 
 import { raw, type TranslateFn } from "@/types/i18n";
 
@@ -33,24 +29,21 @@ import {
   dbmVerifyStep,
 } from "./dbmShared";
 
-// Step 1 — the monitoring login + the grants the receiver actually needs
-// (verified). On SQL Server 2019 and older, VIEW SERVER STATE replaces
-// VIEW SERVER PERFORMANCE STATE. The login name/password are literals here and in
-// the collector config so the two stay in lockstep — users edit them inline.
+// Step 1 — the monitoring login and the grants the receiver needs. On SQL
+// Server 2019 and older, VIEW SERVER STATE replaces VIEW SERVER PERFORMANCE
+// STATE. The login name/password are literals here and in the collector config
+// so the two stay in lockstep.
 const GRANT_SQL = `USE master;
 CREATE LOGIN otel WITH PASSWORD = 'YourStrong@Passw0rd';
 GRANT VIEW SERVER PERFORMANCE STATE TO otel;
 GRANT VIEW ANY DATABASE TO otel;`;
 
-// The grants run INSIDE SQL Server, not the shell — Step 1 offers runnable client
-// commands (sqlcmd / Docker) that pipe the SQL in via -Q (the SQL's own quotes are
-// single, so they nest inside the double-quoted -Q value).
 const applyGrants = (connect: string) => `${connect} -Q "
 ${GRANT_SQL}
 "`;
 
-// Single-receiver config. Only the exporter endpoint + token are substituted
-// per-org; {server}/{port} are filled live from the configure step's inputs.
+// Only the exporter endpoint + token are substituted per-org; {server}/{port}
+// are filled live from the configure step's inputs.
 const CONFIG_YAML = `receivers:
   sqlserver:
     collection_interval: 10s
@@ -125,9 +118,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
           },
         ],
       },
-      // Pinned to the release the SQL Server recipes were verified against
-      // (contrib v0.158.0, SQL Server 2022) so all four Tier-1 cards install
-      // the same verified collector.
+      // Pinned so all four Tier-1 cards install the same collector.
       collectorInstallStep(t, DBM_CONTRIB_VERSION),
       {
         id: "configure",
@@ -172,10 +163,8 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // What the verify step will show, in prose. These are NOT the performance-counter
-        // names that land in the streams (those are sqlserver.user.connection.count,
-        // sqlserver.batch.request.rate, …) — they are a plain-English summary of them,
-        // so they are translated.
+        // Plain-English summary, NOT the performance-counter names — so these
+        // are translated.
         pills: [
           t("ingestion.setupCard.pillUserConnections"),
           t("ingestion.setupCard.pillBatchRequestRate"),
@@ -185,12 +174,10 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
         ],
       },
       // ── Database Monitoring (optional) ──────────────────────────────────
-      // Deadlocks + blocked queries. The deadlock recipe shreds the XML graph
-      // in the system_health Extended Events session into flat rows in T-SQL
-      // (see MSSQL_DEADLOG_RECEIVER), so both tabs fill. Activity, top queries
-      // and plans are NOT here: the upstream sqlserverreceiver's events are
-      // not adopted by OpenObserve yet, and the card says so rather than
-      // implying engine parity with Postgres/MySQL.
+      // Every DBM tab this product has: deadlocks (shredded from the
+      // system_health XML graph in T-SQL), Table health, and — from
+      // sqlserverreceiver's events — Activity, Top queries AND the execution
+      // plans, which ride on the same db.server.top_query event.
       {
         id: "dbm-grant",
         titleKey: "ingestion.setupCard.dbmPrepareMssqlTitle",
@@ -249,7 +236,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
             masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
           },
         })),
-        note: "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Unlike Postgres and MySQL, both recipes here poll SQL views rather than tailing files, so they work on managed SQL Server (Amazon RDS, Azure SQL Managed Instance) — except Azure SQL Database, which does not provide sys.fn_xe_file_target_read_file, so deadlock capture degrades there while blocking still works. Two honest limits on deadlock text: SQL Server records the client's whole batch, not just the statement that deadlocked, and stored-procedure workloads show up as the EXEC call rather than the statement inside the procedure. If you run the deadlock query yourself in sqlcmd, pass -I: it needs QUOTED_IDENTIFIER ON, which sqlcmd turns off by default (this config already sets it for the collector).",
+        note: "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Unlike Postgres and MySQL, every recipe here polls SQL views rather than tailing files, so they work on managed SQL Server (Amazon RDS, Azure SQL Managed Instance) — except Azure SQL Database, which does not provide sys.fn_xe_file_target_read_file, so deadlock capture degrades there while blocking still works. Activity, top queries and execution plans come from the sqlserver receiver, which reads across the whole instance rather than the one database above — the plans arrive with the top queries, on the same feed. Two honest limits on deadlock text: SQL Server records the client's whole batch, not just the statement that deadlocked, and stored-procedure workloads show up as the EXEC call rather than the statement inside the procedure. If you run the deadlock query yourself in sqlcmd, pass -I: it needs QUOTED_IDENTIFIER ON, which sqlcmd turns off by default (this config already sets it for the collector).",
       },
       {
         id: "dbm-run",
@@ -263,12 +250,13 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
         },
         note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
       },
-      // "both" now that the deadlock shred ships: SQL Server names its victim
-      // inline in the system_health graph, so the Deadlocks tab fills too.
-      dbmVerifyStep("both"),
+      // "full" + table health: every tab this card's config can fill. The
+      // mssql_table_stats / mssql_index_stats recipes run at
+      // collection_interval: 60s, so the 60-second wording is true.
+      dbmVerifyStep("full", true, "60s", "plain"),
     ],
-    // Metrics fan out into one stream per metric (sqlserver_user_connection_count,
-    // …) — match by keyword: any metrics stream containing "sqlserver" = flowing.
+    // Metrics fan out into one stream per metric — match by keyword: any
+    // metrics stream containing "sqlserver" means data is flowing.
     detect: { streamType: "metrics", match: "keyword", streamName: "sqlserver", filter: "" },
     docUrl: "https://openobserve.ai/blog/monitor-sql-server-with-otel/",
   };

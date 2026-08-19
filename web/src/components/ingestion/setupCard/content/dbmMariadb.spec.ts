@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
+
+import { gt } from "@/types/i18n";
+
 import { MARIADB_DBM_CONFIG_YAML, MYSQL_DBM_CONFIG_YAML } from "./dbmShared";
 import mariadbCard from "./mariadb";
 
@@ -157,19 +160,80 @@ describe("MariaDB Database Monitoring config", () => {
     }
   });
 
-  // Tier honesty: NO `mariadbreceiver` exists in collector-contrib, so there
-  // are no activity/top-query events to enable — an events: block here would
-  // reference a receiver that does not exist, and the card copy states the
-  // gap instead of implying parity with MySQL.
-  it("ships no receiver-native events, because no MariaDB receiver exists upstream", () => {
-    expect(config).not.toContain("db.server.query_sample");
-    expect(config).not.toContain("db.server.top_query");
-    expect(config).not.toContain("logs/dbm_events");
+  /**
+   * ACTIVITY + TOP QUERIES, the two tabs this card used to leave permanently
+   * empty. There is no `mariadbreceiver` and there does not need to be:
+   * MariaDB speaks the MySQL wire protocol, and `mysqlreceiver` identifies the
+   * product correctly (measured on the rig: the receiver's own log reports
+   * `"product": "MariaDB"`, and the lane went from 0 to 237 top_query / 2
+   * query_sample records per window once this receiver was wired in).
+   *
+   * The trap this pins is silent: upstream v0.148.0 flipped both events
+   * default-OFF, so without the `events:` block the collector starts clean,
+   * reports itself healthy and emits ZERO events with no warning at all.
+   */
+  it("ships the receiver's activity and top-query events on, spelled out", () => {
+    expect(config).toContain("mysql/dbm_events:");
+    expect(config).toContain("db.server.query_sample: { enabled: true }");
+    expect(config).toContain("db.server.top_query: { enabled: true }");
+
+    // `events:` must be TOP-LEVEL on the receiver (a sibling of the collection
+    // blocks) — nesting it inside them is a fatal config error.
+    expect(config).toMatch(/\n {4}events:\n/);
+
+    // mysqlreceiver's spelling, not Postgres's: `top_query_count`, and it
+    // REJECTS max_rows_per_query inside top_query_collection. These blocks are
+    // strictly key-validated, so a borrowed key kills the collector at startup.
+    expect(config).toContain("top_query_count:");
+    expect(config).not.toMatch(/top_query_collection:[\s\S]{0,200}max_rows_per_query/);
+
+    // The events pipeline must BYPASS filter/dbm: receiver-native events carry
+    // no o2_recipe / o2_*_event tag (the backend recognises them by their OTLP
+    // event name), so the filter would silently drop every one. memory_limiter
+    // must still be FIRST — anything ahead of it runs outside the OOM guard.
+    expect(config).toMatch(/logs\/dbm_events:\n\s+receivers: \[mysql\/dbm_events\]/);
+    const eventsProcessors = config.match(/logs\/dbm_events:[\s\S]*?processors: \[([^\]]+)\]/)![1];
+    expect(eventsProcessors).not.toContain("filter/dbm");
+    expect(eventsProcessors.split(",")[0]!.trim()).toBe("memory_limiter");
+  });
+
+  /**
+   * THE ENGINE-IDENTITY CORRECTION, and why it is not cosmetic.
+   *
+   * `mysqlreceiver` stamps `db.system.name: mysql` on its events even when the
+   * server it scraped is MariaDB. The sqlquery recipes on this same card stamp
+   * `mariadb` through their own tags, so without a correction ONE SERVER
+   * ANSWERS TO TWO ENGINES: measured on the rig, the fleet list returned five
+   * identities for four servers, with the MariaDB host appearing once as
+   * MariaDB and once as MySQL, and the Overview rendering it as two rows.
+   *
+   * BOTH levels are set. The record-level attribute is what the log record
+   * carries; the resource-level one is what the resource it belongs to claims.
+   * Setting only one leaves the other still saying "mysql".
+   */
+  it("corrects the engine mysqlreceiver stamps, on the events pipeline only", () => {
+    // Declared…
+    expect(config).toContain("transform/mariadb_engine:");
+    expect(config).toContain('set(attributes["db.system.name"], "mariadb")');
+    expect(config).toContain('set(resource.attributes["db.system.name"], "mariadb")');
+
+    // …AND referenced. A processor declared but never named in a pipeline does
+    // nothing at all, which is exactly how this bug would come back silently.
+    const eventsProcessors = config.match(/logs\/dbm_events:[\s\S]*?processors: \[([^\]]+)\]/)![1];
+    expect(eventsProcessors).toContain("transform/mariadb_engine");
+
+    // NOT on the recipe pipeline: those rows already carry MariaDB's own tags,
+    // so the transform would be dead weight there.
+    const mainProcessors = config.match(/\n    logs:\n[\s\S]*?processors: \[([^\]]+)\]/)![1];
+    expect(mainProcessors).not.toContain("transform/mariadb_engine");
+
+    // And nothing anywhere may re-stamp this lane as mysql.
+    expect(config).not.toContain('set(attributes["db.system.name"], "mysql")');
   });
 });
 
 describe("MariaDB setup card honesty copy", () => {
-  const card = mariadbCard(SUBS);
+  const card = mariadbCard(SUBS, gt);
 
   // THE REGRESSION THIS BLOCK EXISTS FOR. The grant note used to claim the
   // blocking recipe reads performance_schema.data_lock_waits and "needs
@@ -183,19 +247,32 @@ describe("MariaDB setup card honesty copy", () => {
     expect(note).not.toMatch(/needs MariaDB 10\.6/);
   });
 
-  // Log tailing cannot work on managed MariaDB, and the missing
-  // activity/top-queries/plans are an upstream receiver gap.
+  // Log tailing cannot work on managed MariaDB — that limit is real and stays.
+  // What is NOT a limit any more: activity, top queries and plans, which the
+  // borrowed mysqlreceiver supplies on managed instances too (it polls, it does
+  // not tail), so the note must scope the RDS caveat to deadlocks alone.
   it("states the managed-database limit and the tier scope", () => {
     const note = card.steps.find((s) => s.id === "dbm-configure")!.note!;
     expect(note).toMatch(/RDS/);
     expect(note).toMatch(/not available/i);
-    expect(note).toMatch(/blocking chains work there normally/i);
+    expect(note).toMatch(/blocking chains, activity samples and top queries work there normally/i);
     expect(note).toMatch(/upstream OpenTelemetry Collector Contrib/i);
-    // No Activity pill on the verify step — there is no receiver to fill it.
-    // Table health IS promised: the mariadb_table_stats/mariadb_index_stats
-    // recipes ship in this config.
+    // Every pill this config can actually fill. Activity JOINED this list when
+    // mysqlreceiver's events were wired in; before that the card shipped a
+    // config with two permanently empty tabs.
     const verify = card.steps.find((s) => s.id === "verify-dbm")!;
-    expect(verify.pills).toEqual(["Deadlocks", "Blocked queries", "Table health"]);
+    expect(verify.pills).toEqual(["Deadlocks", "Blocked queries", "Activity", "Table health"]);
+  });
+
+  // The sample-text gap is the ONE honest limit left, and it is the receiver's
+  // own disclosure (supports_query_sample_text: false), not our guess. Stated
+  // up front so an Activity row with an empty query column reads as a
+  // documented MariaDB limit rather than a broken collector.
+  it("discloses that MariaDB activity rows carry no statement text", () => {
+    const note = card.steps.find((s) => s.id === "dbm-configure")!.note!;
+    expect(note).toMatch(/does not expose the sampled statement text/i);
+    const verify = card.steps.find((s) => s.id === "verify-dbm")!;
+    expect(verify.descriptionKey).toBe("ingestion.setupCard.dbmVerifyFullNoSampleTextDesc");
   });
 
   // The idx_scan gap is a scoped honesty note, not a footnote: MariaDB ships
