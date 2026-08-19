@@ -45,6 +45,8 @@ import type {
   DeliveryLedger,
   EscalateResult,
   EscalationProgress,
+  MyDeliveries,
+  MyDeliveriesRead,
   MyOnCall,
   Override,
   PromoteResult,
@@ -709,6 +711,54 @@ const oncall = {
   /// 404ed for exactly as long as this function pointed at it.
   myOnCall: ({ org_identifier }: { org_identifier: string }) =>
     http().get<MyOnCall>(`/api/${org_identifier}/oncall/my/teams`),
+
+  /// "What was I sent last night, and did any of it arrive?"
+  ///
+  /// **Always the caller** — there is no user parameter and there cannot be
+  /// one, which is why this needs no permission beyond being signed in.
+  myDeliveries: ({
+    org_identifier,
+    unread_only,
+    from,
+    to,
+    limit,
+    offset,
+  }: {
+    org_identifier: string;
+    unread_only?: boolean;
+    /** Micros, inclusive. */
+    from?: number;
+    /** Micros, exclusive. */
+    to?: number;
+    /** Server default 100, capped at 200. */
+    limit?: number;
+    offset?: number;
+  }) => {
+    const params: Record<string, string | number | boolean> = {};
+    if (unread_only) params.unread_only = true;
+    if (from !== undefined) params.from = from;
+    if (to !== undefined) params.to = to;
+    if (limit !== undefined) params.limit = limit;
+    if (offset !== undefined) params.offset = offset;
+    return http().get<MyDeliveries>(
+      `/api/${org_identifier}/oncall/my/deliveries`,
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
+
+  /// Marks the caller's own inbox rows read, or puts them back to unread.
+  ///
+  /// `read: false` is not an afterthought — somebody who dismissed a page by
+  /// accident at 3am has to be able to undo it. `all: true` clears the inbox,
+  /// bounded server-side to 1000 rows; `event_ids` is capped at 200 and a 400
+  /// says so. Ids that are not the caller's are ignored rather than refused.
+  markDeliveriesRead: ({
+    org_identifier,
+    data,
+  }: {
+    org_identifier: string;
+    data: { event_ids?: string[]; all?: boolean; read?: boolean };
+  }) => http().post<MyDeliveriesRead>(`/api/${org_identifier}/oncall/my/deliveries/read`, data),
 
   /// Somebody stands in for the rotation over a window. Outside it the
   /// rotation resolves as normal, which is what makes an override safe.

@@ -54,6 +54,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            call (Teams) and which team a page reaches (Routing) are configuration
            for this screen, so they are reached from it rather than from three
            sibling rail entries. -->
+      <!-- Named for what it uniquely answers — "did my phone actually ring" —
+           rather than "My on-call", which is already the filter beside it. Two
+           controls with one name is the vocabulary problem this module keeps
+           being reported for. -->
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="inbox"
+        data-test="oncall-responses-mine-page-btn"
+        @click="goTo('onCallMine')"
+      >
+        {{ t("oncall.mineSentToMe") }}
+      </OButton>
       <OButton
         variant="outline"
         size="sm"
@@ -402,27 +415,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
-      <!-- Who owns it, or — while nobody does — how many people the ladder has
-           already rung, which is the difference between "unanswered" and
-           "nobody has even been called yet". -->
+      <!-- Who owns it, or — while nobody does — that nobody does. How far the
+           ladder has climbed is the escalation column's job, so this one says
+           the one thing it is asked for. -->
       <template #cell-responder="{ row }">
-        <span class="flex min-w-0 flex-col">
-          <OUserCell
-            v-if="row.latest.acked_by"
-            :value="row.latest.acked_by"
-            :name="row.latest.acked_by === viewerEmail ? youLabel : undefined"
-          />
-          <span v-else class="text-status-error-text text-sm" data-test="oncall-responder-nobody">
-            {{ t("oncall.nobodyYet") }}
-          </span>
-          <span
-            v-if="peopleRung(row.latest)"
-            class="text-text-secondary truncate text-xs"
-            :data-test="`oncall-responder-rung-${row.rowKey}`"
-          >
-            {{ peopleRung(row.latest) }}
-          </span>
-        </span>
+        <OUserCell
+          v-if="row.latest.acked_by"
+          :value="row.latest.acked_by"
+          :name="row.latest.acked_by === viewerEmail ? youLabel : undefined"
+        />
+        <OText v-else variant="body" as="span" data-test="oncall-responder-nobody">
+          {{ t("oncall.nobodyYet") }}
+        </OText>
       </template>
 
       <!-- How long this has been ringing, and when the ladder actually started.
@@ -432,12 +436,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-notified="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5">
           <template v-if="isRinging(row)">
-            <span
-              class="text-status-error-text text-sm font-medium"
+            <OText
+              variant="body-strong"
+              as="span"
               :data-test="`oncall-ringing-for-${row.rowKey}`"
             >
               {{ ringingFor(row.latest) }}
-            </span>
+            </OText>
             <OText variant="meta"
               v-if="ladderStarted(row.latest)"
               :data-test="`oncall-ladder-started-${row.rowKey}`">
@@ -1057,20 +1062,6 @@ function isImpactedRow(record: OnCallResponse): boolean {
 /// How fast the page was answered, for a row that already has been.
 function ackedInMicros(record: OnCallResponse): number | null {
   return record.acked_at ? record.acked_at - record.opened_at : null;
-}
-
-/// Distinct people the ladder has already rung, from the rungs that fired.
-///
-/// Deduplicated across rungs: a two-rung ladder that reached the same person
-/// twice has rung one person, and saying "2 people rung" would suggest a second
-/// pair of hands that does not exist.
-function peopleRung(record: OnCallResponse): I18nText | "" {
-  if (record.acked_by) return "";
-  const fired = progressById.value[record.id]?.fired ?? [];
-  const people = new Set(fired.flatMap((rung) => rung.targets));
-  return people.size
-    ? t("oncall.escalationPeopleRung", { count: people.size }, people.size)
-    : "";
 }
 
 /// The channels this record's priority pages on, per its team's policy.

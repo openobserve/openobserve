@@ -499,25 +499,6 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(false);
     });
 
-    /// Deduplicated across rungs: a ladder that reached the same person twice
-    /// has rung one person, not two.
-    it("counts the distinct people the ladder has rung", async () => {
-      service.escalationProgress.mockResolvedValue({
-        data: {
-          fired: [
-            { after_micros: 0, at: 1, targets: ["ana@o2.ai"] },
-            { after_micros: 300, at: 2, targets: ["ana@o2.ai", "bob@o2.ai"] },
-          ],
-          next_targets: [],
-          next_at: null,
-          exhausted: false,
-        },
-      } as any);
-      const wrapper = await withPages([page()]);
-
-      expect(wrapper.find('[data-test^="oncall-responder-rung-"]').text()).toBe("2 people rung");
-    });
-
     /// The channels are the policy's — what WOULD be used — so a channel with
     /// no provider behind it has to be distinguishable from one that sends.
     it("shows the channels the page would go out on", async () => {
@@ -815,11 +796,10 @@ describe("OnCallResponses", () => {
       return withPages(rows);
     }
 
-    /// `oncall/me` used to be a 59-line stub that told every reader they were
-    /// on no team without asking the server. It redirects here now, so the
-    /// query has to arrive already narrowed or the old link lands on a list
-    /// that answers a different question.
-    it("opens already narrowed when the retired page redirects here", async () => {
+    /// `?mine=1` is how the personal page hands "pages that need me" back to
+    /// this list. It has to arrive already narrowed, or the link lands on a
+    /// list answering a different question from the one that was clicked.
+    it("opens already narrowed when it is linked to with mine=1", async () => {
       routeQuery.mine = "1";
       const wrapper = await withMyShift([
         page({ id: "a" }),

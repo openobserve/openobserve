@@ -63,6 +63,7 @@ const OnCallTeamDetail = () => import("@/views/OnCall/OnCallTeamDetail.vue");
 const OnCallResponses = () => import("@/views/OnCall/OnCallResponses.vue");
 const OnCallResponseDetail = () => import("@/views/OnCall/OnCallResponseDetail.vue");
 const OnCallRouting = () => import("@/views/OnCall/OnCallRouting.vue");
+const OnCallMine = () => import("@/views/OnCall/OnCallMine.vue");
 const OnCallPolicies = () => import("@/views/OnCall/OnCallPolicies.vue");
 
 const IdentityAccessManagement = () => import("@/views/IdentityAccessManagement.vue");
@@ -215,17 +216,22 @@ const useEnterpriseRoutes = () => {
         },
       },
       {
-        // Retired. It was a stub that answered "You are not on an on-call team
-        // yet" without asking the server anything, four centimetres from a
-        // banner saying the reader was on call. The Pages list answers the
-        // same question from data it already has, so the old path lands there
-        // narrowed rather than 404ing a link somebody has in a thread.
+        // A page again. It was retired to a redirect for being a stub that
+        // hardcoded "You are not on an on-call team yet" without asking the
+        // server anything — but two endpoints exist that only make sense here:
+        // `my/teams` answers duty in one request instead of one per team, and
+        // `my/deliveries` is the only thing in the product that answers "did my
+        // phone actually ring", which no per-team screen can ask.
+        //
+        // "What needs somebody" still belongs to the Pages list; this page
+        // links to it narrowed rather than rendering a second copy.
         path: "oncall/me",
         name: "onCallMine",
-        redirect: (to: any) => ({
-          name: "onCallResponses",
-          query: { ...to.query, mine: "1" },
-        }),
+        component: OnCallMine,
+        meta: { titleKey: "oncall.mineTitle" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
       },
       {
         path: "oncall/teams",

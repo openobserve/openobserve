@@ -1083,30 +1083,90 @@ export interface HandoffSuggestion {
 export type OnCallSlotRole = "primary" | "secondary";
 
 /** One shift the signed-in user is on. */
-export interface MyOnCallSlot {
-  team_id: string;
-  rotation: string;
-  role: OnCallSlotRole;
-  /** Micros. */
-  starts_at: number;
-  /** Micros. */
-  ends_at: number;
-}
-
+/**
+ * One of the caller's teams, and whether they are on call for it.
+ *
+ * **`on_call_now` is `true` / `false` / `null`.** `null` alongside
+ * `schedule_resolved: false` means the schedule could not be resolved, and it
+ * is deliberately **not** reported as off duty — telling somebody they are not
+ * on call when the truth is that we could not work it out is the one answer
+ * this endpoint must never give. Render it as unknown.
+ */
 export interface MyOnCallTeam {
   team_id: string;
   team_name: string;
   timezone: string;
+  description?: string | null;
+  on_call_now: boolean | null;
+  /** Everybody the schedule resolved for this team, not only the caller. */
+  on_call: string[];
+  schedule_resolved: boolean;
 }
 
-/** Everything the "My on-call" screen needs, in one call. */
+/**
+ * `GET /oncall/my/teams` — the caller's teams and their duty, in one request
+ * instead of N+1.
+ *
+ * **This type described a different response entirely** — `slots`, `channels`,
+ * `open_responses`, `pages_last_7d`, none of which the endpoint sends. It went
+ * unnoticed for the same reason `Override`'s did: nothing called the service
+ * method, so the shape was never read against a real response.
+ */
 export interface MyOnCall {
+  /** The instant this was resolved at. Micros. */
+  at: number;
+  user_email: string;
+  /** True if any team is true. */
+  on_call_now: boolean;
   teams: MyOnCallTeam[];
-  slots: MyOnCallSlot[];
-  /** How this person is reachable, in the order the policy would try them. */
-  channels: Channel[];
-  open_responses: OnCallResponse[];
-  pages_last_7d: number;
+}
+
+/**
+ * One page that was sent to the caller, as their inbox renders it.
+ *
+ * Carries the record's fields alongside the delivery's, so a row answers "what
+ * was this, and did it reach me" without opening anything. `response_state` is
+ * the state **now**, not when the page went out — an inbox row for something
+ * already resolved should say so.
+ */
+export interface MyDelivery {
+  event_id: string;
+  response_id: string;
+  /** Micros. */
+  at: number;
+  body: string;
+  channel: Channel;
+  delivered: boolean;
+  ladder_run?: number | null;
+  rung_micros: number;
+  team_id: string;
+  title?: string | null;
+  priority: number;
+  response_state: ResponseState;
+  subject_type: SubjectType;
+  subject_id: string;
+  /** Micros. Absent while unread. */
+  read_at?: number | null;
+  /** Always present, derived from `read_at`. */
+  read: boolean;
+}
+
+export interface MyDeliveries {
+  /** Respects the filter. */
+  total: number;
+  /**
+   * **Deliberately ignores `from`/`to`.** It is the badge, and "3 unread" must
+   * not change because somebody scrolled to last Tuesday.
+   */
+  unread: number;
+  deliveries: MyDelivery[];
+}
+
+/** What `POST /oncall/my/deliveries/read` answers with. */
+export interface MyDeliveriesRead {
+  updated: number;
+  /** Travels back so the badge is right without a second request. */
+  unread: number;
 }
 
 /**
