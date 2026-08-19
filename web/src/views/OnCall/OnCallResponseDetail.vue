@@ -141,7 +141,11 @@
     </template>
 
     <template v-if="response">
-      <OContent y>
+      <!-- OPageLayout keeps the body a fixed column (`scroll` off) so a table
+           can own its own scroller. This page is a document, so the body is
+           the scroller — without it the activity thread was clipped at the
+           fold with no way to reach the rest. -->
+      <OContent y class="min-h-0 flex-1 overflow-y-auto">
         <!-- The one sentence this screen exists to say when it is true:
              nobody has seen this page, and here is why. -->
         <OnCallReachAlarm
@@ -198,8 +202,8 @@
              that were never optional, and the rail's answers — who this is
              reaching, what fires next, why this team — are the ones people
              opened the tabs to find. -->
-        <div class="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div class="flex flex-col gap-6 lg:col-span-2">
+        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div class="flex flex-col gap-4 lg:col-span-2">
             <OnCallWhatFired
               :org-id="orgId"
               :subject-type="response.subject.subject_type"
@@ -215,8 +219,8 @@
                  analysis panel that sits empty forever. -->
             <OnCallVerdictCard :events="events" />
 
-            <OCard data-test="oncall-response-activity">
-              <OCardSection>
+            <OCard variant="outlined" data-test="oncall-response-activity">
+              <OCardSection role="body">
                 <OnCallTimeline :events="events" :opened-at="response.opened_at" />
 
                 <!-- Pinned under the thread it appends to. A note is a comment. -->
@@ -267,7 +271,7 @@
             </OCollapsible>
           </div>
 
-          <div class="flex flex-col gap-6">
+          <div class="flex flex-col gap-4">
             <OnCallWhoIsOn
               :slots="onCallSlots"
               :deliveries="deliveries"
@@ -531,7 +535,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { StatItem, StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -783,31 +787,59 @@ const elapsedLabel = computed(() => {
 
 /// The headline is "when does this wake somebody else" — the question a
 /// responder actually has, previously buried mid-page.
+/// Every tile said "—" on the page that needs them most: an open record has no
+/// ack duration and no resolve duration yet, and an exhausted ladder has no
+/// next rung. A dash is not the answer to "when does this escalate" — the
+/// answer is that it never will again, and each tile now says its own version
+/// of that instead of going blank.
+const escalatesIn = computed<{ value: I18nText | string; tone: StatTone }>(() => {
+  const r = response.value;
+  const progress = escalation.value;
+  if (r?.state === "resolved")
+    return { value: t("oncall.escalationResolvedShort"), tone: "neutral" };
+  if (r && isSnoozed(r)) return { value: t("oncall.escalationSnoozedShort"), tone: "warning" };
+  if (r?.state === "acknowledged") return { value: t("oncall.escalationAcked"), tone: "success" };
+  const remaining = progress?.next_at ? progress.next_at - nowMicros.value : null;
+  if (remaining && remaining > 0) {
+    return {
+      value: formatMicrosDuration(remaining),
+      tone: remaining < 5 * 60 * 1_000_000 ? "error" : "neutral",
+    };
+  }
+  // Nothing is coming: either the ladder ran out with nobody answering, or it
+  // has not started. The first is the loudest fact on the page.
+  if (progress?.exhausted) return { value: t("oncall.statNobodyLeft"), tone: "error" };
+  return { value: t("oncall.escalationNotStarted"), tone: "neutral" };
+});
+
 const summaryStats = computed<StatItem[]>(() => {
   const r = response.value;
-  const next = escalation.value?.next_at;
-  const remaining = next ? next - nowMicros.value : null;
+  const openMicros = r ? nowMicros.value - r.opened_at : null;
+  const acked = Boolean(r?.acked_at);
+  const closed = Boolean(r?.closed_at);
   return [
     {
       key: "escalatesIn",
       label: t("oncall.statEscalatesIn"),
-      value: remaining && remaining > 0 ? formatMicrosDuration(remaining) : ABSENT,
+      value: escalatesIn.value.value,
       icon: "notifications-active",
-      tone: remaining && remaining > 0 && remaining < 5 * 60 * 1_000_000 ? "error" : "neutral",
+      tone: escalatesIn.value.tone,
       dataTest: "oncall-stat-escalates-in",
     },
     {
+      // Until somebody acks, "time to ack" is a clock still running, and
+      // freezing it at a dash hid the number the SLA is measured on.
       key: "ack",
-      label: t("oncall.timeToAck"),
-      value: timeToAck.value,
+      label: acked || !openMicros ? t("oncall.timeToAck") : t("oncall.statUnackedFor"),
+      value: acked ? timeToAck.value : openMicros ? formatMicrosDuration(openMicros) : ABSENT,
       icon: "check-circle",
       tone: "neutral",
       dataTest: "oncall-stat-ttack",
     },
     {
       key: "resolve",
-      label: t("oncall.timeToResolve"),
-      value: timeToResolve.value,
+      label: closed || !openMicros ? t("oncall.timeToResolve") : t("oncall.statOpenFor"),
+      value: closed ? timeToResolve.value : openMicros ? formatMicrosDuration(openMicros) : ABSENT,
       icon: "task-alt",
       tone: "neutral",
       dataTest: "oncall-stat-ttr",

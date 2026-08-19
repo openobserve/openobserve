@@ -23,7 +23,7 @@ import type { SubjectType } from "@/ts/interfaces/oncall";
 const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
-  OCode: { name: "OCode", template: "<code><slot /></code>" },
+  OButton: { name: "OButton", template: "<button><slot /></button>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
   OUserCell: { name: "OUserCell", props: ["value"], template: `<span>{{ value }}</span>` },
@@ -34,6 +34,11 @@ const stubs = {
     template: "<div><dt>{{ label }}</dt><dd><slot /></dd></div>",
   },
   RouterLink: { name: "RouterLink", props: ["to"], template: "<a><slot /></a>" },
+  ODimensionChip: {
+    name: "ODimensionChip",
+    props: ["dimKey", "keyLabel", "value"],
+    template: `<span>{{ keyLabel ?? dimKey }}={{ value }}</span>`,
+  },
 };
 
 function render(props: Record<string, unknown> = {}) {
@@ -62,9 +67,77 @@ describe("OnCallAboutPage", () => {
     expect(wrapper.find('[data-test="oncall-about-open-routing"]').exists()).toBe(true);
   });
 
+  /// The winning rule was spelled as a path and the team as a ksuid — neither
+  /// is read as prose. The rule now draws as the same key|value chips the
+  /// routing tab uses, so a dimension looks the same wherever it is read.
+  it("draws the winning ownership rule as dimension chips", () => {
+    const wrapper = render({
+      routingReason: "routed to tm_9 by ownership rule k8s-cluster=introspection/service=search",
+    });
+
+    expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).toBe(
+      "Matched an ownership rule",
+    );
+    const chips = wrapper.find('[data-test="oncall-about-routing-dimensions"]').text();
+    expect(chips).toContain("k8s-cluster=introspection");
+    expect(chips).toContain("service=search");
+    // The ksuid belongs to the Team row below, which links; repeating it here
+    // was the noisiest thing on the card.
+    expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).not.toContain("tm_9");
+  });
+
+  /// What routing passed over on the way is the half that answers "why not the
+  /// team I expected", and the card used to drop it entirely.
+  it("keeps the notes routing recorded before its decision", () => {
+    const wrapper = render({
+      routingReason:
+        "the alert names team `paymnets`, which names no team in this org; " +
+        "routed to tm_9 by ownership rule service=search",
+    });
+    expect(wrapper.find('[data-test="oncall-about-routing-note-0"]').text()).toContain("paymnets");
+  });
+
+  /// A mechanism with no rule behind it says so in words and draws no chips.
+  it("says when the default team took it, without inventing a rule", () => {
+    const wrapper = render({
+      routingReason: "no ownership rule matched, so it went to the default team tm_9",
+    });
+    expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).toContain(
+      "default team",
+    );
+    expect(wrapper.find('[data-test="oncall-about-routing-dimensions"]').exists()).toBe(false);
+  });
+
   // No decision recorded leaves the row out rather than rendering an empty one.
   it("omits the routing row when no decision was recorded", () => {
     expect(render().find('[data-test="oncall-about-routing-reason"]').exists()).toBe(false);
+  });
+
+  /// The id here IS the rule that woke somebody, and the trip to change it was
+  /// a copy-paste into the alert list's search box. The editor lives on the
+  /// list route behind `action=update` — `AlertDetail` navigates the same way.
+  it("opens the alert's editor from its id", () => {
+    const link = render()
+      .findAllComponents({ name: "RouterLink" })
+      .find((c) => c.attributes("data-test") === "oncall-about-subject-link");
+
+    expect(link?.props("to")).toEqual({
+      name: "alertList",
+      query: {
+        org_identifier: "default",
+        action: "update",
+        alert_id: "al_ckt",
+        folder: "default",
+      },
+    });
+  });
+
+  /// A subject that is not an alert has no editor to open, and a chip that
+  /// looks like a link and goes nowhere is worse than no link.
+  it("leaves a non-alert subject unlinked", () => {
+    const wrapper = render({ subjectType: "incident" as SubjectType, sourceId: "sig_1" });
+    expect(wrapper.find('[data-test="oncall-about-subject-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-subject-id"]').exists()).toBe(true);
   });
 
   /// The first thing worth knowing before starting to look, and it used to be
@@ -99,14 +172,19 @@ describe("OnCallAboutPage", () => {
 
   it("links an incident once the page has been promoted into one", () => {
     expect(render().find('[data-test="oncall-about-incident-link"]').exists()).toBe(false);
-    expect(
-      render({ incidentId: "inc_9" }).find('[data-test="oncall-about-incident-link"]').text(),
-    ).toBe("inc_9");
+
+    const chip = render({ incidentId: "inc_9" }).find('[data-test="oncall-about-incident-link"]');
+    expect(chip.text()).toContain("inc_9");
+    // The chip labels itself, so the row above it no longer has to.
+    expect(chip.text()).toContain("Incident");
   });
 
-  /// The id somebody pastes into a channel, copyable rather than a ksuid that
-  /// truncates.
-  it("keeps the subject id copyable", () => {
-    expect(render().find('[data-test="oncall-about-subject-id"]').text()).toBe("al_ckt");
+  /// The id is here to be pasted into a channel, so it keeps its copy control
+  /// even though the chip truncates it on a narrow rail.
+  it("names and copies the subject id", () => {
+    const wrapper = render();
+    expect(wrapper.find('[data-test="oncall-about-subject-id"]').text()).toContain("al_ckt");
+    expect(wrapper.find('[data-test="oncall-about-subject-id"]').text()).toContain("Alert ID");
+    expect(wrapper.find('[data-test="oncall-about-copy-subject"]').exists()).toBe(true);
   });
 });

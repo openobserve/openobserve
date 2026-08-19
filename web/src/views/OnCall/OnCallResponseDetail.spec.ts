@@ -906,4 +906,67 @@ describe("OnCallResponseDetail", () => {
       actual_value: 7.4,
     });
   });
+  /// The strip read "— — —" on exactly the page that needs it: an open record
+  /// has no ack or resolve duration yet, and an exhausted ladder has no next
+  /// rung. Each tile now says its own version of what is actually true.
+  it("says what the clocks are doing instead of three dashes", async () => {
+    const wrapper = await renderWith();
+    const items = wrapper.findComponent({ name: "OStatStrip" }).props("items") as {
+      key: string;
+      label: string;
+      value: string;
+    }[];
+
+    const ack = items.find((i) => i.key === "ack")!;
+    expect(ack.label).toBe("Unacked for");
+    expect(ack.value).not.toBe("—");
+
+    const resolve = items.find((i) => i.key === "resolve")!;
+    expect(resolve.label).toBe("Open for");
+    expect(resolve.value).not.toBe("—");
+  });
+
+  /// A ladder with nowhere left to go is the loudest fact on the page; a dash
+  /// under "escalates in" read as one still counting down.
+  it("says nobody is left rather than dashing the escalation tile", async () => {
+    service.escalationProgress.mockResolvedValue({
+      data: {
+        fired: [],
+        next_targets: [],
+        next_at: null,
+        exhausted: true,
+        stopped_because: "the ladder is exhausted — nobody acknowledged",
+      },
+    } as any);
+
+    const wrapper = await renderWith();
+    const items = wrapper.findComponent({ name: "OStatStrip" }).props("items") as {
+      key: string;
+      value: string;
+      tone: string;
+    }[];
+
+    const escalates = items.find((i) => i.key === "escalatesIn")!;
+    expect(escalates.value).toBe("Nobody left");
+    expect(escalates.tone).toBe("error");
+  });
+
+  /// Once it is answered the tile freezes into the metric it was always
+  /// labelled as — the running clock belongs to the open state only.
+  it("reverts to the settled durations once the page is answered", async () => {
+    const wrapper = await renderWith({
+      state: "acknowledged",
+      acked_by: "engineer@example.com",
+      acked_at: 1_700_000_000_000_000 + HOUR_MICROS,
+    });
+    const items = wrapper.findComponent({ name: "OStatStrip" }).props("items") as {
+      key: string;
+      label: string;
+      value: string;
+    }[];
+
+    const ack = items.find((i) => i.key === "ack")!;
+    expect(ack.label).toBe("Time to ack");
+    expect(ack.value).toContain("1h");
+  });
 });

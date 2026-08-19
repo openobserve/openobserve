@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   row with a count, which is also how a human describes it out loud.
 -->
 <template>
-  <OCard data-test="oncall-escalation">
-    <OCardSection>
+  <OCard variant="outlined" data-test="oncall-escalation">
+    <OCardSection role="body">
       <span class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <OText variant="panel-title">{{ t("oncall.escalation") }}</OText>
         <OButton
@@ -50,67 +50,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.ladderLiaisonNote") }}
       </p>
 
-      <ol v-if="groups.length" class="flex flex-col gap-2">
-        <li
-          v-for="group in groups"
-          :key="group.key"
-          class="flex flex-wrap items-baseline gap-x-2 gap-y-1"
-          :data-test="`oncall-escalation-rung-${group.firstMicros}`"
-        >
-          <!-- The level, not the delay: "L2–6" is how a policy is talked
-               about, and the delay is already said by the timestamp. -->
-          <OTag variant="default-soft" size="sm" :data-test="`oncall-escalation-level-${group.key}`">
-            {{ group.levelLabel }}
-          </OTag>
-          <span class="text-text-body min-w-0 flex-1 text-sm">
-            {{ group.said }}
-            <span v-if="group.everyLabel" class="text-text-muted">{{ group.everyLabel }}</span>
-          </span>
-
-          <!-- `/escalation` cannot say this (§G.9 #6): a fired rung that
-               reached nobody looks exactly like one that landed. The timeline
-               can — its page entry carries the whole-rung-lost marker — so the
-               rail cross-references it rather than vouching for every rung. -->
-          <OTag
-            v-if="group.lost"
-            variant="error-soft"
-            size="sm"
-            :data-test="`oncall-escalation-rung-lost-${group.firstMicros}`"
-          >
-            {{ group.count > 1 ? t("oncall.rungLostTimes", { count: group.count }) : t("oncall.rungLost") }}
-          </OTag>
-          <!-- B9's other "nobody": a rung whose targets resolved to no one.
-               The ladder does the OPPOSITE thing about it — an empty rung is
-               consumed and advanced past at once, a lost rung is retried — so
-               the two must not share a tag. -->
-          <OTag
-            v-else-if="group.empty"
-            variant="warning-soft"
-            size="sm"
-            :data-test="`oncall-escalation-rung-empty-${group.firstMicros}`"
-          >
-            {{ t("oncall.rungMatchedNobody") }}
-          </OTag>
-          <OTimeCell v-else :value="group.lastAt" unit="us" />
-        </li>
-
-      </ol>
-
-      <p v-else class="text-text-muted text-sm" data-test="oncall-escalation-none">
+      <p
+        v-if="!groups.length"
+        class="text-text-muted mb-3 text-sm"
+        data-test="oncall-escalation-none"
+      >
         {{ t("oncall.ladderNothingSent") }}
       </p>
 
-      <!-- The row every repeating ladder needs and none of them had: what is
-           still to come, or that nothing is. Outside the list, because a
-           ladder that has sent nothing yet still has a next rung. -->
-      <div
-        class="border-border-subtle mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t pt-2"
-        data-test="oncall-escalation-end"
-      >
-        <OTag variant="default-soft" size="sm">{{ t("oncall.ladderEnd") }}</OTag>
-        <span class="min-w-0 flex-1 text-sm" :class="endTone">{{ endLabel }}</span>
-        <OTimeCell v-if="endAt" :value="endAt" unit="us" />
-      </div>
+      <!-- A rail, not a list: the rungs are one climb, and the level rides the
+           rail itself the way the policy editor numbers them. The end is the
+           last stop on the same rail rather than a footnote under a rule —
+           a ladder that has sent nothing still has one. -->
+      <OTimeline>
+        <OTimelineItem
+          v-for="group in groups"
+          :key="group.key"
+          :label="group.levelLabel"
+          :variant="rungVariant(group)"
+          :data-test="`oncall-escalation-rung-${group.firstMicros}`"
+        >
+          <div
+            class="flex flex-wrap items-baseline gap-x-2 gap-y-1"
+            :data-test="`oncall-escalation-level-${group.key}`"
+          >
+            <span class="text-text-body min-w-0 flex-1 text-sm">
+              {{ group.said }}
+              <span v-if="group.everyLabel" class="text-text-muted">{{ group.everyLabel }}</span>
+            </span>
+
+            <!-- `/escalation` cannot say this (§G.9 #6): a fired rung that
+                 reached nobody looks exactly like one that landed. The timeline
+                 can — its page entry carries the whole-rung-lost marker — so the
+                 rail cross-references it rather than vouching for every rung. -->
+            <OTag
+              v-if="group.lost"
+              variant="error-soft"
+              size="sm"
+              class="shrink-0"
+              :data-test="`oncall-escalation-rung-lost-${group.firstMicros}`"
+            >
+              {{
+                group.count > 1
+                  ? t("oncall.rungLostTimes", { count: group.count })
+                  : t("oncall.rungLost")
+              }}
+            </OTag>
+            <!-- B9's other "nobody": a rung whose targets resolved to no one.
+                 The ladder does the OPPOSITE thing about it — an empty rung is
+                 consumed and advanced past at once, a lost rung is retried — so
+                 the two must not share a tag. -->
+            <OTag
+              v-else-if="group.empty"
+              variant="warning-soft"
+              size="sm"
+              class="shrink-0"
+              :data-test="`oncall-escalation-rung-empty-${group.firstMicros}`"
+            >
+              {{ t("oncall.rungMatchedNobody") }}
+            </OTag>
+            <OTimeCell v-else class="text-text-muted shrink-0" :value="group.lastAt" unit="us" />
+          </div>
+        </OTimelineItem>
+
+        <!-- What is still to come, or that nothing is. -->
+        <OTimelineItem
+          :label="t('oncall.ladderEnd')"
+          :variant="endVariant"
+          data-test="oncall-escalation-end"
+        >
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span class="min-w-0 flex-1 text-sm" :class="endTone">{{ endLabel }}</span>
+            <OTimeCell v-if="endAt" class="text-text-muted shrink-0" :value="endAt" unit="us" />
+          </div>
+        </OTimelineItem>
+      </OTimeline>
     </OCardSection>
   </OCard>
 </template>
@@ -124,6 +138,9 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
+import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
+import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
 import type {
   DeliveryRecord,
   EscalationProgress,
@@ -131,7 +148,7 @@ import type {
   PolicyFinalAction,
   ResponderRole,
 } from "@/ts/interfaces/oncall";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { speakTarget } from "@/utils/oncall";
@@ -237,7 +254,7 @@ const saidTargets = (targets: string[]) =>
 
 interface RungGroup {
   key: string;
-  levelLabel: string;
+  levelLabel: I18nText;
   said: string;
   everyLabel: string;
   count: number;
@@ -297,18 +314,50 @@ function everyLabel(gapMicros: number): string {
     : "";
 }
 
+/// The dot the rail's last stop carries. A ladder that ran out is the loud
+/// failure this panel exists for; one that stopped because somebody owns it is
+/// not, and the two must not share a colour.
+const endVariant = computed<TimelineItemVariant>(() => {
+  if (stoppedKey.value) return "muted";
+  if (props.progress.exhausted) return isLiaison.value ? "muted" : "destructive";
+  if (props.progress.stopped_because) return "destructive";
+  return "info";
+});
+
+/// Which dot a rung carries: a lost rung is the one worth finding at a glance.
+function rungVariant(group: RungGroup): TimelineItemVariant {
+  if (group.lost) return "destructive";
+  if (group.empty) return "muted";
+  return "primary";
+}
+
+/// `stopped_because` is an enum for the three states this card has copy for and
+/// a plain English sentence for the rest (a deleted team, an exhausted ladder).
+/// Interpolating the sentence into a key printed the key back at the reader.
+const STOPPED_KEYS = ["acknowledged", "snoozed", "resolved"] as const;
+type StoppedKey = (typeof STOPPED_KEYS)[number];
+
+const stoppedKey = computed<StoppedKey | null>(() => {
+  const reason = props.progress.stopped_because;
+  return reason && (STOPPED_KEYS as readonly string[]).includes(reason)
+    ? (reason as StoppedKey)
+    : null;
+});
+
 /// What is still due. The three endings are different emergencies: stopped
 /// because somebody owns it, still climbing, or finished with nobody left.
-const endLabel = computed(() => {
-  if (props.progress.stopped_because) {
-    return t(`oncall.ladderStopped_${props.progress.stopped_because}`);
-  }
+const endLabel = computed<I18nText>(() => {
+  if (stoppedKey.value) return t(`oncall.ladderStopped_${stoppedKey.value}`);
+  // An exhausted ladder arrives stopped as well, and this card's own wording
+  // for it knows about the liaison seat and the final action; the server's
+  // one-line reason knows neither.
   if (props.progress.exhausted) {
     if (isLiaison.value) return t("oncall.ladderLiaisonDone");
     return props.finalAction === "notify_default_team"
       ? t("oncall.ladderEndsDefaultTeam")
       : t("oncall.ladderExhausted");
   }
+  if (props.progress.stopped_because) return raw(props.progress.stopped_because);
   const at = props.progress.next_at;
   if (!at) return t("oncall.ladderEndUnknown");
   const remaining = at - nowMicros.value;
@@ -320,8 +369,10 @@ const endLabel = computed(() => {
 });
 
 const endTone = computed(() => {
-  if (props.progress.stopped_because) return "text-text-secondary";
-  if (props.progress.exhausted) return isLiaison.value ? "text-text-secondary" : "text-status-warning-text";
+  if (stoppedKey.value) return "text-text-secondary";
+  if (props.progress.exhausted)
+    return isLiaison.value ? "text-text-secondary" : "text-status-warning-text";
+  if (props.progress.stopped_because) return "text-status-warning-text";
   return "text-text-body";
 });
 

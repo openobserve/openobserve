@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   that needs its threshold tuned.
 -->
 <template>
-  <OCard data-test="oncall-firing-history">
-    <OCardSection>
+  <OCard variant="outlined" data-test="oncall-firing-history">
+    <OCardSection role="body">
       <h2 class="text-text-heading text-lg">{{ t("oncall.firingHistory") }}</h2>
       <p class="text-text-muted mb-3 text-xs">{{ t("oncall.firingHistoryHint") }}</p>
 

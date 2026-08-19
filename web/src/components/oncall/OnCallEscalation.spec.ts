@@ -339,4 +339,31 @@ describe("OnCallEscalation", () => {
     });
     expect(withTeam.find('[data-test="oncall-escalation-edit"]').exists()).toBe(true);
   });
+  /// The server sends an ENUM for three of the stops and a plain English
+  /// sentence for the rest, and the sentence was being interpolated into a
+  /// key — the rail printed `ladderStopped_the ladder is exhausted…` at a
+  /// reader mid-incident.
+  it("does not print a key when the server explains the stop in prose", () => {
+    const wrapper = render({
+      exhausted: true,
+      stopped_because: "the ladder is exhausted — nobody acknowledged",
+    });
+
+    const end = wrapper.find('[data-test="oncall-escalation-end"]');
+    expect(end.text()).not.toContain("ladderStopped_");
+    // This card's own wording knows about the liaison seat and the final
+    // action; the server's one-liner knows neither, so exhaustion is said here.
+    expect(end.text()).toContain("nobody left to escalate to");
+  });
+
+  /// A stop this card has no copy for — the owning team was deleted — is still
+  /// a sentence a responder must read, so it is shown as sent.
+  it("shows an unknown stop reason as the sentence the server sent", () => {
+    const wrapper = render({
+      stopped_because: "the owning team was deleted — this page needs a new owner",
+    });
+    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain(
+      "needs a new owner",
+    );
+  });
 });

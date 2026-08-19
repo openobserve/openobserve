@@ -34,41 +34,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   (asked-for beside applied, including the clamped and refused cases).
 -->
 <template>
-  <div
-    v-if="verdict"
-    class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
-    data-test="oncall-verdict-card"
-  >
-    <span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-      <OText variant="panel-title">{{ t("oncall.verdictTitle") }}</OText>
-      <span class="text-text-secondary text-xs">
-        {{ raw(verdict.actor) }} · <OTimeCell :value="verdict.at" unit="us" />
+  <OCard v-if="verdict" variant="outlined" data-test="oncall-verdict-card">
+    <OCardSection role="body" class="flex flex-col gap-2">
+      <span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <OText variant="panel-title">{{ t("oncall.verdictTitle") }}</OText>
+        <span class="text-text-secondary text-xs">
+          {{ raw(verdict.actor) }} · <OTimeCell :value="verdict.at" unit="us" />
+        </span>
       </span>
-    </span>
 
-    <p class="text-text-body text-sm" data-test="oncall-verdict-body">
-      {{ raw(verdict.body) }}
-    </p>
+      <p class="text-text-body text-sm" data-test="oncall-verdict-body">
+        {{ raw(verdict.body) }}
+      </p>
 
-    <!-- Two facts, one line, the server's words: what was asked for and what
+      <!-- Two facts, one line, the server's words: what was asked for and what
          was applied. A clamped or refused promotion is the feature working. -->
-    <p
-      v-if="promotion"
-      class="text-status-error-text text-sm"
-      data-test="oncall-verdict-promotion"
-    >
-      {{ raw(promotion.body) }}
-    </p>
+      <p
+        v-if="promotion"
+        class="text-status-error-text text-sm"
+        data-test="oncall-verdict-promotion"
+      >
+        {{ raw(promotion.body) }}
+      </p>
 
-    <!-- The verdict never edits the page that already went out — it rides as
+      <!-- The verdict never edits the page that already went out — it rides as
          one follow-up. Saying so heads off "why didn't my page update". -->
-    <span class="text-text-muted text-xs">{{ t("oncall.verdictFollowUpNote") }}</span>
-  </div>
+      <span class="text-text-muted text-xs">{{ t("oncall.verdictFollowUpNote") }}</span>
+    </OCardSection>
+  </OCard>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallResponseEvent } from "@/ts/interfaces/oncall";

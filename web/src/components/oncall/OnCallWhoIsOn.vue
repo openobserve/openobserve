@@ -26,69 +26,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   name — otherwise "why that person" has no answer on any screen.
 -->
 <template>
-  <OCard data-test="oncall-who-is-on">
-    <OCardSection>
+  <OCard variant="outlined" data-test="oncall-who-is-on">
+    <OCardSection role="body">
       <OText variant="panel-title" class="mb-3 block">{{ t("oncall.whoIsOnThis") }}</OText>
 
-      <p v-if="!slots.length" class="text-status-error-text text-sm" data-test="oncall-who-is-on-nobody">
+      <p
+        v-if="!slots.length"
+        class="text-status-error-text text-sm"
+        data-test="oncall-who-is-on-nobody"
+      >
         {{ t("oncall.nobodyOnCall") }}
       </p>
 
-      <ODescriptionList v-else dense>
-        <ODescriptionItem :label="t('oncall.onCallNow')">
-          <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <OUserCell :value="primary.user_email" />
-            <OTag
-              v-if="reachOf(primary.user_email)"
-              :variant="reachOf(primary.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
-              size="sm"
-              data-test="oncall-who-is-on-primary-reach"
-            >
-              {{ reachLabel(primary.user_email) }}
-            </OTag>
-          </span>
-        </ODescriptionItem>
+      <template v-else>
+        <!-- The roster first, and only the roster: a reach tag pinned to the
+             right edge gives every person the same two columns to read, which
+             a tag trailing the address never does. -->
+        <ODescriptionList dense>
+          <ODescriptionItem :label="t('oncall.onCallNow')">
+            <span class="flex w-full items-center gap-2">
+              <OUserCell class="min-w-0 truncate font-medium" :value="primary.user_email" />
+              <OTag
+                v-if="reachOf(primary.user_email)"
+                :variant="reachOf(primary.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
+                size="sm"
+                class="ml-auto shrink-0"
+                data-test="oncall-who-is-on-primary-reach"
+              >
+                {{ reachLabel(primary.user_email) }}
+              </OTag>
+            </span>
+          </ODescriptionItem>
 
-        <!-- Every other staffed slot, named by the slot rather than called
-             "backup": a team may staff three, and two of them called backup is
-             a card that cannot be read. -->
-        <ODescriptionItem
-          v-for="entry in others"
-          :key="entry.slot ?? entry.rotation"
-          :label="slotLabel(entry)"
-        >
-          <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <OUserCell :value="entry.user_email" />
-            <OTag
-              v-if="reachOf(entry.user_email)"
-              :variant="reachOf(entry.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
-              size="sm"
-              :data-test="`oncall-who-is-on-reach-${entry.user_email}`"
-            >
-              {{ reachLabel(entry.user_email) }}
-            </OTag>
-          </span>
-        </ODescriptionItem>
+          <!-- Every other staffed slot, named by the slot rather than called
+               "backup": a team may staff three, and two of them called backup is
+               a card that cannot be read. -->
+          <ODescriptionItem
+            v-for="entry in others"
+            :key="entry.slot ?? entry.rotation"
+            :label="slotLabel(entry)"
+          >
+            <span class="flex w-full items-center gap-2">
+              <OUserCell class="min-w-0 truncate" :value="entry.user_email" />
+              <OTag
+                v-if="reachOf(entry.user_email)"
+                :variant="reachOf(entry.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
+                size="sm"
+                class="ml-auto shrink-0"
+                :data-test="`oncall-who-is-on-reach-${entry.user_email}`"
+              >
+                {{ reachLabel(entry.user_email) }}
+              </OTag>
+            </span>
+          </ODescriptionItem>
+        </ODescriptionList>
 
-        <!-- When the pager changes hands. A page still open at handover is one
-             the next person inherits without being told, unless a screen says
-             so before it happens. -->
-        <ODescriptionItem v-if="handoverAt" :label="t('oncall.shiftHandover')">
-          <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <OTimeCell :value="handoverAt" unit="us" />
-            <template v-if="handoverTo">
-              <span class="text-text-muted text-xs">{{ raw("→") }}</span>
-              <OUserCell :value="handoverTo" />
-            </template>
-          </span>
-        </ODescriptionItem>
+        <!-- Below the rule is the schedule around those people, not more
+             people — the two were one run of rows, and the handover read as
+             another seat somebody is sitting in. -->
+        <template v-if="handoverAt || nextOffset">
+          <OSeparator class="my-3" />
 
-        <!-- The derived secondary's distance down the cycle. Absent for a
-             rotation that hands over to nobody. -->
-        <ODescriptionItem v-if="nextOffset" :label="t('oncall.secondaryOffset')">
-          {{ t("oncall.secondaryOffsetValue", { offset: nextOffset }) }}
-        </ODescriptionItem>
-      </ODescriptionList>
+          <ODescriptionList dense>
+            <!-- When the pager changes hands. A page still open at handover is one
+                 the next person inherits without being told, unless a screen says
+                 so before it happens. -->
+            <ODescriptionItem v-if="handoverAt" :label="t('oncall.shiftHandover')">
+              <span class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+                <OTimeCell :value="handoverAt" unit="us" />
+                <template v-if="handoverTo">
+                  <span class="text-text-muted text-xs">{{ raw("→") }}</span>
+                  <OUserCell class="min-w-0 truncate" :value="handoverTo" />
+                </template>
+              </span>
+            </ODescriptionItem>
+
+            <!-- The derived secondary's distance down the cycle. A footnote to the
+                 roster above, so it is set in the quieter type — it explains a name
+                 rather than adding one. Absent for a rotation that hands over to
+                 nobody. -->
+            <ODescriptionItem v-if="nextOffset" :label="t('oncall.secondaryOffset')">
+              <span class="text-text-muted text-xs">
+                {{ t("oncall.secondaryOffsetValue", { offset: nextOffset }) }}
+              </span>
+            </ODescriptionItem>
+          </ODescriptionList>
+        </template>
+      </template>
     </OCardSection>
   </OCard>
 </template>
@@ -99,6 +123,7 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";

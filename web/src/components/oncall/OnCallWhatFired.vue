@@ -24,8 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   was read by nothing in `web/src`.
 -->
 <template>
-  <OCard data-test="oncall-what-fired">
-    <OCardSection>
+  <OCard variant="outlined" data-test="oncall-what-fired">
+    <OCardSection role="body">
       <span class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <OText variant="panel-title">{{ t("oncall.whatFired") }}</OText>
         <router-link

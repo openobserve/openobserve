@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard data-test="oncall-prior-causes">
-    <OCardSection>
+  <OCard variant="outlined" data-test="oncall-prior-causes">
+    <OCardSection role="body">
       <h2 class="text-text-heading text-lg">{{ t("oncall.priorCauses") }}</h2>
       <p class="text-text-muted mb-3 text-xs">{{ t("oncall.priorCausesHint") }}</p>
 
