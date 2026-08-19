@@ -363,7 +363,7 @@ import useTheme from "@/composables/useTheme";
 import SpanBlock from "./SpanBlock.vue";
 import { summarizeSpanEvents } from "@/composables/traces/useSpanEvents";
 import SpanKindBadge from "./components/SpanKindBadge.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
 import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/convertTraceData";
@@ -843,7 +843,7 @@ export default defineComponent({
      * screen reader as a bare number beside a red glyph — severity by colour
      * alone, which is the defect the badge exists to fix.
      */
-    const getEventErrorLabel = (span: any): string => {
+    const getEventErrorLabel = (span: any): I18nText => {
       const { errors } = getEventSummary(span);
       return errors === 1
         ? t("traces.spanEventErrorCount", { errors })
