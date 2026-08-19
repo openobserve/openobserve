@@ -184,10 +184,7 @@ test.describe('Database Monitoring', () => {
     // nothing else can explain a change in row count.
     await dbm.navigate('tableHealth');
     await dbm.expectLoaded();
-    await dbm.waitForSettled(dbm.tableHealthTable, [
-      dbm.tableHealthNotCollecting,
-      dbm.tableHealthNoMatches,
-    ]);
+    await dbm.settleTab('tableHealth');
 
     const unfilteredRows = await dbm.getRowCount(dbm.tableHealthTable);
     test.skip(
@@ -212,10 +209,7 @@ test.describe('Database Monitoring', () => {
     // the filter, it is testing the fixture.
     testLogger.info(`Filtering table health by instance=${instance} system=${engine}`);
     await dbm.navigateWithScope('tableHealth', { instance, system: engine });
-    await dbm.waitForSettled(dbm.tableHealthTable, [
-      dbm.tableHealthNotCollecting,
-      dbm.tableHealthNoMatches,
-    ]);
+    await dbm.settleTab('tableHealth');
 
     const filteredRows = await dbm.getRowCount(dbm.tableHealthTable);
     testLogger.info(`unfiltered=${unfilteredRows} filtered=${filteredRows}`);
@@ -238,10 +232,12 @@ test.describe('Database Monitoring', () => {
     });
     await dbm.expectLoaded();
 
-    const outcome = await dbm.waitForSettled(dbm.tableHealthTable, [
-      dbm.tableHealthNoMatches,
-      dbm.tableHealthNotCollecting,
-    ]);
+    // `settleTab` rather than a hand-written list: these sites each named two
+    // empty states and omitted `tableHealthEngineUnsupported`, which is the one
+    // an engine with no table-stats recipe renders. On such an org the wait
+    // could only ever time out, blaming the page for a state the test never
+    // agreed to look for.
+    const outcome = await dbm.settleTab('tableHealth');
     expect(outcome, 'an unmatched filter left the page in limbo').not.toBe('timeout');
 
     // Zero rows is the CORRECT answer here; what matters is that the page says
@@ -265,19 +261,29 @@ test.describe('Database Monitoring', () => {
     await dbm.navigate('samples');
     await dbm.expectLoaded();
 
-    const outcome = await dbm.waitForSettled(dbm.samplesTable, [
-      dbm.samplesNoMatches,
-      dbm.samplesLogOff,
-      dbm.serverSamplesSection,
-    ]);
+    // Settle against the tab's OWN empty-state list rather than a hand-written
+    // one. This test previously named three states and omitted the two SHARED
+    // ones (`emptyStateDiagnostic`, `emptyStateFiltered`) that this page
+    // actually renders when neither vantage has rows — so on an org where
+    // Slowest calls is legitimately empty it waited the full budget for a
+    // state that was never going to appear and reported a working page as
+    // hung. Measured: the diagnostic empty state renders at ~1s.
+    const outcome = await dbm.settleTab('samples');
     expect(outcome, 'Slowest calls never settled').not.toBe('timeout');
 
     const clientRows = await dbm.getRowCount(dbm.samplesTable);
     const fallbackShown = await dbm.serverSamplesSection.isVisible().catch(() => false);
     const logOff = await dbm.samplesLogOff.isVisible().catch(() => false);
     const noMatches = await dbm.samplesNoMatches.isVisible().catch(() => false);
+    // The two SHARED empty states this page also renders. Omitting them is what
+    // made this assertion fail on an org where Slowest calls is legitimately
+    // empty: the page WAS explaining itself, through a state the test did not
+    // know to look at.
+    const diagnostic = await dbm.emptyStateDiagnostic.isVisible().catch(() => false);
+    const filtered = await dbm.emptyStateFiltered.isVisible().catch(() => false);
     testLogger.info(
-      `samples: clientRows=${clientRows} fallback=${fallbackShown} logOff=${logOff}`,
+      `samples: clientRows=${clientRows} fallback=${fallbackShown} logOff=${logOff} ` +
+        `noMatches=${noMatches} diagnostic=${diagnostic} filtered=${filtered}`,
     );
 
     // On a no-traces deployment the client list is EMPTY BY DESIGN. Exactly one
@@ -285,7 +291,7 @@ test.describe('Database Monitoring', () => {
     // empty table while the databases are reporting their own slowest
     // statements is hiding the only answer it has.
     expect(
-      clientRows > 0 || fallbackShown || logOff || noMatches,
+      clientRows > 0 || fallbackShown || logOff || noMatches || diagnostic || filtered,
       'Slowest calls rendered neither a list nor an explanation',
     ).toBeTruthy();
 
