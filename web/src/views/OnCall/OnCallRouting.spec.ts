@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
@@ -160,6 +161,9 @@ async function showSignals(w: Wrapper) {
 
 describe("OnCallRouting", () => {
   beforeEach(() => {
+    // The catch-all is cached module-wide so one screen reads it once;
+    // without this it survives into the next test.
+    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.listTeams.mockResolvedValue({ data: TEAMS } as any);
     service.ownershipStats.mockResolvedValue({ data: { rules: [], total: 0 } } as any);

@@ -123,8 +123,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
-import type { RoutingConfig } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -143,7 +143,8 @@ const store = useStore();
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-const routingConfig = ref<RoutingConfig | null>(null);
+const { config: routingConfig, load: loadRoutingConfig, refresh: refreshRoutingConfig } =
+  useOnCallRoutingConfig();
 /// `""` means "none" in the picker; the wire value is null. One vocabulary
 /// per layer, converted at the save.
 const draftDefaultTeam = ref("");
@@ -179,25 +180,26 @@ const defaultTeamDirty = computed(
 /// Always 200 — an org that never nominated answers with nulls. A failure
 /// leaves the card unset-looking rather than breaking the screen, and unset is
 /// the honest reading of "could not load" here: neither claims a catch-all.
+/// Shared with the ownership table beside it and the policy editor's
+/// ladder-end warning. Three components read this and each fetched its own,
+/// so the same request went out twice on one screen and the copies disagreed
+/// the moment one of them wrote.
 async function fetchRoutingConfig() {
-  try {
-    const res = await oncallService.getRoutingConfig({ org_identifier: orgId.value });
-    routingConfig.value = res.data ?? null;
-    draftDefaultTeam.value = res.data?.default_team_id ?? "";
-  } catch {
-    routingConfig.value = null;
-  }
+  await loadRoutingConfig(orgId.value);
+  draftDefaultTeam.value = routingConfig.value?.default_team_id ?? "";
 }
 
 async function saveDefaultTeam() {
   savingDefault.value = true;
   try {
-    const res = await oncallService.setRoutingConfig({
+    await oncallService.setRoutingConfig({
       org_identifier: orgId.value,
       data: { default_team_id: draftDefaultTeam.value || null },
     });
-    routingConfig.value = res.data ?? null;
-    draftDefaultTeam.value = res.data?.default_team_id ?? "";
+    // Re-read rather than patching: the value is shared, so a local assignment
+    // would leave the other readers on this screen showing the old catch-all.
+    await refreshRoutingConfig(orgId.value);
+    draftDefaultTeam.value = routingConfig.value?.default_team_id ?? "";
     open.value = false;
     toast({
       variant: "success",

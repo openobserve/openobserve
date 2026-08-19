@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
+import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
@@ -106,6 +107,9 @@ const simulator = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingSimulato
 
 describe("OnCallOwnership", () => {
   beforeEach(() => {
+    // The catch-all is cached module-wide so one screen reads it once;
+    // without this it survives into the next test.
+    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.getRoutingConfig.mockResolvedValue({
       data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
@@ -234,17 +238,21 @@ describe("OnCallOwnership", () => {
   /// empty string is a UI vocabulary the wire never sees.
   describe("the catch-all team", () => {
     it("nominates a team", async () => {
-      service.setRoutingConfig.mockResolvedValue({
-        data: {
-          org_id: "default",
-          default_team_id: "team_1",
-          default_team_name: "Platform",
-          updated_at: 1,
-        },
-      } as any);
+      const nominated = {
+        org_id: "default",
+        default_team_id: "team_1",
+        default_team_name: "Platform",
+        updated_at: 1,
+      };
+      service.setRoutingConfig.mockResolvedValue({ data: nominated } as any);
       const wrapper = render();
       await flushPromises();
 
+      // The catch-all is shared with the card beside this table and with the
+      // policy editor's ladder-end warning, so a write RE-READS rather than
+      // patching one copy — which means the server answers differently
+      // afterwards, as a real one does.
+      service.getRoutingConfig.mockResolvedValue({ data: nominated } as any);
       list(wrapper).vm.$emit("set-default", "team_1");
       await flushPromises();
 

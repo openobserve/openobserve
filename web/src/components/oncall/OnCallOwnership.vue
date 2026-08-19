@@ -105,11 +105,11 @@ import type { SimulatorQuery } from "@/components/oncall/OnCallRoutingSimulator.
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import alertsService from "@/services/alerts";
+import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
 import type {
   OnCallTeam,
   OwnershipRuleStats,
-  RoutingConfig,
   RoutingPreview,
   TeamRungSummary,
   UnroutedSignal,
@@ -133,7 +133,8 @@ const store = useStore();
 const rules = ref<OwnershipRuleStats[]>([]);
 const signals = ref<UnroutedSignal[]>([]);
 const aliases = ref<{ id: string; display?: string }[]>([]);
-const routingConfig = ref<RoutingConfig | null>(null);
+const { config: routingConfig, load: loadRoutingConfig, refresh: refreshRoutingConfig } =
+  useOnCallRoutingConfig();
 
 const preview = ref<RoutingPreview | null>(null);
 
@@ -202,12 +203,7 @@ async function fetchSignals() {
 /// leaves the row unset-looking, which is the honest reading of "could not
 /// load": neither state claims a catch-all exists.
 async function fetchRoutingConfig() {
-  try {
-    const res = await oncallService.getRoutingConfig({ org_identifier: orgId.value });
-    routingConfig.value = res.data ?? null;
-  } catch {
-    routingConfig.value = null;
-  }
+  await loadRoutingConfig(orgId.value);
 }
 
 /// One call, in place. An edit used to be create-then-delete, which was
@@ -258,11 +254,14 @@ async function deleteRule() {
 async function saveDefaultTeam(teamId: string | null) {
   savingDefault.value = true;
   try {
-    const res = await oncallService.setRoutingConfig({
+    await oncallService.setRoutingConfig({
       org_identifier: orgId.value,
       data: { default_team_id: teamId },
     });
-    routingConfig.value = res.data ?? null;
+    // Re-read rather than patching this copy: the value is shared now, and a
+    // local assignment would leave the policy editor's ladder-end warning
+    // still saying no catch-all exists.
+    await refreshRoutingConfig(orgId.value);
     toast({
       variant: "success",
       message: teamId ? t("oncall.defaultTeamSaved") : t("oncall.defaultTeamCleared"),

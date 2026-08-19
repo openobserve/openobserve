@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
+import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
@@ -97,6 +98,9 @@ describe("OnCallPolicyEditor", () => {
     service.getRoutingConfig.mockResolvedValue({
       data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
     } as any);
+    // The catch-all is cached module-wide so one screen reads it once;
+    // without this it survives into the next test.
+    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.setPolicy.mockResolvedValue({ data: {} } as any);
   });
@@ -509,6 +513,9 @@ describe("targets that name a slot", () => {
   /// does not reach it — without this, `setPolicy.mock.calls[0]` is whichever
   /// test saved first, not this one's.
   beforeEach(() => {
+    // The catch-all is cached module-wide so one screen reads it once;
+    // without this it survives into the next test.
+    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: [], source: "policy" },
@@ -681,6 +688,9 @@ describe("targets that name a slot", () => {
 /// them touch.
 describe("the end of the ladder, as an edit", () => {
   beforeEach(() => {
+    // The catch-all is cached module-wide so one screen reads it once;
+    // without this it survives into the next test.
+    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.getTeamChannel.mockResolvedValue({
       data: { team_id: "team_1", destinations: [], source: "policy" },

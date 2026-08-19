@@ -392,10 +392,10 @@ import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import destinationService from "@/services/alert_destination";
+import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
 import type {
   Channel,
-  RoutingConfig,
   TeamChannel,
   EscalationTarget,
   EscalationTargetKind,
@@ -533,14 +533,13 @@ async function saveTeamChannel(destinations: string[] | null) {
 /// Only read to answer one question: does the final action's safety net
 /// exist. A failure leaves the warning off — a false "no default team" on a
 /// transient error would send somebody to fix a setting that is fine.
-const routingConfig = ref<RoutingConfig | null>(null);
+/// Shared, not fetched here. This is a pure reader — it only needs to know
+/// whether a catch-all exists so the ladder's end can warn when it does not —
+/// and its own copy went stale the moment somebody nominated one on the
+/// Routing screen.
+const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
 async function fetchRoutingConfig() {
-  try {
-    const res = await oncallService.getRoutingConfig({ org_identifier: orgId.value });
-    routingConfig.value = res.data ?? null;
-  } catch {
-    routingConfig.value = null;
-  }
+  await loadRoutingConfig(orgId.value);
 }
 
 const defaultTeamMissing = computed(

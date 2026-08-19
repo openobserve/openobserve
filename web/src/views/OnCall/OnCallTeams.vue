@@ -23,6 +23,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="group-work"
   >
     <template #actions>
+      <!-- Every team's ladder side by side. The page existed, was registered,
+           and had no inbound link from anywhere — so the one view that finds a
+           team paging nobody at P1 was reachable only by typing its URL. It
+           belongs beside the team list, which is where somebody comparing
+           teams already is. -->
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="arrow-upward"
+        data-test="oncall-teams-policies-btn"
+        @click="openPolicies"
+      >
+        {{ t("oncall.policiesTitle") }}
+      </OButton>
       <OButton
         variant="primary"
         size="sm"
@@ -357,6 +371,10 @@ async function deleteTeam() {
       message: raw(err?.response?.data?.message) || t("oncall.deleteTeamFailed"),
     });
   }
+}
+
+function openPolicies() {
+  router.push({ name: "onCallPolicies", query: { org_identifier: orgId.value } });
 }
 
 function openCreate() {

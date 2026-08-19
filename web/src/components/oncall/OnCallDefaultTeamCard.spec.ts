@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallDefaultTeamCard from "@/components/oncall/OnCallDefaultTeamCard.vue";
+import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
@@ -57,6 +58,9 @@ const dialog = (w: ReturnType<typeof render>) => w.findComponent({ name: "ODialo
 
 describe("OnCallDefaultTeamCard", () => {
   beforeEach(() => {
+    // The catch-all is cached module-wide so one screen reads it once;
+    // without this it survives into the next test.
+    __resetOnCallRoutingConfig();
     vi.clearAllMocks();
     service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: null } } as any);
     service.setRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_1" } } as any);
@@ -71,6 +75,9 @@ describe("OnCallDefaultTeamCard", () => {
       "Set a catch-all team",
     );
 
+    // Two mounts, two answers — so the shared read has to be dropped between
+    // them. Reusing it is the composable working: one screen, one request.
+    __resetOnCallRoutingConfig();
     service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_1" } } as any);
     const set = render({ dialog: true });
     await flushPromises();
