@@ -31,7 +31,12 @@ vi.mock("@/services/oncall", () => ({
 }));
 
 const push = vi.fn();
-vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+const replace = vi.fn();
+const routeQuery: Record<string, string> = {};
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ push, replace }),
+  useRoute: () => ({ name: "onCallTeams", params: {}, query: routeQuery }),
+}));
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
@@ -106,7 +111,47 @@ function onCallCell(wrapper: any, _row?: unknown) {
 describe("OnCallTeams", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+  });
+
+  /// The setup checklist's first step sends somebody here already meaning to
+  /// create a team. Landing them on the list to hunt for the button is the same
+  /// click asked twice.
+  describe("arriving with the intent to create", () => {
+    it("opens the form straight away on ?action=add", async () => {
+      service.listTeams.mockResolvedValue({ data: [] } as any);
+      routeQuery.action = "add";
+      const wrapper = mount(OnCallTeams, { global: { plugins: [i18n, store], stubs } });
+      await flushPromises();
+
+      const form = wrapper.findComponent({ name: "OnCallTeamForm" });
+      expect(form.props("open")).toBe(true);
+      expect(form.props("team")).toBe(null);
+    });
+
+    /// Consumed, not left behind: a refresh or a Back into this page would
+    /// otherwise reopen a form the reader had deliberately closed.
+    it("strips the parameter once it has acted on it", async () => {
+      service.listTeams.mockResolvedValue({ data: [] } as any);
+      routeQuery.action = "add";
+      routeQuery.org_identifier = "default";
+      mount(OnCallTeams, { global: { plugins: [i18n, store], stubs } });
+      await flushPromises();
+
+      expect(replace).toHaveBeenCalledWith(
+        expect.objectContaining({ query: { org_identifier: "default" } }),
+      );
+    });
+
+    it("leaves the form closed without it", async () => {
+      service.listTeams.mockResolvedValue({ data: [] } as any);
+      const wrapper = mount(OnCallTeams, { global: { plugins: [i18n, store], stubs } });
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("open")).toBe(false);
+      expect(replace).not.toHaveBeenCalled();
+    });
   });
 
   it("shows who is on call for each team", async () => {

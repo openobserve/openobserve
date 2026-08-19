@@ -111,8 +111,17 @@ const stubs = {
   },
   OnCallSetupChecklist: {
     name: "OnCallSetupChecklist",
-    props: ["hasTeam", "hasStaffedRotation", "hasRouting", "canConfigure", "firstTeamId"],
-    template: "<div data-test='oncall-setup-checklist' />",
+    props: [
+      "hasTeam",
+      "hasStaffedRotation",
+      "hasRouting",
+      "compact",
+      "canConfigure",
+      "firstTeamId",
+    ],
+    // The two shapes the real component takes, so the page's layout decision is
+    // visible from the outside rather than only in a prop.
+    template: "<div :data-test=\"compact ? 'oncall-setup-banner' : 'oncall-setup-checklist'\" />",
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
@@ -424,9 +433,9 @@ describe("OnCallResponses", () => {
 
   describe("the standing summary", () => {
     /// The two cards answer the questions the list answers per row. Neither
-    /// means anything on an org that cannot page at all, so both wait until the
-    /// checklist is satisfied.
-    it("stays hidden while the setup checklist is up", async () => {
+    /// means anything on an org that has never paged, so both wait until there
+    /// is something to describe.
+    it("stays hidden while setup owns the screen", async () => {
       const wrapper = render();
       await flushPromises();
 
@@ -743,6 +752,49 @@ describe("OnCallResponses", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+    });
+
+    /// Nothing has paged and the wiring is incomplete: there is no list worth
+    /// showing, and an empty table under the checklist would offer "no pages
+    /// yet" as though that were the healthy answer.
+    it("is the whole screen when nothing has ever paged", async () => {
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-responses-table"]').exists()).toBe(false);
+    });
+
+    /// "Create a team" that lands on a list you then have to find a button in is
+    /// the same click asked twice, and this step is only ever shown to an org
+    /// that has no team to look at anyway.
+    it("sends the first step to the teams screen with the form already open", async () => {
+      const wrapper = render();
+      await flushPromises();
+
+      wrapper.findComponent({ name: "OnCallSetupChecklist" }).vm.$emit("create-team");
+
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "onCallTeams",
+          query: expect.objectContaining({ action: "add" }),
+        }),
+      );
+    });
+
+    /// The other half of the same rule: pages exist, so the list is the work and
+    /// setup shrinks to one line above it.
+    it("collapses to a bar over the list once pages exist", async () => {
+      service.listOwnershipRules.mockResolvedValue({ data: [] } as any);
+      service.coverageGaps.mockResolvedValue({
+        data: { at: 0, total: 1, teams: [team] },
+      } as any);
+      const wrapper = await withPages([page({ team_id: null })]);
+
+      const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
+      expect(checklist.exists()).toBe(true);
+      expect(checklist.props("compact")).toBe(true);
+      expect(wrapper.find('[data-test="oncall-responses-table"]').exists()).toBe(true);
     });
   });
 

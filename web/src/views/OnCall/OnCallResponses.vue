@@ -76,27 +76,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Setup is answered from live data, so it survives past "no teams": a
          team with nobody in its rotation pages nobody, and the calm empty
-         state below would call that healthy. -->
+         state below would call that healthy.
+
+         `compact` is the whole layout decision. With no pages the checklist is
+         the screen and everything below it is hidden; with pages it is one bar
+         naming the next undone step, over a list that stays fully usable. -->
     <OnCallSetupChecklist
-      v-if="showChecklist"
+      v-if="showChecklist && !unavailable"
       :has-team="setup.hasTeam"
       :has-staffed-rotation="setup.hasStaffedRotation"
       :has-routing="setup.hasRouting"
+      :compact="hasPages"
       :can-configure="canConfigure"
       :first-team-id="teams[0]?.id ?? null"
-      @create-team="goTo('onCallTeams')"
+      @create-team="createTeam"
     />
 
     <!-- The two standing questions, above the list that answers them per row:
          is anything waiting on a person, and would a page reach anyone. Hidden
-         while the checklist is up, because neither means anything on an org
-         that cannot page at all.
+         only while setup owns the screen: on an org that has never paged,
+         neither question has an answer yet.
 
          These were three equal cards in a grid. A grid gives the same weight to
          the one fact somebody has to act on and the two they check once, and it
          spent a third of the first screen doing it — so the urgent one is a
          banner with its own action and the standing two are a single line. -->
-    <OContent v-if="!showChecklist && !unavailable" class="flex flex-col gap-2 pt-2">
+    <OContent v-if="!setupOnly && !unavailable" class="flex flex-col gap-2 pt-2">
       <OnCallRingingBanner
         :ringing="attention.unacked"
         :exhausted="attention.exhausted"
@@ -120,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OContent>
 
     <OTable
-      v-if="!unavailable"
+      v-if="!unavailable && !setupOnly"
       :frame="false"
       :data="rows"
       :columns="columns"
@@ -849,6 +854,20 @@ const showChecklist = computed(
     !loadError.value &&
     !(setup.value.hasTeam && setup.value.hasStaffedRotation && setup.value.hasRouting),
 );
+
+/// Whether this org has ever paged anybody — read from what was FETCHED, not
+/// from the filtered rows, so narrowing the table to nothing does not swap the
+/// page's whole shape underneath the reader.
+const hasPages = computed(() => responses.value.length > 0);
+
+/// Setup is the entire screen.
+///
+/// Nothing has ever paged and the wiring is incomplete, which are the same
+/// fact: there is no list to hide behind the checklist, and an empty table
+/// under it would only offer "no pages yet" as if that were healthy. Once a
+/// single page exists the checklist has to give the screen back — it becomes
+/// one bar over a live list.
+const setupOnly = computed(() => showChecklist.value && !hasPages.value);
 
 const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   {
@@ -1697,6 +1716,17 @@ watch(expandedIds, (ids) => {
 
 function goTo(name: string) {
   router.push({ name, query: { org_identifier: orgId.value } });
+}
+
+/// The setup checklist's first step, which is only ever shown to an org with no
+/// team at all. It lands on the teams screen with the form already open —
+/// "create a team" that drops you on a list you then have to find a button in
+/// is the same click asked twice.
+function createTeam() {
+  router.push({
+    name: "onCallTeams",
+    query: { org_identifier: orgId.value, action: "add" },
+  });
 }
 
 /// A rotation in the on-call menu is worth a click: whoever is reading "nobody on

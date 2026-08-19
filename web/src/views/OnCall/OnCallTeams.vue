@@ -205,8 +205,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -230,6 +230,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18nTyped();
 const store = useStore();
+const route = useRoute();
 const router = useRouter();
 
 const teams = ref<OnCallTeam[]>([]);
@@ -426,5 +427,29 @@ function onSaved() {
   fetchTeams();
 }
 
-onMounted(fetchTeams);
+/// `?action=add` — somebody arrived here already meaning to create a team, and
+/// making them find the button again is the same click twice. Sent by the setup
+/// checklist's first step, which is the one place that knows the visitor has no
+/// team at all.
+///
+/// The parameter is consumed rather than left in the URL: it describes an
+/// intent that has now been acted on, and a refresh or a Back into this page
+/// would otherwise reopen a form the reader had deliberately closed.
+function syncFromRoute() {
+  if (route.query.action !== "add") return;
+
+  openCreate();
+
+  const { action: _action, ...rest } = route.query;
+  router.replace({ name: route.name ?? undefined, params: route.params, query: rest });
+}
+
+// Watched as well as read on mount: arriving with the intent a second time is a
+// query change on a route that is already mounted.
+watch(() => route.query.action, syncFromRoute);
+
+onMounted(() => {
+  fetchTeams();
+  syncFromRoute();
+});
 </script>
