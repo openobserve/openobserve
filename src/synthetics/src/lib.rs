@@ -113,7 +113,6 @@ const JOB_CLUSTER_POLL: std::time::Duration = std::time::Duration::from_secs(10)
 /// poll also earns its keep on the other side: when the claim moves (spec §6, a
 /// scheduler relocated between regions) the new region starts synthetics
 /// without a restart.
-
 pub async fn init() {
     if !config::get_config().synthetics.enabled {
         tracing::info!("[synthetics] disabled via ZO_SYNTHETICS_ENABLED — workers not started");
