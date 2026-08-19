@@ -9,10 +9,15 @@ export class ServiceGraphPage {
     this.page = page;
 
     // ===== NAVIGATION =====
-    // Service Graph is its own route (/traces/service-graph), reached from the
-    // Traces rail tile's hover flyout — it is no longer a tab on the Traces page.
+    // Service Graph is reached from the Traces rail tile's hover flyout; since #13852 the
+    // flyout item lands on the Traces page's in-page `?tab=service-graph` view (the old
+    // /traces/service-graph route now only exists as a legacy redirect).
     this.tracesRailTile = '[data-test="nav-group-traces"]';
-    this.serviceGraphFlyoutItem = '[data-test="nav-group-item-serviceGraph"]';
+    // #13852 rerouted the flyout children through the Traces page's ?tab= views, so the
+    // Service Graph flyout item is now `nav-group-item-traces-service-graph`
+    // (childDataTest = `nav-group-item-${child.name}-${child.tab}`), not the old
+    // standalone `nav-group-item-serviceGraph`.
+    this.serviceGraphFlyoutItem = '[data-test="nav-group-item-traces-service-graph"]';
 
     // ===== MAIN COMPONENT (ServiceGraph.vue) =====
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
@@ -85,8 +90,15 @@ export class ServiceGraphPage {
 
   async navigateToServiceGraph() {
     await this.page.locator(this.tracesRailTile).hover();
-    await this.page.locator(this.serviceGraphFlyoutItem).click();
-    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 });
+    // The flyout is teleported to <body> and opens after ONavGroup's 120ms OPEN_DELAY, so the
+    // item is not in the DOM the instant hover() resolves — wait for it before clicking, else
+    // the click races the debounce and times out.
+    const flyoutItem = this.page.locator(this.serviceGraphFlyoutItem);
+    await flyoutItem.waitFor({ state: 'visible', timeout: 10000 });
+    await flyoutItem.click();
+    // #13852 lands Service Graph on the Traces page as `?tab=service-graph`; the old
+    // /traces/service-graph path now only exists as a legacy redirect.
+    await this.page.waitForURL(/\/traces\?.*tab=service-graph/, { timeout: 10000 });
   }
 
   /**
