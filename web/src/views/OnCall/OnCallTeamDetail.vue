@@ -79,147 +79,88 @@
     </OContent>
 
     <template v-else>
-    <!-- Who holds the pager, who catches it, how far the ladder reaches, and how
-         last week went — the four questions asked before anything else on the
-         page. The tabs below are where you go to CHANGE any of them. -->
-    <div class="bg-border-default border-border-default border-y">
-      <OnCallTeamPulse
-        :slots="onCallNow"
-        :schedule="schedule"
-        :policy="policy"
-        :overview="overview"
-        :reachability="reachability"
-        :timezone="team?.timezone ?? 'UTC'"
-      />
-    </div>
+      <!-- Who holds the pager, who catches it, how far the ladder reaches, and how
+           last week went — the four questions asked before anything else on the
+           page. The tabs below are where you go to CHANGE any of them. -->
+      <div class="bg-border-default border-border-default border-y">
+        <OnCallTeamPulse
+          :slots="onCallNow"
+          :schedule="schedule"
+          :policy="policy"
+          :overview="overview"
+          :reachability="reachability"
+          :timezone="team?.timezone ?? 'UTC'"
+        />
+      </div>
 
-    <OContent class="py-2">
-      <OnCallTeamAttention
-        :risks="configRisks"
-        :reachability="reachability"
-        :overview="overview"
-        :checked-at="insightsCheckedAt"
-        @act="onAttentionAct"
-        @recheck="fetchInsights"
-      />
-    </OContent>
+      <OContent class="py-2">
+        <OnCallTeamAttention
+          :risks="configRisks"
+          :reachability="reachability"
+          :overview="overview"
+          :checked-at="insightsCheckedAt"
+          :has-members="hasMembers"
+          @act="onAttentionAct"
+          @recheck="fetchInsights"
+        />
+      </OContent>
 
-    <!-- What the team HAS been doing, then the chain that decides it: when each
-         person is on, what happens if nobody answers, what reaches the team at
-         all, and finally who the people are. -->
-    <OTabs v-model="activeTab" data-test="oncall-team-tabs">
-      <OTab name="overview" :label="t('oncall.teamOverview')" icon="format-list-bulleted" />
-      <OTab name="schedule" :label="t('oncall.schedule')" icon="calendar-month" />
-      <!-- Counts via the default slot, which is the documented seam for badges;
-           `label` and `icon` are ignored once it is provided. -->
-      <OTab name="policy">
-        <OIcon name="arrow-upward" size="xs" />
-        {{ t("oncall.escalationTab") }}
-        <OTag v-if="silentPriorities" variant="amber-soft" size="sm">{{ silentPriorities }}</OTag>
-      </OTab>
-      <OTab name="ownership">
-        <OIcon name="account-tree" size="xs" />
-        {{ t("oncall.routing") }}
-        <OTag v-if="ruleCount" variant="default-soft" size="sm">{{ ruleCount }}</OTag>
-      </OTab>
-      <OTab name="members">
-        <OIcon name="group-work" size="xs" />
-        {{ t("oncall.members") }}
-        <OTag v-if="memberCount" variant="default-soft" size="sm">{{ memberCount }}</OTag>
-      </OTab>
-    </OTabs>
+      <!-- What the team HAS been doing, then the chain that decides it: when each
+           person is on, what happens if nobody answers, what reaches the team at
+           all, and finally who the people are. -->
+      <OTabs v-model="activeTab" data-test="oncall-team-tabs">
+        <OTab name="overview" :label="t('oncall.teamOverview')" icon="format-list-bulleted" />
+        <OTab name="schedule" :label="t('oncall.schedule')" icon="calendar-month" />
+        <!-- Counts via the default slot, which is the documented seam for badges;
+             `label` and `icon` are ignored once it is provided. -->
+        <OTab name="policy">
+          <OIcon name="arrow-upward" size="xs" />
+          {{ t("oncall.escalationTab") }}
+          <OTag v-if="silentPriorities" variant="amber-soft" size="sm">{{ silentPriorities }}</OTag>
+        </OTab>
+        <OTab name="ownership">
+          <OIcon name="account-tree" size="xs" />
+          {{ t("oncall.routing") }}
+          <OTag v-if="ruleCount" variant="default-soft" size="sm">{{ ruleCount }}</OTag>
+        </OTab>
+        <OTab name="members">
+          <OIcon name="group-work" size="xs" />
+          {{ t("oncall.members") }}
+          <OTag v-if="memberCount" variant="default-soft" size="sm">{{ memberCount }}</OTag>
+        </OTab>
+      </OTabs>
 
-    <!-- `scroll` defaults to overflow-hidden, which silently clipped the
-         escalation policy so its lower priorities were unreachable. -->
-    <OTabPanels v-model="activeTab" grow scroll="y">
-      <!-- What actually happened, not just what fired: the pages this team was
-           woken by, and how fast each was answered. -->
-      <OTabPanel name="overview">
-        <!-- Left is what happened and when nobody is covered; right is how you
-             reach these people. Two columns because the right rail is reference
-             material — read once during an incident, not scanned. -->
-        <OContent
-          y
-          class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
-        >
-          <div class="flex flex-col gap-4">
-            <div class="flex flex-col gap-2">
-              <span class="flex flex-wrap items-baseline gap-x-2">
-                <OText variant="panel-title">{{ t("oncall.teamRecentPages") }}</OText>
-                <OText variant="meta">{{ t("oncall.teamRecentPagesHint") }}</OText>
-                <OButton
-                  variant="outline"
-                  size="xs"
-                  class="ms-auto"
-                  data-test="oncall-team-open-oncall"
-                  @click="openOnCallList"
-                >
-                  {{ t("oncall.teamOpenInOnCall") }}
-                </OButton>
-              </span>
-
-              <OTable
-                :frame="false"
-                :data="recentPages"
-                :columns="pageColumns"
-                row-key="id"
-                :loading="pagesLoading"
-                pagination="client"
-                :page-size="10"
-                sort-by="opened_at"
-                sort-order="desc"
-                :show-global-filter="false"
-                table-id="oncall-team-recent-pages"
-                data-test="oncall-team-pages-table"
-                @row-click="openPage"
-              >
-                <template #cell-opened_at="{ row }">
-                  <OTimeCell :value="row.opened_at" unit="us" />
-                </template>
-                <template #cell-title="{ row }">
-                  <!-- Alert titles are long by nature and this column is one of
-                       five: the row tells you a page happened, the tooltip
-                       tells you which. -->
-                  <span class="text-text-heading truncate text-sm">
-                    {{ raw(row.title || row.subject.source_id) }}
-                    <OTooltip side="bottom" :content="raw(row.title || row.subject.source_id)" />
-                  </span>
-                </template>
-                <template #cell-acked_by="{ row }">
-                  <OUserCell v-if="row.acked_by" :value="row.acked_by" />
-                  <span v-else class="text-text-muted text-sm">{{ ABSENT }}</span>
-                </template>
-                <template #cell-time_to_ack="{ row }">
-                  <span class="text-text-body text-sm">{{ timeToAck(row) }}</span>
-                </template>
-                <template #cell-escalated="{ row }">
-                  <OTag v-if="didEscalate(row)" variant="amber-soft" size="sm">
-                    {{ t("oncall.escalate") }}
-                  </OTag>
-                  <span v-else class="text-text-muted text-sm">
-                    {{ t("oncall.teamNotEscalated") }}
-                  </span>
-                </template>
-                <template #empty>
-                  <OEmptyState
-                    size="hero"
-                    preset="no-oncall-responses"
-                    data-test="oncall-team-pages-empty"
-                  />
-                </template>
-              </OTable>
-            </div>
+      <!-- `scroll` defaults to overflow-hidden, which silently clipped the
+           escalation policy so its lower priorities were unreachable. -->
+      <OTabPanels v-model="activeTab" grow scroll="y">
+        <OTabPanel name="overview">
+          <!-- Two blocks in one column. The demo read as a wall: five sortable
+               columns of history beside a rail restating reach and readiness that
+               the Escalation and Members tabs already own. What is left is the
+               pair of questions this tab exists for — has this team been
+               answering, and is anybody there to answer next. -->
+          <OContent y class="flex flex-col gap-4">
+            <OnCallRecentPages
+              :pages="recentPages"
+              :policy="policy"
+              :window-days="ACTIVITY_WINDOW_DAYS"
+              :loading="pagesLoading"
+              @open="openPage"
+              @view-all="openOnCallList"
+            />
 
             <!-- Gaps are the only thing worth looking at here, so they are the
                  only bands that get an alarming colour. -->
-            <div class="flex flex-col gap-2">
+            <div
+              class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
+              data-test="oncall-team-coverage-card"
+            >
               <span class="flex flex-wrap items-baseline gap-x-2">
                 <OText variant="panel-title">
                   {{ t("oncall.teamCoverage", { days: COVERAGE_DAYS }) }}
                 </OText>
-                <OText variant="meta">{{ t("oncall.teamCoverageHint") }}</OText>
                 <OButton
-                  variant="outline"
+                  variant="ghost-primary"
                   size="xs"
                   class="ms-auto"
                   data-test="oncall-team-open-schedule"
@@ -234,153 +175,155 @@
                 :days="COVERAGE_DAYS"
               />
             </div>
-          </div>
+          </OContent>
+        </OTabPanel>
 
-          <div class="flex flex-col gap-4">
-            <OnCallTeamReach :destinations="policy?.destinations ?? []" />
-            <OnCallContactReadiness
-              :reachability="reachability"
-              :testing="testingPage"
-              @test-page="sendTestPage"
-            />
-          </div>
-        </OContent>
-      </OTabPanel>
-
-      <!-- "1.9x load" is a fact about PEOPLE, and the only thing to be done about
-           it — change who is in the rotation — is on this tab. Reachability and
-           load are columns of the roster now, not panels beside it: one row per
-           person answers can we reach them, what have they carried, when are
-           they on next. -->
-      <OTabPanel name="members">
-        <OnCallMembers
-          :team-id="teamId"
-          :members="members"
-          :rotations="schedule?.rotations ?? []"
-          :timezone="team?.timezone ?? 'UTC'"
-          :on-call-now="onCallNow"
-          :reachability="reachability"
-          :load="teamLoad"
-          :testing="testingPage"
-          @changed="fetchAll"
-          @open-schedule="activeTab = 'schedule'"
-          @test-page="sendTestPage"
-        />
-      </OTabPanel>
-
-      <!-- What the schedule WILL do, then the rotations that decide it, then
-           the editor. Reading before editing: the timeline is resolved by the
-           engine, so it answers "is this right" in a way the draft cannot. -->
-      <OTabPanel name="schedule">
-        <!-- One answer line, then one timeline. Everything the rail used to
-             restate now lives on the lane it describes. -->
-        <OnCallScheduleAnswer
-          :slots="onCallNow"
-          :segments="segments"
-          :timezone="team?.timezone ?? 'UTC'"
-          @assign-secondary="onAssignSecondary"
-          @request-swap="openCover"
-        />
-
-        <OContent y class="flex flex-col gap-5">
-          <!-- Every act on a rotation arrives here, and every one of them opens
-               the SAME drawer: a rotation is one form, and which button was
-               pressed only decides what it opens on. -->
-          <OnCallScheduleTimeline
-            v-model:window="scheduleWindow"
+        <!-- "1.9x load" is a fact about PEOPLE, and the only thing to be done about
+             it — change who is in the rotation — is on this tab. Reachability and
+             load are columns of the roster now, not panels beside it: one row per
+             person answers can we reach them, what have they carried, when are
+             they on next. -->
+        <OTabPanel name="members">
+          <OnCallMembers
+            :team-id="teamId"
+            :members="members"
             :rotations="schedule?.rotations ?? []"
+            :timezone="team?.timezone ?? 'UTC'"
+            :on-call-now="onCallNow"
+            :reachability="reachability"
+            :load="teamLoad"
+            :testing="testingPage"
+            @changed="fetchAll"
+            @open-schedule="activeTab = 'schedule'"
+            @test-page="sendTestPage"
+          />
+        </OTabPanel>
+
+        <!-- What the schedule WILL do, then the rotations that decide it, then
+             the editor. Reading before editing: the timeline is resolved by the
+             engine, so it answers "is this right" in a way the draft cannot. -->
+        <OTabPanel name="schedule">
+          <!-- One answer line, then one timeline. Everything the rail used to
+               restate now lives on the lane it describes. -->
+          <OnCallScheduleAnswer
+            :slots="onCallNow"
             :segments="segments"
             :timezone="team?.timezone ?? 'UTC'"
-            :loading="segmentsLoading"
-            @fill-gap="onFillGap"
-            @add="openScheduleEditor({ mode: 'new' })"
-            @edit="openScheduleEditor({ mode: 'edit', name: $event })"
-            @assign-people="openScheduleEditor({ mode: 'edit', name: $event })"
-            @duplicate="openScheduleEditor({ mode: 'duplicate', name: $event })"
-            @override="openCover"
-            @delete="rotationToDelete = $event"
-            @presets="presetsOpen = true"
+            :has-members="hasMembers !== false"
+            @assign-secondary="onAssignSecondary"
+            @request-swap="openCover"
+            @add-people="activeTab = 'members'"
           />
 
-          <OnCallSchedulePresets
-            v-model:open="presetsOpen"
-            :team-id="teamId"
-            :members="members"
-            :has-schedule="!!schedule?.rotations?.length"
-            @applied="onScheduleSaved"
-          />
-
-          <!-- Drawer only: the read view stays underneath. Swapping the tab
-               into a separate editing mode meant "Add rotation" first landed
-               on a page-sized editor with a second button of the same name. -->
-          <OnCallScheduleEditor
-            drawer-only
-            :team-id="teamId"
-            :timezone="team?.timezone ?? 'UTC'"
-            :schedule="schedule"
-            :members="members"
-            :intent="scheduleIntent"
-            @saved="onScheduleSaved"
-            @intent-handled="scheduleIntent = null"
-          />
-        </OContent>
-      </OTabPanel>
-
-      <!-- Same shape as Schedule: what the ladder WOULD do, then the editor on
-           demand. Reading the policy tells you its shape; only the dry run
-           tells you whether it reaches anybody. -->
-      <OTabPanel name="policy">
-        <OContent y class="flex flex-col gap-5">
-          <span class="flex flex-wrap items-baseline gap-x-2">
-            <OText variant="panel-title">{{ t("oncall.escalationReadTitle") }}</OText>
-            <OButton
-              variant="outline"
-              size="xs"
-              class="ms-auto"
-              data-test="oncall-policy-edit"
-              @click="editingPolicy = true"
-            >
-              {{ t("oncall.edit") }}
-            </OButton>
-          </span>
-
-          <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            <OnCallEscalationLadder
-              v-model:selected="selectedPriority"
-              :priorities="overview?.rungs ?? []"
-              :preview="preview"
-              :loading="previewLoading"
-              @edit="editingPolicy = true"
+          <OContent y class="flex flex-col gap-5">
+            <!-- Every act on a rotation arrives here, and every one of them opens
+                 the SAME drawer: a rotation is one form, and which button was
+                 pressed only decides what it opens on. -->
+            <OnCallScheduleTimeline
+              v-model:window="scheduleWindow"
+              :rotations="schedule?.rotations ?? []"
+              :segments="segments"
+              :timezone="team?.timezone ?? 'UTC'"
+              :loading="segmentsLoading"
+              :can-cover="hasMembers !== false"
+              @fill-gap="onFillGap"
+              @add="openScheduleEditor({ mode: 'new' })"
+              @edit="openScheduleEditor({ mode: 'edit', name: $event })"
+              @assign-people="openScheduleEditor({ mode: 'edit', name: $event })"
+              @duplicate="openScheduleEditor({ mode: 'duplicate', name: $event })"
+              @override="openCover"
+              @delete="rotationToDelete = $event"
+              @presets="presetsOpen = true"
             />
-            <OnCallEscalationDryRun :preview="preview" />
-          </div>
 
-          <!-- Same move as the schedule tab: the editor is a drawer, so the
-               ladder and the dry run stay on screen behind it and the edit is
-               checked against what it is replacing. -->
-          <OnCallPolicyEditor
-            v-model:open="editingPolicy"
-            :priority="selectedPriorityNumber"
-            :team-id="teamId"
-            :policy="policy"
-            @saved="onPolicySaved"
-          />
-        </OContent>
-      </OTabPanel>
+            <OnCallSchedulePresets
+              v-model:open="presetsOpen"
+              :team-id="teamId"
+              :members="members"
+              :has-schedule="!!schedule?.rotations?.length"
+              @applied="onScheduleSaved"
+            />
 
-      <OTabPanel name="ownership">
-        <!-- The list says what "it pages" MEANS, which needs the ladder and
-             whoever is holding it this instant — both already loaded here. -->
-        <OContent y>
-          <OnCallOwnership
-            :team-id="teamId"
-            :teams="teams"
-            :on-call-now="onCallNow"
-            :ladder="overview?.rungs ?? []"
-          />
-        </OContent>
-      </OTabPanel>
-    </OTabPanels>
+            <!-- Drawer only: the read view stays underneath. Swapping the tab
+                 into a separate editing mode meant "Add rotation" first landed
+                 on a page-sized editor with a second button of the same name. -->
+            <OnCallScheduleEditor
+              drawer-only
+              :team-id="teamId"
+              :timezone="team?.timezone ?? 'UTC'"
+              :schedule="schedule"
+              :members="members"
+              :intent="scheduleIntent"
+              @saved="onScheduleSaved"
+              @intent-handled="scheduleIntent = null"
+              @open-members="activeTab = 'members'"
+            />
+          </OContent>
+        </OTabPanel>
+
+        <!-- Same shape as Schedule: what the ladder WOULD do, then the editor on
+             demand. Reading the policy tells you its shape; only the dry run
+             tells you whether it reaches anybody. -->
+        <OTabPanel name="policy">
+          <OContent y class="flex flex-col gap-5">
+            <span class="flex flex-wrap items-baseline gap-x-2">
+              <OText variant="panel-title">{{ t("oncall.escalationReadTitle") }}</OText>
+              <OButton
+                variant="outline"
+                size="xs"
+                class="ms-auto"
+                data-test="oncall-policy-edit"
+                @click="editingPolicy = true"
+              >
+                {{ t("oncall.edit") }}
+              </OButton>
+            </span>
+
+            <div
+              class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+            >
+              <OnCallEscalationLadder
+                v-model:selected="selectedPriority"
+                :priorities="overview?.rungs ?? []"
+                :preview="preview"
+                :loading="previewLoading"
+                @edit="editingPolicy = true"
+              />
+              <div class="flex flex-col gap-4">
+                <OnCallEscalationDryRun :preview="preview" />
+                <!-- The rooms a page is mirrored to. It answers "where does this
+                     land" for the same ladder the dry run just walked, which is
+                     why it moved off Overview and onto this tab. -->
+                <OnCallTeamReach :destinations="policy?.destinations ?? []" />
+              </div>
+            </div>
+
+            <!-- Same move as the schedule tab: the editor is a drawer, so the
+                 ladder and the dry run stay on screen behind it and the edit is
+                 checked against what it is replacing. -->
+            <OnCallPolicyEditor
+              v-model:open="editingPolicy"
+              :priority="selectedPriorityNumber"
+              :team-id="teamId"
+              :policy="policy"
+              @saved="onPolicySaved"
+            />
+          </OContent>
+        </OTabPanel>
+
+        <OTabPanel name="ownership">
+          <!-- The list says what "it pages" MEANS, which needs the ladder and
+               whoever is holding it this instant — both already loaded here. -->
+          <OContent y>
+            <OnCallOwnership
+              :team-id="teamId"
+              :teams="teams"
+              :on-call-now="onCallNow"
+              :ladder="overview?.rungs ?? []"
+            />
+          </OContent>
+        </OTabPanel>
+      </OTabPanels>
     </template>
 
     <OnCallTeamForm v-model:open="editOpen" :team="team" @saved="onTeamSaved" />
@@ -419,10 +362,8 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
@@ -433,7 +374,7 @@ import OnCallScheduleAnswer from "@/components/oncall/OnCallScheduleAnswer.vue";
 import OnCallSchedulePresets from "@/components/oncall/OnCallSchedulePresets.vue";
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
-import OnCallContactReadiness from "@/components/oncall/OnCallContactReadiness.vue";
+import OnCallRecentPages from "@/components/oncall/OnCallRecentPages.vue";
 import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallEscalationDryRun from "@/components/oncall/OnCallEscalationDryRun.vue";
 import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
@@ -443,9 +384,6 @@ import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OnCallTeamPulse from "@/components/oncall/OnCallTeamPulse.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -470,7 +408,6 @@ import type {
 import { DEFAULT_SLOT, MICROS_PER_DAY, sameSlot } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable, upcomingShifts, winningRotation } from "@/utils/oncall";
-import { formatMicrosDuration } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -478,7 +415,8 @@ const route = useRoute();
 const router = useRouter();
 
 /** The window the activity panel and the recent-pages list describe. */
-const ACTIVITY_WINDOW_MICROS = 7 * MICROS_PER_DAY;
+const ACTIVITY_WINDOW_DAYS = 7;
+const ACTIVITY_WINDOW_MICROS = ACTIVITY_WINDOW_DAYS * MICROS_PER_DAY;
 /** How far ahead the coverage strip draws. */
 const COVERAGE_DAYS = 14;
 
@@ -587,6 +525,10 @@ const routeTab = computed(() => {
 /// knows — a header that waits on a second request reads as broken.
 const memberCount = computed(() => overview.value?.members ?? members.value.length);
 
+/// `null` until the roster has been read: an empty array on a page still
+/// loading would announce "this team has nobody in it" about every team.
+const hasMembers = computed<boolean | null>(() => (loaded.value ? members.value.length > 0 : null));
+
 const subtitle = computed(() => {
   if (!team.value) return undefined;
   const rules = overview.value?.alerts_assigned;
@@ -599,73 +541,11 @@ const subtitle = computed(() => {
   return raw(`${base} · ${t("oncall.teamAlertRules", { count: rules }, rules)}`);
 });
 
-const ABSENT = raw("—");
-
 /// Pages this team was woken by, inside the activity window.
 const recentPages = computed(() => {
   const since = Date.now() * 1000 - ACTIVITY_WINDOW_MICROS;
   return responses.value.filter((row) => row.opened_at >= since);
 });
-
-/// The delay before a record's ladder would have woken a SECOND person. Read
-/// from the policy so it needs no per-record request and covers every page.
-function secondRungDelay(record: OnCallResponse): number | null {
-  const steps = policy.value?.rungs.find((rung) => rung.priority === record.priority)?.steps;
-  if (!steps || steps.length < 2) return null;
-  return [...steps].sort((a, b) => a.after_micros - b.after_micros)[1].after_micros;
-}
-
-function timeToAck(record: OnCallResponse) {
-  return record.acked_at ? raw(formatMicrosDuration(record.acked_at - record.opened_at)) : ABSENT;
-}
-
-/// Whether anybody beyond the first responder was woken — the same policy-based
-/// answer the activity panel counts.
-function didEscalate(record: OnCallResponse): boolean {
-  const after = secondRungDelay(record);
-  if (after === null) return false;
-  const delay = record.acked_at ? record.acked_at - record.opened_at : null;
-  return delay === null ? false : delay >= after;
-}
-
-const pageColumns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
-  {
-    id: "opened_at",
-    header: t("oncall.openedAt"),
-    size: 140,
-    accessorKey: "opened_at",
-    sortable: true,
-  },
-  {
-    id: "title",
-    header: t("oncall.subject"),
-    accessorFn: (row: OnCallResponse) => row.title || row.subject.source_id,
-    sortable: true,
-    meta: { isName: true },
-  },
-  {
-    id: "acked_by",
-    header: t("oncall.teamAnsweredBy"),
-    size: 180,
-    accessorFn: (row: OnCallResponse) => row.acked_by ?? "",
-    sortable: true,
-  },
-  {
-    id: "time_to_ack",
-    header: t("oncall.timeToAck"),
-    size: 120,
-    accessorFn: (row: OnCallResponse) =>
-      row.acked_at ? row.acked_at - row.opened_at : Number.MAX_SAFE_INTEGER,
-    sortable: true,
-  },
-  {
-    id: "escalated",
-    header: t("oncall.teamEscalatedCol"),
-    size: 120,
-    accessorFn: (row: OnCallResponse) => (didEscalate(row) ? 1 : 0),
-    sortable: true,
-  },
-]);
 
 function openPage(row: OnCallResponse) {
   router.push({

@@ -245,8 +245,17 @@ const props = withDefaults(
     overview?: TeamOverview | null;
     /** Micros — when the findings were last fetched. */
     checkedAt?: number | null;
+    /**
+     * Whether the team has anybody on it.
+     *
+     * The engine reports no finding for an empty roster — it sees the coverage
+     * gap that follows from it — so a team nobody is on was told to go and fix
+     * its schedule, which is the one tab that cannot fix it. `null` means the
+     * roster has not been read yet and nothing is claimed.
+     */
+    hasMembers?: boolean | null;
   }>(),
-  { risks: null, reachability: null, overview: null, checkedAt: null },
+  { risks: null, reachability: null, overview: null, checkedAt: null, hasMembers: null },
 );
 
 const emit = defineEmits<{
@@ -261,7 +270,7 @@ const nowMicros = useOnCallClock();
 
 const expanded = ref(false);
 
-type FixTab = "policy" | "schedule" | "ownership";
+type FixTab = "policy" | "schedule" | "ownership" | "members";
 
 /// Which tab repairs each finding, and what the button that goes there should
 /// be called. Named for the repair — "Add a final rung" tells you what you are
@@ -283,6 +292,9 @@ const FIX_FOR_KIND: Record<string, { tab: FixTab; cta: I18nKey }> = {
   slots_can_collide: { tab: "schedule", cta: "oncall.attentionOpenSchedule" },
   ownership_rule_never_matched: { tab: "ownership", cta: "oncall.attentionOpenRouting" },
 };
+
+/// Synthesised here, not reported by the engine: a team with nobody on it.
+const NO_MEMBERS = "team_has_no_members";
 
 const DEFAULT_FIX = { tab: "policy" as FixTab, cta: "oncall.attentionOpenPolicy" as I18nKey };
 
@@ -424,9 +436,27 @@ function rowFor(risk: ConfigRisk): AttentionRow {
 /// become one line naming who it costs.
 const rows = computed<AttentionRow[]>(() => {
   const collapsed = collapsible.value;
+  const empty = props.hasMembers === false;
   const out: AttentionRow[] = sorted.value
     .filter((risk) => !collapsed.includes(risk))
+    // On an empty roster the gap IS the missing people, and saying both stacks
+    // two sentences with one cause and sends the reader to the wrong tab first.
+    .filter((risk) => !(empty && risk.kind === "coverage_gap"))
     .map(rowFor);
+
+  if (empty) {
+    out.unshift({
+      key: NO_MEMBERS,
+      kind: NO_MEMBERS,
+      bucket: "blocking",
+      message: t("oncall.attentionNoMembers"),
+      headline: t("oncall.attentionNoMembersHeadline"),
+      detail: t("oncall.attentionNoMembersDetail"),
+      evidence: [],
+      fix: "members",
+      cta: "oncall.attentionAddMember",
+    });
+  }
 
   if (!collapsed.length) return out;
 

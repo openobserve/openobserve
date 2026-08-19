@@ -277,6 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ gapLabel }}
             </span>
             <OButton
+              v-if="canCover"
               variant="outline"
               size="xs"
               class="ms-auto"
@@ -327,8 +328,22 @@ const props = withDefaults(
     segments?: ResolvedSegment[];
     timezone?: string;
     loading?: boolean;
+    /**
+     * Whether there is anybody to hand a cover to.
+     *
+     * Filling a gap writes a window to a PERSON, so on a team with an empty
+     * roster the button opens a picker with no options. Defaults true so a
+     * caller that does not know still shows it.
+     */
+    canCover?: boolean;
   }>(),
-  { rotations: () => [], segments: () => [], timezone: "UTC", loading: false },
+  {
+    rotations: () => [],
+    segments: () => [],
+    timezone: "UTC",
+    loading: false,
+    canCover: true,
+  },
 );
 
 const emit = defineEmits<{
@@ -503,12 +518,15 @@ interface Lane {
 }
 
 const lanes = computed<Lane[]>(() => {
+  // A team with no schedule resolves to one long gap the engine attributes to
+  // no rotation at all, so falling back to the segments drew a nameless lane
+  // whose Edit and menu pointed at a rotation that does not exist. Only named
+  // ones become lanes; with none left the empty state offers to add one.
   const source: Array<{ name: string; rotation: Rotation | null }> = props.rotations.length
     ? props.rotations.map((rotation) => ({ name: rotation.name, rotation }))
-    : [...new Set(props.segments.map((segment) => segment.rotation))].map((name) => ({
-        name,
-        rotation: null,
-      }));
+    : [...new Set(props.segments.map((segment) => segment.rotation))]
+        .filter((name): name is string => !!name?.trim())
+        .map((name) => ({ name, rotation: null }));
 
   return source.map(({ name, rotation }, index) => {
     const parts: string[] = [];
@@ -693,14 +711,21 @@ const firstGap = computed<ResolvedSegment | null>(
 const gapLabel = computed<I18nText>(() => {
   const gap = firstGap.value;
   if (!gap) return raw("");
-  return t("oncall.timelineGapAt", {
-    rotation: raw(gap.rotation),
-    range: raw(
-      `${fmt(gap.from, { weekday: "short", hour: "2-digit", minute: "2-digit" })}–${fmt(gap.to, {
-        hour: "2-digit",
-        minute: "2-digit",
-      })}`,
-    ),
-  });
+  // A gap that crosses midnight needs the day at BOTH ends: a week-long hole
+  // printed as `Wed 05:30–05:30` reads as one of zero length.
+  const sameDay = fmt(gap.from, { weekday: "short" }) === fmt(gap.to, { weekday: "short" });
+  const range = raw(
+    `${fmt(gap.from, { weekday: "short", hour: "2-digit", minute: "2-digit" })}–${fmt(
+      gap.to,
+      sameDay
+        ? { hour: "2-digit", minute: "2-digit" }
+        : { weekday: "short", hour: "2-digit", minute: "2-digit" },
+    )}`,
+  );
+  // Unowned gaps are the whole of an unstaffed team's week, and naming no
+  // rotation left the sentence with a hole where the name should be.
+  return gap.rotation
+    ? t("oncall.timelineGapAt", { rotation: raw(gap.rotation), range })
+    : t("oncall.timelineGapUnowned", { range });
 });
 </script>

@@ -94,6 +94,7 @@ function render(
     reachability?: TeamReachability;
     overview?: TeamOverview;
     checkedAt?: number;
+    hasMembers?: boolean | null;
   } = {},
 ) {
   return mount(OnCallTeamAttention, {
@@ -109,6 +110,40 @@ async function open(wrapper: VueWrapper) {
 }
 
 describe("OnCallTeamAttention", () => {
+  /// The engine reports no finding for an empty roster — only the coverage gap
+  /// that follows from it — so a team nobody was on got sent to the Schedule
+  /// tab, which is the one tab that cannot fix it.
+  describe("a team with nobody on it", () => {
+    const gap = risk({ kind: "coverage_gap", severity: "high", message: "nobody is on call" });
+
+    it("says the roster is empty and points at the roster", async () => {
+      const wrapper = await open(render(risks([gap]), { hasMembers: false }));
+
+      expect(wrapper.find('[data-test="oncall-attention-team_has_no_members"]').exists()).toBe(true);
+      await wrapper
+        .find('[data-test="oncall-attention-cta-team_has_no_members"]')
+        .trigger("click");
+      expect(wrapper.emitted("act")?.[0]?.[0]).toBe("members");
+    });
+
+    /// The gap IS the missing people: two sentences with one cause, and the
+    /// first one sends the reader to the wrong tab.
+    it("drops the coverage gap that only restates it", async () => {
+      const wrapper = await open(render(risks([gap]), { hasMembers: false }));
+      expect(wrapper.find('[data-test="oncall-attention-coverage_gap"]').exists()).toBe(false);
+    });
+
+    /// The roster is loaded asynchronously, so an unread one must claim nothing
+    /// — otherwise every team is announced as empty while its page loads.
+    it("claims nothing until the roster has been read", () => {
+      const wrapper = render(risks([gap]));
+      expect(wrapper.find('[data-test="oncall-attention-team_has_no_members"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.text()).toContain("nobody is on call");
+    });
+  });
+
   /// A team with no findings must render nothing at all — a banner that is
   /// always present is one nobody reads.
   it("renders nothing when the server reports no risks", () => {

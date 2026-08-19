@@ -146,4 +146,24 @@ describe("OnCallScheduleAnswer", () => {
     await wrapper.find('[data-test="oncall-answer-request-swap"]').trigger("click");
     expect(wrapper.emitted("request-swap")).toHaveLength(1);
   });
+
+  /// Every action here names a person, so on a team with nobody on it they all
+  /// open on an empty picker. The one act that leads somewhere is offered.
+  it("offers the roster instead of actions nobody can complete", async () => {
+    const wrapper = render({ slots: [], hasMembers: false });
+
+    expect(wrapper.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-answer-request-swap"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="oncall-answer-add-people"]').trigger("click");
+    expect(wrapper.emitted("add-people")).toHaveLength(1);
+  });
+
+  /// A caller that has not read the roster yet must not hide the actions of a
+  /// team that is staffed.
+  it("keeps its actions when the roster is unknown", () => {
+    const wrapper = render({ slots: [] });
+    expect(wrapper.find('[data-test="oncall-answer-add-people"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-answer-request-swap"]').exists()).toBe(true);
+  });
 });

@@ -206,9 +206,10 @@ describe("OnCallScheduleEditor", () => {
     expect(after).toBe(before);
   });
 
-  // An empty rotation is refused by the server; dropping it locally keeps a
-  // half-emptied form from failing the whole save.
-  it("drops empty rotations on save", async () => {
+  /// Dropping the empty one and reporting success is how a rotation somebody
+  /// had just emptied looked saved: the server refuses it, so the whole save
+  /// has to stop and say which rotation is the problem.
+  it("refuses a save that would silently drop an empty rotation", async () => {
     const wrapper = render({
       schedule: schedule([
         {
@@ -237,9 +238,49 @@ describe("OnCallScheduleEditor", () => {
     await wrapper.find('[data-test="oncall-schedule-save"]').trigger("click");
     await flushPromises();
 
-    const sent = service.setSchedule.mock.calls[0][0] as any;
-    expect(sent.data.rotations).toHaveLength(1);
-    expect(sent.data.rotations[0].name).toBe("Primary");
+    expect(service.setSchedule).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="oncall-rotation-needs-people"]').exists()).toBe(true);
+  });
+
+  /// The drawer's Save is the one a new rotation is saved from, and a new
+  /// rotation starts with nobody in it — so it has to be out of reach until
+  /// somebody is picked, not merely refused after the click.
+  it("keeps the drawer save out of reach until somebody is picked", async () => {
+    const wrapper = render({ schedule: null });
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
+    await flushPromises();
+
+    expect(
+      wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
+    ).toBeDefined();
+
+    await wrapper
+      .findComponent('[data-test="oncall-schedule-members"]')
+      .vm.$emit("update:modelValue", ["ana@o2.ai"]);
+    await flushPromises();
+
+    expect(
+      wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  /// Nothing in this drawer can add a person, so the empty picker has to hand
+  /// the reader to the one screen that can.
+  it("sends the reader to the roster from inside the drawer", async () => {
+    const wrapper = render({ members: [], schedule: null });
+    await flushPromises();
+
+    // The bulk table is hidden on a team with nobody, so open the drawer the
+    // way the team page does — through an intent.
+    await wrapper.setProps({ intent: { mode: "new" } });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-rotation-no-members"]').exists()).toBe(true);
+    await wrapper.find('[data-test="oncall-rotation-open-members"]').trigger("click");
+
+    expect(wrapper.emitted("open-members")).toHaveLength(1);
   });
 
   /// Rotations are named shifts, not slots in a fixed ladder, so there is no

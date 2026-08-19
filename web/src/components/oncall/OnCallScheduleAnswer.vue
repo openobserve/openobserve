@@ -86,8 +86,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <span class="ms-auto flex flex-wrap items-center gap-2">
+      <!-- On a team with nobody in it every one of these opens on an empty
+           picker, so the only act that leads anywhere is offered instead. -->
       <OButton
-        v-if="!secondary"
+        v-if="!hasMembers"
+        variant="primary"
+        size="sm-action"
+        data-test="oncall-answer-add-people"
+        @click="emit('add-people')"
+      >
+        {{ t("oncall.rotationOpenMembers") }}
+      </OButton>
+      <OButton
+        v-else-if="!secondary"
         variant="outline"
         size="sm-action"
         data-test="oncall-answer-assign-secondary"
@@ -96,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.schedAssignSecondary") }}
       </OButton>
       <OButton
+        v-if="hasMembers"
         variant="outline"
         size="sm-action"
         :disabled="!holder"
@@ -134,11 +146,24 @@ const props = withDefaults(
     segments?: ResolvedSegment[];
     /** The team's zone. A handover read in the browser's zone is a lie. */
     timezone?: string;
+    /**
+     * Whether the team has anybody on it at all.
+     *
+     * Every action here names a person, so on an empty roster they all open on
+     * an empty picker. Defaults true: a caller that does not know must not hide
+     * the actions of a team that is staffed.
+     */
+    hasMembers?: boolean;
   }>(),
-  { slots: () => [], segments: () => [], timezone: "UTC" },
+  { slots: () => [], segments: () => [], timezone: "UTC", hasMembers: true },
 );
 
-const emit = defineEmits<{ "assign-secondary": []; "request-swap": [] }>();
+const emit = defineEmits<{
+  "assign-secondary": [];
+  "request-swap": [];
+  /** The only act an empty team can take: go and add somebody. */
+  "add-people": [];
+}>();
 
 const { t } = useI18nTyped();
 const nowMicros = useOnCallClock();

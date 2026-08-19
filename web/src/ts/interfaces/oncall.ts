@@ -683,8 +683,14 @@ export interface ResolvedSegment {
   to: number;
   /** Absent means nobody is on call for this span. */
   user_email?: string | null;
-  /** The layer this span belongs to — or the one a cover displaced. */
-  rotation: string;
+  /**
+   * The layer this span belongs to — or the one a cover displaced.
+   *
+   * **Null on a gap no rotation owns**, which is every span of a team with no
+   * schedule at all. Anything drawn per rotation has to skip those rather than
+   * render a lane with no name.
+   */
+  rotation: string | null;
   /** Present when a cover took this span from the rotation. */
   override_id?: string | null;
 }

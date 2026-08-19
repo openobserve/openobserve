@@ -198,6 +198,50 @@ describe("OnCallScheduleTimeline", () => {
     expect(wrapper.emitted("fill-gap")?.[0]?.[0]).toMatchObject({ rotation: "Primary" });
   });
 
+  /// A team with no schedule resolves to one long gap the engine owns to no
+  /// rotation. Falling back to the segments drew that as a nameless lane whose
+  /// Edit pointed at a rotation that does not exist and did nothing.
+  it("draws no lane for a gap no rotation owns", () => {
+    const wrapper = render({
+      rotations: [],
+      segments: [seg({ rotation: null, user_email: null })],
+    });
+
+    expect(wrapper.findComponent({ name: "OScheduleTimeline" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-timeline-empty"]').exists()).toBe(true);
+  });
+
+  /// A named rotation's own gap is still its lane — only the unowned one goes.
+  it("keeps the lane of a gap its rotation owns", () => {
+    const wrapper = render({ rotations: [], segments: [seg({ user_email: null })] });
+    expect(tracksOf(wrapper).map((t: any) => t.key)).toEqual(["Primary"]);
+  });
+
+  /// A week-long hole printed as `Wed 05:30–05:30` reads as one of zero length,
+  /// and an unowned gap left the sentence with a hole where a name should be.
+  it("dates both ends of a gap that crosses a day, and names no rotation it has none of", () => {
+    const wrapper = render({
+      segments: [
+        seg({ to: start + DAY }),
+        seg({ rotation: null, user_email: null, from: start + DAY, to: start + 5 * DAY }),
+      ],
+    });
+    const gap = wrapper.find('[data-test="oncall-timeline-gap"]').text();
+
+    expect(gap).toContain("nobody is on call");
+    // Two weekday names — the end carries its own day.
+    expect(gap.match(/Mon|Tue|Wed|Thu|Fri|Sat|Sun/g)).toHaveLength(2);
+  });
+
+  /// Filling a gap hands a window to a PERSON, so on a team with an empty
+  /// roster the button opens a picker with nothing in it.
+  it("does not offer to fill a gap when there is nobody to hand it to", () => {
+    const wrapper = render({ segments: [seg({ user_email: null })], canCover: false });
+
+    expect(wrapper.find('[data-test="oncall-timeline-gap"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-timeline-fill-gap"]').exists()).toBe(false);
+  });
+
   /// The parent owns the fetch, so the window has to be published rather than
   /// kept private — otherwise the range buttons change nothing.
   it("publishes the window it wants fetched", () => {

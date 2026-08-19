@@ -137,6 +137,26 @@
         <section class="flex flex-col gap-4">
           <OText variant="section">{{ t("oncall.rotationSectionWho") }}</OText>
 
+          <!-- The picker draws from the team roster, so on an empty team it has
+               nothing to offer. Saying so beats a select that opens on nothing. -->
+          <div
+            v-if="!props.members.length"
+            class="border-border-default rounded-surface flex flex-wrap items-center gap-3 border p-3"
+            data-test="oncall-rotation-no-members"
+          >
+            <span class="text-text-secondary min-w-0 flex-1 text-sm">
+              {{ t("oncall.scheduleNeedsMembers") }}
+            </span>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="oncall-rotation-open-members"
+              @click="openMembers"
+            >
+              {{ t("oncall.rotationOpenMembers") }}
+            </OButton>
+          </div>
+
           <OSelect
             :model-value="active.members"
             multiple
@@ -145,9 +165,20 @@
             :help-text="t('oncall.rotationOrderHint')"
             :placeholder="t('oncall.rotationPickPlaceholder')"
             :options="memberOptions"
+            :disabled="!props.members.length"
             data-test="oncall-schedule-members"
             @update:model-value="(v: unknown) => setMembers(active as Rotation, v as string[])"
           />
+
+          <!-- The server refuses a rotation with nobody in it, so this one would
+               store nothing. Said next to the pick that fixes it. -->
+          <p
+            v-if="!active.members.length"
+            class="text-status-warning-text text-sm"
+            data-test="oncall-rotation-needs-people"
+          >
+            {{ t("oncall.rotationNeedsPeople") }}
+          </p>
 
           <!-- Catching this while somebody is still looking at the rotation is
                the entire value; catching it at 3am is not. The rota will pass
@@ -329,7 +360,7 @@
             variant="primary"
             size="sm-action"
             :loading="saving"
-            :disabled="!!priorityClash"
+            :disabled="!!priorityClash || !activeIsStaffed"
             data-test="oncall-rotation-done"
             @click="save"
           >
@@ -391,7 +422,12 @@ const props = defineProps<{
    */
   drawerOnly?: boolean;
 }>();
-const emit = defineEmits<{ saved: []; "intent-handled": [] }>();
+const emit = defineEmits<{
+  saved: [];
+  "intent-handled": [];
+  /** Nothing here can add a person, so the roster is asked for by name. */
+  "open-members": [];
+}>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -509,6 +545,15 @@ function removeRotation(rotation: Rotation) {
 const nowMicros = ref(Date.now() * 1000);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+
+/// A rotation with nobody in it stores nothing, so Save stays out of reach
+/// until somebody is picked.
+const activeIsStaffed = computed(() => !!active.value?.members.length);
+
+function openMembers() {
+  cancelDrawer();
+  emit("open-members");
+}
 
 const memberOptions = computed(() =>
   props.members.map((m) => ({ label: raw(m.user_email), value: m.user_email })),
@@ -731,9 +776,18 @@ async function deleteActive() {
 }
 
 async function save() {
-  // An empty rotation is refused by the server; dropping it here keeps a
-  // half-filled form from failing the whole save.
-  const rotations = draft.value.filter((r) => r.members.length > 0);
+  // Dropping the empty ones and reporting success is how a rotation somebody
+  // just filled in looked saved while nothing was stored: the server refuses a
+  // rotation with nobody in it, so this has to be refused here and said out loud.
+  const empty = draft.value.find((r) => !r.members.length);
+  if (empty) {
+    toast({
+      variant: "error",
+      message: t("oncall.rotationEmptyNotSaved", { name: raw(empty.name) }),
+    });
+    return;
+  }
+  const rotations = draft.value;
   saving.value = true;
   try {
     await oncallService.setSchedule({
