@@ -80,7 +80,7 @@ export interface DbmTabCountsContext {
    * `undefined` means "no better number yet" and is ignored, so a page can
    * call this from a watcher without guarding the not-yet-loaded case.
    */
-  publishOwnCount: (key: DbmTabCountKey, value: BadgeCount | undefined) => void;
+  publishOwnCount: (key: DbmTabCountKey, value: BadgeCount | undefined, scopeKey?: string) => void;
 }
 
 const DBM_TAB_COUNTS: InjectionKey<DbmTabCountsContext> = Symbol("dbmTabCounts");

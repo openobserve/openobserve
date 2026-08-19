@@ -775,8 +775,28 @@ describe("the Activity badge does not blank a good shared count", () => {
    */
   it("ActivityPage publishes its count, coalescing its null first", () => {
     const source = readFileSync(join(here, "ActivityPage.vue"), "utf8");
-    expect(source).toContain(
-      'ownCounts: [{ key: "activityCount", value: () => sampleTotal.value ?? undefined }]',
+    // Asserted as SHAPE rather than an exact literal: the previous version of
+    // this test pinned the whole expression, so it failed on any edit —
+    // including the correct one that added the loading guard below.
+    const entry = source.match(/ownCounts:\s*\[[\s\S]*?\],/)?.[0] ?? "";
+    expect(entry).toContain('key: "activityCount"');
+    expect(entry, "a null sampleTotal must coalesce to undefined, never blank the badge").toContain(
+      "sampleTotal.value ?? undefined",
     );
+  });
+
+  it("ActivityPage withholds its count while its own data is stale", () => {
+    const source = readFileSync(join(here, "ActivityPage.vue"), "utf8");
+    const entry = source.match(/ownCounts:\s*\[[\s\S]*?\],/)?.[0] ?? "";
+    // `stateBuckets` is a page ref and survives <keep-alive>, so between a
+    // scope change and this page's own reload `sampleTotal` still describes
+    // the PREVIOUS scope. Publishing then paints that number over the shared
+    // fan-out's fresh answer — the reported bug was an Activity badge reading
+    // 493 for `instance=mssql-prod-1` beside a table correctly showing no
+    // sessions. DatabasesPage withholds for exactly this reason.
+    expect(
+      entry,
+      "publishing an unloaded page's total repaints the previous scope's badge",
+    ).toContain("loading.value");
   });
 });

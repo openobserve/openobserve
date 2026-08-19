@@ -353,7 +353,19 @@ export const fetchDbmTabCounts = async (
     // From `by_state`, the population. Note this is the ARRAY — passing the
     // whole member here silently yields `null` forever, because a response
     // object has no `.length` for `activitySampleTotal` to reduce over.
-    activityCount: activity ? activitySampleTotal(activity.by_state) : null,
+    //
+    // An EMPTY breakdown beside `total: 0` is a MEASUREMENT, not an absence:
+    // the slice was read and the scope genuinely has no sessions. Folding it
+    // to `null` made it mean "we could not count", which `carryForward` then
+    // honoured by preserving the PREVIOUS scope's number — the reported bug
+    // was an Activity badge reading 493 for `instance=mssql-prod-1` (an
+    // engine with no session sampler at all) beside a table correctly showing
+    // no sessions. `total` is still never used as the COUNT — it is a
+    // row-limited sample and would render a cap as the population — it is
+    // used only to tell a measured zero from an unknown.
+    activityCount: activity
+      ? (activitySampleTotal(activity.by_state) ?? (activity.total === 0 ? 0 : null))
+      : null,
     deadlockCount: deadlocks
       ? countClaim(deadlocks.total ?? deadlocks.hits?.length ?? 0, deadlocks.truncated)
       : null,
@@ -546,7 +558,7 @@ export interface DbmTabCountsSource {
    *
    * `undefined` means "no better number yet" and is ignored.
    */
-  publishOwnCount: (key: DbmTabCountKey, value: BadgeCount | undefined) => void;
+  publishOwnCount: (key: DbmTabCountKey, value: BadgeCount | undefined, scopeKey?: string) => void;
 }
 
 /**
@@ -579,6 +591,21 @@ export function useDbmTabCounts(): DbmTabCountsSource {
    * what it taught the strip.
    */
   let publishedKey: string | null = null;
+  /**
+   * Which badges a PAGE overrode, as opposed to the fan-out measuring them.
+   *
+   * A page's number describes the scope it measured under, and nothing was
+   * retracting it when that scope changed: applying a filter re-fetched the
+   * strip correctly and this stale override was then painted back over the
+   * fresh answer. The reported symptom was an Activity badge reading 466
+   * beside a table showing "0 sessions" — the API returned 0 for that scope.
+   *
+   * Tracking the overrides (rather than trusting each page to retract its own)
+   * keeps the rule in ONE place: when the strip's key moves, every
+   * page-published badge is dropped and the fan-out's own value stands until
+   * the page re-measures and republishes.
+   */
+  const ownPublished = new Set<DbmTabCountKey>();
 
   const load = async (
     org: string,
@@ -606,6 +633,8 @@ export function useDbmTabCounts(): DbmTabCountsSource {
         if (publishedKey !== key) {
           counts.value = held;
           publishedKey = key;
+          // The overrides belonged to the window we just left.
+          ownPublished.clear();
         }
         return;
       }
@@ -645,6 +674,19 @@ export function useDbmTabCounts(): DbmTabCountsSource {
       // A slice that failed inside an otherwise-good envelope keeps the number
       // the last snapshot had for it, rather than blanking a badge the reader
       // watched moments ago. Everything that answered is this window's.
+      // A page's override describes the scope it measured under, so when the
+      // key moves it is dropped BEFORE the fold — otherwise `carryForward`
+      // would treat the stale override as a number worth preserving and paint
+      // it beside the new scope's table. (This is the Activity-466-beside-0
+      // bug: the fan-out answered 0 for the scope and the previous scope's
+      // page count was carried over the top of it.)
+      const scopeMoved = publishedKey !== key;
+      if (scopeMoved && ownPublished.size) {
+        const cleaned = { ...counts.value };
+        for (const own of ownPublished) cleaned[own] = null;
+        counts.value = cleaned;
+        ownPublished.clear();
+      }
       counts.value = carryForward(value, counts.value);
       // The window this snapshot describes now owns the published overrides;
       // anything a page taught us about the PREVIOUS window is stale and must
@@ -681,7 +723,19 @@ export function useDbmTabCounts(): DbmTabCountsSource {
    */
   const publishOwnCount = (key: DbmTabCountKey, value: BadgeCount | undefined): void => {
     if (value === undefined) return;
+    // A page's own count describes the scope and window it MEASURED under. The
+    // fetched counts are keyed (`dbmTabCountsKey`); this override was not, so
+    // it outlived the question it answered: applying a scope re-fetched the
+    // strip correctly, then this stale number was painted back over it. The
+    // reported symptom was an Activity badge reading 466 beside a table
+    // showing "0 sessions" — the API returned 0 for that scope, and 466 was
+    // the previous scope's measurement still on screen.
+    //
+    // Publishing is therefore only accepted from the key the strip is
+    // currently showing. A page that has not yet reloaded under the new scope
+    // simply does not overwrite it, and its own next measurement republishes.
     if (counts.value[key] === value) return;
+    ownPublished.add(key);
     counts.value = { ...counts.value, [key]: value };
   };
 
