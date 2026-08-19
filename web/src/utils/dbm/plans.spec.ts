@@ -285,6 +285,36 @@ describe("planRows", () => {
   });
 });
 
+describe("planRows keeps a plan it cannot walk", () => {
+  const SHOWPLAN =
+    '<ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan">' +
+    "<BatchSequence><Batch><Statements/></Batch></BatchSequence></ShowPlanXML>";
+
+  it("carries an unparseable plan as raw text so the page can render it", () => {
+    // SQL Server ships XML. `flattenPlanTree` cannot walk it, so `nodes` is
+    // empty — and the page then showed "The plan could not be read" over a plan
+    // that had been collected, stored and returned perfectly well. A plan a
+    // reader can READ beats one the page refuses to show.
+    const [row] = planRows(response({ hits: [plan({ plan: SHOWPLAN, plan_hash: null })] }));
+    expect(row.nodes).toHaveLength(0);
+    expect(row.rawPlan, "an XML showplan must survive as text").toBe(SHOWPLAN);
+  });
+
+  it("does NOT carry raw text when a tree was built", () => {
+    // The tree is strictly the better rendering. Carrying both would invite a
+    // page that shows the same plan twice.
+    const [row] = planRows(response({ hits: [plan()] }));
+    expect(row.nodes.length).toBeGreaterThan(0);
+    expect(row.rawPlan, "a walkable plan needs no text fallback").toBeUndefined();
+  });
+
+  it("carries nothing for a blank plan", () => {
+    const [row] = planRows(response({ hits: [plan({ plan: "   " })] }));
+    expect(row.nodes).toHaveLength(0);
+    expect(row.rawPlan, "whitespace is not a plan").toBeUndefined();
+  });
+});
+
 describe("planDriftLevel", () => {
   it("reports drift when more than one plan appeared in the window", () => {
     expect(planDriftLevel(response({ drift_detected: true, hits: [plan(), plan()] }))).toBe(

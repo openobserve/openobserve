@@ -157,6 +157,19 @@ export interface PlanRow {
   lastSeen: number;
   calls: number;
   nodes: PlanNodeRow[];
+  /**
+   * The plan AS TEXT, kept only when no tree could be built from it.
+   *
+   * Not every engine ships a plan this UI can walk. SQL Server emits an XML
+   * showplan, which `flattenPlanTree` cannot parse, so `nodes` is empty and the
+   * page rendered "The plan could not be read" over a plan that was collected,
+   * stored and returned perfectly well. A plan a reader can READ beats a plan
+   * the page refuses to show: the text renders verbatim in that case.
+   *
+   * Absent whenever `nodes` is non-empty — the tree is strictly the better
+   * rendering, and carrying both would invite a page that shows the plan twice.
+   */
+  rawPlan?: string;
   avgDurationMs?: number;
   maxDurationMs?: number;
   executions?: number;
@@ -359,6 +372,11 @@ export function planRows(res: QueryPlansResponse): PlanRow[] {
         calls: hit.calls,
         nodes: flattenPlanTree(hit.plan),
       };
+      // Fall back to the raw text ONLY when no tree came out of it, so an
+      // engine whose plan format this UI cannot walk still shows its plan.
+      if (!row.nodes.length && typeof hit.plan === "string" && hit.plan.trim()) {
+        row.rawPlan = hit.plan;
+      }
       // The conditional-latency invariant, enforced here as well as at the
       // API: a duration reaches a row only on an executed hit that carries
       // one. Whatever a (buggy or hostile) response says about a generic hit,
