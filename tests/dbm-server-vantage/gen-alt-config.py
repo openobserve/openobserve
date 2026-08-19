@@ -78,6 +78,20 @@ LANES = [
         "env_host": "MARIAHOST",
         "metrics_receiver": None,  # no mariadb metrics receiver is configured
         "require_filelog": True,   # deadlocks come ONLY from the error log
+        # mysqlreceiver speaks to MariaDB over the same protocol and identifies
+        # it correctly (measured: product "MariaDB", version 11.8.8), so the
+        # receiver-native db.server.* events fill Activity and Top queries here
+        # exactly as they do on the MySQL lane -- no hand-written digest recipe
+        # needed. Verified before wiring: the receiver starts clean against
+        # maria-prod-1 and emits log records.
+        #
+        # ONE HONEST LIMIT, which the receiver discloses itself:
+        # `supports_query_sample_text: false`. MariaDB does not expose the
+        # statement text the sampler wants, so sample rows describe a session
+        # without carrying its SQL. A real gap, but the receiver's own
+        # disclosure rather than our guess.
+        "events_receiver": True,
+        "events_receiver_type": "mysql",
     },
     {
         "out": "config.mssql.yaml",
@@ -87,6 +101,18 @@ LANES = [
         "prefixes": ("sqlquery/mssql_",),
         "env_host": "MSSQLHOST",
         "metrics_receiver": None,
+        # sqlserverreceiver adopts the SAME `db.server.*` events mysqlreceiver
+        # does, so Activity and Top queries come from the receiver rather than a
+        # hand-written recipe. Verified before wiring: with the workload running
+        # the receiver emits log records against mssql-prod-1.
+        #
+        # This matters beyond convenience -- a sqlquery recipe would NOT have
+        # worked. The backend builds activity records from the
+        # `db.server.query_sample` EVENT (server_vantage.rs: ActivitySample), so
+        # recipe rows would land as an unclassified kind and the Activity tab
+        # would stay empty however good the SQL was.
+        "events_receiver": True,
+        "events_receiver_type": "sqlserver",
         # SQL Server names the victim inline in its deadlock graph, so the
         # `sqlquery/mssql_deadlocks` shred is self-contained -- no log tailing,
         # and no cross-record stitching of the kind InnoDB needs.
@@ -136,8 +162,83 @@ def exporters_block(lane) -> str:
 """
 
 
+def events_pipeline(lane) -> str:
+    """The receiver-native `db.server.*` events pipeline, where the engine has one.
+
+    Kept SEPARATE from the recipe pipeline, exactly as the MySQL lane does: the
+    two carry different record shapes and only the recipes need `filter/dbm`.
+    """
+    if not lane.get("events_receiver"):
+        return ""
+    fan = ", otlphttp/fan_logs" if FANOUT_ORG else ""
+    rid = lane["events_receiver_type"] + "/alt"
+    return f"""
+    # RECEIVER-NATIVE EVENTS -> Activity + Top queries.
+    # The receiver adopts `db.server.query_sample` / `db.server.top_query`, which
+    # is what the backend actually builds activity records from -- a sqlquery
+    # recipe emitting the same columns would NOT populate the Activity tab.
+    # No `filter/dbm`: that processor gates the sqlquery recipe rows, and these
+    # records arrive already shaped by the receiver.
+    logs/receiver_events:
+      receivers: [{rid}]
+      processors: [memory_limiter/alt, transform/tag_source, resource/ident, batch]
+      exporters: [otlphttp/alt_logs{fan}, file/raw_events]"""
+
+
+def events_receiver(lane) -> str:
+    """A `mysql` receiver pointed at THIS lane's engine.
+
+    Named `mysql/alt` rather than reusing the upstream `mysql:` definition: that
+    one interpolates ${env:MYSQLHOST}, which this lane deliberately sets to an
+    inert placeholder so nothing can quietly scrape the MySQL lane's database
+    into this org.
+    """
+    if not lane.get("events_receiver"):
+        return ""
+    kind = lane["events_receiver_type"]
+    events = """    events:
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }
+"""
+    if kind == "mysql":
+        # mysqlreceiver takes host:port as one `endpoint`.
+        return f"""
+  mysql/alt:
+    endpoint: ${{env:{lane["env_host"]}}}:${{env:MARIAPORT}}
+    username: ${{env:MARIAUSER}}
+    password: ${{env:MARIAPASS}}
+    database: ${{env:MARIADB}}
+    collection_interval: 10s
+    query_sample_collection:
+      max_rows_per_query: 1000
+    top_query_collection:
+      top_query_count: 200
+      collection_interval: 15s
+      lookback_time: 120
+      query_plan_cache_size: 1000
+{events}"""
+    if kind == "sqlserver":
+        # sqlserverreceiver splits `server` and `port`, and takes NO `database`
+        # -- it reads across the instance. Not interchangeable with the mysql
+        # shape above, which is why the type is explicit per lane.
+        return f"""
+  sqlserver/alt:
+    server: ${{env:{lane["env_host"]}}}
+    port: ${{env:MSSQLPORT}}
+    username: ${{env:MSSQLUSER}}
+    password: ${{env:MSSQLPASS}}
+    collection_interval: 10s
+    query_sample_collection:
+      max_rows_per_query: 1000
+    top_query_collection:
+      top_query_count: 200
+{events}"""
+    raise SystemExit(f"unknown events_receiver_type {kind!r}")
+
+
 def service_block(lane, recipe_receivers: str) -> str:
     fan_logs = ", otlphttp/fan_logs" if FANOUT_ORG else ""
+    events = events_pipeline(lane)
     return f"""service:
   extensions: [health_check, file_storage/o2dbm]
   telemetry:
@@ -157,7 +258,7 @@ def service_block(lane, recipe_receivers: str) -> str:
           {recipe_receivers}
         ]
       processors: [memory_limiter/alt, filter/dbm, transform/tag_source, resource/ident, batch]
-      exporters: [otlphttp/alt_logs{fan_logs}, file/raw_events]
+      exporters: [otlphttp/alt_logs{fan_logs}, file/raw_events]{events}
     # NO `metrics:` PIPELINE -- no metrics receiver is configured for this
     # engine, and naming one that does not exist fails the collector at startup.
     # NO `traces:` PIPELINE. Deliberate. A span has no route to this org.
@@ -217,6 +318,23 @@ def main() -> None:
         upstream = (
             upstream_base[: ident_m.start(2)] + ident_body + upstream_base[ident_m.end(2):]
         )
+
+        # Splice the events receiver in at the END of the RECEIVERS section.
+        # `upstream` spans the whole file up to `exporters:`, so it holds
+        # receivers AND processors: appending to its end puts a receiver inside
+        # `processors:`, which the collector rejects at startup with
+        # `'processors' unknown type: "mysql"`. The `\nprocessors:\n` line is
+        # the boundary between the two.
+        extra_receiver = events_receiver(lane)
+        if extra_receiver:
+            marker = "\nprocessors:\n"
+            if marker not in upstream:
+                raise SystemExit(
+                    "could not find the processors: boundary -- refusing to guess "
+                    "where a receiver belongs"
+                )
+            head, tail = upstream.split(marker, 1)
+            upstream = head.rstrip("\n") + "\n" + extra_receiver + marker + tail
 
         kept = [x for x in all_names if x.startswith(lane["prefixes"])]
         if not kept:
