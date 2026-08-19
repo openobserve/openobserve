@@ -733,20 +733,31 @@ export const executeTestRun = async (opts: {
     const outputs = res.data?.outputs || {};
 
     if (single) {
-      // Single-node Run Step: MERGE this node's fresh input/output/error into the
-      // existing result so OTHER nodes' Run Step results survive — each node keeps
-      // its own last run. Only this node's slot is refreshed (its stale error is
-      // cleared first, then re-applied if it failed again). A prior full/history
-      // result isn't merged into (mode set) — start clean from this node.
-      const prev = workflowObj.testRun.result;
-      const base = prev && !prev.mode ? prev : null;
-      const mergedErrors = { ...(base?.errors || {}) };
+      // Single-node Run Step: REPLACE just this node's input/output/error in the
+      // CURRENT result, leaving every other node untouched — its fresh output
+      // overwrites whatever was shown for it (a loaded history run, a prior Test, or
+      // an earlier Run Step) while the rest of the view stays put. The spread keeps
+      // the surrounding context (mode/runId/ghostNodeIds, other nodes' data); only
+      // this node's slot is refreshed (its stale error cleared, then re-applied if
+      // it failed again) and it's marked as ran.
+      const base: any = workflowObj.testRun.result || {};
+      const mergedErrors = { ...(base.errors || {}) };
+      const mergedInputs = { ...(base.inputs || {}) };
+      const mergedOutputs = { ...(base.outputs || {}) };
+      // This node's slots are FULLY REPLACED by the fresh run: drop the old value
+      // first, then apply the response. Critical when the step emitted nothing — an
+      // empty/absent result must CLEAR the old output, not fall through to it
+      // (a plain `{ ...base, ...resp }` spread leaves the stale value when `resp`
+      // has no key for this node).
       delete mergedErrors[single];
+      delete mergedInputs[single];
+      delete mergedOutputs[single];
       Object.assign(mergedErrors, errors);
-      const mergedInputs = { ...(base?.inputs || {}), ...inputs };
-      const mergedOutputs = { ...(base?.outputs || {}), ...outputs };
-      const ranNodeIds = [...new Set([...(base?.ranNodeIds || []), single])];
+      Object.assign(mergedInputs, inputs);
+      Object.assign(mergedOutputs, outputs);
+      const ranNodeIds = [...new Set([...(base.ranNodeIds || []), single])];
       workflowObj.testRun.result = {
+        ...base,
         errors: mergedErrors,
         inputs: mergedInputs,
         outputs: mergedOutputs,

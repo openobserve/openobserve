@@ -391,6 +391,48 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(res.outputs.f).toEqual([{ o: 9 }]);
   });
 
+  it("Run Step into a loaded run replaces only that node's output, keeping the rest", async () => {
+    // A history run is loaded (mode set) with data for every node.
+    workflowObj.testRun.result = {
+      mode: "history",
+      runId: "r9",
+      errors: {},
+      inputs: { t: [{ x: 0 }], f: [{ a: 1 }], d: [{ b: 2 }] },
+      outputs: { t: [{ x: 0 }], f: [{ old: 1 }], d: [{ dd: 2 }] },
+      ranNodeIds: ["t", "f", "d"],
+      blockedNodeIds: [],
+    } as any;
+    mockTest.mockResolvedValue({
+      data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ fresh: 9 }] } },
+    });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    const res: any = workflowObj.testRun.result;
+    expect(res.outputs.f).toEqual([{ fresh: 9 }]); // this node's output REPLACED
+    expect(res.outputs.d).toEqual([{ dd: 2 }]); // other nodes untouched
+    expect(res.outputs.t).toEqual([{ x: 0 }]);
+    expect(res.mode).toBe("history"); // surrounding context preserved
+    expect(res.runId).toBe("r9");
+    expect(res.ranNodeIds.sort()).toEqual(["d", "f", "t"]);
+  });
+
+  it("Run Step with an EMPTY output clears this node's stale output (not falls through)", async () => {
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: { f: [{ a: 1 }] },
+      outputs: { f: [{ stale: 1 }] }, // a previous output for f
+      ranNodeIds: ["f"],
+      blockedNodeIds: [],
+    } as any;
+    // the run emits nothing for f (e.g. it errored) — response has no `outputs.f`
+    mockTest.mockResolvedValue({
+      data: { errors: { f: { error_count: 1, errors: [["boom"]] } }, inputs: {}, outputs: {} },
+    });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    const res: any = workflowObj.testRun.result;
+    expect(res.outputs.f).toBeUndefined(); // stale output CLEARED, not left behind
+    expect(res.errors.f).toBeTruthy();
+  });
+
   it("a FULL run replaces accumulated single-node results", async () => {
     mockTest.mockResolvedValue({ data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ o: 1 }] } } });
     await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
