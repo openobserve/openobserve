@@ -187,16 +187,32 @@ export interface Rotation {
   /**
    * How far down the cycle the derived secondary sits.
    *
-   * **Absent means derived** — `max(1, len/2)` — not `1`. Writing the old
-   * behaviour into every rotation would have frozen it into the data. A
-   * three-person roster stays lockstep, which is correct: the only other offset
-   * would make the secondary *last* week's primary.
+   * **Absent means derived, and the derived value is `1`** — the secondary is
+   * whoever takes over next, the person the calendar already shows in the next
+   * cell. It was `max(1, len/2)` for two days and was replaced on 2026-08-18,
+   * because a secondary nobody can derive means the calendar's "next" and the
+   * ladder's second rung name two different people and both are right.
    *
    * `0` is refused with a 400 — it would make the secondary the person already
    * on call. Larger than the roster is clamped silently, so a shrinking team
    * never takes its own rotation out of service.
    */
   secondary_offset?: number;
+  /**
+   * The slot this rotation's **derived** second position staffs.
+   *
+   * One roster, two positions: `slot` is held by whoever is on shift, and this
+   * one by whoever sits `secondary_offset` handovers ahead. Declaring it is
+   * what makes that position *addressable* — a cover can name it, a rung can
+   * page it, and `GET .../on-call` reports it as a slot of its own. Undeclared,
+   * the same person is still computed (as `next_on_call`) but there is nothing
+   * to write a cover against.
+   *
+   * **A rotation with a derived secondary has TWO slots while carrying one
+   * `slot` value.** Anything asking "which slots does this team staff" has to
+   * read both fields — see `staffedSlots`.
+   */
+  secondary_slot?: string;
   /** Shift length in microseconds. */
   shift_micros: number;
   /** Instant `members[0]`'s first shift begins, in microseconds. */
@@ -208,6 +224,34 @@ export interface Rotation {
   /// When this rotation applies. Empty means always — the catch-all every
   /// follow-the-sun setup needs underneath the restricted ones.
   restrictions?: TimeWindow[];
+  /**
+   * The layer is not in effect before this instant. Absent means "since
+   * forever".
+   */
+  starts_at?: number;
+  /**
+   * The layer is not in effect at or after this instant. Absent means "until
+   * further notice".
+   *
+   * **This is how a layer is retired.** Deleting it is the only substitute and
+   * it throws away exactly the record this field exists to keep — "the weekend
+   * rotation ran until March" stops being something the schedule can say.
+   * Exclusive, like every other boundary here.
+   */
+  ends_at?: number;
+  /**
+   * Where this rotation came from. `"default"` marks the one the backend
+   * staffed when the team first had members — whole roster, weekly, 24×7.
+   *
+   * It exists because auto-staffing costs a screen the signal it used to read
+   * absence with: `GET .../schedule` no longer returns `null` for a new team,
+   * so "never configured" has to be read from here instead.
+   *
+   * **Render it as "default rotation — everyone in turn. Customise", never as
+   * something somebody designed. Never write it: any human edit clears it, by
+   * definition.**
+   */
+  source?: string;
 }
 
 /**
@@ -311,6 +355,33 @@ export const DEFAULT_SLOT = "primary";
 /** Server-side comparison is case- and whitespace-insensitive; match it. */
 export function sameSlot(a: string | null | undefined, b: string | null | undefined): boolean {
   return (a ?? DEFAULT_SLOT).trim().toLowerCase() === (b ?? DEFAULT_SLOT).trim().toLowerCase();
+}
+
+/**
+ * Every slot a set of rotations staffs, in the order they first appear.
+ *
+ * **A rotation can staff two.** `slot` is held by whoever is on shift;
+ * `secondary_slot` — when declared — is held by whoever sits
+ * `secondary_offset` handovers ahead, off the same roster. Reading only `slot`
+ * therefore misses the secondary of every team whose rotation the backend
+ * auto-staffed, which since 2026-08-17 is every team with two or more members.
+ *
+ * What that cost while it was wrong: the calendar drew no secondary lane
+ * (`resolved-schedule` was only ever asked for `?slot=primary`), and the cover
+ * dialog's slot picker never appeared, so a cover meant for the secondary
+ * landed on the primary and evicted whoever was on call.
+ */
+export function staffedSlots(rotations: readonly Rotation[]): string[] {
+  const seen = new Map<string, string>();
+  const remember = (slot: string) => {
+    const key = slot.trim().toLowerCase();
+    if (!seen.has(key)) seen.set(key, slot);
+  };
+  for (const rotation of rotations) {
+    remember(rotation.slot ?? DEFAULT_SLOT);
+    if (rotation.secondary_slot) remember(rotation.secondary_slot);
+  }
+  return [...seen.values()];
 }
 
 export interface OnCallSlot {

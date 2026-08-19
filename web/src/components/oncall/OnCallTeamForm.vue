@@ -119,7 +119,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
 import type { OnCallTeam, Rotation } from "@/ts/interfaces/oncall";
-import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, MICROS_PER_WEEK, sameSlot } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { resolvableTimezones, SHIFT_PRESETS } from "@/utils/oncall";
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
@@ -347,8 +347,18 @@ async function amendStaffedRotations(
     if (!staffed.length) return fallback;
     return staffed.map((rotation) => ({
       ...rotation,
-      shift_micros: shift,
-      anchor_micros: anchorMicros,
+      // Only the DEFAULT slot's rotations take this form's cadence. A team the
+      // backend staffed with a second pool gave it its own handover day, and
+      // stamping the primary's anchor over every rotation collapsed the two
+      // onto one instant — which is the opposite of what a secondary is for.
+      ...(sameSlot(rotation.slot, DEFAULT_SLOT)
+        ? { shift_micros: shift, anchor_micros: anchorMicros }
+        : {}),
+      // A human has now chosen the timezone, the handover and the cadence, so
+      // this is no longer the rotation nobody chose. The marker is the
+      // backend's to write and ours to clear — sending it back would make the
+      // team detail screen offer to "customise" a schedule already customised.
+      source: undefined,
     }));
   } catch {
     return fallback;

@@ -117,7 +117,7 @@ describe("OnCallTeamForm", () => {
         timezone: "UTC",
         rotations: [
           { name: "Primary", slot: "primary", members: ["ana@o2.ai", "bob@o2.ai"], shift_micros: 1, anchor_micros: 1 },
-          { name: "Secondary", slot: "secondary", members: ["bob@o2.ai", "ana@o2.ai"], shift_micros: 1, anchor_micros: 1 },
+          { name: "Secondary", slot: "secondary", members: ["bob@o2.ai", "ana@o2.ai"], shift_micros: 1, anchor_micros: 7 },
         ],
       },
     } as any);
@@ -134,7 +134,54 @@ describe("OnCallTeamForm", () => {
 
     const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
     expect(rotations.map((r: any) => r.slot)).toEqual(["primary", "secondary"]);
-    expect(rotations.every((r: any) => r.anchor_micros === Date.parse("2026-08-17T10:00") * 1000)).toBe(true);
+
+    // Only the DEFAULT slot takes this form's cadence. A second pool has its
+    // own handover day — that separateness is the whole point of it — and
+    // stamping the primary's anchor over every rotation collapsed both slots
+    // onto one instant. The two people would still be different; the moment
+    // they change hands would not be.
+    expect(rotations[0].anchor_micros).toBe(Date.parse("2026-08-17T10:00") * 1000);
+    expect(rotations[1].anchor_micros).toBe(7);
+  });
+
+  /// `source: "default"` means "the backend staffed this and no human has
+  /// touched it", and it drives the team screen's offer to customise. By the
+  /// time this PUT is sent a human has chosen a timezone, a cadence and a first
+  /// handover, so carrying the marker back would make the product offer to
+  /// customise a schedule somebody just customised.
+  it("clears the default-staffing marker once the form has set the cadence", async () => {
+    oncall.getSchedule.mockResolvedValue({
+      data: {
+        timezone: "UTC",
+        rotations: [
+          {
+            name: "Primary",
+            members: ["ana@o2.ai"],
+            shift_micros: 1,
+            anchor_micros: 1,
+            secondary_slot: "secondary",
+            source: "default",
+          },
+        ],
+      },
+    } as any);
+
+    const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, {
+      name: "Payments",
+      members: ["ana@o2.ai"],
+      first_handover: "2026-08-17T10:00",
+    });
+    await submit(wrapper);
+    await flushPromises();
+
+    const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
+    expect(rotations[0].source).toBeUndefined();
+    // The declared secondary slot is the backend's, not the form's, and it
+    // survives: dropping it is what left a UI-created team with one slot while
+    // the same team built by curl had two.
+    expect(rotations[0].secondary_slot).toBe("secondary");
   });
 
   /// A server that staffed nothing, or a read that failed, still gets the one

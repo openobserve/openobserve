@@ -335,7 +335,7 @@
       :gap="coverGap"
       :default-user="coverDefaultUser"
       :shifts="swappableShifts"
-      :slots="staffedSlots"
+      :slots="teamSlots"
       @save="saveCover"
       @swap="saveSwap"
     />
@@ -391,7 +391,7 @@ import type {
   TeamReachability,
   ScheduleEditorIntent,
 } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, MICROS_PER_DAY, sameSlot } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, MICROS_PER_DAY, sameSlot, staffedSlots } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable, upcomingShifts, winningRotation } from "@/utils/oncall";
 
@@ -729,7 +729,7 @@ async function fetchSegments() {
   const { from, to } = scheduleWindow.value;
   if (!from || !to) return;
   segmentsLoading.value = true;
-  const slots = staffedSlots.value.length ? staffedSlots.value : [DEFAULT_SLOT];
+  const slots = teamSlots.value.length ? teamSlots.value : [DEFAULT_SLOT];
   try {
     const answers = await Promise.all(
       slots.map((slot) =>
@@ -853,15 +853,23 @@ const SWAPPABLE_SHIFTS = 8;
 /// The slots this team staffs, in the order the schedule lists them. The cover
 /// dialog needs it to ask which rotation is being covered — a cover written
 /// with no slot lands on the default one whatever the reader had in mind.
-const staffedSlots = computed(() => [
-  ...new Set((schedule.value?.rotations ?? []).map((r) => r.slot ?? DEFAULT_SLOT)),
-]);
+///
+/// It counts a rotation's DERIVED secondary too, which is the common case: a
+/// team the backend auto-staffed has one rotation carrying two slots. Reading
+/// only `rotation.slot` left the calendar asking for `?slot=primary` alone and
+/// the cover picker hidden, on every team that had never hand-built a second
+/// rotation.
+const teamSlots = computed(() => staffedSlots(schedule.value?.rotations ?? []));
 
 const swappableShifts = computed(() => {
   const rotations = schedule.value?.rotations ?? [];
   if (!rotations.length) return [];
   const now = Date.now() * 1000;
   const zone = schedule.value?.timezone || team.value?.timezone || "UTC";
+  // `rotation.slot` only, deliberately — NOT `staffedSlots`. A swap trades two
+  // shifts on a roster, and a DERIVED secondary has no shift sequence of its
+  // own: it is the same roster read an offset further along. Offering its
+  // "weeks" would write covers against a position the rotation cannot move.
   const slots = [...new Set(rotations.map((r) => r.slot ?? DEFAULT_SLOT))];
   return slots.flatMap((slot) => {
     const inSlot = rotations.filter((r) => sameSlot(r.slot, slot));
