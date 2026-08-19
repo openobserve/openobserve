@@ -1695,6 +1695,128 @@ fn every_event_name_write_is_guarded_on_non_empty() {
 /// The whole `postgresql_blocking_*` family is present with empty/zero sentinels
 /// (measured 58/58 records, spec E3), so presence proves nothing; `pids != '{}'`
 /// is the only blocked-ness predicate.
+/// A real `db.server.query_sample` from `sqlserverreceiver` 0.158.0, captured
+/// verbatim off the rig (`mssql_server` org, blocked UPDATE under lock
+/// contention). Every attribute name below is the MEASURED wire shape.
+fn mssql_query_sample_blocked() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_787_115_615_903_000i64,
+        "db_system_name": "microsoft.sql_server",
+        "db_namespace": "dbmlab",
+        "db_query_text": "UPDATE accounts set balance = ? - @1 WHERE id = @2",
+        "user_name": "sa",
+        "host_name": "mssql-prod-1",
+        "server_address": "mssql-prod-1",
+        "service_instance_id": "mssql-prod-1:1433",
+        "client_address": "5f1b7032a632",
+        "client_port": 44964,
+        "network_peer_address": "172.21.0.12",
+        "network_peer_port": 44964,
+        "sqlserver_session_id": 66,
+        "sqlserver_blocking_session_id": 60,
+        "sqlserver_blocking_start_time": "2026-08-19T07:00:15.900+00:00",
+        "sqlserver_client_app_name": "pymssql=2.3.2",
+        "sqlserver_command": "UPDATE",
+        "sqlserver_query_hash": "113a60cd5aa2d772",
+        "sqlserver_query_plan_hash": "ff9e7fd201e9d9d9",
+        "sqlserver_query_start": "2026-08-19T07:00:15.903+00:00",
+        "sqlserver_request_status": "suspended",
+        "sqlserver_session_status": "running",
+        "sqlserver_total_elapsed_time": 11.839,
+        "sqlserver_wait_resource": "KEY: 5:72057594045726720 (d123aa1a66e6)",
+        "sqlserver_wait_resource_type": "KEY",
+        "sqlserver_wait_time": 11.839,
+        "sqlserver_wait_type": "LCK_M_X",
+        "o2_event_name": "db.server.query_sample",
+        "o2_vantage": "server",
+    }))
+}
+
+/// THE BUG THIS PINS: every SQL Server session sample was DISCARDED.
+///
+/// `canonicalize_query_sample` reads the session id from a fixed list of
+/// attribute names, and that list knew only `postgresql_pid` /
+/// `mysql_session_id` / `mysql_threads_thread_id`. `sqlserverreceiver` emits a
+/// complete sample — session id, request status, wait type, blocking spid,
+/// elapsed time — but under `sqlserver_*` names, so the `?` on that lookup
+/// bailed and the whole record was dropped. Live, the rows reached the stream
+/// carrying no `o2_dbm_kind` at all and the Activity tab stayed empty on SQL
+/// Server no matter how much load the server was under.
+#[test]
+fn mssql_query_sample_is_not_discarded_for_want_of_a_session_id() {
+    let sample = server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked())
+        .expect("a SQL Server sample must canonicalize, not be dropped");
+
+    assert_eq!(sample.session_pid, Some(66), "the SPID is the session identity");
+    assert_eq!(sample.engine.as_deref(), Some("mssql"));
+    assert_eq!(sample.database.as_deref(), Some("dbmlab"));
+    assert_eq!(
+        sample.instance.as_deref(),
+        Some("mssql-prod-1"),
+        "the SERVER, port-stripped — never the client address"
+    );
+}
+
+#[test]
+fn mssql_query_sample_carries_its_blocker_state_and_wait() {
+    let sample = server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked()).expect("sample");
+
+    // The blocked-ness predicate. SQL Server ships a scalar SPID where
+    // Postgres ships an array; both must read the same downstream.
+    assert_eq!(
+        sample.blocking_pids,
+        vec![60],
+        "a scalar blocking SPID must normalise to the same list Postgres builds"
+    );
+    // `request_status` wins over `session_status`: a SUSPENDED request is the
+    // interesting state (it is the one waiting on a lock), and the
+    // session-level column would call it merely `running`.
+    assert_eq!(sample.state.as_deref(), Some("suspended"));
+    assert_eq!(sample.wait_event.as_deref(), Some("LCK_M_X"));
+    assert_eq!(sample.wait_event_type.as_deref(), Some("KEY"));
+    assert_eq!(sample.session_app.as_deref(), Some("pymssql=2.3.2"));
+    assert_eq!(sample.server_query_id.as_deref(), Some("113a60cd5aa2d772"));
+}
+
+#[test]
+fn mssql_wait_time_is_milliseconds_not_seconds() {
+    // UNITS DIFFER BETWEEN ENGINES and this is the easy 1000x bug: Postgres's
+    // `blocking.wait_duration` is SECONDS, SQL Server's `wait_time` is
+    // MILLISECONDS. 11.839 ms is a sub-second wait, not a twelve-second one.
+    let sample = server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked()).expect("sample");
+    let wait = sample.wait_seconds.expect("a measured wait");
+    assert!(
+        (wait - 0.011_839).abs() < 1e-9,
+        "expected 11.839 ms to read as ~0.0118 s, got {wait}"
+    );
+    // Elapsed time is ALREADY milliseconds on this receiver — unlike MySQL's
+    // timer_wait, which is seconds and is converted.
+    assert_eq!(sample.exec_time_ms, Some(11.839));
+}
+
+#[test]
+fn mssql_unblocked_session_reports_no_blocker() {
+    // 0 is SQL Server's "not blocked" sentinel — the scalar twin of Postgres's
+    // `{}`. Storing it would mark every idle session blocked by session 0.
+    let mut rec = mssql_query_sample_blocked();
+    rec.insert("sqlserver_blocking_session_id".into(), json!(0));
+    let sample = server_vantage::canonicalize_query_sample(&rec).expect("sample");
+    assert!(
+        sample.blocking_pids.is_empty(),
+        "a blocking SPID of 0 is a sentinel, not a blocker"
+    );
+}
+
+#[test]
+fn mssql_session_blocked_by_itself_is_not_reported() {
+    // SQL Server reports self-blocking for some intra-session waits. Rendering
+    // "blocked by itself" in the Activity table is worse than saying nothing.
+    let mut rec = mssql_query_sample_blocked();
+    rec.insert("sqlserver_blocking_session_id".into(), json!(66));
+    let sample = server_vantage::canonicalize_query_sample(&rec).expect("sample");
+    assert!(sample.blocking_pids.is_empty(), "a session cannot block itself");
+}
+
 fn pg_query_sample_unblocked() -> Map<String, Value> {
     obj(json!({
         "_timestamp": 1_786_415_519_730_706i64,

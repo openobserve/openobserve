@@ -379,6 +379,14 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
             "postgresql_pid",
             "mysql_session_id",
             "mysql_threads_thread_id",
+            // SQL Server's SPID. Its absence here is what silently DROPPED
+            // every SQL Server sample: sqlserverreceiver emits a complete
+            // `db.server.query_sample` (session id, request status, wait type,
+            // blocking spid, reads, cpu time), but with no key in this list the
+            // `?` below bailed and the whole record was discarded. The Activity
+            // tab was then empty on SQL Server for want of one field name, and
+            // the rows arrived carrying no `o2_dbm_kind` at all.
+            "sqlserver_session_id",
         ],
     )?;
 
@@ -389,17 +397,38 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
         .unwrap_or((None, None));
 
     // The blocked-ness predicate, and the only one.
+    //
+    // SQL Server expresses it as a single scalar SPID rather than Postgres's
+    // array, and uses 0 — not the `{}` literal — as its "not blocked"
+    // sentinel. Both are normalised to the same list here so one rule reads
+    // blocked-ness across every engine. A row whose blocker is itself is
+    // discarded: SQL Server reports that for some intra-session waits, and
+    // rendering "blocked by itself" in the Activity table is worse than saying
+    // nothing.
     let blocking_pids = first_str(rec, &["postgresql_blocking_pids"])
         .filter(|p| p != UNBLOCKED_PIDS)
         .map(|p| parse_blocking_pids(&p))
+        .or_else(|| {
+            first_i64(rec, &["sqlserver_blocking_session_id"])
+                .filter(|b| *b > 0 && *b != session_pid)
+                // SPIDs are smallint in SQL Server, so this always fits; the
+                // checked conversion is here so a malformed value is DROPPED
+                // rather than wrapping into some other session's id.
+                .and_then(|b| i32::try_from(b).ok())
+                .map(|b| vec![b])
+        })
         .unwrap_or_default();
 
     // Exec time. Postgres ships milliseconds on this event; MySQL ships no exec
     // time at all, only a `timer_wait` in SECONDS, which is converted here so the
     // `_ms` column always means what its name says.
-    let exec_time_ms = first_f64(rec, &["postgresql_total_exec_time"]).or_else(|| {
-        first_f64(rec, &["mysql_events_statements_current_timer_wait"]).map(|s| s * 1000.0)
-    });
+    let exec_time_ms = first_f64(rec, &["postgresql_total_exec_time"])
+        .or_else(|| {
+            first_f64(rec, &["mysql_events_statements_current_timer_wait"]).map(|s| s * 1000.0)
+        })
+        // SQL Server ships `total_elapsed_time` already in milliseconds, so it
+        // needs no conversion — unlike the MySQL branch above.
+        .or_else(|| first_f64(rec, &["sqlserver_total_elapsed_time"]));
 
     Some(ActivitySample {
         engine,
@@ -416,28 +445,56 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
         timestamp: detect_timestamp(rec),
         session_pid: Some(session_pid),
         session_user: first_str(rec, &["user_name"]),
-        session_app: first_str(rec, &["postgresql_application_name", "mysql_client_app"]),
+        session_app: first_str(
+            rec,
+            &[
+                "postgresql_application_name",
+                "mysql_client_app",
+                "sqlserver_client_app_name",
+            ],
+        ),
+        // SQL Server carries TWO status columns and they answer different
+        // questions: `request_status` describes the running request
+        // (`running` / `suspended` / `runnable`) and is absent when the session
+        // is idle; `session_status` describes the session itself (`running` /
+        // `sleeping`). The request one is preferred because a suspended request
+        // is the interesting state — it is the one waiting on a lock — and the
+        // session-level value would report it as merely `running`.
         state: first_str(
             rec,
             &[
                 "postgresql_state",
                 "mysql_session_status",
                 "mysql_threads_processlist_state",
+                "sqlserver_request_status",
+                "sqlserver_session_status",
             ],
         ),
-        query_start: first_str(rec, &["postgresql_query_start"]),
+        query_start: first_str(rec, &["postgresql_query_start", "sqlserver_query_start"]),
         // Transaction start is read INDEPENDENTLY of blocked-ness despite its
         // `blocking.*` namespace: measured, 784 of 1072 populated values are on
         // UNBLOCKED sessions, including all 261 `idle in transaction` ones —
         // which are never blocked and are precisely the bloat condition this
         // column exists to age.
         xact_start: first_str(rec, &["postgresql_blocking_transaction_start_time"]),
-        wait_start: first_str(rec, &["postgresql_blocking_start_time"]),
+        wait_start: first_str(
+            rec,
+            &["postgresql_blocking_start_time", "sqlserver_blocking_start_time"],
+        ),
         exec_time_ms,
         // The SHARED wait columns (D-D): one wait-event view reads across
         // activity and blocking alike.
-        wait_event_type: first_str(rec, &["postgresql_wait_event_type"]),
-        wait_event: first_str(rec, &["postgresql_wait_event", "mysql_wait_type"]),
+        // SQL Server names the RESOURCE class it is waiting on
+        // (`KEY` / `PAGE` / `OBJECT`) separately from the wait type
+        // (`LCK_M_X`), which lines up with Postgres's type/event split.
+        wait_event_type: first_str(
+            rec,
+            &["postgresql_wait_event_type", "sqlserver_wait_resource_type"],
+        ),
+        wait_event: first_str(
+            rec,
+            &["postgresql_wait_event", "mysql_wait_type", "sqlserver_wait_type"],
+        ),
         // `0` is the COALESCE sentinel, not a measured wait — the numeric twin
         // of the `{}` trap above. It is present on all 5495 unblocked rows, so
         // storing it would pollute every AVG/percentile over
@@ -446,12 +503,23 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
         // WHOLE SECONDS, so sub-second lock waits round to 0 and are
         // indistinguishable from the sentinel — dropping both is the honest
         // reading of a field with that resolution.
-        wait_seconds: first_f64(rec, &["postgresql_blocking_wait_duration"]).filter(|w| *w > 0.0),
+        // UNITS DIFFER, and getting this wrong would misreport lock waits by
+        // 1000x. Postgres's `blocking.wait_duration` is SECONDS; SQL Server's
+        // `wait_time` is MILLISECONDS (measured: 11.839 on a row whose
+        // `total_elapsed_time` is also 11.839 ms). The same `> 0.0` filter
+        // applies to both — a zero wait is the COALESCE sentinel, not a
+        // measurement.
+        wait_seconds: first_f64(rec, &["postgresql_blocking_wait_duration"])
+            .or_else(|| first_f64(rec, &["sqlserver_wait_time"]).map(|ms| ms / 1000.0))
+            .filter(|w| *w > 0.0),
         server_query_id: first_str(
             rec,
             &[
                 "postgresql_query_id",
                 "mysql_events_statements_current_digest",
+                // SQL Server's stable statement identity, the same value its
+                // plan cache is keyed on.
+                "sqlserver_query_hash",
             ],
         ),
         query: query_norm.or(query),
@@ -459,7 +527,13 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
         blocking_pids,
         lock_mode: first_str(rec, &["postgresql_blocking_lock_mode"]),
         lock_type: first_str(rec, &["postgresql_blocking_lock_type"]),
-        lock_relation: first_str(rec, &["postgresql_blocking_lock_relation"]),
+        // `wait_resource` is SQL Server's nearest analogue: the concrete object
+        // under contention ("KEY: 5:72057594045726720 (d123aa1a66e6)"), which
+        // is what the lock columns exist to name.
+        lock_relation: first_str(
+            rec,
+            &["postgresql_blocking_lock_relation", "sqlserver_wait_resource"],
+        ),
         // Postgres ships the peer address under the OTel network.* convention;
         // MySQL under client.*. There is no `client_addr` attribute on either.
         // Postgres ships `172.21.0.6/32` (a CIDR from `inet`), MySQL ships the
