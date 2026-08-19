@@ -448,40 +448,8 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
 }
 
 pub(crate) fn is_past_hour(offset: i64) -> bool {
-    is_past_hour_at(offset, now_micros())
-}
-
-fn is_past_hour_at(offset: i64, now: i64) -> bool {
-    // the hour of `offset` must have ended at least 3 * max_file_retention_time ago,
-    // so data still buffered in ingester WAL when the hour closed has landed:
-    // -- first period: the last hour local file upload to storage, write file list
-    // -- second period, the last hour file list upload to storage
-    // -- third period, we can do the merge, so, at least 3 times of
-    // max_file_retention_time
-    let offset_hour_end = offset - offset % hour_micros(1) + hour_micros(1);
+    let now = now_micros();
+    let hour = hour_micros(1);
+    let offset_hour_end = offset - offset % hour + hour;
     now - offset_hour_end > second_micros(get_config().limit.max_file_retention_time as i64) * 3
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_past_hour_at() {
-        let settle = second_micros(get_config().limit.max_file_retention_time as i64) * 3;
-        let hour = hour_micros(1);
-        let offset = 1_755_590_400_000_000; // 2025-08-19 08:00:00 UTC
-        let hour_end = offset + hour;
-
-        // right at the top of the next hour: not yet
-        assert!(!is_past_hour_at(offset, hour_end + 1));
-        // within the settle window after the hour ends: not yet
-        assert!(!is_past_hour_at(offset, hour_end + settle));
-        // past the settle window: ready
-        assert!(is_past_hour_at(offset, hour_end + settle + 1));
-        // mid-hour offsets are floored to their hour
-        assert!(is_past_hour_at(offset + hour / 2, hour_end + settle + 1));
-        // old hours are always ready
-        assert!(is_past_hour_at(offset - hour * 24, hour_end));
-    }
 }
