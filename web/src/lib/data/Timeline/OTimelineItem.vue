@@ -39,7 +39,7 @@ const isOIcon = computed<boolean>(() =>
 </script>
 
 <template>
-  <li class="relative flex gap-4 pb-6 last:pb-0">
+  <li class="o-timeline-item relative flex gap-4 pb-6 last:pb-0">
     <!-- Left column: dot + vertical connector line -->
     <div class="relative flex shrink-0 flex-col items-center">
       <!-- Node: a pill when it carries a label, otherwise the dot. Both are
@@ -60,15 +60,19 @@ const isOIcon = computed<boolean>(() =>
       </div>
 
       <!--
-        Vertical connector line.
-        OTimeline's scoped :deep rule hides this element when the
-        parent <li> is :last-child — so `-mb-6` never overhangs the rail's end.
+        Vertical connector line, hidden on the rail's last item the way OStep
+        does it — from the item itself, so it does not depend on the parent's
+        scoped styles reaching slot content. They do not: slotted markup carries
+        the CONSUMER's scope id, so the rule that used to live on OTimeline
+        matched nothing and the last rung's line overhung the card.
 
         That `-mb-6` cancels the li's `pb-6`: this column is a flex child, so it
         stretches only to the CONTENT box, and the line would otherwise stop
         short of the next node and break the rail into stubs.
       -->
-      <div class="timeline-connector bg-timeline-line -mb-6 mt-1 w-px flex-1" />
+      <div
+        class="timeline-connector bg-timeline-line mt-1 -mb-6 w-px flex-1 [.o-timeline-item:last-child_&]:hidden"
+      />
     </div>
 
     <!-- Right column: title, subtitle, extra slot content -->
