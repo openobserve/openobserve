@@ -179,6 +179,26 @@ export class DatabaseMonitoringPage {
     await this.page.waitForTimeout(600);
 
     const table = this.tabSpec(tab).table;
+    const before = await this.getRowCount(table);
+
+    // WAIT FOR THE TABLE TO MOVE, then for it to settle.
+    //
+    // Stability alone is not enough: several of these searches are SERVER-side,
+    // so for the first beat after typing the table still holds the PREVIOUS
+    // result — which is perfectly stable and would be returned as though the
+    // search had run. That is what made `search narrows the list` fail with
+    // "still 8 rows" while the search was in fact working (measured: 8 -> 0
+    // once given time). A caller comparing before/after then compares a number
+    // to itself.
+    //
+    // A search that legitimately changes nothing still returns after the
+    // no-change window below, so this cannot hang a passing case.
+    const moveDeadline = Date.now() + 8000;
+    while (Date.now() < moveDeadline) {
+      if ((await this.getRowCount(table)) !== before) break;
+      await this.page.waitForTimeout(200);
+    }
+
     let last = -1;
     let stable = 0;
     const deadline = Date.now() + 15000;
@@ -286,7 +306,20 @@ export class DatabaseMonitoringPage {
   async getRowCount(tableLocator) {
     if (!(await tableLocator.count())) return 0;
     if (!(await tableLocator.isVisible().catch(() => false))) return 0;
-    return tableLocator.locator('tbody tr').count();
+    // EXCLUDE THE LOADING SKELETON. OTable renders placeholder rows in their
+    // own `<tbody data-test="o2-table-skeleton-body">` while a read is in
+    // flight, and counting them reported a CONSTANT phantom population — 8 on
+    // this build — for tabs that were still loading or genuinely empty.
+    //
+    // That silently corrupted every measurement built on this helper: a scope
+    // with no rows read as 8, `search narrows the list` compared 8 to 8 and
+    // failed a working search, and an org whose Activity feed does not exist
+    // at all (SQL Server has no session sampler) looked populated. The rows
+    // are content-free (`"\t\t\t\t\t"`), so nothing downstream could tell
+    // them from data either.
+    return tableLocator
+      .locator('tbody:not([data-test="o2-table-skeleton-body"]) tr')
+      .count();
   }
 
   // =======================================================================
@@ -377,7 +410,13 @@ export class DatabaseMonitoringPage {
    * assertion can read 0 from a page that is merely slow), and waiting only
    * for rows hangs forever on a legitimately empty tab.
    */
-  async waitForSettled(tableLocator, emptyLocators = [], timeout = 30000) {
+  // 60s, not 30s. The skeleton rows this helper used to count made every tab
+  // look settled within ~1s; excluding them (see `getRowCount`) means it now
+  // waits for REAL data or a declared empty state, which on a debug build
+  // against a busy multi-engine org measures 9-19s per tab serially — and
+  // longer with several workers competing for the same backend. The old
+  // budget was only ever met because it was timing a placeholder.
+  async waitForSettled(tableLocator, emptyLocators = [], timeout = 60000) {
     const deadline = Date.now() + timeout;
     let lastCount = -1;
     let stableFor = 0;
@@ -537,8 +576,63 @@ export class DatabaseMonitoringPage {
     return specs[tab];
   }
 
+  /**
+   * The number printed on a tab's badge, or null when it shows none.
+   *
+   * A null badge is a REAL state, not a failure: a tab whose feed cannot be
+   * counted for the current scope withholds its number rather than claiming
+   * zero, so callers must distinguish "no badge" from "badge reads 0".
+   */
+  async badgeNumber(tab) {
+    // The badge has its OWN selector. Reading the whole tab element instead
+    // picks up any digits in the label and reports a number the strip never
+    // rendered — the badge is `v-if="section.count != null"`, so its absence
+    // is the signal that the count was WITHHELD.
+    const el = this.page.locator(`[data-test="dbm-section-tab-badge-${tab}"]`);
+    if (!(await el.isVisible().catch(() => false))) return null;
+    const text = (await el.innerText()).trim();
+    // Strip the vantage suffix ("client count") and any cap marker ("50+").
+    const m = text.match(/(\d[\d,]*)/);
+    return m ? Number(m[1].replace(/,/g, '')) : null;
+  }
+
+  /**
+   * Every instance the scope picker OFFERS on the current tab.
+   *
+   * Read from the open popover rather than the URL, because the bug this
+   * guards was exactly that the picker's contents disagreed with the org's
+   * fleet — a value the reader could not choose is invisible to any assertion
+   * made against the query string.
+   */
+  async instanceOptions() {
+    await this.page.locator('[data-test="dbm-queries-scope-trigger"]').click();
+    const select = this.page.locator('[data-test="dbm-queries-filter-instance"]');
+    await select.waitFor({ state: 'visible', timeout: 10000 });
+    await select.click();
+    // The listbox renders in a portal, so it is not inside the select.
+    const items = this.page.locator('[role="option"], .q-item__label');
+    await items.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const labels = await items.allInnerTexts();
+    await this.page.keyboard.press('Escape');
+    return labels.map((l) => l.trim()).filter(Boolean);
+  }
+
+  /** Every (engine, instance) the ORG holds, from the fleet endpoint. */
+  async fleetInstances({ periodSeconds = 3600 } = {}) {
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
+    const now = Date.now() * 1000;
+    const res = await this.page.request.get(
+      `${baseUrl}/api/${org}/traces/db_monitoring/instances` +
+        `?start_time=${now - periodSeconds * 1_000_000}&end_time=${now}`,
+    );
+    if (!res.ok()) return null;
+    const body = await res.json().catch(() => null);
+    return (body?.hits ?? []).map((h) => ({ system: h.db_system, instance: h.db_instance }));
+  }
+
   /** Settle whichever table the named tab owns. */
-  async settleTab(tab, timeout = 30000) {
+  async settleTab(tab, timeout = 60000) {
     const spec = this.tabSpec(tab);
     return this.waitForSettled(spec.table, spec.empties, timeout);
   }

@@ -202,19 +202,36 @@ test.describe('Database Monitoring — filter matrix', () => {
     // on a single-server rig, so prove it from the OTHER side: an impossible
     // value must collapse the count that a real value preserves. If both come
     // back identical, the parameter is being ignored.
-    const real = await dbm.apiCount('activity', {
-      system: scope.engine,
-      instance: scope.instance || undefined,
-    });
-    const bogus = await dbm.apiCount('activity', { system: scope.engine, instance: BOGUS });
-    test.skip(real === null || bogus === null, 'activity reads failed — nothing to compare');
+    //
+    // The probe endpoint is DISCOVERED, not hardcoded. This used to always ask
+    // `/activity`, which asserts a population that some engines cannot have:
+    // SQL Server ships only blocking and deadlock recipes and has no session
+    // sampler at all, so its honest answer is 0 and the test failed the
+    // PRODUCT for an engine limitation. Pick the first endpoint this org
+    // actually populates.
+    let probe = null;
+    let real = null;
+    for (const candidate of ['activity', 'blocking', 'deadlocks', 'table_health']) {
+      const n = await dbm.apiCount(candidate, {
+        system: scope.engine,
+        instance: scope.instance || undefined,
+      });
+      if (n) {
+        probe = candidate;
+        real = n;
+        break;
+      }
+    }
+    test.skip(!probe, 'this org has no populated feed to prove the filter against');
+    const bogus = await dbm.apiCount(probe, { system: scope.engine, instance: BOGUS });
+    test.skip(bogus === null, `${probe} bogus read failed — nothing to compare`);
 
-    expect(bogus, 'a nonexistent instance returned rows').toBe(0);
+    expect(bogus, `a nonexistent instance returned rows from ${probe}`).toBe(0);
     expect(
       real,
-      'a real instance returned nothing — the scope matched no data at all',
+      `a real instance returned nothing from ${probe} — the scope matched no data`,
     ).toBeGreaterThan(0);
-    testLogger.info(`activity: real-scope=${real} bogus-scope=${bogus}`);
+    testLogger.info(`${probe}: real-scope=${real} bogus-scope=${bogus}`);
   });
 
   // =========================================================================
