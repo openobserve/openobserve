@@ -280,11 +280,15 @@ const stepSelectOptions = computed<SelectOptionInput[]>(() => {
             v-model="stepFilterModel"
             :options="stepSelectOptions"
             size="sm"
-            class="min-w-48"
+            class="w-56 shrink-0"
             :searchable="false"
             data-test="synthetics-evidence-step-filter"
           />
+          <!-- flex-1 so its own `ml-auto` still pushes the wrap button to the
+               far right: nested inside this row it would otherwise size to
+               content and strand the button mid-row. -->
           <EvidenceFilters
+            class="flex-1"
             v-model:view="view"
             v-model:first-party-only="firstPartyOnly"
             v-model:wrap="wrap"
