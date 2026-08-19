@@ -388,7 +388,15 @@ export const convertPivotTableData = (
     if (bucket === null) continue;
 
     for (const yAlias of yAliases) {
-      const numericValue = Number(getDataValue(row, yAlias)) || 0;
+      // A null/undefined aggregate (e.g. min() over an all-null group) is
+      // absent, not zero: coercing it before merging corrupts min/max and can
+      // lock keep-first onto a synthetic 0. Skip it — the cell stays unwritten
+      // until a real value arrives, and Step 3 fills never-written cells with
+      // null so they render as missing.
+      const rawValue = getDataValue(row, yAlias);
+      if (rawValue === null || rawValue === undefined) continue;
+
+      const numericValue = Number(rawValue) || 0;
       const colKey = `${bucket}_${yAlias}`;
       const existing = targetRow[colKey];
       // First write assigns: seeding the merge with 0 would corrupt min/max.

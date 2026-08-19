@@ -179,6 +179,70 @@ describe("convertPivotTableData", () => {
       },
     );
 
+    it("treats a null aggregate as absent, not zero, when merging", () => {
+      // min() over an all-null SQL group returns null; coercing it to 0 before
+      // the merge would make min(0, 5) = 0 and fabricate the cell.
+      const data = [
+        [
+          { country: "US", method: "GET", cnt: null },
+          { country: "US", method: "GET", cnt: 5 },
+        ],
+      ];
+      const result = convertPivotTableData(
+        schema({ y: [yField("cnt", "Count", "min")] }),
+        data,
+        store,
+      );
+      expect(result.rows[0].GET_cnt).toBe(5);
+    });
+
+    it("seeds keep-first merges from the first numeric value, skipping nulls", () => {
+      const data = [
+        [
+          { country: "US", method: "GET", cnt: null },
+          { country: "US", method: "GET", cnt: 7 },
+        ],
+      ];
+      const result = convertPivotTableData(
+        schema({ y: [yField("cnt", "Count", "avg")] }),
+        data,
+        store,
+      );
+      expect(result.rows[0].GET_cnt).toBe(7);
+    });
+
+    it("keeps max exact for negative data with null duplicates", () => {
+      const data = [
+        [
+          { country: "US", method: "GET", cnt: null },
+          { country: "US", method: "GET", cnt: -5 },
+          { country: "US", method: "GET", cnt: -3 },
+        ],
+      ];
+      const result = convertPivotTableData(
+        schema({ y: [yField("cnt", "Count", "max")] }),
+        data,
+        store,
+      );
+      expect(result.rows[0].GET_cnt).toBe(-3);
+    });
+
+    it("leaves a cell null when every source aggregate is null", () => {
+      const data = [
+        [
+          { country: "US", method: "GET", cnt: null },
+          { country: "US", method: "POST", cnt: 4 },
+        ],
+      ];
+      const result = convertPivotTableData(
+        schema({ y: [yField("cnt", "Count", "min")] }),
+        data,
+        store,
+      );
+      expect(result.rows[0].GET_cnt).toBeNull();
+      expect(result.rows[0].POST_cnt).toBe(4);
+    });
+
     it("applies the same merge to groups folded into the Others bucket", () => {
       // min values from different folded groups: the bucket's min is the true
       // min of the union, not a sum of per-group minimums.
