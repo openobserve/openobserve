@@ -146,14 +146,29 @@ export default defineComponent({
         ).catch(() => {});
         return;
       }
-      const notMeta =
-        store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
-      if ((name === "nodes" || name === "license" || name === "syntheticsLocations") && notMeta) {
+      const toGeneral = () => {
         settingsTab.value = "general";
         router.push({
           path: "/settings/general",
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
+      };
+      // Nodes and License are enterprise-only meta-org pages.
+      const notMeta =
+        store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
+      if ((name === "nodes" || name === "license") && notMeta) {
+        toGeneral();
+        return;
+      }
+      // Synthetics locations is meta-org-only but NOT enterprise-only: synthetics
+      // ships in OSS, and the public location registry is the one venue an OSS
+      // deployment has — there is no agent-served pool to fall back on. It follows
+      // the same backend flag the rest of synthetics does.
+      const syntheticsBlocked =
+        (store.state.zoConfig.meta_org && !isMetaOrg.value) ||
+        store.state.zoConfig?.synthetics_enabled === false;
+      if (name === "syntheticsLocations" && syntheticsBlocked) {
+        toGeneral();
       }
     };
 
@@ -330,7 +345,9 @@ export default defineComponent({
           description: t("synthetics.locations.description"),
           icon: "location-on",
           to: { name: "syntheticsLocations", query: { org_identifier: org } },
-          visible: isEnt && meta,
+          // Not `isEnt`: synthetics ships in OSS. Meta-org only (public rows are
+          // cluster-wide) and driven by the same `/config` flag as the feature.
+          visible: meta && z?.synthetics_enabled !== false,
           dataTest: "synthetics-locations-tab",
           group: "Synthetics",
         },
