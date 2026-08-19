@@ -1063,7 +1063,9 @@ function openInLogs() {
                         </span>
                         <button
                           class="dld-expand-btn shrink-0"
-                          :aria-label="isSurroundExpanded(i) ? t('common.collapse') : t('common.expand')"
+                          :aria-label="
+                            isSurroundExpanded(i) ? t('common.collapse') : t('common.expand')
+                          "
                           @click.stop="toggleSurroundExpand(surroundPage * surroundPageSize + i)"
                         >
                           <OIcon
@@ -1092,8 +1094,10 @@ function openInLogs() {
                       </div>
                     </div>
                   </div>
-                  <!-- Surrounding events pagination — project-standard controls -->
-                  <div v-if="surroundEvents.length" class="flex w-full items-center px-3 pt-2">
+                  <div
+                    v-if="surroundEvents.length"
+                    class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center border-t px-3 py-2"
+                  >
                     <div class="flex-1" />
                     <TablePaginationControls
                       :show-pagination="true"
