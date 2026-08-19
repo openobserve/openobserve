@@ -49,7 +49,15 @@ import { dirname, join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/services/db_monitoring", () => ({
-  default: { getBadges: vi.fn() },
+  // `getInstances` is stubbed alongside `getBadges` because the scope filters
+  // now read the org's fleet for their instance picker (see
+  // `useDbmFleetInstances`). The TDZ test below mounts a REAL page-shaped
+  // component, so an unmocked method there is not a type error — it is an
+  // undefined call that hangs the mount until the test times out.
+  default: {
+    getBadges: vi.fn(),
+    getInstances: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+  },
 }));
 
 // `useDbmListPage` reads the selected org from the store; the TDZ test below
@@ -63,6 +71,10 @@ const service = dbMonitoringService as unknown as Record<string, ReturnType<type
 
 const { useDbmTabCounts, clearDbmTabCounts, fetchDbmTabCounts } =
   await import("@/composables/dbm/useDbmTabCounts");
+// The scope filters' instance picker reads the org's fleet through its own
+// module-scoped cache, so one test's in-flight read would otherwise be served
+// to the next.
+const { clearDbmFleetInstances } = await import("@/composables/dbm/useDbmFleetInstances");
 const { badgeCount, claimedCount } = await import("@/utils/dbm/format");
 
 /**
@@ -94,6 +106,7 @@ describe("a failed fan-out must not blank badges that were already answered", ()
   beforeEach(() => {
     vi.clearAllMocks();
     clearDbmTabCounts();
+    clearDbmFleetInstances();
   });
 
   it("keeps the previous window's numbers when the next fan-out fails", async () => {
@@ -139,6 +152,7 @@ describe("the databases fallback counts the same refs the fleet union renders", 
   beforeEach(() => {
     vi.clearAllMocks();
     clearDbmTabCounts();
+    clearDbmFleetInstances();
   });
 
   it("derives instance refs from the statement lists, not only sessions and blocking", async () => {
@@ -215,6 +229,7 @@ describe("one dead slice must not blank a badge the last window answered", () =>
   beforeEach(() => {
     vi.clearAllMocks();
     clearDbmTabCounts();
+    clearDbmFleetInstances();
   });
 
   it("carries the previous count for a slice that came back null", async () => {
@@ -268,6 +283,7 @@ describe("what one page learns is visible from every tab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearDbmTabCounts();
+    clearDbmFleetInstances();
   });
 
   it("publishes a page's own refined count into the shared snapshot", async () => {
@@ -304,6 +320,96 @@ describe("what one page learns is visible from every tab", () => {
       badgeCount(counts.value.databaseCount),
       "a stale published count must not survive a window change",
     ).toBe("1");
+  });
+
+  it("treats an empty breakdown beside total:0 as a MEASURED zero, not an unknown", async () => {
+    // THE REPORTED BUG, at its source. Scoping Activity to `mssql-prod-1` —
+    // an engine with no session sampler at all — returns
+    // `{ by_state: [], total: 0 }`. Folding that to `null` meant "we could not
+    // count", so `carryForward` preserved the PREVIOUS scope's number and the
+    // badge read 493 beside a table correctly showing no sessions.
+    //
+    // `total` is still never the COUNT (it is row-limited and would render a
+    // cap as the population) — only the witness that the slice was read.
+    service.getBadges.mockResolvedValueOnce({
+      data: { ...envelope(), activity: { by_state: [], total: 0, hits: [] } },
+    });
+    const { counts, load } = useDbmTabCounts();
+
+    await load("acme", RANGE, WINDOW, { instance: "mssql-prod-1" });
+
+    expect(
+      badgeCount(counts.value.activityCount),
+      "an engine with no session feed must read 0, not inherit another scope's count",
+    ).toBe("0");
+  });
+
+  it("still reports an unknown when the breakdown is empty and no total was given", async () => {
+    // The complement, so the fix above cannot quietly turn every failed read
+    // into a confident zero: with no `total` there is no witness that anything
+    // was measured, and `null` remains the honest answer.
+    service.getBadges.mockResolvedValueOnce({
+      data: { ...envelope(), activity: { by_state: [], hits: [] } },
+    });
+    const { counts, load } = useDbmTabCounts();
+
+    await load("acme", RANGE, WINDOW, { instance: "mssql-prod-1" });
+
+    expect(
+      counts.value.activityCount,
+      "an unmeasured slice must not claim zero",
+    ).toBeNull();
+  });
+
+  it("drops published counts when the SCOPE moves, not only the window", async () => {
+    // THE REPORTED BUG. Filtering to an instance re-fetched the strip
+    // correctly, and the previous scope's page-published number was then
+    // painted back over the fresh answer: an Activity badge reading 466
+    // beside a table showing "0 sessions", where the API returned 0 for that
+    // scope. The window never moved — only the filter — so the existing
+    // window-change guard never fired.
+    // The second fan-out returns `null` for activity — a slice that could not
+    // be counted under the new scope. This is the case that EXPOSES the bug:
+    // when the fresh envelope carries a number it simply overwrites the stale
+    // one, so only a `null` lets a stale override survive into the render.
+    // (Live, this is what an errored or withheld slice looks like.)
+    service.getBadges
+      .mockResolvedValueOnce({ data: envelope() })
+      .mockResolvedValueOnce({ data: { ...envelope(), activity: null } });
+    const { counts, load, publishOwnCount } = useDbmTabCounts();
+
+    await load("acme", RANGE, WINDOW, { system: "postgresql" });
+    publishOwnCount("activityCount", 466);
+    expect(badgeCount(counts.value.activityCount)).toBe("466");
+
+    // Same org, same window — a narrower SCOPE. A different question.
+    await load("acme", RANGE, WINDOW, { system: "postgresql", instance: "mssql-prod-1" });
+
+    expect(
+      badgeCount(counts.value.activityCount),
+      "a count measured under the previous scope must not survive a filter change",
+    ).not.toBe("466");
+  });
+
+  it("lets a page republish after a scope change, so the badge is not stuck blank", async () => {
+    // The invalidation must not be a one-way door: once the page reloads under
+    // the new scope it measures again, and that number is the right one to
+    // show. A guard that permanently ignored page counts would trade a stale
+    // badge for a blank one.
+    service.getBadges
+      .mockResolvedValueOnce({ data: envelope() })
+      .mockResolvedValueOnce({ data: { ...envelope(), activity: null } });
+    const { counts, load, publishOwnCount } = useDbmTabCounts();
+
+    await load("acme", RANGE, WINDOW, { system: "postgresql" });
+    publishOwnCount("activityCount", 466);
+    await load("acme", RANGE, WINDOW, { system: "postgresql", instance: "mssql-prod-1" });
+
+    publishOwnCount("activityCount", 0);
+    expect(
+      badgeCount(counts.value.activityCount),
+      "the page's fresh measurement under the new scope must be painted",
+    ).toBe("0");
   });
 
   it("ignores a published count of undefined (the page has no better number)", async () => {
@@ -487,6 +593,7 @@ describe("the badge fan-out is scoped by every filter the reader set", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearDbmTabCounts();
+    clearDbmFleetInstances();
     service.getBadges.mockResolvedValue({ data: envelope() });
   });
 
@@ -552,6 +659,7 @@ describe("a capped table-health read is a claim, not a total", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearDbmTabCounts();
+    clearDbmFleetInstances();
   });
 
   it("renders a truncated count with the + disclosure", async () => {

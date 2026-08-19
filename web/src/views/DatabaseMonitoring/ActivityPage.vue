@@ -406,7 +406,21 @@ const {
   // `undefined` is the "I have no better number" signal instead, so the shared
   // fan-out's answer stands until this page has one of its own. Same convention,
   // and the same reason, as DatabasesPage's `loading ? undefined : …`.
-  ownCounts: [{ key: "activityCount", value: () => sampleTotal.value ?? undefined }],
+  //
+  // WITHHELD WHILE LOADING, for the same reason DatabasesPage withholds:
+  // `stateBuckets` is a page ref and survives `<keep-alive>`, so between a
+  // scope change and this page's own reload it still holds the PREVIOUS
+  // scope's breakdown. Publishing then paints that number over the fan-out's
+  // fresh answer — the reported bug was an Activity badge reading 493 for
+  // `instance=mssql-prod-1` while the table below it correctly showed no
+  // sessions (SQL Server has no session sampler at all).
+  //
+  // `undefined` — not `null` — because this is "I have no better number yet",
+  // which lets the shared fan-out's own count stand rather than blanking the
+  // badge.
+  ownCounts: [
+    { key: "activityCount", value: () => (loading.value ? undefined : (sampleTotal.value ?? undefined)) },
+  ],
 });
 
 /**
@@ -815,6 +829,14 @@ const {
   onScopeAdopted: () => void load(),
   // Options come from the SESSION rows, which carry all three dimensions —
   // `allRows` is the same population before the search narrows it.
+  // The identity picker describes the ORG's fleet over this window, not this
+  // tab's rows — see `useDbmFleetInstances` for the three ways the rows-derived
+  // list failed.
+  fleetWindow: () => ({
+    org: org.value,
+    startTime: current.value.startTime,
+    endTime: current.value.endTime,
+  }),
   options: () => ({
     system: allRows.value.map((r) => r.db_system),
     instance: allRows.value.map((r) => r.db_instance),
