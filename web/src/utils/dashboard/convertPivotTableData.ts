@@ -21,6 +21,7 @@ import {
   PIVOT_TABLE_ROW_KEY_SEPARATOR,
   PIVOT_TABLE_TOTAL_LABEL,
   PIVOT_TABLE_OTHERS_LABEL,
+  PIVOT_TABLE_EMPTY_KEY,
   PIVOT_TABLE_EMPTY_LABEL,
 } from "./constants";
 import {
@@ -71,6 +72,10 @@ function buildPivotHeaderLevels(
 
   const formatPivotLabel = (value: string, levelIndex: number) => {
     if (!value) return value;
+    // The empty-bucket sentinel never reaches the user: render its label
+    // before any field-specific formatting (a timestamp parse would fail and
+    // fall back to the raw sentinel).
+    if (value === PIVOT_TABLE_EMPTY_KEY) return PIVOT_TABLE_EMPTY_LABEL;
     const fieldAlias = breakdownFields[levelIndex]?.alias;
     if (!fieldAlias || !timestampFieldAliases.has(fieldAlias)) return value;
     if (value === PIVOT_TABLE_TOTAL_LABEL || value === PIVOT_TABLE_OTHERS_LABEL) {
@@ -268,14 +273,17 @@ export const convertPivotTableData = (
   const getPivotKey = (row: any): string => {
     return breakdownAliases
       .map((alias: string) => {
-        // Fold null, undefined and "" into one labeled bucket — `?? ` alone
-        // would leave "" as a blank column header. Deliberately wider than the
-        // chart path (sql/shared/seriesBuilder.ts), which drops null/undefined
+        // Fold null, undefined and "" into one bucket — `?? ` alone would
+        // leave "" as a blank column header. Deliberately wider than the chart
+        // path (sql/shared/seriesBuilder.ts), which drops null/undefined
         // breakdown series entirely and folds only "": a table column with no
-        // header is unusable, a missing chart series is merely absent.
+        // header is unusable, a missing chart series is merely absent. The
+        // bucket's machine key is a sentinel outside the user-data namespace,
+        // so a genuine "(empty)" string value keeps its own column; the
+        // "(empty)" label is applied only when rendering headers.
         const raw = getDataValue(row, alias);
         const value = raw === null || raw === undefined ? "" : String(raw);
-        return value === "" ? PIVOT_TABLE_EMPTY_LABEL : value;
+        return value === "" ? PIVOT_TABLE_EMPTY_KEY : value;
       })
       .join(PIVOT_TABLE_SEPARATOR);
   };
@@ -459,9 +467,11 @@ export const convertPivotTableData = (
       const formattedPivotKey =
         pk === PIVOT_TABLE_OTHERS_LABEL
           ? gt("dashboard.pivotOthers")
-          : breakdownTimestampAliases.has(breakdownFields[0]?.alias)
-            ? parseTimestampValue(pk, timezone) || pk
-            : pk;
+          : pk === PIVOT_TABLE_EMPTY_KEY
+            ? PIVOT_TABLE_EMPTY_LABEL
+            : breakdownTimestampAliases.has(breakdownFields[0]?.alias)
+              ? parseTimestampValue(pk, timezone) || pk
+              : pk;
       const label = needsMultiRowHeader
         ? yField.label
         : isSingleValueField

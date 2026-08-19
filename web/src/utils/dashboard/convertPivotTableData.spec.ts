@@ -20,6 +20,8 @@ import {
   PIVOT_TABLE_SEPARATOR,
   PIVOT_TABLE_OTHERS_LABEL,
   PIVOT_TABLE_TOTAL_LABEL,
+  PIVOT_TABLE_EMPTY_KEY,
+  PIVOT_TABLE_EMPTY_LABEL,
 } from "@/utils/dashboard/constants";
 
 // Translated strings are asserted by key so the tests stay locale-independent.
@@ -160,14 +162,56 @@ describe("convertPivotTableData", () => {
       ];
       const result = convertPivotTableData(schema({}), data, store);
 
-      expect(colNames(result)).toEqual(["country", "(empty)_cnt", "X_cnt"]);
-      expect(result.rows[0]["(empty)_cnt"]).toBe(3);
+      expect(colNames(result)).toEqual(["country", `${PIVOT_TABLE_EMPTY_KEY}_cnt`, "X_cnt"]);
+      expect(result.rows[0][`${PIVOT_TABLE_EMPTY_KEY}_cnt`]).toBe(3);
+    });
+
+    it("labels the empty bucket (empty) while keying it by the sentinel", () => {
+      const data = [[{ country: "US", method: "", cnt: 1 }]];
+      const result = convertPivotTableData(schema({}), data, store);
+      const emptyCol = valueColumns(result)[0];
+      expect(emptyCol.name).toBe(`${PIVOT_TABLE_EMPTY_KEY}_cnt`);
+      expect(emptyCol.label).toBe(PIVOT_TABLE_EMPTY_LABEL);
     });
 
     it("never produces a blank column label", () => {
       const data = [[{ country: "US", method: "", cnt: 1 }]];
       const result = convertPivotTableData(schema({}), data, store);
       expect(valueColumns(result).every((c: any) => c.label !== "")).toBe(true);
+    });
+
+    it('keeps a literal "(empty)" data value separate from the empty bucket', () => {
+      // The bucket's machine key is a sentinel, so genuine "(empty)" strings in
+      // the data must not merge into it (they did when the key was the label).
+      const data = [
+        [
+          { country: "US", method: "", cnt: 2 },
+          { country: "US", method: PIVOT_TABLE_EMPTY_LABEL, cnt: 5 },
+        ],
+      ];
+      const result = convertPivotTableData(
+        schema({ config: { table_pivot_show_row_totals: true } }),
+        data,
+        store,
+      );
+
+      expect(result.rows[0][`${PIVOT_TABLE_EMPTY_KEY}_cnt`]).toBe(2);
+      expect(result.rows[0][`${PIVOT_TABLE_EMPTY_LABEL}_cnt`]).toBe(5);
+      expect(result.rows[0][`${PIVOT_TABLE_TOTAL_LABEL}_cnt`]).toBe(7);
+    });
+
+    it("renders the empty-bucket label in multi-level headers", () => {
+      const breakdown = [field("method"), field("code")];
+      const data = [
+        [
+          { country: "US", method: "", code: "200", cnt: 1 },
+          { country: "US", method: "GET", code: "200", cnt: 2 },
+        ],
+      ];
+      const result = convertPivotTableData(schema({ breakdown }), data, store);
+      const level0Labels = result.pivotHeaderLevels[0].cells.map((c: any) => c.label);
+      expect(level0Labels).toContain(PIVOT_TABLE_EMPTY_LABEL);
+      expect(level0Labels).not.toContain(PIVOT_TABLE_EMPTY_KEY);
     });
   });
 
