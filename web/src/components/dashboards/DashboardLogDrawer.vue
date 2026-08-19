@@ -131,7 +131,13 @@ const timeline = ref<{ keyMs: number; num: number }[]>([]);
 
 // Field Anomaly Profile table: rarity column carries chip + bar, value column the sample.
 const anomalyColumns = computed<OTableColumnDef[]>(() => [
-  { id: "fld", header: t("panel.logExplorer.insights.colField"), accessorKey: "fld", size: 160 },
+  // Auto-size to the field name so long keys aren't truncated at a fixed width.
+  {
+    id: "fld",
+    header: t("panel.logExplorer.insights.colField"),
+    accessorKey: "fld",
+    meta: { autoWidth: true },
+  },
   {
     id: "rarity",
     header: t("panel.logExplorer.insights.colRarity"),
@@ -139,12 +145,12 @@ const anomalyColumns = computed<OTableColumnDef[]>(() => [
     size: 120,
     minSize: 120,
   },
-  // Elastic value column: absorbs leftover width and ellipsis-truncates instead of scrolling.
+  // Content-sized value column: long values overflow into the table's horizontal scroll.
   {
     id: "sv",
     header: t("panel.logExplorer.insights.colValue"),
     accessorKey: "sv",
-    meta: { autoWidth: true, fillRemaining: true },
+    meta: { autoWidth: true },
   },
 ]);
 const insightPatterns = ref<any[]>([]);
@@ -819,7 +825,8 @@ function openInLogs() {
                   :frame="false"
                   pagination="none"
                   sorting="none"
-                  :wrap="true"
+                  :horizontal-scroll="true"
+                  :wrap="false"
                 >
                   <!-- Field name -->
                   <template #cell-fld="{ value }">
@@ -1022,6 +1029,7 @@ function openInLogs() {
                       'dld-ctx-row cursor-pointer',
                       String(ev._timestamp) === String(selectedEvent!._timestamp) &&
                         'dld-ctx-row--current',
+                      isSurroundExpanded(i) && 'dld-ctx-row--expanded',
                     ]"
                     @click="toggleSurroundExpand(surroundPage * surroundPageSize + i)"
                   >
@@ -1333,6 +1341,14 @@ function openInLogs() {
 }
 .dld-ctx-row--current:hover {
   background: color-mix(in srgb, var(--color-accent) 9%, transparent);
+}
+/* No hover highlight once a row is expanded — the JSON body isn't a click target. */
+.dld-ctx-row--expanded:hover {
+  background: transparent;
+}
+/* A selected + expanded row keeps its base selection tint, just no hover boost. */
+.dld-ctx-row--expanded.dld-ctx-row--current:hover {
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent);
 }
 
 .dld-ctx-spine {

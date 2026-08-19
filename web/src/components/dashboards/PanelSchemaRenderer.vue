@@ -1662,7 +1662,7 @@ export default defineComponent({
       baseWhere: "",
     });
 
-    function resolveAliasToColumn(alias: string, query: any): string {
+    function resolveAliasToColumn(alias: string, query: any, executedSql = ""): string {
       // Field-config lookup (field-based panels).
       const allConfigFields: any[] = [
         ...(Array.isArray(query?.fields?.x) ? query.fields.x : []),
@@ -1673,8 +1673,7 @@ export default defineComponent({
       if (fromConfig) return fromConfig.column;
 
       // SQL fallback (custom SQL panels): aliases are double-quoted; column may carry a stream prefix.
-      const sql: string =
-        metadata.value?.queries?.[0]?.query ?? props.panelSchema.queries?.[0]?.query ?? "";
+      const sql: string = executedSql || query?.query || "";
       if (sql) {
         const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const re = new RegExp(
@@ -1758,17 +1757,18 @@ export default defineComponent({
     }
 
     // Called directly by the search icon so it works even with a panel drilldown config.
-    function exploreCellInLogs(alias: string, value: unknown, _row: any) {
-      const query = props.panelSchema.queries?.[0];
+    function exploreCellInLogs(alias: string, value: unknown, row: any) {
+      const queries = props.panelSchema.queries ?? [];
+      const qi = Number.isInteger(row?.__q) && queries[row.__q] ? row.__q : 0;
+      const query = queries[qi];
+      const executedSql = String(metadata.value?.queries?.[qi]?.query ?? query?.query ?? "");
       const stream = query?.fields?.stream ?? query?.stream ?? "";
       const streamType = query?.fields?.stream_type ?? query?.stream_type ?? "logs";
-      const realField = resolveAliasToColumn(alias, query);
-      const baseWhere = extractPanelWhere(
-        String(metadata.value?.queries?.[0]?.query ?? query?.query ?? ""),
-      );
+      const realField = resolveAliasToColumn(alias, query, executedSql);
+      const baseWhere = extractPanelWhere(executedSql);
 
-      const metaStartµs = Number(metadata.value?.queries?.[0]?.startTime ?? 0);
-      const metaEndµs = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
+      const metaStartµs = Number(metadata.value?.queries?.[qi]?.startTime ?? 0);
+      const metaEndµs = Number(metadata.value?.queries?.[qi]?.endTime ?? 0);
       const selStartµs = toµs((props.selectedTimeObj as any).start_time);
       const selEndµs = toµs((props.selectedTimeObj as any).end_time);
 
