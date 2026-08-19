@@ -6788,11 +6788,17 @@ pub(crate) fn build_dbm_server_queries_sql(
     limit: usize,
     present: &HashSet<String>,
 ) -> Option<String> {
-    if !present.contains(server_vantage::O2_DBM_CALLS)
-        || !present.contains(server_vantage::O2_DBM_FINGERPRINT)
-    {
+    // THE FINGERPRINT is what this list is keyed on and the one column it
+    // cannot do without. `calls` is a RANKING figure, and requiring it hid
+    // every statement on an engine that reports statements without call
+    // counts: sqlserverreceiver's `db.server.top_query` carries the statement
+    // text and its plan but no execution metrics, so on a SQL Server-only
+    // stream this returned nothing and the query-detail header fell through to
+    // painting a bare fingerprint at a reader who came to see a statement.
+    if !present.contains(server_vantage::O2_DBM_FINGERPRINT) {
         return None;
     }
+    let has_calls = present.contains(server_vantage::O2_DBM_CALLS);
     // Group keys under their WIRE aliases: storage names never reach the
     // browser (the `activity_row_to_dto` contract), and aliasing in SQL keeps
     // the reader below a plain key lookup. GROUP BY names the storage columns.
@@ -6823,19 +6829,91 @@ pub(crate) fn build_dbm_server_queries_sql(
     } else {
         "NULL AS exec_time_s".to_string()
     };
+    // Same conditional shape `exec_time` already uses. The DTO keeps its
+    // `calls` FIELD either way so the wire contract does not change per
+    // engine — it is simply null, which is the honest value for a feed that
+    // reports no call count.
+    let calls_col = if has_calls {
+        format!("SUM({}) AS calls", server_vantage::O2_DBM_CALLS)
+    } else {
+        "NULL AS calls".to_string()
+    };
+    // Ranking needs a figure to rank BY. With no call count the newest
+    // statements are the useful ones, which is also what the reader gets on
+    // every other feed that has no ranking metric.
+    let order_by = if has_calls { "calls DESC" } else { "last_seen DESC" };
     Some(format!(
-        "SELECT {proj}, {query_text}, SUM({calls}) AS calls, {exec_time}, \
+        "SELECT {proj}, {query_text}, {calls_col}, {exec_time}, \
          MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
          FROM \"{stream}\"\n\
          WHERE {kind} = '{kind_val}'{preds}\nGROUP BY {group}\n\
-         ORDER BY calls DESC\nLIMIT {limit}",
+         ORDER BY {order_by}\nLIMIT {limit}",
         proj = projected.join(", "),
-        calls = server_vantage::O2_DBM_CALLS,
+        calls_col = calls_col,
+        order_by = order_by,
         stream = escape_ident(stream_name),
         kind = server_vantage::O2_DBM_KIND,
         kind_val = escape_sq(server_vantage::KIND_TOP_QUERY),
         group = group_cols.join(", "),
     ))
+}
+
+#[cfg(test)]
+mod server_queries_without_calls_tests {
+    use super::*;
+
+    fn cols(with_calls: bool) -> HashSet<String> {
+        let mut c: HashSet<String> = [
+            server_vantage::O2_DBM_FINGERPRINT,
+            server_vantage::O2_DBM_ACTIVITY_QUERY,
+            server_vantage::O2_DBM_KIND,
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        if with_calls {
+            c.insert(server_vantage::O2_DBM_CALLS.to_string());
+        }
+        c
+    }
+
+    /// An engine that reports statements but no call counts must still list
+    /// them.
+    ///
+    /// `sqlserverreceiver`'s `db.server.top_query` carries the statement text
+    /// and its execution plan but NO metrics — no `calls`, no `exec_time`. This
+    /// builder required `calls`, so on a SQL Server stream it returned nothing
+    /// and the query-detail header fell through to painting a bare fingerprint
+    /// at a reader who came to see a statement. The fingerprint is the only
+    /// column this list truly cannot do without; `calls` is a ranking figure.
+    #[test]
+    fn server_queries_sql_builds_without_a_calls_column() {
+        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(false))
+            .expect("statements without call counts are still statements");
+        assert!(sql.contains("NULL AS calls"), "the wire field must survive as null: {sql}");
+        assert!(
+            sql.contains("ORDER BY last_seen DESC"),
+            "with no figure to rank by, newest-first is the honest order: {sql}"
+        );
+    }
+
+    #[test]
+    fn server_queries_sql_still_ranks_by_calls_where_it_can() {
+        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(true)).expect("sql");
+        assert!(sql.contains("ORDER BY calls DESC"), "{sql}");
+        assert!(sql.contains(&format!("SUM({})", server_vantage::O2_DBM_CALLS)), "{sql}");
+    }
+
+    #[test]
+    fn server_queries_sql_still_needs_a_fingerprint() {
+        let mut without = cols(true);
+        without.remove(server_vantage::O2_DBM_FINGERPRINT);
+        assert_eq!(
+            build_dbm_server_queries_sql("dbm_server", "", 50, &without),
+            None,
+            "the list is KEYED on the fingerprint — without it there is nothing to group"
+        );
+    }
 }
 
 /// The server-queries response envelope — a callable fn, so the shape is
