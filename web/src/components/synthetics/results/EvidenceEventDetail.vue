@@ -28,6 +28,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCode from "@/lib/core/Code/OCode.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -105,10 +106,6 @@ const fields = computed<DetailField[]>(() => {
 function copyValue() {
   copyToClipboard(fullValue.value, t);
 }
-
-function copyStack() {
-  if (props.event.stack) copyToClipboard(props.event.stack, t);
-}
 </script>
 
 <template>
@@ -145,27 +142,17 @@ function copyStack() {
     </dl>
 
     <div v-if="event.stack" class="flex flex-col gap-1">
-      <div class="flex items-center gap-1">
-        <span class="text-2xs text-text-label font-medium">
-          {{ t("synthetics.evidence.detailStackTrace") }}
-        </span>
-        <OButton
-          variant="ghost"
-          size="xs"
-          data-test="synthetics-evidence-event-detail-copy-stack"
-          @click="copyStack"
-        >
-          <OIcon name="content-copy" size="xs" />
-          <OTooltip :content="t('common.copyToClipboard')" />
-        </OButton>
-      </div>
-      <!-- Bordered, not just filled: `--color-code-bg` and
-           `--color-table-row-expanded-bg` are the same value in the light theme,
-           so a fill alone gives the trace no edge against the row it sits in. -->
-      <pre
-        class="bg-code-bg border-border-default rounded-default m-0 max-h-50 overflow-auto border p-3 font-mono text-xs leading-relaxed"
+      <span class="text-2xs text-text-label font-medium">
+        {{ t("synthetics.evidence.detailStackTrace") }}
+      </span>
+      <OCode
+        block
+        copyable
+        class="max-h-50 overflow-y-auto"
         data-test="synthetics-evidence-event-detail-stack"
-        >{{ event.stack }}</pre>
+      >
+        {{ event.stack }}
+      </OCode>
     </div>
   </div>
 </template>

@@ -18,6 +18,7 @@ import { mount } from "@vue/test-utils";
 
 import i18n from "@/locales";
 import EvidenceEventDetail from "./EvidenceEventDetail.vue";
+import OCode from "@/lib/core/Code/OCode.vue";
 import type { EvidenceEvent } from "@/composables/synthetics/syntheticResultsSchema";
 
 const ev = (over: Partial<EvidenceEvent>): EvidenceEvent => ({
@@ -130,18 +131,16 @@ describe("EvidenceEventDetail", () => {
     expect(w.find('[data-test="synthetics-evidence-event-detail-stack"]').exists()).toBe(false);
   });
 
-  it("offers a copy button for the value, and one for the stack only when it exists", () => {
+  it("offers a copy button for the value, and a copyable code block for the stack only when it exists", () => {
     const plain = mountDetail(ev({ url: LONG_URL }));
     expect(plain.find('[data-test="synthetics-evidence-event-detail-copy-value"]').exists()).toBe(
       true,
     );
-    expect(plain.find('[data-test="synthetics-evidence-event-detail-copy-stack"]').exists()).toBe(
-      false,
-    );
+    expect(plain.findComponent(OCode).exists()).toBe(false);
 
     const withStack = mountDetail(ev({ kind: "pageerror", message: "x", stack: "at h" }));
-    expect(
-      withStack.find('[data-test="synthetics-evidence-event-detail-copy-stack"]').exists(),
-    ).toBe(true);
+    const code = withStack.findComponent(OCode);
+    expect(code.exists()).toBe(true);
+    expect(code.props("copyable")).toBe(true);
   });
 });

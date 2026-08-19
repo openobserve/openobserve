@@ -24,9 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   engineer arrived with had to be rebuilt by hand.
 
   Shows the step's FULL bucket, in time order, paged — the same table the
-  Evidence tab renders for the whole run, filtered to this step. It used to be
-  a worst-first top five with the rest a tab-switch away; now the tab switch is
-  only for the run-level view, not for finishing reading one step.
+  Evidence tab renders for the whole run, filtered to this step.
 
   Separate from StepEvidence.vue, which is gated on the failure detail and so
   renders only on the step that failed. Page activity renders on ANY step that
@@ -98,7 +96,7 @@ const originTs = computed(() => evidenceOriginTs(props.events));
  * the panel already reports it; this count is scoped to one step.
  */
 const countLabel = computed(() =>
-  t("synthetics.runDetail.pageActivityEvents", { count: props.events.length }),
+  t("synthetics.runDetail.pageActivityEvents", { count: props.events.length }, props.events.length),
 );
 
 /** The step HAS events, but the current view/first-party filter matched none. */
@@ -171,12 +169,9 @@ function reloadPage() {
       >
         {{ countLabel }}
       </span>
-      <!-- Trailing in the header, where the section's scope is stated: this
-           table is one step, and the button is the way to the run-level view.
-           Unconditional — the run-level view is a different question (how does
-           this step compare to the rest) rather than an overflow escape now
-           that nothing here is capped. In the body it sat above the rows and
-           read as one. -->
+      <!-- Trailing in the header, where the section's scope is stated. Unconditional —
+           the run-level view is a different question, not an overflow escape now that
+           nothing here is capped. -->
       <OButton
         variant="ghost"
         size="xs"

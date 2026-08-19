@@ -482,10 +482,9 @@ describe("click fidelity survives the storage round trip", () => {
 });
 
 describe("stored journeys with mid-journey navigates", () => {
-  // The recorder used to emit runs of navigate steps (see
-  // docs/synthetics/navigation-steps-research.md Appendix A). Journeys carrying them are
-  // in production. Nothing in the loading path may merge, reorder or drop one: a step an
-  // author has seen and saved is their data, however it got there.
+  // The recorder used to emit runs of navigate steps, and stored journeys carrying
+  // them are in production. Nothing in the loading path may merge, reorder or drop
+  // one: a step an author has seen and saved is their data, however it got there.
   //
   // This is the real path a saved journey takes - mapResponseToBrowserCheck loads
   // `config.steps` straight through mapWireSteps (buildPayload.ts).

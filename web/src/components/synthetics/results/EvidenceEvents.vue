@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              column, and a longer page
 
   Everything else — header, sorting, row expansion, wrap, pagination — is the
-  same on both. It was not, and the difference was a cap the inline surface no
-  longer has: five ranked rows needed no header and had nothing to page.
+  same on both.
 
   One row definition for both surfaces, so a change to a row is a change to
   both. This component owns the OTable configuration and renders cell content
@@ -132,7 +131,7 @@ const columns = computed<OTableColumnDef<EvidenceRow>[]>(() => [
     id: "message",
     header: t("synthetics.evidence.colMessage"),
     size: 200,
-    // A filler with no floor collapses to OTable's 48px default before the
+    // A filler with no floor collapses to OTable's 3rem default before the
     // table starts scrolling — set one so it scrolls instead of collapsing.
     minSize: 200,
     // Bounded elastic: absorbs the leftover and ellipsises, so the table fits
@@ -282,8 +281,7 @@ function rowTitle(e: EvidenceEvent): string {
     :get-row-status-color="rowStatusColor"
     expansion="multiple"
     horizontal-scroll
-    :expanded-ids="expandedIds"
-    @update:expandedIds="(ids: string[]) => (expandedIds = ids)"
+    v-model:expanded-ids="expandedIds"
     :footer-title="t('synthetics.evidence.footerEvents')"
     data-test="synthetics-evidence-events"
   >

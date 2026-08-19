@@ -81,6 +81,11 @@ describe("StepPageActivity", () => {
     expect(w.find('[data-test="synthetics-step-page-activity-count"]').text()).toBe("12 events");
   });
 
+  it("uses the singular for exactly one event", () => {
+    const w = mountActivity({ events: manyEvents(1) });
+    expect(w.find('[data-test="synthetics-step-page-activity-count"]').text()).toBe("1 event");
+  });
+
   it("keeps the way to the run-level view open even when nothing overflows", () => {
     const w = mountActivity({ events: manyEvents(2) });
     expect(w.find('[data-test="synthetics-step-page-activity-view-all-btn"]').exists()).toBe(true);

@@ -314,11 +314,9 @@ describe("EvidenceEvents", () => {
   });
 
   it("labels the footer count instead of leaving a bare number", () => {
-    expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("footerTitle")).toBeTruthy();
-  });
-
-  it("gives the inline step list a header, so seven columns are not a puzzle", () => {
-    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("showHeader")).toBe(true);
+    expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("footerTitle")).toBe(
+      "Events",
+    );
   });
 
   it("lets the inline step list expand a row to the full record", async () => {
@@ -362,8 +360,8 @@ describe("EvidenceEvents", () => {
   });
 
   it("floors the message column so a narrow card scrolls instead of collapsing it", () => {
-    // A filler with no minSize defaults to 48px (useTableCore) and shrinks to a
-    // sliver on the step card, which is narrower than the panel.
+    // A filler with no minSize defaults to OTable's 3rem (useTableCore) and
+    // shrinks to a sliver on the step card, which is narrower than the panel.
     const cols = mountEvents().findComponent(OTable).props("columns") as Array<Record<string, any>>;
     expect(cols.find((c) => c.id === "message")?.minSize).toBe(200);
   });

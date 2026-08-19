@@ -29,7 +29,7 @@
  * error, not a cosmetic one.
  */
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 
 import {
@@ -173,23 +173,24 @@ const stepFilterModel = computed({
  */
 const stepSelectOptions = computed<SelectOptionInput[]>(() => {
   const options: SelectOptionInput[] = [
-    { value: null, label: raw(`${t("synthetics.evidence.allSteps")} (${props.events.length})`) },
+    {
+      value: null,
+      label: t("synthetics.evidence.allSteps", { count: props.events.length }),
+    },
   ];
   for (const step of props.stepOptions) {
     const count = props.events.filter((e) => e.stepId === step.stepId).length;
     if (count === 0) continue;
     options.push({
       value: step.stepId,
-      label: raw(
-        `${t("synthetics.evidence.stepOption", { number: step.number, name: step.name })} (${count})`,
-      ),
+      label: t("synthetics.evidence.stepOption", { number: step.number, name: step.name, count }),
     });
   }
   const unattributedCount = props.events.filter((e) => e.stepId === null).length;
   if (unattributedCount > 0) {
     options.push({
       value: UNATTRIBUTED_STEP,
-      label: raw(`${t("synthetics.evidence.unattributed")} (${unattributedCount})`),
+      label: t("synthetics.evidence.unattributedOption", { count: unattributedCount }),
     });
   }
   return options;
@@ -270,11 +271,9 @@ const stepSelectOptions = computed<SelectOptionInput[]>(() => {
           {{ t("synthetics.evidence.truncated") }}
         </div>
 
-        <!-- D6: the step scope is a control that narrows the list, not a
-             caption that only restates it — a select the reader can change,
-             where the old banner could only be dismissed. It lives in the
-             toolbar with the other filters; passing the options is what turns
-             it on, so the step card (which passes none) never shows it. -->
+        <!-- The step scope is a control you can change, not a caption you can
+             only dismiss; supplying options is what turns it on, which is how
+             the step card avoids it. -->
         <EvidenceFilters
           v-model:view="view"
           v-model:first-party-only="firstPartyOnly"

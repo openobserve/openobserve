@@ -296,7 +296,7 @@ describe("EvidencePanel", () => {
     expect(scoped.findComponent(OSelect).props("modelValue")).toBe("s19");
   });
 
-  // D6: the step scope is a control the reader can change, not a caption they
+  // The step scope is a control the reader can change, not a caption they
   // can only dismiss — so a select replaces the old banner+Clear pair.
   it("renders a step-filter select instead of a dismissible banner", () => {
     const unfiltered = mountPanel();
