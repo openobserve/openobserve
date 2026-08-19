@@ -437,7 +437,8 @@ class TraceRecorder {
 
     // Bound forceFlush + shutdown so an unreachable endpoint can't stall exit; always shut down in
     // finally (a thrown forceFlush would otherwise skip it and leak handles that hang the process).
-    const FLUSH_DEADLINE_MS = 15_000;
+    // Stay above the configured forceFlush timeout so a healthy-but-slow endpoint isn't cut short.
+    const FLUSH_DEADLINE_MS = Math.max(traceExportTimeoutMs() + 5_000, 15_000);
     const withDeadline = (label, p) => Promise.race([
       p,
       new Promise((_, reject) => {
@@ -1109,7 +1110,9 @@ function postReviewComment(prNumber, body) {
   const tmpFile = `/tmp/review_comment_${randomUUID()}.txt`;
   writeFileSync(tmpFile, body, "utf-8");
   try {
-    gh(`pr comment "${prNumber}" --body-file "${tmpFile}"`);
+    const out = gh(`pr comment "${prNumber}" --body-file "${tmpFile}"`);
+    const m = out.match(/#issuecomment-(\d+)/);
+    return m ? m[1] : null;
   } finally {
     try { unlinkSync(tmpFile); } catch {}
   }
@@ -1121,16 +1124,16 @@ function updateReviewComment(prNumber, commentId, body) {
   writeFileSync(tmpFile, payload);
   try {
     gh(`api "repos/${process.env.GITHUB_REPOSITORY}/issues/comments/${commentId}" --method PATCH --input "${tmpFile}"`);
+    return { action: "update", id: commentId };
   } catch (err) {
     // The comment we captured at the start of the run was deleted mid-run (e.g. someone cleared
     // the review thread). Post a fresh comment instead of failing the whole review on a 404.
     const detail = execErrorText(err);
     if (/HTTP 404|Not Found/i.test(detail)) {
       console.log(`[${isoNow()}] Review comment #${commentId} no longer exists (404); posting a new comment instead`);
-      postReviewComment(prNumber, body);
-    } else {
-      throw err;
+      return { action: "create", id: postReviewComment(prNumber, body) };
     }
+    throw err;
   } finally {
     try { unlinkSync(tmpFile); } catch {}
   }
@@ -1355,22 +1358,23 @@ async function main() {
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 
     // 8. Post or update review
-    const commentAction = existingCommentId ? "update" : "create";
+    const requestedAction = existingCommentId ? "update" : "create";
     const commentSpan = TRACE.startSpan("github.pr.review_comment", {
-      "github.pr.comment.action": commentAction,
+      "github.pr.comment.action": requestedAction,
       "github.pr.number": prNumber,
     }, rootSpan);
     try {
+      let commentResult;
       if (existingCommentId) {
         console.log(`[${isoNow()}] Updating existing review comment #${existingCommentId}`);
-        updateReviewComment(prNumber, existingCommentId, finalReview);
+        commentResult = updateReviewComment(prNumber, existingCommentId, finalReview);
       } else {
         console.log(`[${isoNow()}] Posting new review comment`);
-        postReviewComment(prNumber, finalReview);
+        commentResult = { action: "create", id: postReviewComment(prNumber, finalReview) };
       }
       TRACE.endSpan(commentSpan, {
-        "github.pr.comment.action": commentAction,
-        "github.pr.comment.id": existingCommentId,
+        "github.pr.comment.action": commentResult.action,
+        "github.pr.comment.id": commentResult.id,
       });
     } catch (err) {
       TRACE.endSpan(commentSpan, {}, err);
