@@ -3281,6 +3281,23 @@ fn mssql_top_query_plan_is_not_dropped() {
         "an XML showplan must not be hashed by the JSON plan walker — a hash over \
          raw XML would flip on every execution and fake a plan change"
     );
+
+    // AND THE PLAN MUST SURVIVE TO THE RECORD despite having no hash. The
+    // earlier version of this test stopped at the struct and passed while the
+    // flattened record still dropped the plan: `to_record` emitted it only
+    // when a hash was ALSO present, so every SQL Server plan was read and then
+    // discarded one step later. Asserting on the struct alone is not enough —
+    // the column is what the UI reads.
+    let rec = sample.to_record();
+    assert!(
+        rec.get(config::meta::db_monitoring::O2_DBM_PLAN).is_some(),
+        "the plan must reach the record even with no hash — a plan you can read \
+         but not diff beats no plan at all"
+    );
+    assert!(
+        rec.get(config::meta::db_monitoring::O2_DBM_PLAN_HASH).is_none(),
+        "no hash was computed, so none must be claimed"
+    );
 }
 
 fn pg_top_query_empty_plan() -> Map<String, Value> {

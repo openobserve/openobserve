@@ -1473,12 +1473,38 @@ impl TopQuerySample {
         insert_opt(&mut out, O2_DBM_ACTIVITY_QUERY, self.query.clone());
         insert_opt(&mut out, O2_DBM_FINGERPRINT, self.fingerprint.clone());
 
-        // The plan and its hash travel together or not at all: a hash with no
-        // plan cannot be inspected, and a plan with no hash cannot be compared.
-        if let (Some(plan), Some(hash)) = (self.plan.as_ref(), self.plan_hash.as_ref()) {
+        // A HASH REQUIRES A PLAN, but a plan does NOT require a hash.
+        //
+        // These used to travel strictly together, on the reasoning that a plan
+        // with no hash cannot be compared. That is true and still worth having
+        // — but it silently DISCARDED every SQL Server plan: `plan_hash`
+        // canonicalizes a plan by walking its JSON structure, and SQL Server
+        // ships XML, so the hash is legitimately None and the plan went with
+        // it. The receiver produced a perfectly readable showplan, the
+        // canonicalizer read it, and this condition threw it away.
+        //
+        // A plan you can READ but not diff is worth strictly more than no plan
+        // at all: plan comparison is one feature of this column, inspection is
+        // the other, and only comparison needs the hash. Readers already gate
+        // on the hash where they diff (see `plan_drift`), so an unhashed plan
+        // renders and simply never claims to have drifted.
+        // A BLANK or LITERAL-NULL plan is not a plan. The hash requirement used
+        // to filter these as a side effect — `plan_hash` parses the text and
+        // declines on anything structureless — so dropping that requirement
+        // means filtering them HERE, explicitly, rather than leaning on a
+        // second rule to do it. Storing `"   "` or `"null"` (which a VRL
+        // pipeline or a transformed record really can deliver) puts a blank
+        // plan tree in the UI beside a query that looks like it was explained.
+        if let Some(plan) = self
+            .plan
+            .as_ref()
+            .filter(|p| !p.trim().is_empty() && p.trim() != "null")
+        {
             out.insert(O2_DBM_PLAN.into(), json!(plan));
-            out.insert(O2_DBM_PLAN_HASH.into(), json!(hash));
-            out.insert(O2_DBM_PLAN_HASH_VERSION.into(), json!(PLAN_HASH_VERSION));
+            if let Some(hash) = self.plan_hash.as_ref() {
+                out.insert(O2_DBM_PLAN_HASH.into(), json!(hash));
+                out.insert(O2_DBM_PLAN_HASH_VERSION.into(), json!(PLAN_HASH_VERSION));
+            }
             // E-C: provenance travels with the plan. This producer's plan is
             // the generic NULL-bound estimate, stated per record so a window
             // holding both producers never mislabels a row.
