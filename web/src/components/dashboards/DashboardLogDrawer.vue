@@ -927,7 +927,7 @@ function openInLogs() {
                         }}
                       </OTag>
                       <span
-                        class="text-text-primary shrink-0 text-xs font-medium whitespace-nowrap tabular-nums"
+                        class="text-text-heading shrink-0 text-xs font-medium whitespace-nowrap tabular-nums"
                         >{{ p.pct }}%</span
                       >
                       <!-- Pattern template with wildcards -->
@@ -1032,7 +1032,7 @@ function openInLogs() {
                         :class="[
                           'dld-ctx-dot rounded-full',
                           String(ev._timestamp) === String(selectedEvent!._timestamp) &&
-                            'dld-ctx-dot--current',
+                            'dld-ctx-dot--current ring-accent/25 ring-2',
                         ]"
                       />
                       <div
@@ -1273,7 +1273,7 @@ function openInLogs() {
 /* ── Insight sections ────────────────────────────────────────────────────── */
 .dld-section {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: section divider (1 device pixel) */
-  border-bottom: 1px solid var(--color-border-default);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 100%, transparent);
   padding-bottom: 0.5rem;
 }
 .dld-section:last-child {
@@ -1288,7 +1288,7 @@ function openInLogs() {
   font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--color-text-body);
+  color: color-mix(in srgb, var(--color-text-body) 100%, transparent);
 }
 /* Render the leading section OIcon as a small accent chip. */
 .dld-section-header > :first-child {
@@ -1310,7 +1310,7 @@ function openInLogs() {
   font-weight: 400;
   letter-spacing: 0;
   font-size: var(--text-2xs);
-  color: var(--color-text-secondary);
+  color: color-mix(in srgb, var(--color-text-secondary) 100%, transparent);
   margin-left: auto;
 }
 
@@ -1350,7 +1350,6 @@ function openInLogs() {
 }
 .dld-ctx-dot--current {
   background: color-mix(in srgb, var(--color-accent) 90%, transparent);
-  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
 .dld-ctx-line {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1px vertical connector line */
