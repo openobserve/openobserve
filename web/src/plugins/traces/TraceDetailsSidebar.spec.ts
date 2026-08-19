@@ -860,16 +860,14 @@ describe("TraceDetailsSidebar", async () => {
         }
       });
 
-      // Regression: the highlight named a row index, not an event, so selecting
-      // a different span left the same index lit on an unrelated row — and, for
-      // the same reason, left it expanded on the new span's table too.
-      it("clears the selected event when the span changes", async () => {
+      // Regression: the expansion names a row index, not an event, so selecting
+      // a different span left the same index expanded on an unrelated row.
+      it("clears the expanded event when the span changes", async () => {
         await setSpanEvents([
           { name: "first", _timestamp: eventNsAt(0.25) },
           { name: "second", _timestamp: eventNsAt(0.75) },
         ]);
         await timelineMarkers()[1].trigger("click");
-        expect((wrapper.vm as any).selectedEventIndex).toBe(1);
         expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
 
         await wrapper.setProps({
@@ -884,7 +882,6 @@ describe("TraceDetailsSidebar", async () => {
         });
         await flushPromises();
 
-        expect((wrapper.vm as any).selectedEventIndex).toBeNull();
         expect((wrapper.vm as any).expandedEventIds).toEqual([]);
       });
 
@@ -914,7 +911,6 @@ describe("TraceDetailsSidebar", async () => {
         vm.focusEvent(1);
 
         expect(vm.expandedEventIds).toEqual(["1"]);
-        expect(vm.selectedEventIndex).toBe(1);
       });
 
       it("expands the row named by focusEventIndex", async () => {
@@ -927,7 +923,6 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
 
         expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
-        expect((wrapper.vm as any).selectedEventIndex).toBe(1);
       });
 
       it("ignores a null focusEventIndex", async () => {
@@ -936,7 +931,7 @@ describe("TraceDetailsSidebar", async () => {
         await wrapper.setProps({ focusEventIndex: null });
         await flushPromises();
 
-        expect((wrapper.vm as any).selectedEventIndex).toBeNull();
+        expect((wrapper.vm as any).expandedEventIds).toEqual([]);
       });
 
       it("uses the span window, not the trace window", async () => {
@@ -947,7 +942,7 @@ describe("TraceDetailsSidebar", async () => {
         expect(timelineMarkers()[0].attributes("style")).toContain("left: 25%");
       });
 
-      it("selects and expands the matching row when a marker is clicked", async () => {
+      it("expands the matching row when a marker is clicked", async () => {
         await setSpanEvents([
           { name: "first", _timestamp: eventNsAt(0.25) },
           { name: "second", _timestamp: eventNsAt(0.75) },
@@ -955,7 +950,6 @@ describe("TraceDetailsSidebar", async () => {
 
         await timelineMarkers()[1].trigger("click");
 
-        expect(wrapper.vm.selectedEventIndex).toBe(1);
         expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
       });
 

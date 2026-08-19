@@ -671,12 +671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="cluster.key"
                   type="button"
                   class="absolute top-1/2 h-3 w-0.75 -translate-x-1/2 -translate-y-1/2 cursor-pointer p-0 before:absolute before:top-1/2 before:left-1/2 before:h-5 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
-                  :class="[
-                    SEVERITY_MARKER_CLASS[cluster.severity],
-                    selectedEventIndex === cluster.events[0].index
-                      ? 'ring-badge-focus-ring ring-2'
-                      : '',
-                  ]"
+                  :class="SEVERITY_MARKER_CLASS[cluster.severity]"
                   :style="{ left: cluster.left + '%' }"
                   :title="clusterLabel(cluster)"
                   :aria-label="clusterAriaLabel(cluster)"
@@ -1376,7 +1371,6 @@ export default defineComponent({
     const eventsWrap = ref(false);
 
     const eventsTableRef = ref<any>(null);
-    const selectedEventIndex = ref<number | null>(null);
 
     /**
      * Row keys expanded in the events table.
@@ -1460,7 +1454,6 @@ export default defineComponent({
     // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
     // events keep that index, so a marker maps straight onto its table row.
     const focusEvent = (index: number) => {
-      selectedEventIndex.value = index;
       expandedEventIds.value = [String(index)];
     };
 
@@ -1468,14 +1461,13 @@ export default defineComponent({
       focusEvent(marker.index);
     };
 
-    // The highlight names a row of *this* span's events table. Carrying it to
-    // the next span highlights an unrelated row that happens to share the index.
+    // The expansion names a row of *this* span's events table. Carrying it to
+    // the next span expands an unrelated row that happens to share the index.
     // `focusEventIndex` arrives a tick later (see TraceDetails.onSelectSpanEvent),
     // so a marker-driven span change still lands on its event.
     watch(
       () => props.span?.span_id,
       () => {
-        selectedEventIndex.value = null;
         expandedEventIds.value = [];
       },
     );
@@ -2216,7 +2208,6 @@ export default defineComponent({
       focusEvent,
       expandedEventIds,
       spanEventMarkers,
-      selectedEventIndex,
       eventMarkerLabel,
       onEventMarkerClick,
       eventTimelineRef,
