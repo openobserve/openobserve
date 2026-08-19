@@ -1551,7 +1551,24 @@ pub fn canonicalize_top_query(rec: &Map<String, Value>) -> Option<TopQuerySample
     // receiver bug that EXPLAINs the normalised text. `first_str` already treats
     // "" as absent, which is the correct reading: "no plan THIS interval", not
     // "no plan exists".
-    let plan = first_str(rec, &["postgresql_query_plan", "mysql_query_plan"]);
+    // SQL Server ships an obfuscated XML SHOWPLAN under its own vendor prefix.
+    // Its absence from this list is why SQL Server top queries carried no plan
+    // while the receiver was emitting one: the attribute reached the stream
+    // (`sqlserver.query_plan` is in the raw capture) and nothing read it.
+    //
+    // The three engines' plans are DIFFERENT FORMATS — Postgres JSON, MySQL
+    // JSON, SQL Server XML — and are deliberately stored in one column anyway:
+    // the reader wants "the plan for this statement", and a per-engine column
+    // would be null on two engines out of three. `o2_dbm_plan_source` already
+    // records which vantage produced it.
+    let plan = first_str(
+        rec,
+        &[
+            "postgresql_query_plan",
+            "mysql_query_plan",
+            "sqlserver_query_plan",
+        ],
+    );
     // Computed by US over the plan's structure. Deliberately NOT
     // `mysql.query_plan.hash`: measured, that attribute EQUALS the statement
     // digest, so it moves only when the statement moves — i.e. never, since the
