@@ -67,7 +67,11 @@ const props = withDefaults(
     errorKind?: EvidenceErrorKind | null;
     /** `evidence_truncated` from the record, or a truncation event in the stream. */
     truncated?: boolean;
-    /** Scope every row and every count to one step. Null shows the whole run. */
+    /**
+     * Scope every row and every count to one step. Null shows the whole run;
+     * the `__unattributed__` sentinel shows only the events the bundle could
+     * not attribute to any step.
+     */
     stepFilter?: string | null;
     /**
      * Steps to offer in the scope select, in journey order. The panel resolves
@@ -172,6 +176,15 @@ const stepFilterModel = computed({
  * badges above.
  */
 const stepSelectOptions = computed<SelectOptionInput[]>(() => {
+  // One pass for every count: filtering per step rescanned the whole bundle
+  // once per step, and both tallies come off the same walk.
+  const perStep = new Map<string, number>();
+  let unattributedCount = 0;
+  for (const e of props.events) {
+    if (e.stepId === null) unattributedCount += 1;
+    else perStep.set(e.stepId, (perStep.get(e.stepId) ?? 0) + 1);
+  }
+
   const options: SelectOptionInput[] = [
     {
       value: null,
@@ -179,14 +192,13 @@ const stepSelectOptions = computed<SelectOptionInput[]>(() => {
     },
   ];
   for (const step of props.stepOptions) {
-    const count = props.events.filter((e) => e.stepId === step.stepId).length;
+    const count = perStep.get(step.stepId) ?? 0;
     if (count === 0) continue;
     options.push({
       value: step.stepId,
       label: t("synthetics.evidence.stepOption", { number: step.number, name: step.name, count }),
     });
   }
-  const unattributedCount = props.events.filter((e) => e.stepId === null).length;
   if (unattributedCount > 0) {
     options.push({
       value: UNATTRIBUTED_STEP,

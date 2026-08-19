@@ -60,7 +60,11 @@ const props = withDefaults(
   defineProps<{
     events: EvidenceEvent[];
     mode: "inline" | "panel";
-    /** Panel only — the list HAS events but the current filter matched none. */
+    /**
+     * The list HAS events but the current filter matched none. Both surfaces
+     * pass it, so the empty state offers to clear the filter rather than
+     * reading as a step that captured nothing.
+     */
     filtered?: boolean;
     /**
      * Epoch ms the elapsed column counts from — normally the attempt's first
@@ -203,12 +207,16 @@ function elapsedTitle(e: EvidenceEvent): string {
 }
 
 /**
- * A 4px rail on rows that deserve one, and none on the rest.
+ * A coloured rail on rows that deserve one, and a transparent reserved slot on
+ * the rest.
  *
  * Drawn from the shared severity ladder rather than a fourth local classifier,
  * so the rail can never disagree with the ordering the fold already applied.
  * Only exceptions get colour — a rail on every row of an all-200 bundle is
  * decoration, and the point is that the two anomalies are findable at a glance.
+ * Every row still reserves the slot: the rail's class is what insets the first
+ * cell, so returning undefined here drops that row's expand chevron half a rem
+ * left of the others.
  */
 function rowStatusColor(row: EvidenceRow): string {
   const rank = evidenceSeverity(row);
