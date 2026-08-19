@@ -126,8 +126,12 @@ pub async fn create_table() -> Result<(), errors::Error> {
 }
 
 pub async fn add(provider: &Provider) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
+    // Build the record (which fetches/creates the org DEK) *before* taking the
+    // meta-store lock. get_dek() may itself acquire the same global SQLite write
+    // lock via cipher::add() on first-DEK creation, so acquiring it here first
+    // would self-deadlock on the non-reentrant mutex.
     let record = provider_active_model(provider).await?;
+    let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::insert(record).exec(client).await?;
@@ -136,8 +140,10 @@ pub async fn add(provider: &Provider) -> Result<(), errors::Error> {
 }
 
 pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
+    // Build the record (which fetches/creates the org DEK) *before* taking the
+    // meta-store lock — see add() for why the reverse order self-deadlocks.
     let record = provider_active_model(provider).await?;
+    let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::update(record).exec(client).await?;
