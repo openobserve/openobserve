@@ -209,7 +209,7 @@ pub(crate) async fn create_context(
     // physical rows are attached to each FileKey before the metrics table is
     // built. Files of any other layout (legacy or not yet finalized hours) are
     // scanned in full; the PromQL matchers are always applied by the query.
-    let idx_took = match tsid_series_index::search(
+    match tsid_series_index::search(
         query.as_ref(),
         &mut files,
         schema.as_ref(),
@@ -218,16 +218,23 @@ pub(crate) async fn create_context(
     )
     .await
     {
-        Ok(took) => took.unwrap_or_default(),
+        Ok(took) => {
+            scan_stats.idx_took = took.unwrap_or_default() as i64;
+        }
         Err(error) => {
             log::warn!(
                 "[trace_id {trace_id}] promql->search->storage: TSID series-index query failed, falling back to a full scan: {error}"
             );
-            0
         }
     };
 
-    scan_stats.idx_took = idx_took as i64;
+    log::info!(
+        "[trace_id {trace_id}] promql->search->storage: after TSID series-index pruning, files {}, scan_size {}, compressed_size {}, index took: {} ms",
+        scan_stats.files,
+        scan_stats.original_size,
+        scan_stats.compressed_size,
+        scan_stats.idx_took
+    );
 
     let session = SearchSession {
         id: trace_id.to_string(),
