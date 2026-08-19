@@ -932,6 +932,16 @@ describe("OnCallResponses", () => {
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallTeams" }));
   });
 
+  /// The rail carries a single On-Call entry, so Routing has no other way in:
+  /// this header button is the module's only standing route to it, unlike the
+  /// per-row "assign team" shortcut that exists only on unrouted pages.
+  it("always offers a route to Routing", async () => {
+    const wrapper = await withPages([page()]);
+
+    await wrapper.find('[data-test="oncall-responses-routing-btn"]').trigger("click");
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallRouting" }));
+  });
+
   /// "My on-call" narrows THIS list. It used to navigate, which threw away
   /// every other filter the reader had set and answered the question from a
   /// different dataset on a different screen.

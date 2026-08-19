@@ -50,6 +50,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("oncall.myOnCallNav") }}
       </OButton>
+      <!-- The module's own navigation. The rail names On-Call once; who is on
+           call (Teams) and which team a page reaches (Routing) are configuration
+           for this screen, so they are reached from it rather than from three
+           sibling rail entries. -->
       <OButton
         variant="outline"
         size="sm"
@@ -58,6 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="goTo('onCallTeams')"
       >
         {{ t("oncall.teams") }}
+      </OButton>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="account-tree"
+        data-test="oncall-responses-routing-btn"
+        @click="goTo('onCallRouting')"
+      >
+        {{ t("oncall.routingNav") }}
       </OButton>
     </template>
 
