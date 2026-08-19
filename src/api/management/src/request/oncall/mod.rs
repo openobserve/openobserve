@@ -4544,12 +4544,17 @@ async fn carry_page_history_into_incident(
     // acks and system lines are deliberately left behind: they describe how the
     // *page* was worked, and the incident has its own timeline for that. What a
     // human typed, and what the AI SRE concluded, are the parts that carry.
+    // `AiVerdict`, not `Rca`. `Rca` is a variant no producer in either tree
+    // writes — the agent's findings land as `AiVerdict` (`escalation.rs`,
+    // `verdict_event`). Filtering on `Rca` made this loop's whole AI branch
+    // unreachable: notes carried, findings never did, and the prefix below was
+    // dead code.
     for event in timeline.iter().filter(|e| {
-        matches!(e.kind, ResponseEventKind::Note | ResponseEventKind::Rca)
+        matches!(e.kind, ResponseEventKind::Note | ResponseEventKind::AiVerdict)
             && !e.body.trim().is_empty()
     }) {
         let prefix = match event.kind {
-            ResponseEventKind::Rca => "AI SRE (from the page): ",
+            ResponseEventKind::AiVerdict => "AI SRE (from the page): ",
             _ => "",
         };
         if let Err(e) = infra::table::incident_events::append(
@@ -5232,11 +5237,19 @@ mod tests {
         use config::meta::oncall::ResponseEventKind as K;
 
         let carries = |kind: K, body: &str| {
-            matches!(kind, K::Note | K::Rca) && !body.trim().is_empty()
+            matches!(kind, K::Note | K::AiVerdict) && !body.trim().is_empty()
         };
 
         assert!(carries(K::Note, "rolled back checkout 4.2.1"));
-        assert!(carries(K::Rca, "probable cause: the deploy at 14:02"));
+        // `AiVerdict` is the kind the agent actually writes. This test named
+        // `Rca` when it was first written and passed, because it asserted
+        // against the same filter it was testing rather than against a kind
+        // some producer emits — so the AI branch was dead and green.
+        assert!(carries(K::AiVerdict, "probable cause: the deploy at 14:02"));
+        assert!(
+            !carries(K::Rca, "anything"),
+            "Rca has no producer; matching it is how the branch went dead"
+        );
 
         assert!(!carries(K::Page, "paged ana@o2.ai"));
         assert!(!carries(K::Ack, "acknowledged by bo@o2.ai"));
