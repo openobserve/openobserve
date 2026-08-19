@@ -851,6 +851,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                     </li>
                   </ol>
+                  <!-- No tree, but a plan. SQL Server ships an XML showplan
+                   this page cannot walk into nodes; refusing to show it left
+                   "The plan could not be read" over a plan that was collected,
+                   stored and returned perfectly well. The text renders verbatim
+                   instead — scrollable, since a showplan is long — because a
+                   plan a reader can READ beats one the page hides. -->
+                  <pre
+                    v-else-if="plan.rawPlan"
+                    class="text-text-secondary max-h-96 overflow-auto p-2 font-mono text-xs whitespace-pre-wrap"
+                    :data-test="`dbm-detail-plan-raw-${plan.rowKey}`"
+                    >{{ plan.rawPlan }}</pre
+                  >
                   <p v-else class="text-text-muted p-2 text-xs">
                     {{ t("dbm.detail.plans.noTree") }}
                   </p>
