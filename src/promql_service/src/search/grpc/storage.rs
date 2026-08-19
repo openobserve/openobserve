@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::VALUE_LABEL,
+        promql::{VALUE_LABEL, tsid_layout::MetricsFileLayout},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
@@ -216,8 +216,10 @@ pub(crate) async fn create_context(
         use_inverted_index: true,
     });
 
-    // Search the TSID-major sidecar at the same stage as Tantivy: both attach
+    // Search the TSID-major sidecars at the same stage as Tantivy: both attach
     // physical row selections to FileKey before the metrics table is built.
+    // The sidecar covers the TSID-major files only; whatever else is in the
+    // file set (legacy or not yet finalized hours) goes through Tantivy.
     let mut idx_took = 0;
     let mut is_add_filter_back = true;
     let series_index_applied = match tsid_series_index::search(
@@ -242,25 +244,39 @@ pub(crate) async fn create_context(
         }
     };
 
-    // Search Tantivy only when the complete file set cannot use `.sidx`.
+    // Tantivy over the files the sidecar did not cover (all of them when no
+    // sidecar applied). Sidecar selections still need the final PromQL filter,
+    // so the filter stays whenever one was applied.
     let (index_condition, is_full_convert) =
         convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
-    if !series_index_applied
-        && !index_condition.conditions.is_empty()
-        && cfg.search.inverted_index_enabled
-    {
-        (idx_took, is_add_filter_back,..) =
-            tantivy_search(query.clone(), &mut files, Some(index_condition), None)
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index error: {e}"
-                    );
-                    DataFusionError::Execution(e.to_string())
-                })?;
-        log::info!(
-            "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {idx_took} ms, is_add_filter_back: {is_add_filter_back}, is_full_convert: {is_full_convert}",
-        );
+    if !index_condition.conditions.is_empty() && cfg.search.inverted_index_enabled {
+        let (sidecar_files, mut tantivy_files): (Vec<FileKey>, Vec<FileKey>) =
+            if series_index_applied {
+                std::mem::take(&mut files).into_iter().partition(|file| {
+                    MetricsFileLayout::of(&file.key) == MetricsFileLayout::TsidMajor
+                })
+            } else {
+                (Vec::new(), std::mem::take(&mut files))
+            };
+        if !tantivy_files.is_empty() {
+            let (tantivy_took, tantivy_add_filter_back, ..) =
+                tantivy_search(query.clone(), &mut tantivy_files, Some(index_condition), None)
+                    .await
+                    .map_err(|e| {
+                        log::error!(
+                            "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index error: {e}"
+                        );
+                        DataFusionError::Execution(e.to_string())
+                    })?;
+            idx_took += tantivy_took;
+            is_add_filter_back = tantivy_add_filter_back || series_index_applied;
+            log::info!(
+                "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {tantivy_took} ms, files: {}, is_add_filter_back: {is_add_filter_back}, is_full_convert: {is_full_convert}",
+                tantivy_files.len(),
+            );
+        }
+        files = sidecar_files;
+        files.extend(tantivy_files);
     }
     scan_stats.idx_took = idx_took as i64;
 

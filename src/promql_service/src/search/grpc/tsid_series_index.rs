@@ -105,12 +105,15 @@ impl SeriesSelectionCache {
 static SERIES_SELECTION_CACHE: LazyLock<Mutex<SeriesSelectionCache>> =
     LazyLock::new(|| Mutex::new(SeriesSelectionCache::default()));
 
-/// Apply a TSID-major `.sidx` sidecar before registering the metrics table.
+/// Apply the `.sidx` sidecars of the TSID-major files in `files` before
+/// registering the metrics table.
 ///
 /// This mirrors the PromQL Tantivy path: matching physical rows are attached
-/// to each [`FileKey`] and the generic DataFusion scan later converts that
-/// selection into a Parquet access plan. `Ok(None)` means the file set or
-/// matchers are not eligible and the caller should try Tantivy/full scan.
+/// to each TSID-major [`FileKey`] (files without a matching series are
+/// dropped) and the generic DataFusion scan later converts that selection into
+/// a Parquet access plan. Files of any other layout are left untouched, in
+/// place, for the caller to run Tantivy / a full scan over. `Ok(None)` means
+/// no file or matcher was eligible and nothing was changed.
 pub(super) async fn search(
     query: &QueryParams,
     files: &mut Vec<FileKey>,
@@ -131,8 +134,9 @@ pub(super) async fn search(
     let filter_key = format!("{matchers:?}");
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
+        // only TSID-major files own a sidecar; other layouts stay as they are
         if MetricsFileLayout::of(&file.key) != MetricsFileLayout::TsidMajor {
-            return Ok(None);
+            continue;
         }
         let sidecar_path = MetricsFileLayout::series_index_path(&file.key).ok_or_else(|| {
             DataFusionError::Execution(format!(
@@ -147,6 +151,10 @@ pub(super) async fn search(
             cache_key,
         ));
     }
+    if index_files.is_empty() {
+        return Ok(None);
+    }
+    let other_files = files.len() - index_files.len();
 
     let start = std::time::Instant::now();
     let mut evaluated = Vec::with_capacity(index_files.len());
@@ -213,7 +221,8 @@ pub(super) async fn search(
     let mut selections = evaluated.into_iter().collect::<HashMap<_, _>>();
     files.retain_mut(|file| {
         let Some(ranges) = selections.remove(&file.key) else {
-            return false;
+            // not TSID-major: untouched, the caller decides how to scan it
+            return true;
         };
         if ranges.is_empty() {
             return false;
@@ -227,7 +236,7 @@ pub(super) async fn search(
 
     let took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {}] promql->series-index: selected {selected_ranges} ranges across {selected_files}/{} files, selection cache hits: {cache_hits}, took: {took} ms",
+        "[trace_id {}] promql->series-index: selected {selected_ranges} ranges across {selected_files}/{} files, {other_files} files without a sidecar left to tantivy/full scan, selection cache hits: {cache_hits}, took: {took} ms",
         query.trace_id,
         indexed_file_count,
     );
