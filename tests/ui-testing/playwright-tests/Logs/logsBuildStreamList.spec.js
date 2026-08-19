@@ -27,7 +27,7 @@
  * @tags @logs @queryBuilder @all
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ingestForQueryBuilderTest } = require('../utils/queryBuilder-helpers.js');
@@ -55,94 +55,70 @@ test.describe("Logs Build Tab - Stream List Without A Preselected Stream", () =>
         // if an environment ever pre-seeds a stream on the logs page, Build would
         // mount with a stream already set and both tests below would pass against
         // the buggy build without exercising anything.
-        const preselected = await pm.logsPage.getLogsSelectedStream();
-        expect(
-            preselected,
-            'logs page must start with no stream selected — the Build tab inherits that blank stream'
-        ).toBe('');
+        await pm.logsPage.expectNoLogsStreamSelected();
     });
 
     test("Build tab stream dropdown is populated and usable when no stream is selected on the logs page", {
         tag: ['@queryBuilder', '@functional', '@P0', '@all', '@logs']
-    }, async ({ page }) => {
+    }, async () => {
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();
 
         // The select defaults to logs and is the user's own control here — the bug
         // was an enabled, openable, permanently empty dropdown, not a disabled one.
-        expect(await pm.logsPage.getBuildSelectedStreamType()).toBe('logs');
-        expect(
-            await pm.logsPage.isBuildStreamDropdownEnabled(),
-            'Build tab stream select must be user-editable'
-        ).toBe(true);
+        await pm.logsPage.expectBuildStreamType('logs');
+        await pm.logsPage.expectBuildStreamDropdownEditable();
 
         await pm.logsPage.openBuildStreamDropdown();
 
         // The regression itself: the list never loaded, so OSelect fell through to
         // its empty state.
-        await expect(
-            page.locator(pm.logsPage.buildStreamPopover).getByText('No options found', { exact: true })
-        ).toHaveCount(0);
-        await expect(page.locator(pm.logsPage.buildStreamOptions).first()).toBeVisible({ timeout: 15000 });
-        expect(await page.locator(pm.logsPage.buildStreamOptions).count()).toBeGreaterThan(0);
+        await pm.logsPage.expectBuildStreamListPopulated();
 
         // The ingested stream is actually offered, not just "some" options.
-        await pm.logsPage.filterBuildStreamOptions(STREAM_NAME);
-        const option = page.locator(pm.logsPage.buildStreamOption(STREAM_NAME)).first();
-        await expect(option).toBeVisible({ timeout: 15000 });
+        await pm.logsPage.expectBuildStreamOptionVisible(STREAM_NAME);
 
         // "no way to pick one" was the user-visible symptom, so assert the pick
         // lands rather than stopping at the list being non-empty.
-        await option.click();
-        await expect(page.locator(pm.logsPage.buildStreamPopover)).toBeHidden({ timeout: 10000 });
-        expect(await pm.logsPage.getBuildSelectedStream()).toBe(STREAM_NAME);
+        await pm.logsPage.clickBuildStreamOption(STREAM_NAME);
+        await pm.logsPage.expectBuildStreamSelected(STREAM_NAME);
 
         // And the selection propagates: the field list loads that stream's schema.
-        // Asserted on "any field row" rather than a named field — this shard runs
-        // with ZO_QUICK_MODE_ENABLED, which narrows which fields are listed.
-        const fieldRows = page.locator('[data-test="logs-build-query-page"] [data-test^="o-field-list-row-"]');
-        await expect(fieldRows.first()).toBeVisible({ timeout: 20000 });
+        await pm.logsPage.expectBuildFieldListPopulated();
 
         testLogger.info('Build tab stream list loaded and selectable without a preselected stream');
     });
 
     test("Build tab stream list refreshes when the stream type changes with no stream selected", {
         tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
-    }, async ({ page }) => {
+    }, async () => {
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();
 
         // Baseline: under "logs" the ingested stream is listed.
         await pm.logsPage.openBuildStreamDropdown();
-        await pm.logsPage.filterBuildStreamOptions(STREAM_NAME);
-        await expect(page.locator(pm.logsPage.buildStreamOption(STREAM_NAME)).first())
-            .toBeVisible({ timeout: 15000 });
+        await pm.logsPage.expectBuildStreamOptionVisible(STREAM_NAME);
         await pm.logsPage.closeBuildStreamDropdown();
 
         // Switching type must refetch. `e2e_automate` is ingested as a LOGS stream,
         // so a traces list that still offers it means the list was never refreshed —
         // this is what the un-armed stream_type watcher used to do.
         await pm.logsPage.selectBuildStreamType('traces');
-        expect(await pm.logsPage.getBuildSelectedStreamType()).toBe('traces');
+        await pm.logsPage.expectBuildStreamType('traces');
 
         await pm.logsPage.openBuildStreamDropdown();
         // A real traces list arrived — not merely an empty one. Global setup ingests
         // traces for every shard, so this pins "refetched" rather than "cleared".
-        await expect(page.locator(pm.logsPage.buildStreamOptions).first())
-            .toBeVisible({ timeout: 15000 });
-        await pm.logsPage.filterBuildStreamOptions(STREAM_NAME);
-        await expect(page.locator(pm.logsPage.buildStreamOption(STREAM_NAME)))
-            .toHaveCount(0, { timeout: 15000 });
+        await pm.logsPage.expectBuildStreamListPopulated();
+        await pm.logsPage.expectBuildStreamOptionAbsent(STREAM_NAME);
         await pm.logsPage.closeBuildStreamDropdown();
 
         // Switching back restores it — the watcher fires on every change, not once.
         await pm.logsPage.selectBuildStreamType('logs');
-        expect(await pm.logsPage.getBuildSelectedStreamType()).toBe('logs');
+        await pm.logsPage.expectBuildStreamType('logs');
 
         await pm.logsPage.openBuildStreamDropdown();
-        await pm.logsPage.filterBuildStreamOptions(STREAM_NAME);
-        await expect(page.locator(pm.logsPage.buildStreamOption(STREAM_NAME)).first())
-            .toBeVisible({ timeout: 15000 });
+        await pm.logsPage.expectBuildStreamOptionVisible(STREAM_NAME);
 
         testLogger.info('Build tab stream list refreshed on every stream type change');
     });
