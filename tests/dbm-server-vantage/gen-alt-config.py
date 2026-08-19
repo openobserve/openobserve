@@ -92,6 +92,8 @@ LANES = [
         # disclosure rather than our guess.
         "events_receiver": True,
         "events_receiver_type": "mysql",
+        # mysqlreceiver stamps `db.system.name: mysql` even against MariaDB.
+        "engine_override": True,
     },
     {
         "out": "config.mssql.yaml",
@@ -172,6 +174,9 @@ def events_pipeline(lane) -> str:
         return ""
     fan = ", otlphttp/fan_logs" if FANOUT_ORG else ""
     rid = lane["events_receiver_type"] + "/alt"
+    engine_fix = (
+        f" transform/engine_{lane['engine']}," if lane.get("engine_override") else ""
+    )
     return f"""
     # RECEIVER-NATIVE EVENTS -> Activity + Top queries.
     # The receiver adopts `db.server.query_sample` / `db.server.top_query`, which
@@ -181,7 +186,7 @@ def events_pipeline(lane) -> str:
     # records arrive already shaped by the receiver.
     logs/receiver_events:
       receivers: [{rid}]
-      processors: [memory_limiter/alt, transform/tag_source, resource/ident, batch]
+      processors: [memory_limiter/alt, transform/tag_source,{engine_fix} resource/ident, batch]
       exporters: [otlphttp/alt_logs{fan}, file/raw_events]"""
 
 
@@ -234,6 +239,37 @@ def events_receiver(lane) -> str:
       top_query_count: 200
 {events}"""
     raise SystemExit(f"unknown events_receiver_type {kind!r}")
+
+
+def engine_fixup_processor(lane) -> str:
+    """Correct the engine name a borrowed receiver stamps.
+
+    `mysqlreceiver` works against MariaDB — it detects the product correctly
+    (`"product": "MariaDB"`) — but it still stamps `db.system.name: mysql` on
+    the events it emits. The lane's own sqlquery recipes stamp `mariadb`, so
+    without this ONE SERVER ANSWERS TO TWO ENGINES: measured on the rig, the
+    fleet list returned five identities for four servers, with `maria-prod-1`
+    appearing once as MariaDB and once as MySQL, and the Overview rendering it
+    as two rows.
+
+    That is the same class of split the instance identity had, and it is worth
+    fixing at the collector rather than the reader: a record-level attribute is
+    the engine's own claim about itself, and correcting it once here beats every
+    downstream consumer having to know that one receiver lies about this lane.
+    """
+    if not lane.get("events_receiver") or not lane.get("engine_override"):
+        return ""
+    return f"""
+  # The borrowed receiver stamps its OWN engine name; this lane is not that
+  # engine. See engine_fixup_processor in gen-alt-config.py.
+  transform/engine_{lane["engine"]}:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["db.system.name"], "{lane["engine"]}")
+          - set(resource.attributes["db.system.name"], "{lane["engine"]}")
+"""
 
 
 def service_block(lane, recipe_receivers: str) -> str:
@@ -366,7 +402,8 @@ def main() -> None:
             "# PG* env vars set to something, even though nothing scrapes Postgres here.\n"
         )
         out.write_text(
-            header + upstream.rstrip("\n") + "\n" + limiter + "\n"
+            header + upstream.rstrip("\n") + "\n" + limiter
+            + engine_fixup_processor(lane) + "\n"
             + exporters_block(lane) + "\n"
             + extensions.rstrip("\n") + "\n\n"
             + service_block(lane, recipe_receivers)
