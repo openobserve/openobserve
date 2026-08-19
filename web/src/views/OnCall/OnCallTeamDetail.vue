@@ -239,6 +239,19 @@
               @presets="presetsOpen = true"
             />
 
+            <!-- Under the calendar, because a cover is an exception to what
+                 the calendar draws — and until now the only trace of one was
+                 an "· override" annotation on a cell, with no reason, no whose
+                 shift, and no way to take it back. -->
+            <OnCallCoverList
+              ref="coverListRef"
+              :team-id="teamId"
+              :timezone="team?.timezone ?? 'UTC'"
+              :window="scheduleWindow"
+              :slots="teamSlots"
+              @changed="fetchSegments"
+            />
+
             <OnCallSchedulePresets
               v-model:open="presetsOpen"
               :team-id="teamId"
@@ -360,6 +373,7 @@ import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
 import OnCallScheduleAnswer from "@/components/oncall/OnCallScheduleAnswer.vue";
+import OnCallCoverList from "@/components/oncall/OnCallCoverList.vue";
 import OnCallSchedulePresets from "@/components/oncall/OnCallSchedulePresets.vue";
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";

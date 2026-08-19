@@ -1176,17 +1176,42 @@ export interface UnroutedSignal {
  * Somebody standing in for the rotation over a window. Drawn on top of the
  * resolved schedule; outside the window the rotation resolves as normal.
  */
+/**
+ * A cover: somebody stands in for the rotation over a window.
+ *
+ * **Three of these field names were wrong** — `starts_at`, `ends_at` and
+ * `note`, none of which the wire has. It went unnoticed because `listOverrides`
+ * had no callers: the type was never read against a real response, only
+ * written by the create form, which builds its own body. A cover shows on the
+ * calendar as an `override_id` annotation, and that is a field the type did
+ * get right.
+ */
 export interface Override {
   id: string;
   org_id: string;
   team_id: string;
+  /** Which rotation this cover stands over. Absent means {@link DEFAULT_SLOT}. */
+  slot?: string | null;
   user_email: string;
   /** Micros. */
-  starts_at: number;
+  start_at: number;
   /** Micros. */
-  ends_at: number;
-  created_by?: string | null;
-  note?: string | null;
+  end_at: number;
+  /**
+   * Whose shift is being covered. Optional, and legitimately so: "cover
+   * tonight" is a real request even when nobody has worked out whose night it
+   * is yet.
+   */
+  covering_for?: string | null;
+  /** Why. Free text, up to 500 characters. */
+  reason?: string | null;
+  created_by: string;
+  /**
+   * Micros. **Load-bearing for overlapping covers**: the latest `created_at`
+   * wins the overlap, with `id` descending breaking a tie — so a list that
+   * sorts by anything else shows the wrong one on top.
+   */
+  created_at: number;
 }
 
 /**
