@@ -445,3 +445,102 @@ describe("OnCallScheduleEditor", () => {
     });
   });
 });
+
+/// **Retiring a layer instead of deleting it.** `ends_at` is how a rotation is
+/// taken out of service without losing the record of who covered those hours.
+/// Deleting was the only way to stop one, so "the weekend layer ran until
+/// March" stopped being something the schedule could say the moment somebody
+/// tidied up.
+describe("OnCallScheduleEditor — retiring a layer", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    vi.clearAllMocks();
+    service.setSchedule.mockResolvedValue({ data: {} } as any);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const WEEKEND = {
+    name: "Weekend",
+    members: ["ana@o2.ai"],
+    shift_micros: MICROS_PER_WEEK,
+    anchor_micros: ANCHOR,
+  };
+
+  const savedRotations = () => (service.setSchedule.mock.calls.at(-1)![0] as any).data.rotations;
+
+  async function save(wrapper: any) {
+    await wrapper.find('[data-test="oncall-schedule-save"]').trigger("click");
+    await flushPromises();
+  }
+
+  it("writes ends_at when a layer is retired", async () => {
+    const wrapper = render({ schedule: schedule([WEEKEND]) });
+    await openRotation(wrapper);
+
+    wrapper
+      .findComponent('[data-test="oncall-schedule-retire"]')
+      .vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    await save(wrapper);
+    // Defaults to now: "retire this" almost always means "as of today", and a
+    // date somebody must fill in first makes the common case two steps.
+    expect(savedRotations()[0].ends_at).toBe(NOW * 1000);
+  });
+
+  it("clears ends_at when the layer is put back into service", async () => {
+    const wrapper = render({
+      schedule: schedule([{ ...WEEKEND, ends_at: ANCHOR + MICROS_PER_WEEK }]),
+    });
+    await openRotation(wrapper);
+
+    wrapper
+      .findComponent('[data-test="oncall-schedule-retire"]')
+      .vm.$emit("update:modelValue", false);
+    await flushPromises();
+
+    await save(wrapper);
+    expect(savedRotations()[0].ends_at).toBeUndefined();
+  });
+
+  /// The date is read and written in the TEAM's zone, which is what the field
+  /// says on its label and what every restriction window is evaluated in.
+  it("reads the retirement date as the team's wall clock", async () => {
+    const wrapper = mount(OnCallScheduleEditor, {
+      props: {
+        teamId: "team_1",
+        timezone: "Asia/Kolkata",
+        schedule: schedule([{ ...WEEKEND, ends_at: Date.UTC(2026, 7, 17, 4, 30) * 1000 }]),
+        members: members("ana@o2.ai"),
+      },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await openRotation(wrapper);
+
+    const field = wrapper.findComponent('[data-test="oncall-schedule-retire-at"]');
+    expect(field.props("modelValue")).toBe("2026-08-17T10:00");
+
+    field.vm.$emit("update:modelValue", "2026-08-18T10:00");
+    await flushPromises();
+    await save(wrapper);
+
+    expect(savedRotations()[0].ends_at).toBe(Date.UTC(2026, 7, 18, 4, 30) * 1000);
+  });
+
+  /// A retired layer stays in the list — it still resolves for the past — so
+  /// the row has to say it is not staffing anything now. Without that, the
+  /// name it shows sends somebody looking for a person who is not on call.
+  it("marks a retired layer in the list rather than hiding it", async () => {
+    const wrapper = render({
+      schedule: schedule([WEEKEND, { ...WEEKEND, name: "Old weekend", ends_at: ANCHOR }]),
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-schedule-retired-Weekend"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-schedule-retired-Old weekend"]').exists()).toBe(true);
+  });
+});

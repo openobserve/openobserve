@@ -55,6 +55,24 @@
           </span>
         </template>
 
+        <!-- A retired layer still resolves for the past, so it stays in the
+             list — but it is not staffing anything now, and a row that reads
+             like the others would have somebody looking for the person it
+             names. -->
+        <template #cell-name="{ row }">
+          <span class="flex flex-wrap items-center gap-2">
+            {{ raw(row.name) }}
+            <OTag
+              v-if="isRetired(row)"
+              variant="default-soft"
+              size="xs"
+              :data-test="`oncall-schedule-retired-${row.name}`"
+            >
+              {{ t("oncall.rotationRetiredOnDate", { date: raw(shortDate(row.ends_at ?? 0)) }) }}
+            </OTag>
+          </span>
+        </template>
+
         <template #cell-primary="{ row }">
           <OUserCell :value="holderOf(row, 0)" />
         </template>
@@ -304,6 +322,30 @@
           >
             {{ priorityClash }}
           </p>
+
+          <!-- Retiring a layer, rather than deleting it. Delete was the only
+               way to stop a rotation and it threw away the record of who had
+               been covering those hours, so "the weekend layer ran until
+               March" stopped being something the schedule could say. -->
+          <div class="flex flex-col gap-2">
+            <OCheckbox
+              :model-value="isRetired(active)"
+              :label="t('oncall.rotationRetire')"
+              data-test="oncall-schedule-retire"
+              @update:model-value="(on: CheckboxModelValue) => setRetired(active as Rotation, !!on)"
+            />
+            <OText variant="meta">{{ t("oncall.rotationRetireHint") }}</OText>
+            <OInput
+              v-if="isRetired(active)"
+              type="datetime-local"
+              width="md"
+              :model-value="retiredAtLocal(active)"
+              :label="t('oncall.rotationRetiredOn')"
+              :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(props.timezone) })"
+              data-test="oncall-schedule-retire-at"
+              @update:model-value="(v: string | number) => setRetiredAt(active as Rotation, v)"
+            />
+          </div>
         </section>
 
         <!-- The answer the form produces. It is the reason to have a drawer at
@@ -379,6 +421,8 @@ import { useStore } from "vuex";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -399,7 +443,13 @@ import { DEFAULT_SLOT, MICROS_PER_WEEK, sameSlot } from "@/ts/interfaces/oncall"
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Shift } from "@/utils/oncall";
-import { formatMinuteOfDay, SHIFT_PRESETS, upcomingShifts } from "@/utils/oncall";
+import {
+  formatMinuteOfDay,
+  fromZonedInputValue,
+  SHIFT_PRESETS,
+  toZonedInputValue,
+  upcomingShifts,
+} from "@/utils/oncall";
 
 const PREVIEW_SHIFTS = 5;
 
@@ -621,6 +671,38 @@ function setPriority(rotation: Rotation, priority: number) {
   rotation.priority = priority;
 }
 
+/// ── Retiring a layer ──────────────────────────────────────────────────────
+///
+/// `ends_at` is how a rotation is taken out of service without deleting it.
+/// Deleting was the only way to stop one, and it discarded exactly the record
+/// the field exists to keep: "the weekend layer ran until March" stopped being
+/// something the schedule could say, and the calendar lost the reason those
+/// hours had been covered at all.
+///
+/// The end is exclusive, like every other boundary here.
+const isRetired = (rotation: Rotation) => rotation.ends_at !== undefined;
+
+const retiredAt = (rotation: Rotation) => rotation.ends_at ?? nowMicros.value;
+
+/// The picker is a `datetime-local`, which has no timezone of its own — so the
+/// value is rendered in the TEAM's zone and labelled with it, rather than in
+/// whatever zone the reader's laptop is set to.
+function retiredAtLocal(rotation: Rotation): string {
+  return toZonedInputValue(retiredAt(rotation), props.timezone);
+}
+
+function setRetired(rotation: Rotation, on: boolean) {
+  // Defaults to now: "retire this" almost always means "as of today", and a
+  // date somebody has to fill in before the checkbox means anything is a
+  // second step for the common case.
+  rotation.ends_at = on ? retiredAt(rotation) : undefined;
+}
+
+function setRetiredAt(rotation: Rotation, value: string | number) {
+  const micros = fromZonedInputValue(String(value), props.timezone);
+  if (micros !== null) rotation.ends_at = micros;
+}
+
 /// A window with no days applies on no day, which is a rotation that resolves
 /// to nobody — so a new one starts as the working week.
 function addRestriction() {
@@ -660,19 +742,20 @@ function setMembers(rotation: Rotation, members: string[]) {
   rotation.members = [...members];
 }
 
-/** `datetime-local` wants local wall time with no zone suffix. */
+/// In the TEAM's zone, which is what the label beside it promises and what
+/// every restriction window is evaluated in. Read and written with the
+/// browser's zone, an operator in Berlin editing an Asia/Kolkata team saw the
+/// handover three and a half hours from where it was — and moved it there by
+/// saving.
 function handoverInput(rotation: Rotation): string {
-  const d = new Date(rotation.anchor_micros / 1000);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return toZonedInputValue(rotation.anchor_micros, props.timezone);
 }
 
 function setAnchor(rotation: Rotation, value: string) {
-  const parsed = Date.parse(value);
-  // An unparseable value means the user is mid-edit; keeping the previous
+  const micros = fromZonedInputValue(value, props.timezone);
+  // An incomplete value means the user is mid-edit; keeping the previous
   // anchor beats writing NaN and blanking the preview.
-  if (Number.isNaN(parsed)) return;
-  rotation.anchor_micros = parsed * 1000;
+  if (micros !== null) rotation.anchor_micros = micros;
 }
 
 function reset() {

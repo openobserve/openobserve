@@ -31,6 +31,7 @@ import {
   describeTarget,
   formatInZone,
   formatMinuteOfDay,
+  fromZonedInputValue,
   groupBySubject,
   isEscalating,
   isOnCallUnavailable,
@@ -58,6 +59,7 @@ import {
   rungProblem,
   shiftBands,
   shortReachReason,
+  toZonedInputValue,
   stateTagVariant,
   upcomingShifts,
   windowContains,
@@ -1345,5 +1347,78 @@ describe("rungProblem", () => {
 
     expect(problem?.label).toBe("oncall.reachShortNoSmtp");
     expect(problem?.tip).toBe("this deployment has no SMTP transport configured");
+  });
+});
+
+/// **A `datetime-local` in somebody else's timezone.**
+///
+/// The input has no zone of its own: it reads and writes bare wall time, and
+/// the browser's zone is the only one the platform applies. Every on-call
+/// instant belongs to the TEAM's zone instead — that is what "handover at
+/// 10:00" means, and the fields say so on their labels. Reading with
+/// `getHours()` and writing with `Date.parse()` answered in the reader's zone
+/// while the label promised the team's, so an operator in Berlin editing an
+/// Asia/Kolkata team saw the handover three and a half hours from where it was
+/// and moved it there by saving.
+describe("toZonedInputValue / fromZonedInputValue", () => {
+  /// The instant Asia/Kolkata calls 2026-08-17 10:00 — UTC+05:30.
+  const KOLKATA_10AM = Date.UTC(2026, 7, 17, 4, 30) * 1000;
+
+  it("renders an instant as the team's wall clock, not the reader's", () => {
+    expect(toZonedInputValue(KOLKATA_10AM, "Asia/Kolkata")).toBe("2026-08-17T10:00");
+    expect(toZonedInputValue(KOLKATA_10AM, "UTC")).toBe("2026-08-17T04:30");
+    expect(toZonedInputValue(KOLKATA_10AM, "America/New_York")).toBe("2026-08-17T00:30");
+  });
+
+  it("reads a wall time as the instant that team means by it", () => {
+    expect(fromZonedInputValue("2026-08-17T10:00", "Asia/Kolkata")).toBe(KOLKATA_10AM);
+    expect(fromZonedInputValue("2026-08-17T04:30", "UTC")).toBe(KOLKATA_10AM);
+  });
+
+  it("round-trips through both directions", () => {
+    for (const zone of ["UTC", "Asia/Kolkata", "America/New_York", "Australia/Eucla"]) {
+      const back = fromZonedInputValue(toZonedInputValue(KOLKATA_10AM, zone), zone);
+      expect(back, zone).toBe(KOLKATA_10AM);
+    }
+  });
+
+  /// A handover is wall-clock anchored, so 09:00 stays 09:00 across a DST
+  /// change — which means the two sides of a transition are different offsets
+  /// and the naive single-pass conversion is an hour out on one of them.
+  it("uses the offset in force on each side of a DST change", () => {
+    // US spring forward 2026: 2026-03-08.
+    expect(fromZonedInputValue("2026-03-07T09:00", "America/New_York")).toBe(
+      Date.UTC(2026, 2, 7, 14, 0) * 1000,
+    );
+    expect(fromZonedInputValue("2026-03-09T09:00", "America/New_York")).toBe(
+      Date.UTC(2026, 2, 9, 13, 0) * 1000,
+    );
+  });
+
+  /// The hour a spring-forward skips is a wall time that does not exist. It
+  /// resolves to the instant the clock jumps to, which is what the platform
+  /// does — and never to NaN, which would blank the preview.
+  it("resolves a wall time the clock skips rather than failing", () => {
+    const skipped = fromZonedInputValue("2026-03-08T02:30", "America/New_York");
+    expect(skipped).not.toBeNull();
+    expect(Number.isFinite(skipped!)).toBe(true);
+  });
+
+  /// Half-typed input is the normal state of a field somebody is editing.
+  /// Returning null lets the caller keep the previous instant instead of
+  /// writing NaN.
+  it("refuses an incomplete value instead of inventing one", () => {
+    for (const partial of ["", "2026", "2026-08", "2026-08-17", "not a date"]) {
+      expect(fromZonedInputValue(partial, "UTC"), partial).toBeNull();
+    }
+  });
+
+  it("falls back rather than throwing on a zone the runtime cannot resolve", () => {
+    expect(toZonedInputValue(KOLKATA_10AM, "Mars/Olympus")).toBe("2026-08-17T04:30");
+    expect(fromZonedInputValue("2026-08-17T04:30", "Mars/Olympus")).toBe(KOLKATA_10AM);
+  });
+
+  it("answers empty for an instant that is not one", () => {
+    expect(toZonedInputValue(Number.NaN, "UTC")).toBe("");
   });
 });

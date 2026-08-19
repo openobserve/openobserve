@@ -1235,3 +1235,80 @@ export function isOnCallUnavailable(err: unknown): boolean {
   if (response.status === 404) return true;
   return response.status === 403 && /not supported/i.test(response.data?.message ?? "");
 }
+
+/// ── `datetime-local` in somebody else's timezone ──────────────────────────
+///
+/// A `<input type="datetime-local">` has no zone: it reads and writes bare
+/// wall time, and the browser's own zone is the only one the platform will
+/// apply. Every on-call instant belongs to the TEAM's zone instead — that is
+/// what "handover at 10:00" means, and the fields say so on their labels.
+///
+/// Rendering `new Date(micros).getHours()` and parsing with `Date.parse()`
+/// therefore answered in the reader's zone while the label promised the
+/// team's. An operator in Berlin editing an Asia/Kolkata team read a handover
+/// three and a half hours from where it was, and moved it there by saving.
+
+/** How far `timezone` is from UTC at this instant, in ms. DST-correct. */
+function zoneOffsetMs(utcMs: number, timezone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(utcMs));
+
+  const at = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  // `hour12: false` reports midnight as 24 in some engines.
+  const asIfUtc = Date.UTC(
+    at("year"),
+    at("month") - 1,
+    at("day"),
+    at("hour") % 24,
+    at("minute"),
+    at("second"),
+  );
+  return asIfUtc - utcMs;
+}
+
+/** An instant as the `YYYY-MM-DDTHH:mm` a `datetime-local` shows, in `timezone`. */
+export function toZonedInputValue(micros: number, timezone: string): string {
+  if (!Number.isFinite(micros)) return "";
+  const ms = Math.trunc(micros / 1000);
+  try {
+    const local = new Date(ms + zoneOffsetMs(ms, timezone));
+    return local.toISOString().slice(0, 16);
+  } catch {
+    return new Date(ms).toISOString().slice(0, 16);
+  }
+}
+
+/**
+ * The instant a `datetime-local` value names **in `timezone`**, in micros.
+ * `null` when the value is not a complete wall time — which is most of what a
+ * half-typed field holds, and keeping the previous instant beats writing NaN.
+ *
+ * Resolved twice because the offset depends on the answer: a wall time an hour
+ * either side of a DST boundary is read with the wrong offset on the first
+ * pass. The second pass uses the offset in force at the instant the first one
+ * produced. Where a wall time does not exist at all (the hour a spring-forward
+ * skips) this lands on the instant the clock jumps to, which is the same
+ * choice the platform makes.
+ */
+export function fromZonedInputValue(value: string, timezone: string): number | null {
+  const parsed = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+  if (!parsed) return null;
+  const [, y, mo, d, h, mi] = parsed.map(Number);
+  const asIfUtc = Date.UTC(y, mo - 1, d, h, mi);
+  if (Number.isNaN(asIfUtc)) return null;
+  try {
+    const first = asIfUtc - zoneOffsetMs(asIfUtc, timezone);
+    const second = asIfUtc - zoneOffsetMs(first, timezone);
+    return second * 1000;
+  } catch {
+    return asIfUtc * 1000;
+  }
+}
