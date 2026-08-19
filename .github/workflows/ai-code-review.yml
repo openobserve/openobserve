@@ -109,10 +109,25 @@ jobs:
           fi
           echo "force_full=false" >> "$GITHUB_OUTPUT"
 
+      # Mint a GitHub App installation token so the review comment is authored by the
+      # "OpenObserve Code Reviewer" app (branded name + avatar) instead of github-actions[bot].
+      # Gated on the OO_REVIEWER_APP_ID repo/org variable: if the app isn't configured yet this
+      # step is skipped and the run step falls back to github.token — safe to ship before the app
+      # exists, auto-activates once OO_REVIEWER_APP_ID + OO_REVIEWER_APP_PRIVATE_KEY are provisioned.
+      - name: Generate OpenObserve Code Reviewer app token
+        id: app_token
+        if: ${{ steps.skip.outputs.skip_review == 'false' && vars.OO_REVIEWER_APP_ID != '' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.OO_REVIEWER_APP_ID }}
+          private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
+
       - name: Run AI Code Review
         if: steps.skip.outputs.skip_review == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
+          # App token when the app is configured (comment posts as OpenObserve Code Reviewer),
+          # else github.token (posts as github-actions[bot]). Same engine either way.
+          GH_TOKEN: ${{ steps.app_token.outputs.token || github.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           FORCE_FULL: ${{ steps.skip.outputs.force_full }}
           # Provider selection for this matrix leg (see run-review.mjs for how these are used).
