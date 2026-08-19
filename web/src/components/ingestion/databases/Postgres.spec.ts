@@ -731,7 +731,15 @@ describe("postgresCard builder", () => {
     // pg_stat_user_tables — it is a LEFT JOIN, so the coalesce is load-bearing
     // for tables with no stat row at all.
     expect(tableStats).toContain("LEFT JOIN pg_stat_user_tables s");
-    expect(tableStats).toContain("AND coalesce(s.n_live_tup, 0) > 0");
+    expect(tableStats).toContain("coalesce(s.n_live_tup, 0) > 0");
+
+    // …but NOT on n_live_tup alone. It is a statistics estimate that stays 0
+    // until autovacuum or a manual ANALYZE first runs, so gating solely on it
+    // hid every table on a freshly loaded database — measured on the rig as 5
+    // populated tables returning 0 rows, which is exactly when someone opens
+    // Table health to look at a new database. Size comes from the catalog and
+    // needs no ANALYZE, so a relation occupying pages qualifies regardless.
+    expect(tableStats).toContain("OR pg_total_relation_size(c.oid) > 0");
 
     // NOT a LIMIT — the failure mode is a tab that flickers, which reads as
     // data loss rather than as a bound. Checked on SQL lines only: the

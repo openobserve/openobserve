@@ -518,7 +518,13 @@ const MARIADB_BLOCKING_RECEIVER = `  sqlquery/mariadb_locks:
  */
 const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
     driver: sqlserver
-    datasource: "sqlserver://\${env:MSSQL_USER}:\${env:MSSQL_PASSWORD}@{host}:{port}?database={database}"
+    # KEY-VALUE DSN, NEVER the sqlserver:// URL form, on all four mssql
+    # receivers. A URL parses the password as part of the authority, so any
+    # password containing '#' truncates at the fragment and every scrape fails
+    # with: parse "sqlserver://sa:dbm_Passw0rd": invalid port ":dbm_Passw0rd"
+    # after host -- once per collection_interval, while the collector's own
+    # health stays green. '#' is common in generated SA passwords.
+    datasource: "server={host};port={port};user id=\${env:MSSQL_USER};password=\${env:MSSQL_PASSWORD};database={database}"
     collection_interval: 10s
     # max_open_conn is SINGULAR; the plural is an unknown key that is
     # silently ignored, and unset means unlimited.
@@ -655,13 +661,21 @@ const MSSQL_INDEX_STATS_RECEIVER = `  sqlquery/mssql_index_stats:
           GROUP BY SCHEMA_NAME(t.schema_id), t.name, i.name,
                    us.user_seeks, us.user_scans, us.user_lookups, i.is_unique
         logs:
+          # index_name is BOTH the body and an attribute, and the duplication is
+          # load-bearing. The canonicalizer reads index_name as a required
+          # ATTRIBUTE and never from the body, so listing it only as body_column
+          # drops every row: measured, 54 mssql_index_stats records arrived with
+          # o2_dbm_kind null and SQL Server index health never reached the page.
+          # Postgres hides this because it has an index_def to put in the body;
+          # SQL Server has no equivalent, so the name serves as both.
           - body_column: index_name
             attribute_columns:
-              [schema_name, table_name, idx_scan, index_bytes, is_unique, server_address, o2_recipe]`;
+              [schema_name, table_name, index_name, idx_scan, index_bytes, is_unique,
+               server_address, o2_recipe]`;
 
 const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
     driver: sqlserver
-    datasource: "sqlserver://\${env:MSSQL_USER}:\${env:MSSQL_PASSWORD}@{host}:{port}?database={database}"
+    datasource: "server={host};port={port};user id=\${env:MSSQL_USER};password=\${env:MSSQL_PASSWORD};database={database}"
     collection_interval: 30s
     # max_open_conn is SINGULAR; the plural is an unknown key that is
     # silently ignored, and unset means unlimited.
@@ -763,11 +777,20 @@ const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
           JOIN pg_namespace n ON n.oid = c.relnamespace
           LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
           WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog','information_schema')
-            -- The bound. A relation with zero live tuples has no bloat, no
-            -- vacuum debt and no meaningful size. Deliberately NOT a LIMIT: a
-            -- LIMIT with no stable ORDER BY drops a different set of tables
-            -- each tick and the tab flickers; this drops the same ones.
-            AND coalesce(s.n_live_tup, 0) > 0
+            -- The bound. Deliberately NOT a LIMIT: a LIMIT with no stable
+            -- ORDER BY drops a different set of tables each tick and the tab
+            -- flickers; this drops the same ones.
+            --
+            -- n_live_tup ALONE IS NOT THE TEST. It is a statistics estimate
+            -- that stays 0 until autovacuum or a manual ANALYZE first runs, so
+            -- gating on it hid every table on a freshly loaded database —
+            -- measured: 5 populated tables, 0 rows returned, and Postgres
+            -- absent from Table health until ANALYZE was run by hand. That is
+            -- precisely when someone opens the tab to look at a new database.
+            -- Size comes from the catalog and needs no ANALYZE, so a relation
+            -- that occupies pages is real whatever the estimator has recorded.
+            AND (coalesce(s.n_live_tup, 0) > 0
+                 OR pg_total_relation_size(c.oid) > 0)
         logs:
           - body_column: table_name
             attribute_columns:
@@ -1030,7 +1053,7 @@ const MARIADB_INDEX_STATS_RECEIVER = `  sqlquery/mariadb_index_stats:
  * `--config` flags, and a same-named receiver would collide.
  */
 const PG_EVENTS_RECEIVER = `  postgresql/dbm_events:
-    endpoint: {host}:{port}
+    endpoint: "{host}:{port}"
     transport: tcp
     username: \${env:PGUSER}
     password: \${env:PGPASS}
