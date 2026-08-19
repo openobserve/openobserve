@@ -17,15 +17,9 @@ use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use config::{
-    FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
-    meta::{
-        promql::{MetricsFileLayout, metrics_tsid_major_stream},
-        stream::{FileMeta, StreamType},
-    },
-    utils::{
-        parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
-        util::is_trace_time_index_stream,
-    },
+    FileFormat, get_config,
+    meta::{promql::MetricsFileLayout, stream::FileMeta},
+    utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -57,12 +51,10 @@ use crate::datafusion::{
 
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
+pub mod mode;
 mod tsid_major;
-#[cfg(feature = "enterprise")]
-use {
-    crate::datafusion::merge::downsampling::merge_parquet_files_with_downsampling,
-    o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule,
-};
+
+pub use mode::{MergeMode, MergeOutput};
 
 /// One file written by [`merge_parquet_files`].
 pub struct MergedFile {
@@ -80,23 +72,6 @@ pub struct MergeParquetResult {
 }
 
 impl MergeParquetResult {
-    fn single(
-        buf: Vec<u8>,
-        meta: FileMeta,
-        layout: MetricsFileLayout,
-        file_format: FileFormat,
-    ) -> Self {
-        Self {
-            files: vec![MergedFile {
-                buf,
-                meta,
-                layout,
-                series_index: None,
-            }],
-            file_format,
-        }
-    }
-
     /// The merged file, for callers that always merge into exactly one file
     /// (the ingester movers).
     pub fn into_single(self) -> Result<(MergedFile, FileFormat)> {
@@ -114,87 +89,107 @@ impl MergeParquetResult {
     }
 }
 
-/// Merge `tables` into one file, or — for the compactor's hour-end merge of a
-/// TSID-major metrics stream (`finalize`) — into size-bounded TSID-major files
-/// with `.sidx` sidecars.
-#[allow(clippy::too_many_arguments)]
+/// Merge `tables` (the union of the input files) into one or more files
+/// according to `mode`, written as `output` says.
 pub async fn merge_parquet_files(
-    stream_type: StreamType,
-    stream_name: &str,
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
     mut metadata: FileMeta,
-    is_ingester: bool,
-    finalize: bool,
+    mode: &MergeMode,
+    output: MergeOutput,
 ) -> Result<MergeParquetResult> {
     let start = std::time::Instant::now();
-    let cfg = get_config();
+    let sql = mode.sql(&schema);
+    log::debug!("merge_parquet_files [{mode}] sql: {sql}");
+    let (schema, mut rx, read_task) =
+        run_merge_query(&sql, mode.output_sort_order(), schema, tables).await?;
 
-    let file_format = merge_output_file_format(stream_type, is_ingester, cfg.common.file_format);
-    let sort_order = merge_output_sort_order(stream_type, file_format, &schema);
-    // compactor hour-end merge: size-bounded TSID-major files with series-index
-    // sidecars. Ingester and incremental compactor merges write one plain
-    // hash-sorted file instead.
-    let metrics_tsid_major =
-        !is_ingester && finalize && sort_order == FileSortOrder::HashTimestampAsc;
-
-    #[cfg(feature = "enterprise")]
-    if stream_type == StreamType::Metrics && !is_ingester {
-        let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
-        if let Some(rule) = rule {
-            log::info!(
-                "merge_parquet_files: stream_type={stream_type}, stream_name={stream_name}, downsampling rule={rule:?}"
-            );
-            return merge_parquet_files_with_downsampling(
-                schema,
-                tables,
+    let files = match mode {
+        #[cfg(feature = "enterprise")]
+        MergeMode::Downsampling(_) => {
+            downsampling::write_files(
+                &schema,
                 bloom_filter_fields,
-                rule,
                 &metadata,
-                file_format,
+                output.file_format,
+                rx,
+                read_task,
             )
-            .await;
+            .await?
         }
-    }
-
-    // get all sorted data
-    let sql = if stream_type == StreamType::Metadata && is_trace_time_index_stream(stream_name) {
-        // Files whose records all had a null session_id were persisted without the
-        // column (all-null columns are pruned), so only select it when present.
-        let session_id_col = if schema.column_with_name("session_id").is_some() {
-            ", MAX(session_id) AS session_id"
-        } else {
-            ""
-        };
-        format!(
-            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id{session_id_col}, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
-        )
-    } else if stream_type == StreamType::Filelist {
-        // for file list we do not have timestamp, so we instead sort by min ts of entries
-        "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
-    } else {
-        format!(
-            "SELECT * FROM tbl ORDER BY {}",
-            sort_order
-                .order_by_clause()
-                .expect("merge output always has a sort order")
-        )
+        MergeMode::TsidMajor => {
+            tsid_major::write_files(
+                &schema,
+                bloom_filter_fields,
+                &metadata,
+                get_config().compact.max_file_size,
+                &mut rx,
+                read_task,
+            )
+            .await?
+        }
+        _ => {
+            let buf = match output.file_format {
+                FileFormat::Parquet => {
+                    write_parquet(
+                        &schema,
+                        bloom_filter_fields,
+                        &metadata,
+                        output.parquet_compression,
+                        &mut rx,
+                        read_task,
+                    )
+                    .await?
+                }
+                FileFormat::Vortex => write_vortex(schema, &metadata, rx, read_task).await?,
+            };
+            metadata.compressed_size = buf.len() as i64;
+            vec![MergedFile {
+                buf,
+                meta: metadata,
+                layout: mode.file_layout(),
+                series_index: None,
+            }]
+        }
     };
-    log::debug!("merge_parquet_files sql: {sql}");
 
+    log::debug!(
+        "merge_parquet_files [{mode}] wrote {} file(s) in {} ms",
+        files.len(),
+        start.elapsed().as_millis()
+    );
+    Ok(MergeParquetResult {
+        files,
+        file_format: output.file_format,
+    })
+}
+
+/// Plan and start `sql` over the union of `tables`; the record batches arrive
+/// on the returned channel, the task reports the stream's completion / error.
+/// `sort_order` only enables `split_file_groups_by_statistics` for that
+/// order; the input tables declare what the files really carry.
+async fn run_merge_query(
+    sql: &str,
+    sort_order: FileSortOrder,
+    schema: Arc<Schema>,
+    tables: Vec<Arc<dyn TableProvider>>,
+) -> Result<(
+    Arc<Schema>,
+    tokio::sync::mpsc::Receiver<RecordBatch>,
+    tokio::task::JoinHandle<Result<()>>,
+)> {
+    let cfg = get_config();
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files")
-        // enables split_file_groups_by_statistics for the declared input order;
-        // harmless when the input tables declare no order
         .sort_order(sort_order)
-        .build(get_config().limit.datafusion_min_partition_num)
+        .build(cfg.limit.datafusion_min_partition_num)
         .await?;
     // register union table
-    let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
+    let union_table = Arc::new(NewUnionTable::new(schema, tables));
     ctx.register_table("tbl", union_table)?;
 
-    let plan = ctx.state().create_logical_plan(&sql).await?;
+    let plan = ctx.state().create_logical_plan(sql).await?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     let schema = physical_plan.schema();
 
@@ -210,7 +205,7 @@ pub async fn merge_parquet_files(
     }
 
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+    let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
     let read_task = tokio::task::spawn(async move {
         loop {
             match batch_stream.try_next().await {
@@ -231,108 +226,18 @@ pub async fn merge_parquet_files(
         }
         Ok(())
     });
-
-    if metrics_tsid_major {
-        let files = tsid_major::write_files(
-            &schema,
-            bloom_filter_fields,
-            &metadata,
-            cfg.compact.max_file_size,
-            &mut rx,
-            read_task,
-        )
-        .await?;
-        log::debug!(
-            "merge_parquet_files wrote {} size-bounded TSID-major files in {} ms",
-            files.len(),
-            start.elapsed().as_millis()
-        );
-        return Ok(MergeParquetResult { files, file_format });
-    }
-
-    let buf = match file_format {
-        FileFormat::Parquet => {
-            write_parquet(
-                &schema,
-                bloom_filter_fields,
-                &metadata,
-                is_ingester,
-                &mut rx,
-                read_task,
-            )
-            .await?
-        }
-        FileFormat::Vortex => write_vortex(schema, &metadata, rx, read_task).await?,
-    };
-
-    log::debug!(
-        "merge_parquet_files took {} ms",
-        start.elapsed().as_millis()
-    );
-
-    metadata.compressed_size = buf.len() as i64;
-    // a hash-sorted single file is not finalized: the ingester and incremental
-    // compactor merges write it, the hour-end merge turns it into TSID-major
-    let layout = if sort_order == FileSortOrder::HashTimestampAsc {
-        MetricsFileLayout::HashSorted
-    } else {
-        MetricsFileLayout::Legacy
-    };
-    Ok(MergeParquetResult::single(
-        buf,
-        metadata,
-        layout,
-        file_format,
-    ))
-}
-
-/// Row order `merge_parquet_files` writes for the given stream.
-///
-/// The classic layout is `_timestamp DESC`. With `ZO_METRICS_TSID_MAJOR_ENABLED`
-/// Parquet metrics files are ordered by `(__hash__, _timestamp)` so every
-/// series is contiguous: the ingester writes plain hash-sorted files, the
-/// compactor writes size-bounded TSID-major files. Streams without a
-/// `__hash__` column (or written as Vortex) keep the classic layout.
-fn merge_output_sort_order(
-    stream_type: StreamType,
-    file_format: FileFormat,
-    schema: &Schema,
-) -> FileSortOrder {
-    if file_format == FileFormat::Parquet && metrics_tsid_major_stream(stream_type, schema) {
-        FileSortOrder::HashTimestampAsc
-    } else {
-        FileSortOrder::TimestampDesc
-    }
-}
-
-fn merge_output_file_format(
-    stream_type: StreamType,
-    is_ingester: bool,
-    configured: FileFormatConfig,
-) -> FileFormat {
-    let configured = configured.for_stream(stream_type);
-    if is_ingester {
-        FileFormat::for_ingester_stream(stream_type, configured)
-    } else {
-        configured
-    }
+    Ok((schema, rx, read_task))
 }
 
 async fn write_parquet(
     schema: &Arc<Schema>,
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
-    is_ingester: bool,
+    compression: Option<&str>,
     rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<u8>> {
-    let cfg = get_config();
     let mut buf = Vec::new();
-    let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
-        Some("none")
-    } else {
-        None
-    };
     let mut writer = new_parquet_writer(
         &mut buf,
         schema,
@@ -434,6 +339,7 @@ mod tests {
     use arrow::array::{Array, Int64Array, StringArray};
     use arrow_schema::{DataType, Field, Schema};
     use bytes::Bytes;
+    use config::{TIMESTAMP_COL_NAME, meta::stream::StreamType};
     use datafusion::datasource::MemTable;
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use vortex::file::OpenOptionsSessionExt;
@@ -448,35 +354,6 @@ mod tests {
         ]))
     }
 
-    #[test]
-    fn test_merge_output_file_format_uses_parquet_for_ingester_metrics() {
-        let configured = "parquet,metrics=vortex"
-            .parse::<FileFormatConfig>()
-            .unwrap();
-        assert_eq!(
-            merge_output_file_format(StreamType::Metrics, true, configured),
-            FileFormat::Parquet
-        );
-        assert_eq!(
-            merge_output_file_format(StreamType::Logs, true, configured),
-            FileFormat::Parquet
-        );
-        assert_eq!(
-            merge_output_file_format(StreamType::Metrics, false, configured),
-            FileFormat::Vortex
-        );
-        assert_eq!(
-            merge_output_file_format(StreamType::Traces, false, configured),
-            FileFormat::Parquet
-        );
-
-        let configured = FileFormatConfig::new(FileFormat::Vortex);
-        assert_eq!(
-            merge_output_file_format(StreamType::Logs, true, configured),
-            FileFormat::Vortex
-        );
-    }
-
     #[tokio::test]
     async fn test_merge_parquet_files_error_handling() {
         // Test with empty tables vector
@@ -485,14 +362,12 @@ mod tests {
         let metadata = FileMeta::default();
 
         let result = merge_parquet_files(
-            StreamType::Logs,
-            "test_stream",
             schema,
             empty_tables,
             &[],
             metadata,
-            false,
-            false,
+            &MergeMode::Classic,
+            MergeOutput::for_compactor(StreamType::Logs),
         )
         .await;
 
@@ -523,9 +398,9 @@ mod tests {
         .unwrap();
         let table = Arc::new(MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap());
 
+        let mode = MergeMode::for_ingester(StreamType::Metadata, "trace_time_index_test", &schema);
+        assert!(matches!(mode, MergeMode::TraceTimeIndex));
         let merged = merge_parquet_files(
-            StreamType::Metadata,
-            "trace_time_index_test",
             schema,
             vec![table],
             &[],
@@ -535,8 +410,8 @@ mod tests {
                 records: 4,
                 ..Default::default()
             },
-            true,
-            false,
+            &mode,
+            MergeOutput::for_ingester(StreamType::Metadata),
         )
         .await
         .unwrap();

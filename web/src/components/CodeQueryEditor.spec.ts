@@ -66,6 +66,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     defineTheme: vi.fn(),
     setTheme: vi.fn(),
     setModelMarkers: vi.fn(),
+    setModelLanguage: vi.fn(),
   },
   languages: {
     // Real values, mirroring monaco-editor/esm/vs/editor/common/languages.js
@@ -108,6 +109,7 @@ vi.mock("monaco-editor/esm/vs/language/html/monaco.contribution.js", () => ({}))
 vi.mock("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/basic-languages/python/python.contribution.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/basic-languages/hcl/hcl.contribution.js", () => ({}));
 
 // Fix: component imports default from "@/composables/useLogs/searchState"
 vi.mock("@/composables/useLogs/searchState", () => ({
@@ -203,6 +205,29 @@ describe("CodeQueryEditor", () => {
       },
     });
   };
+
+  // A surface that switches language, such as the export dialog's JSON and
+  // Terraform tabs, used to force a remount to get new highlighting: that throws
+  // away the DOM, the scroll position and the undo stack on every toggle.
+  describe("language switching", () => {
+    it("retokenizes the existing model instead of recreating the editor", async () => {
+      attachEditorHost();
+      const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+      const wrapper = createWrapper({ language: "json", query: "{}" });
+      await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalled());
+
+      const createdBefore = monacoApi.editor.create.mock.calls.length;
+      monacoApi.editor.setModelLanguage.mockClear();
+
+      await wrapper.setProps({ language: "hcl" });
+      await vi.waitFor(() => expect(monacoApi.editor.setModelLanguage).toHaveBeenCalled());
+
+      expect(monacoApi.editor.setModelLanguage.mock.calls[0][1]).toBe("hcl");
+      // No second editor: the same instance was retokenized.
+      expect(monacoApi.editor.create.mock.calls.length).toBe(createdBefore);
+      wrapper.unmount();
+    });
+  });
 
   describe("Component Rendering", () => {
     it("should render the component", () => {

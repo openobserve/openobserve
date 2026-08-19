@@ -820,7 +820,13 @@
     "backTo": "返回 {label}",
     "boolTrue": "真",
     "boolFalse": "假",
-    "browserTimeWithZone": "浏览器时间（{zone}）"
+    "browserTimeWithZone": "浏览器时间（{zone}）",
+    "download": "下载",
+    "openProviderOnRegistry": "OpenObserve provider 在 {registry} 上",
+    "exportTerraformTabTooltip": "相同的配置适用于 Terraform 或 OpenTofu。",
+    "exportTerraformEmpty": "该选择没有对应的 Terraform 资源。请改为导出为 JSON。",
+    "exportTerraformSkipped": "未包含：{names}。OpenObserve Terraform provider 没有对应的资源。",
+    "exportTerraformDropped": "已省略 — provider schema 无法承载这些字段：{fields}。"
   },
   "flow": {
     "stepPicker": {
@@ -2578,6 +2584,23 @@
     "triggerRequired": "需要触发器",
     "addStepRequired": "在触发器后至少添加一个步骤",
     "connectAllNodes": "保存前连接所有节点",
+    "finishStepsBeforePublish": "完成所有步骤配置后再发布",
+    "draft": "草稿",
+    "saveDraft": "保存为草稿",
+    "publish": "发布",
+    "draftSaveSuccess": "草稿保存成功",
+    "publishSuccess": "工作流发布成功",
+    "publishError": "发布工作流时出错",
+    "comingSoon": "此功能将在后续步骤中提供",
+    "triggerType": {
+      "pick": "选择触发器",
+      "dialogTitle": "创建新工作流",
+      "dialogIntro": "选择此工作流的触发方式。更多触发器类型即将推出。",
+      "cta": "创建工作流",
+      "soonCta": "将在未来版本中提供",
+      "comingSoon": "即将推出",
+      "soon": "即将"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "告警触发",
@@ -2675,7 +2698,6 @@
       "linkError": "无法链接告警。"
     },
     "chooseTrigger": "选择触发器",
-    "edgeDeleteHint": "按 Backspace / Delete 键以移除连线",
     "node": {
       "kindTrigger": "触发器",
       "kindLogic": "逻辑",
@@ -2702,9 +2724,55 @@
       "conditionNoteNull": "要检查空值，请使用 null。例如：",
       "conditionNoteCustom": "要添加自定义列，请键入其名称并按回车。",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "使用函数重塑负载",
+      "functionBodySet": "应用 {name}",
+      "functionSelect": "选择函数",
+      "functionCreateNew": "创建新函数",
+      "functionRequired": "必须提供函数",
+      "functionLoadError": "无法加载函数",
+      "destinationBody": "发送到目标",
+      "destinationBodySet": "发送到 {name}",
+      "destinationSelect": "目标",
+      "destinationCreateNew": "创建新目标",
+      "destinationRequired": "请选择目标",
+      "destinationLoadError": "无法加载目标",
+      "namePlaceholder": "命名此步骤（可选）",
+      "commentLabel": "备注（可选）",
+      "commentPlaceholder": "添加关于此步骤的备注...",
+      "commentAdd": "添加备注",
+      "disable": "禁用步骤",
+      "enable": "启用步骤",
+      "disabledBadge": "已禁用",
+      "incompleteBadge": "稍后设置",
+      "destinationSetUpLater": "稍后设置",
+      "destinationSetUpLaterPrompt": "还没有目标？开启此项可稍后设置 — 现在即可保存草稿并测试。",
+      "destinationSetUpLaterActive": "目标暂时跳过 — 名称和备注仍会保存。发布前需要先提供目标。",
+      "functionSetUpLater": "稍后设置",
+      "functionSetUpLaterPrompt": "还没有函数？开启此项可稍后设置 — 现在即可保存草稿并测试。",
+      "functionSetUpLaterActive": "函数暂时跳过 — 名称和备注仍会保存。发布前需要先提供函数。"
     },
-    "commonFieldsAbove": "以上为公共字段"
+    "commonFieldsAbove": "以上为公共字段",
+    "canvas": {
+      "undo": "撤销",
+      "tidyUp": "整理",
+      "insertStep": "插入步骤",
+      "deleteEdge": "删除连接"
+    },
+    "unsaved": {
+      "title": "未保存的更改",
+      "message": "您有未保存的更改。现在离开将丢弃这些更改。",
+      "discard": "放弃更改",
+      "stay": "继续编辑"
+    },
+    "results": {
+      "title": "步骤结果",
+      "collapse": "折叠",
+      "expand": "展开",
+      "close": "清除并关闭结果",
+      "nodesTitle": "步骤",
+      "empty": "运行测试以在此处查看步骤结果。"
+    }
   },
   "pipeline": {
     "validation": {
@@ -7302,7 +7370,9 @@
     "sloKind": "条件类型",
     "sloLongWindow": "长窗口",
     "sloShortWindow": "短窗口",
-    "sloCloneDisabled": "SLO 警报是在其 SLO 页面上创建的，因此无法从此处克隆。"
+    "sloCloneDisabled": "SLO 警报是在其 SLO 页面上创建的，因此无法从此处克隆。",
+    "exportDialogTitle": "导出告警 | 导出 {count} 条告警",
+    "exportDialogSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform。"
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -11454,19 +11524,19 @@
           "span": {
             "title": "匹配的跨度数",
             "hint": "一旦您选择了流和过滤器，此面板将显示您的任务将匹配多少个跨度。",
-            "matchedSuffix": "匹配的跨度数 · 过去24小时",
+            "matchedSuffix": "匹配的跨度 · 最近 1 小时",
             "matchedLoading": "正在计算匹配的跨度数…"
           },
           "trace": {
             "title": "匹配的跟踪数",
             "hint": "一旦您选择了流和过滤器，此面板将显示您的任务将匹配多少个追踪。",
-            "matchedSuffix": "匹配的跟踪数 · 过去24小时",
+            "matchedSuffix": "匹配的追踪 · 最近 1 小时",
             "matchedLoading": "正在计算匹配的跟踪数…"
           },
           "session": {
             "title": "匹配的会话数",
             "hint": "一旦您选择了流和过滤器，此面板将显示您的任务将匹配多少个会话。",
-            "matchedSuffix": "匹配的会话数 · 过去24小时",
+            "matchedSuffix": "匹配的会话 · 最近 1 小时",
             "matchedLoading": "正在计算匹配的会话数…"
           }
         },
@@ -13678,7 +13748,8 @@
       "alertSavedSuccessfully": "告警保存成功。",
       "alertUpdatedSuccessfully": "告警更新成功。",
       "openingDedupConfig": "正在为 {name} 打开去重配置",
-      "editingAlert": "正在编辑告警：{name}"
+      "editingAlert": "正在编辑告警：{name}",
+      "someAlertsCouldNotBeExported": "无法读取 {names}。其余已准备好导出。"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "加密密钥更新成功",
@@ -13992,7 +14063,6 @@
     "rolling": "滚动",
     "totalSlos": "SLO 总数",
     "noGrouping": "无（单一整体序列）",
-    "generation": "第 {n} 代",
     "newAlert": "新建告警",
     "overRolling": "在滚动 {window} 内",
     "searchPlaceholder": "搜索 SLO 或标签，例如 team:payments",
@@ -14248,7 +14318,12 @@
       "editTargetMissing": "该告警已不在此 SLO 上。",
       "describeBurn": "燃烧速率 > {critical} 在 {long} 和 {short} 期间",
       "describeBudget": "错误预算消耗 > {critical}%"
-    }
+    },
+    "exportTitle": "导出 SLO | 导出 {count} 个 SLO",
+    "exportSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform 格式。",
+    "exportFailed": "无法读取 SLO 定义。请重试。",
+    "exportPartial": "无法读取 {names}。其余已准备好导出。",
+    "exportSucceeded": "已导出 {count} 个 SLO | 已导出 {count} 个 SLO"
   },
   "promql": {
     "operations": {

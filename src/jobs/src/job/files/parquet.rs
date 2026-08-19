@@ -47,7 +47,11 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::{exec::TableBuilder, merge, sort_order::FileSortOrder};
+use search::datafusion::{
+    exec::TableBuilder,
+    merge::{self, MergeMode, MergeOutput},
+    sort_order::FileSortOrder,
+};
 use tantivy_utils::index_builder::create_tantivy_index;
 use tokio::{
     fs::remove_file,
@@ -780,15 +784,14 @@ async fn merge_files(
         .await?;
 
     let start = std::time::Instant::now();
+    let mode = MergeMode::for_ingester(stream_type, &stream_name, &schema);
     let merge_result = merge::merge_parquet_files(
-        stream_type,
-        &stream_name,
         schema,
         tables,
         &bloom_filter_fields,
         new_file_meta,
-        true,
-        false,
+        &mode,
+        MergeOutput::for_ingester(stream_type),
     )
     .await;
 

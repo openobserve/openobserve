@@ -19,6 +19,7 @@ use config::{
     cluster::is_offline,
     meta::stream::{FileKey, StreamType},
 };
+use search::datafusion::merge::MergeMode;
 use tokio::sync::{Mutex, mpsc};
 
 #[derive(Clone)]
@@ -29,11 +30,8 @@ pub struct MergeBatch {
     pub stream_name: String,
     pub prefix: String,
     pub files: Vec<FileKey>,
-    /// True for the hour-end merge of a closed hour. Metrics streams with the
-    /// TSID-major layout write their final size-split files + `.sidx` only
-    /// then; incremental merges of the still-open hour write plain
-    /// hash-sorted files that the hour-end pass merges again.
-    pub finalize: bool,
+    /// What the merge produces; decided by the scheduler, read by the worker.
+    pub mode: MergeMode,
 }
 
 pub struct MergeResult {
@@ -217,7 +215,7 @@ impl MergeWorker {
                                 &msg.stream_name,
                                 &msg.prefix,
                                 &msg.files,
-                                msg.finalize,
+                                &msg.mode,
                             )
                             .await
                             {

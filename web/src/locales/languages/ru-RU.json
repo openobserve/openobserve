@@ -820,7 +820,13 @@
     "backTo": "Назад к {label}",
     "boolTrue": "Истина",
     "boolFalse": "Ложь",
-    "browserTimeWithZone": "Время браузера ({zone})"
+    "browserTimeWithZone": "Время браузера ({zone})",
+    "download": "Скачать",
+    "openProviderOnRegistry": "Провайдер OpenObserve в {registry}",
+    "exportTerraformTabTooltip": "Та же конфигурация применима с Terraform или OpenTofu.",
+    "exportTerraformEmpty": "Для этого выбора не существует ресурса Terraform. Экспортируйте его как JSON.",
+    "exportTerraformSkipped": "Не включено: {names}. Провайдер OpenObserve Terraform не имеет ресурса для них.",
+    "exportTerraformDropped": "Исключено — схема провайдера не может содержать эти поля: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -2578,6 +2584,23 @@
     "triggerRequired": "Требуется триггер",
     "addStepRequired": "Добавьте хотя бы один шаг после триггера",
     "connectAllNodes": "Соедините все узлы перед сохранением",
+    "finishStepsBeforePublish": "Завершите настройку всех шагов перед публикацией",
+    "draft": "Черновик",
+    "saveDraft": "Сохранить как черновик",
+    "publish": "Опубликовать",
+    "draftSaveSuccess": "Черновик успешно сохранён",
+    "publishSuccess": "Рабочий процесс успешно опубликован",
+    "publishError": "Ошибка при публикации рабочего процесса",
+    "comingSoon": "Это появится на более позднем шаге",
+    "triggerType": {
+      "pick": "Выберите триггер",
+      "dialogTitle": "Создать новый рабочий процесс",
+      "dialogIntro": "Выберите, как запускается этот рабочий процесс. Скоро появятся дополнительные типы триггеров.",
+      "cta": "Создать рабочий процесс",
+      "soonCta": "Доступно в будущем релизе",
+      "comingSoon": "Скоро",
+      "soon": "Скоро"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Оповещение сработало",
@@ -2675,7 +2698,6 @@
       "linkError": "Не удалось привязать оповещения."
     },
     "chooseTrigger": "Выберите триггер",
-    "edgeDeleteHint": "Нажмите Backspace / Delete, чтобы удалить соединение",
     "node": {
       "kindTrigger": "Триггер",
       "kindLogic": "Логика",
@@ -2702,9 +2724,55 @@
       "conditionNoteNull": "Чтобы проверить значение null, используйте null. Пример:",
       "conditionNoteCustom": "Чтобы добавить пользовательский столбец, введите его имя и нажмите Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Изменяйте полезную нагрузку с помощью функции",
+      "functionBodySet": "Применяет {name}",
+      "functionSelect": "Выберите функцию",
+      "functionCreateNew": "Создать новую функцию",
+      "functionRequired": "Функция обязательна",
+      "functionLoadError": "Не удалось загрузить функции",
+      "destinationBody": "Отправить в пункт назначения",
+      "destinationBodySet": "Отправляет в {name}",
+      "destinationSelect": "Пункт назначения",
+      "destinationCreateNew": "Создать новый пункт назначения",
+      "destinationRequired": "Пожалуйста, выберите пункт назначения",
+      "destinationLoadError": "Не удалось загрузить пункты назначения",
+      "namePlaceholder": "Назовите этот шаг (необязательно)",
+      "commentLabel": "Комментарий (необязательно)",
+      "commentPlaceholder": "Добавьте заметку об этом шаге...",
+      "commentAdd": "Добавить комментарий",
+      "disable": "Отключить шаг",
+      "enable": "Включить шаг",
+      "disabledBadge": "Отключено",
+      "incompleteBadge": "Настроить позже",
+      "destinationSetUpLater": "Настроить позже",
+      "destinationSetUpLaterPrompt": "Ещё нет пункта назначения? Включите это, чтобы настроить его позже — вы можете сохранить черновик и протестировать сейчас.",
+      "destinationSetUpLaterActive": "Пункт назначения пока пропускается — имя и комментарий всё равно сохраняются. Вам понадобится пункт назначения перед публикацией.",
+      "functionSetUpLater": "Настроить позже",
+      "functionSetUpLaterPrompt": "Ещё нет функции? Включите это, чтобы настроить её позже — вы можете сохранить черновик и протестировать сейчас.",
+      "functionSetUpLaterActive": "Функция пока пропускается — имя и комментарий всё равно сохраняются. Вам понадобится функция перед публикацией."
     },
-    "commonFieldsAbove": "общие поля выше"
+    "commonFieldsAbove": "общие поля выше",
+    "canvas": {
+      "undo": "Отменить",
+      "tidyUp": "Упорядочить",
+      "insertStep": "Вставить шаг",
+      "deleteEdge": "Удалить соединение"
+    },
+    "unsaved": {
+      "title": "Несохранённые изменения",
+      "message": "У вас есть несохранённые изменения. Если вы уйдёте сейчас, они будут отброшены.",
+      "discard": "Отбросить изменения",
+      "stay": "Продолжить редактирование"
+    },
+    "results": {
+      "title": "Результаты шага",
+      "collapse": "Свернуть",
+      "expand": "Развернуть",
+      "close": "Очистить и закрыть результаты",
+      "nodesTitle": "Шаги",
+      "empty": "Запустите тест, чтобы увидеть здесь результаты шагов."
+    }
   },
   "pipeline": {
     "validation": {
@@ -7302,7 +7370,9 @@
     "sloKind": "Тип условия",
     "sloLongWindow": "Длинное окно",
     "sloShortWindow": "Короткое окно",
-    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда."
+    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда.",
+    "exportDialogTitle": "Экспортировать оповещение | Экспортировать {count} оповещений",
+    "exportDialogSubtitle": "Проверьте определение, затем скачайте его в формате JSON или Terraform для провайдера OpenObserve."
   },
   "alert_dependencies": {
     "actionOpen": "Открыть",
@@ -11454,19 +11524,19 @@
           "span": {
             "title": "Совпавшие спаны",
             "hint": "После выбора потока и фильтра эта панель покажет, сколько спанов будет соответствовать вашей задаче.",
-            "matchedSuffix": "спанов совпало · за последние 24 часа",
+            "matchedSuffix": "Совпавшие спаны · за последний 1h",
             "matchedLoading": "Подсчёт совпавших спанов…"
           },
           "trace": {
             "title": "Совпавшие трассировки",
             "hint": "После выбора потока и фильтра эта панель покажет, сколько трассировок будет соответствовать вашей задаче.",
-            "matchedSuffix": "трассировок совпало · за последние 24 часа",
+            "matchedSuffix": "Совпавшие трейсы · за последний 1h",
             "matchedLoading": "Подсчёт совпавших трассировок…"
           },
           "session": {
             "title": "Совпавшие сеансы",
             "hint": "После выбора потока и фильтра эта панель покажет, сколько сеансов будет соответствовать вашей задаче.",
-            "matchedSuffix": "сеансов совпало · за последние 24 часа",
+            "matchedSuffix": "Совпавшие сессии · за последний 1h",
             "matchedLoading": "Подсчёт совпавших сеансов…"
           }
         },
@@ -13678,7 +13748,8 @@
       "alertSavedSuccessfully": "Оповещение успешно сохранено.",
       "alertUpdatedSuccessfully": "Оповещение успешно обновлено.",
       "openingDedupConfig": "Открытие конфигурации дедупликации для: {name}",
-      "editingAlert": "Редактирование оповещения: {name}"
+      "editingAlert": "Редактирование оповещения: {name}",
+      "someAlertsCouldNotBeExported": "Не удалось прочитать {names}. Остальные готовы к экспорту."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Ключ шифрования успешно обновлён",
@@ -13992,7 +14063,6 @@
     "rolling": "скользящий",
     "totalSlos": "Всего SLO",
     "noGrouping": "Нет (один общий ряд)",
-    "generation": "поколение {n}",
     "newAlert": "Новое оповещение",
     "overRolling": "за скользящее окно {window}",
     "searchPlaceholder": "Поиск SLO или тега, напр. team:payments",
@@ -14248,7 +14318,12 @@
       "editTargetMissing": "Это оповещение больше не относится к этому SLO.",
       "describeBurn": "Скорость выгорания > {critical} за {long} и {short}",
       "describeBudget": "Израсходовано бюджета ошибок > {critical}%"
-    }
+    },
+    "exportTitle": "Экспортировать SLO | Экспортировать {count} SLO",
+    "exportSubtitle": "Просмотрите определение, затем скачайте его как JSON или как Terraform для провайдера OpenObserve.",
+    "exportFailed": "Не удалось прочитать определение SLO. Пожалуйста, попробуйте снова.",
+    "exportPartial": "Не удалось прочитать {names}. Остальные готовы к экспорту.",
+    "exportSucceeded": "Экспортировано {count} SLO | Экспортировано {count} SLO"
   },
   "promql": {
     "operations": {

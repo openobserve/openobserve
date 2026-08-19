@@ -51,9 +51,6 @@
           size="xs"
           :label="raw(tag)"
         />
-        <span v-if="slo" class="text-compact text-text-secondary">
-          {{ t("slos.generation", { n: slo.definition_generation }) }}
-        </span>
       </div>
     </template>
 

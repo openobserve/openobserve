@@ -23,7 +23,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
-        promql::{MetricsFileLayout, metrics_tsid_major_stream},
+        promql::MetricsFileLayout,
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
             StreamType,
@@ -48,13 +48,10 @@ use infra::{
     },
     storage,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
-    merge::{self, MergeParquetResult, MergedFile},
-    sort_order::FileSortOrder,
+    merge::{self, MergeMode, MergeOutput, MergeParquetResult, MergedFile},
 };
 use search_service::file_list;
 use tantivy_utils::index_builder::create_tantivy_index;
@@ -65,15 +62,16 @@ use tokio::{
 
 use super::worker::{MergeBatch, MergeSender};
 
-/// True when a TSID-major metrics stream still has files that are not in the
-/// final layout (legacy timestamp-major or hash-sorted): the hour-end merge
-/// must rewrite them. A closed hour made entirely of `tsid-major-v3-*` files is
-/// finalized and re-running the hour-end job leaves it alone.
-fn needs_tsid_layout_rewrite(tsid_major_stream: bool, files: &[FileKey]) -> bool {
-    tsid_major_stream
-        && files
-            .iter()
-            .any(|file| MetricsFileLayout::of(&file.key) != MetricsFileLayout::TsidMajor)
+/// Last microsecond of the range a merge job at `offset` covers: the hour of
+/// `offset`, or the whole day for daily-partitioned streams. No file of the
+/// job can be newer, so "is the range old enough" is decided against this.
+fn job_range_end(offset: i64, partition_time_level: PartitionTimeLevel) -> i64 {
+    let offset = offset - offset % hour_micros(1);
+    if partition_time_level == PartitionTimeLevel::Daily {
+        offset - offset % day_micros(1) + day_micros(1) - 1
+    } else {
+        offset + hour_micros(1) - 1
+    }
 }
 
 /// Generate merging job by stream
@@ -325,6 +323,11 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // -- third period, we can do the merge, so, at least 3 times of
     // -- 1 day, downsampling is in day level
     // max_file_retention_time
+    // The job merges the hour of `offset` and decides the downsampling rule
+    // against the end of that hour (see merge_by_stream), so only enqueue it
+    // once the whole hour is older than the rule's offset; otherwise the job
+    // would run as a plain merge and the advanced offset would skip the hour.
+    let job_end_ts = job_range_end(offset, get_partition_time_level(stream_type));
     if offset >= time_now_day
         || time_now.timestamp_micros() - offset
             <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
@@ -333,7 +336,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
                 .unwrap()
                 * 3
                 + day_micros(1)
-        || time_now.timestamp_micros() - rule.0 * 1_000_000 < offset
+        || time_now.timestamp_micros() - rule.0 * 1_000_000 < job_end_ts
     {
         return Ok(()); // the time is future, just wait
     }
@@ -389,7 +392,6 @@ pub async fn merge_by_stream(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let tsid_major_stream = metrics_tsid_major_stream(stream_type, &schema);
     if schema == Schema::empty() {
         // the stream was deleted, mark the job as done
         if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
@@ -423,10 +425,34 @@ pub async fn merge_by_stream(
             offset_time.format("%Y/%m/%d/%H").to_string(),
         )
     };
-    let files =
-        file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
-            .await
-            .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
+    // What this hour of files turns into. Decided once here — the workers and
+    // the merge only read it — from the end of the range, so a whole-hour
+    // mode applies to the hour as a unit.
+    let range_end_ts = job_range_end(offset, partition_time_level);
+    let mode = MergeMode::for_compactor(
+        stream_type,
+        stream_name,
+        &schema,
+        range_end_ts,
+        !is_incremental,
+    );
+    // a whole-hour merge needs every file of the hour, even those already
+    // above the size target that a normal merge would leave alone
+    let max_original_size = if mode.merges_whole_batch() {
+        i64::MAX
+    } else {
+        infra_file_list::merge_max_original_size()
+    };
+    let files = file_list::query_for_merge(
+        org_id,
+        stream_type,
+        stream_name,
+        &date_start,
+        &date_end,
+        max_original_size,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] date range: [{date_start},{date_end}], files: {}",
@@ -456,6 +482,7 @@ pub async fn merge_by_stream(
     for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
+        let mode = mode.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
         let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
@@ -474,42 +501,23 @@ pub async fn merge_by_stream(
                 }
             }
 
-            #[cfg(feature = "enterprise")]
-            let skip_group_files = stream_type == StreamType::Metrics
-                && get_largest_downsampling_rule(
-                    &stream_name,
-                    files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
-                )
-                .is_some();
-
-            #[cfg(not(feature = "enterprise"))]
-            let skip_group_files = false;
-
-            // A closed metrics hour must be globally sorted before writing
-            // size-based TSID-major files. The writer applies
-            // ZO_COMPACT_MAX_FILE_SIZE to logical original size at
-            // record-batch boundaries; using it here as an input-group limit
-            // would sort only fragments.
-            let finalize_tsid_major_hour =
-                tsid_major_stream && !is_incremental && !skip_group_files;
-
-            if finalize_tsid_major_hour
-                && !files_with_size.is_empty()
-                && !needs_tsid_layout_rewrite(tsid_major_stream, &files_with_size)
-            {
+            if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
                 return Ok(vec![]);
             }
-
-            let rewrite_single_tsid_layout = files_with_size.len() == 1
-                && !is_incremental
-                && needs_tsid_layout_rewrite(tsid_major_stream, &files_with_size);
-            if files_with_size.len() <= 1 && !skip_group_files && !rewrite_single_tsid_layout {
+            // A closed TSID-major hour made entirely of `tsid-major-v3-*` files
+            // is finalized: re-running the hour-end job leaves it alone. Any
+            // legacy or `tsid-sorted-*` file makes the whole hour merge again.
+            if mode.is_tsid_major()
+                && files_with_size
+                    .iter()
+                    .all(|f| MetricsFileLayout::of(&f.key) == MetricsFileLayout::TsidMajor)
+            {
                 return Ok(vec![]);
             }
 
             // group files need to merge
             let mut batch_groups = Vec::new();
-            if skip_group_files || finalize_tsid_major_hour {
+            if mode.merges_whole_batch() {
                 batch_groups.push(MergeBatch {
                     batch_id: 0,
                     org_id: org_id.clone(),
@@ -517,7 +525,7 @@ pub async fn merge_by_stream(
                     stream_name: stream_name.clone(),
                     prefix: prefix.clone(),
                     files: files_with_size.clone(),
-                    finalize: !is_incremental,
+                    mode: mode.clone(),
                 });
             } else {
                 let mut new_file_list = Vec::new();
@@ -543,7 +551,7 @@ pub async fn merge_by_stream(
                             stream_name: stream_name.clone(),
                             prefix: prefix.clone(),
                             files: new_file_list.clone(),
-                            finalize: !is_incremental,
+                            mode: mode.clone(),
                         });
                         new_file_size = 0;
                         new_file_list.clear();
@@ -564,7 +572,7 @@ pub async fn merge_by_stream(
                         stream_name: stream_name.clone(),
                         prefix: prefix.clone(),
                         files: new_file_list.clone(),
-                        finalize: true,
+                        mode: mode.clone(),
                     });
                 }
 
@@ -706,8 +714,7 @@ pub async fn merge_by_stream(
 // - stream_name: the name of the stream
 // - prefix: the prefix of the files
 // - files_with_size: the files to merge
-// - finalize: hour-end merge of a closed hour (TSID-major metrics write their final layout only
-//   then; incremental merges write plain hash-sorted files)
+// - mode: what the merge produces (decided by the scheduler)
 // returns:
 // - new_files: the files that are merged
 // - retain_file_list: the files that are not merged
@@ -718,37 +725,13 @@ pub async fn merge_files(
     stream_name: &str,
     prefix: &str,
     files_with_size: &[FileKey],
-    finalize: bool,
+    mode: &MergeMode,
 ) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
     let start = std::time::Instant::now();
-    #[cfg(feature = "enterprise")]
-    let is_match_downsampling_rule = get_largest_downsampling_rule(
-        stream_name,
-        files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
-    )
-    .is_some();
-
-    #[cfg(not(feature = "enterprise"))]
-    let is_match_downsampling_rule = false;
-
-    // TSID-major layout applies to this stream (flag, Parquet, UInt64 __hash__)
-    let tsid_major_stream = metrics_tsid_major_stream(
-        stream_type,
-        &infra::schema::get(org_id, stream_name, stream_type).await?,
-    );
-    // TSID-major finalization: merge the complete batch regardless of size
-    // and rewrite even a lone legacy/hash-sorted file. Incremental merges keep
-    // the regular size grouping and never rewrite a single file.
-    let finalize_tsid_major = finalize && tsid_major_stream && !is_match_downsampling_rule;
-    // nothing to do with 0/1 files, unless a rule forces the merge
-    let nothing_to_merge = |files: &[FileKey]| {
-        files.len() <= 1
-            && !is_match_downsampling_rule
-            && !(finalize_tsid_major
-                && files.len() == 1
-                && needs_tsid_layout_rewrite(tsid_major_stream, files))
-    };
-    if nothing_to_merge(files_with_size) {
+    // a whole-batch mode (downsampling) merges everything it is given, even a
+    // single file; otherwise 0/1 files means nothing to do
+    let merge_whole_batch = mode.merges_whole_batch();
+    if files_with_size.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -760,8 +743,7 @@ pub async fn merge_files(
         if (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
             || new_compressed_file_size + file.meta.compressed_size
                 > cfg.compact.max_file_size as i64)
-            && !is_match_downsampling_rule
-            && !finalize_tsid_major
+            && !merge_whole_batch
         {
             break;
         }
@@ -777,7 +759,7 @@ pub async fn merge_files(
             .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge
-    if nothing_to_merge(&new_file_list) {
+    if new_file_list.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -793,7 +775,7 @@ pub async fn merge_files(
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
-    if nothing_to_merge(&new_file_list) {
+    if new_file_list.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), retain_file_list));
     }
 
@@ -903,25 +885,9 @@ pub async fn merge_files(
         target_partitions: 2,
     };
 
-    // Physical order the merge query may rely on. All inputs (hash, ts)
-    // ordered and a TSID-major output: declare it, DataFusion then merges the
-    // pre-sorted files (SortPreservingMerge, one file per partition) instead
-    // of a full SortExec. Mixed layouts, or hash-ordered files merged into the
-    // classic layout: declare nothing. Otherwise the classic `_timestamp DESC`.
-    let metrics_tsid_major_requested = tsid_major_stream && !is_match_downsampling_rule;
-    let hash_ordered_files = files
-        .iter()
-        .filter(|f| MetricsFileLayout::of(&f.key).is_hash_ordered())
-        .count();
-    let input_sort_order = if metrics_tsid_major_requested && hash_ordered_files == files.len() {
-        FileSortOrder::HashTimestampAsc
-    } else if metrics_tsid_major_requested || hash_ordered_files > 0 {
-        FileSortOrder::None
-    } else {
-        FileSortOrder::TimestampDesc
-    };
+    let input_sort_order = mode.input_sort_order(&files);
     log::debug!(
-        "[COMPACTOR:WORKER:{thread_id}] merge input sort order: {input_sort_order}, files: {}",
+        "[COMPACTOR:WORKER:{thread_id}] merge [{mode}] input sort order: {input_sort_order}, files: {}",
         files.len()
     );
     let tables = match TableBuilder::new()
@@ -937,18 +903,16 @@ pub async fn merge_files(
     };
 
     let merge_result = {
-        let stream_name = stream_name.to_string();
+        let mode = mode.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 merge::merge_parquet_files(
-                    stream_type,
-                    &stream_name,
                     schema,
                     tables,
                     &bloom_filter_fields,
                     new_file_meta,
-                    false,
-                    finalize,
+                    &mode,
+                    MergeOutput::for_compactor(stream_type),
                 )
                 .await
             })
@@ -1298,6 +1262,29 @@ mod tests {
     use config::meta::stream::{FileKey, FileMeta};
 
     use super::*;
+
+    #[test]
+    fn test_job_range_end_hourly_and_daily() {
+        // 2026-08-18 10:10:00 UTC
+        let offset = Utc
+            .with_ymd_and_hms(2026, 8, 18, 10, 10, 0)
+            .unwrap()
+            .timestamp_micros();
+        assert_eq!(
+            job_range_end(offset, PartitionTimeLevel::Hourly),
+            Utc.with_ymd_and_hms(2026, 8, 18, 11, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+                - 1
+        );
+        assert_eq!(
+            job_range_end(offset, PartitionTimeLevel::Daily),
+            Utc.with_ymd_and_hms(2026, 8, 19, 0, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+                - 1
+        );
+    }
 
     // Helper function to create test FileKey
     fn create_file_key(key: &str, min_ts: i64, max_ts: i64, original_size: i64) -> FileKey {

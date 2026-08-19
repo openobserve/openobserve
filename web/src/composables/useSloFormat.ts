@@ -50,13 +50,13 @@ export function healthTone(health: SloHealth): string {
 export function healthIcon(health: SloHealth): string {
   switch (health) {
     case "budget_blown":
-      return "local_fire_department";
+      return "local-fire-department";
     case "at_risk":
-      return "trending_down";
+      return "trending-down";
     case "meeting":
-      return "check_circle";
+      return "check-circle";
     default:
-      return "help";
+      return "help-outline";
   }
 }
 

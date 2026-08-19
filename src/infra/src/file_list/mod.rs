@@ -113,12 +113,15 @@ pub trait FileList: Sync + Send + 'static {
         time_range: (i64, i64),
         flattened: Option<bool>,
     ) -> Result<Vec<FileKey>>;
+    /// Files of `date_range` with `original_size <= max_original_size`, the
+    /// compactor's merge candidates.
     async fn query_for_merge(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
         date_range: (String, String),
+        max_original_size: i64,
     ) -> Result<Vec<FileKey>>;
     async fn query_for_dump(
         &self,
@@ -357,22 +360,6 @@ pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
 }
 
 /// Remove a parquet file from the metastore and optionally from object storage.
-/// Upper bound on `original_size` for files the compactor considers for
-/// merging (`query_for_merge`): files at or above ~95% of
-/// `ZO_COMPACT_MAX_FILE_SIZE` are already "big enough".
-///
-/// TSID-major metrics files carry their share of the logical uncompressed
-/// input size in `original_size`, which can be far larger than the physical
-/// file target, so every file of the hour is returned for such streams; the
-/// compactor itself recognizes a fully finalized hour and leaves it alone.
-pub fn merge_query_max_original_size(stream_type: StreamType) -> i64 {
-    if config::meta::promql::metrics_tsid_major_enabled(stream_type) {
-        i64::MAX
-    } else {
-        get_config().compact.max_file_size as i64 * 95 / 100
-    }
-}
-
 pub async fn delete_parquet_file(account: &str, key: &str, file_list_only: bool) -> Result<()> {
     batch_process(&[FileKey::new(
         0,
@@ -418,15 +405,29 @@ pub async fn query(
 }
 
 #[inline]
+/// Classic upper bound on `original_size` for merge candidates: files at or
+/// above ~95% of `ZO_COMPACT_MAX_FILE_SIZE` are already "big enough" and are
+/// not merged again.
+pub fn merge_max_original_size() -> i64 {
+    get_config().compact.max_file_size as i64 * 95 / 100
+}
+
 #[tracing::instrument(name = "infra:file_list:db:query_for_merge")]
 pub async fn query_for_merge(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_range: (String, String),
+    max_original_size: i64,
 ) -> Result<Vec<FileKey>> {
     CLIENT
-        .query_for_merge(org_id, stream_type, stream_name, date_range)
+        .query_for_merge(
+            org_id,
+            stream_type,
+            stream_name,
+            date_range,
+            max_original_size,
+        )
         .await
 }
 
