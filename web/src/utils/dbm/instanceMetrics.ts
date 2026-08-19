@@ -295,6 +295,39 @@ export const DBM_INSTANCE_METRICS: readonly DbmMetricSpec[] = [
     aggregate: "max",
     identityColumn: MYSQL_IDENTITY,
   },
+  // ONE STREAM, TWO ROLES. Postgres publishes hits and disk reads as two
+  // separate metrics; mysqlreceiver publishes `mysql.buffer_pool.operations`
+  // with an `operation` dimension, so both roles read the same stream and are
+  // told apart by `filter` — the arrangement `connections` already uses for
+  // `mysql_threads.kind`.
+  //
+  // `defaultEnabled: true` is the receiver's own default (`enabled: true` on
+  // mysql.buffer_pool.operations in its metadata.yaml), and the shipped setup
+  // card declares no `metrics:` block, so these arrive with no config change.
+  //
+  // The two values are NOT disjoint — `read_requests` counts every logical
+  // read and `reads` is the subset that missed. `metricsForSet` routes MySQL
+  // through `overlappingCacheHitRatio` for that reason; see its doc comment.
+  {
+    system: MYSQL,
+    role: "cacheHit",
+    stream: "mysql_buffer_pool_operations",
+    defaultEnabled: true,
+    cumulative: true,
+    aggregate: "sum",
+    identityColumn: MYSQL_IDENTITY,
+    filter: { column: "operation", value: "read_requests" },
+  },
+  {
+    system: MYSQL,
+    role: "cacheRead",
+    stream: "mysql_buffer_pool_operations",
+    defaultEnabled: true,
+    cumulative: true,
+    aggregate: "sum",
+    identityColumn: MYSQL_IDENTITY,
+    filter: { column: "operation", value: "reads" },
+  },
   {
     system: MYSQL,
     role: "connectionLimit",
@@ -591,6 +624,40 @@ export const cacheHitRatio = (
   return total > 0 ? hit / total : null;
 };
 
+/**
+ * The same ratio where the two counters OVERLAP instead of partitioning.
+ *
+ * Postgres's `blks_hit` and `blks_read` are disjoint — a block read is either a
+ * cache hit or a disk read — so the share is `hit / (hit + read)`.
+ *
+ * InnoDB does not count that way. `Innodb_buffer_pool_read_requests` is EVERY
+ * logical read, and `Innodb_buffer_pool_reads` is the subset of those that
+ * missed and went to disk, so `reads` is already inside `requests`. Feeding
+ * these to `cacheHitRatio` would compute `requests / (requests + reads)` and
+ * understate the ratio on exactly the busy, disk-bound instances the column
+ * exists to surface — a 90% real hit rate would render as 91.7% only because
+ * the denominator is inflated, and a genuinely bad instance would still read
+ * as healthy. Hence `1 - reads/requests`, the standard InnoDB formula.
+ *
+ * Clamped at 0: the two counters are sampled from one status snapshot but the
+ * server may increment them between reads, so `reads > requests` is possible by
+ * a hair, and a negative "hit rate" is not a thing.
+ */
+export const overlappingCacheHitRatio = (
+  totalRequests: number | null | undefined,
+  diskReads: number | null | undefined,
+): number | null => {
+  if (!Number.isFinite(totalRequests as number) || !Number.isFinite(diskReads as number)) {
+    return null;
+  }
+  const requests = totalRequests as number;
+  const reads = diskReads as number;
+  if (requests < 0 || reads < 0) return null;
+  // Same rule as the disjoint form: an idle window measured nothing.
+  if (requests === 0) return null;
+  return Math.max(0, 1 - reads / requests);
+};
+
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 /**
@@ -623,13 +690,22 @@ const EMPTY_SATURATION: DbmSaturation = { state: "absent", used: null, limit: nu
 const lagUnitFor = (system: string): "bytes" | "seconds" =>
   metricSystemFor(system) === MYSQL ? "seconds" : "bytes";
 
+/**
+ * How this engine's two cache counters relate.
+ *
+ * Aliased through `metricSystemFor`, so MariaDB — which rides mysqlreceiver's
+ * streams — gets the InnoDB reading rather than the Postgres one.
+ */
+const cacheHitRatioFor = (system: string) =>
+  metricSystemFor(system) === MYSQL ? overlappingCacheHitRatio : cacheHitRatio;
+
 /** The row-shaped view of one instance's metrics. */
 export const metricsForSet = (system: string, set: DbmInstanceMetricSet): DbmRowMetrics => {
   const lag = set.replicationLag?.latest;
   return {
     state: "matched",
     saturation: connectionSaturation(set.connections?.latest, set.connectionLimit?.latest),
-    cacheHitRatio: cacheHitRatio(set.cacheHit?.latest, set.cacheRead?.latest),
+    cacheHitRatio: cacheHitRatioFor(system)(set.cacheHit?.latest, set.cacheRead?.latest),
     replicationLag:
       lag === null || lag === undefined ? null : { value: lag, unit: lagUnitFor(system) },
     deadlocks: set.deadlocks?.latest ?? null,

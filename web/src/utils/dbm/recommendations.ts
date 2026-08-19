@@ -518,17 +518,31 @@ export type DbmRecommendationCoverage = "supported" | "unsupported";
 /**
  * Whether a rule's input is collected for this engine.
  *
- * The index feed reads `pg_stat_user_indexes` and is Postgres-only; activity
- * and blocking have recipes on every supported engine. Reporting this per RULE
- * rather than per page is what lets a MySQL user see their blocking findings
- * while being told, specifically, that the index check did not run.
+ * Activity and blocking have recipes on every supported engine. The unused-index
+ * rule needs a scan COUNTER, which is narrower than shipping an index recipe:
+ *
+ *  • postgresql — `pg_stat_user_indexes.idx_scan`
+ *  • mysql      — `performance_schema.table_io_waits_summary_by_index_usage`
+ *  • mssql      — `sys.dm_db_index_usage_stats` (seeks + scans + lookups)
+ *  • mariadb    — NOT SUPPORTED, and deliberately so. Its index recipe omits
+ *    `idx_scan` entirely because `performance_schema` is off by default there,
+ *    so the counter would be absent rather than zero. Treating that absence as
+ *    a scan count of 0 would fire "never scanned" for EVERY index on every
+ *    MariaDB instance — a fabricated finding, and the one this rule exists to
+ *    make trustworthy.
+ *
+ * Reporting this per RULE rather than per page is what lets a MariaDB user see
+ * their blocking findings while being told, specifically, that the index check
+ * did not run.
  */
+const UNUSED_INDEX_ENGINES = new Set(["postgresql", "mysql", "mssql"]);
+
 export const recommendationEngineSupport = (
   id: DbmRecommendationId,
   engine: string,
 ): DbmRecommendationCoverage => {
   if (id === "unused-index") {
-    return engine === "postgresql" ? "supported" : "unsupported";
+    return UNUSED_INDEX_ENGINES.has(engine) ? "supported" : "unsupported";
   }
   return "supported";
 };

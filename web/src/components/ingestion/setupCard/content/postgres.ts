@@ -14,9 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // PostgreSQL data-source setup card. Shared collector scaffolding (install +
-// write-config command) comes from ./otelShared; this file holds the Postgres
-// specifics. Follows the OpenObserve guide:
-// https://openobserve.ai/blog/how-to-monitor-postgresql-performance
+// write-config command) comes from ./otelShared.
 
 import { raw, type TranslateFn } from "@/types/i18n";
 
@@ -33,18 +31,14 @@ import {
   dbmVerifyStep,
 } from "./dbmShared";
 
-// Step 1 — the monitoring role. Literal name/password here and in the config (the
-// config reads the password from $POSTGRESQL_PASSWORD set at run time) — edit
-// inline for different credentials.
+// Step 1 — the monitoring role. The config reads the password from
+// $POSTGRESQL_PASSWORD, set at run time.
 const ROLE_SQL = `CREATE ROLE myuser WITH LOGIN PASSWORD 'mypassword';`;
 
-// The SQL runs INSIDE Postgres, not the shell — Step 1 offers runnable psql /
-// Docker commands that pass it via -c, plus the raw SQL for a GUI client.
 const applyRole = (connect: string) => `${connect} -c "${ROLE_SQL}"`;
 
-// Collector config (per the guide). Only the exporter endpoint + token are
-// substituted per-org; {host}/{port} fill from the configure step's inputs. The
-// password is read from $POSTGRESQL_PASSWORD (set in the run step).
+// Only the exporter endpoint + token are substituted per-org; {host}/{port}
+// fill from the configure step's inputs.
 const CONFIG_YAML = `receivers:
   postgresql:
     endpoint: {host}:{port}
@@ -129,10 +123,9 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
           },
         ],
       },
-      // Pinned to the DBM-verified contrib release, not the shared default:
-      // the Database Monitoring config below needs upstream contrib >= 0.148.0
-      // (the `events:` block is an unknown key on older releases) and was
-      // verified end-to-end at this version.
+      // Pinned, not the shared default: the DBM config below needs upstream
+      // contrib >= 0.148.0 (the `events:` block is an unknown key on older
+      // releases).
       collectorInstallStep(t, DBM_CONTRIB_VERSION),
       {
         id: "configure",
@@ -180,9 +173,8 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // What the verify step will show, in prose. These are NOT the pg_stat_database
-        // counter names that appear in the ingested metrics — they are a plain-English
-        // summary of them, so they are translated.
+        // Plain-English summary, NOT the pg_stat_database counter names — so
+        // these are translated.
         pills: [
           t("ingestion.setupCard.pillActiveBackends"),
           t("ingestion.setupCard.pillCommits"),
@@ -193,12 +185,10 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
       },
       // ── Database Monitoring (optional) ──────────────────────────────────
       // Everything above ingests METRICS. The steps below add the SERVER
-      // vantage that Infra → Databases needs for its Deadlocks, Blocked
-      // queries and Activity tabs (plus server top queries with estimated
-      // plans): a blocked query emits no client span while it is blocked, and
-      // a deadlock's other participant may not be instrumented at all, so
-      // none of it can be derived from traces. Kept last and optional so the
-      // metrics path stays a four-step flow.
+      // vantage the Deadlocks, Blocked queries and Activity tabs need: a
+      // blocked query emits no client span while it is blocked, and a
+      // deadlock's other participant may not be instrumented at all, so none
+      // of it can be derived from traces.
       {
         id: "dbm-grant",
         titleKey: "ingestion.setupCard.dbmPreparePostgresTitle",
@@ -230,10 +220,9 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
           },
         ],
       },
-      // The deadlock recipe tails the Postgres log, and its parser expects one
-      // exact prefix shape that is NOT the Postgres default. Without this step
-      // the collector below runs, reports healthy, and ingests nothing — so it
-      // has to come BEFORE the config that depends on it.
+      // The deadlock recipe's parser expects one exact log prefix shape that
+      // is NOT the Postgres default. Without this step the collector runs,
+      // reports healthy, and ingests nothing — so it comes BEFORE the config.
       {
         id: "dbm-logging",
         titleKey: "ingestion.setupCard.dbmPgLoggingTitle",
@@ -251,11 +240,8 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
         completeOn: "copy",
         code: { lang: "sql", raw: PG_DBM_LOGGING_VERIFY_SQL },
       },
-      // OPTIONAL — real executed plans. Sits directly after the logging step
-      // because both edit postgresql.conf and share one restart; the
-      // collector's parser already routes the entries this produces, and
-      // OpenObserve ingests them whenever Database Monitoring is enabled —
-      // there is no separate server switch.
+      // OPTIONAL — real executed plans. Sits after the logging step because
+      // both edit postgresql.conf and share one restart.
       {
         id: "dbm-auto-explain",
         titleKey: "ingestion.setupCard.dbmPgAutoExplainTitle",
@@ -308,8 +294,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
         code: {
           lang: "bash",
           // POSTGRESQL_PASSWORD feeds the metrics config; PGUSER/PGPASS feed
-          // the DBM one. The merged run needs all three — omitting the first
-          // breaks the metrics receiver's auth once the configs merge.
+          // the DBM one. The merged run needs all three.
           raw: "POSTGRESQL_PASSWORD='mypassword' PGUSER='myuser' PGPASS='mypassword' \\\n  ./otelcol-contrib --config ./config.yaml --config ./dbm-config.yaml",
         },
         note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",

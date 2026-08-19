@@ -1933,8 +1933,10 @@ fn pg_query_sample_on_cpu() -> Map<String, Value> {
     rec
 }
 
-/// `mysql-query-sample.jsonl` line 1, verbatim. MySQL carries NO blocking/lock
-/// attributes at all — the lock columns must stay null rather than defaulting.
+/// `mysql-query-sample.jsonl` line 1, verbatim. MySQL names no BLOCKER and no
+/// lock object, so those columns must stay null rather than defaulting. It does
+/// carry a wait type and duration — here an I/O wait, which is exactly the class
+/// `is_mysql_lock_wait` must refuse to report as a lock wait.
 fn mysql_query_sample() -> Map<String, Value> {
     obj(json!({
         "_timestamp": 1_786_415_529_744_171i64,
@@ -2300,9 +2302,13 @@ fn mysql_query_sample_canonicalizes() {
     );
 }
 
-/// MySQL query_sample carries NO blocking/lock fields at all. Those columns must
+/// MySQL query_sample names no blocker and no lock object. Those columns must
 /// stay NULL rather than defaulting, so the UI can degrade instead of rendering
 /// an empty lock section that looks like "not blocked" when it means "unknown".
+///
+/// `wait_seconds` is asserted separately (see the wait-class tests below): the
+/// sample DOES carry a duration, and whether it may be reported depends on the
+/// instrument class, not on presence.
 #[test]
 fn mysql_lock_columns_stay_null() {
     let s = server_vantage::canonicalize_query_sample(&mysql_query_sample()).expect("mysql");
@@ -3162,6 +3168,133 @@ fn a_zero_wait_duration_is_a_sentinel_not_a_measurement() {
         blocked.wait_seconds,
         Some(1.0),
         "a genuine lock wait must be stored"
+    );
+}
+
+// ─── MySQL wait duration is gated on the WAIT CLASS ──────────────────────────
+//
+// `events_waits_current.timer_wait` is the current wait of ANY performance_schema
+// instrument, so the one attribute carries lock waits, disk I/O and internal
+// mutexes alike. `wait_seconds` is read only by Blocked queries, which ranks
+// contention severity and singles out the notably-longest waiter, so admitting a
+// slow disk read there invents a blocker that does not exist.
+
+/// The shipped capture is an I/O wait with a REAL, non-zero timer — the exact
+/// row an ungated map would misreport, and the reason this is a class test and
+/// not a presence test.
+#[test]
+fn a_mysql_io_wait_is_not_reported_as_a_lock_wait() {
+    let rec = mysql_query_sample();
+    assert_eq!(
+        rec.get("mysql_wait_type").and_then(|v| v.as_str()),
+        Some("wait/io/table/sql/handler"),
+        "fixture drift: this test is only meaningful on an I/O wait"
+    );
+    assert!(
+        rec.get("mysql_events_waits_current_timer_wait")
+            .and_then(|v| v.as_f64())
+            .is_some_and(|w| w > 0.0),
+        "fixture drift: the duration must be non-zero, or the gate is untested"
+    );
+
+    let s = server_vantage::canonicalize_query_sample(&rec).expect("mysql");
+    assert_eq!(
+        s.wait_seconds, None,
+        "an I/O wait must not populate the lock-wait duration"
+    );
+    assert!(
+        !s.to_record()
+            .contains_key(server_vantage::O2_DBM_WAIT_SECONDS),
+        "the column must be absent, not zero — Blocked queries ranks on it"
+    );
+}
+
+/// The same record with a LOCK instrument does land, in seconds, unconverted.
+#[test]
+fn a_mysql_lock_wait_lands_in_seconds() {
+    let mut rec = mysql_query_sample();
+    rec.insert(
+        "mysql_wait_type".into(),
+        json!("wait/lock/table/sql/handler"),
+    );
+    rec.insert("mysql_events_waits_current_timer_wait".into(), json!(2.5));
+
+    let s = server_vantage::canonicalize_query_sample(&rec).expect("mysql");
+    // SECONDS, like Postgres's blocking.wait_duration — NOT milliseconds like
+    // SQL Server's wait_time. A conversion here would misreport by 1000x.
+    assert_eq!(s.wait_seconds, Some(2.5));
+}
+
+/// Mutex contention is real contention, but no session is on the other side to
+/// name and terminate, so it must not outrank a genuine row-lock waiter.
+#[test]
+fn a_mysql_mutex_wait_is_not_a_lock_wait() {
+    let mut rec = mysql_query_sample();
+    rec.insert(
+        "mysql_wait_type".into(),
+        json!("wait/synch/mutex/innodb/log_sys_mutex"),
+    );
+    rec.insert("mysql_events_waits_current_timer_wait".into(), json!(9.0));
+
+    assert_eq!(
+        server_vantage::canonicalize_query_sample(&rec)
+            .expect("mysql")
+            .wait_seconds,
+        None
+    );
+}
+
+/// The receiver's own non-instrument placeholders. `CPU` means the wait ALREADY
+/// ENDED and `other` means no wait row joined at all; neither is a wait being
+/// served, and the template COALESCEs the duration to a `processlist_time`
+/// fallback or 0 on those rows.
+#[test]
+fn mysql_non_instrument_wait_types_report_no_duration() {
+    for placeholder in ["CPU", "other", "User sleep", ""] {
+        let mut rec = mysql_query_sample();
+        rec.insert("mysql_wait_type".into(), json!(placeholder));
+        rec.insert("mysql_events_waits_current_timer_wait".into(), json!(7.0));
+        assert_eq!(
+            server_vantage::canonicalize_query_sample(&rec)
+                .expect("mysql")
+                .wait_seconds,
+            None,
+            "`{placeholder}` is not an instrument and cannot be a lock wait"
+        );
+    }
+}
+
+/// A lock wait whose duration is the COALESCE sentinel is still dropped — the
+/// class gate does not bypass the `> 0.0` filter every engine shares.
+#[test]
+fn a_zero_duration_lock_wait_is_still_a_sentinel() {
+    let mut rec = mysql_query_sample();
+    rec.insert("mysql_wait_type".into(), json!("wait/lock/table/sql/handler"));
+    rec.insert("mysql_events_waits_current_timer_wait".into(), json!(0));
+
+    assert_eq!(
+        server_vantage::canonicalize_query_sample(&rec)
+            .expect("mysql")
+            .wait_seconds,
+        None
+    );
+}
+
+/// MySQL still names no BLOCKER, and a wait duration must not imply one. This is
+/// the pairing that keeps the fix honest: Blocked queries can now say how long,
+/// and still cannot say who.
+#[test]
+fn a_mysql_lock_wait_still_names_no_blocker() {
+    let mut rec = mysql_query_sample();
+    rec.insert("mysql_wait_type".into(), json!("wait/lock/table/sql/handler"));
+    rec.insert("mysql_events_waits_current_timer_wait".into(), json!(2.5));
+
+    let s = server_vantage::canonicalize_query_sample(&rec).expect("mysql");
+    assert_eq!(s.wait_seconds, Some(2.5));
+    assert!(
+        s.blocking_pids.is_empty(),
+        "mysqlreceiver publishes no blocking session id; inventing one would \
+         name an innocent session as the blocker"
     );
 }
 

@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// MySQL data-source setup card. Follows the OpenObserve guide:
-// https://openobserve.ai/blog/monitor-mysql-metrics-otel (requires MySQL 8.0+).
+// MySQL data-source setup card. Requires MySQL 8.0+.
 
 import { raw, type TranslateFn } from "@/types/i18n";
 
@@ -32,21 +31,17 @@ const USER_SQL = `CREATE USER 'otel'@'localhost' IDENTIFIED BY 'yourpassword';
 GRANT SELECT, PROCESS, REPLICATION CLIENT ON *.* TO 'otel'@'localhost';
 FLUSH PRIVILEGES;`;
 
-// The SQL runs INSIDE MySQL — Step 1 offers runnable mysql / Docker commands that
-// pass it via -e, plus the raw SQL for a GUI client.
 const applyUser = (connect: string) => `${connect} -e "
 ${USER_SQL}
 "`;
 
 // The `sqlquery/mysql_limits` receiver exists because mysqlreceiver publishes
-// no `max_connections`: without a limit, the Databases page can only show a
-// connection COUNT, never a saturation percentage. One gauge per minute fills
-// that denominator honestly.
+// no `max_connections`, so without it the Databases page can only show a
+// connection COUNT, never a saturation percentage.
 //
 // CRITICAL: `mysql_instance_endpoint` must be BOTH projected in the SQL and
 // listed in `attribute_columns`, spelled to match mysqlreceiver's own
-// `mysql.instance.endpoint` attribute — the Databases page joins the limit to
-// the instance on that column, and the read side rejects the stream as
+// `mysql.instance.endpoint` attribute — the read side rejects the stream as
 // unreadable when its identity column is missing (instanceMetricsRead.ts).
 const CONFIG_YAML = `receivers:
   mysql:
@@ -132,9 +127,8 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
           },
         ],
       },
-      // Pinned to the DBM-verified contrib release: the Database Monitoring
-      // config below needs upstream contrib >= 0.148.0 (the `events:` block is
-      // an unknown key on older releases) and was verified at this version.
+      // Pinned: the DBM config below needs upstream contrib >= 0.148.0 (the
+      // `events:` block is an unknown key on older releases).
       collectorInstallStep(t, DBM_CONTRIB_VERSION),
       {
         id: "configure",
@@ -183,9 +177,8 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        // What the verify step will show, in prose. These are NOT the receiver metric
-        // names that land in the data (those are mysql.buffer_pool.*, mysql.operations,
-        // …) — they are a plain-English summary of them, so they are translated.
+        // Plain-English summary, NOT the receiver metric names — so these are
+        // translated.
         pills: [
           t("ingestion.setupCard.pillBufferPool"),
           t("ingestion.setupCard.pillOperations"),

@@ -4114,7 +4114,7 @@
       "dbmConfigureTitle": "Database Monitoring · Configure the collector (optional)",
       "dbmConfigurePostgresDesc": "Writes `dbm-config.yaml` — set the database and the path to your Postgres log file below. Besides deadlocks and blocked queries, this config turns on activity samples and server top queries (with estimated plans): the collector ships both OFF by default, so the top-level `events:` block in this file is what enables them — without it the collector looks healthy and sends nothing.",
       "dbmConfigureMysqlDesc": "Writes `dbm-config.yaml` — set the database and the path to your MySQL error log below. Besides deadlocks and blocked queries, this config turns on activity samples and server top queries: the collector ships both OFF by default, so the top-level `events:` block in this file is what enables them — without it the collector looks healthy and sends nothing.",
-      "dbmConfigureMariadbDesc": "Writes `dbm-config.yaml` — set the database and the path to your MariaDB error log below. MariaDB gets deadlocks and blocked queries here; activity samples, top queries and plans are not available for MariaDB — no OpenTelemetry receiver exists for it upstream.",
+      "dbmConfigureMariadbDesc": "Writes `dbm-config.yaml` — set the database and the path to your MariaDB error log below. MariaDB gets deadlocks, blocked queries, activity samples and top queries here: the mysql receiver speaks MariaDB's protocol and identifies it correctly. One gap the receiver reports itself — MariaDB does not expose the sampled statement text, so an activity row names the session without its SQL.",
       "dbmRunTitle": "Database Monitoring · Run the collector (optional)",
       "dbmRunPostgresDesc": "Runs both configs together. Use the same role and password you created in step 1.",
       "dbmRunMysqlDesc": "Runs both configs together. Use the same user and password you created in step 1.",
@@ -4131,9 +4131,11 @@
       "dbmMariadbLogPathHelp": "The collector must be able to read this file. Find it with: SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "Database Monitoring · Grant access (optional)",
       "dbmPrepareMssqlDesc": "**Everything above is complete on its own** — query timings already reach Databases from your application's traces, with no setup here. This last group adds what a trace can never see: deadlocks and blocked queries, which only the database itself records. Both grants are needed — one lets the collector read other sessions, the other lets it read the deadlock history. Run them in a SQL client, **not** your shell.",
-      "dbmConfigureMssqlDesc": "Writes `dbm-config.yaml` — set the database to connect to below. SQL Server gets deadlocks and blocked queries here; activity samples, top queries and plans are not supported for SQL Server in OpenObserve yet.",
+      "dbmConfigureMssqlDesc": "Writes `dbm-config.yaml` — set the database to connect to below. SQL Server gets deadlocks, blocked queries, activity samples, top queries and execution plans here. The sqlserver receiver reads across the whole instance, so activity and top queries are not limited to the database you name above.",
       "dbmRunMssqlDesc": "Runs both configs together. Use the same login and password you created in step 1.",
       "dbmVerifyBlockingDesc": "Open **Infra → Databases → Blocked queries**. Sessions waiting on a lock appear as soon as one is sampled — an empty tab there tells you whether nothing is blocked or nothing is being collected.",
+      "dbmVerifyFullNoSampleTextDesc": "Open **Infra \u2192 Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and top queries carry their plans on a query's detail page. MariaDB does not expose the sampled statement text, so an activity row names the session without its SQL. Table health fills after the first 60-second snapshot.",
+      "dbmVerifyFullPlainPlansDesc": "Open **Infra \u2192 Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and execution plans appear on a query's detail page. Table health fills after the first 60-second snapshot.",
       "dbmVerifyFullSlowTableHealthDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one; the Activity tab fills with sampled sessions within a minute of the collector starting, and estimated plans appear on a query's detail page. Table health takes up to five minutes — reading table sizes gets slower as your schema grows, so it runs less often than the rest.",
       "dbmVerifyTableHealthDesc": "Open **Infra → Databases** and pick a tab below. Deadlocks and blocked queries appear as soon as your database reports one — an empty tab there tells you whether nothing happened or nothing is being collected. Table health fills after the first 60-second snapshot."
     },
@@ -15418,7 +15420,7 @@
         "activity": "Activity",
         "activityHint": "Sessions your databases are running right now.",
         "tableHealth": "Table health",
-        "tableHealthHint": "Table size, bloat and vacuum state (PostgreSQL only).",
+        "tableHealthHint": "Table size, bloat and vacuum state. Bloat and vacuum are PostgreSQL only.",
         "deadlocksLocked": "Deadlocks is an Enterprise feature. Upgrade to see which queries deadlocked against each other, and why. The other database tabs work on every plan.",
         "blockedLocked": "Blocked queries is an Enterprise feature. Upgrade to see which sessions are waiting on a lock and what is holding it. The other database tabs work on every plan.",
         "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan."
@@ -15876,7 +15878,7 @@
         "noReceiverHint": "Your applications are querying this database, but no {engine} receiver is sending server metrics for it. Add the {engine} receiver to your collector to fill this column.",
         "noReceiverMariadbHint": "Your applications are querying this MariaDB server, but nothing is sending server metrics for it. There is no separate MariaDB receiver — point a MySQL receiver at this instance and its metrics fill this column.",
         "engineUnsupported": "Not collected for {engine}",
-        "engineUnsupportedHint": "Instance metrics are collected for PostgreSQL, MySQL and MariaDB only — no receiver recipe exists for {engine} yet, so this column stays empty. That is a coverage note, not a health verdict.",
+        "engineUnsupportedHint": "Instance metrics are collected for PostgreSQL, MySQL and MariaDB — no receiver is wired up for {engine} yet, so this column stays empty. That is a coverage note, not a health verdict.",
         "unreadable": "Instance metrics could not be read",
         "unreadableHint": "The metrics streams exist but could not be read. This is usually a permission problem rather than anything wrong with the database."
       },
@@ -15892,11 +15894,11 @@
       "searchPlaceholder": "Search tables",
       "never": "Never",
       "countersCumulative": "Scan and vacuum counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
-      "tuplesEstimated": "Row counts and bloat percentage are PostgreSQL planner estimates, not exact counts.",
+      "tuplesEstimated": "Row counts and bloat percentage are statistics estimates from the database engine, not exact counts.",
       "notCollectingTitle": "No table statistics yet",
       "notCollectingDescription": "Nothing has reported table statistics in this time range. This signal ships as a separate collector recipe.",
       "engineUnsupportedTitle": "Not collected for this engine",
-      "engineUnsupportedDescription": "Table health reads PostgreSQL catalogs (pg_class and pg_stat_user_tables). MySQL, MariaDB and SQL Server have no equivalent recipe, so no data is collected for them — this is not an all-clear.",
+      "engineUnsupportedDescription": "Table health is collected by a per-engine collector recipe, and no recipe ships for this engine — so nothing is collected for it. This is not an all-clear.",
       "checklistTitle": "To start collecting",
       "checkRecipe": "Add the pg_table_stats recipe from the Databases setup guide to your collector config.",
       "checkGrant": "Grant pg_monitor to the collector user so it can read pg_stat_user_tables.",
@@ -15949,7 +15951,7 @@
         "rule": "Mean rows per call is at least {rows}, over at least {calls} calls. The mean is the server's total rows divided by its call count."
       },
       "enginePartialTitle": "Some checks did not run",
-      "enginePartialDescription": "Index checks read PostgreSQL catalogs (pg_stat_user_indexes). They are not collected for this engine, so an empty list here is not an all-clear.",
+      "enginePartialDescription": "The unused-index check needs an index scan counter, which is not collected for this engine, so an empty list here is not an all-clear.",
       "allClearTitle": "Nothing crossed a threshold",
       "allClearDescription": "Every check ran and none crossed its threshold in this time range."
     }

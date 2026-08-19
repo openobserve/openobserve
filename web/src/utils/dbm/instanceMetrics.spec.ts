@@ -22,6 +22,7 @@ import {
   buildInstanceMetricsSql,
   cacheHitRatio,
   connectionSaturation,
+  overlappingCacheHitRatio,
   foldMetricRows,
   instanceIdentityKey,
   mergeInstanceMetrics,
@@ -85,7 +86,24 @@ describe("DBM_INSTANCE_METRICS", () => {
       connections: "mysql_threads",
       replicationLag: "mysql_replica_time_behind_source",
       connectionLimit: "mysql_connection_max",
+      // Both cache roles read ONE stream, told apart by the `operation`
+      // dimension — mysqlreceiver publishes no per-role metric the way
+      // Postgres does with blks_hit / blks_read.
+      cacheHit: "mysql_buffer_pool_operations",
+      cacheRead: "mysql_buffer_pool_operations",
     });
+  });
+
+  it("separates the two MySQL cache roles by the operation dimension", () => {
+    // Same stream twice is only correct if the filters disambiguate it; without
+    // them both roles would read every row and the ratio would be 1 - 1 = 0 on
+    // every instance.
+    const specs = Object.fromEntries(
+      DBM_INSTANCE_METRICS.filter((s) => s.system === "mysql" && s.stream.includes("buffer_pool"))
+        .map((s) => [s.role, s.filter]),
+    );
+    expect(specs.cacheHit).toEqual({ column: "operation", value: "read_requests" });
+    expect(specs.cacheRead).toEqual({ column: "operation", value: "reads" });
   });
 
   // The MySQL limit does NOT come from mysqlreceiver — it publishes no
@@ -123,6 +141,10 @@ describe("DBM_INSTANCE_METRICS", () => {
     expect(enabledByDefault.sort()).toEqual(
       [
         "mysql_threads",
+        // Both cache roles read this one stream, and mysqlreceiver enables it
+        // by default, so it appears twice.
+        "mysql_buffer_pool_operations",
+        "mysql_buffer_pool_operations",
         "postgresql_backends",
         "postgresql_connection_max",
         "postgresql_replication_data_delay",
@@ -135,7 +157,13 @@ describe("DBM_INSTANCE_METRICS", () => {
   it("marks the monotonic counters as cumulative", () => {
     const cumulative = DBM_INSTANCE_METRICS.filter((s) => s.cumulative).map((s) => s.stream);
     expect(cumulative.sort()).toEqual(
-      ["postgresql_blks_hit", "postgresql_blks_read", "postgresql_deadlocks"].sort(),
+      [
+        "postgresql_blks_hit",
+        "postgresql_blks_read",
+        "postgresql_deadlocks",
+        "mysql_buffer_pool_operations",
+        "mysql_buffer_pool_operations",
+      ].sort(),
     );
   });
 
@@ -150,17 +178,23 @@ describe("DBM_INSTANCE_METRICS", () => {
   // repeated, and a per-replica lag takes the WORST — summing replicas reports
   // a lag no replica has.
   it("records how each metric's same-timestamp rows combine", () => {
-    const byStream = Object.fromEntries(DBM_INSTANCE_METRICS.map((s) => [s.stream, s.aggregate]));
-    expect(byStream).toEqual({
-      postgresql_backends: "sum",
-      postgresql_connection_max: "single",
-      postgresql_replication_data_delay: "max",
-      postgresql_blks_hit: "sum",
-      postgresql_blks_read: "sum",
-      postgresql_deadlocks: "sum",
-      mysql_threads: "sum",
-      mysql_replica_time_behind_source: "max",
-      mysql_connection_max: "single",
+    // Keyed by (system, role), not by stream: MySQL's two cache roles share one
+    // stream, so a stream-keyed map would silently drop one of them.
+    const byKey = Object.fromEntries(
+      DBM_INSTANCE_METRICS.map((s) => [`${s.system}/${s.role}`, s.aggregate]),
+    );
+    expect(byKey).toEqual({
+      "postgresql/connections": "sum",
+      "postgresql/connectionLimit": "single",
+      "postgresql/replicationLag": "max",
+      "postgresql/cacheHit": "sum",
+      "postgresql/cacheRead": "sum",
+      "postgresql/deadlocks": "sum",
+      "mysql/connections": "sum",
+      "mysql/replicationLag": "max",
+      "mysql/connectionLimit": "single",
+      "mysql/cacheHit": "sum",
+      "mysql/cacheRead": "sum",
     });
   });
 
@@ -180,6 +214,11 @@ describe("DBM_INSTANCE_METRICS", () => {
       mysql_threads: [],
       mysql_replica_time_behind_source: [],
       mysql_connection_max: [],
+      // No series split: mysqlreceiver reports the buffer pool per INSTANCE,
+      // not per database, so the `operation` dimension is a filter (which
+      // value this role reads) rather than a series column (which rows to
+      // keep apart within one role).
+      mysql_buffer_pool_operations: [],
     });
   });
 
@@ -874,6 +913,47 @@ describe("cacheHitRatio", () => {
 
   it("is null for a negative counter, which cannot be a real delta", () => {
     expect(cacheHitRatio(-5, 10)).toBeNull();
+  });
+});
+
+// ── InnoDB's overlapping counters ────────────────────────────────────────────
+
+describe("overlappingCacheHitRatio", () => {
+  /**
+   * The whole reason this function exists. `Innodb_buffer_pool_reads` is a
+   * SUBSET of `Innodb_buffer_pool_read_requests`, so the disjoint formula
+   * inflates the denominator and reports a healthier instance than the one
+   * being measured.
+   */
+  it("differs from the disjoint formula on the same counters", () => {
+    // 1000 logical reads, 100 of which went to disk => a 90% hit rate.
+    expect(overlappingCacheHitRatio(1000, 100)).toBeCloseTo(0.9, 10);
+    // The disjoint reading of the same pair would claim ~90.9%, and the gap
+    // widens exactly as the instance gets more disk-bound.
+    expect(cacheHitRatio(1000, 100)).toBeCloseTo(0.909, 3);
+  });
+
+  it("is 1 when nothing missed the buffer pool", () => {
+    expect(overlappingCacheHitRatio(500, 0)).toBe(1);
+  });
+
+  it("is 0 when every logical read went to disk", () => {
+    expect(overlappingCacheHitRatio(500, 500)).toBe(0);
+  });
+
+  it("clamps at 0 when the counters are sampled a hair apart", () => {
+    // Both are read from one SHOW STATUS snapshot, but the server keeps
+    // running; reads may edge past requests. A negative hit rate is not a thing.
+    expect(overlappingCacheHitRatio(100, 101)).toBe(0);
+  });
+
+  it("is null on an idle window rather than claiming a perfect cache", () => {
+    expect(overlappingCacheHitRatio(0, 0)).toBeNull();
+  });
+
+  it("is null when either counter is absent", () => {
+    expect(overlappingCacheHitRatio(null, 10)).toBeNull();
+    expect(overlappingCacheHitRatio(1000, undefined)).toBeNull();
   });
 });
 

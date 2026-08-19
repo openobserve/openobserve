@@ -352,14 +352,21 @@ describe("buildRecommendations", () => {
 
 describe("engine coverage", () => {
   /**
-   * The index and table feeds are Postgres-only. A MySQL user seeing an empty
-   * list would read it as "no unused indexes", which is an all-clear about a
-   * check that never ran — the single most dangerous empty state here.
+   * The unused-index rule needs a scan COUNTER, not merely an index recipe.
+   * Postgres, MySQL and SQL Server each publish one; MariaDB's recipe omits
+   * `idx_scan` entirely because `performance_schema` is off by default there.
+   *
+   * MariaDB is the case that matters: reading its absent counter as 0 would
+   * fire "never scanned" for EVERY index on the instance. A user seeing that
+   * list would act on a finding nothing measured — worse than the empty list,
+   * which at least reads as an all-clear we can label.
    */
-  it("reports index-derived rules as uncollected on non-Postgres engines", () => {
+  it("reports the unused-index rule as collected only where a scan counter exists", () => {
     expect(recommendationEngineSupport("unused-index", "postgresql")).toBe("supported");
-    expect(recommendationEngineSupport("unused-index", "mysql")).toBe("unsupported");
-    expect(recommendationEngineSupport("unused-index", "mssql")).toBe("unsupported");
+    expect(recommendationEngineSupport("unused-index", "mysql")).toBe("supported");
+    expect(recommendationEngineSupport("unused-index", "mssql")).toBe("supported");
+    // No idx_scan in the mariadb recipe — absent, not zero.
+    expect(recommendationEngineSupport("unused-index", "mariadb")).toBe("unsupported");
   });
 
   /** Activity and blocking are collected on every engine with a recipe. */
@@ -371,7 +378,11 @@ describe("engine coverage", () => {
   });
 
   it("distinguishes 'nothing found' from 'not collected for this engine'", () => {
-    expect(recommendationsEmptyCause([], "mysql")).toBe("engine-partial");
+    // MariaDB is the partial engine: every rule but unused-index runs there.
+    expect(recommendationsEmptyCause([], "mariadb")).toBe("engine-partial");
+    // MySQL now collects an index scan counter, so its empty list is a real
+    // all-clear rather than a check that never ran.
+    expect(recommendationsEmptyCause([], "mysql")).toBe("all-clear");
     expect(recommendationsEmptyCause([], "postgresql")).toBe("all-clear");
     // A non-empty list has no empty state at all.
     expect(
