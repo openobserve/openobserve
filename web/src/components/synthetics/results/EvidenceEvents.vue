@@ -211,11 +211,14 @@ function elapsedTitle(e: EvidenceEvent): string {
  * Only exceptions get colour — a rail on every row of an all-200 bundle is
  * decoration, and the point is that the two anomalies are findable at a glance.
  */
-function rowStatusColor(row: EvidenceRow): string | undefined {
+function rowStatusColor(row: EvidenceRow): string {
   const rank = evidenceSeverity(row);
   if (rank <= 4) return "var(--color-status-error-text)";
   if (rank === 5) return "var(--color-status-warning-text)";
-  return undefined;
+  // Transparent, not undefined: the rail's presence is what insets the first
+  // cell past it, so a row without one sits half a rem left and its expand
+  // chevron breaks the column's vertical line. Reserve the slot, paint nothing.
+  return "transparent";
 }
 
 /** Truncate from the LEFT: the host repeats on every row, the path is what differs. */

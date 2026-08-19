@@ -55,6 +55,19 @@ const mountEvents = (props: Record<string, unknown> = {}) =>
   });
 
 describe("EvidenceEvents", () => {
+  /**
+   * The rail's own class is what insets the first cell past it, so a row with no
+   * rail sits half a rem further left — visible as expand chevrons that do not
+   * line up down the column. Every row reserves the slot; only exceptions fill it.
+   */
+  it("reserves the rail slot on every row, so the expand chevrons line up", () => {
+    const fn = mountEvents().findComponent(OTable).props("getRowStatusColor") as (
+      r: EvidenceEvent,
+    ) => string | undefined;
+    expect(fn(ev({ kind: "response", status: 200 }))).toBe("transparent");
+    expect(fn(ev({ kind: "response", status: 304 }))).toBe("transparent");
+  });
+
   it("renders one row per event", () => {
     const w = mountEvents();
     expect(w.findAll('[data-test="synthetics-evidence-events-row"]')).toHaveLength(2);
@@ -159,8 +172,9 @@ describe("EvidenceEvents", () => {
   });
 
   it("rails only the rows that deserve one", () => {
-    // A rail on every row of an all-200 bundle is decoration; the point is that
-    // the anomalies are findable at a glance.
+    // A VISIBLE rail on every row of an all-200 bundle is decoration; the point
+    // is that the anomalies are findable at a glance. Benign rows still reserve
+    // the slot (transparent) so the expand chevrons stay in one vertical line.
     const rail = mountEvents().findComponent(OTable).props("getRowStatusColor") as (
       r: EvidenceEvent,
     ) => string | undefined;
@@ -168,8 +182,8 @@ describe("EvidenceEvents", () => {
     expect(rail(ev({ kind: "requestfailed" }))).toContain("error");
     expect(rail(ev({ status: 503 }))).toContain("error");
     expect(rail(ev({ status: 404 }))).toContain("warning");
-    expect(rail(ev({ status: 200 }))).toBeUndefined();
-    expect(rail(ev({ status: 302 }))).toBeUndefined();
+    expect(rail(ev({ status: 200 }))).toBe("transparent");
+    expect(rail(ev({ status: 302 }))).toBe("transparent");
   });
 
   it("pages a long list in both surfaces, panel wider than inline", () => {
