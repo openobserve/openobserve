@@ -83,18 +83,6 @@ const stepFilter = computed({
        the group rather than in it — it narrows whichever option is
        selected, so it is not a fourth one. -->
   <div class="flex flex-wrap items-center gap-2">
-    <!-- Leftmost because it is the broadest cut: which part of the run, before
-         which kind of event. Fixed width so a long step name truncates in the
-         trigger instead of stretching the control and shifting the row. -->
-    <OSelect
-      v-if="stepOptions?.length"
-      v-model="stepFilter"
-      :options="stepOptions"
-      size="sm"
-      class="w-56 shrink-0"
-      :searchable="false"
-      data-test="synthetics-evidence-step-filter"
-    />
     <OToggleGroup v-model="view" type="single">
       <OToggleGroupItem
         v-for="v in views"
@@ -106,6 +94,17 @@ const stepFilter = computed({
         {{ v.label }} <span class="text-text-secondary">({{ v.count }})</span>
       </OToggleGroupItem>
     </OToggleGroup>
+    <!-- Fixed width so a long step name truncates in the trigger instead of
+         stretching the control and shifting the rest of the row. -->
+    <OSelect
+      v-if="stepOptions?.length"
+      v-model="stepFilter"
+      :options="stepOptions"
+      size="md"
+      class="w-56! shrink-0"
+      :searchable="false"
+      data-test="synthetics-evidence-step-filter"
+    />
     <OCheckbox
       v-model="firstPartyOnly"
       size="sm"
