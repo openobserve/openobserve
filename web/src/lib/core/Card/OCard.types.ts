@@ -1,11 +1,22 @@
-/** OCard ΓÇö flat surface container. No variant props ΓÇö always flat. */
+/**
+ * Visual chrome of the card surface.
+ *
+ * - `panel`    — the filled, borderless surface OCard has always drawn.
+ * - `outlined` — base surface + one hairline border: the chrome every
+ *   `card-container` panel elsewhere in the app uses, so a page built from
+ *   OCards sits on the same grid as a page built from those.
+ */
+export type OCardVariant = "panel" | "outlined";
+
+/** OCard — flat surface container. */
 export interface OCardProps {
-  // No props. Use `class` for layout and sizing.
+  /** Defaults to `panel`. Use `class` for layout and sizing. */
+  variant?: OCardVariant;
 }
 
 export type OCardEmits = Record<never, never>;
 
 export interface OCardSlots {
-  /** Card content ΓÇö compose OCardSection, OSeparator, OCardActions inside */
+  /** Card content — compose OCardSection, OSeparator, OCardActions inside */
   default(): unknown;
 }
