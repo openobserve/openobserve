@@ -37,18 +37,13 @@ const stubs = {
       "ladder",
       "saving",
     ],
+    emits: ["update:open", "save", "remove"],
     template: "<span />",
   },
   OPopover: {
     name: "OPopover",
     props: ["open"],
     template: "<span><slot name='trigger' /><slot /></span>",
-  },
-  ODropdown: { name: "ODropdown", template: "<span><slot name='trigger' /><slot /></span>" },
-  ODropdownItem: {
-    name: "ODropdownItem",
-    emits: ["select"],
-    template: `<button @click="$emit('select')"><slot /></button>`,
   },
   OTimeCell: { name: "OTimeCell", props: ["value", "unit"], template: "<span>5 days ago</span>" },
   OSelect: {
@@ -128,7 +123,6 @@ function render(props: Record<string, unknown> = {}) {
       teamId: "team_1",
       teamName: "Search",
       teams: TEAMS,
-      onCallNow: [{ user_email: "mei@o2.ai" }],
       ladder: [{ priority: "P1", rungs: 3, pages_anyone: true, ends_with_whole_team: false }],
       ...props,
     },
@@ -148,12 +142,20 @@ describe("OnCallRoutingList", () => {
     expect(ids).toEqual(["oncall-routing-row-r_narrow", "oncall-routing-row-r_broad"]);
   });
 
+  /// The shared dimension chip, so a dimension is the same shape and colour
+  /// here as on an error or an incident — with the org's own name for the key.
   it("reads each condition in the org's own vocabulary", async () => {
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-routing-row-r_broad"]').text()).toContain(
-      "K8s Cluster = introspection",
-    );
+    const chips = wrapper
+      .find('[data-test="oncall-routing-row-r_broad"]')
+      .findAllComponents({ name: "ODimensionChip" });
+    expect(chips).toHaveLength(1);
+    expect(chips[0].props()).toMatchObject({
+      dimKey: "k8s-cluster",
+      keyLabel: "K8s Cluster",
+      value: "introspection",
+    });
   });
 
   /// Evidence replaces the health pill: what it caught, and when.
@@ -175,7 +177,14 @@ describe("OnCallRoutingList", () => {
         {
           ...NARROW,
           health: "shadowed",
-          shadowed_by: [{ rule_id: "x", team_id: "team_2", path: "service=query-planner", outcome: "a service match beats a cluster match" }],
+          shadowed_by: [
+            {
+              rule_id: "x",
+              team_id: "team_2",
+              path: "service=query-planner",
+              outcome: "a service match beats a cluster match",
+            },
+          ],
         },
       ],
     });
@@ -185,32 +194,60 @@ describe("OnCallRoutingList", () => {
     expect(note).toContain("a service match beats a cluster match");
   });
 
-  /// What a broad rule does NOT pin is the honest reading of how broad it is.
-  it("names the axes a rule leaves open", async () => {
-    const wrapper = render();
-    await flushPromises();
-    const note = wrapper.find('[data-test="oncall-routing-note-r_broad"]').text();
-    expect(note).toContain("any Service");
-    expect(note).toContain("any K8s Namespace");
-  });
+  /// A row leads with the sentence its conditions make; the conditions stay
+  /// underneath as the evidence for it.
+  describe("the sentence each row makes", () => {
+    it("makes the place the subject when no service is pinned", async () => {
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-routing-says-r_broad"]').text()).toBe(
+        "Anything from the introspection cluster",
+      );
+    });
 
-  /// "It pages" has to survive the question "who, right now" — a team name on
-  /// its own does not answer it.
-  it("says which ladder runs and who is holding it", async () => {
-    const wrapper = render();
-    await flushPromises();
-    const row = wrapper.find('[data-test="oncall-routing-row-r_broad"]').text();
-    expect(row).toContain("Search");
-    expect(row).toContain("P1 ladder");
-    expect(row).toContain("mei@o2.ai");
-  });
+    it("makes the service the subject and everything else where it runs", async () => {
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-routing-says-r_narrow"]').text()).toBe(
+        "Signals from the query-planner service on introspection",
+      );
+    });
 
-  it("says when nobody is holding the pager", async () => {
-    const wrapper = render({ onCallNow: [] });
-    await flushPromises();
-    expect(wrapper.find('[data-test="oncall-routing-row-r_broad"]').text()).toContain(
-      "nobody on call now",
-    );
+    /// Cluster before namespace, the way an operator says it out loud — not
+    /// the alphabetical order the dimensions happen to arrive in.
+    it("reads a multi-place scope in speaking order", async () => {
+      const wrapper = render({
+        rules: [
+          {
+            ...BROAD,
+            rule_id: "r_scope",
+            dimensions: {
+              "k8s-namespace": "risk",
+              "k8s-cluster": "ap1cloud",
+              service: "fraud-scorer",
+            },
+          },
+        ],
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-routing-says-r_scope"]').text()).toBe(
+        "Signals from the fraud-scorer service on ap1cloud / risk",
+      );
+    });
+
+    /// The team's own tab says "this team" once, in the header. A rule pointing
+    /// somewhere else is the only case that has to name a team on the row.
+    it("names the team only when the rule pages another one", async () => {
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-routing-elsewhere-r_broad"]').exists()).toBe(false);
+
+      const elsewhere = render({ rules: [{ ...BROAD, team_id: "team_2" }] });
+      await flushPromises();
+      expect(elsewhere.find('[data-test="oncall-routing-elsewhere-r_broad"]').text()).toContain(
+        "Payments",
+      );
+    });
   });
 
   describe("the catch-all row", () => {
@@ -219,16 +256,20 @@ describe("OnCallRoutingList", () => {
     it("says nobody takes it when no catch-all is nominated", async () => {
       const wrapper = render();
       await flushPromises();
-      expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe("Nobody");
+      expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe(
+        "Everything else pages nobody",
+      );
       expect(wrapper.find('[data-test="oncall-routing-catch-all-set"]').text()).toContain(
-        "Set a catch-all team",
+        "Set a team",
       );
     });
 
     it("names the nominated team once there is one", async () => {
       const wrapper = render({ defaultTeamId: "team_2" });
       await flushPromises();
-      expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe("Payments");
+      expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe(
+        "Everything else goes to Payments",
+      );
     });
 
     /// The row carries the volume that landed on it, which is the argument for
@@ -236,9 +277,9 @@ describe("OnCallRoutingList", () => {
     it("counts the signals and fires that landed in it", async () => {
       const wrapper = render();
       await flushPromises();
-      const volume = wrapper.find('[data-test="oncall-routing-catch-all-volume"]').text();
-      expect(volume).toContain("2 signals");
-      expect(volume).toContain("9 fires");
+      expect(wrapper.find('[data-test="oncall-routing-catch-all-volume"]').text()).toBe(
+        "2 signals · 9 fires, 30d",
+      );
     });
 
     /// The picker's empty string is a UI vocabulary; the wire takes null.
@@ -257,10 +298,37 @@ describe("OnCallRoutingList", () => {
   });
 
   describe("the queue attached to it", () => {
-    it("lists what landed in the last row, with a claim per signal", async () => {
+    /// One line naming what fell through — the rows are an inbox, and an inbox
+    /// unfolded by default turns the tab into two lists.
+    async function review(props: Record<string, unknown> = {}) {
+      const wrapper = render(props);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-routing-review-claim"]').trigger("click");
+      return wrapper;
+    }
+
+    it("names what landed there without unfolding the rows", async () => {
       const wrapper = render();
       await flushPromises();
-      expect(wrapper.find('[data-test="oncall-routing-unclaimed"]').exists()).toBe(true);
+      const strip = wrapper.find('[data-test="oncall-routing-unclaimed"]').text();
+      expect(strip).toContain("2 unclaimed");
+      expect(strip).toContain("fraud_scoring_stalled");
+      expect(strip).toContain("billing_sync_backlog");
+      expect(wrapper.find('[data-test="oncall-routing-unclaimed-rows"]').exists()).toBe(false);
+    });
+
+    /// Two names, then a count — a strip that lists nine titles is the wall
+    /// this replaced.
+    it("counts the rest once there are more names than it spells out", async () => {
+      const wrapper = render({
+        signals: [...SIGNALS, { ...SIGNALS[0], id: "s3", last_title: "dispute_webhook_backlog" }],
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-routing-unclaimed"]').text()).toContain("and 1 more");
+    });
+
+    it("lists what landed in the last row, with a claim per signal", async () => {
+      const wrapper = await review();
       expect(wrapper.find('[data-test="oncall-routing-signal-s1"]').text()).toContain(
         "fraud_scoring_stalled",
       );
@@ -271,8 +339,7 @@ describe("OnCallRoutingList", () => {
 
     /// A dismissed row is the historical record, not the worklist.
     it("leaves dismissed signals out of the queue and its counts", async () => {
-      const wrapper = render({ signals: [SIGNALS[0], { ...SIGNALS[1], dismissed_at: 7 }] });
-      await flushPromises();
+      const wrapper = await review({ signals: [SIGNALS[0], { ...SIGNALS[1], dismissed_at: 7 }] });
       expect(wrapper.find('[data-test="oncall-routing-signal-s2"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-routing-catch-all-volume"]').text()).toContain(
         "1 signal",
@@ -289,15 +356,13 @@ describe("OnCallRoutingList", () => {
     });
 
     it("emits a dismissal for one signal", async () => {
-      const wrapper = render();
-      await flushPromises();
+      const wrapper = await review();
       await wrapper.find('[data-test="oncall-routing-dismiss-s1"]').trigger("click");
       expect((wrapper.emitted("dismiss")?.[0]?.[0] as { id: string }).id).toBe("s1");
     });
 
     it("offers a bulk claim for the team whose screen this is", async () => {
-      const wrapper = render();
-      await flushPromises();
+      const wrapper = await review();
       await wrapper.find('[data-test="oncall-routing-claim-all"]').trigger("click");
       expect(wrapper.emitted("claim-all")).toHaveLength(1);
     });
@@ -342,6 +407,7 @@ describe("OnCallRoutingList", () => {
         ],
       });
       await flushPromises();
+      await wrapper.find('[data-test="oncall-routing-review-claim"]').trigger("click");
       await wrapper.find('[data-test="oncall-routing-claim-s1"]').trigger("click");
 
       expect(editor(wrapper).props("initialDimensions")).toEqual({
@@ -395,10 +461,16 @@ describe("OnCallRoutingList", () => {
     });
   });
 
-  it("emits a removal from the row's own menu", async () => {
+  /// The row is Edit and nothing else. Removal is a decision made about a rule
+  /// you are already looking at, so it lives in the dialog that shows it.
+  it("closes the editor before passing a removal up", async () => {
     const wrapper = render();
     await flushPromises();
-    await wrapper.find('[data-test="oncall-routing-delete-r_broad"]').trigger("click");
+    await wrapper.find('[data-test="oncall-routing-edit-r_broad"]').trigger("click");
+    wrapper.findComponent({ name: "OnCallRuleEditor" }).vm.$emit("remove");
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.findComponent({ name: "OnCallRuleEditor" }).props("open")).toBe(false);
     expect((wrapper.emitted("remove")?.[0]?.[0] as { rule_id: string }).rule_id).toBe("r_broad");
   });
 

@@ -33,10 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="t('oncall.cancel')"
     :primary-button-disabled="!pairs.length || !team"
     :primary-button-loading="saving"
+    :neutral-button-label="rule ? t('oncall.removeRule') : undefined"
+    neutral-button-variant="ghost-destructive"
     data-test="oncall-rule-editor"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:primary="save"
     @click:secondary="emit('update:open', false)"
+    @click:neutral="emit('remove')"
   >
     <div class="flex flex-col gap-3">
       <!-- The queue is where most rules come from, so it is one field away
@@ -92,7 +95,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- A closed vocabulary: free text is how a rule ends up pinned to a
            dimension nothing ever emits, which reads as "never matched". -->
-      <span v-if="adding" class="flex flex-wrap items-end gap-2" data-test="oncall-rule-editor-adder">
+      <span
+        v-if="adding"
+        class="flex flex-wrap items-end gap-2"
+        data-test="oncall-rule-editor-adder"
+      >
         <OSelect
           v-model="draftName"
           :options="dimensionOptions"
@@ -192,11 +199,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { OwnershipRuleStats, TeamRungSummary, UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import {
-  identityDimensions,
-  normalizeDimensionValue,
-  ruleClaimsDimensions,
-} from "@/utils/oncall";
+import { identityDimensions, normalizeDimensionValue, ruleClaimsDimensions } from "@/utils/oncall";
 
 export interface RuleDraft {
   dimensions: Record<string, string>;
@@ -237,6 +240,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: "update:open", open: boolean): void;
   (e: "save", draft: RuleDraft): void;
+  /** Removal lives here so a row keeps one button; the host confirms it. */
+  (e: "remove"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -283,7 +288,6 @@ const teamOptions = computed(() =>
 const signalOptions = computed(() =>
   props.signals.map((signal) => ({ label: titleOf(signal), value: signal.id })),
 );
-
 
 /// Why `Add` is refused, in the reader's terms. A disabled button beside a
 /// select whose placeholder was a real dimension key read as a filled form

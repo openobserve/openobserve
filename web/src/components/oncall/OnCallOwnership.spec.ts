@@ -55,7 +55,6 @@ const stubs = {
       "teamName",
       "teams",
       "defaultTeamId",
-      "onCallNow",
       "ladder",
       "loading",
       "saving",
@@ -78,8 +77,22 @@ function render() {
     props: {
       teamId: "team_1",
       teams: [
-        { id: "team_1", org_id: "default", name: "Platform", timezone: "UTC", created_at: 0, updated_at: 0 },
-        { id: "team_2", org_id: "default", name: "Payments", timezone: "UTC", created_at: 0, updated_at: 0 },
+        {
+          id: "team_1",
+          org_id: "default",
+          name: "Platform",
+          timezone: "UTC",
+          created_at: 0,
+          updated_at: 0,
+        },
+        {
+          id: "team_2",
+          org_id: "default",
+          name: "Payments",
+          timezone: "UTC",
+          created_at: 0,
+          updated_at: 0,
+        },
       ],
     },
     global: { plugins: [i18n, store], stubs },
@@ -129,7 +142,12 @@ describe("OnCallOwnership", () => {
   /// reach it from here rather than from a card that fetches its own copy.
   it("passes the nominated catch-all down to the list", async () => {
     service.getRoutingConfig.mockResolvedValue({
-      data: { org_id: "default", default_team_id: "team_2", default_team_name: "Payments", updated_at: 1 },
+      data: {
+        org_id: "default",
+        default_team_id: "team_2",
+        default_team_name: "Payments",
+        updated_at: 1,
+      },
     } as any);
     const wrapper = render();
     await flushPromises();
@@ -217,7 +235,12 @@ describe("OnCallOwnership", () => {
   describe("the catch-all team", () => {
     it("nominates a team", async () => {
       service.setRoutingConfig.mockResolvedValue({
-        data: { org_id: "default", default_team_id: "team_1", default_team_name: "Platform", updated_at: 1 },
+        data: {
+          org_id: "default",
+          default_team_id: "team_1",
+          default_team_name: "Platform",
+          updated_at: 1,
+        },
       } as any);
       const wrapper = render();
       await flushPromises();
@@ -344,7 +367,9 @@ describe("OnCallOwnership", () => {
       data: {
         reached_anyone: true,
         channels: ["email"],
-        attempts: [{ channel: "email", recipient: "a@o2.ai", reason: "on call now", delivered: true }],
+        attempts: [
+          { channel: "email", recipient: "a@o2.ai", reason: "on call now", delivered: true },
+        ],
       },
     } as any);
     const wrapper = render();

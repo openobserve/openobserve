@@ -79,19 +79,22 @@
     </OContent>
 
     <template v-else>
-      <!-- Who holds the pager, who catches it, how far the ladder reaches, and how
-           last week went — the four questions asked before anything else on the
-           page. The tabs below are where you go to CHANGE any of them. -->
-      <div class="bg-border-default border-border-default border-y">
+      <!-- What a page fired right now would do, end to end: who it wakes, in
+           what order, when the pager changes hands, and how the week went. The
+           tabs below are where you go to CHANGE any of it. -->
+      <OContent class="pt-3">
         <OnCallTeamPulse
+          :preview="firesNowPreview"
+          :loading="previewLoading"
           :slots="onCallNow"
           :schedule="schedule"
-          :policy="policy"
           :overview="overview"
-          :reachability="reachability"
           :timezone="team?.timezone ?? 'UTC'"
+          @edit-ladder="activeTab = 'policy'"
+          @open-schedule="activeTab = 'schedule'"
+          @open-pages="openOnCallList"
         />
-      </div>
+      </OContent>
 
       <OContent class="py-2">
         <OnCallTeamAttention
@@ -203,12 +206,12 @@
              the editor. Reading before editing: the timeline is resolved by the
              engine, so it answers "is this right" in a way the draft cannot. -->
         <OTabPanel name="schedule">
-          <!-- One answer line, then one timeline. Everything the rail used to
-               restate now lives on the lane it describes. -->
+          <!-- Only what the chart cannot be acted on for. Who is on, until
+               when and who is next are on the lane and on the pulse strip
+               above the tabs; restating them here gave the reader two
+               renderings to reconcile. -->
           <OnCallScheduleAnswer
             :slots="onCallNow"
-            :segments="segments"
-            :timezone="team?.timezone ?? 'UTC'"
             :has-members="hasMembers !== false"
             @assign-secondary="onAssignSecondary"
             @request-swap="openCover"
@@ -262,8 +265,8 @@
         </OTabPanel>
 
         <!-- Same shape as Schedule: what the ladder WOULD do, then the editor on
-             demand. Reading the policy tells you its shape; only the dry run
-             tells you whether it reaches anybody. -->
+             demand. One rail, full width — the ladder answers who and when, and
+             says whether a page would land only where one would not. -->
         <OTabPanel name="policy">
           <OContent y class="flex flex-col gap-5">
             <span class="flex flex-wrap items-baseline gap-x-2">
@@ -279,28 +282,18 @@
               </OButton>
             </span>
 
-            <div
-              class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
-            >
-              <OnCallEscalationLadder
-                v-model:selected="selectedPriority"
-                :priorities="overview?.rungs ?? []"
-                :preview="preview"
-                :loading="previewLoading"
-                @edit="editingPolicy = true"
-              />
-              <div class="flex flex-col gap-4">
-                <OnCallEscalationDryRun :preview="preview" />
-                <!-- The rooms a page is mirrored to. It answers "where does this
-                     land" for the same ladder the dry run just walked, which is
-                     why it moved off Overview and onto this tab. -->
-                <OnCallTeamReach :destinations="policy?.destinations ?? []" />
-              </div>
-            </div>
+            <OnCallEscalationLadder
+              v-model:selected="selectedPriority"
+              :priorities="overview?.rungs ?? []"
+              :policy="policy"
+              :preview="preview"
+              :loading="previewLoading"
+              @edit="editingPolicy = true"
+            />
 
             <!-- Same move as the schedule tab: the editor is a drawer, so the
-                 ladder and the dry run stay on screen behind it and the edit is
-                 checked against what it is replacing. -->
+                 ladder stays on screen behind it and the edit is checked
+                 against what it is replacing. -->
             <OnCallPolicyEditor
               v-model:open="editingPolicy"
               :priority="selectedPriorityNumber"
@@ -312,15 +305,10 @@
         </OTabPanel>
 
         <OTabPanel name="ownership">
-          <!-- The list says what "it pages" MEANS, which needs the ladder and
-               whoever is holding it this instant — both already loaded here. -->
+          <!-- The ladder rides along so the rule editor can say what paging
+               this team would actually run. -->
           <OContent y>
-            <OnCallOwnership
-              :team-id="teamId"
-              :teams="teams"
-              :on-call-now="onCallNow"
-              :ladder="overview?.rungs ?? []"
-            />
+            <OnCallOwnership :team-id="teamId" :teams="teams" :ladder="overview?.rungs ?? []" />
           </OContent>
         </OTabPanel>
       </OTabPanels>
@@ -376,10 +364,8 @@ import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.v
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
 import OnCallRecentPages from "@/components/oncall/OnCallRecentPages.vue";
 import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
-import OnCallEscalationDryRun from "@/components/oncall/OnCallEscalationDryRun.vue";
 import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
-import OnCallTeamReach from "@/components/oncall/OnCallTeamReach.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OnCallTeamPulse from "@/components/oncall/OnCallTeamPulse.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -466,6 +452,12 @@ const selectedPriority = ref("P1");
 const selectedPriorityNumber = computed(() => Number(selectedPriority.value.slice(1)) || 1);
 const preview = ref<EscalationPreview | null>(null);
 const previewLoading = ref(false);
+/// The dry run the header strip draws. Always the top priority, whatever the
+/// Escalation tab happens to be showing: a strip that changed under the reader
+/// because they clicked P3 on a tab below it would be answering a different
+/// question from the one its heading asks.
+const firesNowPreview = ref<EscalationPreview | null>(null);
+const HEADER_PRIORITY = 1;
 /// Owned by the timeline, which decides the visible range; the fetch follows it.
 const scheduleWindow = ref({ from: 0, to: 0 });
 const ruleCount = ref(0);
@@ -973,30 +965,39 @@ async function saveCover(value: {
 /// engine now says, not to keep staring at the form.
 /// The dry run for whichever priority is selected. Re-asked on every change,
 /// because the answer depends on who is on call at THIS instant.
-async function fetchPreview() {
-  const priority = Number(selectedPriority.value.replace(/\D/g, "")) || 1;
-  previewLoading.value = true;
+async function loadPreview(priority: number): Promise<EscalationPreview | null> {
   try {
     const res = await oncallService.escalationPreview({
       org_identifier: orgId.value,
       team_id: teamId.value,
       priority,
     });
-    preview.value = res.data ?? null;
+    return res.data ?? null;
   } catch {
     // One priority failing must not blank the strip that lets you pick another.
-    preview.value = null;
-  } finally {
-    previewLoading.value = false;
+    return null;
   }
 }
 
+async function fetchPreview() {
+  const priority = Number(selectedPriority.value.replace(/\D/g, "")) || 1;
+  previewLoading.value = true;
+  preview.value = await loadPreview(priority);
+  // One request feeding both surfaces while the tab is on the priority the
+  // header draws, which is where every reader starts.
+  if (priority === HEADER_PRIORITY) firesNowPreview.value = preview.value;
+  previewLoading.value = false;
+}
+
 /// Back to the dry run on save — seeing whether the change actually reaches
-/// anybody is the reason to have made it.
+/// anybody is the reason to have made it. The editor edits ONE priority, so a
+/// save made from P3 leaves the header holding an answer from before it.
 async function onPolicySaved() {
   editingPolicy.value = false;
   await fetchAll();
-  await fetchPreview();
+  if (selectedPriorityNumber.value !== HEADER_PRIORITY) {
+    firesNowPreview.value = await loadPreview(HEADER_PRIORITY);
+  }
 }
 
 async function onScheduleSaved() {

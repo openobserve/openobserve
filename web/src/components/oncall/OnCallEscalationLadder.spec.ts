@@ -18,13 +18,17 @@ import { describe, expect, it } from "vitest";
 
 import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
 import i18n from "@/locales";
-import type { EscalationPreview, PreviewRecipient, TeamRungSummary } from "@/ts/interfaces/oncall";
+import type {
+  EscalationPreview,
+  OnCallPolicy,
+  PreviewRecipient,
+  TeamRungSummary,
+} from "@/ts/interfaces/oncall";
 import { MICROS_PER_MINUTE } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
-  OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
-  OBanner: { name: "OBanner", template: "<div><slot /><slot name='actions' /></div>" },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span>{{ content }}</span>" },
   OTimeline: { name: "OTimeline", template: "<ol><slot /></ol>" },
   OTimelineItem: {
     name: "OTimelineItem",
@@ -34,6 +38,7 @@ const stubs = {
   OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: {
     name: "OButton",
+    props: ["variant"],
     emits: ["click"],
     template: "<button @click=\"$emit('click')\"><slot /></button>",
   },
@@ -57,6 +62,41 @@ const priorities: TeamRungSummary[] = [
   },
   { priority: "P4", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
 ];
+
+const paging = (priority: string, rungs: number): TeamRungSummary => ({
+  priority,
+  rungs,
+  pages_anyone: true,
+  nobody_after_micros: 5 * MICROS_PER_MINUTE,
+  ends_with_whole_team: false,
+});
+
+/// P2, P3 and P4 run one ladder; P1 runs its own and P5 wakes nobody.
+const fivePriorities: TeamRungSummary[] = [
+  paging("P1", 3),
+  paging("P2", 1),
+  paging("P3", 1),
+  paging("P4", 1),
+  { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+];
+
+const oneStep = [{ after_micros: 0, targets: [{ kind: "on_call_now" as const }] }];
+
+const sharedPolicy = {
+  id: "p",
+  org_id: "o",
+  team_id: "t",
+  rungs: [
+    {
+      priority: 1 as const,
+      steps: [...oneStep, { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "whole_team" as const }] }],
+      channels: ["email" as const],
+    },
+    { priority: 2 as const, steps: oneStep, channels: ["email" as const] },
+    { priority: 3 as const, steps: oneStep, channels: ["email" as const] },
+    { priority: 4 as const, steps: oneStep, channels: ["email" as const] },
+  ],
+} satisfies OnCallPolicy;
 
 function preview(over: Partial<EscalationPreview> = {}): EscalationPreview {
   return {
@@ -101,40 +141,122 @@ describe("OnCallEscalationLadder", () => {
     expect(wrapper.emitted("update:selected")?.[0]).toEqual(["P4"]);
   });
 
-  /// Red on the filled selected chip fails contrast and is unreadable — and it
-  /// is the one priority whose finding is already spelled out underneath.
-  it("drops the red finding on the selected chip but keeps it on the others", () => {
+  /// Four chips describing one ladder are four things to check.
+  it("folds consecutive priorities that run the same ladder into one chip", async () => {
+    const wrapper = render({ priorities: fivePriorities, policy: sharedPolicy });
+    const chip = wrapper.find('[data-test="oncall-ladder-priority-p2-p4"]');
+
+    expect(chip.text()).toContain("P2–P4");
+    expect(chip.text()).toContain("same ladder");
+    // The one that differs keeps its own chip.
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').exists()).toBe(true);
+
+    await chip.trigger("click");
+    expect(wrapper.emitted("update:selected")?.[0]).toEqual(["P2"]);
+  });
+
+  /// Without the policy the ladders are UNKNOWN, and "same ladder" would be a
+  /// claim nothing on this side can support.
+  it("folds nothing when the policy has not been read", () => {
+    const wrapper = render({ priorities: fivePriorities });
+
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p2-p4"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p3"]').exists()).toBe(true);
+  });
+
+  /// A range chip promises every priority inside it. A strip that skips one
+  /// must not be folded across the gap.
+  it("does not fold across a priority the strip never listed", () => {
     const wrapper = render({
-      selected: "P4",
-      // Two silent priorities, so the difference is selection and nothing else.
+      priorities: [fivePriorities[1], fivePriorities[3]],
+      policy: sharedPolicy,
+    });
+
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p2-p4"]').exists()).toBe(false);
+  });
+
+  /// The chip's own border and text carry the finding when it is red; on the
+  /// selected one the finding is already spelled out in full underneath.
+  it("keeps the red finding off the selected chip", () => {
+    const wrapper = render({
+      selected: "P3",
+      // Two silent priorities, far enough apart not to fold, so the only
+      // difference between the chips is which one is selected.
+      priorities: [
+        { priority: "P3", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+        { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+      ],
+    });
+    const variantOf = (priority: string) =>
+      wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((chip) => chip.attributes("data-test") === `oncall-ladder-priority-${priority}`)
+        ?.props("variant");
+
+    expect(variantOf("p3")).toBe("outline-primary");
+    expect(variantOf("p5")).toBe("outline-destructive");
+  });
+
+  /// Two priorities that both wake nobody are one finding, and the policy is
+  /// not needed to know it.
+  it("folds the silent priorities together", () => {
+    const wrapper = render({
+      selected: "P1",
       priorities: [
         { priority: "P4", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
         { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
       ],
     });
-    const classesOf = (priority: string) =>
-      wrapper.find(`[data-test="oncall-ladder-priority-${priority}"] span`).classes();
 
-    expect(classesOf("p4")).not.toContain("text-status-error-text");
-    expect(classesOf("p5")).toContain("text-status-error-text");
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p4-p5"]').text()).toContain(
+      "Pages nobody",
+    );
   });
 
   /// The whole point: a policy lists target KINDS, and the question is who
-  /// that resolves to right now, and on what.
-  ///
-  /// The per-recipient `reason` is deliberately not shown — it restates the
-  /// rung title ("the on-call" / "you are on call") once per person.
-  it("names who the rung resolves to, and the channels that would carry it", () => {
+  /// that resolves to right now. One line — the channels that would carry it
+  /// are noise until one of them cannot.
+  it("names who the rung resolves to, without listing channels", () => {
     const text = render().find('[data-test="oncall-ladder-rung-0"]').text();
 
     expect(text).toContain("The on-call");
-    expect(text).toContain("Right now that is");
-    expect(text).toContain("ana@o2.ai");
-    expect(text).toContain("Email");
+    expect(text).toContain("right now that is ana@o2.ai");
+    expect(text).not.toContain("Email");
   });
 
-  /// Never our own guess at why a page failed.
-  it("shows the server's reason when a page would not land", () => {
+  /// Six addresses are a wall, not an answer.
+  it("counts the people on a rung once there are more than two", () => {
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 0,
+            targets: ["the whole team"],
+            recipients: [
+              person({ user_email: "a@o2.ai" }),
+              person({ user_email: "b@o2.ai" }),
+              person({ user_email: "c@o2.ai" }),
+            ],
+            resolves_to_nobody: false,
+          },
+        ],
+      }),
+    });
+
+    expect(wrapper.text()).toContain("all 3 people right now");
+  });
+
+  /// A healthy ladder is read for its SHAPE — nothing about delivery is said
+  /// when there is nothing to say.
+  it("says nothing about delivery when every page would land", () => {
+    const wrapper = render();
+
+    expect(wrapper.find('[data-test="oncall-ladder-rung-problem-0"]').exists()).toBe(false);
+  });
+
+  /// The server's reason is a full sentence, which is a paragraph on a rail —
+  /// the rung carries four words, and the sentence is one hover away.
+  it("badges why a page would not land, keeping the server's sentence on hover", () => {
     const wrapper = render({
       preview: preview({
         rungs: [
@@ -154,12 +276,84 @@ describe("OnCallEscalationLadder", () => {
       }),
     });
 
-    expect(wrapper.text()).toContain("no SMTP transport configured");
+    const badge = wrapper.find('[data-test="oncall-ladder-rung-problem-0"]');
+    expect(badge.text()).toContain("email only · no SMTP transport");
+    // The stubbed tooltip renders its content, so nothing is lost.
+    expect(badge.text()).toContain("this deployment has no SMTP transport configured");
   });
 
-  /// The rail carries the axis itself — the delay — as the design has it,
-  /// which is what lets the rungs line up against each other.
-  it("puts each rung's delay on the rail", () => {
+  /// A reason the mapping has never seen must not vanish.
+  it("keeps an unrecognised reason verbatim", () => {
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 0,
+            targets: ["the on-call"],
+            recipients: [
+              person({
+                would_a_page_land: false,
+                deliverable_channels: [],
+                why_not: "the moon is in the way",
+              }),
+            ],
+            resolves_to_nobody: false,
+          },
+        ],
+      }),
+    });
+
+    expect(wrapper.find('[data-test="oncall-ladder-rung-problem-0"]').text()).toContain(
+      "the moon is in the way",
+    );
+  });
+
+  /// One silent address is easy to miss among names that would land, and the
+  /// reason for one of six says nothing about the other five.
+  it("counts the unreachable people on a rung with several", () => {
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 0,
+            targets: ["the whole team"],
+            recipients: [
+              person({ user_email: "a@o2.ai" }),
+              person({ user_email: "b@o2.ai", would_a_page_land: false, deliverable_channels: [] }),
+            ],
+            resolves_to_nobody: false,
+          },
+        ],
+      }),
+    });
+
+    expect(wrapper.text()).toContain("1 of 2 unreachable");
+  });
+
+  /// A rung that fires and reaches nobody is worse than a slow one: the ladder
+  /// moves on and the page stays unanswered.
+  it("calls out a rung that resolves to nobody", () => {
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 0,
+            targets: ["the on-call"],
+            recipients: [],
+            resolves_to_nobody: true,
+          },
+        ],
+      }),
+    });
+
+    expect(wrapper.find('[data-test="oncall-ladder-rung-problem-0"]').text()).toContain(
+      "Reaches nobody",
+    );
+  });
+
+  /// The rail carries the axis itself — the delay — and the ending is its last
+  /// rung, because when the ladder runs out is what the delays are read against.
+  it("puts each rung's delay on the rail, and the ending at its foot", () => {
     const wrapper = render({
       preview: preview({
         rungs: [
@@ -182,108 +376,44 @@ describe("OnCallEscalationLadder", () => {
       .findAllComponents({ name: "OTimelineItem" })
       .map((item) => item.props("label"));
 
-    expect(labels).toEqual(["0m", "+5m"]);
+    expect(labels).toEqual(["0m", "+5m", "end"]);
   });
 
-  /// The rung firing now is the one somebody is living through; the later ones
-  /// are still ahead, so they recede.
-  it("gives the rung firing now the loud node and later ones a muted one", () => {
-    const wrapper = render({
-      preview: preview({
-        rungs: [
-          {
-            after_micros: 0,
-            targets: ["the on-call"],
-            recipients: [person()],
-            resolves_to_nobody: false,
-          },
-          {
-            after_micros: 5 * MICROS_PER_MINUTE,
-            targets: ["the next on-call"],
-            recipients: [person({ user_email: "b@o2.ai" })],
-            resolves_to_nobody: false,
-          },
-        ],
-      }),
-    });
-    const variants = wrapper
+  /// Nothing is firing in a preview — it is what WOULD happen. A loud first
+  /// node reads as "this one is live now", which is a different screen.
+  it("keeps the whole rail quiet", () => {
+    const variants = render()
       .findAllComponents({ name: "OTimelineItem" })
       .map((item) => item.props("variant"));
 
-    expect(variants).toEqual(["destructive", "muted"]);
+    expect(new Set(variants)).toEqual(new Set(["muted"]));
   });
 
-  /// The rail is the CLOCK, not a health indicator. Colouring it by health
-  /// turned every node red on a deployment where nothing can be delivered,
-  /// which says the same thing three times and loses the ordering — the state
-  /// already has its own badge inside the card.
-  it("colours the rail by position, not by whether the rung would land", () => {
+  /// "Level 3 of 3" and "nobody is coming" are the same rung and opposite
+  /// situations — the ending says which, in the server's own sentence.
+  it("says how the ladder ends", () => {
+    const wrapper = render();
+    const ending = wrapper.find('[data-test="oncall-ladder-ends"]').text();
+
+    expect(ending).toContain("Escalation stops");
+    expect(ending).toContain("escalation ends");
+  });
+
+  /// A ladder that hands the page on has not stopped, and saying it stopped
+  /// would tell somebody nobody is coming when somebody is.
+  it("does not say a handed-off ladder stops", () => {
+    const wrapper = render({ preview: preview({ final_action: "notify_default_team" }) });
+
+    expect(wrapper.find('[data-test="oncall-ladder-ends"]').text()).toContain("hands off");
+  });
+
+  /// How a page can leave this team at all, in the server's words.
+  it("keeps the cross-team moves on the ending", () => {
     const wrapper = render({
-      preview: preview({
-        rungs: [
-          {
-            after_micros: 0,
-            targets: ["the on-call"],
-            recipients: [person({ would_a_page_land: false, deliverable_channels: [] })],
-            resolves_to_nobody: false,
-          },
-          {
-            after_micros: 5 * MICROS_PER_MINUTE,
-            targets: ["the next on-call"],
-            recipients: [person({ user_email: "b@o2.ai", would_a_page_land: false, deliverable_channels: [] })],
-            resolves_to_nobody: true,
-          },
-        ],
-      }),
-    });
-    const variants = wrapper
-      .findAllComponents({ name: "OTimelineItem" })
-      .map((item) => item.props("variant"));
-
-    expect(variants).toEqual(["destructive", "muted"]);
-  });
-
-  it("frames each rung so it reads as its own block", () => {
-    expect(render().findComponent({ name: "OTimelineItem" }).props("framed")).toBe(true);
-  });
-
-  /// "1 of 1 unreachable" says nothing the reason underneath does not say
-  /// better; the count earns its place only when people could be missed.
-  it("counts unreachable people only when the rung has several", () => {
-    const single = render({
-      preview: preview({
-        rungs: [
-          {
-            after_micros: 0,
-            targets: ["the on-call"],
-            recipients: [person({ would_a_page_land: false, deliverable_channels: [] })],
-            resolves_to_nobody: false,
-          },
-        ],
-      }),
-    });
-    expect(single.text()).not.toContain("1 of 1");
-  });
-
-  /// One silent address is easy to miss among names that would land.
-  it("counts the unreachable people on a whole-team rung", () => {
-    const wrapper = render({
-      preview: preview({
-        rungs: [
-          {
-            after_micros: 0,
-            targets: ["the whole team"],
-            recipients: [
-              person({ user_email: "a@o2.ai" }),
-              person({ user_email: "b@o2.ai", would_a_page_land: false, deliverable_channels: [] }),
-            ],
-            resolves_to_nobody: false,
-          },
-        ],
-      }),
+      preview: preview({ cross_team_moves: ["a responder can hand this to Platform"] }),
     });
 
-    expect(wrapper.text()).toContain("1 of 2 unreachable");
+    expect(wrapper.find('[data-test="oncall-ladder-move-0"]').text()).toContain("Platform");
   });
 
   it("says so when the selected priority pages nobody", () => {

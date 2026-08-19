@@ -70,7 +70,6 @@ const stubs = {
   OnCallScheduleTimeline: true,
   OnCallScheduleEditor: true,
   OnCallEscalationLadder: true,
-  OnCallEscalationDryRun: true,
   OnCallCoverForm: true,
   OnCallTeamPulse: true,
   OnCallMembers: true,
@@ -552,14 +551,22 @@ describe("OnCallTeamDetail", () => {
       return wrapper;
     }
 
-    /// Same shape as Schedule: reading the policy tells you its shape, the dry
-    /// run tells you whether it reaches anybody.
-    it("shows the dry run, with the editor drawer closed, by default", async () => {
+    /// One rail, and the editor only on demand.
+    it("shows the ladder, with the editor drawer closed, by default", async () => {
       const wrapper = await openEscalation();
 
       expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallEscalationDryRun" }).exists()).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("open")).toBe(false);
+    });
+
+    /// Which priorities share a ladder is a fact about the POLICY — without it
+    /// the strip cannot fold, so it must reach the ladder.
+    it("hands the policy to the ladder so its chips can fold", async () => {
+      const wrapper = await openEscalation();
+
+      expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).props("policy")).toEqual({
+        rungs: [],
+      });
     });
 
     /// The read view is what the edit is checked against, so it stays on
@@ -571,7 +578,6 @@ describe("OnCallTeamDetail", () => {
 
       expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("open")).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallEscalationDryRun" }).exists()).toBe(true);
     });
 
     /// The chips are labels ("P3"); the policy's rungs are numbered. Editing

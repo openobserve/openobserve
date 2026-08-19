@@ -47,6 +47,7 @@ import {
   priorityLabel,
   priorityTagVariant,
   priorityTone,
+  parseRoutingReason,
   promoteSeverityFloor,
   promoteSeverityOptions,
   resolveHolder,
@@ -54,7 +55,9 @@ import {
   resolveNextHolder,
   rotationAppliesAt,
   routingReasonOf,
+  rungProblem,
   shiftBands,
+  shortReachReason,
   stateTagVariant,
   upcomingShifts,
   windowContains,
@@ -952,6 +955,16 @@ describe("routingReasonOf", () => {
     expect(routingReasonOf([ev("sys", body)])).toBe(body);
   });
 
+  /// The decision is prefixed with everything routing passed over, so the
+  /// sentence does not start with "routed to" on exactly the records whose
+  /// routing was worth explaining.
+  it("finds the decision behind the notes routing wrote ahead of it", () => {
+    const body =
+      "the alert names team `paymnets`, which names no team in this org; " +
+      "routed to tm_pay by ownership rule service=search";
+    expect(routingReasonOf([ev("sys", body)])).toBe(body);
+  });
+
   it("ignores a note that merely quotes the wording", () => {
     expect(routingReasonOf([ev("note", "routed to the wrong team again")])).toBeNull();
   });
@@ -960,6 +973,62 @@ describe("routingReasonOf", () => {
   // routing decision.
   it("returns null when nothing matches", () => {
     expect(routingReasonOf([ev("sys", "opened for alert al_ckt: x")])).toBeNull();
+  });
+});
+
+describe("parseRoutingReason", () => {
+  // Every sentence below is `RoutingDecision::reason()` verbatim; they are the
+  // contract this parser is written against.
+  it("reads the winning rule back into the dimensions it was built from", () => {
+    const parsed = parseRoutingReason(
+      "routed to tm_9 by ownership rule k8s-cluster=introspection/service=search",
+    );
+    expect(parsed?.mechanism).toBe("ownership");
+    expect(parsed?.teamId).toBe("tm_9");
+    expect(parsed?.dimensions).toEqual({ "k8s-cluster": "introspection", service: "search" });
+  });
+
+  it("keeps a value that contains its own equals sign whole", () => {
+    expect(
+      parseRoutingReason("routed to tm_9 by ownership rule label=env=prod")?.dimensions,
+    ).toEqual({ label: "env=prod" });
+  });
+
+  it("separates the notes routing passed over from the decision it made", () => {
+    const parsed = parseRoutingReason(
+      "the alert names team `paymnets`, which names no team in this org; " +
+        "routed to tm_9 by ownership rule service=search",
+    );
+    expect(parsed?.notes).toEqual([
+      "the alert names team `paymnets`, which names no team in this org",
+    ]);
+    expect(parsed?.mechanism).toBe("ownership");
+  });
+
+  it.each([
+    ["routed to tm_9 by the alert's own setting", "explicit"],
+    ["no ownership rule matched, so it went to the default team tm_9", "default"],
+    [
+      "no ownership rule matches this signal and no default team is set, so no team was paged",
+      "unrouted",
+    ],
+  ] as const)("names the mechanism behind %s", (sentence, mechanism) => {
+    expect(parseRoutingReason(sentence)?.mechanism).toBe(mechanism);
+  });
+
+  it("carries the team the context attribute asked for", () => {
+    const parsed = parseRoutingReason(
+      "routed to tm_9 by the alert's context attribute team=`Payments`",
+    );
+    expect(parsed?.mechanism).toBe("context");
+    expect(parsed?.namedTeam).toBe("Payments");
+  });
+
+  /// Drift must return null so the caller prints the server's sentence rather
+  /// than a half-read one.
+  it("returns null when the wording is not one it knows", () => {
+    expect(parseRoutingReason("matched ownership rule namespace = envoy")).toBeNull();
+    expect(parseRoutingReason(null)).toBeNull();
   });
 });
 
@@ -1189,5 +1258,92 @@ describe("isOnCallUnavailable", () => {
     expect(isOnCallUnavailable(http(500, "boom"))).toBe(false);
     expect(isOnCallUnavailable(new Error("network down"))).toBe(false);
     expect(isOnCallUnavailable(undefined)).toBe(false);
+  });
+});
+
+/// A finished sentence is a paragraph on a rail. The badge is four words and
+/// the sentence stays on hover — but only where the cause is one we know.
+describe("shortReachReason", () => {
+  const t = ((k: string) => k) as any;
+
+  it("shortens each reason the engine writes", () => {
+    expect(
+      shortReachReason(
+        "this deployment has no SMTP transport configured, so no email page can be sent",
+        t,
+      ),
+    ).toBe("oncall.reachShortNoSmtp");
+    expect(shortReachReason("`ana@o2.ai` is not a user of this organization", t)).toBe(
+      "oncall.reachShortNoAddress",
+    );
+    expect(shortReachReason("`root@example` is a login, not a mailbox", t)).toBe(
+      "oncall.reachShortNotMailbox",
+    );
+    expect(
+      shortReachReason("`a@example.com` uses a domain reserved for documentation", t),
+    ).toBe("oncall.reachShortUnroutable");
+  });
+
+  /// Guessing a short word for a cause we have never seen is how a UI tells
+  /// somebody to fix the wrong thing.
+  it("gives up on a reason it does not recognise", () => {
+    expect(shortReachReason("the moon is in the way", t)).toBeNull();
+    expect(shortReachReason(null, t)).toBeNull();
+  });
+});
+
+/// One rung, one finding — shared by the pulse strip and the escalation rail,
+/// which used to say the same thing two different ways.
+describe("rungProblem", () => {
+  const t = ((k: string, params?: Record<string, unknown>) =>
+    params ? `${k}:${JSON.stringify(params)}` : k) as any;
+  const person = (over: Record<string, unknown> = {}) => ({
+    user_email: "ana@o2.ai",
+    reason: "on call now",
+    would_a_page_land: true,
+    deliverable_channels: [],
+    ...over,
+  });
+  const rung = (recipients: unknown[], nobody = false) =>
+    ({
+      after_micros: 0,
+      targets: ["the on-call"],
+      recipients,
+      resolves_to_nobody: nobody,
+    }) as any;
+
+  it("says nothing about a rung that would reach everybody on it", () => {
+    expect(rungProblem(rung([person()]), t)).toBeNull();
+  });
+
+  /// A rung that fires and reaches nobody is worse than a slow one.
+  it("calls out a rung that resolves to nobody", () => {
+    expect(rungProblem(rung([], true), t)?.label).toBe("oncall.ladderReachesNobody");
+  });
+
+  /// The reason for one of six says nothing about the other five.
+  it("counts the unreachable on a crowd rung instead of quoting one reason", () => {
+    const problem = rungProblem(
+      rung([person(), person({ user_email: "b@o2.ai", would_a_page_land: false })]),
+      t,
+    );
+
+    expect(problem?.label).toContain("oncall.ladderUnreachableCount");
+    expect(problem?.tip).toBeNull();
+  });
+
+  it("badges a lone unreachable person and keeps the sentence behind it", () => {
+    const problem = rungProblem(
+      rung([
+        person({
+          would_a_page_land: false,
+          why_not: "this deployment has no SMTP transport configured",
+        }),
+      ]),
+      t,
+    );
+
+    expect(problem?.label).toBe("oncall.reachShortNoSmtp");
+    expect(problem?.tip).toBe("this deployment has no SMTP transport configured");
   });
 });

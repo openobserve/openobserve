@@ -18,12 +18,10 @@ import { describe, expect, it } from "vitest";
 
 import OnCallScheduleAnswer from "@/components/oncall/OnCallScheduleAnswer.vue";
 import i18n from "@/locales";
-import type { OnCallSlot, ResolvedSegment } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import type { OnCallSlot } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OTag: { name: "OTag", template: "<span><slot /></span>" },
   OButton: {
     name: "OButton",
     props: ["disabled"],
@@ -32,9 +30,6 @@ const stubs = {
   },
 };
 
-const DAY = MICROS_PER_DAY;
-const now = Date.now() * 1000;
-
 const slot = (over: Partial<OnCallSlot> = {}): OnCallSlot => ({
   slot: "primary",
   rotation: "Primary",
@@ -42,64 +37,23 @@ const slot = (over: Partial<OnCallSlot> = {}): OnCallSlot => ({
   ...over,
 });
 
-const seg = (over: Partial<ResolvedSegment> = {}): ResolvedSegment => ({
-  slot: "primary",
-  from: now - DAY,
-  to: now + 6 * DAY,
-  user_email: "mei@o2.ai",
-  rotation: "Primary",
-  ...over,
-});
-
 function render(over: Record<string, unknown> = {}) {
   return mount(OnCallScheduleAnswer, {
-    props: { slots: [slot()], segments: [seg()], timezone: "UTC", ...over },
+    props: { slots: [slot()], ...over },
     global: { plugins: [i18n], stubs },
   });
 }
 
 describe("OnCallScheduleAnswer", () => {
-  /// The one line the tab exists to produce, and the reason the rail's cards
-  /// could go: who is on, and how much of their shift is left.
-  it("names the holder and how long they have left", () => {
-    const text = render().find('[data-test="oncall-answer-holder"]').text();
-    expect(text).toContain("mei@o2.ai");
-    expect(text).toContain("On call until");
-    expect(render().find('[data-test="oncall-answer-until"]').text()).toContain("left");
-  });
-
-  /// Read off the SEGMENTS, not off `shift_micros`: a cover or a restriction
-  /// ends the current shift somewhere the cadence alone would not put it.
-  it("takes the handover from the resolved segment, not the rotation's cadence", () => {
-    const endsAt = now + 2 * DAY;
-    const wrapper = render({ segments: [seg({ to: endsAt })] });
-    // The instant, not the countdown: the shared clock ticks between the
-    // fixture and the render, so "2d" is "1d 23h" by the time it is drawn.
-    const weekday = new Intl.DateTimeFormat(undefined, {
-      weekday: "short",
-      timeZone: "UTC",
-    }).format(new Date(endsAt / 1000));
-    expect(wrapper.find('[data-test="oncall-answer-until"]').text()).toContain(weekday);
-  });
-
-  /// The window may simply not reach the handover. That is a missing fact, not
-  /// "no handover exists", and printing an inferred end time would be a lie.
-  it("says so when no segment covers the present", () => {
-    const wrapper = render({ segments: [] });
-    expect(wrapper.find('[data-test="oncall-answer-until"]').text()).toContain(
-      "No scheduled handover",
-    );
-  });
-
-  it("names who takes the pager next", () => {
-    const wrapper = render({
-      segments: [
-        seg(),
-        seg({ from: now + 6 * DAY, to: now + 13 * DAY, user_email: "priya@o2.ai" }),
-      ],
-    });
-    const next = wrapper.find('[data-test="oncall-answer-next"]').text();
-    expect(next).toContain("priya@o2.ai");
+  /// The whole reason this row was trimmed: the primary, their remaining shift
+  /// and the handover are on the pulse strip above the tabs and on the
+  /// timeline's own "on now" band, so saying them a third time here gave the
+  /// reader two derivations of one fact to reconcile.
+  it("does not restate the primary or the handover the chart already draws", () => {
+    const text = render().text();
+    expect(text).not.toContain("mei@o2.ai");
+    expect(text).not.toContain("On call until");
+    expect(text).not.toContain("Next");
   });
 
   /// An unstaffed secondary is the difference between "the ladder has a second
@@ -123,13 +77,14 @@ describe("OnCallScheduleAnswer", () => {
     expect(wrapper.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(false);
   });
 
-  /// Nobody on call is not a quieter version of this line — it is a different
-  /// claim, and it must not read as a blank name.
-  it("states that nobody is on call rather than rendering an empty holder", () => {
+  /// Nobody on call is a louder claim than an empty second rung, and it must
+  /// not read as a blank name — so it takes the row rather than sitting beside
+  /// a secondary status that is beside the point.
+  it("states that nobody is on call instead of naming the secondary's state", () => {
     const wrapper = render({ slots: [] });
     expect(wrapper.text()).toContain("Nobody is on call");
     expect(wrapper.find('[data-test="oncall-answer-nobody-hint"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-answer-holder"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-answer-secondary"]').exists()).toBe(false);
   });
 
   /// A swap trades two people's shifts. With nobody on call there is no shift

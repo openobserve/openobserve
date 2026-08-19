@@ -15,75 +15,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Who is on, until when, who is next, and who is behind them — in one line.
+  What this tab can be ACTED on: whether a secondary exists, and the buttons.
 
-  The schedule tab used to answer this three times: a rail card per rotation, a
-  pulse panel above the tabs, and the chart itself. Three renderings of one fact
-  is three chances to disagree, and the reader had to check. This is the single
-  place the tab makes the claim, and every part of it is read off the SERVER's
-  resolution (`whoIsOnCall` for the holder, `resolved-schedule` for the
-  instants) rather than recomputed from rotation arithmetic — a screen whose
-  whole job is "who gets paged" must not be able to name a different person from
-  the one the engine will page.
+  It used to open with a three-part line — the primary and how long they had
+  left, who was next, then the secondary. Every one of those three is said
+  elsewhere on the same screen. The primary and the handover are on the pulse
+  strip ABOVE the tabs, and the timeline's own band label says "<who> · on now ·
+  until <when>" on the span the reader is already looking at; the handover was
+  worse than redundant, because the strip derives it from rotation cadence while
+  this line derived it from resolved segments, so a cover on the next shift made
+  the two name different people a few pixels apart.
+
+  What is left is what nothing else carries. An unstaffed secondary reads as a
+  greyed lane on the chart, which is not the same as being told; and the three
+  acts — staff the second rung, trade a shift, go and get some people — have no
+  other home on this tab. `whoIsOnCall` is still the source, so the pool named
+  here is the pool the engine would page.
 -->
 <template>
   <div
     class="border-border-default px-page-edge flex flex-wrap items-center gap-x-8 gap-y-3 border-b py-3"
     data-test="oncall-schedule-answer"
   >
-    <!-- Nobody on call is not a quieter version of this line — it is a
-         different claim, and it takes the whole width rather than leaving the
-         reader to notice a blank name. -->
-    <template v-if="!holder">
-      <div class="flex min-w-0 flex-col gap-0.5">
-        <OText variant="panel-title" class="text-status-error-text">
-          {{ t("oncall.schedNobodyOnCall") }}
-        </OText>
-        <p class="text-text-secondary text-xs" data-test="oncall-answer-nobody-hint">
-          {{ t("oncall.schedNobodyOnCallHint") }}
-        </p>
-      </div>
-    </template>
+    <!-- Nobody on call at all is a different and louder claim than an
+         unstaffed second rung, so it replaces it rather than sitting beside
+         it: naming the secondary's state is beside the point when the first
+         rung is empty too. -->
+    <div v-if="!holder" class="flex min-w-0 flex-col gap-0.5">
+      <OText variant="panel-title" class="text-status-error-text">
+        {{ t("oncall.schedNobodyOnCall") }}
+      </OText>
+      <p class="text-text-secondary text-xs" data-test="oncall-answer-nobody-hint">
+        {{ t("oncall.schedNobodyOnCallHint") }}
+      </p>
+    </div>
 
-    <template v-else>
-      <div class="flex min-w-0 flex-col gap-0.5" data-test="oncall-answer-holder">
-        <span class="flex flex-wrap items-center gap-2">
-          <OText variant="panel-title">{{ raw(holder.user_email) }}</OText>
-          <OTag variant="success-soft" size="sm">{{ t("oncall.schedPrimaryTag") }}</OTag>
-        </span>
-        <p class="text-text-secondary text-xs" data-test="oncall-answer-until">
-          {{ untilLine }}
-        </p>
-      </div>
-
-      <div
-        class="border-border-default flex min-w-0 flex-col gap-0.5 sm:border-s sm:ps-8"
-        data-test="oncall-answer-next"
+    <div v-else class="flex min-w-0 flex-col gap-0.5" data-test="oncall-answer-secondary">
+      <OText variant="meta">{{ t("oncall.schedSecondary") }}</OText>
+      <!-- An unstaffed secondary is the difference between "the ladder has a
+           second rung" and "the second rung resolves to nobody", so it is
+           coloured like the finding it is. -->
+      <span
+        v-if="secondary"
+        class="text-text-body truncate text-sm"
+        data-test="oncall-answer-secondary-who"
       >
-        <OText variant="meta">{{ t("oncall.schedNext") }}</OText>
-        <span class="text-text-body truncate text-sm">{{ nextLine }}</span>
-      </div>
-
-      <div
-        class="border-border-default flex min-w-0 flex-col gap-0.5 sm:border-s sm:ps-8"
-        data-test="oncall-answer-secondary"
-      >
-        <OText variant="meta">{{ t("oncall.schedSecondary") }}</OText>
-        <!-- An unstaffed secondary is the difference between "the ladder has a
-             second rung" and "the second rung resolves to nobody", so it is
-             coloured like the finding it is. -->
-        <span
-          v-if="secondary"
-          class="text-text-body truncate text-sm"
-          data-test="oncall-answer-secondary-who"
-        >
-          {{ raw(secondary.user_email) }}
-        </span>
-        <span v-else class="text-status-error-text text-sm">
-          {{ t("oncall.schedNoOneAssigned") }}
-        </span>
-      </div>
-    </template>
+        {{ raw(secondary.user_email) }}
+      </span>
+      <span v-else class="text-status-error-text text-sm">
+        {{ t("oncall.schedNoOneAssigned") }}
+      </span>
+    </div>
 
     <span class="ms-auto flex flex-wrap items-center gap-2">
       <!-- On a team with nobody in it every one of these opens on an empty
@@ -123,16 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
-import { useOnCallClock } from "@/composables/useOnCallClock";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import type { OnCallSlot, ResolvedSegment } from "@/ts/interfaces/oncall";
+import type { OnCallSlot } from "@/ts/interfaces/oncall";
 import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
-import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone } from "@/utils/oncall";
-import { formatMicrosDuration } from "@/utils/formatters";
 
 /// The pool a secondary rotation staffs. Lower-cased at the comparison, so it
 /// does not depend on somebody spelling it the same way the ladder does.
@@ -142,10 +119,6 @@ const props = withDefaults(
   defineProps<{
     /** `whoIsOnCall` — the server's answer, one entry per staffed pool. */
     slots?: OnCallSlot[];
-    /** `resolved-schedule` for the visible window. Supplies the instants. */
-    segments?: ResolvedSegment[];
-    /** The team's zone. A handover read in the browser's zone is a lie. */
-    timezone?: string;
     /**
      * Whether the team has anybody on it at all.
      *
@@ -155,7 +128,7 @@ const props = withDefaults(
      */
     hasMembers?: boolean;
   }>(),
-  { slots: () => [], segments: () => [], timezone: "UTC", hasMembers: true },
+  { slots: () => [], hasMembers: true },
 );
 
 const emit = defineEmits<{
@@ -166,7 +139,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const nowMicros = useOnCallClock();
 
 const holder = computed<OnCallSlot | null>(
   () => props.slots.find((slot) => sameSlot(slot.slot, DEFAULT_SLOT)) ?? null,
@@ -175,71 +147,4 @@ const holder = computed<OnCallSlot | null>(
 const secondary = computed<OnCallSlot | null>(
   () => props.slots.find((slot) => sameSlot(slot.slot, SECONDARY_SLOT)) ?? null,
 );
-
-/// The span covering the present in the pool this line speaks for.
-///
-/// From the segments rather than from `shift_micros` arithmetic: a cover, a
-/// restriction or a higher layer all end the current shift somewhere other than
-/// where the rotation's own cadence would put it.
-const current = computed<ResolvedSegment | null>(
-  () =>
-    props.segments.find(
-      (segment) =>
-        !!segment.user_email &&
-        sameSlot(segment.slot, DEFAULT_SLOT) &&
-        segment.from <= nowMicros.value &&
-        segment.to > nowMicros.value,
-    ) ?? null,
-);
-
-/// The next span in the same pool with somebody different on it.
-const upcoming = computed<ResolvedSegment | null>(() => {
-  const from = current.value?.to ?? nowMicros.value;
-  return (
-    props.segments
-      .filter(
-        (segment) =>
-          !!segment.user_email &&
-          sameSlot(segment.slot, DEFAULT_SLOT) &&
-          segment.from >= from &&
-          segment.user_email !== current.value?.user_email,
-      )
-      .sort((a, b) => a.from - b.from)[0] ?? null
-  );
-});
-
-const at = (micros: number) =>
-  raw(
-    formatInZone(micros, props.timezone, {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-  );
-
-/// "On call until Mon 25 Aug, 14:30 · 6d 4h left".
-///
-/// The window the chart drew may simply not reach the handover — that is a
-/// missing fact, not "no handover exists", so it says so rather than printing
-/// an end time it inferred.
-const untilLine = computed<I18nText>(() => {
-  const segment = current.value;
-  if (!segment) return t("oncall.schedNoHandover");
-  return raw(
-    `${t("oncall.schedUntil", { when: at(segment.to) })} · ${t("oncall.schedLeft", {
-      duration: raw(formatMicrosDuration(Math.max(0, segment.to - nowMicros.value))),
-    })}`,
-  );
-});
-
-const nextLine = computed<I18nText>(() => {
-  const segment = upcoming.value;
-  if (!segment?.user_email) return t("oncall.schedNextNobody");
-  return t("oncall.schedNextWho", {
-    who: raw(segment.user_email),
-    when: at(segment.from),
-  });
-});
 </script>

@@ -19,26 +19,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   A policy reads as a list of target KINDS — "the on-call", "the whole team" —
   which is not the question anybody has. The question is who that resolves to
-  at this instant and whether a page to them would land, and only the server can
-  answer it: it holds the rotation, the transports and the verification state.
+  at this instant, and only the server can answer it: it holds the rotation,
+  the transports and the verification state.
+
+  One line per rung, and the ending is the rail's last rung rather than a panel
+  beside it. Channels and per-person verdicts are spent only where something is
+  wrong: a healthy ladder is read to check its SHAPE, and listing every address
+  and transport on it buried the one rung that would reach nobody.
 -->
 <template>
-  <div class="flex flex-col gap-3" data-test="oncall-escalation-ladder">
+  <div class="flex flex-col gap-4" data-test="oncall-escalation-ladder">
     <!-- Every priority, including the ones that wake nobody. A priority absent
          from this strip is one nobody would think to check. -->
     <span class="flex flex-wrap items-center gap-2">
       <OButton
-        v-for="entry in priorities"
-        :key="entry.priority"
-        :variant="entry.priority === selected ? 'primary' : 'outline'"
+        v-for="group in groups"
+        :key="group.key"
+        :variant="group.variant"
         size="xs"
-        :data-test="`oncall-ladder-priority-${entry.priority.toLowerCase()}`"
-        @click="emit('update:selected', entry.priority)"
+        :data-test="`oncall-ladder-priority-${group.key}`"
+        @click="emit('update:selected', group.selects)"
       >
-        {{ raw(entry.priority) }}
-        <span class="text-2xs ms-1.5" :class="summaryToneFor(entry)">
-          {{ summaryFor(entry) }}
-        </span>
+        {{ group.label }}
+        <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
       </OButton>
     </span>
 
@@ -58,68 +61,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="rung.after_micros"
         :label="delayLabel(rung.after_micros)"
         :title="raw(saidTargets(rung.targets))"
-        :variant="rungVariant(rung)"
-        framed
+        :subtitle="resolvesTo(rung)"
+        variant="muted"
         :data-test="`oncall-ladder-rung-${rung.after_micros}`"
       >
-        <span class="mt-1 flex flex-col gap-1">
-          <!-- A rung that fires and reaches nobody is worse than a slow one:
-               the ladder moves on and the page stays unanswered. -->
-          <OTag v-if="rung.resolves_to_nobody" variant="error-soft" size="sm" class="self-start">
-            {{ t("oncall.ladderReachesNobody") }}
-          </OTag>
-          <!-- Only worth counting on a rung with several people, where one
-               silent address hides among names that would land. A "1 of 1" says
-               nothing the reason underneath does not say better. -->
-          <OTag
-            v-else-if="unreachableIn(rung)"
-            variant="error-soft"
-            size="sm"
-            class="self-start"
-          >
-            {{ unreachableIn(rung) }}
-          </OTag>
+        <!-- Only when something is wrong, and as a badge: the server's reason
+             is a full sentence, which is a paragraph on a rail. The sentence
+             itself is one hover away, so nothing is hidden. -->
+        <OTag
+          v-if="problems[rung.after_micros]"
+          variant="error-soft"
+          size="sm"
+          class="mt-1"
+          :data-test="`oncall-ladder-rung-problem-${rung.after_micros}`"
+        >
+          {{ problems[rung.after_micros]?.label }}
+          <OTooltip
+            v-if="problems[rung.after_micros]?.tip"
+            side="bottom"
+            :content="problems[rung.after_micros]?.tip ?? undefined"
+          />
+        </OTag>
+      </OTimelineItem>
 
-          <span
-            v-for="person in rung.recipients"
-            :key="person.user_email"
-            class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
-            :data-test="`oncall-ladder-person-${person.user_email}`"
+      <!-- The ending is a rung of the same rail: it is when the ladder runs
+           out, which is the fact the delays above are read against. -->
+      <OTimelineItem
+        :label="t('oncall.ladderEnd')"
+        :title="endTitle"
+        variant="muted"
+        data-test="oncall-ladder-ends"
+      >
+        <span class="flex flex-wrap items-baseline gap-x-2">
+          <!-- The server's own sentence — never our guess at what a policy ends with. -->
+          <span class="text-text-secondary text-xs">{{ raw(preview.ends_with) }}</span>
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            data-test="oncall-ladder-add-rung"
+            @click="emit('edit')"
           >
-            <span class="text-text-secondary text-xs">{{ t("oncall.ladderRightNow") }}</span>
-            <OUserCell :value="person.user_email" />
-            <!-- Channels that would carry it, or the server's reason none can.
-                 Never our own guess at why a page failed. -->
-            <span v-if="person.would_a_page_land" class="text-status-success-text text-xs">
-              {{ channelList(person) }}
-            </span>
-            <span v-else class="text-status-error-text text-xs">
-              {{ raw(person.why_not) || t("oncall.contactNoChannel") }}
-            </span>
-          </span>
+            {{ t("oncall.ladderAddRung") }}
+          </OButton>
+        </span>
+
+        <!-- How a page can leave this team at all. Both sentences are the
+             server's: "escalate to a sibling" is not a thing, and wording it
+             that way would tell somebody they still hold a page they gave away. -->
+        <span
+          v-for="(move, index) in preview.cross_team_moves"
+          :key="index"
+          class="text-text-secondary block text-xs"
+          :data-test="`oncall-ladder-move-${index}`"
+        >
+          {{ raw(move) }}
         </span>
       </OTimelineItem>
     </OTimeline>
-
-    <!-- What happens when the rungs run out, in the server's words. -->
-    <OBanner
-      v-if="preview?.ends_with"
-      :variant="preview.reaches_nobody ? 'error-soft' : 'info'"
-      inline-actions
-      data-test="oncall-ladder-ends"
-    >
-      {{ raw(preview.ends_with) }}
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="xs"
-          data-test="oncall-ladder-add-rung"
-          @click="emit('edit')"
-        >
-          {{ t("oncall.ladderAddRung") }}
-        </OButton>
-      </template>
-    </OBanner>
   </div>
 </template>
 
@@ -128,32 +126,33 @@ import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
-import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   EscalationPreview,
-  PreviewRecipient,
+  OnCallPolicy,
   PreviewRung,
   TeamRungSummary,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { speakTarget } from "@/utils/oncall";
+import { rungProblem, speakTarget } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = withDefaults(
   defineProps<{
     /** Every priority, from the overview — including the silent ones. */
     priorities?: TeamRungSummary[];
+    /** The stored policy, read only to tell which priorities share a ladder. */
+    policy?: OnCallPolicy | null;
     selected?: string;
     preview?: EscalationPreview | null;
     loading?: boolean;
   }>(),
-  { priorities: () => [], selected: "P1", preview: null, loading: false },
+  { priorities: () => [], policy: null, selected: "P1", preview: null, loading: false },
 );
 
 const emit = defineEmits<{ (e: "update:selected", priority: string): void; (e: "edit"): void }>();
@@ -165,24 +164,77 @@ const { t } = useI18nTyped();
 const saidTargets = (targets: string[]) =>
   targets.map((target) => speakTarget(target, t)).join(", ");
 
+const numberOf = (entry: TeamRungSummary) => Number(entry.priority.slice(1));
 
-/// "3 rungs · 20m", or the finding when the priority wakes nobody.
-function summaryFor(entry: TeamRungSummary): I18nText {
+/// What makes two priorities the same ladder. `null` means UNKNOWN — without
+/// the policy we cannot claim two ladders match, so nothing folds. `p1_parallel`
+/// is part of the shape: the same steps fired at once are a different ladder.
+function ladderKey(entry: TeamRungSummary): string | null {
+  if (!entry.pages_anyone) return "silent";
+  if (!props.policy) return null;
+  const priority = numberOf(entry);
+  const rung = props.policy.rungs.find((candidate) => candidate.priority === priority);
+  if (!rung) return null;
+  return JSON.stringify([priority === 1 && props.policy.p1_parallel === true, rung.steps]);
+}
+
+interface PriorityGroup {
+  key: string;
+  label: I18nText;
+  summary: I18nText;
+  variant: ButtonVariant;
+  summaryTone: string;
+  /** Which priority a click selects — the first of the run. */
+  selects: string;
+}
+
+/// Consecutive priorities running the same ladder fold into one chip. Five
+/// chips that all describe one ladder are five things to check, and a reader
+/// comparing them has to hold four of them in their head to find the one that
+/// differs.
+const groups = computed<PriorityGroup[]>(() => {
+  const runs: TeamRungSummary[][] = [];
+  let previousKey: string | null = null;
+
+  for (const entry of props.priorities) {
+    const key = ladderKey(entry);
+    const run = runs[runs.length - 1];
+    // A null key never folds — not with its neighbour and not with itself. Nor
+    // does a gap: "P1–P4" would promise a P2 and a P3 the strip never listed.
+    const follows = run && numberOf(entry) === numberOf(run[run.length - 1]) + 1;
+    if (key !== null && key === previousKey && follows) run.push(entry);
+    else runs.push([entry]);
+    previousKey = key;
+  }
+
+  return runs.map((run) => {
+    const first = run[0];
+    const last = run[run.length - 1];
+    const isSelected = run.some((entry) => entry.priority === props.selected);
+    const silent = !first.pages_anyone;
+
+    return {
+      key: (run.length > 1 ? `${first.priority}-${last.priority}` : first.priority).toLowerCase(),
+      label: run.length > 1 ? raw(`${first.priority}–${last.priority}`) : raw(first.priority),
+      summary: summaryFor(first, run.length),
+      variant: isSelected ? "outline-primary" : silent ? "outline-destructive" : "outline",
+      // The chip's own border and text already carry the finding when it is
+      // red; on the others the sub-label is metadata and stays quiet.
+      summaryTone: silent && !isSelected ? "" : "text-text-secondary",
+      selects: first.priority,
+    };
+  });
+});
+
+/// "3 rungs · 20m" for one priority, and for a folded run the only fact that is
+/// still true of every member of it.
+function summaryFor(entry: TeamRungSummary, folded: number): I18nText {
   if (!entry.pages_anyone) return t("oncall.reachPagesNobody");
+  if (folded > 1) return t("oncall.ladderSameLadder");
   const rungs = String(t("oncall.reachRungs", { count: entry.rungs }, entry.rungs));
   return entry.nobody_after_micros
     ? raw(`${rungs} · ${formatMicrosDuration(entry.nobody_after_micros)}`)
     : raw(rungs);
-}
-
-/// The finding is red only on an UNSELECTED chip. The selected one is a filled
-/// surface, and red on it fails contrast badly enough to be unreadable — while
-/// being the one priority whose finding is already spelled out in full
-/// underneath. So it inherits the button's own foreground instead: nothing is
-/// lost, and the red is spent where it is still the only warning on screen.
-function summaryToneFor(entry: TeamRungSummary): string {
-  if (entry.pages_anyone || entry.priority === props.selected) return "";
-  return "text-status-error-text";
 }
 
 /// Kept to a few characters — this is a rail, not a column. "0m" rather than
@@ -191,28 +243,34 @@ function delayLabel(afterMicros: number): I18nText {
   return afterMicros === 0 ? raw("0m") : raw(`+${formatMicrosDuration(afterMicros)}`);
 }
 
-/// "1 of 6 unreachable" — the count that matters on a whole-team rung, where a
-/// single silent address is easy to miss among the names that would land.
-function unreachableIn(rung: PreviewRung): I18nText | "" {
-  const total = rung.recipients.length;
-  if (total < 2) return "";
-  const bad = rung.recipients.filter((person) => !person.would_a_page_land).length;
-  return bad ? t("oncall.ladderUnreachableCount", { count: bad, total }) : "";
+/// Who the rung resolves to this instant — the line the whole preview exists
+/// for. Named while it is one or two people; counted past that, where six
+/// addresses are a wall rather than an answer.
+function resolvesTo(rung: PreviewRung): I18nText | undefined {
+  const people = rung.recipients;
+  if (!people.length) return undefined;
+  return people.length <= 2
+    ? t("oncall.ladderResolvesTo", { who: raw(people.map((one) => one.user_email).join(", ")) })
+    : t("oncall.ladderResolvesToMany", { count: people.length });
 }
 
-/// Position, not state. The rail is the clock: the rung firing now is the one
-/// somebody is living through, and the rest are still ahead. Colouring it by
-/// health instead turned the whole rail red on a deployment where nothing can
-/// be delivered, which says the same thing three times and loses the ordering.
-function rungVariant(rung: PreviewRung): TimelineItemVariant {
-  return rung.after_micros === 0 ? "destructive" : "muted";
-}
+/// The exception badge per rung, keyed by delay so the template asks once.
+/// Shared with the pulse strip, which used to say the same thing differently.
+const problems = computed(() => {
+  const out: Record<number, ReturnType<typeof rungProblem>> = {};
+  for (const rung of props.preview?.rungs ?? []) {
+    out[rung.after_micros] = rungProblem(rung, t);
+  }
+  return out;
+});
 
-function channelList(person: PreviewRecipient): I18nText {
-  return raw(
-    person.deliverable_channels.map((channel) => String(t(`oncall.channel_${channel}`))).join(", "),
-  );
-}
+/// A ladder that hands the page to the default team has not stopped — saying
+/// it stopped would tell somebody nobody is coming when somebody is.
+const endTitle = computed<I18nText>(() =>
+  props.preview?.final_action === "notify_default_team"
+    ? t("oncall.ladderEndsHandsOff")
+    : t("oncall.ladderEndsStops"),
+);
 
 /// Kept so the template reads the prop rather than reaching through `props`.
 const preview = computed(() => props.preview);

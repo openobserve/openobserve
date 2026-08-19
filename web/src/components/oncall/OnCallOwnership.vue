@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :team-name="teamName"
       :teams="teams"
       :default-team-id="routingConfig?.default_team_id ?? null"
-      :on-call-now="onCallNow"
       :ladder="ladder"
       :loading="loadingRules"
       :saving="saving"
@@ -69,7 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="t('oncall.removeRuleMessage')"
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
-      @update:model-value="(v: boolean) => { if (!v) ruleToDelete = null; }"
+      @update:model-value="
+        (v: boolean) => {
+          if (!v) ruleToDelete = null;
+        }
+      "
     />
 
     <!-- Claiming everything writes one rule per signal, so it is confirmed:
@@ -77,10 +80,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :model-value="claimAllOpen"
       :title="t('oncall.unroutedClaimAllTitle')"
-      :message="t('oncall.unroutedClaimAllMessage', { count: openSignals.length, team: raw(teamName) })"
+      :message="
+        t('oncall.unroutedClaimAllMessage', { count: openSignals.length, team: raw(teamName) })
+      "
       @update:ok="claimAll"
       @update:cancel="claimAllOpen = false"
-      @update:model-value="(v: boolean) => { if (!v) claimAllOpen = false; }"
+      @update:model-value="
+        (v: boolean) => {
+          if (!v) claimAllOpen = false;
+        }
+      "
     />
   </div>
 </template>
@@ -98,7 +107,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import alertsService from "@/services/alerts";
 import oncallService from "@/services/oncall";
 import type {
-  OnCallSlot,
   OnCallTeam,
   OwnershipRuleStats,
   RoutingConfig,
@@ -113,12 +121,10 @@ const props = withDefaults(
   defineProps<{
     teamId: string;
     teams: OnCallTeam[];
-    /** Who holds the pager right now — the list says what "it pages" means. */
-    onCallNow?: OnCallSlot[];
     /** This team's ladder, so a rule can say what paging it would run. */
     ladder?: TeamRungSummary[];
   }>(),
-  { onCallNow: () => [], ladder: () => [] },
+  { ladder: () => [] },
 );
 
 const { t } = useI18nTyped();
@@ -144,9 +150,7 @@ const ruleToDelete = ref<OwnershipRuleStats | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-const teamName = computed(
-  () => props.teams.find((team) => team.id === props.teamId)?.name ?? "",
-);
+const teamName = computed(() => props.teams.find((team) => team.id === props.teamId)?.name ?? "");
 
 /// What a bulk claim would actually write — dismissed rows are the record, not
 /// the worklist, and the confirmation has to count the same set.
@@ -346,9 +350,7 @@ async function claimAll() {
   claiming.value = false;
   toast({
     variant: claimed ? "success" : "error",
-    message: claimed
-      ? t("oncall.unroutedClaimed", { count: claimed })
-      : t("oncall.saveRuleFailed"),
+    message: claimed ? t("oncall.unroutedClaimed", { count: claimed }) : t("oncall.saveRuleFailed"),
   });
   await Promise.all([fetchRules(), fetchSignals()]);
 }

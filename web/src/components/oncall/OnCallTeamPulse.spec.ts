@@ -18,15 +18,17 @@ import { describe, expect, it } from "vitest";
 
 import OnCallTeamPulse from "@/components/oncall/OnCallTeamPulse.vue";
 import i18n from "@/locales";
-import type { TeamOverview } from "@/ts/interfaces/oncall";
+import type { EscalationPreview, PreviewRung, TeamOverview } from "@/ts/interfaces/oncall";
 import { MICROS_PER_MINUTE, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
-  OTag: { name: "OTag", props: ["value"], template: "<span>{{ value }}<slot /></span>" },
+  OTag: { name: "OTag", template: "<span><slot /></span>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
-  OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span>{{ content }}</span>" },
+  OSeparator: { name: "OSeparator", template: "<hr />" },
+  OSpinner: { name: "OSpinner", template: "<span />" },
+  OButton: { name: "OButton", template: "<button><slot /></button>" },
 };
 
 const NOW = Date.now() * 1000;
@@ -43,11 +45,54 @@ const schedule = {
       name: "Primary",
       members: ["ana@o2.ai", "bob@o2.ai"],
       shift_micros: MICROS_PER_WEEK,
-      // Mid-shift, so there is a "left" and a handover ahead.
+      // Mid-shift, so there is a handover ahead to name.
       anchor_micros: NOW - 2 * 24 * 60 * 60 * 1_000_000,
     },
   ],
 };
+
+function person(email: string, over: Record<string, unknown> = {}) {
+  return {
+    user_email: email,
+    reason: "on call now",
+    would_a_page_land: true,
+    deliverable_channels: [],
+    ...over,
+  };
+}
+
+function rung(over: Partial<PreviewRung> = {}): PreviewRung {
+  return {
+    after_micros: 0,
+    targets: ["the on-call"],
+    recipients: [person("ana@o2.ai")],
+    resolves_to_nobody: false,
+    ...over,
+  } as PreviewRung;
+}
+
+function preview(over: Partial<EscalationPreview> = {}): EscalationPreview {
+  return {
+    team_id: "t",
+    team_name: "Payments",
+    priority: "P1",
+    at: NOW,
+    pages_anyone: true,
+    channels: [],
+    rungs: [
+      rung(),
+      rung({
+        after_micros: 5 * MICROS_PER_MINUTE,
+        targets: ["the secondary"],
+        recipients: [person("bob@o2.ai")],
+      }),
+    ],
+    ends_with: "Escalation stops.",
+    cross_team_moves: [],
+    reaches_nobody: false,
+    ...over,
+  } as EscalationPreview;
+}
 
 function overview(over: Partial<TeamOverview> = {}): TeamOverview {
   return {
@@ -79,9 +124,9 @@ function overview(over: Partial<TeamOverview> = {}): TeamOverview {
 function render(over: Record<string, unknown> = {}) {
   return mount(OnCallTeamPulse, {
     props: {
+      preview: preview(),
       slots: [{ rotation: "Primary", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" }],
       schedule,
-      policy: { rungs: [] },
       overview: overview(),
       ...over,
     } as any,
@@ -90,372 +135,179 @@ function render(over: Record<string, unknown> = {}) {
 }
 
 describe("OnCallTeamPulse", () => {
-  it("says when the shift started, how much is left and who it hands to", () => {
-    const line = render().find('[data-test="oncall-pulse-shift"]').text();
+  /// The rail IS the ladder: one step per rung, in the order they fire.
+  it("draws a step per rung with the delay on the ones that wait", () => {
+    const wrapper = render();
 
-    expect(line).toContain("Since");
-    expect(line).toContain("left");
-    expect(line).toContain("bob@o2.ai");
+    expect(wrapper.find('[data-test="oncall-pulse-rung-0"]').text()).toContain("ana@o2.ai");
+    expect(wrapper.find('[data-test="oncall-pulse-rung-0"]').text()).toContain("is paged first");
+    expect(wrapper.find('[data-test="oncall-pulse-rung-1"]').text()).toContain("bob@o2.ai");
+    expect(wrapper.text()).toContain("+5m");
   });
 
-  /// A rotation resolving to nobody is the failure the panel exists for.
-  it("says nobody is on call when the rotation resolves to no one", () => {
-    expect(render({ slots: [] }).find('[data-test="oncall-pulse-nobody"]').exists()).toBe(true);
-  });
-
-  /// A one-person rotation has no next: naming the same person as backup would
-  /// suggest a second pair of hands that does not exist.
-  it("says so when nobody backs the rotation up", () => {
+  /// A rung that wakes a pool has no single face to put on it, so it is named
+  /// by what it targets and counted rather than listed.
+  it("names the pool and counts it when a rung wakes more than one person", () => {
     const wrapper = render({
-      slots: [{ rotation: "Primary", user_email: "ana@o2.ai", next_user_email: null }],
-    });
-    expect(wrapper.find('[data-test="oncall-pulse-no-backup"]').exists()).toBe(true);
-  });
-
-  /// The delay AND the wording come from the policy: the second rung is named
-  /// by what it targets, never assumed to be "Secondary". `targets` is required
-  /// on the wire, so the fixture carries it — a step without one is a shape the
-  /// server rejects, and pinning it here would test a policy nobody can save.
-  it("reads the backup's paging delay off the policy", () => {
-    const wrapper = render({
-      policy: {
+      preview: preview({
         rungs: [
-          {
-            priority: 1,
-            steps: [
-              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
-              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "next_on_call" }] },
-            ],
-            channels: [],
-          },
-        ],
-      },
-    });
-    expect(wrapper.text()).toContain("paged at +5m");
-  });
-
-  /// The bug this guards: with a staffed `secondary` slot, the Overview said
-  /// "Secondary — mei" (the next primary) while the Schedule tab said
-  /// "Secondary → priya" (the slot). Both were right; one word meant two
-  /// people. A rung that targets `next_on_call` must say so.
-  it("calls the second rung what it targets, not 'Secondary'", () => {
-    const wrapper = render({
-      slots: [
-        { slot: "primary", rotation: "Primary", user_email: "ana@o2.ai", next_user_email: "bo@o2.ai" },
-        { slot: "secondary", rotation: "Secondary", user_email: "cy@o2.ai", next_user_email: "dee@o2.ai" },
-      ],
-      policy: {
-        rungs: [
-          {
-            priority: 1,
-            steps: [
-              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
-              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "next_on_call" }] },
-            ],
-            channels: [],
-          },
-        ],
-      },
-    });
-    // Both are true and they are different people, so both are shown — each
-    // labelled by what it is. What must never happen is one word covering
-    // both: the slot row says "secondary", the rung row says what it targets.
-    const slotRow = wrapper.find('[data-test="oncall-pulse-secondary-slot"]');
-    expect(slotRow.text()).toContain("cy@o2.ai");
-    expect(slotRow.text()).toContain("secondary");
-    // `26111bd135` settled the word: the ladder owns "secondary", the calendar
-    // owns "next". So the rung says secondary and the SLOT row says which
-    // rotation — two labelled rows, not one word doing both jobs.
-    expect(wrapper.text()).toContain("The secondary");
-    expect(wrapper.find('[data-test="oncall-pulse-next"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain("bo@o2.ai");
-  });
-
-  /// The shipped default policy's second rung is `whole_team`, which names no
-  /// individual — and reading only that rung told EVERY stock team "Nobody
-  /// backs this rotation up" while `/on-call` was returning a staffed
-  /// secondary right underneath it.
-  it("reads the staffed secondary slot, not just the ladder rung", () => {
-    const wrapper = render({
-      slots: [
-        { slot: "primary", rotation: "Primary", user_email: "ana@o2.ai" },
-        { slot: "secondary", rotation: "Secondary", user_email: "cy@o2.ai" },
-      ],
-      policy: {
-        rungs: [
-          {
-            priority: 1,
-            steps: [
-              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
-              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "whole_team" }] },
-            ],
-            channels: [],
-          },
-        ],
-      },
-    });
-    expect(wrapper.find('[data-test="oncall-pulse-no-backup"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-pulse-secondary-slot"]').text()).toContain("cy@o2.ai");
-  });
-
-  /// A rung that wakes a pool is a backup with no single face. Naming the pool
-  /// is the answer; the empty state would be a lie.
-  it("names the pool when the rung reaches everybody", () => {
-    const wrapper = render({
-      slots: [{ slot: "primary", rotation: "Primary", user_email: "ana@o2.ai" }],
-      policy: {
-        rungs: [
-          {
-            priority: 1,
-            steps: [
-              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
-              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "whole_team" }] },
-            ],
-            channels: [],
-          },
-        ],
-      },
-    });
-    expect(wrapper.find('[data-test="oncall-pulse-no-backup"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-pulse-backup-group"]').text()).toContain(
-      "The whole team",
-    );
-  });
-
-  /// And when there really is nothing — one person, one rung — the warning
-  /// still fires. It was never wrong, only over-eager.
-  it("still warns when nothing backs the rotation", () => {
-    const wrapper = render({
-      slots: [{ slot: "primary", rotation: "Primary", user_email: "ana@o2.ai" }],
-      policy: {
-        rungs: [
-          { priority: 1, steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" }] }], channels: [] },
-        ],
-      },
-    });
-    expect(wrapper.find('[data-test="oncall-pulse-no-backup"]').exists()).toBe(true);
-  });
-
-  /// One member list; the secondary is DERIVED from it. The offset says which
-  /// position, and without it the first question anybody asks is why that
-  /// person — but only when it is not 1, because at 1 they literally are next
-  /// and the label already says so.
-  it("says where a derived secondary came from when the offset is not 1", () => {
-    const wrapper = render({
-      slots: [
-        {
-          slot: "primary",
-          rotation: "Primary",
-          user_email: "ana@o2.ai",
-          next_user_email: "bo@o2.ai",
-          next_offset: 5,
-        },
-      ],
-      policy: {
-        rungs: [
-          {
-            priority: 1,
-            steps: [
-              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
-              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "next_on_call" }] },
-            ],
-            channels: [],
-          },
-        ],
-      },
-    });
-    expect(wrapper.find('[data-test="oncall-pulse-backup-offset"]').text()).toContain("+5");
-  });
-
-  it("stays quiet about an offset of 1, which the label already says", () => {
-    const wrapper = render({
-      slots: [
-        {
-          slot: "primary",
-          rotation: "Primary",
-          user_email: "ana@o2.ai",
-          next_user_email: "bo@o2.ai",
-          next_offset: 1,
-        },
-      ],
-      policy: {
-        rungs: [
-          {
-            priority: 1,
-            steps: [
-              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
-              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "next_on_call" }] },
-            ],
-            channels: [],
-          },
-        ],
-      },
-    });
-    expect(wrapper.find('[data-test="oncall-pulse-backup-offset"]').exists()).toBe(false);
-  });
-
-  /// The primary slot is named, not guessed at as "the first staffed one" —
-  /// a two-slot team returns two, in whatever order the server likes.
-  it("shows the primary slot under 'on call now', whatever order the slots arrive in", () => {
-    const wrapper = render({
-      slots: [
-        { slot: "secondary", rotation: "Secondary", user_email: "cy@o2.ai", next_user_email: "dee@o2.ai" },
-        { slot: "primary", rotation: "Primary", user_email: "ana@o2.ai", next_user_email: "bo@o2.ai" },
-      ],
-    });
-    expect(wrapper.find('[data-test="oncall-pulse-holder"]').text()).toContain("ana@o2.ai");
-  });
-
-  /// The ladder summary is the server's, including the priorities it says wake
-  /// nobody — that silence is the finding, not an empty row.
-  it("renders the ladder reach the server reported", () => {
-    const wrapper = render({
-      overview: overview({
-        rungs: [
-          {
-            priority: "P1",
-            rungs: 3,
-            pages_anyone: true,
-            nobody_after_micros: 15 * MICROS_PER_MINUTE,
-            ends_with_whole_team: true,
-          },
-          { priority: "P4", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+          rung(),
+          rung({
+            after_micros: 15 * MICROS_PER_MINUTE,
+            targets: ["the whole team"],
+            recipients: [person("ana@o2.ai"), person("bob@o2.ai"), person("mei@o2.ai")],
+          }),
         ],
       }),
     });
 
-    const p1 = wrapper.find('[data-test="oncall-pulse-reach-p1"]').text();
-    expect(p1).toContain("3 rungs");
-    expect(p1).toContain("nobody after 15m");
-    // P4 is silent, so it belongs to the collapsed summary row rather than a
-    // line of its own — five "Pages nobody" lines is one fact stated five times.
-    expect(wrapper.find('[data-test="oncall-pulse-reach-silent"]').text()).toContain(
-      "Pages nobody",
+    const step = wrapper.find('[data-test="oncall-pulse-rung-1"]').text();
+    expect(step).toContain("The whole team");
+    expect(step).toContain("all 3 members");
+  });
+
+  /// Where the ladder ends is read against every delay above it, so it rides
+  /// the last rung rather than a panel elsewhere.
+  it("says how the ladder ends on its last step", () => {
+    expect(render().find('[data-test="oncall-pulse-rung-1"]').text()).toContain("then stops");
+
+    const handsOff = render({ preview: preview({ final_action: "notify_default_team" }) });
+    expect(handsOff.find('[data-test="oncall-pulse-rung-1"]').text()).toContain("then hands off");
+  });
+
+  /// The server's reason is a full sentence, which is a paragraph on a rail —
+  /// the rung carries four words, and the sentence is one hover away.
+  it("badges the unreachable rung and keeps the server's sentence on hover", () => {
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          rung({
+            recipients: [
+              person("ana@o2.ai", {
+                would_a_page_land: false,
+                why_not: "no SMTP transport is configured on this deployment",
+              }),
+            ],
+          }),
+        ],
+      }),
+    });
+
+    const mark = wrapper.find('[data-test="oncall-pulse-rung-problem-0"]');
+    expect(mark.exists()).toBe(true);
+    expect(mark.text()).toContain("email only · no SMTP transport");
+    // The stubbed tooltip renders its content, so the sentence is still there.
+    expect(mark.text()).toContain("no SMTP transport is configured on this deployment");
+  });
+
+  /// A reason the mapping has never seen must not vanish — it falls back to
+  /// the sentence rather than to a short word that might be wrong.
+  it("keeps an unrecognised reason verbatim", () => {
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          rung({
+            recipients: [
+              person("ana@o2.ai", { would_a_page_land: false, why_not: "the moon is in the way" }),
+            ],
+          }),
+        ],
+      }),
+    });
+
+    expect(wrapper.find('[data-test="oncall-pulse-rung-problem-0"]').text()).toContain(
+      "the moon is in the way",
     );
   });
 
-  /// Four panels share a row and the tallest sets its height, so this one is
-  /// capped: every silent priority collapses onto a single trailing line.
-  it("collapses every silent priority onto one row", () => {
+  it("keeps the mark off a rung that would reach everybody on it", () => {
+    expect(render().find('[data-test="oncall-pulse-rung-problem-0"]').exists()).toBe(false);
+  });
+
+  /// A ladder with no rungs at all is the loudest thing this strip can say.
+  it("says plainly when a page right now would wake nobody", () => {
+    const wrapper = render({ preview: preview({ rungs: [], pages_anyone: false }) });
+    expect(wrapper.find('[data-test="oncall-pulse-reaches-nobody"]').exists()).toBe(true);
+  });
+
+  /// Every silent priority on one chip: the finding is one fact however many
+  /// priorities share it.
+  it("names every priority that pages nobody on one chip", () => {
     const wrapper = render({
       overview: overview({
         rungs: [
-          { priority: "P1", rungs: 3, pages_anyone: true, ends_with_whole_team: true },
-          { priority: "P2", rungs: 2, pages_anyone: true, ends_with_whole_team: false },
-          { priority: "P3", rungs: 1, pages_anyone: true, ends_with_whole_team: false },
+          { priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: true },
           { priority: "P4", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
           { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
         ],
       }),
     });
 
-    const silent = wrapper.find('[data-test="oncall-pulse-reach-silent"]');
-    expect(silent.text()).toContain("P4, P5");
-    // One detailed ladder, one line naming the ones that did not fit, one line
-    // for the silent ones — never one row per priority.
-    expect(wrapper.findAll('[data-test^="oncall-pulse-reach-"]')).toHaveLength(3);
+    const chip = wrapper.find('[data-test="oncall-pulse-silent"]');
+    expect(chip.text()).toContain("P4, P5");
+    expect(chip.text()).toContain("pages nobody");
   });
 
-  /// I11: the panel used to draw three ladders and drop the rest without a
-  /// word, so a reader seeing P1, P2 and P5 could not tell whether P3 was
-  /// absent, silent, or merely off the bottom — three different facts sharing
-  /// one blank space. Whatever does not fit is named.
-  it("names the paging priorities it had no room to draw", () => {
+  it("draws no silent chip while every priority pages somebody", () => {
     const wrapper = render({
       overview: overview({
-        rungs: [
-          { priority: "P1", rungs: 3, pages_anyone: true, ends_with_whole_team: true },
-          { priority: "P2", rungs: 2, pages_anyone: true, ends_with_whole_team: false },
-          { priority: "P3", rungs: 1, pages_anyone: true, ends_with_whole_team: false },
-          { priority: "P4", rungs: 1, pages_anyone: true, ends_with_whole_team: false },
-        ],
+        rungs: [{ priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: true }],
       }),
     });
-
-    const more = wrapper.find('[data-test="oncall-pulse-reach-more"]');
-    expect(more.text()).toContain("P3, P4");
-    // Named as paging, never as silent: "also page" and "Pages nobody" are
-    // opposite findings and the whole point is telling them apart.
-    expect(more.text()).toContain("also page");
-    expect(wrapper.find('[data-test="oncall-pulse-reach-silent"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-pulse-silent"]').exists()).toBe(false);
   });
 
-  /// Nothing collapses when everything fits — a summary line for zero hidden
-  /// priorities is a row that says nothing.
-  it("draws no overflow line while every ladder fits", () => {
+  /// The countdown and the instant together: "in 5d 10h" is unreadable against
+  /// a calendar, and the instant alone hides how far away it is.
+  it("says who takes the pager next and when", () => {
+    const wrapper = render();
+    expect(wrapper.find('[data-test="oncall-pulse-handoff"]').text()).toContain("bob@o2.ai");
+    expect(wrapper.find('[data-test="oncall-pulse-handoff"]').text()).toContain("in ");
+  });
+
+  /// A one-person rotation has no next. Naming the same person again would
+  /// suggest a second pair of hands that does not exist.
+  it("says so when nothing is scheduled to take the pager", () => {
     const wrapper = render({
-      overview: overview({
-        rungs: [
-          { priority: "P1", rungs: 3, pages_anyone: true, ends_with_whole_team: true },
-          { priority: "P2", rungs: 2, pages_anyone: true, ends_with_whole_team: false },
-        ],
-      }),
+      slots: [{ rotation: "Primary", user_email: "ana@o2.ai", next_user_email: null }],
     });
-    expect(wrapper.find('[data-test="oncall-pulse-reach-more"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-pulse-no-handoff"]').exists()).toBe(true);
   });
 
-  /// Server-computed over the window, which is what makes it safe on a tile.
   it("reports the window's pages and the share acked quickly", () => {
     const wrapper = render({
       overview: overview({
         stats: {
-          pages: 24,
-          acknowledged: 18,
-          acked_under_5m: 16,
-          night_pages: 2,
-          reached_second_rung: 3,
-          reached_final_rung: 1,
+          pages: 6,
+          acknowledged: 4,
+          acked_under_5m: 0,
+          night_pages: 1,
+          reached_second_rung: 5,
+          reached_final_rung: 4,
         },
-        acked_under_5m_percent: 89,
+        acked_under_5m_percent: 0,
       }),
     });
 
-    expect(wrapper.find('[data-test="oncall-pulse-pages"]').text()).toBe("24");
-    expect(wrapper.find('[data-test="oncall-pulse-fast"]').text()).toBe("89%");
-    const detail = wrapper.find('[data-test="oncall-pulse-activity"]').text();
-    expect(detail).toContain("3 reached rung 2");
-    expect(detail).toContain("1 reached the whole team");
-    expect(detail).toContain("2 pages overnight");
+    expect(wrapper.find('[data-test="oncall-pulse-pages"]').text()).toContain("6 pages");
+    expect(wrapper.find('[data-test="oncall-pulse-acked"]').text()).toContain("0% acked < 5m");
+    expect(wrapper.find('[data-test="oncall-pulse-reached-final"]').text()).toContain(
+      "4 reached the whole team",
+    );
   });
 
   it("says plainly when the window had no pages at all", () => {
     expect(render().find('[data-test="oncall-pulse-no-pages"]').exists()).toBe(true);
   });
 
-  /// Whether a page would LAND, per channel, with the server's own reason —
-  /// a blocked channel that failed silently is the whole problem.
-  it("shows each channel's verdict for whoever is on call", () => {
-    const wrapper = render({
-      reachability: {
-        team_id: "t",
-        team_name: "Payments",
-        smtp_configured: false,
-        reachable: 0,
-        total: 1,
-        unreachable_members: ["ana@o2.ai"],
-        members: [
-          {
-            user_email: "ana@o2.ai",
-            is_org_user: true,
-            mailbox_shaped: true,
-            deliverable_channels: [],
-            configured_but_unverified: [],
-            would_a_page_land: false,
-            channels: [
-              {
-                channel: "email",
-                deliverable: false,
-                configured_but_unverified: false,
-                blocked_because: "this deployment has no SMTP transport configured",
-              },
-            ],
-          },
-        ],
-      },
-    });
-
-    const chip = wrapper.find('[data-test="oncall-pulse-channel-email"]');
-    expect(chip.exists()).toBe(true);
-    expect(chip.text()).toContain("✗");
+  /// The strip reads; the tabs below it edit. Each link says which tab.
+  it.each([
+    ["oncall-pulse-edit-ladder", "edit-ladder"],
+    ["oncall-pulse-open-schedule", "open-schedule"],
+    ["oncall-pulse-view-pages", "open-pages"],
+  ])("emits %s's errand", async (testId, event) => {
+    const wrapper = render();
+    await wrapper.find(`[data-test="${testId}"]`).trigger("click");
+    expect(wrapper.emitted(event)).toBeTruthy();
   });
 });

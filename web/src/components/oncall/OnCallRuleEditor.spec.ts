@@ -26,8 +26,8 @@ import store from "@/test/unit/helpers/store";
 const stubs = {
   ODialog: {
     name: "ODialog",
-    props: ["open", "title", "primaryButtonDisabled", "primaryButtonLoading"],
-    emits: ["update:open", "click:primary", "click:secondary"],
+    props: ["open", "title", "primaryButtonDisabled", "primaryButtonLoading", "neutralButtonLabel"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
     template: "<div><slot /></div>",
   },
   OButton: {
@@ -261,5 +261,29 @@ describe("OnCallRuleEditor", () => {
     expect(wrapper.find('[data-test="oncall-rule-editor-ladder"]').text()).toContain(
       "no escalation ladder yet",
     );
+  });
+
+  /// The row is Edit and nothing else, so removing a rule is a decision made
+  /// about the one already open — and only ever about an existing one.
+  describe("removing the rule", () => {
+    const dialog = (w: ReturnType<typeof render>) => w.findComponent({ name: "ODialog" });
+
+    it("offers no removal while writing a new rule", async () => {
+      const wrapper = render();
+      await flushPromises();
+      expect(dialog(wrapper).props("neutralButtonLabel")).toBeUndefined();
+    });
+
+    it("passes the removal up so the host can confirm it", async () => {
+      const wrapper = render({
+        rule: { rule_id: "r1", team_id: "team_1", dimensions: { "k8s-cluster": "introspection" } },
+      });
+      await flushPromises();
+      expect(dialog(wrapper).props("neutralButtonLabel")).toBe("Remove rule");
+
+      dialog(wrapper).vm.$emit("click:neutral");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted("remove")).toHaveLength(1);
+    });
   });
 });

@@ -30,6 +30,7 @@ import type {
   OnCallResponseEvent,
   OnCallResponseGroup,
   OnCallSlot,
+  PreviewRung,
   PriorityRung,
   PromoteSeverity,
 } from "@/ts/interfaces/oncall";
@@ -38,6 +39,7 @@ import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interface
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
+import { raw } from "@/types/i18n";
 
 /**
  * Who holds `rotation` at `atMicros`.
@@ -424,6 +426,65 @@ export function speakTargetsInSentence(
     const said = speakTarget(term, t);
     return said === term ? whole : said;
   });
+}
+
+/**
+ * A page-cannot-land reason, short enough to be a badge.
+ *
+ * `reachability.rs` writes one finished sentence per cause, and a sentence on a
+ * rail is a paragraph nobody reads at 3am. Each known cause gets four words;
+ * the sentence itself stays on hover, and an unknown one returns `null` so the
+ * caller falls back to it rather than to a short word that might be wrong.
+ *
+ * "email only" is not a flourish: email is the single channel this build can
+ * deliver on, so when it is the deployment that cannot send, saying so is the
+ * whole finding.
+ */
+export function shortReachReason(
+  sentence: string | null | undefined,
+  t: TranslateFn,
+): I18nText | null {
+  const said = (sentence ?? "").toLowerCase();
+  if (!said) return null;
+  // Matched on the distinctive noun, not the whole sentence: the engine has
+  // reworded these before, and a near-miss must degrade to the sentence rather
+  // than to silence.
+  if (said.includes("smtp")) return t("oncall.reachShortNoSmtp");
+  if (said.includes("not a user of this organization")) return t("oncall.reachShortNoAddress");
+  if (said.includes("login, not a mailbox")) return t("oncall.reachShortNotMailbox");
+  if (said.includes("reserved for documentation")) return t("oncall.reachShortUnroutable");
+  return null;
+}
+
+/**
+ * What is wrong with one rung, as a badge and the sentence behind it.
+ *
+ * Shared by the pulse strip and the escalation rail, which were drifting: the
+ * same rung read as an icon on one screen and a paragraph on the other. A
+ * single unreachable person gets the server's reason; a crowd gets the count,
+ * because the reason for one of six says nothing about the other five.
+ */
+export function rungProblem(
+  rung: PreviewRung,
+  t: TranslateFn,
+): { label: I18nText; tip: I18nText | null } | null {
+  if (rung.resolves_to_nobody) return { label: t("oncall.ladderReachesNobody"), tip: null };
+
+  const people = rung.recipients;
+  const unreachable = people.filter((one) => !one.would_a_page_land);
+  if (!unreachable.length) return null;
+  if (people.length > 1) {
+    return {
+      label: t("oncall.ladderUnreachableCount", { count: unreachable.length, total: people.length }),
+      tip: null,
+    };
+  }
+
+  const why = unreachable[0].why_not;
+  const short = shortReachReason(why, t);
+  // Nothing is hidden: the badge is the summary, the sentence is the answer.
+  if (short) return { label: short, tip: raw(why) };
+  return { label: raw(why) || t("oncall.contactNoChannel"), tip: null };
 }
 
 /**
@@ -880,9 +941,104 @@ export function routingReasonOf(
   const hit = events.find(
     (e) =>
       e.kind === "sys" &&
-      ROUTING_REASON_PREFIXES.some((prefix) => e.body.startsWith(prefix)),
+      ROUTING_REASON_PREFIXES.some(
+        // Not `startsWith`: `RoutingDecision::reason` prefixes the sentence
+        // with every note routing passed over ("the alert names team `x`,
+        // which names no team in this org; routed to …"), and anchoring at
+        // the start dropped the row on exactly the records whose routing was
+        // worth explaining.
+        (prefix) => e.body.startsWith(prefix) || e.body.includes(`; ${prefix}`),
+      ),
   );
   return hit ? hit.body : null;
+}
+
+/** Which of `RoutingDecision`'s five branches produced a sentence. */
+export type RoutingMechanism = "explicit" | "context" | "ownership" | "default" | "unrouted";
+
+/** A routing sentence read back into the parts a screen can render. */
+export interface RoutingReasonView {
+  /** What routing considered and passed over, in the order it says them. */
+  notes: string[];
+  mechanism: RoutingMechanism;
+  /** The winning ownership rule's dimensions — chips, not a path. */
+  dimensions: Record<string, string>;
+  /** The team the sentence names, when it names one. */
+  teamId: string | null;
+  /** The team NAME the alert's context attribute asked for (`context` only). */
+  namedTeam: string | null;
+}
+
+/**
+ * The routing sentence, read back into its parts.
+ *
+ * Same bargain as `routingReasonOf` above — matched against every branch of
+ * `RoutingDecision::reason()`, and null the moment the wording drifts, so the
+ * caller falls back to printing the server's sentence verbatim rather than
+ * showing a half-parsed one. Deleted with `routingReasonOf` when a typed
+ * routing event lands.
+ */
+export function parseRoutingReason(reason: string | null | undefined): RoutingReasonView | null {
+  if (!reason) return null;
+
+  // Notes are joined with "; " ahead of the decision, so the decision is the
+  // last segment and everything before it is what was passed over.
+  const segments = reason.split("; ");
+  const decision = segments[segments.length - 1]?.trim() ?? "";
+  const notes = segments.slice(0, -1).map((note) => note.trim());
+  const view = (
+    mechanism: RoutingMechanism,
+    rest: Partial<RoutingReasonView> = {},
+  ): RoutingReasonView => ({
+    notes,
+    mechanism,
+    dimensions: {},
+    teamId: null,
+    namedTeam: null,
+    ...rest,
+  });
+
+  const ownership = /^routed to (\S+) by ownership rule (.+)$/.exec(decision);
+  if (ownership) {
+    return view("ownership", {
+      teamId: ownership[1],
+      dimensions: dimensionsOfPath(ownership[2]),
+    });
+  }
+
+  const explicit = /^routed to (\S+) by the alert's own setting$/.exec(decision);
+  if (explicit) return view("explicit", { teamId: explicit[1] });
+
+  const context = /^routed to (\S+) by the alert's context attribute team=`(.*)`$/.exec(decision);
+  if (context) return view("context", { teamId: context[1], namedTeam: context[2] });
+
+  const fallback = /^no ownership rule matched, so it went to the default team (\S+)$/.exec(
+    decision,
+  );
+  if (fallback) return view("default", { teamId: fallback[1] });
+
+  if (decision.startsWith("no ownership rule matches this signal and no default team is set")) {
+    return view("unrouted");
+  }
+
+  return null;
+}
+
+/**
+ * `k=v/k=v` back into the map it was built from — the inverse of
+ * `ownershipPath`, so the About rail can draw the same dimension chips the
+ * routing tab draws from a rule's own `dimensions`.
+ *
+ * A value may itself contain `=`; only the FIRST one separates.
+ */
+export function dimensionsOfPath(path: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const segment of path.split("/")) {
+    const at = segment.indexOf("=");
+    if (at <= 0) continue;
+    out[segment.slice(0, at).trim()] = segment.slice(at + 1).trim();
+  }
+  return out;
 }
 
 /// One rung of a ladder with its targets resolved to actual people.

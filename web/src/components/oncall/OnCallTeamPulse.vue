@@ -15,225 +15,168 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  The four questions somebody has about a team before they read anything else:
-  who is holding the pager, who catches it if they miss it, how far the ladder
-  reaches before it gives up, and how the last week actually went.
+  What a page fired right now would do — one rail, read left to right.
 
-  The ladder and the week's figures come from `GET .../overview`, counted in the
-  database over the window. The shift's start and handover come from the
-  SCHEDULE instead, because the overview names who is on call but carries no
-  instants — a slot has no start and no end.
+  This was four panels: on call now, backing them up, escalation reach, last
+  seven days. They answered one question between them and asked the reader to
+  assemble it, because the same ladder was split across three of them — the
+  first rung under "on call now", the second under "backing them up", the shape
+  of the rest under "reach". The rail is that ladder, in the order it fires.
+
+  The rungs come from `GET .../escalation-preview`, which resolves each target
+  against the rotation, the transports and the verification state at this
+  instant — the one thing no amount of client-side arithmetic can work out. The
+  handover comes from the SCHEDULE, because a slot carries no instants, and the
+  week's figures from `GET .../overview`, counted in the database.
 -->
 <template>
-  <div class="grid grid-cols-1 gap-px md:grid-cols-2 xl:grid-cols-4" data-test="oncall-team-pulse">
-    <!-- ── On call now ─────────────────────────────────────────── -->
-    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
-      <span class="flex items-center gap-1.5">
-        <OIcon name="notifications-active" size="xs" class="text-text-secondary" />
-        <OText variant="section">{{ t("oncall.teamOnCallNow") }}</OText>
-      </span>
+  <div
+    class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-3 border px-4 py-3"
+    data-test="oncall-team-pulse"
+  >
+    <OText variant="section" as="div" class="uppercase">
+      {{ t("oncall.pulseFiresNow", { priority: raw(priority) }) }}
+    </OText>
 
-      <template v-if="holder">
-        <span class="flex flex-wrap items-center gap-2" data-test="oncall-pulse-holder">
-          <OUserCell :value="holder.user_email" />
-          <OTag variant="success-soft" size="sm">{{ raw(holder.rotation) }}</OTag>
-        </span>
-        <p class="text-text-secondary truncate text-xs" data-test="oncall-pulse-shift">
-          {{ shiftLine }}
-          <OTooltip side="bottom" :content="shiftLine" />
-        </p>
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <OSpinner v-if="loading && !preview" variant="ring" size="xs" />
 
-        <!-- Would a page to this person actually land, per channel. Every
-             verdict carries the server's own reason, so a blocked channel says
-             WHY rather than failing quietly at 3am. -->
-        <span v-if="holderChannels.length" class="flex flex-wrap items-center gap-1">
-          <OTag
-            v-for="entry in holderChannels"
-            :key="entry.channel"
-            :variant="entry.deliverable ? 'success-soft' : 'error-soft'"
-            size="sm"
-            :data-test="`oncall-pulse-channel-${entry.channel}`"
-          >
-            {{ channelLabel(entry) }}
-            <OTooltip
-              v-if="entry.blocked_because"
-              side="bottom"
-              :content="raw(entry.blocked_because)"
-            />
-          </OTag>
-        </span>
-      </template>
-      <p v-else class="text-status-error-text text-sm" data-test="oncall-pulse-nobody">
-        {{ t("oncall.nobodyOnCallShort") }}
+      <!-- A ladder nobody is on the end of is the loudest thing this strip can
+           say, so it takes the whole rail rather than a chip beside it. -->
+      <p v-else-if="!preview" class="text-text-secondary text-sm" data-test="oncall-pulse-unknown">
+        {{ t("oncall.pulsePreviewUnavailable") }}
       </p>
-    </section>
-
-    <!-- ── Backing them up ─────────────────────────────────────── -->
-    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
-      <span class="flex items-center gap-1.5">
-        <OIcon name="group-work" size="xs" class="text-text-secondary" />
-        <OText variant="section">{{ t("oncall.teamBackingUp") }}</OText>
-      </span>
-
-      <!-- A staffed second pool, on call at this instant. Named first because
-           it is a fact about the schedule, where the rung below it is a fact
-           about the ladder — and on a two-slot team they are different people. -->
-      <span
-        v-if="secondary"
-        class="flex flex-wrap items-center gap-2"
-        data-test="oncall-pulse-secondary-slot"
-      >
-        <OUserCell :value="secondary.user_email" />
-        <OTag variant="default-soft" size="sm">{{ raw(secondary.slot ?? "") }}</OTag>
-        <span class="text-text-secondary text-xs">{{ raw(secondary.rotation) }}</span>
-      </span>
-
-      <template v-if="backupWho">
-        <span class="flex flex-wrap items-center gap-2">
-          <OUserCell :value="backupWho" />
-          <span class="text-text-secondary text-xs">{{ backupLine }}</span>
-          <!-- Where a derived secondary came from. Shown only when the offset is
-               not 1: at 1 the person literally IS the next in the cycle, which
-               the target label already says, and a "+1" beside it reads as a
-               second delay rather than a position. -->
-          <OTag
-            v-if="backupOffset"
-            variant="default-soft"
-            size="sm"
-            data-test="oncall-pulse-backup-offset"
-          >
-            {{ t("oncall.ctxSecondaryDerived", { offset: backupOffset }) }}
-          </OTag>
-        </span>
-        <p class="text-text-secondary text-xs" data-test="oncall-pulse-next">
-          {{ nextPrimaryLine }}
-        </p>
-      </template>
-      <!-- The rung wakes a pool, not a person. Saying which pool is the whole
-           answer; an avatar would misrepresent how many people it wakes. -->
       <p
-        v-else-if="backupIsGroup"
-        class="text-text-body text-sm"
-        data-test="oncall-pulse-backup-group"
+        v-else-if="!steps.length"
+        class="text-status-error-text text-sm"
+        data-test="oncall-pulse-reaches-nobody"
       >
-        {{ backupLine }}
+        {{ t("oncall.pulseReachesNobody", { priority: raw(priority) }) }}
       </p>
-      <!-- A one-person rotation has no next: naming the same person as backup
-           would suggest a second pair of hands that does not exist. -->
-      <p
-        v-else-if="nobodyBacking"
-        class="text-status-warning-text text-sm"
-        data-test="oncall-pulse-no-backup"
-      >
-        {{ t("oncall.teamNobodyBacking") }}
-      </p>
-    </section>
 
-    <!-- ── Escalation reach ────────────────────────────────────── -->
-    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
-      <span class="flex items-center gap-1.5">
-        <OIcon name="arrow-upward" size="xs" class="text-text-secondary" />
-        <OText variant="section">{{ t("oncall.teamReach") }}</OText>
-      </span>
-
-      <ul class="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1">
-        <li
-          v-for="entry in visibleReach"
-          :key="entry.priority"
-          class="col-span-2 grid grid-cols-subgrid items-baseline"
-          :data-test="`oncall-pulse-reach-${entry.priority.toLowerCase()}`"
+      <template v-for="(step, index) in steps" :key="step.key">
+        <!-- The delay is the server's own, measured from the page opening —
+             the same number the Escalation tab labels the rung with. -->
+        <span
+          v-if="index"
+          class="text-text-secondary flex shrink-0 items-center gap-2 text-xs"
+          aria-hidden="true"
         >
-          <OTag type="alertPriority" :value="entry.priority.toLowerCase()" size="sm" />
-          <span v-if="!entry.pages_anyone" class="text-status-error-text truncate text-xs">
-            {{ t("oncall.reachPagesNobody") }}
-          </span>
-          <span v-else class="flex min-w-0 items-baseline gap-2 text-xs">
-            <!-- One dot per rung: the shape of the ladder is readable before
-                 the number is, and a one-rung P3 stands out against a P1. -->
-            <span class="flex shrink-0 items-center gap-0.5" aria-hidden="true">
-              <span
-                v-for="dot in entry.rungs"
-                :key="dot"
-                class="bg-text-secondary size-1 rounded-full"
+          <span class="bg-border-default h-px w-6" />
+          {{ step.delay }}
+          <span class="bg-border-default h-px w-6" />
+        </span>
+
+        <span class="flex min-w-0 flex-col gap-0.5" :data-test="`oncall-pulse-rung-${index}`">
+          <OText variant="body-strong" as="span" class="truncate">{{ step.who }}</OText>
+          <span class="flex flex-wrap items-center gap-1.5">
+            <span class="text-text-secondary text-xs">{{ step.detail }}</span>
+            <!-- Only where something is wrong. A rung that fires and reaches
+                 nobody is worse than a slow one: the ladder moves on and the
+                 page stays unanswered. The finding is a badge rather than a
+                 bare mark — an icon says only "look here", and the reason is
+                 four words; the server's full sentence stays on hover. -->
+            <OTag
+              v-if="step.problem"
+              variant="error-soft"
+              size="sm"
+              :data-test="`oncall-pulse-rung-problem-${index}`"
+            >
+              {{ step.problem.label }}
+              <OTooltip
+                v-if="step.problem.tip"
+                side="bottom"
+                :content="step.problem.tip ?? undefined"
               />
-            </span>
-            <span class="text-text-body shrink-0">
-              {{ t("oncall.reachRungs", { count: entry.rungs }, entry.rungs) }}
-            </span>
-            <span v-if="entry.nobody_after_micros" class="text-text-secondary ms-auto truncate">
-              {{ nobodyAfter(entry) }}
-            </span>
-          </span>
-        </li>
-        <!-- The priorities that page, but did not fit. Dropping them silently
-             left a panel reading "P1, P2, P5" with no way to tell whether P3
-             was absent, silent, or merely not shown — three different facts
-             wearing one blank space. Named here, so the only thing missing is
-             their detail. -->
-        <li
-          v-if="hiddenReach.length"
-          class="col-span-2 grid grid-cols-subgrid items-baseline"
-          data-test="oncall-pulse-reach-more"
-        >
-          <span class="text-text-secondary text-2xs">{{ hiddenLabel }}</span>
-          <span class="text-text-secondary truncate text-xs">
-            {{ t("oncall.reachAlsoPage") }}
-          </span>
-        </li>
-
-        <!-- Every priority that wakes nobody, on one row. Five separate
-             "Pages nobody" lines is the same fact five times, and it pushed
-             this panel past the height of the three beside it. -->
-        <li
-          v-if="silentPriorities.length"
-          class="col-span-2 grid grid-cols-subgrid items-baseline"
-          data-test="oncall-pulse-reach-silent"
-        >
-          <span class="text-text-secondary text-2xs">{{ silentLabel }}</span>
-          <span class="text-status-error-text truncate text-xs">
-            {{ t("oncall.reachPagesNobody") }}
-          </span>
-        </li>
-      </ul>
-    </section>
-
-    <!-- ── Last N days ─────────────────────────────────────────── -->
-    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
-      <span class="flex items-center gap-1.5">
-        <OIcon name="show-chart" size="xs" class="text-text-secondary" />
-        <OText variant="section">{{ t("oncall.teamLastDays", { days: windowDays }) }}</OText>
-      </span>
-
-      <template v-if="stats && stats.pages">
-        <span class="flex flex-wrap items-baseline gap-x-2">
-          <span
-            class="text-text-heading text-2xl leading-none font-semibold"
-            data-test="oncall-pulse-pages"
-          >
-            {{ stats.pages }}
-          </span>
-          <span class="text-text-body text-sm">{{ t("oncall.activityPages") }}</span>
-          <!-- Counted in the database over the window, not averaged from a
-               fetched page, which is what makes it safe on a tile. -->
-          <span
-            v-if="stats.acknowledged"
-            class="text-status-success-text text-sm font-semibold"
-            data-test="oncall-pulse-fast"
-          >
-            {{ ackedFastPct }}
-          </span>
-          <span v-if="stats.acknowledged" class="text-text-secondary text-xs">
-            {{ t("oncall.activityAckedUnder5m") }}
+            </OTag>
           </span>
         </span>
-        <p class="text-text-secondary text-xs" data-test="oncall-pulse-activity">
-          {{ activityLine }}
-        </p>
       </template>
-      <p v-else class="text-text-secondary text-sm" data-test="oncall-pulse-no-pages">
-        {{ t("oncall.activityNone") }}
-      </p>
-    </section>
+
+      <span class="ms-auto flex shrink-0 items-center gap-2">
+        <!-- Every priority that wakes nobody, on one chip: the finding is
+             "these page nobody", which is one fact however many share it. -->
+        <OTag
+          v-if="silentPriorities.length"
+          variant="error-soft"
+          size="sm"
+          data-test="oncall-pulse-silent"
+        >
+          {{ t("oncall.pulseSilent", { priorities: silentLabel }) }}
+        </OTag>
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          data-test="oncall-pulse-edit-ladder"
+          @click="emit('edit-ladder')"
+        >
+          {{ t("oncall.pulseEditLadder") }}
+        </OButton>
+      </span>
+    </div>
+
+    <OSeparator />
+
+    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
+      <span class="text-text-secondary">{{ t("oncall.pulseHandoff") }}</span>
+      <template v-if="handoffWho">
+        <span class="text-text-heading font-semibold" data-test="oncall-pulse-handoff">
+          {{ handoffWho }}
+        </span>
+        <span class="text-text-secondary">{{ handoffAt }}</span>
+      </template>
+      <span v-else class="text-text-secondary" data-test="oncall-pulse-no-handoff">
+        {{ t("oncall.teamNoHandover") }}
+      </span>
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        data-test="oncall-pulse-open-schedule"
+        @click="emit('open-schedule')"
+      >
+        {{ t("oncall.pulseFullSchedule") }}
+      </OButton>
+
+      <span class="ms-auto flex flex-wrap items-baseline gap-x-2">
+        <span class="text-text-secondary">{{ t("oncall.pulseWindow", { days: windowDays }) }}</span>
+        <template v-if="stats && stats.pages">
+          <span class="text-text-heading font-semibold" data-test="oncall-pulse-pages">
+            {{ t("oncall.pulsePagesCount", { count: stats.pages }, stats.pages) }}
+          </span>
+          <span class="text-text-secondary" aria-hidden="true">{{ dot }}</span>
+          <!-- Red only at nothing-acked-quickly: a share below a made-up
+               threshold is an opinion, none at all is a fact. -->
+          <span
+            class="font-semibold"
+            :class="nothingAckedFast ? 'text-status-error-text' : 'text-text-heading'"
+            data-test="oncall-pulse-acked"
+          >
+            {{ t("oncall.pulseAckedFast", { percent: ackedFastPct }) }}
+          </span>
+          <span v-if="stats.reached_final_rung" class="text-text-secondary" aria-hidden="true">
+            {{ dot }}
+          </span>
+          <span
+            v-if="stats.reached_final_rung"
+            class="text-text-secondary"
+            data-test="oncall-pulse-reached-final"
+          >
+            {{ t("oncall.activityReachedFinal", { count: stats.reached_final_rung }) }}
+          </span>
+        </template>
+        <span v-else class="text-text-secondary" data-test="oncall-pulse-no-pages">
+          {{ t("oncall.activityNone") }}
+        </span>
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          data-test="oncall-pulse-view-pages"
+          @click="emit('open-pages')"
+        >
+          {{ t("oncall.pulseViewPages") }}
+        </OButton>
+      </span>
+    </div>
   </div>
 </template>
 
@@ -242,57 +185,132 @@ import { computed } from "vue";
 
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
-  ChannelReadiness,
-  OnCallPolicy,
+  EscalationPreview,
   OnCallSchedule,
   OnCallSlot,
   TeamOverview,
-  TeamReachability,
-  TeamRungSummary,
 } from "@/ts/interfaces/oncall";
 import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
-import { DELIVERABLE_CHANNELS } from "@/utils/oncall";
-import { formatInZone, nextHandover, upcomingShifts, winningRotation } from "@/utils/oncall";
+import {
+  formatInZone,
+  nextHandover,
+  rungProblem,
+  speakTarget,
+  winningRotation,
+} from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
-    /** Slots as `whoIsOnCall` returns them — the authority on WHO. */
+    /** The engine's own dry run of the ladder this strip draws. */
+    preview?: EscalationPreview | null;
+    loading?: boolean;
+    /** Slots as `whoIsOnCall` returns them — the authority on WHO hands over. */
     slots?: OnCallSlot[];
     /** The schedule answers WHEN; a slot carries no start or end instant. */
     schedule?: OnCallSchedule | null;
-    policy?: OnCallPolicy | null;
-    /** `GET .../overview` — the ladder summary and the window's statistics. */
+    /** `GET .../overview` — the silent priorities and the window's figures. */
     overview?: TeamOverview | null;
-    /** `GET .../reachability` — would a page to each person actually land. */
-    reachability?: TeamReachability | null;
     timezone?: string;
   }>(),
   {
+    preview: null,
+    loading: false,
     slots: () => [],
     schedule: null,
-    policy: null,
     overview: null,
-    reachability: null,
     timezone: "UTC",
   },
 );
 
+const emit = defineEmits<{
+  (e: "edit-ladder"): void;
+  (e: "open-schedule"): void;
+  (e: "open-pages"): void;
+}>();
+
 const { t } = useI18nTyped();
+
+/// The separator between facts on one line. Decoration, so it is hidden from
+/// a screen reader rather than read out between every figure.
+const dot = raw("·");
 
 const nowMicros = useOnCallClock();
 
-/// The primary slot, named rather than taken as "the first one with somebody in
-/// it". A two-slot team returns two staffed slots and the order is the server's
-/// business, so first-non-empty would eventually show the secondary under a
-/// heading that says "On call now".
+/// Which ladder is on the rail. Named in the heading rather than assumed: the
+/// other priorities can run a different one, and a strip that says "a page"
+/// while drawing P1's rungs would be wrong on every team that varies them.
+const priority = computed(() => props.preview?.priority ?? "P1");
+
+const preview = computed(() => props.preview);
+
+interface LadderStep {
+  key: string;
+  /** Absolute delay from the page opening. Empty on the opening rung. */
+  delay: I18nText;
+  who: I18nText;
+  detail: I18nText;
+  /** The badge, and the server's full sentence behind it. */
+  problem: ReturnType<typeof rungProblem>;
+}
+
+/// The engine's own English, said the way the editor says it — one vocabulary
+/// for one concept, rather than two a click apart.
+const saidTargets = (targets: string[]) =>
+  targets.map((target) => speakTarget(target, t)).join(", ");
+
+/// A ladder that hands the page to the default team has not stopped — saying
+/// it stopped would tell somebody nobody is coming when somebody is.
+const endPhrase = computed<I18nText>(() =>
+  props.preview?.final_action === "notify_default_team"
+    ? t("oncall.pulseThenHandsOff")
+    : t("oncall.pulseThenStops"),
+);
+
+const steps = computed<LadderStep[]>(() => {
+  const rungs = preview.value?.rungs ?? [];
+  return rungs.map((rung, index) => {
+    const people = rung.recipients;
+    const last = index === rungs.length - 1;
+    // A rung wakes a pool or a person, and only one of those has a name worth
+    // printing: six addresses on a rail is a wall rather than an answer.
+    const many = people.length > 1;
+    const parts = [
+      many
+        ? String(t("oncall.pulseAllMembers", { count: people.length }, people.length))
+        : String(index === 0 ? t("oncall.pulsePagedFirst") : t("oncall.pulseIfNoAck")),
+    ];
+    if (last) parts.push(String(endPhrase.value));
+
+    return {
+      key: `${rung.after_micros}-${index}`,
+      delay: raw(`+${formatMicrosDuration(rung.after_micros)}`),
+      who: people.length === 1 ? raw(people[0].user_email) : raw(saidTargets(rung.targets)),
+      detail: raw(parts.join(" · ")),
+      problem: rungProblem(rung, t),
+    };
+  });
+});
+
+const silentPriorities = computed(() =>
+  (props.overview?.rungs ?? []).filter((entry) => !entry.pages_anyone),
+);
+
+const silentLabel = computed<I18nText>(() =>
+  raw(silentPriorities.value.map((entry) => entry.priority).join(", ")),
+);
+
+/// The primary slot, named rather than taken as "the first one with somebody
+/// in it": a two-slot team returns two staffed slots and the order is the
+/// server's business, so first-non-empty eventually hands over the secondary.
 const holder = computed<OnCallSlot | null>(
   () =>
     props.slots.find((slot) => sameSlot(slot.slot, DEFAULT_SLOT) && !!slot.user_email) ??
@@ -307,261 +325,48 @@ const rotation = computed(() =>
     : null,
 );
 
-const zone = computed(
-  () => props.schedule?.timezone || props.overview?.timezone || props.timezone,
-);
+const zone = computed(() => props.schedule?.timezone || props.overview?.timezone || props.timezone);
 
-/// Carries the zone abbreviation: "hands over at 18:00" is ambiguous to a
-/// reader in another office, which is most of them.
-const clock = (micros: number) =>
-  formatInZone(micros, zone.value, {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
-
-/// "Since 18:00 Wed · 5h 12m left · hands to Mia at 18:00" — one sentence,
-/// because the three facts are only useful together.
-const shiftLine = computed<I18nText>(() => {
+/// When the pager changes hands, or null when nothing is scheduled to take it.
+const handoverAt = computed<number | null>(() => {
   const current = rotation.value;
-  if (!current) return raw("");
-
-  const shift = upcomingShifts(current, nowMicros.value, 2)[0];
-  const endsAt = nextHandover(current, nowMicros.value);
-  const parts: string[] = [];
-
-  if (shift) {
-    parts.push(
-      String(
-        t("oncall.teamSince", {
-          time: raw(
-            formatInZone(shift.startMicros, zone.value, {
-              weekday: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          ),
-        }),
-      ),
-    );
-  }
-  if (endsAt && endsAt > nowMicros.value) {
-    parts.push(
-      String(t("oncall.teamLeft", { duration: formatMicrosDuration(endsAt - nowMicros.value) })),
-    );
-  }
-  const nextPerson = holder.value?.next_user_email;
-  parts.push(
-    endsAt && nextPerson
-      ? String(t("oncall.teamHandsTo", { name: raw(nextPerson), time: raw(clock(endsAt)) }))
-      : String(t("oncall.teamNoHandover")),
-  );
-  return raw(parts.join(" · "));
+  if (!current || !holder.value?.next_user_email) return null;
+  const at = nextHandover(current, nowMicros.value);
+  return at && at > nowMicros.value ? at : null;
 });
 
-/// The channels that would be tried for whoever is on call right now.
-const holderChannels = computed<ChannelReadiness[]>(() => {
-  const email = holder.value?.user_email?.toLowerCase();
-  if (!email) return [];
-  const member = props.reachability?.members.find(
-    (candidate) => candidate.user_email.toLowerCase() === email,
-  );
-  // Only channels a Notifier can send. "✗ SMS ✗ Push" implied a fixable
-  // problem with this person's setup; the truth is the transport does not
-  // exist yet, which is not a per-member fact and not this panel's news.
-  return (member?.channels ?? []).filter((entry) =>
-    (DELIVERABLE_CHANNELS as readonly string[]).includes(entry.channel),
-  );
-});
-
-function channelLabel(entry: ChannelReadiness): I18nText {
-  const name = t(`oncall.channel_${entry.channel}`);
-  return raw(`${entry.deliverable ? "✓" : "✗"} ${name}`);
-}
-
-/// The second rung of the P1 ladder: when it fires, and **what it names**.
-///
-/// The label is read off the rung's target rather than fixed to "Secondary".
-/// It used to say Secondary on the grounds that secondary was a rung and not a
-/// role — true until slots landed. Now a team can staff a real `secondary`
-/// slot, and on such a team `next_on_call` and the secondary are *different
-/// people*: this panel said "Secondary — mei" while the Schedule tab said
-/// "Secondary → priya", and both were right about different things. Naming the
-/// target is what keeps the two screens telling one story.
-const backupTarget = computed(() => {
-  const steps = props.policy?.rungs.find((rung) => rung.priority === 1)?.steps ?? [];
-  const second = [...steps].sort((a, b) => a.after_micros - b.after_micros)[1];
-  // `targets` is required on the wire, but a rung that somehow arrives without
-  // one must not take the whole team overview down with it.
-  return second ? { step: second, target: second.targets?.[0] ?? null } : null;
-});
-
-const backupLine = computed<I18nText>(() => {
-  const found = backupTarget.value;
-  if (!found?.target) return raw("");
-  const label = String(t(`oncall.target_${found.target.kind}`));
-  return raw(
-    `${label} · ${t("oncall.teamPagedAt", { delay: formatMicrosDuration(found.step.after_micros) })}`,
-  );
-});
-
-/// How far down the cycle a derived secondary sits. Null unless the rung is
-/// the derived one AND the offset is interesting — see the template.
-const backupOffset = computed<number | null>(() => {
-  if (backupTarget.value?.target?.kind !== "next_on_call") return null;
-  const offset = holder.value?.next_offset ?? 1;
-  return offset > 1 ? offset : null;
-});
-
-/// Who that rung reaches. `next_on_call` stays **within** the primary slot, so
-/// the slot holder's own `next_user_email` is the answer — not the first
-/// non-empty slot, which on a two-slot team is a coin toss.
-const backupWho = computed<string | null>(() => {
-  const target = backupTarget.value?.target;
-  if (!target) return null;
-  if (target.kind === "user") return target.email;
-  if (target.kind === "next_on_call") return holder.value?.next_user_email ?? null;
-  if (target.kind === "on_call_now") return holder.value?.user_email ?? null;
-  if (target.kind === "on_call_in_slot" || target.kind === "next_on_call_in_slot") {
-    const named = props.slots.find((slot) => sameSlot(slot.slot, target.slot));
-    return (
-      (target.kind === "on_call_in_slot" ? named?.user_email : named?.next_user_email) ?? null
-    );
-  }
-  // whole_team / everyone_on_schedule reach a room, not a person — the ladder
-  // on the Escalation tab names them, and one avatar here would misrepresent
-  // how many people that rung wakes.
-  return null;
-});
-
-/// A staffed **secondary slot** — a second pool that is on call right now,
-/// resolved by the same `/on-call` call that names the primary.
-///
-/// This is the fact the panel was missing. It read the P1 ladder's second rung
-/// and nothing else, and the shipped default policy's rung 2 is `whole_team`,
-/// which names no individual — so every team with the stock policy was told
-/// "Nobody backs this rotation up" while `/on-call` was plainly returning a
-/// staffed secondary underneath it.
-const secondary = computed<OnCallSlot | null>(
-  () =>
-    props.slots.find(
-      (slot) => !sameSlot(slot.slot, DEFAULT_SLOT) && !!slot.user_email,
-    ) ?? null,
-);
-
-/// The rung reaches a pool rather than a person — a real backup with no single
-/// face to put on it. Naming the target is honest; an empty state is not.
-const backupIsGroup = computed(() => {
-  const kind = backupTarget.value?.target?.kind;
-  return kind === "whole_team" || kind === "everyone_on_schedule" || kind === "everyone_in_slot";
-});
-
-/// Only when there is genuinely nothing: no second pool on call, and no second
-/// rung to wake anybody — a one-person rotation with a one-rung ladder.
-const nobodyBacking = computed(
-  () => !secondary.value && !backupWho.value && !backupIsGroup.value,
-);
-
-const nextPrimaryLine = computed<I18nText>(() => {
-  const current = rotation.value;
-  if (!current) return raw("");
-  const [thisShift, afterThat] = upcomingShifts(current, nowMicros.value, 3).slice(0, 2);
-  if (!thisShift) return raw("");
-
-  const parts: string[] = [
-    String(
-      t("oncall.teamNextPrimary", {
+const handoffWho = computed<I18nText | null>(() =>
+  handoverAt.value
+    ? t("oncall.pulseHandoffIn", {
         name: raw(holder.value?.next_user_email ?? ""),
-        duration: formatMicrosDuration(thisShift.endMicros - nowMicros.value),
-      }),
-    ),
-  ];
-  // Only when it is somebody NEW: a two-person rotation cycles straight back,
-  // and "Then Ana" under "Next Ana" reads as a third shift that is not coming.
-  if (afterThat && afterThat.member !== holder.value?.next_user_email) {
-    parts.push(
-      String(
-        t("oncall.teamThen", {
-          name: raw(afterThat.member),
-          date: raw(formatInZone(afterThat.startMicros, zone.value, { dateStyle: "medium" })),
-        }),
-      ),
-    );
-  }
-  return raw(parts.join(" · "));
-});
-
-const reach = computed<TeamRungSummary[]>(() => props.overview?.rungs ?? []);
-
-/**
- * Rows this panel may draw.
- *
- * Four panels sit side by side and the tallest sets the height of the row, so
- * a list that grows one line per priority makes the other three mostly empty.
- * Three is what fits beside them.
- */
-const MAX_REACH_ROWS = 3;
-
-/// Priorities that wake nobody, collapsed to one line — the finding is "these
-/// page nobody", which is one fact however many priorities share it.
-const silentPriorities = computed(() => reach.value.filter((entry) => !entry.pages_anyone));
-
-const silentLabel = computed<I18nText>(() =>
-  raw(silentPriorities.value.map((entry) => entry.priority).join(", ")),
+        duration: formatMicrosDuration(handoverAt.value - nowMicros.value),
+      })
+    : null,
 );
 
-const pagingPriorities = computed(() => reach.value.filter((entry) => entry.pages_anyone));
-
-/// The ladders that actually fire, most urgent first. The two summary lines —
-/// "these also page" and "these page nobody" — take the last rows when they are
-/// needed, so neither is the one that falls off the bottom.
-const visibleReach = computed<TeamRungSummary[]>(() => {
-  const paging = pagingPriorities.value;
-  const budget = MAX_REACH_ROWS - (silentPriorities.value.length ? 1 : 0);
-  // Everything fits, so nothing is collapsed and no summary row is spent.
-  if (paging.length <= budget) return paging;
-  // One row goes to naming what did not fit; the rest show their ladders.
-  return paging.slice(0, Math.max(0, budget - 1));
-});
-
-/// Priorities that page and were not drawn in full — named, never dropped.
-const hiddenReach = computed<TeamRungSummary[]>(() =>
-  pagingPriorities.value.slice(visibleReach.value.length),
+/// The instant as well as the countdown: "in 5d 10h" is unreadable against a
+/// calendar, and a reader in another office needs the zone spelled out.
+const handoffAt = computed<I18nText>(() =>
+  handoverAt.value
+    ? raw(
+        `· ${formatInZone(handoverAt.value, zone.value, {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZoneName: "short",
+        })}`,
+      )
+    : raw(""),
 );
-
-const hiddenLabel = computed<I18nText>(() =>
-  raw(hiddenReach.value.map((entry) => entry.priority).join(", ")),
-);
-
-/// The instant after which this priority stops waking anybody.
-function nobodyAfter(entry: TeamRungSummary): I18nText {
-  return t("oncall.reachNobodyAfter", {
-    duration: formatMicrosDuration(entry.nobody_after_micros ?? 0),
-  });
-}
 
 const stats = computed(() => props.overview?.stats ?? null);
 const windowDays = computed(() => props.overview?.days ?? 7);
 
 const ackedFastPct = computed<I18nText>(() =>
-  raw(`${Math.round(props.overview?.acked_under_5m_percent ?? 0)}%`),
+  raw(`${Math.round(props.overview?.acked_under_5m_percent ?? 0)}`),
 );
 
-/// How far pages actually got. "Reached the whole team" is the loud one — it
-/// means the ladder ran to the end and everybody was woken.
-const activityLine = computed<I18nText>(() => {
-  const s = stats.value;
-  if (!s) return raw("");
-  const parts: string[] = [];
-  if (s.reached_second_rung) {
-    parts.push(String(t("oncall.activityReachedSecond", { count: s.reached_second_rung })));
-  }
-  if (s.reached_final_rung) {
-    parts.push(String(t("oncall.activityReachedFinal", { count: s.reached_final_rung })));
-  }
-  if (s.night_pages) {
-    parts.push(String(t("oncall.activityOvernight", { count: s.night_pages }, s.night_pages)));
-  }
-  return raw(parts.join(" · "));
-});
+const nothingAckedFast = computed(() => !!stats.value?.pages && !stats.value.acked_under_5m);
 </script>
