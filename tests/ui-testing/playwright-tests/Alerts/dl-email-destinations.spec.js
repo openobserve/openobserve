@@ -38,6 +38,7 @@ const api = require('../utils/o2-api.js');
 const RUN = Date.now().toString().slice(-6);
 const ORG_USER = process.env['ZO_ROOT_USER_EMAIL'] || 'root@example.com';
 const DL_ADDRESS = process.env['DL_ADDRESS'] || '';
+const DL_MEMBERS = (process.env['DL_MEMBERS'] || '').split(',').map((s) => s.trim()).filter(Boolean);
 
 const created = [];
 const uniq = (suffix) => {
@@ -93,6 +94,7 @@ test.describe('Email destinations and distribution lists', () => {
 
   test.afterAll(async () => {
     for (const n of created) await api.deleteDestination(n).catch(() => {});
+    if (DL_ADDRESS) await api.deleteOrgUser(DL_ADDRESS).catch(() => {});
     testLogger.info('Cleaned up destinations created by this spec', { count: created.length });
   });
 
@@ -484,15 +486,23 @@ test.describe('Email destinations and distribution lists', () => {
   test('D-02 · a real distribution list fans out to its members', {
     tag: ['@dlEmailDestinations', '@email', '@delivery', '@dl', '@P1', '@all'],
   }, async () => {
-    test.skip(!DL_ADDRESS, 'set DL_ADDRESS to a real distribution list to run the fan-out case');
+    test.skip(!DL_ADDRESS, 'set DL_ADDRESS to a distribution list to run the fan-out case');
     test.skip(!(await sink.available()), await sink.unavailableReason());
 
+    // The alias has to be an org member before it can be addressed at all.
+    await api.createOrgUser(DL_ADDRESS);
     const destName = uniq('fanout');
-    const before = await sink.count();
+    await sink.clear();
 
     await fillEmailForm(pm, destName, DL_ADDRESS);
     await pm.alertDestinationsPage.clickTest();
-    await sink.waitForCount(before + 1);
+
+    // One send must produce one delivery per member — that is the whole point of
+    // a distribution list, and the half OpenObserve does not perform itself.
+    const expected = DL_MEMBERS.length || 1;
+    const delivered = await sink.waitForCount(expected);
+    expect(delivered, `one send should reach all ${expected} member mailbox(es)`)
+      .toBeGreaterThanOrEqual(expected);
 
     const msg = await sink.latest();
     expect(msg, 'a member mailbox must receive the message').not.toBeNull();

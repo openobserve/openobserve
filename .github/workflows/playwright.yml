@@ -47,10 +47,17 @@ env:
   # delivery assertions in Alerts/dl-email-destinations.spec.js runnable.
   ZO_SMTP_ENABLED: true
   ZO_SMTP_HOST: localhost
-  ZO_SMTP_PORT: 1025
+  # 1026 is the DL relay, not Mailpit — it expands DL_ADDRESS and forwards
+  # everything else through untouched, so non-email shards see no difference.
+  ZO_SMTP_PORT: 1026
   ZO_SMTP_FROM_EMAIL: alerts@ci.openobserve.test
   # Read by tests/ui-testing/playwright-tests/utils/mail-sink.js
   MAILPIT_URL: http://localhost:8025
+  # A distribution list that exists only inside the runner: one alias, three
+  # member mailboxes. Lets the fan-out case run with no external mail provider,
+  # no secrets and no egress.
+  DL_ADDRESS: ci-dl@ci.openobserve.test
+  DL_MEMBERS: ci-dl-m1@ci.openobserve.test,ci-dl-m2@ci.openobserve.test,ci-dl-m3@ci.openobserve.test
   ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
@@ -273,6 +280,20 @@ jobs:
           done
           echo "::warning::Mailpit did not start; email delivery assertions will skip"
 
+      - name: Start distribution-list relay
+        # Mailpit is a sink: it accepts any address but stores ONE message, so it
+        # can never show what a real distribution list does. This tiny relay sits
+        # in front of it and expands the alias into per-member deliveries, the
+        # same way alerts-content-templates.spec.js stands up an HTTP receiver to
+        # capture what a webhook destination really sent.
+        run: |
+          node tests/ui-testing/scripts/dl-relay.js > dl-relay.log 2>&1 &
+          for i in $(seq 1 20); do
+            (echo > /dev/tcp/127.0.0.1/1026) >/dev/null 2>&1 && { echo "DL relay ready after ${i}s"; exit 0; }
+            sleep 1
+          done
+          echo "::warning::DL relay did not start; the fan-out case will skip"
+
       - name: Start OpenObserve
         # Per-shard override of the workflow-level default. ZO_QUICK_MODE_ENABLED is
         # read once at server start and is global to the process, so a shard is the
@@ -337,6 +358,8 @@ jobs:
           echo "ORGNAME=${ORGNAME}" >> .env
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           echo "MAILPIT_URL=${MAILPIT_URL}" >> .env
+          echo "DL_ADDRESS=${DL_ADDRESS}" >> .env
+          echo "DL_MEMBERS=${DL_MEMBERS}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
 

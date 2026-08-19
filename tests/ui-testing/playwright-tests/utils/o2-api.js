@@ -28,6 +28,18 @@ const createDestination = (payload) => req('POST', '/alerts/destinations', paylo
 const deleteDestination = (name) => req('DELETE', `/alerts/destinations/${name}`);
 const testDestination = (payload) => req('POST', '/alerts/destinations/test', payload);
 const listTemplates = () => req('GET', '/alerts/templates');
+
+/**
+ * A destination recipient must be a user of the org — see the membership gate in
+ * alerts/destinations.rs. A distribution-list alias is not a person, so the DL
+ * fan-out case has to enrol the alias before it can be addressed at all.
+ */
+const createOrgUser = (email) => req('POST', '/users', {
+  email, first_name: 'dl', last_name: 'alias',
+  password: process.env.ZO_ROOT_USER_PASSWORD || 'Complexpass#123',
+  role: 'admin',
+});
+const deleteOrgUser = (email) => req('DELETE', `/users/${encodeURIComponent(email)}`);
 const getTemplate = (name) => req('GET', `/alerts/templates/${name}`);
 
 /** Stored recipients for a destination, or null when it does not exist. */
@@ -40,4 +52,5 @@ async function storedRecipients(name) {
 module.exports = {
   BASE, ORG, req, getDestination, listDestinations, createDestination,
   deleteDestination, testDestination, listTemplates, getTemplate, storedRecipients,
+  createOrgUser, deleteOrgUser,
 };
