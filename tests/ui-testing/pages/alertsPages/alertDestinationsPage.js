@@ -117,13 +117,27 @@ export class AlertDestinationsPage {
         this.customEmailsSelect = '[data-test="add-destination-emails-select"]';
         this.customEmailsSelectTrigger = '[data-test="add-destination-emails-select-trigger"]';
         this.customEmailsSelectSearch = '[data-test="add-destination-emails-select-search"]';
+        // OSelect derives `<parent>-option` from its OWN data-test, so each
+        // dropdown's options carry a distinct suffix — scope to it rather than
+        // a page-global selector that would also match whichever OTHER select
+        // (e.g. the template picker) happens to still be in the DOM.
+        this.customEmailsSelectOption = '[data-test="add-destination-emails-select-option"]';
+        this.customEmailsSelectPopover = '[data-test="add-destination-emails-select-popover"]';
         this.prebuiltTemplateSelectTrigger = '[data-test="add-destination-prebuilt-template-select-trigger"]';
+        this.prebuiltTemplateSelectOption = '[data-test="add-destination-prebuilt-template-select-option"]';
+        this.prebuiltTemplateSelectPopover = '[data-test="add-destination-prebuilt-template-select-popover"]';
         this.skipTlsVerifyToggle = '[data-test="add-destination-skip-tls-verify-toggle-btn"]';
         this.previewButton = '[data-test="destination-preview-button"]';
-        this.previewDialog = '[role="dialog"]';
+        // Not the generic `[role="dialog"]` — the add-destination form can
+        // itself resolve to a dialog role in some contexts, so a generic
+        // selector risks reading the FORM's own content as the preview and
+        // passing vacuously against a broken Preview.
+        this.previewDialog = '[data-test="destination-preview-modal"]';
         this.updateDestinationButton = '[data-test="alert-destination-list-{destinationName}-update-destination"]';
         this.typeCard = '[data-test="destination-type-card"]';
-        this.selectOption = '[role="option"], [data-test$="-option"]';
+        // AppTabs.vue derives `tab-${tab.value}` off the tab's own value, not
+        // the parent add-destination-tabs container's data-test.
+        this.emailTypeTab = '[data-test="tab-email"]';
         this.visibleFieldError = '[data-test$="-error"]:visible';
     }
 
@@ -173,15 +187,16 @@ export class AlertDestinationsPage {
 
     /** Switch the form to a given prebuilt/custom type card without filling anything. */
     async clickDestinationTypeCard(type) {
-        await this.page.locator(`${this.typeCard}[data-type="${type}"]`).click();
-        await this.page.waitForTimeout(2000);
+        const card = this.page.locator(`${this.typeCard}[data-type="${type}"]`);
+        await card.click();
+        await expect(card).toHaveClass(/selected/, { timeout: 10000 });
     }
 
     /** Custom (non-prebuilt) destination → Email tab. Uses the org-user picker. */
     async openCustomEmailPath() {
         await this.clickDestinationTypeCard('custom');
-        await this.page.getByText('Email', { exact: true }).last().click();
-        await this.page.waitForTimeout(2000);
+        await this.page.locator(this.emailTypeTab).first().click();
+        await this.page.locator(this.customEmailsSelect).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async isCustomEmailsPickerPresent() {
@@ -192,25 +207,47 @@ export class AlertDestinationsPage {
         return (await this.page.locator(this.recipientsInputField).count()) > 0;
     }
 
-    /** Options offered by the custom path's org-user picker, optionally filtered by a search term. */
+    /**
+     * Options offered by the custom path's org-user picker, optionally filtered
+     * by a search term. Idempotent about opening: a caller reading the picker
+     * twice in the same test (e.g. once unfiltered, once filtered) must not have
+     * the second call's trigger click TOGGLE an already-open popover closed.
+     */
     async getCustomEmailPickerOptions(searchTerm = null) {
-        await this.page.locator(this.customEmailsSelectTrigger).first().click();
-        await this.page.waitForTimeout(1500);
+        const popover = this.page.locator(this.customEmailsSelectPopover).first();
+        if (!(await popover.isVisible().catch(() => false))) {
+            await this.page.locator(this.customEmailsSelectTrigger).first().click();
+            await popover.waitFor({ state: 'visible', timeout: 10000 });
+        }
         if (searchTerm) {
             const search = this.page.locator(this.customEmailsSelectSearch).first();
             if (await search.isVisible().catch(() => false)) {
                 await search.fill(searchTerm);
+                // No DOM signal for "the client-side filter finished re-rendering" —
+                // the search value itself lands synchronously, but the filtered
+                // option list is the thing under test, so this settle is real.
                 await this.page.waitForTimeout(1200);
             }
         }
-        return await this.page.locator(this.selectOption).allInnerTexts().catch(() => []);
+        return await this.page.locator(this.customEmailsSelectOption).allInnerTexts().catch(() => []);
+    }
+
+    /**
+     * Whether the custom email picker's search field is actually present in the
+     * currently-open dropdown. A non-member search term legitimately returns
+     * zero options, so an empty getCustomEmailPickerOptions() result can never
+     * by itself prove the search ran — this checks the mechanism engaged.
+     */
+    async isCustomEmailsSearchVisible() {
+        return await this.page.locator(this.customEmailsSelectSearch).first().isVisible().catch(() => false);
     }
 
     /** Template names an EMAIL destination is allowed to pick. */
     async getTemplateOptionsForEmail() {
         await this.page.locator(this.prebuiltTemplateSelectTrigger).first().click();
-        await this.page.waitForTimeout(1800);
-        return await this.page.locator(this.selectOption).allInnerTexts().catch(() => []);
+        await this.page.locator(this.prebuiltTemplateSelectPopover).first()
+            .waitFor({ state: 'visible', timeout: 10000 });
+        return await this.page.locator(this.prebuiltTemplateSelectOption).allInnerTexts().catch(() => []);
     }
 
     async isSkipTlsToggleVisible() {
@@ -220,7 +257,7 @@ export class AlertDestinationsPage {
     /** Open the Destination Preview dialog and return its rendered text. */
     async openPreviewAndGetText() {
         await this.page.locator(this.previewButton).first().click();
-        await this.page.waitForTimeout(2500);
+        await this.page.locator(this.previewDialog).first().waitFor({ state: 'visible', timeout: 10000 });
         return await this.page.locator(this.previewDialog).first().innerText().catch(() => '');
     }
 

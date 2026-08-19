@@ -35,6 +35,14 @@ const listTemplates = () => req('GET', '/alerts/templates');
  * A destination recipient must be a user of the org — see the membership gate in
  * alerts/destinations.rs. A distribution-list alias is not a person, so the DL
  * fan-out case has to enrol the alias before it can be addressed at all.
+ *
+ * role MUST be 'admin': UserRoleRequest::from() (common/src/meta/user.rs) matches
+ * the requested role string against get_roles() and, on no match, treats it as a
+ * CUSTOM role — which core/src/users.rs::post_user rejects outright with 400 when
+ * OpenFGA/RBAC is off (the OSS CI topology this suite actually runs in restricts
+ * the standard-role set to Admin only). A lower role 400s the create outright,
+ * which is worse for the "stray privileged account" concern this once tried to
+ * avoid — cleanup being flag-gated (see dlUserCreated below) is the real mitigation.
  */
 const createOrgUser = (email) => req('POST', '/users', {
   email, first_name: 'dl', last_name: 'alias',

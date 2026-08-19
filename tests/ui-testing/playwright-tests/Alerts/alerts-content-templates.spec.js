@@ -423,20 +423,22 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
       .toBeGreaterThan(1);
   });
 
-  test.skip('B1 · rows disabled in a content template are not embedded [#2471 B1]', {
+  // BLOCKED BY #2471 (B1): resolve.rs builds the rows collection from
+  // spec.rows.max / columns / format but never reads spec.rows.enabled, so the
+  // "Show matching rows" switch is inert and matched log rows are always
+  // embedded. The frontend is not at fault — the editor stores the flag
+  // correctly; only the renderer ignores it.
+  //
+  // Verification shape (see the issue for the full manual reproduction):
+  //   1. author a content template with rows.enabled = false
+  //   2. confirm the STORED spec really has rows.enabled: false
+  //   3. bind it to a destination + alert, fire, capture the payload
+  //   4. assert the payload carries no rows
+  //
+  // Not yet implemented as a runnable test — a hardcoded failing assertion
+  // here would still fail once #2471 is fixed, which reads as "still broken"
+  // when it means the opposite.
+  test.fixme('B1 · rows disabled in a content template are not embedded [#2471 B1]', {
     tag: ['@contentTemplates', '@delivery', '@regression', '@P1', '@all'],
-  }, async () => {
-    // BLOCKED BY #2471 (B1): resolve.rs builds the rows collection from
-    // spec.rows.max / columns / format but never reads spec.rows.enabled, so the
-    // "Show matching rows" switch is inert and matched log rows are always
-    // embedded. The frontend is not at fault — the editor stores the flag
-    // correctly; only the renderer ignores it.
-    //
-    // Verification shape (see the issue for the full manual reproduction):
-    //   1. author a content template with rows.enabled = false
-    //   2. confirm the STORED spec really has rows.enabled: false
-    //   3. bind it to a destination + alert, fire, capture the payload
-    //   4. assert the payload carries no rows
-    expect(true, 'placeholder until the renderer honours rows.enabled').toBe(false);
-  });
+  }, async () => {});
 });

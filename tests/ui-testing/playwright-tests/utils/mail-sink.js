@@ -61,17 +61,20 @@ async function unavailableReason() {
        + `or set MAILINATOR_INBOX to a public inbox name`;
 }
 
+/** `ts` is epoch ms, carried so latest() can sort rather than trust API order —
+ *  Mailpit returns /api/v1/messages newest-first, but Mailinator's v2 inbox
+ *  returns oldest-first, and neither ordering is documented as an API contract. */
 async function list() {
   const b = await backend();
   if (b === 'mailpit') {
     const r = await fetch(`${MAILPIT}/api/v1/messages`);
     const d = await r.json();
-    return (d.messages || []).map((m) => ({ id: m.ID, subject: m.Subject }));
+    return (d.messages || []).map((m) => ({ id: m.ID, subject: m.Subject, ts: Date.parse(m.Created) || 0 }));
   }
   if (b === 'mailinator') {
     const r = await fetch(`https://www.mailinator.com/api/v2/domains/public/inboxes/${MAILINATOR_INBOX}`);
     const d = await r.json();
-    return (d.msgs || []).map((m) => ({ id: m.id, subject: m.subject }));
+    return (d.msgs || []).map((m) => ({ id: m.id, subject: m.subject, ts: Number(m.time) || 0 }));
   }
   return [];
 }
@@ -105,7 +108,7 @@ async function latest() {
   const b = await backend();
   const msgs = await list();
   if (!msgs.length) return null;
-  const id = msgs[0].id;
+  const id = [...msgs].sort((a, c) => c.ts - a.ts)[0].id;
 
   if (b === 'mailpit') {
     const m = await (await fetch(`${MAILPIT}/api/v1/message/${id}`)).json();

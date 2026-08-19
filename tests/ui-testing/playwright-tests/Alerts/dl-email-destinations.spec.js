@@ -47,6 +47,12 @@ const uniq = (suffix) => {
   return n;
 };
 
+// Gates the afterAll delete on THIS suite having actually created the DL_ADDRESS
+// user, not merely on the env var being set — DL_ADDRESS is a shared, global CI
+// value, and deleting whatever account it happens to name (with no record of
+// whether this run made it) is unsafe against a real/shared org.
+let dlUserCreated = false;
+
 async function gotoDestinations(page, pm) {
   await page.goto(`${process.env['ZO_BASE_URL']}/web/alert-destinations?org_identifier=${process.env['ORGNAME']}`);
   await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
@@ -86,7 +92,17 @@ test.describe('Email destinations and distribution lists', () => {
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
-    test.skip(!(await smtpAvailable()),
+    const ready = await smtpAvailable();
+    if (!ready && process.env['ZO_SMTP_ENABLED'] === 'true') {
+      // ZO_SMTP_ENABLED=true means this environment explicitly configured SMTP
+      // for this suite (CI does) — a gate that still reads "off" here means the
+      // /alerts/destinations/test contract drifted, not that SMTP is genuinely
+      // unavailable. Silently skipping would turn every case in this file into
+      // a green no-op with nothing in the report to explain why.
+      throw new Error('ZO_SMTP_ENABLED=true but smtpAvailable() still reads false — '
+        + 'the /alerts/destinations/test SMTP-detection contract may have drifted');
+    }
+    test.skip(!ready,
       'SMTP is not configured on this environment (ZO_SMTP_ENABLED) — email destinations cannot be saved');
     pm = new PageManager(page);
     await gotoDestinations(page, pm);
@@ -94,13 +110,17 @@ test.describe('Email destinations and distribution lists', () => {
 
   test.afterAll(async () => {
     for (const n of created) await api.deleteDestination(n).catch(() => {});
-    if (DL_ADDRESS) await api.deleteOrgUser(DL_ADDRESS).catch(() => {});
+    if (dlUserCreated) await api.deleteOrgUser(DL_ADDRESS).catch(() => {});
     testLogger.info('Cleaned up destinations created by this spec', { count: created.length });
   });
 
   // ══ TIER A · P0 — critical path, no mailbox required ═════════════════════
 
-  test('D-01 · a DL address saves, appears in the list, and round-trips', {
+  // Uses ORG_USER, not DL_ADDRESS — DL_ADDRESS is env-optional (empty string
+  // fallback above) and this is the P0 smoke test, so it must not depend on it
+  // being configured. The DL-specific fan-out is covered separately in the
+  // delivery tier below, which does gate on DL_ADDRESS being set.
+  test('D-01 · a recipient address saves, appears in the list, and round-trips', {
     tag: ['@dlEmailDestinations', '@email', '@smoke', '@P0', '@all'],
   }, async () => {
     const destName = uniq('dl');
@@ -303,6 +323,15 @@ test.describe('Email destinations and distribution lists', () => {
     const offered = await pm.alertDestinationsPage.getCustomEmailPickerOptions();
     expect(offered.some((o) => o.includes('@')), 'the picker must list org users').toBe(true);
 
+    // A real, non-member search term legitimately returns zero options — that
+    // IS the secure behaviour, so an empty result cannot itself prove the
+    // check ran. What must be proven is that the search box actually engaged;
+    // getCustomEmailPickerOptions() otherwise silently skips a missing search
+    // field and would return the unfiltered list, which the substring filter
+    // below cannot distinguish from a correctly-empty one.
+    expect(await pm.alertDestinationsPage.isCustomEmailsSearchVisible(),
+      'the picker search field must be present to filter by').toBe(true);
+
     const forOutsider = await pm.alertDestinationsPage.getCustomEmailPickerOptions('outsider-not-a-member');
     expect(forOutsider.filter((o) => o.includes('outsider')).length,
       'a non-member must not be selectable').toBe(0);
@@ -322,6 +351,10 @@ test.describe('Email destinations and distribution lists', () => {
     const stored = await api.storedRecipients(destName);
     testLogger.info('duplicate-recipient behaviour', { stored });
     expect(stored).not.toBeNull();
+    // .every() alone is true for a would-be-deduped 1-element array too, so it
+    // cannot distinguish "duplicates preserved" from "duplicates removed" — the
+    // exact behaviour this test documents. Length pins that down.
+    expect(stored, 'duplicates are recorded as entered, not de-duplicated').toHaveLength(2);
     expect(stored.every((r) => r === ORG_USER.toLowerCase())).toBe(true);
   });
 
@@ -498,7 +531,8 @@ test.describe('Email destinations and distribution lists', () => {
     test.skip(!(await sink.available()), await sink.unavailableReason());
 
     // The alias has to be an org member before it can be addressed at all.
-    await api.createOrgUser(DL_ADDRESS);
+    const createRes = await api.createOrgUser(DL_ADDRESS);
+    dlUserCreated = createRes.status === 200 || createRes.status === 201;
     const destName = uniq('fanout');
     await sink.clear();
 
@@ -567,16 +601,16 @@ test.describe('Email destinations and distribution lists', () => {
     expect(preview, 'Preview must not show a placeholder recipient').not.toContain('admin@example.com');
   });
 
-  test.skip('B2 · a user removed from the org stops receiving alerts [#2471 B2]', {
+  // BLOCKED BY #2471 (B2): membership is validated in destinations.rs save()
+  // and test_email() only; the send path never re-checks, so alerts keep
+  // reaching a removed user while the destination can no longer be saved.
+  // Needs a disposable org user plus a firing alert — see the issue for the
+  // full manual reproduction. Not yet implemented as a runnable test — a
+  // hardcoded failing assertion here would still fail once #2471 is fixed,
+  // which reads as "still broken" when it means the opposite.
+  test.fixme('B2 · a user removed from the org stops receiving alerts [#2471 B2]', {
     tag: ['@dlEmailDestinations', '@email', '@delivery', '@regression', '@P1', '@all'],
-  }, async () => {
-    // BLOCKED BY #2471 (B2): membership is validated in destinations.rs save()
-    // and test_email() only; the send path never re-checks, so alerts keep
-    // reaching a removed user while the destination can no longer be saved.
-    // Needs a disposable org user plus a firing alert — see the issue for the
-    // full manual reproduction.
-    expect(true, 'placeholder until the send path re-validates recipients').toBe(false);
-  });
+  }, async () => {});
 
   test.skip('B3 · the text/plain part is readable text, not HTML [#2471 B3]', {
     tag: ['@dlEmailDestinations', '@email', '@delivery', '@regression', '@P2', '@all'],
