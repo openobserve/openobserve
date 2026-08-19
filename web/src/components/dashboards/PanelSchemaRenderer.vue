@@ -1357,14 +1357,15 @@ export default defineComponent({
 
     // Restore the cell drawer when navigating to a URL that already carries cell-explorer params.
     onMounted(() => {
-      if (String(route.query.cell_panel) === String(props.panelSchema.id)) {
-        const field = String(route.query.cell_field ?? "");
-        const value = String(route.query.cell_value ?? "");
-        const stream = String(route.query.cell_stream ?? "");
-        const stype = String(route.query.cell_stype ?? "logs");
-        const t0 = Number(route.query.cell_t0 ?? 0);
-        const t1 = Number(route.query.cell_t1 ?? 0);
-        const where = String(route.query.cell_where ?? "");
+      const query = route?.query;
+      if (query && String(query.cell_panel) === String(props.panelSchema.id)) {
+        const field = String(query.cell_field ?? "");
+        const value = String(query.cell_value ?? "");
+        const stream = String(query.cell_stream ?? "");
+        const stype = String(query.cell_stype ?? "logs");
+        const t0 = Number(query.cell_t0 ?? 0);
+        const t1 = Number(query.cell_t1 ?? 0);
+        const where = String(query.cell_where ?? "");
         if (field && stream && t0 && t1) {
           cellDrawer.value = {
             open: true,
