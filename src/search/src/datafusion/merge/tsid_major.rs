@@ -16,15 +16,12 @@
 use std::sync::Arc;
 
 use arrow::{
-    array::{Array, Int64Array, RecordBatch, UInt64Array},
+    array::{Array, Int64Array, RecordBatch},
     compute::{max, min},
 };
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{
-        promql::{HASH_LABEL, tsid_layout::MetricsFileLayout},
-        stream::FileMeta,
-    },
+    meta::{promql::tsid_layout::MetricsFileLayout, stream::FileMeta},
     utils::parquet::new_parquet_writer,
 };
 use datafusion::{
@@ -46,66 +43,42 @@ pub(super) async fn write_files(
     rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<MergedFile>> {
-    let hash_index = schema.index_of(HASH_LABEL).map_err(|e| {
-        DataFusionError::Plan(format!("TSID-major layout requires {HASH_LABEL}: {e}"))
-    })?;
     let timestamp_index = schema.index_of(TIMESTAMP_COL_NAME).map_err(|e| {
         DataFusionError::Plan(format!(
             "TSID-major layout requires {TIMESTAMP_COL_NAME}: {e}"
         ))
     })?;
-    let max_file_size = max_file_size.max(1);
+    let max_file_size = i64::try_from(max_file_size).unwrap_or(i64::MAX).max(1);
     let mut active: Option<ActiveSizeTsidWriter> = None;
-    let mut previous_hash = None;
     let mut files: Vec<MergedFile> = Vec::new();
-    let mut rows_written = 0_i64;
 
     while let Some(batch) = rx.recv().await {
         if batch.num_rows() == 0 {
             continue;
         }
-        let hashes = hash_column(&batch, hash_index)?;
-        // the merge query sorts by (__hash__, _timestamp); a null or a
-        // decreasing hash means the input was not the sorted merge output
-        let mut last_hash = previous_hash;
-        for hash in hashes.iter() {
-            let hash = hash.ok_or_else(|| {
-                DataFusionError::Execution(format!("TSID-major layout found null {HASH_LABEL}"))
-            })?;
-            if last_hash.is_some_and(|previous| hash < previous) {
-                return Err(DataFusionError::Execution(format!(
-                    "TSID-major merge output is not ordered: previous hash {last_hash:?}, current hash {hash}"
-                )));
-            }
-            last_hash = Some(hash);
-        }
-
         // rotate between input batches once the logical size target is reached
-        if active
-            .as_ref()
-            .is_some_and(|writer| writer.estimated_original_size(metadata) >= max_file_size)
-        {
-            files.push(active.take().unwrap().finish().await?);
+        if active.as_ref().is_some_and(|writer| {
+            proportional_original_size(metadata, writer.file_meta.records) >= max_file_size
+        }) {
+            files.push(
+                active
+                    .take()
+                    .unwrap()
+                    .finish(metadata, max_file_size)
+                    .await?,
+            );
         }
-        let writer = match active.as_mut() {
-            Some(writer) => writer,
-            None => active.insert(ActiveSizeTsidWriter::try_new(
-                schema,
-                bloom_filter_fields,
-                metadata,
-                timestamp_index,
-            )?),
-        };
+        let writer = active.get_or_insert_with(|| {
+            ActiveSizeTsidWriter::new(schema, bloom_filter_fields, metadata, timestamp_index)
+        });
         writer.write(&batch).await?;
-        rows_written += batch.num_rows() as i64;
-        previous_hash = last_hash;
     }
 
     read_task
         .await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
     if let Some(active) = active.take() {
-        files.push(active.finish().await?);
+        files.push(active.finish(metadata, max_file_size).await?);
     }
     if files.is_empty() {
         return Err(DataFusionError::Execution(
@@ -113,18 +86,7 @@ pub(super) async fn write_files(
         ));
     }
 
-    assign_tsid_file_sizes(metadata, rows_written, &mut files);
     Ok(files)
-}
-
-fn hash_column(batch: &RecordBatch, hash_index: usize) -> Result<&UInt64Array> {
-    batch
-        .column(hash_index)
-        .as_any()
-        .downcast_ref::<UInt64Array>()
-        .ok_or_else(|| {
-            DataFusionError::Plan(format!("TSID-major layout requires UInt64 {HASH_LABEL}"))
-        })
 }
 
 /// One output file in progress: the Parquet writer and the running file meta.
@@ -135,12 +97,12 @@ struct ActiveSizeTsidWriter {
 }
 
 impl ActiveSizeTsidWriter {
-    fn try_new(
+    fn new(
         schema: &Arc<Schema>,
         bloom_filter_fields: &[String],
         metadata: &FileMeta,
         timestamp_index: usize,
-    ) -> Result<Self> {
+    ) -> Self {
         let writer = new_parquet_writer(
             Vec::new(),
             schema,
@@ -149,19 +111,11 @@ impl ActiveSizeTsidWriter {
             false,
             None,
         );
-        Ok(Self {
+        Self {
             writer,
-            file_meta: FileMeta {
-                min_ts: 0,
-                max_ts: 0,
-                records: 0,
-                original_size: 0,
-                compressed_size: 0,
-                index_size: 0,
-                ..metadata.clone()
-            },
+            file_meta: FileMeta::default(),
             timestamp_index,
-        })
+        }
     }
 
     /// Append one (hash, ts)-ordered batch to the data file and its rows /
@@ -179,70 +133,55 @@ impl ActiveSizeTsidWriter {
                 ))
             })?;
         let meta = &mut self.file_meta;
-        let (mut min_ts, mut max_ts) = if meta.records == 0 {
-            (i64::MAX, i64::MIN)
-        } else {
-            (meta.min_ts, meta.max_ts)
-        };
-        if let (Some(min), Some(max)) = (min(timestamps), max(timestamps)) {
-            min_ts = min_ts.min(min);
-            max_ts = max_ts.max(max);
-        }
-        if min_ts <= max_ts {
-            (meta.min_ts, meta.max_ts) = (min_ts, max_ts);
+        if let (Some(batch_min), Some(batch_max)) = (min(timestamps), max(timestamps)) {
+            if meta.records == 0 {
+                (meta.min_ts, meta.max_ts) = (batch_min, batch_max);
+            } else {
+                meta.min_ts = meta.min_ts.min(batch_min);
+                meta.max_ts = meta.max_ts.max(batch_max);
+            }
         }
         meta.records += batch.num_rows() as i64;
         Ok(())
     }
 
-    fn estimated_original_size(&self, source_meta: &FileMeta) -> usize {
-        let estimate = (i128::from(source_meta.original_size.max(0))
-            * i128::from(self.file_meta.records))
-            / i128::from(source_meta.records.max(1));
-        usize::try_from(estimate).unwrap_or(usize::MAX)
-    }
-
-    async fn finish(self) -> Result<MergedFile> {
+    async fn finish(self, source_meta: &FileMeta, max_file_size: i64) -> Result<MergedFile> {
         let Self {
             mut writer,
-            file_meta,
+            mut file_meta,
             ..
         } = self;
+
+        file_meta.original_size =
+            proportional_original_size(source_meta, file_meta.records).min(max_file_size - 1);
         append_metadata(&mut writer, &file_meta)?;
         writer.finish().await?;
+
+        let buf = writer.into_inner();
+        file_meta.compressed_size = buf.len() as i64;
         Ok(MergedFile {
-            buf: writer.into_inner(),
+            buf,
             meta: file_meta,
             layout: MetricsFileLayout::TsidMajor,
         })
     }
 }
 
-/// Split the logical `original_size` of the input over the output files by
-/// row count (the last file takes the remainder) and record the physical size.
-fn assign_tsid_file_sizes(source_meta: &FileMeta, rows_written: i64, files: &mut [MergedFile]) {
-    let denominator = rows_written.max(1) as i128;
-    let mut assigned_original_size = 0_i64;
-    let file_count = files.len();
-    for (index, file) in files.iter_mut().enumerate() {
-        file.meta.original_size = if index + 1 == file_count {
-            source_meta.original_size - assigned_original_size
-        } else {
-            ((i128::from(source_meta.original_size) * i128::from(file.meta.records)) / denominator)
-                as i64
-        };
-        assigned_original_size += file.meta.original_size;
-        file.meta.compressed_size = file.buf.len() as i64;
-    }
+/// The share of the source `original_size` that `records` rows carry: the
+/// batch of inputs' average logical bytes per row, times `records`.
+fn proportional_original_size(source_meta: &FileMeta, records: i64) -> i64 {
+    let estimate = (i128::from(source_meta.original_size.max(0)) * i128::from(records.max(0)))
+        / i128::from(source_meta.records.max(1));
+    i64::try_from(estimate).unwrap_or(i64::MAX)
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Float64Array, Int64Array, StringViewArray};
+    use arrow::array::{Float64Array, Int64Array, StringViewArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::promql::VALUE_LABEL;
+    use config::meta::promql::{HASH_LABEL, VALUE_LABEL};
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
     use super::*;
@@ -299,11 +238,12 @@ mod tests {
         tx.send(batch3).await.unwrap();
         drop(tx);
 
+        let max_file_size = 151;
         let files = write_files(
             &schema,
             &[],
             &metadata,
-            1,
+            max_file_size,
             &mut rx,
             tokio::spawn(async { Ok(()) }),
         )
@@ -317,15 +257,26 @@ mod tests {
                 .iter()
                 .map(|f| f.meta.original_size)
                 .collect::<Vec<_>>(),
-            vec![200, 300, 100]
+            vec![150, 150, 100]
         );
         assert!(files.iter().all(|f| {
-            f.layout == MetricsFileLayout::TsidMajor && f.meta.compressed_size == f.buf.len() as i64
+            f.layout == MetricsFileLayout::TsidMajor
+                && f.meta.original_size < max_file_size as i64
+                && f.meta.compressed_size == f.buf.len() as i64
         }));
 
         let mut file_hashes = Vec::new();
         for file in files {
-            let reader = ParquetRecordBatchReaderBuilder::try_new(bytes::Bytes::from(file.buf))
+            let bytes = bytes::Bytes::from(file.buf);
+            let footer = config::utils::parquet::read_metadata_from_bytes(&bytes)
+                .await
+                .unwrap();
+            assert_eq!(footer.min_ts, file.meta.min_ts);
+            assert_eq!(footer.max_ts, file.meta.max_ts);
+            assert_eq!(footer.records, file.meta.records);
+            assert_eq!(footer.original_size, file.meta.original_size);
+
+            let reader = ParquetRecordBatchReaderBuilder::try_new(bytes)
                 .unwrap()
                 .build()
                 .unwrap();
