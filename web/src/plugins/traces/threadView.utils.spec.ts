@@ -1003,7 +1003,9 @@ describe("buildTurnDetail", () => {
     gen_ai_request_model: "deepseek-v4-pro",
     gen_ai_response_model: "deepseek-v4-pro",
     start_time: "1787040515717940269",
-    gen_ai_input_messages: JSON.stringify([{ role: "user", content: "how many streams are there" }]),
+    gen_ai_input_messages: JSON.stringify([
+      { role: "user", content: "how many streams are there" },
+    ]),
     gen_ai_output_messages: JSON.stringify([
       { role: "assistant", content: "There are **3,647 streams** in the `default` organization." },
     ]),
