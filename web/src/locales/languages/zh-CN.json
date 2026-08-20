@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "录制已取消 — 录制窗口已关闭",
       "restoreFailedHint": "在通过此步骤之前，旅程无法到达您选择的点",
       "recordBeforeFailedStep": "在步骤 {step} 之前录制",
-      "recordingHere": "在此处录制",
+      "newStepsLandHere": "新步骤会显示在此处",
       "recordBeforeStep": "在此步骤之前录制",
       "recordBeforeStepHint": "重放旅程到此为止，然后在其之前录制新步骤。",
       "recordBeforeNeedsNewerExtension": "更新录制器扩展程序，以便从特定步骤开始录制。",

@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Grabación cancelada — la ventana del grabador se cerró",
       "restoreFailedHint": "el recorrido no puede llegar al punto que elegiste hasta que este paso se complete",
       "recordBeforeFailedStep": "Grabar antes del paso {step}",
-      "recordingHere": "Grabar aquí",
+      "newStepsLandHere": "Los nuevos pasos aparecen aquí",
       "recordBeforeStep": "Grabar antes de este paso",
       "recordBeforeStepHint": "Reproduce el recorrido hasta este punto, luego graba nuevos pasos antes de él.",
       "recordBeforeNeedsNewerExtension": "Actualiza la extensión del grabador para grabar desde un paso específico.",

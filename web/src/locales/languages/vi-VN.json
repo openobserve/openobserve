@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Đã hủy ghi hình — cửa sổ ghi hình đã bị đóng",
       "restoreFailedHint": "hành trình không thể đến điểm bạn đã chọn cho đến khi bước này hoàn tất",
       "recordBeforeFailedStep": "Ghi trước bước {step}",
-      "recordingHere": "Ghi hình tại đây",
+      "newStepsLandHere": "Các bước mới sẽ xuất hiện tại đây",
       "recordBeforeStep": "Ghi hình trước bước này",
       "recordBeforeStepHint": "Phát lại hành trình đến điểm này, sau đó ghi các bước mới trước đó.",
       "recordBeforeNeedsNewerExtension": "Cập nhật tiện ích mở rộng ghi hình để ghi từ một bước cụ thể.",

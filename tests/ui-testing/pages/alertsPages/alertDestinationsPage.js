@@ -109,6 +109,181 @@ export class AlertDestinationsPage {
         this.addDestinationLoadingIndicator = '[data-test="add-destination-loading-indicator"]';
         this.dialogCloseBtn = '[data-test="o-dialog-close-btn"]';
         this.checkmarkIcon = '[name="check-circle"]';
+
+        // ── Email / DL destination locators (added for the DL suite) ──────────
+        // The custom (non-prebuilt) email path collects recipients through an
+        // ORG-USER PICKER, not a free-text field — a different control from the
+        // prebuilt Email tile, which is why both are addressed separately.
+        this.customEmailsSelect = '[data-test="add-destination-emails-select"]';
+        this.customEmailsSelectTrigger = '[data-test="add-destination-emails-select-trigger"]';
+        this.customEmailsSelectSearch = '[data-test="add-destination-emails-select-search"]';
+        // OSelect derives `<parent>-option` from its OWN data-test, so each
+        // dropdown's options carry a distinct suffix — scope to it rather than
+        // a page-global selector that would also match whichever OTHER select
+        // (e.g. the template picker) happens to still be in the DOM.
+        this.customEmailsSelectOption = '[data-test="add-destination-emails-select-option"]';
+        this.customEmailsSelectPopover = '[data-test="add-destination-emails-select-popover"]';
+        this.prebuiltTemplateSelectTrigger = '[data-test="add-destination-prebuilt-template-select-trigger"]';
+        this.prebuiltTemplateSelectOption = '[data-test="add-destination-prebuilt-template-select-option"]';
+        this.prebuiltTemplateSelectPopover = '[data-test="add-destination-prebuilt-template-select-popover"]';
+        this.skipTlsVerifyToggle = '[data-test="add-destination-skip-tls-verify-toggle-btn"]';
+        this.previewButton = '[data-test="destination-preview-button"]';
+        // Not the generic `[role="dialog"]` — the add-destination form can
+        // itself resolve to a dialog role in some contexts, so a generic
+        // selector risks reading the FORM's own content as the preview and
+        // passing vacuously against a broken Preview.
+        this.previewDialog = '[data-test="destination-preview-modal"]';
+        this.updateDestinationButton = '[data-test="alert-destination-list-{destinationName}-update-destination"]';
+        this.typeCard = '[data-test="destination-type-card"]';
+        // AppTabs.vue derives `tab-${tab.value}` off the tab's own value, not
+        // the parent add-destination-tabs container's data-test.
+        this.emailTypeTab = '[data-test="tab-email"]';
+        this.visibleFieldError = '[data-test$="-error"]:visible';
+    }
+
+    // ========================================================================
+    // EMAIL / DISTRIBUTION-LIST HELPERS
+    // ========================================================================
+
+    /** True while the add/edit destination form is open — a rejected save keeps it open. */
+    async isFormOpen() {
+        return await this.page.locator(this.addDestinationTitle).isVisible().catch(() => false);
+    }
+
+    async expectFormOpen() {
+        await expect(this.page.locator(this.addDestinationTitle)).toBeVisible();
+    }
+
+    /** Current value of the prebuilt recipients field (edit-mode prefill checks). */
+    async getEmailRecipientsValue() {
+        return await this.page.locator(this.recipientsInputField).first().inputValue().catch(() => '');
+    }
+
+    /** Open an existing destination for editing, by name. */
+    async openDestinationForEdit(destinationName) {
+        const btn = this.page.locator(this.updateDestinationButton.replace('{destinationName}', destinationName));
+        await btn.waitFor({ state: 'visible', timeout: 15000 });
+        await btn.click();
+        await this.page.locator(this.recipientsInputField).first().waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /** Text of every visible field-level validation error. */
+    async getVisibleErrors() {
+        return await this.page.locator(this.visibleFieldError).allInnerTexts().catch(() => []);
+    }
+
+    /**
+     * Whole-page text — for asserting that a backend message surfaced somewhere
+     * the user can actually see it, without coupling to which element renders it.
+     */
+    async getPageText() {
+        return await this.page.locator('body').innerText();
+    }
+
+    /** Text of every toast currently on screen. */
+    async getToastMessages() {
+        return await this.page.locator(this.toastMessage).allInnerTexts().catch(() => []);
+    }
+
+    /** Switch the form to a given prebuilt/custom type card without filling anything. */
+    async clickDestinationTypeCard(type) {
+        const card = this.page.locator(`${this.typeCard}[data-type="${type}"]`);
+        await card.click();
+        await expect(card).toHaveClass(/selected/, { timeout: 10000 });
+    }
+
+    /** Custom (non-prebuilt) destination → Email tab. Uses the org-user picker. */
+    async openCustomEmailPath() {
+        await this.clickDestinationTypeCard('custom');
+        await this.page.locator(this.emailTypeTab).first().click();
+        await this.page.locator(this.customEmailsSelect).first().waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async isCustomEmailsPickerPresent() {
+        return (await this.page.locator(this.customEmailsSelect).count()) > 0;
+    }
+
+    async isPrebuiltRecipientsFieldPresent() {
+        return (await this.page.locator(this.recipientsInputField).count()) > 0;
+    }
+
+    /**
+     * Options offered by the custom path's org-user picker, optionally filtered
+     * by a search term. Idempotent about opening: a caller reading the picker
+     * twice in the same test (e.g. once unfiltered, once filtered) must not have
+     * the second call's trigger click TOGGLE an already-open popover closed.
+     */
+    async getCustomEmailPickerOptions(searchTerm = null) {
+        const popover = this.page.locator(this.customEmailsSelectPopover).first();
+        if (!(await popover.isVisible().catch(() => false))) {
+            await this.page.locator(this.customEmailsSelectTrigger).first().click();
+            await popover.waitFor({ state: 'visible', timeout: 10000 });
+        }
+        if (searchTerm) {
+            const search = this.page.locator(this.customEmailsSelectSearch).first();
+            if (await search.isVisible().catch(() => false)) {
+                await search.fill(searchTerm);
+                // No DOM signal for "the client-side filter finished re-rendering" —
+                // the search value itself lands synchronously, but the filtered
+                // option list is the thing under test, so this settle is real.
+                await this.page.waitForTimeout(1200);
+            }
+        }
+        return await this.page.locator(this.customEmailsSelectOption).allInnerTexts().catch(() => []);
+    }
+
+    /**
+     * Whether the custom email picker's search field is actually present in the
+     * currently-open dropdown. A non-member search term legitimately returns
+     * zero options, so an empty getCustomEmailPickerOptions() result can never
+     * by itself prove the search ran — this checks the mechanism engaged.
+     */
+    async isCustomEmailsSearchVisible() {
+        return await this.page.locator(this.customEmailsSelectSearch).first().isVisible().catch(() => false);
+    }
+
+    /** Template names an EMAIL destination is allowed to pick. */
+    async getTemplateOptionsForEmail() {
+        await this.page.locator(this.prebuiltTemplateSelectTrigger).first().click();
+        await this.page.locator(this.prebuiltTemplateSelectPopover).first()
+            .waitFor({ state: 'visible', timeout: 10000 });
+        return await this.page.locator(this.prebuiltTemplateSelectOption).allInnerTexts().catch(() => []);
+    }
+
+    async isSkipTlsToggleVisible() {
+        return await this.page.locator(this.skipTlsVerifyToggle).first().isVisible().catch(() => false);
+    }
+
+    /** Open the Destination Preview dialog and return its rendered text. */
+    async openPreviewAndGetText() {
+        await this.page.locator(this.previewButton).first().click();
+        await this.page.locator(this.previewDialog).first().waitFor({ state: 'visible', timeout: 10000 });
+        return await this.page.locator(this.previewDialog).first().innerText().catch(() => '');
+    }
+
+    /** Tab from the name field until focus lands on recipients. Returns true if reached. */
+    async tabToRecipientsField(maxTabs = 12) {
+        await this.page.locator(this.destinationNameInputField).first().focus();
+        const field = this.page.locator(this.recipientsInputField).first();
+        for (let i = 0; i < maxTabs; i++) {
+            await this.page.keyboard.press('Tab');
+            if (await field.evaluate((el) => el === document.activeElement).catch(() => false)) return true;
+        }
+        return false;
+    }
+
+    /** Computed focus styling of the recipients field's wrapper — for focus-visible checks. */
+    async getRecipientsFocusStyle() {
+        return await this.page.locator(this.recipientsInputField).first().evaluate((el) => {
+            const s = getComputedStyle(el.parentElement || el);
+            return { shadow: s.boxShadow, border: s.borderColor };
+        });
+    }
+
+    /** True when the page overflows horizontally — a layout-break signal. */
+    async isPageScrolledHorizontally() {
+        return await this.page.evaluate(
+            () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
     }
 
     // ============================================================================

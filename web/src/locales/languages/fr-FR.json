@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Enregistrement annulé — la fenêtre de l'enregistreur a été fermée",
       "restoreFailedHint": "le parcours ne peut pas atteindre le point que vous avez choisi tant que cette étape n'est pas passée",
       "recordBeforeFailedStep": "Enregistrer avant l'étape {step}",
-      "recordingHere": "Enregistrer ici",
+      "newStepsLandHere": "Les nouvelles étapes arrivent ici",
       "recordBeforeStep": "Enregistrer avant cette étape",
       "recordBeforeStepHint": "Rejouez le parcours jusqu'à ce point, puis enregistrez de nouvelles étapes avant lui.",
       "recordBeforeNeedsNewerExtension": "Mettez à jour l'extension d'enregistrement pour enregistrer à partir d'une étape spécifique.",

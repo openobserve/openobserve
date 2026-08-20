@@ -754,10 +754,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         ..Default::default()
                     };
                     let stream_type = config::meta::stream::StreamType::from(stream_type.as_str());
-                    let count_response =
-                        search_service::search("", &org_id, stream_type, None, &count_req)
-                            .await
-                            .map_err(|e| anyhow::anyhow!(e))?;
+                    let count_response = search_service::search(
+                        &config::ider::generate_trace_id(),
+                        &org_id,
+                        stream_type,
+                        None,
+                        &count_req,
+                    )
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))?;
                     if count_response.is_partial || !count_response.function_error.is_empty() {
                         return Ok(o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
                             total: count_response.total,
@@ -797,18 +802,24 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         use_cache: false,
                         ..Default::default()
                     };
-                    search_service::search("", &org_id, stream_type, None, &data_req)
-                        .await
-                        .map(|response| {
-                            o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
-                                hits: response.hits,
-                                total,
-                                is_partial: response.is_partial,
-                                function_error: response.function_error,
-                                over_limit,
-                            }
-                        })
-                        .map_err(|e| anyhow::anyhow!(e))
+                    search_service::search(
+                        &config::ider::generate_trace_id(),
+                        &org_id,
+                        stream_type,
+                        None,
+                        &data_req,
+                    )
+                    .await
+                    .map(|response| {
+                        o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                            hits: response.hits,
+                            total,
+                            is_partial: response.is_partial,
+                            function_error: response.function_error,
+                            over_limit,
+                        }
+                    })
+                    .map_err(|e| anyhow::anyhow!(e))
                 })
             },
         );
@@ -832,7 +843,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         ..Default::default()
                     };
                     search_service::search(
-                        "",
+                        &config::ider::generate_trace_id(),
                         &request.org_id,
                         stream_type,
                         None,

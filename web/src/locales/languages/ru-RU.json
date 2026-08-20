@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Запись отменена — окно рекордера было закрыто",
       "restoreFailedHint": "путь не может достичь выбранной точки, пока этот шаг не пройден",
       "recordBeforeFailedStep": "Записать перед шагом {step}",
-      "recordingHere": "Запись здесь",
+      "newStepsLandHere": "Новые шаги добавляются сюда",
       "recordBeforeStep": "Записать перед этим шагом",
       "recordBeforeStepHint": "Воспроизведите путь до этого момента, затем запишите новые шаги перед ним.",
       "recordBeforeNeedsNewerExtension": "Обновите расширение рекордера, чтобы записывать с определённого шага.",

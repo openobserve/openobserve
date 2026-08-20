@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Nagrywanie anulowane — okno rejestratora zostało zamknięte",
       "restoreFailedHint": "podróż nie może dotrzeć do wybranego punktu, dopóki ten krok nie zostanie ukończony",
       "recordBeforeFailedStep": "Nagraj przed krokiem {step}",
-      "recordingHere": "Nagrywanie tutaj",
+      "newStepsLandHere": "Nowe kroki trafiają tutaj",
       "recordBeforeStep": "Nagraj przed tym krokiem",
       "recordBeforeStepHint": "Odtwórz podróż do tego punktu, a następnie nagraj nowe kroki przed nim.",
       "recordBeforeNeedsNewerExtension": "Zaktualizuj rozszerzenie rejestratora, aby nagrywać od konkretnego kroku.",

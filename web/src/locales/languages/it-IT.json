@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Registrazione annullata — la finestra del registratore è stata chiusa",
       "restoreFailedHint": "il percorso non può raggiungere il punto scelto finché questo passaggio non viene superato",
       "recordBeforeFailedStep": "Registra prima del passaggio {step}",
-      "recordingHere": "Registra qui",
+      "newStepsLandHere": "I nuovi passaggi compaiono qui",
       "recordBeforeStep": "Registra prima di questo passaggio",
       "recordBeforeStepHint": "Riproduci il percorso fino a questo punto, poi registra nuovi passaggi prima di esso.",
       "recordBeforeNeedsNewerExtension": "Aggiorna l'estensione del registratore per registrare da un passaggio specifico.",
