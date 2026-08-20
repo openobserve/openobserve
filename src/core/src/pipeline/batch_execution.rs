@@ -1821,7 +1821,10 @@ async fn process_function_node(
         metadata.node_idx
     );
 
-    if func_params.name.is_empty() {
+    if func_params.name.is_empty()
+        && (func_params.raw_fn.is_none()
+            || func_params.raw_fn.as_ref().is_some_and(|v| v.is_empty()))
+    {
         let mut count = 0;
         while let Some(pipeline_item) = channels.receiver.recv().await {
             channels
