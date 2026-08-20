@@ -165,6 +165,41 @@ pub(crate) const fn required_stream_for(vantage: DbmVantage) -> StreamType {
     }
 }
 
+/// The ONE raw trace stream the history backfill may aggregate over, or `None`.
+///
+/// `stream_param` (an explicit `?stream=`) wins and passes through unfiltered:
+/// it has its own gate at the top of `get_dbm_query_history`, which 403s an
+/// unreadable one. Re-filtering it here would turn that 403 into a silent 200.
+///
+/// Otherwise the stream is INFERRED from the rollup rows' `trace_stream_name`
+/// — and that inference is why `readable` exists. `_o2_db_stats` is read
+/// ORG-SCOPED, so its rows name every trace stream in the org regardless of the
+/// caller's role. Feeding one straight to the backfill runs raw-span
+/// aggregations against a stream the caller may not read: `run_dbm_search`
+/// carries `user_id` for attribution and range limits but explicitly does not
+/// authorize, and `involved_streams` catches it only afterwards — so the 403
+/// discards the rows while the work has already run and its duration is
+/// observable. Intersecting with `readable` here closes that window.
+///
+/// Ambiguity still beats permission: two candidate streams yield `None` (the
+/// handler must not guess which one carries the fingerprint), and that holds
+/// whether the second one was readable or not.
+pub(crate) fn resolve_backfill_stream(
+    stream_param: Option<&String>,
+    rollup_rows: &[Value],
+    readable: &BTreeSet<String>,
+) -> Option<String> {
+    if let Some(s) = stream_param {
+        return Some(s.clone());
+    }
+    let names: BTreeSet<String> = rollup_rows
+        .iter()
+        .map(|r| get_str(r, "trace_stream_name"))
+        .filter(|s| !s.is_empty() && readable.contains(s))
+        .collect();
+    (names.len() == 1).then(|| names.into_iter().next().unwrap())
+}
+
 /// The response for a stream the caller may not read.
 ///
 /// Deliberately identical to the app-wide wording (`"Unauthorized Access"`) and
@@ -1079,14 +1114,13 @@ async fn compute_tail(
     // WALL CLOCK that ignored the caller's range entirely (it was not even
     // passed in). Two consequences, both fixed by deriving it from the query:
     //
-    //  - it answered a question about the past with data from the present, so
-    //    `collect_tails` had to DISCARD any tail that did not overlap the
-    //    requested window. A historical read paid for a delta it then threw
-    //    away.
-    //  - `now` moved on every request, so no two requests ever asked the same
-    //    question and the search result cache could never match one. Anchoring
-    //    both bounds to the request is what makes the read cacheable at all —
-    //    every viewer of the same window now asks the identical query.
+    //  - it answered a question about the past with data from the present, so `collect_tails` had
+    //    to DISCARD any tail that did not overlap the requested window. A historical read paid for
+    //    a delta it then threw away.
+    //  - `now` moved on every request, so no two requests ever asked the same question and the
+    //    search result cache could never match one. Anchoring both bounds to the request is what
+    //    makes the read cacheable at all — every viewer of the same window now asks the identical
+    //    query.
     //
     // Clamped to the request: a rollup ahead of `q_end` (a historical window
     // fully rolled up) leaves nothing to do, and `tail_start > tail_end` would
@@ -1432,12 +1466,11 @@ async fn collect_tails(
     if offsets.is_some() {
         // Every stream's tail concurrently — each is its own bounded pair of
         // searches (or a cache hit), with no ordering between streams.
-        let computed = join_all(
-            streams
-                .iter()
-                .map(|stream| compute_tail(org_id, stream, offset_of(stream), start_time, end_time)),
-        )
-        .await;
+        let computed =
+            join_all(streams.iter().map(|stream| {
+                compute_tail(org_id, stream, offset_of(stream), start_time, end_time)
+            }))
+            .await;
         for t in computed.into_iter().flatten() {
             if t.failed || !t.relevant {
                 continue;
@@ -1551,7 +1584,7 @@ pub struct DatabasesQuery {
     pub include_breakdown: Option<bool>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/databases — FR-1 overview.
+/// GET /{org_id}/db_monitoring/databases — FR-1 overview.
 ///
 /// `db_totals` rows grouped per (system, instance, namespace) — exact window
 /// totals with true percentiles, never fingerprint-fused — plus the distinct
@@ -1560,7 +1593,7 @@ pub struct DatabasesQuery {
 /// service-filtered `query_stats` instead and `top_n_subset` is set.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/databases",
+    path = "/{org_id}/db_monitoring/databases",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringDatabases",
@@ -1931,14 +1964,14 @@ pub struct QueriesQuery {
     pub include_server_fallback: Option<bool>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/queries — FR-2 top queries.
+/// GET /{org_id}/db_monitoring/queries — FR-2 top queries.
 ///
 /// `query_stats` rows merged per (fingerprint, system, instance) across
 /// windows and constituent rows, `_other` remainders passed through at their
 /// own grains, rollup + live tail (D4).
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/queries",
+    path = "/{org_id}/db_monitoring/queries",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringQueries",
@@ -2227,7 +2260,7 @@ pub struct HistoryQuery {
     pub endpoints_limit: Option<usize>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/query/history — FR-5 per-fingerprint
+/// GET /{org_id}/db_monitoring/query/history — FR-5 per-fingerprint
 /// series.
 ///
 /// Distinguishes "below top-N" from zero: a window whose `db_totals` rows
@@ -2238,7 +2271,7 @@ pub struct HistoryQuery {
 /// point (D4).
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/query/history",
+    path = "/{org_id}/db_monitoring/query/history",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringQueryHistory",
@@ -2427,14 +2460,27 @@ pub async fn get_dbm_query_history(
     // Backfill needs ONE raw trace stream: the explicit param, else the unique
     // trace_stream_name of the window rows. Ambiguous multi-stream scopes skip
     // backfill (flag-only) rather than guess.
-    let backfill_stream: Option<String> = q.stream.clone().or_else(|| {
-        let names: BTreeSet<String> = totals_rows
-            .iter()
-            .map(|r| get_str(r, "trace_stream_name"))
-            .filter(|s| !s.is_empty())
-            .collect();
-        (names.len() == 1).then(|| names.into_iter().next().unwrap())
-    });
+    //
+    // Resolved BEFORE the backfill runs and intersected with what the caller may
+    // read (see `resolve_backfill_stream`): the inferred name comes from
+    // org-scoped rollup rows, so without this the backfill could aggregate raw
+    // spans from a stream this caller has no access to.
+    let readable_streams: BTreeSet<String> = involved_streams(
+        &org_id,
+        &user_email.user_id,
+        // The explicit param is deliberately NOT passed: it is already gated at
+        // the top of this handler, and `involved_streams` would return `None`
+        // for an unreadable one — collapsing the readable set that the INFERRED
+        // branch needs. Here we only ever want "what may this caller read".
+        None,
+        &[&totals_rows[..]],
+    )
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .collect();
+    let backfill_stream: Option<String> =
+        resolve_backfill_stream(q.stream.as_ref(), &totals_rows, &readable_streams);
 
     let interval_micros = rollup::rollup_interval_secs() as i64 * 1_000_000;
     let mut series: Vec<Value> = Vec::new();
@@ -2452,8 +2498,15 @@ pub async fn get_dbm_query_history(
         let mut point = json!({ "timestamp": window_end, "below_top_n": true });
         if let Some(stream) = backfill_stream_ref {
             let sql = build_backfill_sql(stream, fingerprint);
-            match rollup::run_dbm_search(org, user_id, sql, window_end - interval_micros, *window_end, true)
-                    .await
+            match rollup::run_dbm_search(
+                org,
+                user_id,
+                sql,
+                window_end - interval_micros,
+                *window_end,
+                true,
+            )
+            .await
             {
                 Ok(rows) if !rows.is_empty() && get_i64(&rows[0], "calls") > 0 => {
                     let mut merged = rows[0].clone();
@@ -2478,13 +2531,23 @@ pub async fn get_dbm_query_history(
     }));
     // Live-tail point inputs (D4 — the series' live segment, never flat/zero).
     let tails_fut = async {
-        let streams = involved_streams(
-            &org_id,
-            &user_email.user_id,
-            q.stream.as_ref(),
-            &[&totals_rows[..]],
-        )
-        .await?;
+        // With no `?stream=`, this is exactly `readable_streams` — already
+        // resolved above for the backfill, so reuse it rather than pay a second
+        // round of per-stream OFGA checks. The explicit-param case keeps going
+        // through `involved_streams`, which returns `None` for an unreadable
+        // name so the handler can still 403 on it.
+        let streams: Vec<String> = match q.stream.as_ref() {
+            Some(_) => {
+                involved_streams(
+                    &org_id,
+                    &user_email.user_id,
+                    q.stream.as_ref(),
+                    &[&totals_rows[..]],
+                )
+                .await?
+            }
+            None => readable_streams.iter().cloned().collect(),
+        };
         Some(collect_tails(&org_id, &streams, start_time, end_time).await)
     };
     // FR-5 calling endpoints, folded into this response when asked for.
@@ -2628,13 +2691,13 @@ pub struct EndpointsQuery {
     pub limit: Option<usize>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/query/endpoints — FR-5 calling
+/// GET /{org_id}/db_monitoring/query/endpoints — FR-5 calling
 /// endpoints: on-demand raw-trace aggregation for ONE fingerprint joining DB
 /// spans to their trace roots. Bounded by the fingerprint predicate and the
 /// request payload's window — no rollup, no tail.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/query/endpoints",
+    path = "/{org_id}/db_monitoring/query/endpoints",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringQueryEndpoints",
@@ -2744,7 +2807,7 @@ pub struct SamplesQuery {
     pub fingerprint: Option<String>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/samples — FR-6 global slow samples: the
+/// GET /{org_id}/db_monitoring/samples — FR-6 global slow samples: the
 /// slowest DB spans in the window ACROSS every system, instance and query.
 ///
 /// The per-query samples on the detail page answer "show me one bad execution
@@ -2767,7 +2830,7 @@ pub struct SamplesQuery {
 /// qualifying spans existed than were returned.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/samples",
+    path = "/{org_id}/db_monitoring/samples",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringSamples",
@@ -4882,7 +4945,7 @@ fn deadlock_matches_search(ev: &server_vantage::DeadlockEvent, needle_lower: &st
         || hit(&ev.instance)
 }
 
-/// GET /{org_id}/traces/db_monitoring/deadlocks — FR-16 deadlock events.
+/// GET /{org_id}/db_monitoring/deadlocks — FR-16 deadlock events.
 ///
 /// Returns assembled deadlock EVENTS in the UI-facing DTO shape — never the raw
 /// stored rows. Newest first, each with a real `participants[]` array whose
@@ -4897,7 +4960,7 @@ fn deadlock_matches_search(ev: &server_vantage::DeadlockEvent, needle_lower: &st
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/deadlocks",
+    path = "/{org_id}/db_monitoring/deadlocks",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringDeadlocks",
@@ -5378,7 +5441,7 @@ fn dedupe_blocking_waits(
     kept
 }
 
-/// GET /{org_id}/traces/db_monitoring/blocking — FR-16 blocking chains.
+/// GET /{org_id}/db_monitoring/blocking — FR-16 blocking chains.
 ///
 /// Returns the flat canonical samples AND server-assembled root-blocker
 /// `chains[]`. `pg_blocking_pids()` yields only DIRECT blocker edges (proof
@@ -5387,7 +5450,7 @@ fn dedupe_blocking_waits(
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/blocking",
+    path = "/{org_id}/db_monitoring/blocking",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringBlocking",
@@ -5682,14 +5745,14 @@ pub struct ActivityQuery {
     pub limit: Option<usize>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/activity — sampled active sessions.
+/// GET /{org_id}/db_monitoring/activity — sampled active sessions.
 ///
 /// `hits` is a row-limited SAMPLE OF SESSIONS, not the population;
 /// `by_wait_event` and `by_state` are SQL aggregates over the whole window, so
 /// the breakdown stays representative however many rows the table shows.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/activity",
+    path = "/{org_id}/db_monitoring/activity",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringActivity",
@@ -6573,7 +6636,7 @@ pub struct ServerMetricsQuery {
     pub end_time: Option<i64>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/query/server_metrics — W6.
+/// GET /{org_id}/db_monitoring/query/server_metrics — W6.
 ///
 /// The database's own counters for one fingerprint, to sit BESIDE (never
 /// merged into) the client-observed latency on the query detail page.
@@ -6590,7 +6653,7 @@ pub struct ServerMetricsQuery {
 /// `/queries`, which does not. Kept registered and unchanged for compatibility.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/query/server_metrics",
+    path = "/{org_id}/db_monitoring/query/server_metrics",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringQueryServerMetrics",
@@ -6861,9 +6924,23 @@ pub(crate) fn build_dbm_server_queries_sql(
     } else {
         "last_seen DESC"
     };
+    // `MAX(_timestamp) AS _timestamp` is projected BESIDE `last_seen`, which
+    // carries the same value under the name `ORDER BY` and the envelope use.
+    //
+    // The duplicate is what makes the read cacheable: the result cache resolves
+    // a complex query's timestamp column from the SELECT output, and every
+    // timestamp here was aliased away as `first_seen`/`last_seen`, so it found
+    // none and declined the query. Verified against the real resolver —
+    // `has_ts=false` before, `has_ts=true` with this column present.
+    //
+    // Unlike the identity list above, this one is NOT grid-stamped: these rows
+    // are ranked by `calls`/`last_seen`, so a floored stamp would reorder them.
+    // The cache entry is therefore narrower than the instances one; recognizing
+    // the column is still what lets an entry exist at all.
     Some(format!(
         "SELECT {proj}, {query_text}, {calls_col}, {exec_time}, \
-         MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
+         MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen, \
+         MAX(_timestamp) AS _timestamp \
          FROM \"{stream}\"\n\
          WHERE {kind} = '{kind_val}'{preds}\nGROUP BY {group}\n\
          ORDER BY {order_by}\nLIMIT {limit}",
@@ -6926,6 +7003,19 @@ mod server_queries_without_calls_tests {
         assert!(
             sql.contains(&format!("SUM({})", server_vantage::O2_DBM_CALLS)),
             "{sql}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// Same defect, same fix, on the server-queries list: it already grouped,
+    /// but aliased its timestamps `first_seen`/`last_seen`, so the resolver saw
+    /// no `_timestamp` and declined. Verified `has_ts=false` before, `true` after.
+    #[test]
+    fn test_server_queries_sql_projects_a_timestamp_the_cache_recognizes() {
+        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(true)).expect("sql");
+        assert!(
+            sql.contains("AS _timestamp"),
+            "aliasing every timestamp to first_seen/last_seen hides it from the cache: {sql}"
         );
     }
 
@@ -7019,7 +7109,7 @@ pub struct ServerQueriesQuery {
     pub limit: Option<usize>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/server_queries — the statement list as
+/// GET /{org_id}/db_monitoring/server_queries — the statement list as
 /// the DATABASES report it, for deployments with no traced application
 /// traffic.
 ///
@@ -7027,7 +7117,7 @@ pub struct ServerQueriesQuery {
 /// and can support no other ranking honestly — see the module note above.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/server_queries",
+    path = "/{org_id}/db_monitoring/server_queries",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringServerQueries",
@@ -7414,11 +7504,11 @@ pub struct ServerSamplesQuery {
     pub limit: Option<usize>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/server_samples — the slowest executions
+/// GET /{org_id}/db_monitoring/server_samples — the slowest executions
 /// the DATABASE ITSELF captured, for deployments with no traced traffic.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/server_samples",
+    path = "/{org_id}/db_monitoring/server_samples",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringServerSamples",
@@ -7585,7 +7675,7 @@ pub struct PlansQuery {
     pub end_time: Option<i64>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/query/plans — W3.4.
+/// GET /{org_id}/db_monitoring/query/plans — W3.4.
 ///
 /// Distinct generic plans captured for one fingerprint over the window. See the
 /// module comment above for what this data is and is not.
@@ -7596,7 +7686,7 @@ pub struct PlansQuery {
 /// compatibility; new callers should use `/query/insights`.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/query/plans",
+    path = "/{org_id}/db_monitoring/query/plans",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringQueryPlans",
@@ -7728,7 +7818,7 @@ pub struct QueryInsightsQuery {
     pub database: Option<String>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/query/insights — the query-detail page's
+/// GET /{org_id}/db_monitoring/query/insights — the query-detail page's
 /// Logs-side pair in one round trip.
 ///
 /// `/query/plans` and `/query/server_metrics` were ALWAYS co-fired from the
@@ -7748,7 +7838,7 @@ pub struct QueryInsightsQuery {
 /// letting an empty section imply "nothing captured".
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/query/insights",
+    path = "/{org_id}/db_monitoring/query/insights",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringQueryInsights",
@@ -8286,10 +8376,10 @@ pub struct DbmInstancesQuery {
     pub system: Option<String>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/instances — every (engine, instance).
+/// GET /{org_id}/db_monitoring/instances — every (engine, instance).
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/instances",
+    path = "/{org_id}/db_monitoring/instances",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringInstances",
@@ -8412,15 +8502,49 @@ async fn read_dbm_instances_body(
     Ok(json!({ "hits": out }))
 }
 
-/// `SELECT DISTINCT engine, instance` over the server stream.
+/// The distinct `(engine, instance)` identities in the server stream, as a
+/// GROUP BY with a grid-stamped `_timestamp` beside it.
 ///
 /// Deliberately NO `o2_dbm_kind` predicate. Every feed's records carry the
 /// identity columns, so filtering to one kind is exactly the per-feed
 /// incompleteness this endpoint exists to remove.
+///
+/// WHY GROUP BY AND NOT `SELECT DISTINCT`, which is what this was.
+///
+/// The result cache resolves a complex query's timestamp column from its
+/// SELECT OUTPUT (`get_timestamp_column_name`). `DISTINCT` and `GROUP BY` are
+/// both "complex" to the planner, so swapping one for the other changes
+/// nothing on its own — what the old shape lacked was a projected
+/// `_timestamp`, so the resolver returned none and the cache declined every
+/// read. Verified against the real resolver: `has_ts=false` for the old SQL,
+/// `has_ts=true` for this one.
+///
+/// `DISTINCT a, b` and `GROUP BY a, b` dedup identically; the group form is
+/// used only because an aggregate projection cannot sit beside `DISTINCT`.
+///
+/// The stamp is the window's GRID BOUNDARY, not `MAX(_timestamp)`. A true max
+/// moves with every ingest, so two viewers of the same window would hash to
+/// different keys and the entry would never be reused — the resolver satisfied
+/// and not one hit delivered. Flooring to the shared grid (the rollup's own
+/// `floor_to_grid`) makes every viewer of a window agree on the key.
+///
+/// The extra column never reaches the wire: the handler projects
+/// `db_system`/`db_instance` and drops the rest.
 pub(crate) fn build_dbm_instances_sql(
     stream_name: &str,
     system: Option<&str>,
     present: &HashSet<String>,
+) -> Option<String> {
+    build_dbm_instances_sql_at(stream_name, system, present, now_micros())
+}
+
+/// [`build_dbm_instances_sql`] with the grid anchor passed in, so the stamping
+/// is testable without a clock.
+pub(crate) fn build_dbm_instances_sql_at(
+    stream_name: &str,
+    system: Option<&str>,
+    present: &HashSet<String>,
+    anchor_micros: i64,
 ) -> Option<String> {
     if !present.contains(server_vantage::O2_DBM_ENGINE) {
         return None;
@@ -8440,7 +8564,10 @@ pub(crate) fn build_dbm_instances_sql(
     // quote would otherwise terminate the identifier. Same helper every
     // sibling builder uses.
     let mut sql = format!(
-        "SELECT DISTINCT {engine}, {instance_col} FROM \"{stream}\" WHERE {engine} IS NOT NULL",
+        "SELECT {engine}, {instance_col}, {grid} AS {ts} \
+         FROM \"{stream}\" WHERE {engine} IS NOT NULL",
+        grid = rollup::floor_to_grid(anchor_micros),
+        ts = config::TIMESTAMP_COL_NAME,
         stream = escape_ident(stream_name),
     );
     if let Some(system) = system.map(str::trim).filter(|s| !s.is_empty()) {
@@ -8448,7 +8575,17 @@ pub(crate) fn build_dbm_instances_sql(
         // literal: double any quote so it cannot terminate the string.
         sql.push_str(&format!(" AND {engine} = '{}'", system.replace('\'', "''")));
     }
-    sql.push_str(&format!(" ORDER BY {engine}"));
+    // GROUP BY names the STORAGE columns: `instance_col` may be a
+    // `CAST(NULL AS VARCHAR) AS ...` projection on a partially-upgraded
+    // stream, and a literal cannot be grouped by.
+    let group_instance = if present.contains(server_vantage::O2_DBM_INSTANCE) {
+        format!(", {}", server_vantage::O2_DBM_INSTANCE)
+    } else {
+        String::new()
+    };
+    sql.push_str(&format!(
+        " GROUP BY {engine}{group_instance} ORDER BY {engine}"
+    ));
     Some(sql)
 }
 
@@ -8468,7 +8605,7 @@ pub struct TableHealthQuery {
     pub include_indexes: Option<bool>,
 }
 
-/// GET /{org_id}/traces/db_monitoring/table_health — W10.
+/// GET /{org_id}/db_monitoring/table_health — W10.
 ///
 /// The newest snapshot of every relation in the window, largest first.
 ///
@@ -8478,7 +8615,7 @@ pub struct TableHealthQuery {
 /// PLANNER ESTIMATES (not exact counts).
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/table_health",
+    path = "/{org_id}/db_monitoring/table_health",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringTableHealth",
@@ -8925,7 +9062,7 @@ pub(crate) fn databases_slice_reports_zero_calls(databases: &Result<Value, HttpR
     }
 }
 
-/// GET /{org_id}/traces/db_monitoring/badges — every tab badge in one read.
+/// GET /{org_id}/db_monitoring/badges — every tab badge in one read.
 ///
 /// Runs the six sibling endpoints' bodies concurrently and — when the
 /// client-vantage answer is exactly zero — the server-vantage fallbacks the
@@ -8934,7 +9071,7 @@ pub(crate) fn databases_slice_reports_zero_calls(databases: &Result<Value, HttpR
 /// response body, or `null` when its read failed.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/badges",
+    path = "/{org_id}/db_monitoring/badges",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetDbMonitoringBadges",
@@ -9423,6 +9560,73 @@ mod tests {
             !args.contains("StreamType::"),
             "{fn_name} must reach its stream type through required_stream_for, \
              never by writing StreamType:: at the gate"
+        );
+    }
+
+    /// The INFERRED backfill stream must be filtered to what the caller may read.
+    ///
+    /// With no `?stream=`, `backfill_stream` is inferred from the rollup rows'
+    /// `trace_stream_name` — and `_o2_db_stats` is read ORG-SCOPED, so those rows
+    /// name every trace stream in the org, not the caller's. The inferred name
+    /// then feeds up to `HISTORY_BACKFILL_MAX_WINDOWS` raw-span aggregations
+    /// through `rollup::run_dbm_search`, whose `user_id` explicitly does NOT
+    /// authorize (see its doc). `involved_streams` catches it only afterwards, so
+    /// the work ran against another team's stream and its duration is observable
+    /// — the same defect the explicit-param case above already fixed, on the
+    /// branch that fix missed.
+    ///
+    /// [`resolve_backfill_stream`] is the chokepoint: it takes the readable set
+    /// and returns `None` for anything outside it, so an unreadable inferred
+    /// stream yields no backfill rather than an unauthorized scan.
+    #[test]
+    fn inferred_backfill_stream_is_dropped_when_the_caller_cannot_read_it() {
+        let rows = vec![json!({ "trace_stream_name": "traces_finance" })];
+        let readable: BTreeSet<String> = ["traces_prod".to_string()].into_iter().collect();
+
+        assert_eq!(
+            resolve_backfill_stream(None, &rows, &readable),
+            None,
+            "a stream absent from the readable set must not be backfilled"
+        );
+    }
+
+    /// The readable case still resolves — the filter must not disable backfill.
+    #[test]
+    fn inferred_backfill_stream_survives_when_the_caller_can_read_it() {
+        let rows = vec![json!({ "trace_stream_name": "traces_prod" })];
+        let readable: BTreeSet<String> = ["traces_prod".to_string()].into_iter().collect();
+
+        assert_eq!(
+            resolve_backfill_stream(None, &rows, &readable),
+            Some("traces_prod".to_string())
+        );
+    }
+
+    /// Ambiguity still wins over the filter: two readable streams is a scope the
+    /// handler must not guess between, exactly as before.
+    #[test]
+    fn inferred_backfill_stream_stays_none_when_two_readable_streams_match() {
+        let rows = vec![
+            json!({ "trace_stream_name": "traces_a" }),
+            json!({ "trace_stream_name": "traces_b" }),
+        ];
+        let readable: BTreeSet<String> = ["traces_a".to_string(), "traces_b".to_string()]
+            .into_iter()
+            .collect();
+
+        assert_eq!(resolve_backfill_stream(None, &rows, &readable), None);
+    }
+
+    /// An explicit `?stream=` bypasses inference — it is gated at the top of the
+    /// handler by `can_read_stream`, which 403s rather than silently dropping.
+    #[test]
+    fn explicit_backfill_stream_is_passed_through_unfiltered() {
+        let param = "traces_explicit".to_string();
+        assert_eq!(
+            resolve_backfill_stream(Some(&param), &[], &BTreeSet::new()),
+            Some("traces_explicit".to_string()),
+            "the explicit param has its own gate; re-filtering here would 200 \
+             where the handler must 403"
         );
     }
 
@@ -15791,8 +15995,9 @@ mod tests {
     fn test_instances_sql_unions_every_feed() {
         let sql = build_dbm_instances_sql("dbm_server", None, &all_cols()).expect("instances sql");
         assert!(
-            sql.contains("SELECT DISTINCT"),
-            "the identity list must be a distinct scan, not a row read"
+            sql.contains("GROUP BY"),
+            "the identity list must dedup, not read rows — GROUP BY since the \
+             cache needs an aggregate timestamp beside it (see the builder)"
         );
         assert!(
             !sql.contains(server_vantage::O2_DBM_KIND),
@@ -15801,6 +16006,58 @@ mod tests {
         );
         assert!(sql.contains(server_vantage::O2_DBM_ENGINE));
         assert!(sql.contains(server_vantage::O2_DBM_INSTANCE));
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// The identity list must be CACHEABLE.
+    ///
+    /// The result cache resolves a complex query's timestamp column from its
+    /// SELECT output (`get_timestamp_column_name`). `SELECT DISTINCT a, b`
+    /// projects no `_timestamp`, so the resolver returned nothing and every
+    /// load re-scanned the window — verified against the real resolver, which
+    /// answered `has_ts=false` for the old shape and `has_ts=true` for this one.
+    ///
+    /// `DISTINCT` → `GROUP BY` over the SAME columns is the same dedup; what
+    /// earns the cache entry is the projected `_timestamp` beside it.
+    #[test]
+    fn test_instances_sql_projects_a_timestamp_so_the_result_cache_accepts_it() {
+        let sql = build_dbm_instances_sql("dbm_server", None, &all_cols()).expect("instances sql");
+        assert!(
+            sql.contains("AS _timestamp"),
+            "no projected _timestamp means the cache declines the query: {sql}"
+        );
+        assert!(
+            sql.contains("GROUP BY"),
+            "dedup moves to GROUP BY so the timestamp can be aggregated beside it: {sql}"
+        );
+        assert!(
+            !sql.contains("SELECT DISTINCT"),
+            "DISTINCT and an aggregate projection cannot coexist: {sql}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// The projected `_timestamp` is a GRID BOUNDARY, not `MAX(_timestamp)`.
+    ///
+    /// A true max moves on every ingest, so two viewers of the same window
+    /// would hash to different cache keys and the entry would never be reused
+    /// — satisfying the resolver without delivering a single hit. The rollup
+    /// already floors to the same grid for exactly this reason.
+    #[test]
+    fn test_instances_sql_grid_stamps_its_timestamp_so_the_key_is_stable() {
+        let end = 1_800_000_000_000_000_i64;
+        let a = build_dbm_instances_sql_at("dbm_server", None, &all_cols(), end).expect("sql");
+        let b = build_dbm_instances_sql_at("dbm_server", None, &all_cols(), end + 1_000_000)
+            .expect("sql");
+        assert_eq!(
+            a, b,
+            "two reads one second apart in the same window must produce the SAME sql, \
+             or the cache key differs and the entry is never reused"
+        );
+        assert!(
+            !a.contains(&format!("MAX({})", config::TIMESTAMP_COL_NAME)),
+            "a moving max defeats the cache key it was added to enable: {a}"
+        );
     }
 
     #[cfg(feature = "enterprise")]
@@ -16738,7 +16995,7 @@ mod tests {
             .find("async fn read_table_health_body")
             .expect("table health body reader must exist");
         let end = src[start..]
-            .find("\n/// GET /{org_id}/traces/db_monitoring/table_health")
+            .find("\n/// GET /{org_id}/db_monitoring/table_health")
             .map(|i| start + i)
             .unwrap_or_else(|| (start + 6000).min(src.len()));
         let body = &src[start..end];

@@ -19,7 +19,7 @@ import type { TableHealthResponse } from "@/utils/dbm/tableHealth";
 import type { QueryBreakdownRow } from "@/utils/dbm/whereItRuns";
 
 // ─── Response contract ───────────────────────────────────────────────────────
-// Mirrors `src/core/src/traces/db_monitoring/api.rs`. Rows come from
+// Mirrors `src/core/src/db_monitoring/api.rs`. Rows come from
 // `SELECT * FROM _o2_db_stats` merged in Rust, so every metric is OPTIONAL:
 // `merge_rows` only emits a key when at least one constituent row carried it
 // (e.g. `rows_returned` is absent on streams without the column, percentiles
@@ -1111,7 +1111,7 @@ const dbMonitoringService = {
     // Sent only when asked for: a `false` on the wire and an absent param mean
     // the same thing to the server, and the shorter URL is the honest one.
     if (options.includeBreakdown) params.include_breakdown = "true";
-    return http().get<DatabasesResponse>(`/api/${orgId}/traces/db_monitoring/databases`, {
+    return http().get<DatabasesResponse>(`/api/${orgId}/db_monitoring/databases`, {
       params,
     });
   },
@@ -1137,7 +1137,7 @@ const dbMonitoringService = {
     put(params, "baseline_end_time", options.baselineEndTime);
     put(params, "fingerprint", options.fingerprint);
     if (options.includeServerFallback) params.include_server_fallback = "true";
-    return http().get<QueriesResponse>(`/api/${orgId}/traces/db_monitoring/queries`, { params });
+    return http().get<QueriesResponse>(`/api/${orgId}/db_monitoring/queries`, { params });
   },
 
   /**
@@ -1157,7 +1157,7 @@ const dbMonitoringService = {
     put(params, "limit", options.limit);
     put(params, "fingerprint", options.fingerprint);
     if (options.includeServerFallback) params.include_server_fallback = "true";
-    return http().get<SamplesResponse>(`/api/${orgId}/traces/db_monitoring/samples`, { params });
+    return http().get<SamplesResponse>(`/api/${orgId}/db_monitoring/samples`, { params });
   },
 
   /** FR-5 per-fingerprint series, with below-top-N and live points flagged. */
@@ -1175,7 +1175,7 @@ const dbMonitoringService = {
     // asked for, since a `false` and an absent param mean the same thing.
     if (options.includeEndpoints) params.include_endpoints = "true";
     put(params, "endpoints_limit", options.endpointsLimit);
-    return http().get<QueryHistoryResponse>(`/api/${orgId}/traces/db_monitoring/query/history`, {
+    return http().get<QueryHistoryResponse>(`/api/${orgId}/db_monitoring/query/history`, {
       params,
     });
   },
@@ -1193,10 +1193,9 @@ const dbMonitoringService = {
     put(params, "system", options.system);
     put(params, "namespace", options.namespace);
     put(params, "limit", options.limit);
-    return http().get<QueryEndpointsResponse>(
-      `/api/${orgId}/traces/db_monitoring/query/endpoints`,
-      { params },
-    );
+    return http().get<QueryEndpointsResponse>(`/api/${orgId}/db_monitoring/query/endpoints`, {
+      params,
+    });
   },
 
   /**
@@ -1217,7 +1216,7 @@ const dbMonitoringService = {
     // not to run the counters read at all.
     put(params, "engine", options.engine);
     put(params, "database", options.database);
-    return http().get<QueryInsightsResponse>(`/api/${orgId}/traces/db_monitoring/query/insights`, {
+    return http().get<QueryInsightsResponse>(`/api/${orgId}/db_monitoring/query/insights`, {
       params,
     });
   },
@@ -1236,7 +1235,7 @@ const dbMonitoringService = {
     put(params, "stream", options.stream);
     put(params, "start_time", options.startTime);
     put(params, "end_time", options.endTime);
-    return http().get<QueryPlansResponse>(`/api/${orgId}/traces/db_monitoring/query/plans`, {
+    return http().get<QueryPlansResponse>(`/api/${orgId}/db_monitoring/query/plans`, {
       params,
     });
   },
@@ -1263,10 +1262,9 @@ const dbMonitoringService = {
     put(params, "stream", options.stream);
     put(params, "start_time", options.startTime);
     put(params, "end_time", options.endTime);
-    return http().get<Record<string, unknown>>(
-      `/api/${orgId}/traces/db_monitoring/query/server_metrics`,
-      { params },
-    );
+    return http().get<Record<string, unknown>>(`/api/${orgId}/db_monitoring/query/server_metrics`, {
+      params,
+    });
   },
 
   /**
@@ -1290,7 +1288,7 @@ const dbMonitoringService = {
     put(params, "instance", options.instance);
     put(params, "namespace", options.namespace);
     put(params, "limit", options.limit);
-    return http().get<ServerQueriesResponse>(`/api/${orgId}/traces/db_monitoring/server_queries`, {
+    return http().get<ServerQueriesResponse>(`/api/${orgId}/db_monitoring/server_queries`, {
       params,
     });
   },
@@ -1316,7 +1314,7 @@ const dbMonitoringService = {
     put(params, "instance", options.instance);
     put(params, "namespace", options.namespace);
     put(params, "limit", options.limit);
-    return http().get<ServerSamplesResponse>(`/api/${orgId}/traces/db_monitoring/server_samples`, {
+    return http().get<ServerSamplesResponse>(`/api/${orgId}/db_monitoring/server_samples`, {
       params,
     });
   },
@@ -1332,7 +1330,7 @@ const dbMonitoringService = {
     put(params, "namespace", options.namespace);
     put(params, "search", options.search);
     put(params, "limit", options.limit);
-    return http().get<DeadlocksResponse>(`/api/${orgId}/traces/db_monitoring/deadlocks`, {
+    return http().get<DeadlocksResponse>(`/api/${orgId}/db_monitoring/deadlocks`, {
       params,
     });
   },
@@ -1354,7 +1352,7 @@ const dbMonitoringService = {
     // `database`, but every sibling method here spells it `namespace`.
     put(params, "namespace", options.namespace);
     put(params, "limit", options.limit);
-    return http().get<ActivityResponse>(`/api/${orgId}/traces/db_monitoring/activity`, { params });
+    return http().get<ActivityResponse>(`/api/${orgId}/db_monitoring/activity`, { params });
   },
 
   /** FR-9 sessions currently waiting on a lock, with root-blocker chains. */
@@ -1368,7 +1366,7 @@ const dbMonitoringService = {
     put(params, "namespace", options.namespace);
     put(params, "search", options.search);
     put(params, "limit", options.limit);
-    return http().get<BlockingResponse>(`/api/${orgId}/traces/db_monitoring/blocking`, { params });
+    return http().get<BlockingResponse>(`/api/${orgId}/db_monitoring/blocking`, { params });
   },
 
   /**
@@ -1389,7 +1387,7 @@ const dbMonitoringService = {
     // W11 rides along — see TableHealthResponse: one response carries both
     // sections so the page issues one round trip.
     if (options.includeIndexes) params.include_indexes = "true";
-    return http().get<TableHealthResponse>(`/api/${orgId}/traces/db_monitoring/table_health`, {
+    return http().get<TableHealthResponse>(`/api/${orgId}/db_monitoring/table_health`, {
       params,
     });
   },
@@ -1409,7 +1407,7 @@ const dbMonitoringService = {
     put(params, "namespace", options.namespace);
     put(params, "env", options.env);
     put(params, "service", options.service);
-    return http().get<BadgesResponse>(`/api/${orgId}/traces/db_monitoring/badges`, { params });
+    return http().get<BadgesResponse>(`/api/${orgId}/db_monitoring/badges`, { params });
   },
 
   /**
@@ -1430,7 +1428,7 @@ const dbMonitoringService = {
     put(params, "end_time", options.endTime);
     put(params, "stream", options.stream);
     put(params, "system", options.system);
-    return http().get<InstancesResponse>(`/api/${orgId}/traces/db_monitoring/instances`, {
+    return http().get<InstancesResponse>(`/api/${orgId}/db_monitoring/instances`, {
       params,
     });
   },

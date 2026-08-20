@@ -360,7 +360,7 @@ export class DatabaseMonitoringPage {
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
     const now = Date.now() * 1000;
     const url =
-      `${baseUrl}/api/${org}/traces/db_monitoring/table_health` +
+      `${baseUrl}/api/${org}/db_monitoring/table_health` +
       `?start_time=${now - periodSeconds * 1e6}&end_time=${now}`;
     // Basic auth explicitly: OpenObserve authenticates API calls with an
     // Authorization header the SPA holds in local storage, NOT with a cookie,
@@ -623,7 +623,7 @@ export class DatabaseMonitoringPage {
     const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
     const now = Date.now() * 1000;
     const res = await this.page.request.get(
-      `${baseUrl}/api/${org}/traces/db_monitoring/instances` +
+      `${baseUrl}/api/${org}/db_monitoring/instances` +
         `?start_time=${now - periodSeconds * 1_000_000}&end_time=${now}`,
     );
     if (!res.ok()) return null;
@@ -796,7 +796,7 @@ export class DatabaseMonitoringPage {
     ).toString('base64');
     try {
       const res = await this.page.request.get(
-        `${baseUrl}/api/${org}/traces/db_monitoring/${endpoint}?${qs}`,
+        `${baseUrl}/api/${org}/db_monitoring/${endpoint}?${qs}`,
         { timeout: 30000, headers: { Authorization: `Basic ${auth}` } },
       );
       if (!res.ok()) return null;
@@ -823,7 +823,7 @@ export class DatabaseMonitoringPage {
       `${process.env['ZO_ROOT_USER_EMAIL'] || ''}:${process.env['ZO_ROOT_USER_PASSWORD'] || ''}`,
     ).toString('base64');
     const url =
-      `${baseUrl}/api/${org}/traces/db_monitoring/${endpoint}` +
+      `${baseUrl}/api/${org}/db_monitoring/${endpoint}` +
       `?start_time=${now - periodSeconds * 1e6}&end_time=${now}` +
       (system ? `&system=${encodeURIComponent(system)}` : '');
     try {

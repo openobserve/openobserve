@@ -141,7 +141,7 @@ export interface IndexHealthRow {
   is_unique?: boolean | null;
 }
 
-/** The index section of `GET /{org}/traces/db_monitoring/table_health?include_indexes=true`. */
+/** The index section of `GET /{org}/db_monitoring/table_health?include_indexes=true`. */
 export interface IndexHealthResponse {
   hits: IndexHealthRow[];
   stream: string;

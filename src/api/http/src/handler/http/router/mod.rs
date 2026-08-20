@@ -803,33 +803,38 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
-        // Database Monitoring — deliberately in the UNGATED router section
-        // (design §6). Every route below is registered in BOTH builds; the
-        // build-type gate lives in the handlers, three of which
-        // (deadlocks/blocking/table_health) are dual-implemented and answer 403
-        // on OSS. Moving them into the enterprise-gated block would 404 them
-        // instead, losing the distinction between "not licensed" and "no such
-        // endpoint". Runtime off-switch is ZO_DB_MONITORING_ENABLED.
-        .route("/{org_id}/traces/db_monitoring/databases", get(traces::get_dbm_databases))
-        .route("/{org_id}/traces/db_monitoring/queries", get(traces::get_dbm_queries))
-        .route("/{org_id}/traces/db_monitoring/query/history", get(traces::get_dbm_query_history))
-        .route("/{org_id}/traces/db_monitoring/query/endpoints", get(traces::get_dbm_query_endpoints))
-        .route("/{org_id}/traces/db_monitoring/samples", get(traces::get_dbm_samples))
+        // Database Monitoring — its own top-level module, NOT under /traces.
+        // The path matches the OFGA resource these routes authorize against
+        // (`db_monitoring:{org}`, see o2_openfga ROUTE_PERMISSIONS); a path
+        // saying `traces` while the permission says `db_monitoring` invites a
+        // later "fix" back to the wrong object.
+        //
+        // Every route below is registered in BOTH builds; the build-type gate
+        // lives in the handlers, three of which (deadlocks/blocking/
+        // table_health) are dual-implemented and answer 403 on OSS. Moving them
+        // into the enterprise-gated block would 404 them instead, losing the
+        // distinction between "not licensed" and "no such endpoint". Runtime
+        // off-switch is ZO_DB_MONITORING_ENABLED.
+        .route("/{org_id}/db_monitoring/databases", get(traces::get_dbm_databases))
+        .route("/{org_id}/db_monitoring/queries", get(traces::get_dbm_queries))
+        .route("/{org_id}/db_monitoring/query/history", get(traces::get_dbm_query_history))
+        .route("/{org_id}/db_monitoring/query/endpoints", get(traces::get_dbm_query_endpoints))
+        .route("/{org_id}/db_monitoring/samples", get(traces::get_dbm_samples))
         // Server-vantage events (read the canonical o2_dbm_* columns)
-        .route("/{org_id}/traces/db_monitoring/deadlocks", get(traces::get_dbm_deadlocks))
-        .route("/{org_id}/traces/db_monitoring/blocking", get(traces::get_dbm_blocking))
-        .route("/{org_id}/traces/db_monitoring/activity", get(traces::get_dbm_activity))
+        .route("/{org_id}/db_monitoring/deadlocks", get(traces::get_dbm_deadlocks))
+        .route("/{org_id}/db_monitoring/blocking", get(traces::get_dbm_blocking))
+        .route("/{org_id}/db_monitoring/activity", get(traces::get_dbm_activity))
         // The query-detail page's Logs-side pair in ONE round trip. The two
         // routes below are SUPERSEDED by it (same sections, same envelopes) and
         // stay registered for compatibility.
-        .route("/{org_id}/traces/db_monitoring/query/insights", get(traces::get_dbm_query_insights))
-        .route("/{org_id}/traces/db_monitoring/query/plans", get(traces::get_dbm_query_plans))
-        .route("/{org_id}/traces/db_monitoring/query/server_metrics", get(traces::get_dbm_query_server_metrics))
-        .route("/{org_id}/traces/db_monitoring/server_queries", get(traces::get_dbm_server_queries))
-        .route("/{org_id}/traces/db_monitoring/server_samples", get(traces::get_dbm_server_samples))
-        .route("/{org_id}/traces/db_monitoring/table_health", get(traces::get_dbm_table_health))
-        .route("/{org_id}/traces/db_monitoring/instances", get(traces::get_dbm_instances))
-        .route("/{org_id}/traces/db_monitoring/badges", get(traces::get_dbm_badges))
+        .route("/{org_id}/db_monitoring/query/insights", get(traces::get_dbm_query_insights))
+        .route("/{org_id}/db_monitoring/query/plans", get(traces::get_dbm_query_plans))
+        .route("/{org_id}/db_monitoring/query/server_metrics", get(traces::get_dbm_query_server_metrics))
+        .route("/{org_id}/db_monitoring/server_queries", get(traces::get_dbm_server_queries))
+        .route("/{org_id}/db_monitoring/server_samples", get(traces::get_dbm_server_samples))
+        .route("/{org_id}/db_monitoring/table_health", get(traces::get_dbm_table_health))
+        .route("/{org_id}/db_monitoring/instances", get(traces::get_dbm_instances))
+        .route("/{org_id}/db_monitoring/badges", get(traces::get_dbm_badges))
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))

@@ -145,7 +145,7 @@ case "${1:-up}" in
     FROM=$(( (NOW-1800)*1000000 )); TO=$(( NOW*1000000 ))
     echo "== $ORG =="
     curl -s -u "$O2_USER:$O2_PASS" \
-      "$O2_URL/api/$ORG/traces/db_monitoring/badges?start_time=$FROM&end_time=$TO" \
+      "$O2_URL/api/$ORG/db_monitoring/badges?start_time=$FROM&end_time=$TO" \
       | python3 -c '
 import sys, json
 d = json.load(sys.stdin)
