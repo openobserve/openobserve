@@ -303,7 +303,8 @@
     "browser": "chrome",
     "quick_mode_enabled": "true",
     "run_files": [
-      "logsVisualizeSelectStar.spec.js"
+      "logsVisualizeSelectStar.spec.js",
+      "logsBuildStreamList.spec.js"
     ],
     "disabled": []
   },
