@@ -10064,6 +10064,11 @@ mod tests {
     /// no grant ever creates, so the module grant would silently never match
     /// and the defect would come straight back. Asserted by scraping the
     /// source because the call itself needs a live OFGA store.
+    /// Opens `can_read_stream`'s non-enterprise arm, and so closes the
+    /// enterprise one this test reads.
+    #[cfg(feature = "enterprise")]
+    const OSS_ARM: &str = "#[cfg(not(feature = \"enterprise\"))]";
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn module_grant_is_checked_against_the_org_level_db_monitoring_object() {
@@ -10071,12 +10076,25 @@ mod tests {
         let start = src
             .find("async fn can_read_stream(")
             .expect("can_read_stream must exist");
-        let body = &src[start..start + 2600];
+        // Bound the window on the syntax that ends the enterprise arm, not on a
+        // byte count: a comment edit inside the function shifts every offset,
+        // and a count that lands mid-character panics rather than fails.
+        let end = src[start..]
+            .find(OSS_ARM)
+            .map(|offset| start + offset)
+            .expect("can_read_stream must keep its non-enterprise arm");
+        let body = &src[start..end];
 
+        // The FIRST check_permissions call is the module check — it has to be,
+        // or the per-stream check would run first and the grant would be
+        // consulted only after a denial. The next call opens the fallback.
         let call = body
             .find("check_permissions(")
             .expect("can_read_stream must consult check_permissions");
-        let args = &body[call..body.len().min(call + 400)];
+        let args = match body[call + 1..].find("check_permissions(") {
+            Some(next) => &body[call..call + 1 + next],
+            None => &body[call..],
+        };
 
         assert!(
             args.contains("\"db_monitoring\""),
