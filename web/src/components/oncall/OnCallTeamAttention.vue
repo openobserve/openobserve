@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <template v-if="rows.length">
     <div
       v-if="expanded"
-      class="card-container border-border-default bg-surface-base rounded-surface overflow-hidden border"
+      class="card-container rounded-surface bg-surface-base border-border-default overflow-hidden border"
       data-test="oncall-team-attention"
     >
       <!-- Tinted on the header only: the findings below carry their own severity
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-banner-warning-bg border-banner-warning-border flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2.5"
       >
         <OIcon name="warning-amber" size="sm" class="text-status-warning-text shrink-0" />
-        <OText variant="body-strong">{{ t("oncall.attentionHeading") }}</OText>
+        <OText variant="panel-title">{{ t("oncall.attentionHeading") }}</OText>
 
         <!-- The three counts are the shape of the problem before any reading:
              what is broken, what is thin, and what is merely dead. -->
@@ -287,9 +287,9 @@ const FIX_FOR_KIND: Record<string, { tab: FixTab; cta: I18nKey }> = {
   single_member_rotation: { tab: "schedule", cta: "oncall.attentionAddMember" },
   rotation_hands_a_shift_to_someone_away: {
     tab: "schedule",
-    cta: "oncall.attentionOpenSchedule",
+    cta: "oncall.openSchedule",
   },
-  slots_can_collide: { tab: "schedule", cta: "oncall.attentionOpenSchedule" },
+  slots_can_collide: { tab: "schedule", cta: "oncall.openSchedule" },
   ownership_rule_never_matched: { tab: "ownership", cta: "oncall.attentionOpenRouting" },
 };
 

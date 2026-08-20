@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-3 border px-4 py-3"
     data-test="oncall-team-pulse"
   >
-    <OText variant="section" as="div" class="uppercase">
+    <OText variant="panel-title">
       {{ t("oncall.pulseFiresNow", { priority: raw(priority) }) }}
     </OText>
 
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-pulse-open-schedule"
         @click="emit('open-schedule')"
       >
-        {{ t("oncall.pulseFullSchedule") }}
+        {{ t("oncall.openSchedule") }}
       </OButton>
 
       <span class="ms-auto flex flex-wrap items-baseline gap-x-2">

@@ -171,7 +171,7 @@
          which made "who is overloaded" and "who is in the rota" two screens. -->
     <div
       v-if="loadSummary || fairness.length"
-      class="border-border-subtle flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3 pt-3"
+      class="border-border-subtle px-page-edge flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-3"
       data-test="oncall-members-load"
     >
       <template v-if="loadSummary">

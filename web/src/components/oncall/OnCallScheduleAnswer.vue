@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-answer-request-swap"
         @click="emit('request-swap')"
       >
-        {{ t("oncall.schedRequestSwap") }}
+        {{ t("oncall.requestCover") }}
       </OButton>
     </span>
   </div>

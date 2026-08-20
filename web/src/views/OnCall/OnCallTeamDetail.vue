@@ -81,8 +81,9 @@
     <template v-else>
       <!-- What a page fired right now would do, end to end: who it wakes, in
            what order, when the pager changes hands, and how the week went. The
-           tabs below are where you go to CHANGE any of it. -->
-      <OContent class="pt-3">
+           tabs below are where you go to CHANGE any of it. One inset and one
+           gap: the two strips are peers, not two hand-picked pads. -->
+      <OContent y class="flex flex-col gap-3">
         <OnCallTeamPulse
           :preview="firesNowPreview"
           :loading="previewLoading"
@@ -94,9 +95,7 @@
           @open-schedule="activeTab = 'schedule'"
           @open-pages="openOnCallList"
         />
-      </OContent>
 
-      <OContent class="py-2">
         <OnCallTeamAttention
           :risks="configRisks"
           :reachability="reachability"
@@ -112,24 +111,52 @@
            person is on, what happens if nobody answers, what reaches the team at
            all, and finally who the people are. -->
       <OTabs v-model="activeTab" data-test="oncall-team-tabs">
-        <OTab name="overview" :label="t('oncall.teamOverview')" icon="format-list-bulleted" />
-        <OTab name="schedule" :label="t('oncall.schedule')" icon="calendar-month" />
+        <OTab
+          name="overview"
+          :label="t('oncall.teamOverview')"
+          icon="format-list-bulleted"
+          data-test="oncall-team-tab-overview"
+        />
+        <OTab
+          name="schedule"
+          :label="t('oncall.schedule')"
+          icon="calendar-month"
+          data-test="oncall-team-tab-schedule"
+        />
         <!-- Counts via the default slot, which is the documented seam for badges;
-             `label` and `icon` are ignored once it is provided. -->
-        <OTab name="policy">
-          <OIcon name="arrow-upward" size="xs" />
-          {{ t("oncall.escalationTab") }}
-          <OTag v-if="silentPriorities" variant="amber-soft" size="sm">{{ silentPriorities }}</OTag>
+             `label` and `icon` are ignored once it is provided. The icon is
+             sized the way the `icon` prop sizes it on the two tabs above, so the
+             strip carries one glyph size rather than two. -->
+        <OTab name="policy" data-test="oncall-team-tab-policy">
+          <OIcon name="arrow-upward" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.escalationTab") }}</span>
+          <!-- Warning whether or not the tab is open: a priority that pages
+               nobody is a finding, not a tally of what is on the tab. -->
+          <OTag v-if="silentPriorities" type="countChip" value="warning">
+            {{ silentPriorities }}
+          </OTag>
         </OTab>
-        <OTab name="ownership">
-          <OIcon name="account-tree" size="xs" />
-          {{ t("oncall.routing") }}
-          <OTag v-if="ruleCount" variant="default-soft" size="sm">{{ ruleCount }}</OTag>
+        <OTab name="ownership" data-test="oncall-team-tab-ownership">
+          <OIcon name="account-tree" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.routing") }}</span>
+          <OTag
+            v-if="ruleCount"
+            type="countChip"
+            :value="activeTab === 'ownership' ? 'primary' : 'neutral'"
+          >
+            {{ ruleCount }}
+          </OTag>
         </OTab>
-        <OTab name="members">
-          <OIcon name="group-work" size="xs" />
-          {{ t("oncall.members") }}
-          <OTag v-if="memberCount" variant="default-soft" size="sm">{{ memberCount }}</OTag>
+        <OTab name="members" data-test="oncall-team-tab-members">
+          <OIcon name="group-work" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.members") }}</span>
+          <OTag
+            v-if="memberCount"
+            type="countChip"
+            :value="activeTab === 'members' ? 'primary' : 'neutral'"
+          >
+            {{ memberCount }}
+          </OTag>
         </OTab>
       </OTabs>
 
@@ -142,7 +169,7 @@
                the Escalation and Members tabs already own. What is left is the
                pair of questions this tab exists for — has this team been
                answering, and is anybody there to answer next. -->
-          <OContent y class="flex flex-col gap-4">
+          <OContent y class="flex flex-col gap-5">
             <OnCallRecentPages
               :pages="recentPages"
               :policy="policy"
@@ -169,7 +196,7 @@
                   data-test="oncall-team-open-schedule"
                   @click="activeTab = 'schedule'"
                 >
-                  {{ t("oncall.calendar") }}
+                  {{ t("oncall.openSchedule") }}
                 </OButton>
               </span>
               <OnCallCoverageStrip
@@ -843,8 +870,9 @@ function openCover() {
   coverOpen.value = true;
 }
 
-/// The header's verb is *take*, so the reader is the person being pre-filled —
-/// the dialog opens on the answer they came to give. The window is left blank
+/// The header offers to cover a shift, so the reader is the person being
+/// pre-filled — the dialog opens on the answer they came to give. The window is
+/// left blank
 /// on purpose: "until when" has no safe default, and a cover silently saved
 /// over the wrong hours reassigns a night nobody agreed to. The form drops the
 /// pre-fill when the reader is not on this team, which is why the picker is

@@ -186,7 +186,7 @@ describe("OnCallScheduleTimeline", () => {
   it("gives the legend three entries that all carry meaning", () => {
     const text = render().text();
     expect(text).toContain("On shift");
-    expect(text).toContain("Override");
+    expect(text).toContain("Cover");
     expect(text).toContain("No one on call");
     expect(text).not.toContain("A colour per person");
   });

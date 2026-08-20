@@ -169,7 +169,7 @@ async function intoSwapMode(wrapper: any) {
   await wrapper.find('[data-test="oncall-cover-mode-swap"]').trigger("click");
 }
 
-/// The header's *Take override* opens this dialog on the reader — the answer
+/// The header's *Cover a shift* opens this dialog on the reader — the answer
 /// they came to give, already filled in. A pre-selection the picker cannot
 /// show is worse than none: the field would read as chosen and submit as
 /// nothing, so the team roster is the gate.
