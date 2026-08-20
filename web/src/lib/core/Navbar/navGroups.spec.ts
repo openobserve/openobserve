@@ -166,6 +166,7 @@ describe("groupNavLinks", () => {
       "alertList",
       "sloList",
       "incidentList",
+      "alertLibrary",
       "alertDestinations",
       "alertTemplates",
       "alertSources",
@@ -182,6 +183,7 @@ describe("groupNavLinks", () => {
     expect(reliability?.children.map((c) => c.name)).toEqual([
       "alertList",
       "sloList",
+      "alertLibrary",
       "alertDestinations",
       "alertTemplates",
     ]);
@@ -196,6 +198,7 @@ describe("groupNavLinks", () => {
     );
     expect(reliability?.children.map((c) => c.name)).toEqual([
       "alertList",
+      "alertLibrary",
       "alertDestinations",
       "alertTemplates",
     ]);

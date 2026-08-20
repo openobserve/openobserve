@@ -24,6 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="location-on"
       :subtitle="t('alert_destinations.subtitle')"
     >
+      <!-- Peer tabs across the four alerting siblings; the routes stay flat. -->
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
+
       <template #actions>
         <OToggleGroup
           :model-value="activeTab"
@@ -315,6 +320,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -341,6 +347,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
+    AlertSectionTabs,
     DependencyUsageCell,
   },
   setup() {

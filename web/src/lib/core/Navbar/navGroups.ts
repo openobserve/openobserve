@@ -118,6 +118,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "incidentList",
         requires: "incidentList",
       },
+      // The curated catalog you install alerts FROM — same workflow as Alerts
+      // and gated the same way, so hiding Alerts hides the place to get more.
+      {
+        titleKey: "alert_library.header",
+        icon: "menu-book",
+        name: "alertLibrary",
+        requires: "alertList",
+      },
       // Where an alert is delivered, and the message it delivers. These moved
       // out of Settings: they are alerting configuration, not deployment
       // configuration. They have no rail entry of their own, so they ride on

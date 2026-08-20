@@ -23,6 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="description"
       :subtitle="t('settings.templatesDesc')"
     >
+      <!-- Peer tabs across the four alerting siblings; the routes stay flat. -->
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
+
       <template #actions>
         <OToggleGroup
           :model-value="activeTab"
@@ -283,6 +288,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import DependencyUsageCell from "./DependencyUsageCell.vue";
 import useDependencyGraph, {

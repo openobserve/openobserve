@@ -25,6 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="t('alerts.subtitle')"
       icon="shield-alert-outline"
     >
+      <!-- Peer tabs across the four alerting siblings. The routes stay flat;
+           this is presentation, not nesting. -->
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
+
       <template #actions>
         <!-- The provider behind the Terraform export tab, which is otherwise
              only discoverable once the export dialog is already open. -->
@@ -891,6 +897,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import { alertsToTerraform } from "@/utils/alerts/alertTerraform";
@@ -936,6 +943,7 @@ export default defineComponent({
     CompositeReferencesDrawer,
     ExportResourceDialog,
     IacRegistryLinks,
+    AlertSectionTabs,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
