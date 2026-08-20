@@ -59,17 +59,84 @@ describe("versions", () => {
   });
 });
 
+describe("secrets", () => {
+  it("lists metadata without reading secret material", async () => {
+    mockGet.mockResolvedValue({
+      data: { list: [{ secretRef: "secret-1", purpose: "auth" }] },
+    });
+
+    const result = await remoteTasksService.listSecrets("org-1", "head-1");
+
+    expect(mockGet).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1/secrets");
+    expect(result).toEqual([{ secretRef: "secret-1", purpose: "auth" }]);
+  });
+
+  it("stores material under an existing task head", async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        metadata: { secretRef: "secret-1", purpose: "auth" },
+        material: { type: "token", value: "shown-once" },
+      },
+    });
+
+    await remoteTasksService.createSecret("org-1", "head-1", {
+      purpose: "auth",
+      material: { type: "token", value: "shown-once" },
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1/secrets", {
+      purpose: "auth",
+      material: { type: "token", value: "shown-once" },
+    });
+  });
+});
+
 describe("draft lifecycle", () => {
-  it("create posts to the collection", async () => {
-    mockPost.mockResolvedValue({ data: { id: "rt1", version: 0 } });
-    await remoteTasksService.create("org-1", {
+  it("registers the complete task and write-only Secrets in one request", async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        entityId: "head-1",
+        version: 0,
+        generatedSigningSecret: {
+          keyId: "key-1",
+          material: { type: "token", value: "generated-once" },
+        },
+      },
+    });
+    const result = await remoteTasksService.create("org-1", {
       name: "summarizer",
       endpoint: "https://tasks.example.com/run",
+      auth: {
+        type: "bearer",
+        secret: { type: "token", value: "auth-value" },
+      },
+      customHeaders: [
+        { key: "X-Static", value: "visible" },
+        {
+          key: "X-Secret",
+          secret: { type: "token", value: "header-value" },
+        },
+      ],
+      signing: { enabled: true },
     });
     expect(mockPost).toHaveBeenCalledWith("/api/org-1/remote_tasks", {
       name: "summarizer",
       endpoint: "https://tasks.example.com/run",
+      auth: {
+        type: "bearer",
+        secret: { type: "token", value: "auth-value" },
+      },
+      customHeaders: [
+        { key: "X-Static", value: "visible" },
+        {
+          key: "X-Secret",
+          secret: { type: "token", value: "header-value" },
+        },
+      ],
+      signing: { enabled: true },
     });
+    expect(result.entityId).toBe("head-1");
+    expect(result.generatedSigningSecret?.keyId).toBe("key-1");
   });
 
   it("saveDraft puts to the head", async () => {
@@ -99,10 +166,9 @@ describe("testConnection — the publish path", () => {
     const result = await remoteTasksService.testConnection("org-1", "head-1", {
       input: "hi",
     });
-    expect(mockPost).toHaveBeenCalledWith(
-      "/api/org-1/remote_tasks/head-1/test_connection",
-      { input: "hi" },
-    );
+    expect(mockPost).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1/test_connection", {
+      input: "hi",
+    });
     expect(result.published).toBe(true);
     expect(result.versionBumped).toBe(true);
   });

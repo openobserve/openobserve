@@ -29,7 +29,8 @@ use openobserve_core::llm_evaluations::{
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::remote_tasks::{
-        ActivateRemoteTaskSecretRequestBody, CreateRemoteTaskSecretRequestBody,
+        ActivateRemoteTaskSecretRequestBody, CreateRemoteTaskRequestBody,
+        CreateRemoteTaskResponseBody, CreateRemoteTaskSecretRequestBody,
         ListRemoteTaskSecretsResponseBody, ListRemoteTasksResponseBody,
         PublishRemoteTaskResponseBody, RemoteTaskRequestBody, RemoteTaskResponseBody,
         RemoteTaskSecretMetadataBody, ReplaceRemoteTaskSecretRequestBody,
@@ -513,9 +514,9 @@ pub async fn list_remote_tasks(
                    reference it until a test connection publishes a version.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = inline(RemoteTaskRequestBody), description = "Remote task payload"),
+    request_body(content = inline(CreateRemoteTaskRequestBody), description = "Remote task payload with inline write-only Secret material"),
     responses(
-        (status = 200, body = inline(RemoteTaskResponseBody)),
+        (status = 200, body = inline(CreateRemoteTaskResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
@@ -525,13 +526,16 @@ pub async fn list_remote_tasks(
 )]
 pub async fn create_remote_task(
     Path(org_id): Path<String>,
-    axum::Json(body): axum::Json<RemoteTaskRequestBody>,
+    axum::Json(body): axum::Json<CreateRemoteTaskRequestBody>,
 ) -> Response {
-    let description = body.description.clone();
-    match remote_tasks::create(&org_id, body.into_spec(), description).await {
-        Ok(task) => {
-            set_ownership(&org_id, "remote_tasks", Authz::new(&task.entity_id)).await;
-            let body: RemoteTaskResponseBody = task.into();
+    let registration = match body.into_registration() {
+        Ok(registration) => registration,
+        Err(error) => return MetaHttpResponse::bad_request(error),
+    };
+    match remote_tasks::register(&org_id, registration).await {
+        Ok(outcome) => {
+            set_ownership(&org_id, "remote_tasks", Authz::new(&outcome.task.entity_id)).await;
+            let body: CreateRemoteTaskResponseBody = outcome.into();
             MetaHttpResponse::json(body)
         }
         Err(err) => remote_task_error_response(err),

@@ -20,12 +20,13 @@
 //! write-only rule the registration form depends on is enforced by the response
 //! type not having a field to leak.
 
-use openobserve_core::llm_evaluations::remote_tasks::{
-    RemoteTask, RemoteTaskAuth, RemoteTaskHeader, RemoteTaskRetryPolicy, RemoteTaskSigning,
-    RemoteTaskSpec, VerificationReport,
-};
-use openobserve_core::llm_evaluations::secrets::{
-    SecretMaterial, SecretMetadata, SecretOwnerKind, SecretPurpose, WrittenSecret,
+use openobserve_core::llm_evaluations::{
+    remote_tasks::{
+        InitialRemoteTaskSecret, RemoteTask, RemoteTaskAuth, RemoteTaskHeader,
+        RemoteTaskRegistration, RemoteTaskRegistrationOutcome, RemoteTaskRetryPolicy,
+        RemoteTaskSecretTarget, RemoteTaskSigning, RemoteTaskSpec, VerificationReport,
+    },
+    secrets::{SecretMaterial, SecretMetadata, SecretOwnerKind, SecretPurpose, WrittenSecret},
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -97,6 +98,196 @@ impl RemoteTaskRequestBody {
             max_concurrency: self.max_concurrency.unwrap_or(DEFAULT_MAX_CONCURRENCY),
             signing: self.signing.unwrap_or_default(),
         }
+    }
+}
+
+/// Authentication submitted while registering a new Remote Task.
+///
+/// The material is write-only. The backend creates and attaches the stable
+/// reference; clients never manufacture or order Secret resources.
+#[derive(Deserialize, ToSchema)]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+pub enum CreateRemoteTaskAuthBody {
+    None,
+    Bearer {
+        secret: RemoteTaskSecretMaterialBody,
+    },
+    Basic {
+        secret: RemoteTaskSecretMaterialBody,
+    },
+    ApiKeyHeader {
+        header_name: String,
+        secret: RemoteTaskSecretMaterialBody,
+    },
+}
+
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRemoteTaskHeaderBody {
+    pub key: String,
+    pub value: Option<String>,
+    pub secret: Option<RemoteTaskSecretMaterialBody>,
+}
+
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRemoteTaskSigningBody {
+    pub enabled: bool,
+    /// Omit to have OpenObserve generate signing material and return it once.
+    pub secret: Option<RemoteTaskSecretMaterialBody>,
+    pub key_id: Option<String>,
+}
+
+/// One-call registration payload for a complete Remote Task draft.
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRemoteTaskRequestBody {
+    pub name: String,
+    pub description: Option<String>,
+    pub endpoint: String,
+    pub http_method: Option<String>,
+    pub auth: Option<CreateRemoteTaskAuthBody>,
+    pub custom_headers: Option<Vec<CreateRemoteTaskHeaderBody>>,
+    pub content_type: Option<String>,
+    pub request_template: Option<String>,
+    pub response_schema: Option<String>,
+    pub timeout_ms: Option<u64>,
+    pub max_attempts: Option<u32>,
+    pub max_concurrency: Option<u32>,
+    pub signing: Option<CreateRemoteTaskSigningBody>,
+}
+
+impl CreateRemoteTaskRequestBody {
+    pub fn into_registration(self) -> Result<RemoteTaskRegistration, String> {
+        use openobserve_core::llm_evaluations::remote_tasks::{
+            DEFAULT_CONTENT_TYPE, DEFAULT_HTTP_METHOD, DEFAULT_MAX_CONCURRENCY,
+            DEFAULT_RESPONSE_SCHEMA, DEFAULT_TIMEOUT_MS,
+        };
+
+        let mut initial_secrets = Vec::new();
+        let auth = match self.auth.unwrap_or(CreateRemoteTaskAuthBody::None) {
+            CreateRemoteTaskAuthBody::None => RemoteTaskAuth::None,
+            CreateRemoteTaskAuthBody::Bearer { secret } => {
+                initial_secrets.push(InitialRemoteTaskSecret {
+                    target: RemoteTaskSecretTarget::Auth,
+                    material: Some(secret.into()),
+                    key_id: None,
+                });
+                RemoteTaskAuth::Bearer {
+                    secret_ref: String::new(),
+                }
+            }
+            CreateRemoteTaskAuthBody::Basic { secret } => {
+                initial_secrets.push(InitialRemoteTaskSecret {
+                    target: RemoteTaskSecretTarget::Auth,
+                    material: Some(secret.into()),
+                    key_id: None,
+                });
+                RemoteTaskAuth::Basic {
+                    secret_ref: String::new(),
+                }
+            }
+            CreateRemoteTaskAuthBody::ApiKeyHeader {
+                header_name,
+                secret,
+            } => {
+                initial_secrets.push(InitialRemoteTaskSecret {
+                    target: RemoteTaskSecretTarget::Auth,
+                    material: Some(secret.into()),
+                    key_id: None,
+                });
+                RemoteTaskAuth::ApiKeyHeader {
+                    secret_ref: String::new(),
+                    header_name,
+                }
+            }
+        };
+
+        let mut custom_headers = Vec::new();
+        for header in self.custom_headers.unwrap_or_default() {
+            let index = custom_headers.len();
+            match (header.value, header.secret) {
+                (Some(value), None) => custom_headers.push(RemoteTaskHeader {
+                    key: header.key,
+                    value: Some(value),
+                    secret_ref: None,
+                }),
+                (None, Some(secret)) => {
+                    custom_headers.push(RemoteTaskHeader {
+                        key: header.key,
+                        value: None,
+                        secret_ref: None,
+                    });
+                    initial_secrets.push(InitialRemoteTaskSecret {
+                        target: RemoteTaskSecretTarget::Header(index),
+                        material: Some(secret.into()),
+                        key_id: None,
+                    });
+                }
+                _ => {
+                    return Err(format!(
+                        "Header '{}' must carry either a value or write-only Secret material",
+                        header.key
+                    ));
+                }
+            }
+        }
+
+        let signing = match self.signing {
+            None => RemoteTaskSigning::default(),
+            Some(signing) if !signing.enabled => {
+                if signing.secret.is_some() || signing.key_id.is_some() {
+                    return Err(
+                        "disabled signing cannot carry Secret material or a key_id".to_string()
+                    );
+                }
+                RemoteTaskSigning::default()
+            }
+            Some(signing) => {
+                initial_secrets.push(InitialRemoteTaskSecret {
+                    target: RemoteTaskSecretTarget::Signing,
+                    material: signing.secret.map(Into::into),
+                    key_id: signing.key_id,
+                });
+                RemoteTaskSigning {
+                    enabled: true,
+                    secret_ref: None,
+                    key_id: None,
+                }
+            }
+        };
+
+        Ok(RemoteTaskRegistration {
+            description: self.description,
+            spec: RemoteTaskSpec {
+                name: self.name,
+                endpoint: self.endpoint,
+                http_method: self
+                    .http_method
+                    .unwrap_or_else(|| DEFAULT_HTTP_METHOD.to_string()),
+                auth,
+                custom_headers,
+                content_type: self
+                    .content_type
+                    .unwrap_or_else(|| DEFAULT_CONTENT_TYPE.to_string()),
+                request_template: self.request_template,
+                response_schema: self
+                    .response_schema
+                    .unwrap_or_else(|| DEFAULT_RESPONSE_SCHEMA.to_string()),
+                timeout_ms: self.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS),
+                retry_policy: self
+                    .max_attempts
+                    .map(|max_attempts| RemoteTaskRetryPolicy { max_attempts })
+                    .unwrap_or_default(),
+                max_concurrency: self.max_concurrency.unwrap_or(DEFAULT_MAX_CONCURRENCY),
+                signing,
+            },
+            initial_secrets,
+        })
     }
 }
 
@@ -445,6 +636,62 @@ mod tests {
         assert_eq!(spec.auth, RemoteTaskAuth::None);
         assert!(!spec.signing.enabled);
     }
+
+    #[test]
+    fn registration_accepts_inline_write_only_secrets_without_client_references() {
+        let body: CreateRemoteTaskRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "summarizer",
+            "endpoint": "https://tasks.example.com/run",
+            "auth": {
+                "type": "bearer",
+                "secret": { "type": "token", "value": "auth-value" }
+            },
+            "customHeaders": [
+                { "key": "x-team", "value": "search" },
+                {
+                    "key": "x-upstream-key",
+                    "secret": { "type": "token", "value": "header-value" }
+                }
+            ],
+            "signing": { "enabled": true }
+        }))
+        .unwrap();
+
+        let registration = body.into_registration().unwrap();
+        assert!(matches!(
+            registration.spec.auth,
+            RemoteTaskAuth::Bearer { .. }
+        ));
+        assert_eq!(registration.spec.custom_headers.len(), 2);
+        assert!(registration.spec.signing.enabled);
+        assert_eq!(registration.initial_secrets.len(), 3);
+        assert!(matches!(
+            registration.initial_secrets[0].target,
+            RemoteTaskSecretTarget::Auth
+        ));
+        assert!(matches!(
+            registration.initial_secrets[1].target,
+            RemoteTaskSecretTarget::Header(1)
+        ));
+        assert!(matches!(
+            registration.initial_secrets[2].target,
+            RemoteTaskSecretTarget::Signing
+        ));
+        assert!(registration.initial_secrets[2].material.is_none());
+    }
+
+    #[test]
+    fn registration_response_keeps_existing_task_fields_at_the_top_level() {
+        let body = CreateRemoteTaskResponseBody::from(RemoteTaskRegistrationOutcome {
+            task: task(0, VerificationStatus::Unverified),
+            generated_signing_secret: None,
+        });
+        let json = serde_json::to_value(body).unwrap();
+
+        assert_eq!(json["entityId"], "head-1");
+        assert!(json.get("task").is_none());
+        assert!(json.get("generatedSigningSecret").is_some());
+    }
 }
 
 // --- Test-run bench (#2442) ---
@@ -651,6 +898,40 @@ impl From<WrittenSecret> for WrittenRemoteTaskSecretResponseBody {
         Self {
             metadata: value.metadata.into(),
             material: value.material.into(),
+        }
+    }
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneratedRemoteTaskSigningSecretBody {
+    pub key_id: String,
+    pub material: RemoteTaskSecretMaterialResponseBody,
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRemoteTaskResponseBody {
+    #[serde(flatten)]
+    pub task: RemoteTaskResponseBody,
+    /// Present only when registration generated HMAC material server-side.
+    pub generated_signing_secret: Option<GeneratedRemoteTaskSigningSecretBody>,
+}
+
+impl From<RemoteTaskRegistrationOutcome> for CreateRemoteTaskResponseBody {
+    fn from(value: RemoteTaskRegistrationOutcome) -> Self {
+        let generated_signing_secret = value.generated_signing_secret.and_then(|secret| {
+            secret
+                .metadata
+                .key_id
+                .map(|key_id| GeneratedRemoteTaskSigningSecretBody {
+                    key_id,
+                    material: secret.material.into(),
+                })
+        });
+        Self {
+            task: value.task.into(),
+            generated_signing_secret,
         }
     }
 }
