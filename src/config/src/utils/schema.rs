@@ -252,8 +252,8 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
                     false,
                 ))
             } else if stream_type == StreamType::Metrics
-                && x.data_type() == &DataType::Int64
                 && x.name() == HASH_LABEL
+                && matches!(x.data_type(), &DataType::Int64 | &DataType::Float64)
             {
                 Arc::new(Field::new(x.name().clone(), DataType::UInt64, false))
             } else {
@@ -634,6 +634,22 @@ mod tests {
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("non-basic type"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn test_metrics_hash_above_i64_max_is_uint64() {
+        let json = format!(r#"{{"{HASH_LABEL}":{},"value":1.5}}"#, u64::MAX);
+        let schema =
+            infer_json_schema(std::io::Cursor::new(json), None, StreamType::Metrics).unwrap();
+
+        assert_eq!(
+            schema.field_with_name(HASH_LABEL).unwrap().data_type(),
+            &DataType::UInt64
+        );
+        assert_eq!(
+            schema.field_with_name("value").unwrap().data_type(),
+            &DataType::Float64
+        );
     }
 
     #[test]
