@@ -429,7 +429,7 @@ export default defineComponent({
       const serviceFlags = buildServiceFlags();
 
       const params = [
-        { key: "Amazon S3 URL (template)", value: COMPLETE_TEMPLATE_URL },
+        { key: raw("Amazon S3 URL (template)"), value: COMPLETE_TEMPLATE_URL },
         { key: "TemplateS3Bucket", value: "openobserve-datasources-bucket" },
         { key: "TemplateS3Prefix", value: "datasource/cloud/aws" },
         { key: "OpenObserveEndpoint", value: endpointUrl },

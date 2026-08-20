@@ -21,6 +21,7 @@ import { ref } from "vue";
 import DynamoDB from "./DynamoDB.vue";
 import dynamodbCard from "@/components/ingestion/setupCard/content/dynamodb";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -52,7 +53,7 @@ const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVz
 
 describe("dynamodbCard builder", () => {
   it("builds a Firehose logs card with the OO endpoint + token", () => {
-    const card = dynamodbCard(SUBS);
+    const card = dynamodbCard(SUBS, gt);
     expect(card.provider.name).toBe("DynamoDB");
     expect(card.provider.metaBadges).toEqual(["Logs"]);
     expect(card.detect).toMatchObject({
@@ -72,7 +73,7 @@ describe("DynamoDB.vue", () => {
     if (wrapper) wrapper.unmount();
   });
   it("renders the shared card", () => {
-    expect(getDataSourceCard("dynamoDB", SUBS)?.provider.name).toBe("DynamoDB");
+    expect(getDataSourceCard("dynamoDB", SUBS, gt)?.provider.name).toBe("DynamoDB");
     wrapper = mount(DynamoDB, { global: { plugins: [mockStore, mockI18n] } });
     expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });

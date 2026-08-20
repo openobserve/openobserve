@@ -77,7 +77,9 @@ const { variablesSplitter } = useCheckWizardUi();
 
 // Journey-only: the toggle lives in the journey toolbar, so sharing the flag
 // would hide the panel on Configure with no control there to bring it back.
-const variablesPanelOpen = ref(true);
+// Collapsed by default — the journey is the point of this page, and the
+// labelled toolbar button is there to bring the panel in when it is needed.
+const variablesPanelOpen = ref(false);
 const journeySplitter = computed({
   get: () => (variablesPanelOpen.value ? variablesSplitter.value : 100),
   set: (v: number) => (variablesSplitter.value = v),
@@ -150,7 +152,7 @@ const saveSchema = computed(() => makeBrowserCheckSaveSchema(t));
 
 // Extension setup state — persists across phases in this session.
 // `extensionInstalled` is now driven by a real runtime probe (not a manual click).
-const recorder = useSyntheticsRecorder();
+const recorder = useSyntheticsRecorder(t);
 const extensionInstalled = ref(false);
 // Session-only on purpose: persisting the attestations would keep tasks
 // pre-completed after the extension is removed. After the connect step's
@@ -181,6 +183,26 @@ const setupBlockingHint = computed(() => {
 });
 const extensionReady = ref(false);
 const checkingExtension = ref(false);
+
+/**
+ * Whether the installed extension can restore the journey before recording.
+ *
+ * Computed here because this component owns the recorder instance that probed, and
+ * read as a capability rather than a version so an older extension degrades to plain
+ * recording instead of getting a command it would refuse.
+ */
+const canRecordFrom = computed(() => extensionReady.value && recorder.hasCapability("recordFrom"));
+
+/**
+ * Whether it can also record on the session a FAILED restore left open.
+ *
+ * A separate capability from `recordFrom`, and read separately, because the two
+ * shipped in different extension builds — an installed base that updates on the Web
+ * Store's schedule always contains both.
+ */
+const canRecordFromFailure = computed(
+  () => extensionReady.value && recorder.hasCapability("recordFromFailure"),
+);
 
 async function probeExtension() {
   checkingExtension.value = true;
@@ -1076,6 +1098,8 @@ function onClearResults() {
                     v-model="check.journey"
                     :start-url="check.url"
                     :extension-ready="extensionReady"
+                    :can-record-from="canRecordFrom"
+                    :can-record-from-failure="canRecordFromFailure"
                     :auto-record="autoRecord"
                     :replay-phase="replayPhase"
                     :step-results="stepResults"

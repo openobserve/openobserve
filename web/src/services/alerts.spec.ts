@@ -526,6 +526,54 @@ describe("alerts service", () => {
     });
   });
 
+  describe("composite alert contracts", () => {
+    it("validates a draft through the advisory composite endpoint", async () => {
+      const body = {
+        composite_condition: {
+          expression: "{id-a} && {id-b}",
+          warning_counts_as_firing: true,
+          stale_child_policy: "use_last_state" as const,
+        },
+        composite_id: "composite-1",
+        folder_id: "payments",
+      };
+      mockHttpInstance.post.mockResolvedValue({ data: { valid: true } });
+
+      await alerts.validateComposite("org123", body);
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/v2/org123/alerts/composites/validate",
+        body,
+      );
+    });
+
+    it("loads references for the chip, drawer, and delete-conflict flow", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { references: [] } });
+
+      await alerts.getCompositeReferences("org123", "child/id");
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/v2/org123/alerts/child%2Fid/composite-references",
+      );
+    });
+
+    it("preserves the child-referenced 409 response for the caller to render", async () => {
+      const conflict = {
+        response: {
+          status: 409,
+          data: {
+            code: "child_referenced",
+            references: [{ alert_id: "parent-1", name: "Checkout degraded" }],
+            hidden_reference_count: 2,
+          },
+        },
+      };
+      mockHttpInstance.delete.mockRejectedValue(conflict);
+
+      await expect(alerts.delete_by_alert_id("org123", "child-1")).rejects.toEqual(conflict);
+    });
+  });
+
   describe("list_by_slo", () => {
     it("should filter to SLO alerts, not just to the slo_id", async () => {
       mockHttpInstance.get.mockResolvedValue({ data: { list: [] } });

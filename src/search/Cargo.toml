@@ -65,3 +65,6 @@ utoipa.workspace = true
 vortex = { workspace = true }
 vortex-btrblocks = { workspace = true }
 vortex-datafusion = { workspace = true }
+
+[dev-dependencies]
+tempfile.workspace = true

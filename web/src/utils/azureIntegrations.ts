@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { type I18nKey } from "@/types/i18n";
+import { raw, type I18nKey } from "@/types/i18n";
 
 export interface AzureIntegration {
   id: string;
@@ -32,8 +32,8 @@ export interface AzureIntegration {
 export const azureIntegrations: AzureIntegration[] = [
   {
     id: "activity-logs",
-    name: "Activity Logs",
-    displayName: "Azure Activity Logs",
+    name: raw("Activity Logs"),
+    displayName: raw("Azure Activity Logs"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.activity-logs.description",
     armTemplate:
@@ -46,7 +46,7 @@ export const azureIntegrations: AzureIntegration[] = [
   {
     id: "aks",
     name: "AKS",
-    displayName: "Azure Kubernetes Service",
+    displayName: raw("Azure Kubernetes Service"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.aks.description",
     hasDashboard: false,
@@ -55,8 +55,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "front-door",
-    name: "Front Door",
-    displayName: "Azure Front Door",
+    name: raw("Front Door"),
+    displayName: raw("Azure Front Door"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.front-door.description",
     hasDashboard: false,
@@ -65,8 +65,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "app-service",
-    name: "App Service",
-    displayName: "Azure App Service",
+    name: raw("App Service"),
+    displayName: raw("Azure App Service"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.app-service.description",
     hasDashboard: false,
@@ -75,8 +75,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "sql-database",
-    name: "SQL Database",
-    displayName: "Azure SQL Database",
+    name: raw("SQL Database"),
+    displayName: raw("Azure SQL Database"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.sql-database.description",
     hasDashboard: false,
@@ -85,8 +85,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "storage-account",
-    name: "Storage Account",
-    displayName: "Azure Storage Account",
+    name: raw("Storage Account"),
+    displayName: raw("Azure Storage Account"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.storage-account.description",
     hasDashboard: false,
@@ -95,8 +95,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "virtual-machines",
-    name: "Virtual Machines",
-    displayName: "Azure Virtual Machines",
+    name: raw("Virtual Machines"),
+    displayName: raw("Azure Virtual Machines"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.virtual-machines.description",
     hasDashboard: false,
@@ -105,8 +105,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "application-gateway",
-    name: "Application Gateway",
-    displayName: "Azure Application Gateway",
+    name: raw("Application Gateway"),
+    displayName: raw("Azure Application Gateway"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.application-gateway.description",
     hasDashboard: false,
@@ -115,8 +115,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "load-balancer",
-    name: "Load Balancer",
-    displayName: "Azure Load Balancer",
+    name: raw("Load Balancer"),
+    displayName: raw("Azure Load Balancer"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.load-balancer.description",
     hasDashboard: false,
@@ -125,8 +125,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "network-security-group",
-    name: "Network Security Group",
-    displayName: "Network Security Group",
+    name: raw("Network Security Group"),
+    displayName: raw("Network Security Group"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.network-security-group.description",
     hasDashboard: false,
@@ -135,8 +135,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "key-vault",
-    name: "Key Vault",
-    displayName: "Azure Key Vault",
+    name: raw("Key Vault"),
+    displayName: raw("Azure Key Vault"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.key-vault.description",
     hasDashboard: false,
@@ -145,8 +145,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "active-directory",
-    name: "Active Directory",
-    displayName: "Azure Active Directory",
+    name: raw("Active Directory"),
+    displayName: raw("Azure Active Directory"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.active-directory.description",
     hasDashboard: false,
@@ -155,8 +155,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "cosmos-db",
-    name: "Cosmos DB",
-    displayName: "Azure Cosmos DB",
+    name: raw("Cosmos DB"),
+    displayName: raw("Azure Cosmos DB"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.cosmos-db.description",
     hasDashboard: false,
@@ -165,8 +165,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "functions",
-    name: "Functions",
-    displayName: "Azure Functions",
+    name: raw("Functions"),
+    displayName: raw("Azure Functions"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.functions.description",
     hasDashboard: false,
@@ -175,8 +175,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "api-management",
-    name: "API Management",
-    displayName: "Azure API Management",
+    name: raw("API Management"),
+    displayName: raw("Azure API Management"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.api-management.description",
     hasDashboard: false,
@@ -185,8 +185,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "container-instances",
-    name: "Container Instances",
-    displayName: "Azure Container Instances",
+    name: raw("Container Instances"),
+    displayName: raw("Azure Container Instances"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.container-instances.description",
     hasDashboard: false,
@@ -195,8 +195,8 @@ export const azureIntegrations: AzureIntegration[] = [
   },
   {
     id: "virtual-network",
-    name: "Virtual Network",
-    displayName: "Azure Virtual Network",
+    name: raw("Virtual Network"),
+    displayName: raw("Azure Virtual Network"),
     icon: "",
     descriptionKey: "ingestion.integrations.azure.virtual-network.description",
     hasDashboard: false,

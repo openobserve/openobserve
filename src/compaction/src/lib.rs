@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     COMPACT_OLD_DATA_STREAM_SET,
     cluster::LOCAL_NODE,
@@ -22,6 +22,7 @@ use config::{
         cluster::{CompactionJobType, Role},
         stream::{PartitionTimeLevel, StreamType},
     },
+    utils::time::{hour_micros, now_micros, second_micros},
 };
 use infra::{
     cluster::get_node_from_consistent_hash,
@@ -398,19 +399,19 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
 }
 
 /// compactor delay delete files run steps:
-/// 1. get pending deleted files from file_list_deleted table, created_at > 2 hours
+/// 1. get pending deleted files from file_list_deleted table, created_at > configured delay
 /// 2. delete files from storage
 pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     let now = Utc::now();
     let time_max =
-        now - Duration::try_hours(get_config().compact.delete_files_delay_hours).unwrap();
+        now - Duration::try_minutes(get_config().compact.delete_files_delay_minutes).unwrap();
     let time_max = Utc
         .with_ymd_and_hms(
             time_max.year(),
             time_max.month(),
             time_max.day(),
             time_max.hour(),
-            0,
+            time_max.minute(),
             0,
         )
         .unwrap();
@@ -447,28 +448,8 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
 }
 
 pub(crate) fn is_past_hour(offset: i64) -> bool {
-    let time_now: DateTime<Utc> = Utc::now();
-    let time_now_hour = Utc
-        .with_ymd_and_hms(
-            time_now.year(),
-            time_now.month(),
-            time_now.day(),
-            time_now.hour(),
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-    // must wait for at least 3 * max_file_retention_time
-    // -- first period: the last hour local file upload to storage, write file list
-    // -- second period, the last hour file list upload to storage
-    // -- third period, we can do the merge, so, at least 3 times of
-    // max_file_retention_time
-    offset < time_now_hour
-        && time_now.timestamp_micros() - offset
-            > Duration::try_seconds(get_config().limit.max_file_retention_time as i64)
-                .unwrap()
-                .num_microseconds()
-                .unwrap()
-                * 3
+    let now = now_micros();
+    let hour = hour_micros(1);
+    let offset_hour_end = offset - offset % hour + hour;
+    now - offset_hour_end > second_micros(get_config().limit.max_file_retention_time as i64) * 3
 }

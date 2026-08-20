@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span
                             class="text-sm"
                             :class="'text-text-body'"
-                            v-html="getInlineEventText(event)"
+                            v-html="DOMPurify.sanitize(getInlineEventText(event))"
                           ></span>
                           <span
                             v-if="
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="bg-surface-subtle border-b-border-default flex items-center gap-2 border-b px-4 py-2"
                       >
                         <span class="text-sm font-semibold" :class="'text-text-body'">
-                          {{ getUserId(event) }}
+                          {{ getUserDisplayName(event) }}
                         </span>
                         <span class="text-xs" :class="'text-text-secondary'">
                           {{ t("alerts.incidents.commentedPrefix") }}
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import { formatToDateOnly } from "@/utils/date";
 import incidentsService from "@/services/incidents";
@@ -368,9 +368,19 @@ const isCommentEvent = (event: any): boolean => {
   return event.type === "Comment";
 };
 
-// Get user ID from event
+// Get user ID from event. `SYSTEM_USER_ID` is a stable sentinel, never display
+// text — the guards below and getAvatarColor() compare against it.
+const SYSTEM_USER_ID = "System";
+
 const getUserId = (event: any): string => {
-  return event.data?.user_id || "System";
+  return event.data?.user_id || SYSTEM_USER_ID;
+};
+
+// Display name for the event author: a real user id renders verbatim, the
+// system sentinel renders translated.
+const getUserDisplayName = (event: any): I18nText => {
+  const userId = getUserId(event);
+  return userId === SYSTEM_USER_ID ? t("alerts.incidents.systemUser") : raw(userId);
 };
 
 // Get current user ID
@@ -487,35 +497,36 @@ const badgeStyle = (c: string) => {
 const getEventBadgeText = (event: any): string => {
   switch (event.type) {
     case "Created":
-      return "Created";
+      return t("alerts.incidents.timeline.badgeCreated");
     case "Alert":
-      return "Alert";
+      return t("alerts.incidents.timeline.badgeAlert");
     case "SeverityUpgrade":
-      return "Severity Upgraded";
+      return t("alerts.incidents.timeline.badgeSeverityUpgraded");
     case "SeverityOverride":
-      return "Severity Changed";
+      return t("alerts.incidents.timeline.badgeSeverityChanged");
     case "Acknowledged":
-      return "Acknowledged";
+      return t("alerts.incidents.timeline.badgeAcknowledged");
     case "Resolved":
-      return "Resolved";
+      return t("alerts.incidents.timeline.badgeResolved");
     case "Reopened":
-      return "Reopened";
+      return t("alerts.incidents.timeline.badgeReopened");
     case "DimensionsUpgraded":
-      return "Dimensions Upgraded";
+      return t("alerts.incidents.timeline.badgeDimensionsUpgraded");
     case "TitleChanged":
-      return "Title Changed";
+      return t("alerts.incidents.timeline.badgeTitleChanged");
     case "AssignmentChanged":
-      return "Assignment";
+      return t("alerts.incidents.timeline.badgeAssignment");
     case "ai_analysis_begin":
-      return "AI Analysis";
+      return t("alerts.incidents.timeline.badgeAiAnalysis");
     case "ai_analysis_complete":
-      return "AI Complete";
+      return t("alerts.incidents.timeline.badgeAiComplete");
     case "ai_analysis_failed":
-      return "AI Failed";
+      return t("alerts.incidents.timeline.badgeAiFailed");
     case "ai_analysis_cancelled":
-      return "AI Cancelled";
+      return t("alerts.incidents.timeline.badgeAiCancelled");
     default:
-      return event.type;
+      // An event type the UI does not know yet — echo the server token verbatim.
+      return raw(event.type);
   }
 };
 
@@ -554,60 +565,84 @@ const getInlineEventText = (event: any): string => {
   const severityBadge = (severity: string) =>
     // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     `<span style="display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: var(--text-2xs); font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "31%" : "25%"}, transparent); color: ${isDark.value ? "var(--color-grey-0)" : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "38%" : "25%"}, transparent);">${esc(severity)}</span>`;
-  const isSystemEvent = getUserId(event) === "System";
+  const isSystemEvent = getUserId(event) === SYSTEM_USER_ID;
 
+  // The badge sits next to this text (before it for system events, after the
+  // username for user events), so several branches are deliberately sentence
+  // fragments — "Incident was" + [Resolved], "alice" + [Resolved] + "the incident".
   switch (event.type) {
     case "Created":
-      return isSystemEvent ? `Incident was` : `the incident`;
-
-    case "Alert":
-      return data.count === 1
-        ? `${bold(data.alert_name || "alert")} triggered`
-        : `${bold(data.alert_name || "alert")} triggered ${data.count} times`;
-
     case "Acknowledged":
-      return isSystemEvent ? `Incident was` : `the incident`;
-
     case "Resolved":
-      return isSystemEvent ? `Incident was` : `the incident`;
-
     case "Reopened":
-      return isSystemEvent ? `Incident was` : `the incident`;
-
-    case "SeverityUpgrade":
       return isSystemEvent
-        ? `Severity upgraded from ${severityBadge(data.from)} to ${severityBadge(data.to)}` +
-            (data.reason ? ` - ${esc(data.reason)}` : "")
-        : `changed the severity from ${severityBadge(data.from)} to ${severityBadge(data.to)}` +
-            (data.reason ? ` - ${esc(data.reason)}` : "");
+        ? t("alerts.incidents.timeline.incidentWas")
+        : t("alerts.incidents.timeline.theIncident");
 
-    case "SeverityOverride":
+    case "Alert": {
+      const alertName = bold(data.alert_name || t("alerts.incidents.timeline.unnamedAlert"));
+      const count = Number(data.count ?? 0);
+      return t("alerts.incidents.timeline.alertTriggered", { alert: alertName, count }, count);
+    }
+
+    case "SeverityUpgrade": {
+      const from = severityBadge(data.from);
+      const to = severityBadge(data.to);
+      if (isSystemEvent) {
+        return data.reason
+          ? t("alerts.incidents.timeline.severityUpgradedWithReason", {
+              from,
+              to,
+              reason: esc(data.reason),
+            })
+          : t("alerts.incidents.timeline.severityUpgraded", { from, to });
+      }
+      return data.reason
+        ? t("alerts.incidents.timeline.userChangedSeverityWithReason", {
+            from,
+            to,
+            reason: esc(data.reason),
+          })
+        : t("alerts.incidents.timeline.userChangedSeverity", { from, to });
+    }
+
+    case "SeverityOverride": {
+      const from = severityBadge(data.from);
+      const to = severityBadge(data.to);
       return isSystemEvent
-        ? `Severity changed from ${severityBadge(data.from)} to ${severityBadge(data.to)}`
-        : `changed the severity from ${severityBadge(data.from)} to ${severityBadge(data.to)}`;
+        ? t("alerts.incidents.timeline.severityChanged", { from, to })
+        : t("alerts.incidents.timeline.userChangedSeverity", { from, to });
+    }
 
     case "TitleChanged":
-      return `renamed from ${bold(data.from)} to ${bold(data.to)}`;
+      return t("alerts.incidents.timeline.renamedFromTo", {
+        from: bold(data.from),
+        to: bold(data.to),
+      });
 
     case "AssignmentChanged":
-      return data.to ? `Assigned to ${bold(data.to)}` : "Assignment removed";
+      return data.to
+        ? t("alerts.incidents.timeline.assignedTo", { user: bold(data.to) })
+        : t("alerts.incidents.timeline.assignmentRemoved");
 
     case "DimensionsUpgraded":
-      return "Correlation key was upgraded";
+      return t("alerts.incidents.timeline.correlationKeyUpgraded");
 
     case "ai_analysis_begin":
-      return "Started analyzing the incident";
+      return t("alerts.incidents.timeline.aiStarted");
 
     case "ai_analysis_complete":
-      return "Finished the analysis";
+      return t("alerts.incidents.timeline.aiFinished");
 
     case "ai_analysis_failed":
-      return bold(data.reason || "Analysis failed");
+      return bold(data.reason || t("alerts.incidents.timeline.analysisFailed"));
 
     // A user-cancelled event carries user_id, so it renders through the user-event
     // branch which already prefixes the username — don't repeat it here.
     case "ai_analysis_cancelled":
-      return data.user_id ? "cancelled the analysis" : "Analysis cancelled";
+      return data.user_id
+        ? t("alerts.incidents.timeline.userCancelledAnalysis")
+        : t("alerts.incidents.timeline.analysisCancelled");
 
     default:
       return "";
@@ -624,16 +659,16 @@ const formatRelativeTime = (timestamp: number): string => {
   const now = Date.now();
   const diff = now - timestamp / 1000; // Convert microseconds to milliseconds
 
-  if (diff < 60000) return "just now";
+  if (diff < 60000) return t("alerts.incidents.timeline.justNow");
 
   const minutes = Math.floor(diff / 60000);
-  if (diff < 3600000) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  if (diff < 3600000) return t("alerts.incidents.timeline.minuteAgo", { count: minutes });
 
   const hours = Math.floor(diff / 3600000);
-  if (diff < 86400000) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (diff < 86400000) return t("alerts.incidents.timeline.hourAgo", { count: hours });
 
   const days = Math.floor(diff / 86400000);
-  if (diff < 604800000) return `${days} day${days === 1 ? "" : "s"} ago`;
+  if (diff < 604800000) return t("alerts.incidents.timeline.dayAgo", { count: days });
 
   return formatToDateOnly(timestamp);
 };

@@ -75,7 +75,7 @@ watch(
           msg,
         );
       if (!isIgnorable) {
-        queryError.value = msg || "Query failed";
+        queryError.value = msg || t("synthetics.queryFailed");
       }
     } finally {
       loading.value = false;
@@ -144,10 +144,10 @@ function worstStatus(statuses: RunStatus[]): RunStatus {
 }
 
 const STATUS_COLOR: Record<RunStatus | "pending", string> = {
-  passed: "text-[var(--color-success-500)]",
-  warning: "text-(--color-orange-500)",
-  failed: "text-[var(--color-error-500)]",
-  error: "text-[var(--color-warning-500)]",
+  passed: "text-success-500",
+  warning: "text-status-flaky",
+  failed: "text-error-500",
+  error: "text-warning-500",
   pending: "text-text-muted",
 };
 
@@ -192,11 +192,11 @@ function failedAtStep(steps: StepResult[]): string {
     <!-- Loading skeleton -->
     <div v-if="loading" class="flex flex-col gap-2 p-4">
       <div class="flex items-center gap-3 py-2">
-        <div class="rounded-default h-4 w-24 animate-pulse bg-[var(--color-border-default)]" />
-        <div class="rounded-default h-4 w-16 animate-pulse bg-[var(--color-border-default)]" />
-        <div class="rounded-default h-4 w-40 animate-pulse bg-[var(--color-border-default)]" />
+        <div class="rounded-default bg-border-default h-4 w-24 animate-pulse" />
+        <div class="rounded-default bg-border-default h-4 w-16 animate-pulse" />
+        <div class="rounded-default bg-border-default h-4 w-40 animate-pulse" />
       </div>
-      <div class="rounded-default h-24 w-full animate-pulse bg-[var(--color-border-default)]" />
+      <div class="rounded-default bg-border-default h-24 w-full animate-pulse" />
     </div>
 
     <!-- Query error -->
@@ -222,7 +222,7 @@ function failedAtStep(steps: StepResult[]): string {
           locationGroups.some((g) => g.status === 'warning') &&
           locationGroups.every((g) => g.status !== 'failed' && g.status !== 'error')
         "
-        class="flex items-center gap-2 border-b border-(--color-orange-500)/20 bg-(--color-orange-500)/10 px-4 py-2 text-xs text-(--color-orange-600)"
+        class="border-status-flaky/20 bg-status-flaky/10 text-status-flaky-text flex items-center gap-2 border-b px-4 py-2 text-xs"
       >
         <OIcon name="warning" size="xs" />
         {{ t("synthetics.runRowExpansion.flakyWarning") }}

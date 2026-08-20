@@ -1,0 +1,64 @@
+/* Copyright 2026 OpenObserve Inc. */
+/* ============================================================
+   UTILITIES — app-level utility classes (O2_STYLE_MIGRATION_PLAN.md §3).
+
+   A rule belongs here when BOTH hold:
+     1. it can't be a Tailwind utility in the template — needs a pseudo-element,
+        a non-utility property, or a runtime-generated node;
+     2. it's a reusable app-level treatment, not one component's private look.
+
+   Use `@utility`, not a plain `.class`: it lands in @layer utilities, so
+   variants (hover:, dark:) and the normal cascade work.
+
+   Colours via var(--color-*) only, never a raw hex. rem units (1px hairlines
+   excepted).
+   ============================================================ */
+
+/* ── Gradient backgrounds ───────────────────────────────────────────────────
+   The --color-gradient-* tokens are deliberately NOT in @theme: a @theme colour
+   would generate `background-color: <gradient>`, which is invalid and dropped.
+   They're background-IMAGES, so they get hand-written utilities. Values stay in
+   the token layer, so dark.css overrides still apply. Declared on demand. */
+@utility bg-gradient-ai {
+  background-image: var(--color-gradient-ai);
+}
+@utility bg-gradient-ai-subtle {
+  background-image: var(--color-gradient-ai-subtle);
+}
+@utility bg-gradient-ai-faint {
+  background-image: var(--color-gradient-ai-faint);
+}
+@utility bg-gradient-brand-ribbon {
+  background-image: var(--color-gradient-brand-ribbon);
+}
+@utility bg-gradient-notification {
+  background-image: var(--color-gradient-notification);
+}
+@utility bg-gradient-danger {
+  background-image: var(--color-gradient-danger);
+}
+@utility bg-gradient-danger-hover {
+  background-image: var(--color-gradient-danger-hover);
+}
+/* Same thing under a different name: a linear-gradient token used as a fill. */
+@utility bg-chat-bubble-user {
+  background-image: var(--color-chat-bubble-user);
+}
+
+/* ── Drag-and-drop row affordances ──────────────────────────────────────────
+   Sortable adds these classes to a row CLONE it builds at runtime, so no
+   template can reach it and the name must be a single token. `!important`
+   reproduces what the old scoped rules got for free — outranking the row's own
+   utilities. Consumer: lib/core/Table/sub-components/OTableBody.vue. */
+@utility table-drag-ghost {
+  opacity: 0.3 !important;
+  background: var(--color-primary-50) !important;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel drag outline must not scale with text */
+  border: 1px dashed var(--color-accent) !important;
+  border-radius: var(--radius-default) !important;
+}
+
+@utility table-drag-dragging {
+  opacity: 0.5 !important;
+  box-shadow: var(--shadow-lg) !important;
+}

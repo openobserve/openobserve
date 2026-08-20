@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { getDataValue } from "./aliasUtils";
 import { getCountryName } from "./countryMappings";
 
@@ -77,7 +79,7 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
         "#a50026",
       ] as const,
     },
-    text: ["High", "Low"],
+    text: [gt("dashboard.utils.visualMapHigh"), gt("dashboard.utils.visualMapLow")],
     calculable: true,
   };
 

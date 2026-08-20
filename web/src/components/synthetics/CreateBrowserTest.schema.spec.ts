@@ -263,10 +263,10 @@ describe("makeBrowserCheckSaveSchema version-2 save gate", () => {
       return key;
     };
     makeBrowserCheckSaveSchema(spy).safeParse(
-      form([opened, { id: "2", action: "hover", name: "Reveal menu" }]),
+      form([opened, { id: "2", action: "wait", name: "Pause here" }]),
     );
 
-    expect(seen).toContainEqual({ step: "Reveal menu", action: "hover" });
+    expect(seen).toContainEqual({ step: "Pause here", action: "wait" });
   });
 
   it("should reject an element step whose locator bundle is empty", () => {
@@ -581,7 +581,11 @@ describe("makeBrowserCheckSaveSchema retired actions", () => {
   const schema = makeBrowserCheckSaveSchema(t);
   const opened = { id: "1", action: "navigate", value: "https://app.test" };
 
-  it.each(["hover", "scroll", "wait", "screenshot"])(
+  // `hover` left this list when Playwright 1.56 added a hover action to the
+  // recorder model: it is captured, stored and replayed like any other action.
+  // The rest still have no counterpart upstream, so a journey using one cannot
+  // be replayed and must not be saved.
+  it.each(["scroll", "wait", "screenshot"])(
     "should reject a journey containing the retired action %s",
     (action) => {
       const result = schema.safeParse(

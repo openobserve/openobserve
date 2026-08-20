@@ -440,6 +440,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         stream_type: StreamType,
         stream_name: &str,
         date_range: (String, String),
+        max_original_size: i64,
     ) -> Result<Vec<FileKey>> {
         let (date_start, date_end) = date_range;
         if date_start.is_empty() && date_end.is_empty() {
@@ -447,8 +448,6 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         }
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let cfg = get_config();
-        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
                 r#"
@@ -460,7 +459,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
-            .bind(max_size)
+            .bind(max_original_size)
             .fetch_all(&pool)
             .await;
         Ok(ret?.iter().map(|r| r.into()).collect())

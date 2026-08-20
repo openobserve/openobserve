@@ -7903,6 +7903,7 @@ dependencies = [
  "url",
  "usage_reporting",
  "utoipa",
+ "uuid",
  "zip 8.6.0",
 ]
 
@@ -10960,6 +10961,7 @@ dependencies = [
  "sqlparser",
  "tantivy",
  "tantivy_utils",
+ "tempfile",
  "thiserror 2.0.19",
  "tokio",
  "tokio-stream",

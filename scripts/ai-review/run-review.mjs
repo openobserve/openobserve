@@ -59,6 +59,25 @@ const ALL_REVIEW_MARKERS = [
   "<!-- ai-code-review -->",
   "<!-- ai-code-review-deepseek -->",
 ];
+
+// ─── Branding (presentation only) ───────────────────────────────────────────
+// The posted comment is branded "OpenObserve Code Review". These strings change ONLY how the
+// comment looks/reads — never what the reviewers find or decide. The engine is unchanged.
+const REVIEW_TITLE = "OpenObserve Code Review";
+const REVIEW_HEADING = `## 🔎 ${REVIEW_TITLE}`;
+// Matches the review heading line whether or not the model included the 🔎 emoji, and tolerates
+// a legacy "AI Code Review" heading (older comments / prompt drift) so re-review still finds and
+// normalizes the header. Case-insensitive, multiline.
+const REVIEW_HEADING_RE = /^#{1,3}[ \t]*(?:🔎[ \t]*)?(?:OpenObserve Code Review|AI Code Review)\b/mi;
+// Category → glyph, used by the deterministic fallback renderer to prefix each finding line so it
+// matches the coordinator's happy-path formatting. Cosmetic only.
+const CATEGORY_GLYPH = {
+  security: "🔒",
+  performance: "⚡",
+  "code-quality": "🧩", "code quality": "🧩", quality: "🧩",
+  documentation: "📝", docs: "📝",
+  release: "📦",
+};
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 20 * 60 * 1000;
@@ -435,13 +454,30 @@ class TraceRecorder {
       return;
     }
 
+    // Bound forceFlush + shutdown so an unreachable endpoint can't stall exit; always shut down in
+    // finally (a thrown forceFlush would otherwise skip it and leak handles that hang the process).
+    // Stay above the configured forceFlush timeout so a healthy-but-slow endpoint isn't cut short.
+    const FLUSH_DEADLINE_MS = Math.max(traceExportTimeoutMs() + 5_000, 15_000);
+    const withDeadline = (label, p) => Promise.race([
+      p,
+      new Promise((_, reject) => {
+        const t = setTimeout(() => reject(new Error(`${label} exceeded ${FLUSH_DEADLINE_MS}ms`)), FLUSH_DEADLINE_MS);
+        if (typeof t.unref === "function") t.unref();
+      }),
+    ]);
+
     try {
       console.log(`[${isoNow()}] Exporting ${this.spanCount} trace spans to OpenObserve with trace ID ${this.traceId}`);
-      await this.provider.forceFlush();
-      await this.provider.shutdown();
+      await withDeadline("trace forceFlush", this.provider.forceFlush());
       console.log(`[${isoNow()}] Exported ${this.spanCount} trace spans to OpenObserve`);
     } catch (err) {
       console.warn(`[${isoNow()}] Trace export failed: ${formatTraceExportError(err)}`);
+    } finally {
+      try {
+        await withDeadline("trace shutdown", this.provider.shutdown());
+      } catch (err) {
+        console.warn(`[${isoNow()}] Trace provider shutdown failed: ${formatTraceExportError(err)}`);
+      }
     }
   }
 }
@@ -862,13 +898,17 @@ function sanitizeReviewBody(body) {
   cleaned = cleaned.replace(/\\t/g, "\t");
   cleaned = cleaned.replace(/\\"/g, '"');
 
-  // Remove any XML boundary tags that escaped into the output
+  // Remove any XML boundary tags that escaped into the output.
+  // NOTE: "summary" is deliberately NOT in this list — it collides with the HTML
+  // <details><summary> element the review comment itself uses, and stripping it turns the
+  // findings fold's clickable label into bare text. Leaked XML <summary> finding-fields are
+  // already covered because they only appear inside <finding> blocks, which ARE stripped.
   const boundaryTags = ["mr_input", "mr_body", "mr_comments", "mr_details",
     "changed_files", "existing_inline_findings", "previous_review",
     "custom_review_instructions", "review_task", "pr_context", "diff",
     "all_findings", "coordinator_task", "overall_pr_context", "risk_tier",
     "failed_reviewers", "reviewer", "findings", "finding", "no-issues",
-    "category", "severity", "file", "line", "summary", "description", "suggestion"];
+    "category", "severity", "file", "line", "description", "suggestion"];
   const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
   cleaned = cleaned.replace(boundaryPattern, "");
 
@@ -881,18 +921,20 @@ function sanitizeReviewBody(body) {
   // Drop any preamble the model emitted before the review proper ("Now I have all the
   // context. Let me produce the consolidated review."). Runs after marker stripping so a
   // leading marker can't anchor the search at index 0 and mask the preamble behind it.
-  const headingAt = cleaned.search(/^#{1,3}[ \t]*AI Code Review\b/mi);
+  const headingAt = cleaned.search(REVIEW_HEADING_RE);
   if (headingAt > 0) cleaned = cleaned.slice(headingAt);
 
   // Re-prepend exactly one marker — ours.
   cleaned = `${REVIEW_MARKER}\n${cleaned.trimStart()}`;
 
-  // Tag the review header with the model label so each provider's comment is visually
-  // identifiable on the PR. Tolerates trailing words ("AI Code Review Summary")
-  // and any case; the negative lookahead for "(" keeps re-runs idempotent.
+  // Normalize the review heading to the branded title + model label. Rewrites the whole heading
+  // line — covering a model that dropped the 🔎 emoji or emitted a legacy "AI Code Review"
+  // heading — to a single canonical form, and tags it with the model label so each provider's
+  // comment is visually identifiable. The negative lookahead for "(" keeps re-runs idempotent
+  // (a heading already carrying "(Label)" is left untouched).
   cleaned = cleaned.replace(
-    /^(#{1,3}[ \t]*AI Code Review\b)(?![ \t]*\()([ \t]*[^\n(]*)$/mi,
-    `$1 (${MODEL_LABEL})$2`,
+    /^#{1,3}[ \t]*(?:🔎[ \t]*)?(?:OpenObserve Code Review|AI Code Review)\b(?![ \t]*\()[ \t]*[^\n(]*$/mi,
+    `${REVIEW_HEADING} (${MODEL_LABEL})`,
   );
 
   return cleaned.trim();
@@ -1007,14 +1049,16 @@ function buildFallbackReview(agentResults, tier, failedAgents) {
 
   if (sorted.length === 0) {
     return `${REVIEW_MARKER}
-## AI Code Review
+${REVIEW_HEADING} (${MODEL_LABEL})
 
-### Decision: approved
+> [!TIP]
+> ### ✅ Approved
+> LGTM — No issues found by automated reviewers.
 
-LGTM — No issues found by automated reviewers.
+**🔴 0 blockers · 🟡 0 warnings · 🔵 0 suggestions**
 
 <details>
-<summary>Review details</summary>
+<summary>🧾 Review details</summary>
 
 - Risk tier: ${tier}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
@@ -1023,10 +1067,11 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
   }
 
   const findingLine = f => {
+    const glyph = CATEGORY_GLYPH[(f.category || "").toLowerCase()] || "•";
     const loc = f.file && f.line && f.line !== "0" ? `\`${f.file}:${f.line}\` ` : f.file ? `\`${f.file}\` ` : "";
     const cat = f.category ? `**[${f.category.charAt(0).toUpperCase() + f.category.slice(1)}]** ` : "";
     const fix = f.suggestion ? ` (→ ${f.suggestion})` : "";
-    return `- ${loc}${cat}${f.summary}${fix}`;
+    return `- ${glyph} ${loc}${cat}${f.summary}${fix}`;
   };
 
   const bySeverity = { critical: [], warning: [], suggestion: [] };
@@ -1055,16 +1100,16 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
     : "";
 
   return `${REVIEW_MARKER}
-## AI Code Review
+${REVIEW_HEADING} (${MODEL_LABEL})
 
-### Decision: approved_with_comments
+> [!NOTE]
+> ### 💬 Approved with comments
+> Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${failureNote}${dedupNote}
 
-Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${failureNote}${dedupNote}
+**🔴 ${bySeverity.critical.length} blocker · 🟡 ${bySeverity.warning.length} warning · 🔵 ${bySeverity.suggestion.length} suggestion**
 
-**Findings:** 🔴 ${bySeverity.critical.length} blocker · 🟡 ${bySeverity.warning.length} warning · 🔵 ${bySeverity.suggestion.length} suggestion
-
-<details>
-<summary>Show findings (${sorted.length})</summary>
+<details open>
+<summary>📋 Show findings (${sorted.length})</summary>
 
 ${sections.join("\n")}
 
@@ -1093,18 +1138,30 @@ function postReviewComment(prNumber, body) {
   const tmpFile = `/tmp/review_comment_${randomUUID()}.txt`;
   writeFileSync(tmpFile, body, "utf-8");
   try {
-    gh(`pr comment "${prNumber}" --body-file "${tmpFile}"`);
+    const out = gh(`pr comment "${prNumber}" --body-file "${tmpFile}"`);
+    const m = out.match(/#issuecomment-(\d+)/);
+    return m ? m[1] : null;
   } finally {
     try { unlinkSync(tmpFile); } catch {}
   }
 }
 
-function updateReviewComment(commentId, body) {
+function updateReviewComment(prNumber, commentId, body) {
   const payload = JSON.stringify({ body });
   const tmpFile = `/tmp/review_comment_${randomUUID()}.json`;
   writeFileSync(tmpFile, payload);
   try {
     gh(`api "repos/${process.env.GITHUB_REPOSITORY}/issues/comments/${commentId}" --method PATCH --input "${tmpFile}"`);
+    return { action: "update", id: commentId };
+  } catch (err) {
+    // The comment we captured at the start of the run was deleted mid-run (e.g. someone cleared
+    // the review thread). Post a fresh comment instead of failing the whole review on a 404.
+    const detail = execErrorText(err);
+    if (/HTTP 404|Not Found/i.test(detail)) {
+      console.log(`[${isoNow()}] Review comment #${commentId} no longer exists (404); posting a new comment instead`);
+      return { action: "create", id: postReviewComment(prNumber, body) };
+    }
+    throw err;
   } finally {
     try { unlinkSync(tmpFile); } catch {}
   }
@@ -1143,10 +1200,10 @@ async function main() {
       // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
       // dropping to zero can't slip by as a green check. Also post to the PR so it's
       // visible without digging into Actions logs.
-      const message = `${API_KEY_VAR_NAME} is not set. AI Code Review (${MODEL_LABEL}) did not run for this PR — this is a CI misconfiguration, not a skip.`;
+      const message = `${API_KEY_VAR_NAME} is not set. OpenObserve Code Review (${MODEL_LABEL}) did not run for this PR — this is a CI misconfiguration, not a skip.`;
       console.error(`[${isoNow()}] ${message}`);
       try {
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review (${MODEL_LABEL})\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`${API_KEY_VAR_NAME}\` secret is provisioned.`);
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n${REVIEW_HEADING} (${MODEL_LABEL})\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> ${message} Please confirm the \`${API_KEY_VAR_NAME}\` secret is provisioned.`);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
@@ -1298,14 +1355,14 @@ async function main() {
         "review.coordinator_skipped": true,
       });
       finalReview = [
-        `## AI Code Review (${MODEL_LABEL})`,
+        `${REVIEW_HEADING} (${MODEL_LABEL})`,
         ``,
-        `### Decision: error`,
-        ``,
-        `⚠️ **This PR was not reviewed.** All ${results.length} reviewers failed against \`${MODEL_SLUG}\`, so there are no findings to report — this is an infrastructure failure, not an approval.`,
+        `> [!CAUTION]`,
+        `> ### ⛔ Not reviewed`,
+        `> All ${results.length} reviewers failed against \`${MODEL_SLUG}\`, so there are no findings to report — this is an infrastructure failure, not an approval.`,
         ``,
         `<details>`,
-        `<summary>Reviewer failures (${failedAgents.length})</summary>`,
+        `<summary>🧾 Reviewer failures (${failedAgents.length})</summary>`,
         ``,
         detail,
         ``,
@@ -1329,22 +1386,23 @@ async function main() {
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 
     // 8. Post or update review
-    const commentAction = existingCommentId ? "update" : "create";
+    const requestedAction = existingCommentId ? "update" : "create";
     const commentSpan = TRACE.startSpan("github.pr.review_comment", {
-      "github.pr.comment.action": commentAction,
+      "github.pr.comment.action": requestedAction,
       "github.pr.number": prNumber,
     }, rootSpan);
     try {
+      let commentResult;
       if (existingCommentId) {
         console.log(`[${isoNow()}] Updating existing review comment #${existingCommentId}`);
-        updateReviewComment(existingCommentId, finalReview);
+        commentResult = updateReviewComment(prNumber, existingCommentId, finalReview);
       } else {
         console.log(`[${isoNow()}] Posting new review comment`);
-        postReviewComment(prNumber, finalReview);
+        commentResult = { action: "create", id: postReviewComment(prNumber, finalReview) };
       }
       TRACE.endSpan(commentSpan, {
-        "github.pr.comment.action": commentAction,
-        "github.pr.comment.id": existingCommentId,
+        "github.pr.comment.action": commentResult.action,
+        "github.pr.comment.id": commentResult.id,
       });
     } catch (err) {
       TRACE.endSpan(commentSpan, {}, err);
@@ -1378,6 +1436,13 @@ async function main() {
 
 // ─── Entry point ───────────────────────────────────────────────────────────
 
+// Let the loop drain (so stdout isn't truncated); unref'd 1s backstop forces exit if OTel handles linger.
+function finishAndExit(code) {
+  process.exitCode = code;
+  const t = setTimeout(() => process.exit(code), 1000);
+  if (typeof t.unref === "function") t.unref();
+}
+
 const startTime = Date.now();
 const timeout = setTimeout(() => {
   const err = new Error(`Overall timeout (${OVERALL_TIMEOUT_MS / 1000}s) reached`);
@@ -1396,10 +1461,11 @@ main()
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[${isoNow()}] Total execution time: ${elapsed}s`);
     await TRACE.flush();
+    finishAndExit(0);
   })
   .catch(async err => {
     clearTimeout(timeout);
     if (!err.suppressFatalLog) console.error(`[${isoNow()}] Fatal error:`, err);
-    process.exitCode = 1;
     await TRACE.flush();
+    finishAndExit(1);
   });

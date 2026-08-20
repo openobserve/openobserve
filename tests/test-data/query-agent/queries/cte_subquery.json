@@ -47,13 +47,13 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-2",
             "4",
             "2",
             "50.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "4",
             "2",
             "50.0"
@@ -695,15 +695,15 @@
         ],
         "results": [
           [
-            "LANE-B",
-            "ZONE-1",
+            "LANE-C",
+            "ZONE-2",
             "4",
             "3.5",
             "0.5"
           ],
           [
-            "LANE-C",
-            "ZONE-2",
+            "LANE-B",
+            "ZONE-1",
             "4",
             "3.5",
             "0.5"
@@ -1010,17 +1010,17 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "2",
-            "0",
-            "1",
-            "66.66999816894531"
-          ],
-          [
             "ZONE-4",
             "2",
             "1",
             "0",
+            "66.66999816894531"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "0",
+            "1",
             "66.66999816894531"
           ],
           [
@@ -1232,14 +1232,14 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "4",
-            "258.0"
-          ],
-          [
             "ZONE-4",
             "4",
             "483.0"
+          ],
+          [
+            "ZONE-1",
+            "4",
+            "258.0"
           ],
           [
             "ZONE-3",
@@ -1561,16 +1561,16 @@
             "66.0"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
@@ -1699,12 +1699,12 @@
         ],
         "results": [
           [
-            "itemPage::performanceMetric",
+            "https://shop.example.com/item/1006::performanceMetric",
             "1",
             "1"
           ],
           [
-            "https://shop.example.com/item/1006::performanceMetric",
+            "itemPage::performanceMetric",
             "1",
             "1"
           ]
@@ -1764,12 +1764,12 @@
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
             "1",
             "1"
           ],
           [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ]
@@ -1932,13 +1932,13 @@
         ],
         "results": [
           [
-            "sess_003",
-            "1",
+            "sess_001",
+            "4",
             "0"
           ],
           [
-            "sess_001",
-            "4",
+            "sess_003",
+            "1",
             "0"
           ],
           [
@@ -2149,22 +2149,22 @@
           ],
           [
             "performanceMetric",
-            "cartPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "checkoutPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
             "searchPage",
             "1"
           ],
           [
             "performanceMetric",
             "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "cartPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "checkoutPage",
             "1"
           ]
         ],
@@ -2288,16 +2288,16 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "1",
-            "1",
-            "567.0"
-          ],
-          [
             "itemPage",
             "2",
             "1",
             "89.0"
+          ],
+          [
+            "checkoutPage",
+            "1",
+            "1",
+            "567.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -2957,6 +2957,12 @@
             "0"
           ],
           [
+            "warehouse-east",
+            "1",
+            "1900.0",
+            "0"
+          ],
+          [
             "warehouse-north",
             "1",
             "12.0",
@@ -2967,12 +2973,6 @@
             "1",
             "230.0",
             "1"
-          ],
-          [
-            "warehouse-east",
-            "1",
-            "1900.0",
-            "0"
           ]
         ],
         "results_mode": "rowsort"
@@ -4548,14 +4548,14 @@
             "610.0"
           ],
           [
-            "ZONE-2",
-            "auto",
+            "ZONE-4",
+            "hybrid",
             "1",
             "480.0"
           ],
           [
-            "ZONE-4",
-            "hybrid",
+            "ZONE-2",
+            "auto",
             "1",
             "480.0"
           ],
@@ -4566,14 +4566,14 @@
             "320.0"
           ],
           [
-            "ZONE-4",
-            "auto",
+            "ZONE-2",
+            "manual",
             "1",
             "150.0"
           ],
           [
-            "ZONE-2",
-            "manual",
+            "ZONE-4",
+            "auto",
             "1",
             "150.0"
           ]
@@ -4896,11 +4896,6 @@
             "230.0"
           ],
           [
-            "scan-hub",
-            "1",
-            "45.0"
-          ],
-          [
             "batch-sync",
             "1",
             "1450.0"
@@ -4909,6 +4904,11 @@
             "conveyor-driver",
             "1",
             "15.0"
+          ],
+          [
+            "scan-hub",
+            "1",
+            "45.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -4994,6 +4994,13 @@
         ],
         "results": [
           [
+            "ZONE-3",
+            "2",
+            "1455.0",
+            "manual",
+            "1"
+          ],
+          [
             "ZONE-1",
             "2",
             "1455.0",
@@ -5001,24 +5008,17 @@
             "1"
           ],
           [
-            "ZONE-3",
-            "2",
-            "1455.0",
-            "hybrid",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "2",
-            "1455.0",
-            "manual",
-            "1"
-          ],
-          [
             "ZONE-1",
             "2",
             "1455.0",
             "manual",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "1455.0",
+            "hybrid",
             "1"
           ],
           [
@@ -5064,15 +5064,15 @@
         "results": [
           [
             "1",
-            "conveyor-driver",
-            "1",
-            "15.0"
-          ],
-          [
-            "1",
             "sorter-engine",
             "1",
             "1900.0"
+          ],
+          [
+            "1",
+            "conveyor-driver",
+            "1",
+            "15.0"
           ],
           [
             "2",
@@ -5133,13 +5133,13 @@
             "725.0"
           ],
           [
-            "ZONE-1",
-            "auto",
+            "ZONE-3",
+            "hybrid",
             "610.0"
           ],
           [
-            "ZONE-3",
-            "hybrid",
+            "ZONE-1",
+            "auto",
             "610.0"
           ],
           [

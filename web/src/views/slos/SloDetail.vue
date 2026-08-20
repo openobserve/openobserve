@@ -27,9 +27,9 @@
 -->
 <template>
   <OPageLayout
-    :title="raw(slo?.name || sloId)"
+    :title="notFound ? t('slos.notFound') : raw(slo?.name || sloId)"
     icon="track-changes"
-    :subtitle="subtitle"
+    :subtitle="notFound ? raw('') : subtitle"
     :back="{ to: backTarget, label: t('slos.title') }"
     title-data-test="slos-slodetail-title"
     bleed
@@ -51,9 +51,6 @@
           size="xs"
           :label="raw(tag)"
         />
-        <span v-if="slo" class="text-compact text-text-secondary">
-          {{ t("slos.generation", { n: slo.definition_generation }) }}
-        </span>
       </div>
     </template>
 
@@ -96,7 +93,7 @@
          on the same page-edge grid line as the title above and the config
          list below, instead of hard against the window. `y` because the strip
          sits directly under the header and needs the breathing room. -->
-    <OContent y>
+    <OContent y v-if="!notFound">
       <!-- Not a subtle indicator: a frozen SLO's alerts neither fire nor
            resolve, and mistaking that for healthy is the failure mode. -->
       <OBanner
@@ -116,11 +113,32 @@
     <!-- No `mt-*`: OContent's bottom inset above already separates the strip
          from the tabs, and no horizontal padding either — a tab strip's first
          label self-aligns to the page-edge grid. -->
-    <OTabs v-model="tab" class="shrink-0" data-test="slos-slodetail-tabs">
-      <OTab name="trend" :label="t('slos.tab.trend')" icon="show-chart" />
-      <OTab name="groups" :label="t('slos.tab.groups')" icon="layers" v-if="isGrouped" />
-      <OTab name="alerts" :label="t('slos.alerts.title')" icon="shield" />
-      <OTab name="config" :label="t('slos.tab.configuration')" icon="settings" />
+    <OTabs v-if="!notFound" v-model="tab" class="shrink-0" data-test="slos-slodetail-tabs">
+      <OTab
+        name="trend"
+        :label="t('slos.tab.trend')"
+        icon="show-chart"
+        data-test="slos-slodetail-tab-trend"
+      />
+      <OTab
+        name="groups"
+        :label="t('slos.tab.groups')"
+        icon="layers"
+        v-if="isGrouped"
+        data-test="slos-slodetail-tab-groups"
+      />
+      <OTab
+        name="alerts"
+        :label="t('slos.alerts.title')"
+        icon="shield"
+        data-test="slos-slodetail-tab-alerts"
+      />
+      <OTab
+        name="config"
+        :label="t('slos.tab.configuration')"
+        icon="settings"
+        data-test="slos-slodetail-tab-config"
+      />
     </OTabs>
 
     <!-- The page body is a FIXED flex column (OPageLayout's default: no
@@ -134,10 +152,10 @@
          the panel scrolls — scrolling the whole body instead would push the
          SLI and budget numbers off-screen, and those are the readings the
          charts below are being compared against. -->
-    <div class="min-h-0 flex-1">
+    <div v-if="!notFound" class="min-h-0 flex-1">
       <OTabPanels v-model="tab" grow scroll="y" class="h-full min-h-0">
         <OTabPanel name="alerts">
-          <OContent>
+          <OContent y>
             <SloAlertsPanel
               ref="alertsPanel"
               v-if="slo"
@@ -150,7 +168,7 @@
         </OTabPanel>
 
         <OTabPanel name="trend">
-          <OContent>
+          <OContent y>
             <!-- The ribbon before the burndown: for an alert SLI the first
                  question is whether the source was running at all, and the
                  grey bands are the only place that answer is visible. -->
@@ -180,88 +198,78 @@
              than opening a second, nested one. Every tab then scrolls the same
              way, which is the point of putting the scroller on the panels. -->
         <OTabPanel v-if="isGrouped" name="groups">
-          <OTable
-            :data="groups"
-            :columns="groupColumns"
-            row-key="group_key"
-            :loading="groupsLoading"
-            :frame="false"
-            :page-size="25"
-            :show-global-filter="false"
-            table-id="slo-groups"
-            data-test="slos-slodetail-groups-table"
-          >
-            <template #cell-group_key="{ row }">
-              <span class="text-compact font-mono">{{ row.group_key }}</span>
-            </template>
-            <template #cell-sli="{ row }">
-              <span v-if="!row.no_data" class="tabular-nums">{{ formatSli(row.sli) }}</span>
-              <span v-else class="text-text-secondary">{{ ABSENT }}</span>
-            </template>
-            <template #cell-budget="{ row }">
-              <span
-                v-if="!row.no_data"
-                class="tabular-nums"
-                :class="(row.error_budget_remaining ?? 0) <= 0 ? 'text-negative font-semibold' : ''"
-              >
-                {{ formatBudget(row.error_budget_remaining) }}
-              </span>
-              <span v-else class="text-text-secondary">{{ ABSENT }}</span>
-            </template>
-            <template #cell-burn="{ row }">
-              <span v-if="!row.no_data" class="tabular-nums">{{ formatBurn(row.burn_rate) }}</span>
-              <span v-else class="text-text-secondary">{{ ABSENT }}</span>
-            </template>
-            <template #cell-coverage="{ row }">
-              <span class="tabular-nums" :class="row.no_data ? 'text-warning font-semibold' : ''">
-                {{ formatCoverage(row.coverage) }}
-              </span>
-            </template>
-            <template #empty>
-              <OEmptyState
-                icon="layers"
-                :title="t('slos.groups.emptyTitle')"
-                :description="t('slos.groups.emptyDescription')"
-              />
-            </template>
-          </OTable>
+          <!-- `bleed-x` keeps the table flush to the window edge (above); `y`
+               supplies only the vertical inset, so the gap under the tab strip
+               is the same on every tab. -->
+          <OContent bleed-x y>
+            <OTable
+              :data="groups"
+              :columns="groupColumns"
+              row-key="group_key"
+              :loading="groupsLoading"
+              :frame="false"
+              :page-size="25"
+              :show-global-filter="false"
+              table-id="slo-groups"
+              data-test="slos-slodetail-groups-table"
+            >
+              <template #cell-group_key="{ row }">
+                <span class="text-compact font-mono">{{ row.group_key }}</span>
+              </template>
+              <template #cell-sli="{ row }">
+                <span v-if="!row.no_data" class="tabular-nums">{{ formatSli(row.sli) }}</span>
+                <span v-else class="text-text-secondary">{{ ABSENT }}</span>
+              </template>
+              <template #cell-budget="{ row }">
+                <span
+                  v-if="!row.no_data"
+                  class="tabular-nums"
+                  :class="
+                    (row.error_budget_remaining ?? 0) <= 0 ? 'text-negative font-semibold' : ''
+                  "
+                >
+                  {{ formatBudget(row.error_budget_remaining) }}
+                </span>
+                <span v-else class="text-text-secondary">{{ ABSENT }}</span>
+              </template>
+              <template #cell-burn="{ row }">
+                <span v-if="!row.no_data" class="tabular-nums">{{
+                  formatBurn(row.burn_rate)
+                }}</span>
+                <span v-else class="text-text-secondary">{{ ABSENT }}</span>
+              </template>
+              <template #cell-coverage="{ row }">
+                <span class="tabular-nums" :class="row.no_data ? 'text-warning font-semibold' : ''">
+                  {{ formatCoverage(row.coverage) }}
+                </span>
+              </template>
+              <template #empty>
+                <OEmptyState
+                  icon="layers"
+                  :title="t('slos.groups.emptyTitle')"
+                  :description="t('slos.groups.emptyDescription')"
+                />
+              </template>
+            </OTable>
+          </OContent>
         </OTabPanel>
 
         <OTabPanel name="config">
-          <OContent v-if="slo">
-            <dl class="text-compact grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2">
-              <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
-              <dd>{{ sliTypeLabel(slo.sli_type) }}</dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
-              <dd>
-                {{ formatTarget(slo.target) }}
-                <span class="text-text-secondary">
-                  {{ t("slos.overRolling", { window: formatWindow(slo.window_secs) }) }}
-                </span>
-              </dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.sliceInterval") }}</dt>
-              <dd>{{ formatSlice(slo.slice_interval_secs) }}</dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.groupBy") }}</dt>
-              <dd>
-                <span v-if="isGrouped" class="font-mono">{{ slo.group_by?.join(", ") }}</span>
-                <span v-else class="text-text-secondary">{{ t("slos.noGrouping") }}</span>
-              </dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.reservation") }}</dt>
-              <dd>{{ t("slos.reservationValue", { groups: slo.groups_reserved }) }}</dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.owner") }}</dt>
-              <dd>{{ slo.owner || ABSENT }}</dd>
-            </dl>
-
-            <OCode class="mt-4" language="json" :code="configJson" />
+          <OContent y>
+            <SloConfigSummary v-if="slo" :slo="slo" />
           </OContent>
         </OTabPanel>
       </OTabPanels>
     </div>
+
+    <OContent v-if="notFound" class="py-6">
+      <OEmptyState
+        size="hero"
+        :title="t('slos.notFound')"
+        :description="t('slos.notFoundDescription')"
+        data-test="slos-slodetail-not-found"
+      />
+    </OContent>
   </OPageLayout>
 </template>
 
@@ -275,7 +283,6 @@ import { toZonedTime } from "date-fns-tz";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCode from "@/lib/core/Code/OCode.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -289,6 +296,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import SloAlertPreview from "@/components/slos/SloAlertPreview.vue";
 import SloAlertsPanel from "@/components/slos/SloAlertsPanel.vue";
 import SloBurndownChart from "@/components/slos/SloBurndownChart.vue";
+import SloConfigSummary from "@/components/slos/SloConfigSummary.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { Slo, SloStatus } from "@/ts/interfaces/slo";
@@ -317,6 +325,7 @@ const slo = ref<Slo | null>(null);
 const status = ref<SloStatus | null>(null);
 const groups = ref<SloStatus[]>([]);
 const groupsLoading = ref(false);
+const notFound = ref(false);
 // Trend first: "how did the budget get here" is the question the page is
 // usually opened to answer. The configuration is a reference lookup and keeps
 // its tab, it is just no longer what greets you.
@@ -455,7 +464,7 @@ const backTarget = computed(() => ({
 const subtitle = computed(() => {
   if (!slo.value) return raw("");
   const parts = [
-    sliTypeLabel(slo.value.sli_type),
+    sliTypeLabel(slo.value.sli_type, t),
     t("slos.overRolling", { window: formatWindow(slo.value.window_secs) }),
     formatSlice(slo.value.slice_interval_secs),
   ];
@@ -475,46 +484,48 @@ const healthVariant = computed(() => {
   }
 });
 
-const configJson = computed(() =>
-  slo.value ? JSON.stringify(slo.value.config ?? {}, null, 2) : "{}",
-);
-
 const stats = computed<StatItem[]>(() => {
   const s = status.value;
   const frozen = !s || s.no_data;
   return [
     {
       key: "sli",
+      dataTest: "slos-slodetail-stat-sli",
       label: t("slos.stat.status", { window: formatWindow(slo.value?.window_secs ?? 0) }),
       value: frozen ? ABSENT : formatSli(s!.sli),
       tone: frozen ? "neutral" : health.value === "meeting" ? "success" : "error",
     },
     {
       key: "target",
+      dataTest: "slos-slodetail-stat-target",
       label: t("slos.stat.target"),
       value: slo.value ? formatTarget(slo.value.target) : ABSENT,
       tone: "primary",
     },
     {
       key: "budget",
+      dataTest: "slos-slodetail-stat-budget",
       label: t("slos.stat.budgetRemaining"),
       value: frozen ? ABSENT : formatBudget(s!.error_budget_remaining),
       tone: frozen ? "neutral" : (s!.error_budget_remaining ?? 0) <= 0 ? "error" : "success",
     },
     {
       key: "burn",
+      dataTest: "slos-slodetail-stat-burn",
       label: t("slos.stat.burnRate"),
       value: frozen ? ABSENT : formatBurn(s!.burn_rate),
       tone: frozen ? "neutral" : (s!.burn_rate ?? 0) > 1 ? "error" : "success",
     },
     {
       key: "exhaust",
+      dataTest: "slos-slodetail-stat-exhaust",
       label: t("slos.stat.timeToExhaust"),
       value: frozen ? ABSENT : formatTimeToExhaust(s!.time_to_exhaust_secs),
       tone: "neutral",
     },
     {
       key: "coverage",
+      dataTest: "slos-slodetail-stat-coverage",
       label: t("slos.stat.coverage"),
       value: formatCoverage(s?.coverage),
       tone: frozen ? "warning" : "neutral",
@@ -562,21 +573,26 @@ const groupColumns = computed<OTableColumnDef<SloStatus>[]>(() => [
 
 async function load() {
   if (!org.value || !sloId.value) return;
-  const res = await sloService.get(org.value, sloId.value);
-  const body = res.data ?? {};
-  status.value = body.status ?? null;
-  // The API flattens the SLO alongside `status`; strip it back out so the
-  // config tab renders the definition and nothing else.
-  const { status: _ignored, ...rest } = body;
-  slo.value = rest as Slo;
+  try {
+    const res = await sloService.get(org.value, sloId.value);
+    const body = res.data ?? {};
+    status.value = body.status ?? null;
+    // The API flattens the SLO alongside `status`; strip it back out so the
+    // config tab renders the definition and nothing else.
+    const { status: _ignored, ...rest } = body;
+    slo.value = rest as Slo;
 
-  // Fetch the groups, but do NOT switch to their tab: every SLO opens on
-  // Trend. This used to select "groups" here, which meant a grouped SLO could
-  // never land on the trend charts — and the per-group breakdown answers
-  // "which one broke", a question you only ask after the burndown has shown
-  // you that something did.
-  if (rest.group_by?.length) {
-    await loadGroups();
+    // Fetch the groups, but do NOT switch to their tab: every SLO opens on
+    // Trend. This used to select "groups" here, which meant a grouped SLO could
+    // never land on the trend charts — and the per-group breakdown answers
+    // "which one broke", a question you only ask after the burndown has shown
+    // you that something did.
+    if (rest.group_by?.length) {
+      await loadGroups();
+    }
+  } catch (e) {
+    slo.value = null;
+    notFound.value = true;
   }
 }
 

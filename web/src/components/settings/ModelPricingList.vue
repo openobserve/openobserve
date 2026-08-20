@@ -155,7 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mr-1 inline-flex shrink-0 cursor-default"
               >
                 <img :src="ooLogo" class="h-4 w-4" :alt="t('modelPricing.openObserveLogoAlt')" />
-                <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
+                <OTooltip
+                  side="top"
+                  align="center"
+                  :content="t('modelPricing.sourceBuiltIn', { product: raw('OpenObserve') })"
+                />
               </span>
               <span
                 v-else-if="
@@ -377,7 +381,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="inline-flex shrink-0 cursor-default"
         >
           <img :src="ooLogo" class="h-4.5 w-4.5" :alt="t('modelPricing.openObserveLogoAlt')" />
-          <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
+          <OTooltip
+            side="top"
+            align="center"
+            :content="t('modelPricing.sourceBuiltIn', { product: raw('OpenObserve') })"
+          />
         </span>
         <span
           v-else-if="
@@ -472,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount, onActivated } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -518,8 +526,9 @@ function openPricingDialog(row: any) {
 
 const confirmDialogMeta = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   onConfirm: async () => {},
 });
 

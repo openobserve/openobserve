@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { gt, raw } from "@/types/i18n";
 import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
@@ -83,12 +84,54 @@ export const opsgenieConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.opsgeniePriority",
       type: "select",
       required: false,
+      // Getters, not resolved strings: this config object is module scope, so a
+      // plain call would freeze the copy at the boot locale.
       options: [
-        { label: "P1 (Critical)", value: "P1", description: "Highest priority alerts" },
-        { label: "P2 (High)", value: "P2", description: "High priority alerts" },
-        { label: "P3 (Moderate)", value: "P3", description: "Moderate priority alerts" },
-        { label: "P4 (Low)", value: "P4", description: "Low priority alerts" },
-        { label: "P5 (Informational)", value: "P5", description: "Informational alerts" },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP1");
+          },
+          value: "P1",
+          get description() {
+            return gt("alert_destinations.priorityP1Description");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP2");
+          },
+          value: "P2",
+          get description() {
+            return gt("alert_destinations.priorityP2Description");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP3");
+          },
+          value: "P3",
+          get description() {
+            return gt("alert_destinations.priorityP3Description");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP4");
+          },
+          value: "P4",
+          get description() {
+            return gt("alert_destinations.priorityP4Description");
+          },
+        },
+        {
+          get label() {
+            return gt("alerts.prebuiltDestinations.priorityP5");
+          },
+          value: "P5",
+          get description() {
+            return gt("alert_destinations.priorityP5Description");
+          },
+        },
       ],
     },
   ],
@@ -98,7 +141,7 @@ import opsgenieLogo from "@/assets/images/alerts/destinations/opsgenie.png";
 
 export const opsgenieDestinationType: PrebuiltType = {
   id: "opsgenie",
-  name: "Opsgenie",
+  name: raw("Opsgenie"),
   descriptionKey: "alert_destinations.prebuilt.opsgenieDescription",
   icon: "opsgenie",
   image: opsgenieLogo,

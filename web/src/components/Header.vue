@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'images/common/openobserve_latest_light_2.svg',
                 )
               "
-              :alt="t('about.name')"
+              :alt="raw('OpenObserve')"
             />
           </a>
         </div>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'images/common/openobserve_latest_light_2.svg',
               )
             "
-            :alt="t('about.name')"
+            :alt="raw('OpenObserve')"
           />
         </a>
       </div>
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-toolbar"
               @click="toggleAIChat"
               data-test="menu-link-ai-item"
-              class="group text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+              class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
               :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
               @mouseenter="handleMouseEnter"
               @mouseleave="handleMouseLeave"
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openSlack"
           >
             <component :is="slackIcon" class="size-5 shrink-0" />
-            <OTooltip side="top" align="center" :content="t('menu.slack')" />
+            <OTooltip side="top" align="center" :content="raw('Slack')" />
           </OButton>
 
           <!-- HELP MENU: Contains links to docs, API, and about page -->
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="menu-link-openapi-item"
                   @select="navigateToOpenAPI(zoBackendUrl)"
                 >
-                  {{ t(`menu.openapi`) }}
+                  {{ raw("OpenAPI") }}
                 </ODropdownItem>
                 <ODropdownSeparator />
               </template>
@@ -432,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, PropType, computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
@@ -571,7 +571,7 @@ export default defineComponent({
       const isCloud = props.config.isCloud === "true";
 
       if (isCloud) {
-        return t("about.header_button.cloud_features");
+        return t("about.header_button.cloud_features", { product: raw("OpenObserve") });
       } else if (isEnterprise) {
         return t("about.header_button.enterprise_edition");
       } else {
@@ -659,6 +659,7 @@ export default defineComponent({
     return {
       isDark,
       t,
+      raw,
       getImageURL,
       enterpriseButtonText,
       ingestionQuotaPercentage,

@@ -305,7 +305,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-session="{ row }">
                   <div class="flex min-w-0 flex-col justify-center gap-0.5">
-                    <OUserCell :value="row.user_email || 'Unknown'" class="truncate font-medium" />
+                    <OUserCell
+                      :value="row.user_email || unknownUserLabel"
+                      class="truncate font-medium"
+                    />
                     <div class="text-text-secondary flex items-center gap-1.5 text-xs">
                       <span
                         class="font-mono"
@@ -601,6 +604,7 @@ const { placeholder: editorPlaceholder } = useQueryPlaceholder(
   computed(() => ({})),
   _sqlMode,
   _noStream,
+  t,
 );
 
 const userDataSet = new Set([
@@ -638,6 +642,12 @@ const userDataSet = new Set([
 
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("rum-sessions-list");
 
+// Resolved once, then used for BOTH the rendered cell and the `session`
+// accessorFn. The accessor value is the table's global-filter search corpus
+// (OTable has no custom globalFilterFn), so display and corpus have to stay
+// the same string or users would search for what they see and match nothing.
+const unknownUserLabel = t("rum.unknown");
+
 const tableColumns = [
   {
     id: "action_play",
@@ -650,7 +660,7 @@ const tableColumns = [
   {
     id: "session",
     header: t("rum.userSession"),
-    accessorFn: (row: any) => row["user_email"] || "Unknown",
+    accessorFn: (row: any) => row["user_email"] || unknownUserLabel,
     sortable: true,
     hideable: true,
     meta: { align: "left", autoWidth: true },
@@ -992,7 +1002,7 @@ const getSessions = () => {
       hasCompleteResult.value = false;
       rows.value = [];
       toast({
-        message: err.response?.data?.message || "Error while fetching sessions",
+        message: err.response?.data?.message || t("rum.errorWhileFetchingSessions"),
         variant: "error",
       });
 
@@ -1119,7 +1129,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[], signal?: Abort
     .catch((err) => {
       if (isAbortError(err)) return;
       toast({
-        message: err.response?.data?.message || "Error while fetching session replay data",
+        message: err.response?.data?.message || t("rum.errorWhileFetchingSessionReplay"),
         variant: "error",
       });
     })
@@ -1329,11 +1339,11 @@ const classifyDevice = (family?: string, os?: string): DeviceSegment => {
 // The SDK `source` field identifies the platform that produced the session.
 // Browser RUM omits it (or sends "browser"); mobile RUM sends the platform slug.
 const PLATFORM_LABELS: Record<string, string> = {
-  browser: "Browser",
-  "react-native": "React Native",
-  ios: "iOS",
-  android: "Android",
-  flutter: "Flutter",
+  browser: raw("Browser"),
+  "react-native": raw("React Native"),
+  ios: raw("iOS"),
+  android: raw("Android"),
+  flutter: raw("Flutter"),
 };
 const classifySource = (source?: string): string => {
   const s = (source || "").toLowerCase();

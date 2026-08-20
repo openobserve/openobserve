@@ -33,6 +33,9 @@
     bleed
   >
     <template #actions>
+      <!-- The provider behind the Terraform export, which is otherwise only
+           discoverable once the export dialog is already open. -->
+      <IacRegistryLinks data-test="slos-slolist-iac-registries" />
       <OButton
         variant="primary"
         size="sm-action"
@@ -81,6 +84,17 @@
           >
             {{ t("slos.moveSelected", { count: selectedIds.length }) }}
           </OButton>
+          <OButton
+            v-if="selectedIds.length"
+            variant="outline"
+            size="sm-action"
+            icon-left="download"
+            :loading="exporting"
+            data-test="slos-slolist-export-selected"
+            @click="openExport(selectedRows)"
+          >
+            {{ t("common.export") }}
+          </OButton>
           <OToggleGroup v-model="typeFilter" data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
@@ -122,7 +136,7 @@
           icon-left="refresh"
           :loading="loading"
           data-test="slos-slolist-refresh"
-          @click="load"
+          @click="() => load()"
         >
           <OTooltip side="bottom" :content="t('slos.refresh')" />
         </OButton>
@@ -262,6 +276,14 @@
           <OButton
             variant="ghost"
             size="icon-sm"
+            icon-left="download"
+            :title="t('common.export')"
+            :data-test="`slos-slolist-export-${row.name}`"
+            @click="openExport([row])"
+          />
+          <OButton
+            variant="ghost"
+            size="icon-sm"
             icon-left="delete"
             :title="t('slos.delete')"
             :data-test="`slos-slolist-delete-${row.name}`"
@@ -366,6 +388,17 @@
         </OButton>
       </template>
     </ODialog>
+
+    <ExportResourceDialog
+      v-model:open="exportDialog"
+      :items="slosToExport"
+      :terraform="slosTerraform"
+      :title="t('slos.exportTitle', { count: slosToExport.length }, slosToExport.length)"
+      :sub-title="t('slos.exportSubtitle')"
+      file-prefix="slos"
+      data-test="slos-slolist-export-dialog"
+      @download="onExported"
+    />
   </OPageLayout>
 </template>
 
@@ -375,7 +408,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
+import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -399,6 +434,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
 import alertsService from "@/services/alerts";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
+import { slosToTerraform } from "@/utils/slos/sloTerraform";
 import {
   ABSENT,
   compareByUrgency,
@@ -438,6 +474,71 @@ const activeFolderId = computed(() => (route.query.folder as string) || "default
 const org = computed(() => store.state.selectedOrganization?.identifier);
 
 const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.includes(r.id)));
+
+// ── Export ──────────────────────────────────────────────────────────────────
+// The list rows carry measurement status rather than the full definition, so an
+// export re-reads each SLO and shows it as JSON or as an openobserve_slo
+// Terraform resource.
+const exportDialog = ref(false);
+const exporting = ref(false);
+const slosToExport = ref<Record<string, unknown>[]>([]);
+const slosTerraform = computed(() =>
+  slosToTerraform(slosToExport.value, { folderId: activeFolderId.value }),
+);
+
+async function fetchSloForExport(id: string): Promise<Record<string, unknown> | null> {
+  const res = await sloService.get(org.value, id);
+  const body = (res.data ?? {}) as Record<string, unknown>;
+  if (!body.name) return null;
+  // The endpoint flattens the definition alongside `status`, its live
+  // measurement, and carries counters the server assigns. None of that describes
+  // the SLO, and the id belongs to the one this was read from rather than the one
+  // a configuration creates, so an export keeps only the definition.
+  const {
+    id: _id,
+    status: _status,
+    definition_generation: _generation,
+    groups_estimate: _estimate,
+    groups_reserved: _reserved,
+    ...definition
+  } = body;
+  return definition;
+}
+
+async function openExport(items: SloListItem[]) {
+  if (exporting.value || !items.length) return;
+  exporting.value = true;
+  try {
+    const fetched = await Promise.all(items.map((item) => fetchSloForExport(item.id)));
+    const usable = fetched.filter((slo): slo is Record<string, unknown> => slo !== null);
+    if (!usable.length) throw new Error("empty export payload");
+    slosToExport.value = usable;
+    exportDialog.value = true;
+
+    // A definition that came back empty is a gap in the export. Dropping it
+    // quietly would leave the success toast reporting the smaller count as
+    // though everything had been exported.
+    const missing = items.filter((_, i) => fetched[i] === null).map((item) => item.name);
+    if (missing.length) {
+      toast({
+        variant: "warning",
+        message: t("slos.exportPartial", { names: missing.join(", ") }),
+      });
+    }
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: raw(e?.response?.data?.message) || t("slos.exportFailed"),
+    });
+  } finally {
+    exporting.value = false;
+  }
+}
+
+function onExported({ count }: { format: string; count: number }) {
+  toast({ variant: "success", message: t("slos.exportSucceeded", { count }, count) });
+  selectedIds.value = [];
+}
 
 /** Folder ids are opaque; the rail and this column show the human name. */
 function folderName(folderId: string): string {
@@ -591,6 +692,7 @@ const stats = computed<StatItem[]>(() => {
   return [
     {
       key: "budget_blown",
+      dataTest: "slos-slolist-stat-budget_blown",
       label: t("slos.health.budget_blown"),
       value: counts.budget_blown,
       icon: "local-fire-department",
@@ -599,6 +701,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "at_risk",
+      dataTest: "slos-slolist-stat-at_risk",
       label: t("slos.health.at_risk"),
       value: counts.at_risk,
       icon: "trending-down",
@@ -607,6 +710,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "meeting",
+      dataTest: "slos-slolist-stat-meeting",
       label: t("slos.health.meeting"),
       value: counts.meeting,
       icon: "check-circle",
@@ -615,13 +719,21 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "no_data",
+      dataTest: "slos-slolist-stat-no_data",
       label: t("slos.health.no_data"),
       value: counts.no_data,
-      icon: "help",
+      icon: "help-outline",
       tone: "neutral",
       max: total,
     },
-    { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: false },
+    {
+      key: "total",
+      dataTest: "slos-slolist-stat-total",
+      label: t("slos.totalSlos"),
+      value: total,
+      tone: "primary",
+      selectable: true,
+    },
   ];
 });
 
@@ -643,12 +755,19 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
-async function load() {
+// Both optional: refresh calls `load()` bare and falls back to the current org
+// and active folder — the folder-change path is the only caller that passes a
+// folder the refs have not caught up with yet.
+async function load(orgId?: string | null, folderId?: string) {
   if (!org.value) return;
   loading.value = true;
   error.value = null;
+  // sometimes the folder id might not be updated so passed via
+  // query params.
+  const currentOrg = orgId ?? org.value;
+  const folder = folderId ?? activeFolderId.value;
   try {
-    const res = await sloService.list(org.value, activeFolderId.value);
+    const res = await sloService.list(currentOrg, folder);
     rows.value = res.data?.list ?? [];
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
@@ -666,7 +785,7 @@ function onFolderChange(folderId: string) {
     name: "sloList",
     query: { ...route.query, org_identifier: org.value, folder: folderId },
   });
-  load();
+  load(org.value, folderId);
 }
 
 function openMove(targets: SloListItem[]) {

@@ -450,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     seasonality:
                       Number(trainingWindowDays) >= 7
                         ? t("alerts.anomaly.seasonalityWeekly")
-                        : t("alerts.anomaly.seasonalityDaily"),
+                        : raw("hour-of-day"),
                   })
                 }}
               </span>
@@ -661,7 +661,25 @@ export default defineComponent({
       { label: raw("SQL"), value: "custom_sql" },
     ]);
 
-    const filterOperators = ANOMALY_FILTER_OPERATORS;
+    // The array itself stays English: each entry IS the persisted operator and
+    // is matched by identity (operatorNeedsValue, buildAnomalyFilterExpression).
+    // Split label from value so the dropdown reads in the user's language, the
+    // same way AddCondition.vue does — the keys are already shared.
+    const OPERATOR_LABEL_KEYS: Record<string, string> = {
+      Contains: "dashboard.filterOperators.contains",
+      "Starts With": "dashboard.filterOperators.startsWith",
+      "Ends With": "dashboard.filterOperators.endsWith",
+      "Not Contains": "dashboard.filterOperators.notContains",
+      "Is Null": "dashboard.filterOperators.isNull",
+      "Is Not Null": "dashboard.filterOperators.isNotNull",
+    };
+    const filterOperators = computed(() =>
+      ANOMALY_FILTER_OPERATORS.map((op) => {
+        const key = OPERATOR_LABEL_KEYS[op as string];
+        // SQL/PromQL tokens (=, IN, str_match, …) are syntax, not copy.
+        return { label: key ? t(key as any) : raw(op as string), value: op as string };
+      }),
+    );
     const detectionFunctions = ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
     const intervalUnits = computed(() => [
       { label: t("common.minutes"), value: "m" },

@@ -3,6 +3,8 @@
 pub mod prelude;
 
 pub mod action_scripts;
+pub mod alert_composite_children;
+pub mod alert_composites;
 pub mod alert_dedup_state;
 pub mod alert_eval_intervals;
 pub mod alert_incident_alerts;
@@ -75,6 +77,7 @@ pub mod timed_annotations;
 pub mod trial_quota_usage;
 pub mod users;
 pub mod workflow_associations;
+pub mod workflow_drafts;
 pub mod workflow_errors;
 pub mod workflow_run_data;
 pub mod workflows;

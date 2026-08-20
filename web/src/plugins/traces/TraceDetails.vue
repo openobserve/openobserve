@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon :name="tab.icon" :size="tab.iconSize" class="shrink-0" />
                 </template>
-                {{ t(tab.labelKey) }}
+                {{ "label" in tab ? raw(tab.label) : t(tab.labelKey) }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
-              class="unified-search-group rounded-default mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
+              class="unified-search-group rounded-default dark:bg-surface-base dark:hover:border-theme-accent dark:focus-within:border-theme-accent mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -996,7 +996,9 @@ const TRACE_TAB_DEFS = [
   { value: "waterfall", labelKey: "traces.waterfall", icon: "align-left", iconSize: "sm" },
   { value: "flame-graph", labelKey: "traces.flameGraph", icon: "flame", iconSize: "sm" },
   { value: "map", labelKey: "traces.traceGraph", icon: "account-tree", iconSize: "sm" },
-  { value: "dag", labelKey: "traces.dag", icon: "git-branch", iconSize: "sm" },
+  // `label` overrides `labelKey`: DAG is an acronym, and translating it produced
+  // "DÍA"/"JOUR"/"GIORNO" (day) in shipped locales.
+  { value: "dag", label: "DAG", icon: "git-branch", iconSize: "sm" },
   { value: "thread", labelKey: "traces.thread", icon: "chat", iconSize: "xs" },
 ] as const;
 
@@ -2025,7 +2027,13 @@ export default defineComponent({
 
       // Fetch from API — standalone mode, or embedded with no pre-fetched spans
       await loadLogStreams();
-      await getTraceMeta();
+      const timeRange = effectiveTimeRange.value;
+      await getTraceDetails({
+        stream: effectiveStreamName.value,
+        trace_id: effectiveTraceId.value,
+        from: timeRange.from,
+        to: timeRange.to,
+      });
     };
 
     onMounted(async () => {
@@ -2100,77 +2108,6 @@ export default defineComponent({
       hoveredSpanId.value = "";
     };
 
-    const getTraceMeta = () => {
-      try {
-        searchObj.data.traceDetails.isLoadingTraceMeta = true;
-
-        let filter = (router.currentRoute.value.query.filter as string) || "";
-
-        if (filter?.length) filter += ` and trace_id='${effectiveTraceId.value}'`;
-        else filter += `trace_id='${effectiveTraceId.value}'`;
-
-        const timeRange = effectiveTimeRange.value;
-
-        searchService
-          .get_traces({
-            org_identifier: effectiveOrgIdentifier.value,
-            start_time: timeRange.from - 10000,
-            end_time: timeRange.to + 10000,
-            filter: filter || "",
-            size: 1,
-            from: 0,
-            stream_name: effectiveStreamName.value,
-          })
-          .then(async (res: any) => {
-            const trace = getTracesMetaData(res.data.hits)[0];
-            if (!trace) {
-              showTraceDetailsError();
-              return;
-            }
-            searchObj.data.traceDetails.selectedTrace = trace;
-
-            let startTime = Number(router.currentRoute.value.query.from);
-            let endTime = Number(router.currentRoute.value.query.to);
-            if (
-              res.data.hits.length === 1 &&
-              res.data.hits[0].start_time &&
-              res.data.hits[0].end_time
-            ) {
-              startTime = Math.floor(res.data.hits[0].start_time / 1000);
-              endTime = Math.ceil(res.data.hits[0].end_time / 1000);
-
-              // If the trace is not in the current time range, update the time range
-              if (!(
-                startTime >= Number(router.currentRoute.value.query.from) &&
-                endTime <= Number(router.currentRoute.value.query.to)
-              )) {
-                updateUrlQueryParams({
-                  from: startTime,
-                  to: endTime,
-                });
-              }
-            }
-
-            getTraceDetails({
-              stream: effectiveStreamName.value,
-              trace_id: trace.trace_id,
-              from: startTime - 10000,
-              to: endTime + 10000,
-            });
-          })
-          .catch(() => {
-            showTraceDetailsError();
-          })
-          .finally(() => {
-            searchObj.data.traceDetails.isLoadingTraceMeta = false;
-          });
-      } catch (error) {
-        console.error("Error fetching trace meta:", error);
-        searchObj.data.traceDetails.isLoadingTraceMeta = false;
-        showTraceDetailsError();
-      }
-    };
-
     /**
      * Update the query parameters in the URL
      * @param newParams - object containing new parameters
@@ -2184,36 +2121,6 @@ export default defineComponent({
       });
     };
 
-    const getDefaultRequest = () => {
-      return {
-        query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, min(service_name) as service_name, min(operation_name) as operation_name, count(trace_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
-          start_time: (new Date().getTime() - 900000) * 1000,
-          end_time: new Date().getTime() * 1000,
-          from: 0,
-          size: 0,
-        },
-        encoding: "base64",
-      };
-    };
-
-    const sanitizeTraceId = (id: string): string => String(id).replace(/['"\\]/g, "");
-
-    const buildTraceSearchQuery = (trace: any) => {
-      const req = getDefaultRequest();
-      req.query.from = 0;
-      // TODO : Handle this with _search_stream instead of adding size
-      req.query.size = 50000;
-      req.query.start_time = trace.from;
-      req.query.end_time = trace.to;
-
-      req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${sanitizeTraceId(trace.trace_id)}' ORDER BY start_time`,
-      ) as string;
-
-      return req;
-    };
-
     const { fetchRumEventsForTrace, formatRumEventsAsSpans } = useRumSpanBuilder(
       logStreams,
       searchObj,
@@ -2224,84 +2131,60 @@ export default defineComponent({
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
-        const req = buildTraceSearchQuery(data);
+        const traceRes = await searchService.get_trace_details({
+          org_identifier: effectiveOrgIdentifier.value,
+          stream_name: data.stream,
+          trace_id: data.trace_id,
+          start_time: data.from,
+          end_time: data.to,
+          hint_ts: data.from + Math.floor((data.to - data.from) / 2),
+        });
+        if (!traceRes.data?.hits?.length) {
+          showTraceDetailsError();
+          return;
+        }
 
-        const tracePromise = searchService.search(
-          {
-            org_identifier: effectiveOrgIdentifier.value,
-            query: req,
-            page_type: "traces",
-          },
-          "ui",
+        const effectiveStart = traceRes.data.new_start_time ?? data.from;
+        const effectiveEnd = traceRes.data.new_end_time ?? data.to;
+        if (effectiveStart !== data.from || effectiveEnd !== data.to) {
+          updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
+        }
+        const rumData = await fetchRumEventsForTrace(data.trace_id, effectiveStart, effectiveEnd);
+        const traceSpans = traceRes.data.hits;
+        const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
+        const rumSpans = formatRumEventsAsSpans(
+          tracedResources,
+          viewEvents,
+          actionEvents,
+          allViewEvents,
         );
-
-        const rumPromise = fetchRumEventsForTrace(
-          data.trace_id,
-          req.query.start_time,
-          req.query.end_time,
-        );
-
-        Promise.all([tracePromise, rumPromise])
-          .then(([traceRes, rumData]) => {
-            if (!traceRes.data?.hits?.length) {
-              showTraceDetailsError();
-              return;
-            }
-
-            const traceSpans = traceRes.data?.hits || [];
-            const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
-            const rumSpans = formatRumEventsAsSpans(
-              tracedResources,
-              viewEvents,
-              actionEvents,
-              allViewEvents,
-            );
-            // RUM spans take priority over trace spans with the same span_id
-            const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
-            const deduplicatedTraceSpans = traceSpans.filter(
-              (s: any) => !rumSpanIds.has(s.span_id),
-            );
-            // spanList is never[] in useTraces state; widen container to accept spans.
-            (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
-              ...rumSpans,
-              ...deduplicatedTraceSpans,
-            ];
-            updateServiceColors();
-            buildTracesTree();
-          })
-          .catch((error) => {
-            console.error("Error fetching trace details:", error);
-            searchObj.data.traceDetails.isLoadingTraceDetails = false;
-            showTraceDetailsError();
-          })
-          .finally(() => {
-            searchObj.data.traceDetails.isLoadingTraceDetails = false;
-          });
+        // RUM spans take priority over trace spans with the same span_id
+        const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
+        const deduplicatedTraceSpans = traceSpans.filter((s: any) => !rumSpanIds.has(s.span_id));
+        // spanList is never[] in useTraces state; widen container to accept spans.
+        (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
+          ...rumSpans,
+          ...deduplicatedTraceSpans,
+        ];
+        updateSelectedTrace(data.trace_id, spanList.value);
+        updateServiceColors();
+        buildTracesTree();
       } catch (error) {
         console.error("Error fetching trace details:", error);
-        searchObj.data.traceDetails.isLoadingTraceDetails = false;
         showTraceDetailsError();
+      } finally {
+        searchObj.data.traceDetails.isLoadingTraceDetails = false;
       }
     };
 
-    const getTracesMetaData = (traces: any[]) => {
-      if (!traces.length) return [];
-
-      return traces.map((trace) => {
-        const _trace = {
-          trace_id: trace.trace_id,
-          trace_start_time: Math.round(trace.start_time / 1000),
-          trace_end_time: Math.round(trace.end_time / 1000),
-          service_name: trace.service_name,
-          operation_name: trace.operation_name,
-          spans: trace.spans[0],
-          errors: trace.spans[1],
-          duration: trace.duration,
-          services: {} as any,
-          zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
-        };
-        return _trace;
-      });
+    const updateSelectedTrace = (traceId: string, spans: any[]) => {
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: traceId,
+        trace_start_time: Math.floor(Math.min(...spans.map((span) => span.start_time)) / 1000),
+        trace_end_time: Math.ceil(Math.max(...spans.map((span) => span.end_time)) / 1000),
+        service_name: extractServiceNames(spans),
+        services: {},
+      };
     };
 
     const updateServiceColors = () => {
@@ -3179,14 +3062,5 @@ export default defineComponent({
 :global(body:has(.trace-details)),
 :global(html:has(.trace-details)) {
   overflow: hidden !important;
-}
-
-.dark .unified-search-group {
-  background-color: var(--color-surface-base);
-}
-
-.dark .unified-search-group:hover,
-.dark .unified-search-group:focus-within {
-  border-color: var(--color-theme-accent);
 }
 </style>

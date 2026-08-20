@@ -134,7 +134,11 @@ const fetchWorkflows = async () => {
   try {
     const res = await workflowService.listWorkflows(store.state.selectedOrganization.identifier);
     const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-    workflowOptions.value = list.map((wf: any) => ({ label: raw(wf.name), value: wf.id }));
+    // Drafts aren't runnable/published, so they can't be linked to an alert —
+    // only offer non-draft (published) workflows.
+    workflowOptions.value = list
+      .filter((wf: any) => !wf.is_draft)
+      .map((wf: any) => ({ label: raw(wf.name), value: wf.id }));
   } catch {
     workflowOptions.value = [];
   }

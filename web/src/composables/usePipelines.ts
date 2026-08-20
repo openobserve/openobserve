@@ -1,9 +1,10 @@
 import pipelines from "@/services/pipelines";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-export const usePipelines = () => {
+export const usePipelines = (t: TranslateFn) => {
   const store = useStore();
 
   async function getUsedStreamsList() {
@@ -15,7 +16,7 @@ export const usePipelines = () => {
       if (error.response.status != 403) {
         toast({
           variant: "error",
-          message: error.response?.data?.message || "Error fetching used streams",
+          message: error.response?.data?.message || t("pipeline.errorFetchingUsedStreams"),
         });
       }
       return [];

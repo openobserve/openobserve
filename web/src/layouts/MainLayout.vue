@@ -30,12 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ]"
   >
     <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
-      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <div
-        v-if="config.isCloud === 'true'"
-        class="bg-button-primary text-button-primary-foreground text-center"
-      >
-        <WebinarBanner variant="header" />
+      <!-- Every bar that sits above the toolbar, in one measured wrapper so
+           `--navbar-height` accounts for whichever of them is actually showing.
+           The wrapper always renders — an unconditional ref keeps the observer
+           attached even when nothing is on screen yet. -->
+      <div ref="announcementBarRef">
+        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+        <div
+          v-if="config.isCloud === 'true'"
+          class="bg-button-primary text-button-primary-foreground text-center"
+        >
+          <WebinarBanner variant="header" />
+        </div>
+
+        <!-- Operator-authored announcement bars (enterprise) -->
+        <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
@@ -163,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import AppHeader from "../components/Header.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   useLocalCurrentUser,
   useLocalOrganization,
@@ -181,6 +190,7 @@ import {
   KeepAlive,
   computed,
   onMounted,
+  onUnmounted,
   watch,
   markRaw,
   nextTick,
@@ -212,6 +222,7 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
+import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -231,6 +242,7 @@ export default defineComponent({
   components: {
     AppHeader,
     WebinarBanner,
+    AnnouncementBanner,
     "keep-alive": KeepAlive,
     ONavbar,
     "router-view": RouterView,
@@ -421,7 +433,7 @@ export default defineComponent({
         name: "traces",
       },
       {
-        title: t("menu.rum"),
+        title: raw("RUM"),
         icon: "devices",
         link: "/rum",
         name: "rum",
@@ -486,63 +498,63 @@ export default defineComponent({
 
     const langList = [
       {
-        label: "English",
+        label: raw("English"),
         code: "en-us",
       },
       {
-        label: "Türkçe",
+        label: raw("Türkçe"),
         code: "tr-turk",
       },
       {
-        label: "简体中文",
+        label: raw("简体中文"),
         code: "zh-cn",
       },
       {
-        label: "繁體中文",
+        label: raw("繁體中文"),
         code: "zh-tw",
       },
       {
-        label: "Français",
+        label: raw("Français"),
         code: "fr",
       },
       {
-        label: "Español",
+        label: raw("Español"),
         code: "es",
       },
       {
-        label: "Deutsch",
+        label: raw("Deutsch"),
         code: "de",
       },
       {
-        label: "Italiano",
+        label: raw("Italiano"),
         code: "it",
       },
       {
-        label: "日本語",
+        label: raw("日本語"),
         code: "ja",
       },
       {
-        label: "한국어",
+        label: raw("한국어"),
         code: "ko",
       },
       {
-        label: "Nederlands",
+        label: raw("Nederlands"),
         code: "nl",
       },
       {
-        label: "Português",
+        label: raw("Português"),
         code: "pt",
       },
       {
-        label: "Русский",
+        label: raw("Русский"),
         code: "ru",
       },
       {
-        label: "Polski",
+        label: raw("Polski"),
         code: "pl",
       },
       {
-        label: "Tiếng Việt",
+        label: raw("Tiếng Việt"),
         code: "vi",
       },
     ];
@@ -569,14 +581,35 @@ export default defineComponent({
       }
     });
 
-    watch(
-      () => store.state.isWebinarBannerVisible,
-      (visible) => {
-        const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
-        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
-      },
-      { immediate: true },
-    );
+    // Measured rather than assumed. The strip now holds two independent bars
+    // (the cloud webinar promo and any number of operator-authored banners),
+    // each of which wraps its own text, so no fixed value can describe it — the
+    // old `isWebinarBannerVisible` two-value calc only ever fit one bar of one
+    // line. WebinarBanner still dispatches that flag; nothing reads it for
+    // height any more.
+    const announcementBarRef = ref<HTMLElement | null>(null);
+    let announcementBarObserver: ResizeObserver | null = null;
+
+    const setNavbarHeight = (barHeightPx: number) => {
+      const barHeightRem = barHeightPx / 16;
+      document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
+    };
+
+    onMounted(() => {
+      setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);
+
+      if (announcementBarRef.value && typeof ResizeObserver !== "undefined") {
+        announcementBarObserver = new ResizeObserver(([entry]) => {
+          setNavbarHeight(entry.contentRect.height);
+        });
+        announcementBarObserver.observe(announcementBarRef.value);
+      }
+    });
+
+    onUnmounted(() => {
+      announcementBarObserver?.disconnect();
+      announcementBarObserver = null;
+    });
 
     onMounted(async () => {
       filterMenus();
@@ -1085,7 +1118,7 @@ export default defineComponent({
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
         // settings so it's available on boot and every org switch.
-        await useHomeDashboard().load(store.state?.selectedOrganization?.identifier);
+        await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
 
         if (
           orgSettings?.data?.data?.free_trial_expiry != null &&
@@ -1311,6 +1344,7 @@ export default defineComponent({
       router,
       store,
       config,
+      announcementBarRef,
       langList,
       selectedLanguage,
       linksList,

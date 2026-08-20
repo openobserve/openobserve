@@ -56,7 +56,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 15000 });
@@ -130,7 +130,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -211,7 +211,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 15000 });
@@ -288,7 +288,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 15000 });
@@ -394,7 +394,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for variable to appear on dashboard with increased timeout using page object helper
@@ -527,7 +527,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 15000 });
@@ -593,7 +593,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 15000 });
@@ -671,7 +671,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 15000 });

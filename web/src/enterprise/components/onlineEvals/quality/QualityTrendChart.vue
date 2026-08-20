@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import type { I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
@@ -25,6 +25,8 @@ const props = defineProps<{
   legendP95: string;
   legendThresholdFmt: string;
 }>();
+
+const { t } = useI18nTyped();
 
 const chartEl = ref<HTMLElement | null>(null);
 let chart: echarts.ECharts | null = null;
@@ -77,7 +79,10 @@ function buildOption(): echarts.EChartsOption {
         silent: true,
         symbol: "none",
         label: {
-          formatter: `healthy ${sign} ${props.threshold.value}`,
+          formatter: t("onlineEvals.quality.detail.markLineHealthy", {
+            direction: sign,
+            value: props.threshold.value,
+          }),
           color: CHART_THRESHOLD_COLOR,
           fontSize: 10,
           position: "insideEndTop",

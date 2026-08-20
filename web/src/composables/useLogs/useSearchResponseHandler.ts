@@ -27,12 +27,14 @@ import {
 } from "@/ts/interfaces/query";
 import { logsErrorMessage } from "@/utils/common";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 
 export const useSearchResponseHandler = () => {
+  const { t } = useI18nTyped();
+
   // showCancelSearchNotification is defined in logsUtils, not useNotifications
   const {
     fnParsedSQL,
@@ -44,12 +46,11 @@ export const useSearchResponseHandler = () => {
 
   const { getHistogramTitle, getHistogramTitleParts, generateHistogramData } = useHistogram();
 
-  const { refreshPagination, sortResponse } = useSearchPagination();
+  const { refreshPagination, sortResponse } = useSearchPagination(t);
 
-  const { clearCache } = useLogsHighlighter();
+  const { clearCache } = useLogsHighlighter(t);
 
   const store = useStore();
-  const { t } = useI18nTyped();
 
   const {
     searchObj,
@@ -546,7 +547,7 @@ export const useSearchResponseHandler = () => {
       message,
       code,
       trace_id,
-      defaultMessage: "Error while processing request",
+      defaultMessage: t("search.errorWhileProcessingRequest"),
     });
 
     if (error === "rate_limit_exceeded") {
@@ -554,7 +555,7 @@ export const useSearchResponseHandler = () => {
     }
 
     if (request.type === "pageCount") {
-      searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+      searchObj.data.countErrorMsg = t("search.errorWhileRetrievingTotalEvents");
       if (trace_id) searchObj.data.countErrorMsg += " TraceID: " + trace_id;
       notificationMsg.value = searchObj.data.countErrorMsg;
     } else if (request.type === "histogram") {
@@ -605,7 +606,9 @@ export const useSearchResponseHandler = () => {
     }
 
     if (trace_id) {
-      errorMsg += ` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`;
+      // Not translated: useQueryError re-extracts the id with /TraceID:\s*([a-f0-9A-F-]+)/i
+      // from this same string, so the marker has to stay this exact English token.
+      errorMsg += raw(` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`);
     }
 
     return errorMsg;
@@ -626,7 +629,7 @@ export const useSearchResponseHandler = () => {
       searchObj.data.queryResults?.hits?.length &&
       !searchObj.data.queryResults?.aggs?.length
     ) {
-      searchObj.data.histogram.errorMsg = "Histogram search query was cancelled";
+      searchObj.data.histogram.errorMsg = t("search.histogramSearchQueryCancelled");
     }
   };
 

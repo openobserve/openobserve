@@ -131,7 +131,7 @@
                         data-test="search-scheduler-copy-sql-btn"
                         @click.stop="
                           copyToClipboard(row.sql, t, {
-                            successMessage: `${t('logs.searchSchedulersList.sqlQuery')} ${t('search_scheduler_job.copy_success')}`,
+                            successMessage: t('logs.searchSchedulersList.sqlQueryCopied'),
                             timeout: 5000,
                           })
                         "
@@ -183,7 +183,7 @@
                         class="ml-2"
                         @click.stop="
                           copyToClipboard(row.function, t, {
-                            successMessage: `${t('logs.searchSchedulersList.functionDefinationCopy')} ${t('search_scheduler_job.copy_success')}`,
+                            successMessage: t('logs.searchSchedulersList.functionDefinitionCopied'),
                             timeout: 5000,
                           })
                         "
@@ -612,7 +612,7 @@ export default defineComponent({
     });
 
     const formatTime = (took) => {
-      return `${took.toFixed(2)} sec`;
+      return t("logs.searchSchedulersList.tookSeconds", { seconds: took.toFixed(2) });
     };
     const calculateDuration = (startTime, endTime) => {
       const durationMicroseconds = endTime - startTime;

@@ -30,6 +30,7 @@
     icon="track-changes"
     :back="{ to: backTarget, label: t('slos.title') }"
     scroll
+    pad-y
     title-data-test="slos-addslo-title"
   >
     <template #actions>
@@ -328,11 +329,13 @@
                 v-model="form.config.comparator"
                 :label="t('slos.field.comparator')"
                 :options="comparatorOptions"
+                data-test="slos-addslo-comparator"
               />
               <OInput
                 v-model.number="form.config.threshold"
                 :label="t('slos.field.threshold')"
                 type="number"
+                data-test="slos-addslo-threshold"
               />
             </div>
             <!-- Hidden, not just ignored, in PromQL: a scope reaches a SQL
@@ -537,7 +540,7 @@
         <OFormSection :title="t('slos.section.summary')" class="h-fit">
           <dl class="text-compact grid grid-cols-[8rem_1fr] gap-y-2">
             <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
-            <dd>{{ sliTypeLabel(form.sli_type) }}</dd>
+            <dd>{{ sliTypeLabel(form.sli_type, t) }}</dd>
 
             <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
             <dd>{{ formatTarget(form.target || 0) }}</dd>

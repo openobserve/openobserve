@@ -29,7 +29,11 @@
           <OInput
             ref="modelInputRef"
             v-model="testModelName"
-            :placeholder="t('settings.testModelMatchDialog.modelNamePlaceholder')"
+            :placeholder="
+              t('settings.testModelMatchDialog.modelNamePlaceholder', {
+                example: raw('gpt-4-turbo'),
+              })
+            "
             data-test="test-match-model-input"
           >
             <template #icon-left>
@@ -247,7 +251,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import modelPricingService from "@/services/model_pricing";
 import OButton from "@/lib/core/Button/OButton.vue";

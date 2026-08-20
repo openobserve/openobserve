@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import store from "@/stores";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
@@ -145,7 +146,7 @@ export const parseDurationWhereClause = (
  * Values are returned in raw microseconds (µs), matching how duration is
  * stored in the stream. Formatting for display is the caller's responsibility.
  */
-const useDurationPercentiles = () => {
+const useDurationPercentiles = (t: TranslateFn) => {
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const percentiles = ref<DurationPercentiles>({
@@ -236,7 +237,7 @@ const useDurationPercentiles = () => {
           }
         },
         error: () => {
-          errMsg.value = "Failed to load percentiles";
+          errMsg.value = t("traces.failedToLoadPercentiles");
           isLoading.value = false;
           currentTraceId = null;
         },

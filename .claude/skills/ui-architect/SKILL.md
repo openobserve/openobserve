@@ -159,10 +159,19 @@ read it once, it is the backbone of everything below.
        order**. `w-22` loses to a `w-full` already on the element — while the inline
        `width` it replaced always won. Moving `style=""` to a class can therefore lose
        a cascade fight the original never had; add `!` only once you have measured it.
-   - **A token existing does not mean its utility exists.** `--color-border-subtle` is
-     defined but deliberately *not* registered, so `border-border-subtle` compiles to
-     nothing and the border falls back to `currentColor`. Use
-     `border-(--color-border-subtle)` or register the token — never assume the pair.
+   - **A token existing does not mean its utility exists.** Registration in
+     `@theme inline` is what generates the class; an unregistered token compiles to
+     nothing and the property silently falls back (`border` → `currentColor`).
+     `--color-border-subtle`/`-strong` used to be unregistered for exactly this
+     reason — they are registered now, so `border-border-subtle` and
+     `bg-border-strong` work. Check before you assume either way; if a token has no
+     utility, register it rather than reaching for `var()`.
+   - **Tailwind only emits class strings it can literally see.** JIT scans source
+     text, so a class built at runtime (`` `bg-${color}` ``) is never generated —
+     that is why per-row colouring goes through an inline style with a token, not a
+     computed class. It also means a spelling you never wrote does not exist: the
+     source may use `border-border-strong/10` while bare `border-border-strong`
+     was never emitted.
    - **Font size — never `text-[..px/rem]`; pick the type-scale utility by role.**
      Only the px spelling is caught mechanically (`local/no-hardcoded-px` fails
      `text-[13px]`); **`text-[0.8125rem]` compiles silently**, so the rem form is a
@@ -194,11 +203,55 @@ read it once, it is the backbone of everything below.
      **Banned:** bare `rounded`, arbitrary `rounded-[10px]`, and the retired
      `rounded-{sm,md,lg,xl}` / `var(--radius-{sm,md,lg,xl})` (deleted — they were
      five names for one value). Pick the tier by role, not by eye.
+   - **Shadow — one scale, and colour is a SEPARATE axis.** Elevation is
+     `shadow-xs / sm / md / lg`; the directional roles are `--shadow-sticky-*`,
+     `--shadow-rail`, `--shadow-ring-hairline`, `--shadow-scroll-*`, `--shadow-glow-*`.
+     A focus/selection ring is `ring-2 ring-<token>/40`, not a shadow. A 1px hairline
+     is `border-b border-<token>`, not a shadow.
+     **Banned and CI-enforced (`arbShadow`) in all three spellings:**
+     `shadow-[0_4px_12px_…]`, `box-shadow: <literal>` in CSS, and
+     `boxShadow: "<literal>"` in JS. Accepted forms are `var(--shadow-*)`, `none`,
+     and an interpolated `${…}` that is already a token.
+
+     In a **template**, compose the two axes: `shadow-md shadow-ai-accent/35`.
+     In a **stylesheet or JS** no utility exists, so the token layer publishes a
+     colourless geometry half and you append the colour at the use site:
+
+     ```css
+     box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-ai-accent) 35%, transparent);
+     ```
+     ```ts
+     { boxShadow: `var(--shadow-rail-geom) ${color}` }   // colour chosen at runtime
+     ```
+
+     Three rules, each learned from a shipped bug:
+     1. **Never write `var(--glow-color, <fallback>)` in a `:root` token.** A custom
+        property is substituted against `:root`, where the override is unset, so the
+        fallback wins and inherits down — a descendant setting it can never take
+        effect. This silently no-op'd 38 sites.
+     2. **A bare `shadow-<colour>` applies in BOTH themes.** A dark-only tint needs
+        `dark:shadow-<colour>`; `shadow-xs shadow-white/8` renders white-on-white in
+        light mode.
+     3. **A new elevation step needs a `-c` colour token in `dark.css` too**, or it
+        is invisible there — black at 8% on a `#101215` canvas paints nothing.
 4. **No `<style scoped>` and no inline `style=""`** — style with **bare** Tailwind
    utilities (no `tw:` prefix — it was removed). Form-field spacing is
    `class="flex flex-col gap-5"` on `<OForm>`;
    omit it and fields render cramped with no spacing (the #1 "dialog looks broken"
    bug).
+   - **No CSS preprocessor in an SFC** — `vue/block-lang` errors on
+     `<style lang="scss|sass|less">`; `lang="css"` or no `lang` only. This is not
+     taste: `postcss-scss` is not installed, so stylelint silently **skips** a scss
+     block entirely — the hex ban, the `--o2-*` ban and the `.body--dark` ban stop
+     running on that file with no warning. Plain CSS is also all a surviving block
+     needs: what a Tailwind-first template leaves behind is `:deep()`,
+     pseudo-elements and `@keyframes`, none of which want nesting.
+   - **Where a rule goes when it can't be a utility:** an element reset →
+     `src/styles/base-elements.css`; a reusable app-level treatment (pseudo-element,
+     a class a library adds at runtime, a gradient background) →
+     `src/styles/utilities.css` as an `@utility`. Gradients live there, **not** in
+     `@theme` — a `@theme` colour compiles to `background-color: <gradient>`, which
+     is invalid and dropped; the utility sets `background-image` instead.
 5. **No literal colors or sizes — reach every value through a registered token,
    via its utility class.** Colour comes from a `--color-*` token's **token-backed
    utility** (`bg-surface-base`, `text-text-secondary`, `border-border-default`) —
@@ -213,24 +266,33 @@ read it once, it is the backbone of everything below.
    BANNED** — never `var(--o2-*)`, never a new `--o2-*`, never a `.body--dark`
    block; migrate any `--o2-*` you touch. Raw Tailwind palette (`bg-gray-400`,
    `text-red-500`) does not even compile (`palette-reset.css`), and British
-   `grey-*`/`primary-*` primitives in feature code are a ratcheted bypass
+   `grey-*`/`primary-*` primitives in feature code are a zero-tolerance bypass
    (`rawProjectRamp`) — use a semantic token (`text-text-secondary`, `bg-accent`),
    not the ramp. See [references/design-tokens.md](references/design-tokens.md).
 
    > **All of §3–§5 are CI-enforced and FAIL the build** — `local/no-hardcoded-px`
    > (eslint) owns **px on every file type**; `lint:design:strict` owns the rest
-   > (hardcoded hex, arbitrary radius, retired aliases, raw palette/ramp, raw
-   > `var()`, un-justified `<style>`, literal font stacks), plus `lint:tokens`,
-   > `lint:token-purity`, and `lint:styles` (stylelint) run on every PR. The strict
-   > ratchet leaves **no headroom**: a bypass count can only shrink, so new
-   > raw-token usage fails even in a file that still carries old debt. The
-   > counters scan **raw text, comments included** — a `16px` or `#fff` in a
-   > `<style>`-block comment, or a banned class quoted verbatim in a template/JS
-   > comment, counts as debt; word comments in rem/plain English instead. Fix the
-   > cause; don't try to raise the baseline. The flip side: a PR that *reduces*
-   > debt fails strict mode with "baseline is STALE" until you lock the win in —
-   > `cd web && node scripts/check-design-consistency.mjs --baseline` and commit
-   > the tightened `scripts/design-debt-baseline.json` with your change.
+   > (hardcoded hex, arbitrary radius/shadow, retired aliases, raw palette/ramp,
+   > raw `var()` in a template *or* a `<style>` block, un-justified `<style>`,
+   > literal font stacks), plus `lint:tokens`, `lint:token-purity`, `lint:styles`
+   > (stylelint) and `format:check` (prettier) on every PR.
+   >
+   > **Tolerance is ZERO — there is no baseline any more.** `design-debt-baseline.json`
+   > was deleted; one occurrence of any category fails the build. `--strict` is
+   > accepted but ignored, and `--baseline` no longer exists — do not go looking for
+   > a file to regenerate. Use `--list` to enumerate violations. Fix the cause; a new
+   > exemption is not the answer.
+   >
+   > The counters scan **raw text, comments included** — a `16px` or `#fff` in a
+   > `<style>`-block comment, or a banned class quoted verbatim, counts as debt.
+   > Word comments in rem and plain English. This bites inside a CSS-in-TS template
+   > literal too, where a comment is CSS: writing `inset 4px 0 6px` in prose there
+   > fails `local/no-hardcoded-px`.
+   >
+   > **What the guard cannot see** (so review still matters): it walks only `.vue`
+   > and `.ts` — standalone `.css` files are never scanned; the arbitrary-property
+   > form `[background:…]` has no utility prefix so it slips past; and a `var()`
+   > fallback (`var(--color-x,#fff)`) hides a read from the `color-mix` rules.
 6. **No hardcoded user-facing text** — every label, title, placeholder, tooltip,
    empty-state, toast, and validation message comes from `useI18nTyped()`'s `t()`,
    with keys added to `web/src/locales/languages/en-US.json` (other locales follow
@@ -262,6 +324,60 @@ read it once, it is the backbone of everything below.
    >   than the type because a native element has no prop to annotate. Residual gap:
    >   only the STATIC form is covered, so `:title="'Delete'"` still slips through —
    >   don't reach for it to dodge the error.
+   >
+   > **Which translator — `t()` first, `gt()` only when it cannot reach.**
+   >
+   > | Where you are | Use |
+   > |---|---|
+   > | `<script setup>` / inside `setup()` | **`t()`** from `useI18nTyped()` |
+   > | `.ts` module called from a component | **thread `t` in** as a parameter |
+   > | Module scope, nothing to thread from (route guards, registries, import-time singletons) | **`gt()`** |
+   > | A key stored as DATA, resolved later (`titleKey`, `labelKey`) | neither — store `I18nKey`, resolve with `t()` at render |
+   >
+   > `gt()` is the escape hatch, not the default — before reaching for it, ask whether
+   > the function can take `t: TranslateFn` as an argument; usually it can, and the
+   > caller already has one. At module scope, put `gt()` behind a **getter** so it
+   > resolves at read time, not import time:
+   >
+   > ```ts
+   > // WRONG — frozen at whatever locale was loaded when this module was imported
+   > export const destination = { name: gt("alerts.email") };
+   > // RIGHT — resolves when the picker renders
+   > export const destination = { get name() { return gt("alerts.email"); } };
+   > ```
+   >
+   > **What must NEVER enter the catalogue.** A key is a promise that translating the
+   > string is safe. These break that promise — `raw()` them and keep them out:
+   >
+   > | Kind | Examples | What broke when translated |
+   > |---|---|---|
+   > | Values code compares or persists | a sentinel, an enum, a generated name | logic silently stops matching, non-English users only |
+   > | Product / company names | `Kafka`, `Zookeeper`, `NATS`, `Airflow` | shipped as `Zoowärter`, `HORMIGAS` (ants), `Luftstrom` (air current) |
+   > | Acronyms that are names | `RUM`, `DAG`, `IAM`, `AGPL`, `P95` | shipped as `RON` (the drink), `DÍA` (day), `SOY YO` ("I am me") |
+   > | Code the user copies or types | SQL snippets, regexes, model ids, field names, env vars | `gpt-4.*` → `gpt-4. *`; a pasted sample no longer runs |
+   >
+   > The test is **not** "is it user-visible" — all of the above are. It is **"is there
+   > one correct form worldwide?"** If yes, it is not copy.
+   >
+   > **A name INSIDE a sentence: interpolate it out, don't `raw()` the sentence.**
+   >
+   > ```ts
+   > // WRONG — freezes the whole sentence in English
+   > raw("Route all telemetry through the OTel Collector")
+   > // WRONG — the translator mangles the product name
+   > t("traces.noData.otelCollectorDesc")
+   > // RIGHT — catalogue holds "…through the {product}"
+   > t("traces.noData.otelCollectorDesc", { product: raw("OTel Collector") })
+   > ```
+   >
+   > Same for an example token: `"e.g. {example}"` + `{ example: raw("gpt-4.*") }` keeps
+   > *"e.g."* translatable while the token becomes unreachable. Never split a sentence
+   > into fragments you concatenate — word order is per-language.
+   >
+   > **A string that is both a label and an identifier: split it.** Give display and
+   > machine value separate fields — `{ label: t("iam.roleAdmin"), value: "admin" }`.
+   > Before translating any label, check for a sibling `value:`; if the label IS the
+   > value, translating it breaks the comparison.
    >
    > **Non-translatable text — the ladder.** Decide in this order:
    >
@@ -512,8 +628,8 @@ considering the UI done:
       stays calm: exceptions highlighted not the norm, muted `0`/`—`,
       border-not-fill selection, no layout shift. See
       [references/calm-signal.md](references/calm-signal.md).
-- [ ] `cd web && npm run lint:design:strict` passes (the strict ratchet — no new
-      raw-token bypass anywhere, even in files with existing debt).
+- [ ] `cd web && npm run lint:design:strict` passes (zero tolerance — no
+      raw-token bypass anywhere; one occurrence fails the build).
 - [ ] **No `--o2-*` anywhere** — no `var(--o2-*)`, no new `--o2-*` definition, no
       `.body--dark` block. Any `--o2-*` in code you touched was migrated to its
       `--color-*` equivalent.

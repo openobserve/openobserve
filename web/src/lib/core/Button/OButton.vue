@@ -152,7 +152,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // AI-themed gradient — purple→pink gradient background, white text
   "ai-gradient": [
-    "bg-[image:var(--color-gradient-ai)] text-white border-0",
+    "bg-gradient-ai text-white border-0",
     "enabled:hover:shadow-md enabled:hover:shadow-ai-accent/40",
     "enabled:active:opacity-90",
     "focus-visible:ring-3 focus-visible:ring-ai-accent",
@@ -193,6 +193,16 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:bg-brand-email-hover",
     "disabled:opacity-60",
   ].join(" "),
+  // preview-opsgenie: Opsgenie ink (dark neutral CTA). Was a scoped
+  // `.opsgenie-actions button` override in DestinationPreview.vue that beat this
+  // variant map from unlayered CSS; it belongs with its sibling brand variants.
+  // `text-white` (not text-text-inverse) — the preview card is a fixed-light
+  // brand replica, so the label must stay white in dark mode too.
+  "preview-opsgenie": [
+    "bg-brand-email-ink text-white border-0 !rounded !text-sm !h-auto !py-2 !px-3",
+    "enabled:hover:bg-brand-email-ink-deep",
+    "disabled:opacity-60",
+  ].join(" "),
   // preview-action: Generic action button for destination previews with no brand color
   "preview-action": [
     "bg-transparent text-button-outline-text border border-button-outline-border !rounded !h-auto !py-2 !px-3 !text-sm",
@@ -202,8 +212,16 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
   "webinar-dismiss": [
     "bg-transparent border-0 text-promo-webinar-link underline font-bold text-compact whitespace-nowrap",
-    "!h-auto !p-0",
+    "h-auto! p-0!",
     "enabled:hover:text-promo-webinar-link-hover",
+    "disabled:opacity-60",
+  ].join(" "),
+  // banner-dismiss: Inline text-link style for the actions inside an OBanner bar.
+  // Inherits the banner's own text color so it reads correctly on every variant.
+  "banner-dismiss": [
+    "bg-transparent border-0 text-inherit underline font-bold text-compact whitespace-nowrap",
+    "h-auto! p-0!",
+    "enabled:hover:opacity-80",
     "disabled:opacity-60",
   ].join(" "),
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.

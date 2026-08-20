@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- No horizontal padding here: sections that need an inset (charts, chip row, tab labels)
            add px-page-edge themselves, so dividers and tables can bleed to the edges naturally. -->
     <div
-      class="panel-content bg-surface-base flex-1 overflow-x-hidden overflow-y-auto py-2.5 dark:bg-[color-mix(in_srgb,var(--color-grey-950)_85%,var(--color-indigo-900))]"
+      class="panel-content bg-surface-base dark:bg-graph-panel-scrim flex-1 overflow-x-hidden overflow-y-auto py-2.5"
     >
       <!-- RED Charts Section -->
       <div
@@ -620,7 +620,7 @@ import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
-import { useI18nTyped, raw, type I18nText, type I18nKey } from "@/types/i18n";
+import { gt, useI18nTyped, raw, type I18nText, type I18nKey } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -852,11 +852,21 @@ const DEFAULT_GROUP_FIELDS = new Set([
 // Generic environment display labels for non-primary-platform segments.
 // Primary platform labels (k8s/aws/azure/gcp) come from the shared ENV_SEGMENTS.
 const GENERIC_ENV_LABELS: Record<string, string> = {
-  host: "Host",
-  container: "Container",
-  faas: "Serverless",
-  process: "Runtime",
-  cloud: "Cloud",
+  get host() {
+    return gt("traces.serviceGraphNodeSidePanel.envHost");
+  },
+  get container() {
+    return gt("traces.serviceGraphNodeSidePanel.envContainer");
+  },
+  get faas() {
+    return gt("traces.serviceGraphNodeSidePanel.envServerless");
+  },
+  get process() {
+    return gt("traces.serviceGraphNodeSidePanel.envRuntime");
+  },
+  get cloud() {
+    return gt("traces.serviceGraphNodeSidePanel.envCloud");
+  },
 };
 
 /** Gets a display label for any environment key, platform or generic. */
@@ -1636,15 +1646,15 @@ export default defineComponent({
     const serviceMetrics = computed(() => {
       if (!props.selectedNode || !props.graphData) {
         return {
-          requestRate: t("common.notAvailable"),
-          requestRateValue: t("common.notAvailable"),
+          requestRate: raw("N/A"),
+          requestRateValue: raw("N/A"),
           totalRequests: 0,
           incomingRequests: 0,
           outgoingRequests: 0,
-          errorRate: t("common.notAvailable"),
-          p50Latency: t("common.notAvailable"),
-          p95Latency: t("common.notAvailable"),
-          p99Latency: t("common.notAvailable"),
+          errorRate: raw("N/A"),
+          p50Latency: raw("N/A"),
+          p95Latency: raw("N/A"),
+          p99Latency: raw("N/A"),
         };
       }
 
@@ -1700,9 +1710,9 @@ export default defineComponent({
         incomingRequests: incomingRequests,
         outgoingRequests: outgoingRequests,
         errorRate: errorRate.toFixed(2) + "%",
-        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : t("common.notAvailable"),
-        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : t("common.notAvailable"),
-        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : t("common.notAvailable"),
+        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : raw("N/A"),
+        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : raw("N/A"),
+        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : raw("N/A"),
       };
     });
 

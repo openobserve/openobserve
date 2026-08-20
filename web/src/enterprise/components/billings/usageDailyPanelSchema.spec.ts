@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
+
+import { gt } from "@/types/i18n";
+
 import {
   buildUsageCombinedSql,
   buildUsageCombinedLinePanelSchema,
@@ -52,6 +55,7 @@ describe("usageDailyPanelSchema", () => {
       const schema = buildUsageCombinedLinePanelSchema({
         orgId: "org-x",
         dataType: "gb",
+        t: gt,
       });
       expect(schema.version).toBe(2);
       expect(schema.type).toBe("line");
@@ -63,9 +67,9 @@ describe("usageDailyPanelSchema", () => {
     });
 
     it("labels the axis in the selected unit", () => {
-      const gb = buildUsageCombinedLinePanelSchema({ orgId: "o", dataType: "gb" });
+      const gb = buildUsageCombinedLinePanelSchema({ orgId: "o", dataType: "gb", t: gt });
       expect(gb.config.unit_custom).toBe("GB");
-      const mb = buildUsageCombinedLinePanelSchema({ orgId: "o", dataType: "mb" });
+      const mb = buildUsageCombinedLinePanelSchema({ orgId: "o", dataType: "mb", t: gt });
       expect(mb.config.unit_custom).toBe("MB");
     });
 
@@ -75,6 +79,7 @@ describe("usageDailyPanelSchema", () => {
       const schema = buildUsageCombinedLinePanelSchema({
         orgId: "o",
         dataType: "gb",
+        t: gt,
       });
       expect(schema.error_config.custom_error_handeling).toBe(true);
       expect(schema.error_config.custom_error_message).toBeUndefined();

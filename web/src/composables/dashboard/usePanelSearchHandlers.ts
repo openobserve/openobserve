@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { toRaw, markRaw } from "vue";
+import { gt } from "@/types/i18n";
 import { detectChunkingDirection, shouldPrependChunk } from "@/utils/dashboard/chunkingDirection";
 
 /**
@@ -321,7 +322,7 @@ export const usePanelSearchHandlers = ({
       state.loadingProgressPercentage = 0;
       state.isPartialData = false;
       state.errorDetail = {
-        message: error?.message || "Unknown error in search response",
+        message: error?.message || gt("dashboard.unknownErrorInSearchResponse"),
         code: error?.code ?? "",
       };
     }
@@ -342,8 +343,7 @@ export const usePanelSearchHandlers = ({
     if (errorCodes.includes(response.code)) {
       handleSearchError(payload, {
         content: {
-          message:
-            "WebSocket connection terminated unexpectedly. Please check your network and try again",
+          message: gt("dashboard.websocketConnectionTerminated"),
           trace_id: payload.traceId,
           code: response.code,
           error_detail: "",

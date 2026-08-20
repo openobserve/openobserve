@@ -31,6 +31,42 @@ class SearchAPI:
             raise_for_status=raise_for_status,
         )
 
+    def dashboard_panel(
+        self,
+        sql: str,
+        *,
+        dashboard_id: str,
+        start_time: int,
+        end_time: int,
+        size: int = 500,
+        use_cache: bool = False,
+        org: str | None = None,
+        raise_for_status: bool = False,
+    ) -> requests.Response:
+        """Run a panel query the way the dashboard UI does.
+
+        Hits `_search?type=logs&search_type=dashboards&dashboard_id=…`, which is
+        a distinct code path from the Logs page (`search_type=ui`): it carries the
+        dashboard context and defaults `use_cache` on. A query that works in Logs
+        can still regress here, so panel tests must exercise this variant.
+
+        `use_cache` defaults to False so repeated assertions read the engine, not
+        a cached result set.
+        """
+        body = search_payload(sql, start_time=start_time, end_time=end_time, size=size)
+        return self.c.post(
+            "_search",
+            params={
+                "type": "logs",
+                "search_type": "dashboards",
+                "use_cache": str(use_cache).lower(),
+                "dashboard_id": dashboard_id,
+            },
+            json=body,
+            org=org,
+            raise_for_status=raise_for_status,
+        )
+
     def hits(self, sql: str, **kw) -> list[dict[str, Any]]:
         """Convenience: run SQL and return just the hits list."""
         return self.sql(sql, **kw).json().get("hits", [])

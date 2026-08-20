@@ -113,7 +113,7 @@ import {
   type CatalogScoreConfig,
 } from "@/services/online-evals-catalog.service";
 import { showError } from "./utils/evalFormat";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nKey } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
@@ -142,7 +142,7 @@ async function loadCatalog() {
     const catalog = await fetchOnlineEvalsCatalog();
     entries.value = catalog.scoreConfigs.filter((entry) => entry.level === "span");
   } catch (err: any) {
-    loadError.value = err?.message || "Failed to load catalog";
+    loadError.value = err?.message || t("onlineEvals.failedToLoadCatalog");
   } finally {
     isLoadingCatalog.value = false;
   }
@@ -160,10 +160,12 @@ const filteredEntries = computed(() => {
 });
 
 const DATA_TYPE_ORDER = ["numeric", "categorical", "boolean"] as const;
-const DATA_TYPE_LABELS: Record<string, string> = {
-  numeric: "Numeric",
-  categorical: "Categorical",
-  boolean: "Boolean",
+// Keys, not resolved text: this map is built once at setup, so a resolved
+// string would freeze at the locale in force then.
+const DATA_TYPE_LABEL_KEYS: Record<string, I18nKey> = {
+  numeric: "onlineEvals.scoreConfig.dataTypes.numeric",
+  categorical: "onlineEvals.scoreConfig.dataTypes.categorical",
+  boolean: "onlineEvals.scoreConfig.dataTypes.boolean",
 };
 
 const groupedEntries = computed(() => {
@@ -180,7 +182,7 @@ const groupedEntries = computed(() => {
   for (const k of buckets.keys()) if (!ordered.includes(k)) ordered.push(k);
   return ordered.map((dataType) => ({
     dataType,
-    label: DATA_TYPE_LABELS[dataType] ?? dataType,
+    label: DATA_TYPE_LABEL_KEYS[dataType] ? t(DATA_TYPE_LABEL_KEYS[dataType]) : raw(dataType),
     entries: buckets.get(dataType) ?? [],
   }));
 });
@@ -239,7 +241,7 @@ async function importSelected() {
       }
       failCount++;
       // Surface only the first hard error; subsequent failures keep counting.
-      if (failCount === 1) showError(err, "Failed to import score config");
+      if (failCount === 1) showError(err, t("onlineEvals.failedToImportScoreConfig"));
     }
   }
 
@@ -248,10 +250,12 @@ async function importSelected() {
   emit("imported");
 
   if (successCount > 0 || skipCount > 0) {
+    // Each clause is a whole translated phrase; only the list separator is
+    // assembled here, never a sentence built from translated fragments.
     const parts: string[] = [];
-    if (successCount) parts.push(`${successCount} imported`);
-    if (skipCount) parts.push(`${skipCount} skipped (already exists)`);
-    if (failCount) parts.push(`${failCount} failed`);
+    if (successCount) parts.push(t("onlineEvals.import.summaryImported", { count: successCount }));
+    if (skipCount) parts.push(t("onlineEvals.import.summarySkipped", { count: skipCount }));
+    if (failCount) parts.push(t("onlineEvals.import.summaryFailed", { count: failCount }));
     toast({
       variant: failCount > 0 && successCount === 0 ? "error" : "success",
       message: raw(parts.join(" · ")),

@@ -681,7 +681,7 @@ describe("Query Component", () => {
       await nextTick();
       wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+      expect(wrapper.vm.dialog.title).toBe("Discard changes");
       expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel routing changes?");
     });
 

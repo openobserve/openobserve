@@ -114,19 +114,15 @@ describe("en-US locale file", () => {
   });
 
   it("keeps the Data Sources sidebar labels as strings", () => {
-    // Rendered directly by Recommended.vue and the Ingestion search index — if
-    // any becomes an object, that tab shows its raw key path instead of a name.
+    // Rendered by Recommended.vue — if either becomes an object, that tab shows
+    // its raw key path instead of a name.
+    //
+    // Only these two are catalogue-driven. The platform names that used to be
+    // listed here (azure, kubernetes, windows, linux, awsconfig, gcpconfig) are
+    // product nouns with one correct form worldwide, so they moved to raw()
+    // literals in ingestionSearchIndex.ts and no longer have keys to guard.
     const { ingestion } = JSON.parse(raw);
-    for (const key of [
-      "azure",
-      "kubernetes",
-      "windows",
-      "linux",
-      "awsconfig",
-      "gcpconfig",
-      "tracesotlp",
-      "rum",
-    ]) {
+    for (const key of ["tracesotlp", "rum"]) {
       expect(typeof ingestion[key], `ingestion.${key}`).toBe("string");
       expect(ingestion[key].length).toBeGreaterThan(0);
     }

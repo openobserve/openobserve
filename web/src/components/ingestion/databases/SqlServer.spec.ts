@@ -21,6 +21,7 @@ import { ref } from "vue";
 import SqlServer from "./SqlServer.vue";
 import sqlServerCard from "@/components/ingestion/setupCard/content/sqlServer";
 import { getDataSourceCard, hasDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 // Mock useIngestion so the endpoint is deterministic (no network / URL lookup).
 const mockEndpoint = ref({
@@ -64,7 +65,7 @@ const SUBS = {
 
 describe("sqlServerCard builder", () => {
   it("builds the SQL Server card metadata", () => {
-    const card = sqlServerCard(SUBS);
+    const card = sqlServerCard(SUBS, gt);
     expect(card.provider.name).toBe("SQL Server");
     // Non-AI metrics card → replaces the "Cost & Tokens Captured" hero badge.
     expect(card.provider.metaBadges).toEqual(["Metrics"]);
@@ -80,7 +81,7 @@ describe("sqlServerCard builder", () => {
   });
 
   it("writes the config via a shell command with the org's exporter filled in", () => {
-    const configure = sqlServerCard(SUBS).steps.find((s) => s.id === "configure")!;
+    const configure = sqlServerCard(SUBS, gt).steps.find((s) => s.id === "configure")!;
     const unix = configure.variants!.find((v) => v.id === "linux-amd64")!.code;
     expect(unix.lang).toBe("bash");
     // It's a one-shot file-writing command wrapping the full config.
@@ -102,7 +103,7 @@ describe("sqlServerCard builder", () => {
   });
 
   it("puts host/port inputs on the configure step, referenced via placeholders", () => {
-    const configure = sqlServerCard(SUBS).steps.find((s) => s.id === "configure")!;
+    const configure = sqlServerCard(SUBS, gt).steps.find((s) => s.id === "configure")!;
     expect(configure.inputs?.map((i) => i.id)).toEqual(["server", "port"]);
     // The config keeps {server}/{port} unsubstituted so the renderer fills them
     // live from the inputs (build-time subs only touch url/org/token).
@@ -112,7 +113,7 @@ describe("sqlServerCard builder", () => {
   });
 
   it("offers method tabs for applying the grants (sqlcmd / docker / GUI)", () => {
-    const prepare = sqlServerCard(SUBS).steps.find((s) => s.id === "prepare")!;
+    const prepare = sqlServerCard(SUBS, gt).steps.find((s) => s.id === "prepare")!;
     expect(prepare.code).toBeUndefined();
     expect(prepare.variants?.map((v) => v.id)).toEqual(["sqlcmd", "docker", "sql-client"]);
     // sqlcmd/docker are runnable commands that pipe the SQL via -Q.
@@ -131,7 +132,7 @@ describe("sqlServerCard builder", () => {
   });
 
   it("uses the same literal login in Step 1 and the collector config (in lockstep)", () => {
-    const card = sqlServerCard(SUBS);
+    const card = sqlServerCard(SUBS, gt);
     const prepare = card.steps.find((s) => s.id === "prepare")!;
     // No extra input fields to decide on — credentials are edited inline.
     expect(prepare.inputs).toBeUndefined();
@@ -143,7 +144,7 @@ describe("sqlServerCard builder", () => {
   });
 
   it("offers OS-specific install variants (no single code block)", () => {
-    const install = sqlServerCard(SUBS).steps.find((s) => s.id === "install")!;
+    const install = sqlServerCard(SUBS, gt).steps.find((s) => s.id === "install")!;
     expect(install.code).toBeUndefined();
     expect(install.variants?.map((v) => v.id)).toEqual([
       "linux-amd64",
@@ -164,13 +165,13 @@ describe("sqlServerCard builder", () => {
 describe("data-source card registry", () => {
   it("resolves the sqlServer slug", () => {
     expect(hasDataSourceCard("sqlServer")).toBe(true);
-    expect(getDataSourceCard("sqlServer", SUBS)?.provider.name).toBe("SQL Server");
+    expect(getDataSourceCard("sqlServer", SUBS, gt)?.provider.name).toBe("SQL Server");
   });
 
   it("returns undefined for an unregistered slug", () => {
     expect(hasDataSourceCard("not-a-real-slug")).toBe(false);
-    expect(getDataSourceCard("not-a-real-slug", SUBS)).toBeUndefined();
-    expect(getDataSourceCard(undefined, SUBS)).toBeUndefined();
+    expect(getDataSourceCard("not-a-real-slug", SUBS, gt)).toBeUndefined();
+    expect(getDataSourceCard(undefined, SUBS, gt)).toBeUndefined();
   });
 });
 

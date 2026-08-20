@@ -75,9 +75,19 @@ RTL languages (Arabic, Persian) are deliberately excluded until the web app has
 
 1. **Source File**: All translations originate from `web/src/locales/languages/en-US.json`
 2. **Translation**: New/changed keys are translated by DeepSeek, in batches, with
-   interpolation placeholders (`{count}`, `%s`, `@:linked.key`) validated per string
+   interpolation placeholders (`{count}`, `%s`, `@:linked.key`) and vue-i18n
+   literal escapes (`{'{'}`, `{'@'}`) validated per string
 3. **Preservation**: Existing translations are never overwritten unless their English source changed
 4. **Nested Support**: Handles nested JSON structures correctly
+
+A translation is rejected (and retried on the next run) when it is empty, drops or
+adds an interpolation token, changes the `|` plural-form count, or is something
+vue-i18n cannot compile. That last check exists because vue-i18n compiles messages
+just-in-time and a compile error is *thrown*, not warned: a model that helpfully
+localises a placeholder name — `{identifier}` → `{标识符}` — blanks every page that
+renders the string. `web/src/locales/localeMessages.spec.ts` re-checks the same
+property against the committed locale files, so a bad string cannot reach `main`
+even if it predates this validation.
 
 ## Local Development
 
