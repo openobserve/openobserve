@@ -16,9 +16,9 @@ use openobserve_core::llm_evaluations::{
         RecordBatch, RecordBatchResult,
     },
     experiment_results::{
-        ExperimentAggregateSummary, ExperimentProgress, ExperimentResultScore,
-        ExperimentResultScoreStatus, ExperimentResultSlot, ExperimentResultTaskStatus,
-        ExperimentScoreSummary, ExperimentSkipSummary, ScoringStatus,
+        ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentProgress,
+        ExperimentResultScore, ExperimentResultScoreStatus, ExperimentResultSlot,
+        ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary, ScoringStatus,
     },
     experiments::{
         CreateExperiment, CreateExperimentResult, Experiment, ExperimentPreview,
@@ -773,6 +773,7 @@ pub struct ExperimentRowNavigationBody {
 }
 
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExperimentResultsResponseBody {
     pub executions: Vec<Value>,
     pub scores: Vec<Value>,
@@ -786,6 +787,9 @@ pub struct ExperimentResultsResponseBody {
     pub scoring_status: ScoringStatus,
     pub skip_summary: ExperimentSkipSummaryBody,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
+    /// Dimensions the customer's own code reported. Empty for a run whose
+    /// Scores all came from platform Scorers.
+    pub client_score_summaries: Vec<ExperimentClientScoreSummaryBody>,
     pub aggregate_summary: ExperimentAggregateSummaryBody,
     /// Trial dispersion for the cases on this page, always measured over the
     /// Experiment's full evidence so paging never splits a case's trials.
@@ -880,6 +884,9 @@ pub struct ExperimentResultSlotBody {
     pub task_status: ExperimentResultTaskStatusBody,
     pub execution: Option<Value>,
     pub scores: Vec<ExperimentResultScoreBody>,
+    /// Scores the customer's own code reported for this Slot. `scores` above is
+    /// one entry per pinned Scorer, which a client Score is not.
+    pub client_scores: Vec<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -944,6 +951,21 @@ pub struct ExperimentScoreSummaryBody {
     pub value: Option<Value>,
 }
 
+/// One dimension the customer's own code reported.
+///
+/// Separate from [`ExperimentScoreSummaryBody`] because a client Score has no
+/// Scorer. The Score Config is what the two share, so a reader can compare them
+/// without the platform claiming it produced either.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentClientScoreSummaryBody {
+    pub score_config_id: String,
+    pub score_config_name: String,
+    pub client_scorer_key: String,
+    pub sample_count: u64,
+    pub value: Option<Value>,
+}
+
 #[derive(Debug, Clone, Default, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentAggregateSummaryBody {
@@ -1004,6 +1026,11 @@ impl From<ExperimentResultSlot> for ExperimentResultSlotBody {
                 .execution
                 .and_then(|record| serde_json::to_value(record).ok()),
             scores: value.scores.into_iter().map(Into::into).collect(),
+            client_scores: value
+                .client_scores
+                .into_iter()
+                .filter_map(|score| serde_json::to_value(score).ok())
+                .collect(),
         }
     }
 }
@@ -1041,6 +1068,18 @@ impl From<ExperimentScoreSummary> for ExperimentScoreSummaryBody {
             no_reference_count: value.no_reference_count,
             no_trace_count: value.no_trace_count,
             skipped_count: value.skipped_count,
+            value: value.value,
+        }
+    }
+}
+
+impl From<ExperimentClientScoreSummary> for ExperimentClientScoreSummaryBody {
+    fn from(value: ExperimentClientScoreSummary) -> Self {
+        Self {
+            score_config_id: value.score_config_id,
+            score_config_name: value.score_config_name,
+            client_scorer_key: value.client_scorer_key,
+            sample_count: value.sample_count,
             value: value.value,
         }
     }
@@ -1103,7 +1142,9 @@ mod tests {
                     "taskFingerprint": "sha256:customer-code-v3",
                     "config": {}
                 }),
-                _ => serde_json::json!({"type": kind, "config": {}}),
+                // A Remote Task is pinned to one published version, so the
+                // reference is the definition.
+                _ => serde_json::json!({"type": kind, "taskRef": "mock-task@1"}),
             };
             let body: CreateExperimentRequestBody = serde_json::from_value(serde_json::json!({
                 "name": "Experiment",

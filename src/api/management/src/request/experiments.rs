@@ -396,6 +396,11 @@ pub async fn get_experiment(
                     .into_iter()
                     .map(Into::into)
                     .collect(),
+                client_score_summaries: summary
+                    .client_score_summaries
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
                 aggregate_summary: aggregate_summary.into(),
                 row_dispersions,
                 dispersion_summary,
