@@ -264,7 +264,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
     lease_secs: i64,
     browser: Option<bool>,
 ) -> Result<Vec<LeasedRow>, errors::Error> {
-    let lease_secs = lease_secs.max(config::meta::synthetics::limits().job_lease_secs);
+    let lease_secs = lease_secs.max(config::get_config().synthetics.job_lease_secs);
     let lease_expires_at = now_us + lease_secs * 1_000_000;
 
     // `limit` arrives from a client and is cast to u64 below, where a negative

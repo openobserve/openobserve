@@ -1,0 +1,11 @@
+appId: com.o2native
+---
+# Fire a successful (200) and a failing (404) request through the OpenObserve-instrumented OkHttp
+# client so both land as RUM `resource` events (the 404 carries a >=400 status for the negative test).
+# tapOn auto-scrolls to the button (the button list is inside a ScrollView).
+- launchApp:
+    clearState: false
+- tapOn: "Fetch resource 200"
+- tapOn: "Fetch resource 404"
+- waitForAnimationToEnd:
+    timeout: 3000

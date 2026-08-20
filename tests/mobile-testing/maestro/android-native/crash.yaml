@@ -1,0 +1,8 @@
+appId: com.o2native
+---
+- launchApp
+- assertVisible: "Trigger native crash"
+- tapOn: "Trigger native crash"
+- waitForAnimationToEnd:
+    timeout: 4000
+- launchApp

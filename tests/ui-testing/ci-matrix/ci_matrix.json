@@ -227,7 +227,8 @@
       "shared-components-form-validation.spec.js",
       "onboarding-form-validation.spec.js",
       "rum-form-validation.spec.js",
-      "login-form-validation.spec.js"
+      "login-form-validation.spec.js",
+      "datetime-picker-copy-paste.spec.js"
     ],
     "disabled": []
   },
@@ -303,7 +304,8 @@
     "browser": "chrome",
     "quick_mode_enabled": "true",
     "run_files": [
-      "logsVisualizeSelectStar.spec.js"
+      "logsVisualizeSelectStar.spec.js",
+      "logsBuildStreamList.spec.js"
     ],
     "disabled": []
   },

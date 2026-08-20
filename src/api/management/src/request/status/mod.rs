@@ -211,8 +211,13 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    /// Whether private locations — pools served by long-running agents deployed
+    /// inside the customer's network — are available. Enterprise only, so the
+    /// UI hides the private-locations views, the agent-setup drawer and the
+    /// public/private selector on this rather than on `synthetics_enabled`.
+    synthetics_private_locations_enabled: bool,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
-    /// (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
+    /// (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
     synthetics_recorder_extension_url: String,
     enable_cross_linking: bool,
@@ -379,9 +384,15 @@ pub async fn zo_config() -> impl IntoResponse {
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
-    let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
-    let synthetics_recorder_extension_url =
-        enterprise_value!("", &o2cfg.synthetics.recorder_extension_url);
+    // Read straight from the config in every build: synthetics is OSS now, and
+    // reporting `false` here is what hid the whole feature from the UI.
+    let synthetics_enabled = cfg.synthetics.enabled;
+    // The private-agent path is the part that stays enterprise, so it gets its
+    // own flag. Gating the UI on this rather than on `synthetics_enabled` is
+    // what lets an OSS build show synthetics without offering a location it
+    // cannot serve.
+    let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
+    let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
@@ -497,6 +508,7 @@ pub async fn zo_config() -> impl IntoResponse {
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,

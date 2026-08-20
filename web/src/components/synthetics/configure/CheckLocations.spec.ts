@@ -556,6 +556,82 @@ describe("CheckLocations", () => {
     });
   });
 
+  /**
+   * Agents register with one region and their rows never replicate, so a
+   * location whose agents live elsewhere arrives here with none — and used to
+   * be badged "Connecting · install an agent", for an agent already installed.
+   */
+  describe("live status this region cannot see", () => {
+    const unknownLocation: SyntheticsLocation = {
+      id: "private-remote-1",
+      label: "remote-prod",
+      region: "remote-prod",
+      provider: "",
+      kind: "private",
+      status: "pending",
+      live_status_unknown: true,
+      agent_names: [],
+      live_agents: 0,
+    };
+
+    function mountWithUnknown() {
+      return mount(CheckLocations, {
+        props: {
+          check: mockMonitorHttp,
+          locations: [...mockLocations, ...mockPrivateLocations, unknownLocation],
+          allowPrivate: true,
+        },
+        global: { stubs: STUBS },
+      }) as VueWrapper;
+    }
+
+    it("should badge it neutrally rather than as connecting", () => {
+      wrapper = mountWithUnknown();
+
+      const badge = wrapper.find(
+        '[data-test="synthetics-check-locations-status-badge-private-remote-1"]',
+      );
+      expect(badge.attributes("data-variant")).toBe("default-outline");
+      expect(badge.text()).toContain("synthetics.locations.statusUnknown");
+    });
+
+    it("should say the status is unavailable here, not that an agent is missing", () => {
+      wrapper = mountWithUnknown();
+
+      const warning = wrapper.find(
+        '[data-test="synthetics-check-locations-warning-private-remote-1"]',
+      );
+      expect(warning.text()).toContain("synthetics.locations.unknownMessage");
+      expect(wrapper.text()).toContain("synthetics.locations.unknownAgents");
+    });
+
+    /** Nothing is wrong with it, so it must not sink below the locations that
+     *  genuinely need attention. */
+    it("should sort below ready locations and above the rest", () => {
+      wrapper = mountWithUnknown();
+
+      const ids = wrapper
+        .findAll('[data-test^="synthetics-check-locations-status-badge-private-"]')
+        .map((el) => el.attributes("data-test"));
+      const unknownAt = ids.indexOf("synthetics-check-locations-status-badge-private-remote-1");
+      const connectingAt = ids.indexOf("synthetics-check-locations-status-badge-private-pending-1");
+      const readyAt = ids.indexOf("synthetics-check-locations-status-badge-private-mumbai-1");
+      expect(readyAt).toBeLessThan(unknownAt);
+      expect(unknownAt).toBeLessThan(connectingAt);
+    });
+
+    /** A server without super cluster never sends the flag. */
+    it("should be unchanged when the flag is absent", () => {
+      wrapper = mountWithPrivate();
+
+      const badge = wrapper.find(
+        '[data-test="synthetics-check-locations-status-badge-private-pending-1"]',
+      );
+      expect(badge.attributes("data-variant")).toBe("info-outline");
+      expect(wrapper.text()).not.toContain("synthetics.locations.statusUnknown");
+    });
+  });
+
   // ── Agent display ───────────────────────────────────────────────────────
 
   describe("agent display", () => {

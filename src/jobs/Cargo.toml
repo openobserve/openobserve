@@ -18,6 +18,7 @@ enterprise = [
     "enrichment-data/enterprise",
     "openobserve-core/enterprise",
     "openobserve-org-storage/enterprise",
+    "openobserve-synthetics/enterprise",
     "promql-service/enterprise",
     "search_service/enterprise",
     "stream/enterprise",
@@ -45,6 +46,7 @@ openobserve-core.workspace = true
 openobserve-node.workspace = true
 openobserve-builtins.workspace = true
 openobserve-org-storage.workspace = true
+openobserve-synthetics.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
 compaction.workspace = true

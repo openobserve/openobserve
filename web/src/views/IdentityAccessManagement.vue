@@ -107,7 +107,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.syntheticsTokensDesc"),
           icon: "key",
           to: { name: "syntheticsTokens", query: orgQuery.value },
-          visible: isEnt && store.state.zoConfig?.synthetics_enabled !== false,
+          visible: store.state.zoConfig?.synthetics_enabled !== false,
           dataTest: "iam-synthetics-tokens-tab",
         },
         {
