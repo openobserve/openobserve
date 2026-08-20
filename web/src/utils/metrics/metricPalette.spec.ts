@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { BADGE_LABELS, CARD_PALETTE, cardColorForIndex, getBadgeStyle } from "./metricPalette";
+import { BADGE_LABEL_KEYS, CARD_PALETTE, cardColorForIndex, getBadgeStyle } from "./metricPalette";
 
 describe("getBadgeStyle", () => {
   /**
@@ -75,7 +75,7 @@ describe("getBadgeStyle", () => {
 
   it("has a label for every bucket it colours", () => {
     for (const bucket of [...BUCKETS, "other"]) {
-      expect(BADGE_LABELS[bucket]).toBeTruthy();
+      expect(BADGE_LABEL_KEYS[bucket]).toBeTruthy();
     }
   });
 });

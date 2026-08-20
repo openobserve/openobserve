@@ -30,7 +30,10 @@ use arrow::{
 use arrow_schema::Schema;
 use futures::{Stream, StreamExt, TryStreamExt};
 use parquet::{
-    arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata},
+    arrow::{
+        AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata,
+        async_writer::AsyncFileWriter,
+    },
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
@@ -71,14 +74,14 @@ pub fn encode_vortex_file_meta(metadata: &FileMeta) -> Vec<u8> {
     .expect("file meta is always serializable")
 }
 
-pub fn new_parquet_writer<'a>(
-    buf: &'a mut Vec<u8>,
-    schema: &'a Arc<Schema>,
-    bloom_filter_fields: &'a [String],
-    metadata: &'a FileMeta,
+pub fn new_parquet_writer<W: AsyncFileWriter>(
+    buf: W,
+    schema: &Arc<Schema>,
+    bloom_filter_fields: &[String],
+    metadata: &FileMeta,
     write_metadata: bool,
     compression: Option<&str>,
-) -> AsyncArrowWriter<&'a mut Vec<u8>> {
+) -> AsyncArrowWriter<W> {
     let cfg = get_config();
     let compression = compression.unwrap_or(&cfg.common.parquet_compression);
     let mut writer_props = WriterProperties::builder()

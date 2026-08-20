@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -102,7 +102,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/netflow.svg"),
-        label: t("ingestion.netflow"),
+        label: raw("Netflow"),
         contentClass: "tab_content",
       },
     ];

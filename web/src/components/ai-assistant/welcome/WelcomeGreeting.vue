@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useGreeting } from "./useGreeting";
 import { getImageURL } from "@/utils/zincutils";
 import { useTheme } from "@/composables/useTheme";
@@ -58,7 +58,7 @@ const logoSrc = computed(() =>
     >
       {{ t("aiAssistant.welcome.taglineLead") }}
       <span
-        class="welcome-hero__highlight bg-[image:var(--color-gradient-brand-ribbon)] [background-clip:text] font-semibold text-transparent [-webkit-background-clip:text]"
+        class="welcome-hero__highlight bg-gradient-brand-ribbon [background-clip:text] font-semibold text-transparent [-webkit-background-clip:text]"
         >{{ t("aiAssistant.welcome.taglineHighlight") }}</span
       >{{ t("aiAssistant.welcome.taglineTail") }}
       <span
@@ -72,14 +72,14 @@ const logoSrc = computed(() =>
       {{ t("common.and") }}
       <span
         class="welcome-hero__code welcome-hero__code--promql rounded-default text-lang-promql-text bg-lang-promql-bg px-1.5 py-px font-mono text-xs font-semibold tracking-[0.01em]"
-        >{{ t("aiAssistant.welcome.taglinePromql") }}</span
+        >{{ raw("PromQL") }}</span
       >
       {{ t("aiAssistant.welcome.taglineDash") }} {{ t("aiAssistant.welcome.taglineAnd") }}
     </div>
 
     <div
       v-if="email"
-      class="welcome-hero__meta text-2xs mt-1.5 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 rounded-full bg-[color-mix(in_srgb,var(--color-border-default)_30%,transparent)] px-3 py-1.5"
+      class="welcome-hero__meta text-2xs bg-border-default/30 mt-1.5 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 rounded-full px-3 py-1.5"
     >
       <span class="welcome-hero__meta-item inline-flex items-center gap-1">
         <span class="welcome-hero__meta-label text-typography-meta">{{

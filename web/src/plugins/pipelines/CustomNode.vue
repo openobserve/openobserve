@@ -21,7 +21,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
+import { defaultDestinationNodeWarningKey } from "@/utils/pipelines/constants";
 import { getTruncatedConditions as getTruncatedConditionsUtil } from "@/utils/conditionPreview";
 import { formatNodeErrorText } from "@/utils/pipelines/nodeErrors";
 
@@ -304,26 +304,28 @@ const getTruncatedConditions = (conditionData: unknown) =>
 
 const confirmDialogMeta = ref({
   show: false,
-  title: "",
-  message: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
   data: null,
-  warningMessage: "",
+  warningMessage: raw(""),
   onConfirm: () => {},
 });
 
 const openCancelDialog = (id: string) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("common.delete");
-  confirmDialogMeta.value.message = "Are you sure you want to delete node?";
+  confirmDialogMeta.value.message = t("pipeline.confirmDeleteNode");
   //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if (
     Object.prototype.hasOwnProperty.call(props.data ?? {}, "node_type") &&
     props.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(id)
   ) {
-    confirmDialogMeta.value.warningMessage = defaultDestinationNodeWarningMessage;
+    confirmDialogMeta.value.warningMessage = t(defaultDestinationNodeWarningKey);
   } else {
-    confirmDialogMeta.value.warningMessage = "";
+    // raw("") clears the field back to the empty placeholder.
+    confirmDialogMeta.value.warningMessage = raw("");
   }
   confirmDialogMeta.value.onConfirm = () => {
     deletePipelineNode(id);
@@ -332,8 +334,9 @@ const openCancelDialog = (id: string) => {
 
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
-  confirmDialogMeta.value.title = "";
-  confirmDialogMeta.value.message = "";
+  // raw("") clears the fields back to the empty placeholder.
+  confirmDialogMeta.value.title = raw("");
+  confirmDialogMeta.value.message = raw("");
   confirmDialogMeta.value.onConfirm = () => {};
 };
 
@@ -434,14 +437,14 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <div
           v-if="data.node_type == 'function' && hasNodeError"
           data-test="pipeline-node-error-badge"
-          class="bg-status-negative error-badge absolute -top-3 -right-3 z-15 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200"
+          class="bg-status-negative error-badge shadow-status-negative/50 absolute -top-3 -right-3 z-15 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-sm transition-all duration-200"
           @click.stop="navigateToFunction(data.name)"
         >
           <OIcon name="error" size="sm" />
           <span
             data-test="pipeline-node-error-count"
             v-if="nodeErrorCount"
-            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-xs"
           >
             {{ nodeErrorCount }}
           </span>
@@ -517,7 +520,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
   border-radius: 50% !important;
   background: var(--color-grey-500);
-  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
+  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-black) 15%, transparent);
   transition: all 0.3s ease;
 }
 

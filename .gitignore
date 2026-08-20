@@ -106,3 +106,11 @@ node_modules/
 /form-advanced.png
 src/*/data/
 .vscode/settings.json
+
+# Runtime SQLite artifacts. A local run started inside a crate directory writes
+# these into that crate's data dir, which `src/*/data/` does not match once the
+# crate is nested (e.g. src/api/common/data/). Ignoring by extension is precise:
+# no SQLite file in this repo is source.
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

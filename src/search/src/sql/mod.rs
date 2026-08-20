@@ -182,7 +182,10 @@ impl Sql {
         }
         let need_sort_by_time = order_by.len() == 1
             && order_by[0].0 == TIMESTAMP_COL_NAME
-            && order_by[0].1 == OrderBy::Desc;
+            && order_by[0].1 == OrderBy::Desc
+            && !total_schemas.iter().any(|(stream, _)| {
+                matches!(stream.get_stream_type(stream_type), StreamType::Metrics)
+            });
 
         // check if need exact limit and offset
         if (limit == -1 || limit == 0)

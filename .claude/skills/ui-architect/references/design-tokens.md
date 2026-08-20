@@ -38,20 +38,30 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   > **Retired aliases** (CI-banned, `retiredTextAlias`): `text-text-primary` →
   > `text-text-heading`, `text-text-caption` → `text-text-secondary`. The text
   > hierarchy is heading / body / secondary / label / muted.
-- **Arbitrary `[var(--color-x)]` in a class is acceptable in only two cases:**
-  1. the token has **no registered utility** — a var-only token defined in a plain
-     `:root {}` and *not* re-declared in an `@theme inline` block (most domain /
-     data-viz tokens: `bg-[var(--color-card-glass-bg)]`,
-     `text-[var(--color-span-kind-client-text)]`); or
-  2. you need a **load-bearing fallback** —
-     `border-[var(--color-dialog-header-border,var(--color-border-default))]`, where
-     the first token is defined in only one theme so the fallback actually renders.
+- **Arbitrary `[var(--color-x)]` in a class now FAILS CI** (`rawVarInTemplate`,
+  zero tolerance) — including the v4 shorthand `bg-(--color-x)` and the fallback
+  form `bg-[var(--color-x,#fff)]`. "The token has no registered utility" is no
+  longer an escape: **register it** in `@theme inline` and use `bg-x`.
 
-  Otherwise, use the utility. (If you find yourself reaching for an arbitrary value
-  for a token that *should* be a first-class utility, register it in `@theme inline`
-  — see below — rather than scattering `[var(--color-x)]`.)
+  Two other shapes are banned for the same reason, because each is provably
+  replaceable:
+
+  | banned | write instead |
+  |---|---|
+  | `bg-[var(--color-x)]` · `bg-(--color-x)` | `bg-x` |
+  | `bg-[color-mix(in_srgb,var(--color-x)_12%,transparent)]` | `bg-x/12` — byte-identical |
+  | `bg-[color-mix(in_srgb,var(--color-x)_12%,var(--color-y))]` | name the blend as a token, then `bg-<name>` |
+
+  A mix with `transparent` is only an alpha change, which is exactly what Tailwind's
+  `/N` modifier emits. A **2-colour blend** is a genuinely new opaque colour no
+  utility can express — that one belongs in the token layer.
+
+  Everything else inside an arbitrary value is exempt because it has no utility
+  form at all: a gradient stop, a mask stop, a drop-shadow colour, a `calc()`
+  percentage, or a mix whose input is `currentColor` or a runtime-set custom
+  property.
 - **Raw `var(--color-*)` in a `.vue` file is a counted bypass** (`rawVarInComponent`,
-  a ratcheted CI category). It is allowed **only** in the sanctioned residue where no
+  zero tolerance). It is allowed **only** in the sanctioned residue where no
   utility can reach: inside `:deep()`, `@keyframes`, `color-mix()`, `calc()`, SVG
   `fill`/`stroke`, and `v-html`/JS-generated markup (e.g. an ECharts tooltip string).
   Everywhere else use the utility; if the utility doesn't exist, **register the token**
@@ -68,7 +78,7 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   a value that already has one — an alias is a decision made twice that splits adoption
   and can't be seen in review.
 - **British `grey-*`, not `gray-*`** — `grey-*`/`primary-*` are our project ramps; using
-  them raw in feature code is a ratcheted bypass (`rawProjectRamp`) — prefer a semantic
+  them raw in feature code is a zero-tolerance bypass (`rawProjectRamp`) — prefer a semantic
   token (`text-text-secondary`, `bg-accent`). `gray-*` is Tailwind's un-themed default and
   is banned (`rawPalette`).
 
@@ -93,12 +103,11 @@ for one value and were deleted (`sm`/`md` → `default`, `lg`/`xl` → `surface`
 
 None of the above is advisory. Every PR runs, as **required** gating steps:
 
-- `lint:design:strict` — the design-consistency ratchet in **strict** mode. It counts
-  every bypass category (hardcoded hex/px, `arbRadius`, `bareRounded`, `retiredTextAlias`,
+- `lint:design:strict` — the design-consistency guard. It counts every bypass category
+  (hardcoded hex/px, `arbRadius`, `arbShadow`, `bareRounded`, `retiredTextAlias`,
   `retiredRadiusAlias`, `rawPalette`, `rawProjectRamp`, `rawVarInComponent`,
-  un-justified `<style>`, …). Zero-tolerance categories fail on the **first** occurrence;
-  ratcheted categories can **only shrink** — and strict mode leaves **no headroom**, so a
-  new raw token fails even in a file that still carries old debt. You cannot "use up" slack.
+  `rawVarInTemplate`, un-justified `<style>`, …). **Tolerance is zero for all of them** —
+  a single occurrence fails. There is no ratchet and no slack to use up.
 - `lint:tokens` — every `var(--x)` must resolve to a defined token (no silent voids),
   and **any** `--o2-*` used as a CSS custom property fails, fallback or not.
 - `lint:token-purity` — the token files stay pure (no class defs leaking in).
@@ -109,7 +118,7 @@ None of the above is advisory. Every PR runs, as **required** gating steps:
   same thing in class arbitrary values), all at **error** severity.
 
 If a rule blocks you, fix the cause (use the utility, register the token, pick the tier) —
-raising the baseline is not the move.
+adding an exemption is not the move.
 
 **The counters scan raw text — comments included.** A `16px` / `#fff` /
 `var(--color-*)` mentioned in a `<style>`-block comment, or a banned class pattern
@@ -118,18 +127,27 @@ template/JS comment, counts as debt exactly like real code and can fail
 `lint:design:strict`. Describe values in comments in `rem` or plain words instead
 of quoting the banned form.
 
-**The ratchet cuts both ways — improving also needs a baseline update.** In
-`--strict` mode the baseline must *equal* reality, so a PR that *reduces* debt
-(migrates a `var()`, deletes a debt-carrying file or `<style>` block) fails CI with
-"baseline is STALE". That failure is expected and good — lock the win in:
+**There is no baseline any more.** `scripts/design-debt-baseline.json` was deleted
+once the last debt-carrying category reached zero — a baseline is a standing hazard,
+since every non-zero entry is headroom a future bypass can refill silently. So there
+is nothing to regenerate: `--baseline` no longer exists, and `--strict` is accepted
+but ignored (`lint:design:strict` and `lint:design` do the same thing). To see what
+is failing:
 
 ```bash
-cd web && node scripts/check-design-consistency.mjs --baseline
-# commit the tightened scripts/design-debt-baseline.json with your change
+cd web && node scripts/check-design-consistency.mjs --list
 ```
 
-Never hand-edit the baseline, and never re-baseline to *absorb a regression* — only
-to record an improvement (CI's regression check fails first if counts went up).
+**What the guard cannot see** — it is not a proof of cleanliness:
+
+- it walks only `.vue` and `.ts`; **standalone `.css` files are never scanned**
+- the arbitrary-property form `[background:color-mix(…)]` has no utility prefix, so
+  no category matches it
+- a `var()` fallback (`var(--color-accent,#3F7994)`) hides the read from the
+  `color-mix` rules *and* the hex rule
+
+A clean run means "no bypasses of the kinds it looks for, in the two file types it
+walks" — review still matters.
 
 ## The token files
 

@@ -76,7 +76,8 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   rowKey: "id",
   rowHeight: undefined,
   showGlobalFilter: true,
-  globalFilterPlaceholder: "Search...",
+  // no default here: a literal would ship untranslated. Resolved at render below.
+  globalFilterPlaceholder: undefined,
   filterMode: "client",
   defaultColumns: true,
   footerTitle: raw(""),
@@ -560,8 +561,7 @@ function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any>
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the sticky total-column separator shadow would bloom if it scaled with text
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 }
 
@@ -588,6 +588,10 @@ const {
   rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
+  // A delegated scroller can contain a histogram or other content before this
+  // table. Keep its raw offset stable when wrapped rows are remeasured so a
+  // query refresh cannot move the owning page's scrollbar.
+  preserveScrollOffsetOnRowResize: () => !!props.scrollEl && useDynamicRowHeight.value,
 });
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
@@ -1087,7 +1091,7 @@ defineExpose({
           <input
             :value="globalFilterLocal"
             type="text"
-            :placeholder="props.globalFilterPlaceholder"
+            :placeholder="props.globalFilterPlaceholder ?? t('common.searchEllipsis')"
             class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 pr-2 pl-7 text-sm outline-none"
             data-test="o2-table-global-filter-input"
             @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
@@ -1392,8 +1396,7 @@ defineExpose({
                         position: 'sticky',
                         right: `${header.column.getAfter?.('right') ?? 0}px`,
                         zIndex: 20,
-                        /* eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text */
-                        boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+                        boxShadow: 'var(--shadow-sticky-right)',
                       }
                     : {}),
                 }"

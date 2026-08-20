@@ -5,6 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+import { gt } from "@/types/i18n";
+
 import http from "./http";
 import { RETENTION_MS } from "@/plugins/traces/versionCompare/constants";
 
@@ -144,7 +146,9 @@ export async function fetchDefaultGenAiAgentMapping(): Promise<GenAiAgentMapping
     credentials: "omit",
   });
   if (!response.ok) {
-    throw new Error(`Failed to fetch defaults (${response.status})`);
+    throw new Error(
+      gt("settings.genAiAgentMapping.defaultsFetchFailed", { status: response.status }),
+    );
   }
 
   return normalizeConfig(await response.json());

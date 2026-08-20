@@ -22,7 +22,11 @@
           v-model="testModelName"
           :label="t('modelPricing.modelNameInput')"
           :help-text="t('modelPricing.modelNameHint')"
-          :placeholder="t('settings.testModelMatchDialog.modelNamePlaceholder')"
+          :placeholder="
+            t('settings.testModelMatchDialog.modelNamePlaceholder', {
+              example: raw('gpt-4-turbo'),
+            })
+          "
           required
           clearable
           autofocus
@@ -246,7 +250,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import modelPricingService from "@/services/model_pricing";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

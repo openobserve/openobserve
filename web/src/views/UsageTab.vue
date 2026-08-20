@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="devices" size="sm" />
                 </span>
                 <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
-                  t("menu.rum")
+                  raw("RUM")
                 }}</span>
                 <OIcon
                   name="chevron-right"
@@ -553,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import orgService from "@/services/organizations";
@@ -748,7 +748,7 @@ const alertsPanelData = computed(() => {
   return {
     chartType: "custom_chart",
     title: {
-      text: "Last 15 minutes",
+      text: t("billing.last15Minutes"),
       left: "65%",
       top: "50%",
       textStyle: {
@@ -770,7 +770,7 @@ const alertsPanelData = computed(() => {
     },
     series: [
       {
-        name: "Alert Status",
+        name: t("billing.alertStatus"),
         type: "pie",
         radius: ["35%", "55%"],
         center: ["35%", "50%"],
@@ -793,12 +793,12 @@ const alertsPanelData = computed(() => {
         data: [
           {
             value: healthyAlerts,
-            name: "Success Alerts",
+            name: t("billing.successAlerts"),
             itemStyle: {},
           },
           {
             value: failedAlerts,
-            name: "Failed Alerts",
+            name: t("billing.failedAlerts"),
             itemStyle: {},
           },
         ],
@@ -834,8 +834,12 @@ const pipelinesPanelData = computed(() => {
     chartType: "custom_chart",
     xAxis: {
       type: "category",
-      data: ["Healthy", "Failed", "Warning"],
-      name: "Last 15 minutes",
+      data: [
+        t("billing.pipelineStatusHealthy"),
+        t("billing.pipelineStatusFailed"),
+        t("billing.pipelineStatusWarning"),
+      ],
+      name: t("billing.last15Minutes"),
       nameLocation: "middle",
       nameGap: 30,
       nameTextStyle: {
@@ -853,7 +857,7 @@ const pipelinesPanelData = computed(() => {
       min: 0,
       max: Math.ceil((healthyPipelines + failedPipelines + warningPipelines) / 3 / 10) * 10 || 10,
       interval: 10,
-      name: "Number of Pipelines",
+      name: t("billing.numberOfPipelines"),
       nameLocation: "middle",
       nameGap: 60,
       nameRotate: 90,

@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon :name="tab.icon" :size="tab.iconSize" class="shrink-0" />
                 </template>
-                {{ t(tab.labelKey) }}
+                {{ "label" in tab ? raw(tab.label) : t(tab.labelKey) }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
-              class="unified-search-group rounded-default mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
+              class="unified-search-group rounded-default dark:bg-surface-base dark:hover:border-theme-accent dark:focus-within:border-theme-accent mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -996,7 +996,9 @@ const TRACE_TAB_DEFS = [
   { value: "waterfall", labelKey: "traces.waterfall", icon: "align-left", iconSize: "sm" },
   { value: "flame-graph", labelKey: "traces.flameGraph", icon: "flame", iconSize: "sm" },
   { value: "map", labelKey: "traces.traceGraph", icon: "account-tree", iconSize: "sm" },
-  { value: "dag", labelKey: "traces.dag", icon: "git-branch", iconSize: "sm" },
+  // `label` overrides `labelKey`: DAG is an acronym, and translating it produced
+  // "DÍA"/"JOUR"/"GIORNO" (day) in shipped locales.
+  { value: "dag", label: "DAG", icon: "git-branch", iconSize: "sm" },
   { value: "thread", labelKey: "traces.thread", icon: "chat", iconSize: "xs" },
 ] as const;
 
@@ -3060,14 +3062,5 @@ export default defineComponent({
 :global(body:has(.trace-details)),
 :global(html:has(.trace-details)) {
   overflow: hidden !important;
-}
-
-.dark .unified-search-group {
-  background-color: var(--color-surface-base);
-}
-
-.dark .unified-search-group:hover,
-.dark .unified-search-group:focus-within {
-  border-color: var(--color-theme-accent);
 }
 </style>

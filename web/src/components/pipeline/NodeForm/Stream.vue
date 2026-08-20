@@ -166,7 +166,7 @@ import usePipelines from "@/composables/usePipelines";
 
 import AddStream from "@/components/logstream/AddStream.vue";
 
-import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
+import { defaultDestinationNodeWarningKey } from "@/utils/pipelines/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeStreamSchema, type StreamForm } from "./Stream.schema";
 
@@ -194,7 +194,7 @@ const store = useStore();
 
 const { addNode, pipelineObj, deletePipelineNode, checkIfDefaultDestinationNode } =
   useDragAndDrop(t);
-const { getUsedStreamsList } = usePipelines();
+const { getUsedStreamsList } = usePipelines(t);
 
 const { getStreams } = useStreams(t);
 
@@ -425,9 +425,10 @@ const getLogStream = async (data: any) => {
 
 const dialog = ref({
   show: false,
-  title: "",
-  message: "",
-  warningMessage: "",
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
+  warningMessage: raw(""),
   okCallback: () => {},
 });
 
@@ -444,9 +445,10 @@ const handleSecondaryClick = () => {
 
 const openCancelDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel changes?";
-  dialog.value.warningMessage = "";
+  dialog.value.title = t("common.discardChanges");
+  dialog.value.message = t("pipeline.cancelChangesConfirm");
+  // raw("") clears the field back to the empty placeholder.
+  dialog.value.warningMessage = raw("");
   dialog.value.okCallback = () => emit("cancel:hideform");
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
@@ -454,17 +456,18 @@ const openCancelDialog = () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream association?";
+  dialog.value.title = t("pipeline.deleteNodeTitle");
+  dialog.value.message = t("pipeline.deleteStreamAssociationConfirm");
   //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if (
     Object.prototype.hasOwnProperty.call(pipelineObj.currentSelectedNodeData?.data, "node_type") &&
     pipelineObj.currentSelectedNodeData?.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(pipelineObj.currentSelectedNodeID)
   ) {
-    dialog.value.warningMessage = defaultDestinationNodeWarningMessage;
+    dialog.value.warningMessage = t(defaultDestinationNodeWarningKey);
   } else {
-    dialog.value.warningMessage = "";
+    // raw("") clears the field back to the empty placeholder.
+    dialog.value.warningMessage = raw("");
   }
   dialog.value.okCallback = deleteNode;
 };

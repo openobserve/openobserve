@@ -18,6 +18,7 @@ import { mount } from "@vue/test-utils";
 
 import i18n from "@/locales";
 import EvidenceEvents from "./EvidenceEvents.vue";
+import EvidenceEventDetail from "./EvidenceEventDetail.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -54,6 +55,19 @@ const mountEvents = (props: Record<string, unknown> = {}) =>
   });
 
 describe("EvidenceEvents", () => {
+  /**
+   * The rail's own class is what insets the first cell past it, so a row with no
+   * rail sits half a rem further left — visible as expand chevrons that do not
+   * line up down the column. Every row reserves the slot; only exceptions fill it.
+   */
+  it("reserves the rail slot on every row, so the expand chevrons line up", () => {
+    const fn = mountEvents().findComponent(OTable).props("getRowStatusColor") as (
+      r: EvidenceEvent,
+    ) => string | undefined;
+    expect(fn(ev({ kind: "response", status: 200 }))).toBe("transparent");
+    expect(fn(ev({ kind: "response", status: 304 }))).toBe("transparent");
+  });
+
   it("renders one row per event", () => {
     const w = mountEvents();
     expect(w.findAll('[data-test="synthetics-evidence-events-row"]')).toHaveLength(2);
@@ -139,27 +153,28 @@ describe("EvidenceEvents", () => {
     expect(fine.props("variant")).toBe(bad.props("variant"));
   });
 
-  it("labels the columns in the panel and stays bare inline", () => {
-    // Seven unlabelled columns are a puzzle in a full table; a header strip on a
-    // five-row card is chrome.
+  it("labels the columns in both the panel and the inline step list", () => {
+    // Seven unlabelled columns are a puzzle either way, now that inline is no
+    // longer a five-row card.
     expect(mountEvents().findComponent(OTable).props("showHeader")).toBe(true);
-    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("showHeader")).toBe(false);
+    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("showHeader")).toBe(true);
   });
 
-  it("lets the panel re-sort, so a chronological default is recoverable", () => {
+  it("lets both surfaces re-sort, so a chronological default is recoverable", () => {
     // Sorting by Type reproduces the old grouped read, in place.
     const table = mountEvents().findComponent(OTable);
     expect(table.props("sorting")).toBe("client");
     const sortable = (table.props("columns") as { id: string; sortable?: boolean }[])
       .filter((c) => c.sortable)
       .map((c) => c.id);
-    expect(sortable).toEqual(["elapsed", "type", "status", "duration"]);
-    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("sorting")).toBe("none");
+    expect(sortable).toEqual(["elapsed", "type", "status", "step", "duration"]);
+    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("sorting")).toBe("client");
   });
 
   it("rails only the rows that deserve one", () => {
-    // A rail on every row of an all-200 bundle is decoration; the point is that
-    // the anomalies are findable at a glance.
+    // A VISIBLE rail on every row of an all-200 bundle is decoration; the point
+    // is that the anomalies are findable at a glance. Benign rows still reserve
+    // the slot (transparent) so the expand chevrons stay in one vertical line.
     const rail = mountEvents().findComponent(OTable).props("getRowStatusColor") as (
       r: EvidenceEvent,
     ) => string | undefined;
@@ -167,13 +182,13 @@ describe("EvidenceEvents", () => {
     expect(rail(ev({ kind: "requestfailed" }))).toContain("error");
     expect(rail(ev({ status: 503 }))).toContain("error");
     expect(rail(ev({ status: 404 }))).toContain("warning");
-    expect(rail(ev({ status: 200 }))).toBeUndefined();
-    expect(rail(ev({ status: 302 }))).toBeUndefined();
+    expect(rail(ev({ status: 200 }))).toBe("transparent");
+    expect(rail(ev({ status: 302 }))).toBe("transparent");
   });
 
-  it("pages a long list in the panel and leaves the step expansion whole", () => {
+  it("pages a long list in both surfaces, panel wider than inline", () => {
     // The bundle arrives as one NDJSON fetch, so there is no page to ask the
-    // backend for — but a group section can hold 136 rows.
+    // backend for — but a group section can hold 136 rows, hence a page.
     const many = Array.from({ length: 25 }, (_, i) => ev({ ts: i }));
     expect(
       mountEvents({ events: many }).findAll('[data-test="synthetics-evidence-events-row"]'),
@@ -182,7 +197,7 @@ describe("EvidenceEvents", () => {
       mountEvents({ events: many, mode: "inline" }).findAll(
         '[data-test="synthetics-evidence-events-row"]',
       ),
-    ).toHaveLength(25);
+    ).toHaveLength(10);
   });
 
   it("offers a filtered empty state that can clear the filter", async () => {
@@ -192,5 +207,166 @@ describe("EvidenceEvents", () => {
     empty.vm.$emit("action", "clear-filters");
     await w.vm.$nextTick();
     expect(w.emitted("clear-filters")).toBeTruthy();
+  });
+
+  it("offers an expand control on every panel row", () => {
+    const w = mountEvents({ mode: "panel" });
+    expect(w.find('[data-test="o2-table-expand-0"]').exists()).toBe(true);
+    expect(w.find('[data-test="o2-table-expand-1"]').exists()).toBe(true);
+  });
+
+  it("offers an expand control on the inline step list too, now the cap is gone", () => {
+    const w = mountEvents({ mode: "inline" });
+    expect(w.find('[data-test="o2-table-expand-cell"]').exists()).toBe(true);
+    expect(w.find('[data-test="o2-table-expand-0"]').exists()).toBe(true);
+  });
+
+  it("renders the detail panel for an expanded row", async () => {
+    const w = mountEvents({ mode: "panel" });
+    await w.find('[data-test="o2-table-expand-0"]').trigger("click");
+    expect(w.findComponent(EvidenceEventDetail).exists()).toBe(true);
+  });
+
+  it("hands the detail panel the row it was expanded from", async () => {
+    const w = mountEvents({ mode: "panel" });
+    await w.find('[data-test="o2-table-expand-0"]').trigger("click");
+    expect(w.findComponent(EvidenceEventDetail).props("event")).toMatchObject({
+      kind: "pageerror",
+      message: "Uncaught TypeError: c.user is undefined",
+    });
+  });
+
+  it("keeps two rows open at once — comparing two events is the point", async () => {
+    const w = mountEvents({ mode: "panel" });
+    await w.find('[data-test="o2-table-expand-0"]').trigger("click");
+    await w.find('[data-test="o2-table-expand-1"]').trigger("click");
+    expect(w.findAllComponents(EvidenceEventDetail)).toHaveLength(2);
+  });
+
+  it("passes wrap through to the table", () => {
+    expect(mountEvents({ wrap: true }).findComponent(OTable).props("wrap")).toBe(true);
+    expect(mountEvents({ wrap: false }).findComponent(OTable).props("wrap")).toBe(false);
+  });
+
+  it("drops its own truncate when wrapping, which OTable's wrap cannot undo", () => {
+    const off = mountEvents({ wrap: false });
+    const on = mountEvents({ wrap: true });
+    const sel = '[data-test="synthetics-evidence-events-message"]';
+    expect(off.find(sel).classes()).toContain("truncate");
+    expect(on.find(sel).classes()).not.toContain("truncate");
+  });
+
+  it("drops the step cell's truncate when wrapping, same as the message cell", () => {
+    const off = mountEvents({ wrap: false });
+    const on = mountEvents({ wrap: true });
+    const sel = '[data-test="synthetics-evidence-events-step"]';
+    expect(off.find(sel).classes()).toContain("truncate");
+    expect(on.find(sel).classes()).not.toContain("truncate");
+  });
+
+  it("right-aligns Took, so durations line up on their digits", () => {
+    const cols = mountEvents().findComponent(OTable).props("columns") as Array<Record<string, any>>;
+    expect(cols.find((c) => c.id === "duration")?.meta?.align).toBe("right");
+  });
+
+  it("actually reorders rows when the Step header is clicked", async () => {
+    // Non-alphabetical to start, so a working sort visibly moves rows rather
+    // than leaving an order that happened to already match.
+    const w = mountEvents({
+      events: [
+        ev({ stepName: "Zebra crossing" }),
+        ev({ stepName: "Apple pay" }),
+        ev({ stepName: "Mango lassi" }),
+      ],
+      mode: "panel",
+    });
+    const stepText = () =>
+      w.findAll('[data-test="synthetics-evidence-events-step"]').map((c) => c.text());
+    expect(stepText()).toEqual(["Zebra crossing", "Apple pay", "Mango lassi"]);
+
+    await w
+      .find('[data-test="o2-table-th-step"] [data-test="o2-table-th-sort-trigger"]')
+      .trigger("click");
+
+    expect(stepText()).toEqual(["Apple pay", "Mango lassi", "Zebra crossing"]);
+  });
+
+  it("actually reorders rows when the Status header is clicked, inline", async () => {
+    // Non-sorted to start, so a working sort visibly moves rows rather than
+    // leaving an order that happened to already match. Inline, because the
+    // only prior behavioural sort test drove a column (Step) inline does not
+    // have — elapsed/type/status/duration had zero behavioural coverage.
+    const w = mountEvents({
+      events: [ev({ status: 500 }), ev({ status: 200 }), ev({ status: 404 })],
+      mode: "inline",
+    });
+    const statusText = () =>
+      w.findAll('[data-test="synthetics-evidence-events-status"]').map((c) => c.text());
+    expect(statusText()).toEqual(["500", "200", "404"]);
+
+    await w
+      .find('[data-test="o2-table-th-status"] [data-test="o2-table-th-sort-trigger"]')
+      .trigger("click");
+
+    // TanStack infers a numeric column as sort-desc-first, unlike the string
+    // Step column above — still a visible reorder of the un-sorted input.
+    expect(statusText()).toEqual(["500", "404", "200"]);
+  });
+
+  it("labels the footer count instead of leaving a bare number", () => {
+    expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("footerTitle")).toBe(
+      "Events",
+    );
+  });
+
+  it("lets the inline step list expand a row to the full record", async () => {
+    const w = mountEvents({ mode: "inline" });
+    expect(w.find('[data-test="o2-table-expand-0"]').exists()).toBe(true);
+    await w.find('[data-test="o2-table-expand-0"]').trigger("click");
+    expect(w.findComponent(EvidenceEventDetail).exists()).toBe(true);
+  });
+
+  it("sorts and pages inline too, now that the list is no longer capped", () => {
+    const t = mountEvents({ mode: "inline" }).findComponent(OTable);
+    expect(t.props("sorting")).toBe("client");
+    expect(t.props("pagination")).toBe("client");
+  });
+
+  it("pages inline at 10 and the run-level panel at 20", () => {
+    expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("pageSize")).toBe(10);
+    expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("pageSize")).toBe(20);
+  });
+
+  it("still keeps the step column out of the inline list, where the step is the context", () => {
+    const ids = (
+      mountEvents({ mode: "inline" }).findComponent(OTable).props("columns") as Array<{
+        id: string;
+      }>
+    ).map((c) => c.id);
+    expect(ids).not.toContain("step");
+    const panelIds = (
+      mountEvents({ mode: "panel" }).findComponent(OTable).props("columns") as Array<{
+        id: string;
+      }>
+    ).map((c) => c.id);
+    expect(panelIds).toContain("step");
+  });
+
+  it("bounds the message column so the table fits until the fixed columns cannot", () => {
+    const cols = mountEvents().findComponent(OTable).props("columns") as Array<Record<string, any>>;
+    const msg = cols.find((c) => c.id === "message");
+    expect(msg?.meta?.autoWidth).toBe(true);
+    expect(msg?.meta?.fillRemaining).toBe(true);
+  });
+
+  it("floors the message column so a narrow card scrolls instead of collapsing it", () => {
+    // A filler with no minSize defaults to OTable's 3rem (useTableCore) and
+    // shrinks to a sliver on the step card, which is narrower than the panel.
+    const cols = mountEvents().findComponent(OTable).props("columns") as Array<Record<string, any>>;
+    expect(cols.find((c) => c.id === "message")?.minSize).toBe(200);
+  });
+
+  it("scrolls horizontally rather than squeezing columns at narrow widths", () => {
+    expect(mountEvents().findComponent(OTable).props("horizontalScroll")).toBe(true);
   });
 });

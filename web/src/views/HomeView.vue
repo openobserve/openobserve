@@ -143,7 +143,7 @@ export default defineComponent({
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
-    const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard();
+    const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard(t);
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
@@ -263,7 +263,7 @@ export default defineComponent({
     watch(activeHomeTab, (val) => {
       if (val.startsWith("dash:")) {
         const org = store.state.selectedOrganization?.identifier;
-        if (org) useHomeDashboard().load(org);
+        if (org) useHomeDashboard(t).load(org);
       }
     });
 
@@ -400,18 +400,12 @@ export default defineComponent({
   background:
     linear-gradient(var(--color-ai-input-bg), var(--color-ai-input-bg)) padding-box,
     var(--color-gradient-brand-ribbon) border-box !important;
-  box-shadow:
-    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 6%, transparent),
-    0 0.5rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 12%, transparent),
-    0 1.125rem 2.75rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
+  box-shadow: var(--shadow-ai-composer) !important;
 }
 
 .dark .home-ai-panel :deep(.unified-input-box) {
+  /* Only the fill flips here — --shadow-ai-composer carries its own dark values. */
   --color-ai-input-bg: var(--color-surface-panel);
-  box-shadow:
-    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 45%, transparent),
-    0 0.5rem 1.375rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
-    0 1.25rem 3rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 45%, transparent) !important;
 }
 
 /* Soft ambient glow behind the input */
@@ -429,19 +423,7 @@ export default defineComponent({
 
 /* Stronger glow + shadow on focus, no harsh ring */
 .home-ai-panel :deep(.unified-input-box:focus-within) {
-  box-shadow:
-    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes the elevation bloom */
-    0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent),
-    0 0.375rem 1rem -0.125rem color-mix(in srgb, var(--color-black) 10%, transparent),
-    0 1rem 2.5rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 32%, transparent) !important;
-}
-
-.dark .home-ai-panel :deep(.unified-input-box:focus-within) {
-  box-shadow:
-    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes the elevation bloom */
-    0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
-    0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
-    0 1.125rem 2.75rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 42%, transparent) !important;
+  box-shadow: var(--shadow-ai-focus) !important;
 }
 
 .home-ai-panel :deep(.unified-input-box:focus-within::before) {

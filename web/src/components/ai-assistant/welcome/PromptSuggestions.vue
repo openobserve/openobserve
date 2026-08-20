@@ -27,7 +27,7 @@ function selectPrompt(id: string) {
         @click="selectPrompt(s.id)"
       >
         <span
-          class="suggestion-chip__icon rounded-default text-typography-meta group-hover:text-ai-accent inline-flex h-5.5 w-5.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-border-default)_40%,transparent)] [transition:background_0.15s_ease,color_0.15s_ease] group-hover:bg-[rgba(123,97,255,0.15)]"
+          class="suggestion-chip__icon rounded-default text-typography-meta group-hover:text-ai-accent bg-border-default/40 inline-flex h-5.5 w-5.5 shrink-0 items-center justify-center [transition:background_0.15s_ease,color_0.15s_ease] group-hover:bg-[rgba(123,97,255,0.15)]"
         >
           <OIcon :name="s.icon" size="sm" />
         </span>

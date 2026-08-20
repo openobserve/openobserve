@@ -29,6 +29,10 @@ import { AlertsPage } from "./alertsPages/alertsPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
+import { SloListPage } from "./sloPages/sloListPage.js";
+import { SloFormPage } from "./sloPages/sloFormPage.js";
+import { SloDetailPage } from "./sloPages/sloDetailPage.js";
+import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -76,6 +80,7 @@ import { SanityPage } from "./generalPages/sanityPage.js";
 import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
 import { ThemePage } from "./generalPages/themePage.js";
+import { DateTimePickerPage } from "./generalPages/dateTimePickerPage.js";
 import { LanguagePage } from "./generalPages/languagePage.js";
 import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.js";
 import { CorrelationDrawerPage } from "./generalPages/correlationDrawerPage.js";
@@ -154,6 +159,12 @@ class PageManager {
     this.alertDetailPage = new AlertDetailPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
 
+    // ===== SLO PAGE OBJECTS =====
+    this.sloListPage = new SloListPage(page);
+    this.sloFormPage = new SloFormPage(page);
+    this.sloDetailPage = new SloDetailPage(page);
+    this.sloAlertsPage = new SloAlertsPage(page);
+
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);
 
@@ -200,6 +211,7 @@ class PageManager {
     this.changeOrgPage = new ChangeOrgPage(page);
     this.enrichmentPage = new EnrichmentPage(page);
     this.themePage = new ThemePage(page);
+    this.dateTimePickerPage = new DateTimePickerPage(page);
     this.languagePage = new LanguagePage(page);
     this.correlationSettingsPage = new CorrelationSettingsPage(page);
     this.correlationDrawerPage = new CorrelationDrawerPage(page);

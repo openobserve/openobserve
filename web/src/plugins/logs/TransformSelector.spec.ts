@@ -23,6 +23,9 @@ import TransformSelector from "./TransformSelector.vue";
 // namespace, and those tests assert on the real rendered copy (incl. `{name}`
 // interpolation). Resolve that migrated namespace from the real en.json messages so
 // those assertions pass, while continuing to echo keys everywhere else.
+// `search.showEditor` is resolved too: it is the sentence frame that replaced the
+// "Show" + type + "Editor" splice, and the point of the test is that the type lands
+// inside the frame rather than being concatenated onto it.
 vi.mock("vue-i18n", async () => {
   const enLocale = (await import("@/locales/languages/en-US.json")).default as Record<string, any>;
   const resolve = (key: string, params?: Record<string, unknown>): string => {
@@ -35,7 +38,9 @@ vi.mock("vue-i18n", async () => {
   return {
     useI18n: () => ({
       t: (key: string, params?: Record<string, unknown>) =>
-        key.startsWith("logs.transformSelector.") ? resolve(key, params) : key,
+        key.startsWith("logs.transformSelector.") || key === "search.showEditor"
+          ? resolve(key, params)
+          : key,
     }),
   };
 });
@@ -361,9 +366,9 @@ describe("TransformSelector", () => {
       mockSearchObj.data.transformType = "function";
       const wrapper = mountComponent();
       const tooltip = wrapper.vm.getTransformLabelTooltip;
-      expect(tooltip).toContain("search.show");
-      expect(tooltip).toContain("search.functionLabel");
-      expect(tooltip).toContain("search.editor");
+      // The type is interpolated INTO the sentence, not concatenated around it —
+      // the inner label still echoes its key because the mock only resolves the frame.
+      expect(tooltip).toBe("Show search.functionLabel Editor");
     });
 
     it("returns show + action label when editor is hidden and type is action", () => {

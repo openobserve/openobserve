@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import type { I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
@@ -11,6 +11,7 @@ import { chartColor } from "@/utils/chartTheme";
 import { CHART_THRESHOLD_COLOR } from "@/utils/dashboard/colorPalette";
 import type { DistributionBucket } from "../composables/useQualityDetailCharts";
 import { withChartFont } from "@/utils/fonts";
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   buckets: DistributionBucket[];
@@ -37,7 +38,7 @@ function buildOption(): echarts.EChartsOption {
 
   const series: echarts.SeriesOption[] = [
     {
-      name: "Count",
+      name: t("onlineEvals.count"),
       type: "bar",
       data: seriesData,
       barCategoryGap: "8%",
@@ -52,15 +53,19 @@ function buildOption(): echarts.EChartsOption {
 
   if (props.threshold) {
     const sign = props.threshold.direction === "gte" ? ">=" : "<=";
+    const thresholdLabel = t("onlineEvals.quality.detail.markLineHealthy", {
+      direction: sign,
+      value: props.threshold.value,
+    });
     series.push({
-      name: `healthy ${sign} ${props.threshold.value}`,
+      name: thresholdLabel,
       type: "line",
       data: [],
       markLine: {
         silent: true,
         symbol: "none",
         label: {
-          formatter: `healthy ${sign} ${props.threshold.value}`,
+          formatter: thresholdLabel,
           color: CHART_THRESHOLD_COLOR,
           fontSize: 10,
           position: "insideEndTop",

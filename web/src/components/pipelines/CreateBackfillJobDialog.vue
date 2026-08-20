@@ -441,7 +441,7 @@ const createBackfillJobRequest = async (value: BackfillForm) => {
   } catch (error: any) {
     console.error("Error creating backfill job:", error);
     errorMessage.value =
-      error?.response?.data?.message || error?.message || "Failed to create backfill job";
+      error?.response?.data?.message || error?.message || t("pipeline.createBackfillJobFailed");
 
     toast({
       variant: "error",

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nText } from "@/types/i18n";
+import { gt, type I18nText } from "@/types/i18n";
 
 import { ref } from "vue";
 import { useStore } from "vuex";
@@ -266,7 +266,7 @@ export function useSessions() {
         e?.response?.data?.message ||
         e?.response?.data?.error ||
         e?.message ||
-        "Failed to fetch sessions";
+        gt("traces.failedToFetchSessions");
       error.value = serverMsg;
       console.error("Sessions fetch error:", e?.response?.data ?? e);
     } finally {
@@ -445,10 +445,10 @@ export function useSessions() {
    * Fetch the message payload for a single turn (one trace). Used by
    * the SessionDetails accordion when a turn row is expanded.
    *
-   * Pulls only the LLM-turn spans for that trace (the ones carrying
-   * `gen_ai.input.messages` / `gen_ai.output.messages`), then picks
-   * the first user message and last assistant message from the
-   * normalised list — same convention used by `ThreadView`.
+   * Fetches every `gen_ai` span of the trace in one query — tool spans
+   * included, so the LLM/tool call badges can be counted client-side rather
+   * than via a second COUNT query — and hands them to `buildTurnDetail`,
+   * the same projection the session-detail turn cards use.
    */
   async function fetchTurnDetail(
     streamName: string,
@@ -489,89 +489,13 @@ export function useSessions() {
       LIMIT 50
     `);
 
-    const LLM_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
-
     const hits = await executeQuery(sql, startTime, endTime);
 
-    let llmCalls = 0;
-    let toolCalls = 0;
-    let otherCalls = 0;
-    const otherOpsSet = new Set<string>();
-    for (const row of hits || []) {
-      const op = String(row.gen_ai_operation_name || "").toLowerCase();
-      if (LLM_OPS.has(op)) llmCalls += 1;
-      else if (op === "execute_tool") toolCalls += 1;
-      else {
-        otherCalls += 1;
-        otherOpsSet.add(op);
-      }
-    }
-    const otherOps = [...otherOpsSet].sort();
-    // Lazy-import the message parser so this composable stays light
-    // when only the list view is in use.
-    const { messagesFromInput, messagesFromOutput, getModel } = await import("../threadView.utils");
-
-    let userMessage: TurnMessage | null = null;
-    let assistantMessage: TurnMessage | null = null;
-    let model: string | null = null;
-
-    // First pass — forward — pick model and the user question for THIS
-    // turn. `gen_ai.input.messages` carries the FULL prompt sent to
-    // the model (system + every prior turn + the current question),
-    // so the *last* user-role entry of the *first* span is the
-    // current turn's question, not turn 1's.
-    for (const span of hits || []) {
-      if (!model) {
-        const m = getModel(span);
-        if (m) model = m;
-      }
-      if (!userMessage) {
-        const inputMsgs = messagesFromInput(span.gen_ai_input_messages);
-        let u: any = null;
-        for (let i = inputMsgs.length - 1; i >= 0; i--) {
-          if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
-            u = inputMsgs[i];
-            break;
-          }
-        }
-        if (u) userMessage = { role: "user", content: u.content };
-      }
-      if (userMessage && model) break;
-    }
-
-    // Second pass — reverse — pick the FINAL assistant reply for this
-    // turn. An agent may make multiple LLM calls (LLM → tool → LLM
-    // → tool → … → final answer). The first chat span's output is
-    // usually an intermediate "I should call tool X" reply; the user
-    // wants the answer at the end, not the planning step. Walking
-    // from the latest span back gives us the final non-empty
-    // assistant message.
-    for (let s = (hits || []).length - 1; s >= 0; s--) {
-      const span = hits[s];
-      const outputMsgs = messagesFromOutput(span.gen_ai_output_messages);
-      let a: any = null;
-      for (let i = outputMsgs.length - 1; i >= 0; i--) {
-        if (outputMsgs[i].role === "assistant" && outputMsgs[i].content) {
-          a = outputMsgs[i];
-          break;
-        }
-      }
-      if (a) {
-        assistantMessage = { role: "assistant", content: a.content };
-        break;
-      }
-    }
-
-    return {
-      traceId,
-      userMessage,
-      assistantMessage,
-      model,
-      llmCalls,
-      toolCalls,
-      otherCalls,
-      otherOps,
-    };
+    // Lazy-import the projection so this composable stays light when only the
+    // list view is in use. Shared with the session-detail turn cards and
+    // ThreadView so all three classify spans identically.
+    const { buildTurnDetail } = await import("../threadView.utils");
+    return buildTurnDetail(traceId, hits || []);
   }
 
   /**

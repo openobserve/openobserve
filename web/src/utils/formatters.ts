@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { gt } from "@/types/i18n";
+
 export const b64EncodeUnicode = (str: string) => {
   try {
     return btoa(
@@ -193,30 +195,23 @@ export const formatTimeWithSuffix = (us: number) => {
 };
 
 export function formatDuration(ms: number) {
-  if (!ms || ms === 0) return "0 sec";
+  if (!ms || ms === 0) return gt("common.secShort", { count: 0 });
   const seconds = (ms / 1000).toFixed(2);
   const minutes = (Number(seconds) / 60).toFixed(2);
   const hours = (Number(minutes) / 60).toFixed(2);
   const days = (Number(hours) / 24).toFixed(2);
 
-  let formatted = `${seconds} sec`;
-
-  if (ms > 86400000) {
-    formatted = `${days} days ${hours} hr`;
-  } else if (ms > 3600000) {
-    formatted = `${hours} hr `;
-  } else if (ms > 60000) {
-    formatted = `${minutes} min`;
-  }
-
-  return formatted.trim();
+  if (ms > 86400000) return gt("common.daysHrShort", { days, hours });
+  if (ms > 3600000) return gt("common.hrShort", { count: hours });
+  if (ms > 60000) return gt("common.minShort", { count: minutes });
+  return gt("common.secShort", { count: seconds });
 }
 
 export const durationFormatter = (durationInSeconds: number): string => {
   let formattedDuration;
 
   if (durationInSeconds < 0) {
-    formattedDuration = "Invalid duration";
+    formattedDuration = gt("common.invalidDuration");
   } else if (durationInSeconds < 60) {
     formattedDuration = `${durationInSeconds}s`;
   } else if (durationInSeconds < 3600) {

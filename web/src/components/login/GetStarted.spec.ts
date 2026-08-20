@@ -4,7 +4,11 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
 import GetStarted from "./GetStarted.vue";
-import { getStartedSchema } from "./GetStarted.schema";
+import { makeGetStartedSchema } from "./GetStarted.schema";
+import { gt } from "@/types/i18n";
+
+// The schema is a t-threaded factory; build it once with the shared translator.
+const getStartedSchema = makeGetStartedSchema(gt);
 
 // Mock billings service
 vi.mock("@/services/billings", () => ({

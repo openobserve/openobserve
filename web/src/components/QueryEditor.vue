@@ -12,7 +12,7 @@
       v-if="isAIMode"
       :data-test="`${dataTestPrefix}-ai-input-bar`"
       :class="[
-        'border-b-card-glass-border z-10 flex h-9 shrink-0 items-center gap-2 border-b bg-[image:var(--color-gradient-ai-faint)] px-2',
+        'border-b-card-glass-border bg-gradient-ai-faint z-10 flex h-9 shrink-0 items-center gap-2 border-b px-2',
         props.hasExpandButton && 'pr-10',
       ]"
     >
@@ -55,7 +55,7 @@
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="text-text-inverse! disabled:bg-surface-subtle! h-7! min-h-7! w-7! min-w-7! bg-[image:var(--color-gradient-ai)]! transition-all! duration-200! enabled:hover:-translate-y-px enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! enabled:active:translate-y-0 disabled:opacity-40!"
+          class="text-text-inverse! disabled:bg-surface-subtle! bg-gradient-ai! enabled:hover:shadow-ai-accent/40! h-7! min-h-7! w-7! min-w-7! transition-all! duration-200! enabled:hover:-translate-y-px enabled:hover:shadow-md enabled:active:translate-y-0 disabled:opacity-40!"
         >
           <OTooltip
             v-if="props.disableAi && props.disableAiReason"
@@ -120,7 +120,7 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="nlpMode = true"
-        class="group text-text-inverse! rounded-default absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! bg-[image:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
+        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img
@@ -256,6 +256,7 @@ const currentAbortController = ref<AbortController | null>(null);
 const { saveToHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
+  t,
 );
 const currentChatId = ref<number | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
@@ -356,7 +357,10 @@ const handleAIGenerate = async () => {
   // Build the prompt based on whether there's an existing query
   let naturalLanguage = "";
   if (currentQuery && currentQuery.trim()) {
-    naturalLanguage = `Modify this ${currentLanguage.value.toUpperCase()} query to ${userInput}:\n\n${currentQuery}`;
+    // Model input, not screen copy — deliberately English.
+    naturalLanguage = raw(
+      `Modify this ${currentLanguage.value.toUpperCase()} query to ${userInput}:\n\n${currentQuery}`,
+    );
   } else {
     naturalLanguage = userInput;
   }
