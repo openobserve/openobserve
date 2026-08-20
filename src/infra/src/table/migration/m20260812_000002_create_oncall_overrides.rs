@@ -56,12 +56,17 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(OncallOverrides::OrgId).string().not_null())
                     .col(ColumnDef::new(OncallOverrides::TeamId).string().not_null())
-                    // Which rotation slot the cover stands over. Nullable, and
-                    // NULL reads as the default slot: a cover has to name one
-                    // for the same reason a rung does, or arranging cover for
-                    // the primary would silently claim the secondary too and
-                    // the ladder would page one engineer twice.
-                    .col(ColumnDef::new(OncallOverrides::Slot).string().null())
+                    // Which rotation the cover stands over. NOT NULL: a cover
+                    // is "stand in for this position", and a position is a
+                    // rotation. It was a nullable `slot` string, where NULL
+                    // meant the default one — which let a cover claim a
+                    // position nothing staffed, the same mistake the derived
+                    // secondary made in a different place.
+                    .col(
+                        ColumnDef::new(OncallOverrides::RotationId)
+                            .string()
+                            .not_null(),
+                    )
                     // The covering user: who actually holds the pager.
                     .col(
                         ColumnDef::new(OncallOverrides::UserEmail)
@@ -149,7 +154,7 @@ enum OncallOverrides {
     Id,
     OrgId,
     TeamId,
-    Slot,
+    RotationId,
     UserEmail,
     CoveringFor,
     StartAt,
@@ -202,7 +207,7 @@ mod tests {
                 "id",
                 "org_id",
                 "reason",
-                "slot",
+                "rotation_id",
                 "start_at",
                 "team_id",
                 "user_email",
@@ -266,8 +271,9 @@ mod tests {
         db.execute(Statement::from_string(
             sea_orm::DbBackend::Sqlite,
             "INSERT INTO oncall_overrides \
-             (id, org_id, team_id, user_email, start_at, end_at, created_by, created_at) \
-             VALUES ('ov_1', 'default', 'team_1', 'sam@o2.ai', 1, 2, 'ana@o2.ai', 1)"
+             (id, org_id, team_id, rotation_id, user_email, start_at, end_at, created_by, \
+              created_at) \
+             VALUES ('ov_1', 'default', 'team_1', 'rot_1', 'sam@o2.ai', 1, 2, 'ana@o2.ai', 1)"
                 .to_owned(),
         ))
         .await

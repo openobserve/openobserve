@@ -273,13 +273,22 @@ mod tests {
         .await
         .expect("an absence must be insertable after the upgrade");
 
-        // The cover slot arrived in the same release, folded into the create
+        // A cover names the rotation it stands over, folded into the create
         // migration because on-call is unreleased. An upgraded database has to
         // hold it too, or half of this work is inert.
+        //
+        // It was a nullable `slot` string until 2026-08-20, where NULL meant
+        // "the default one" — which let a cover claim a position nothing
+        // staffed. NOT NULL now, because a cover over no rotation stands over
+        // nothing.
         let override_columns = columns(&db, "oncall_overrides").await;
         assert!(
-            override_columns.contains(&"slot".to_string()),
+            override_columns.contains(&"rotation_id".to_string()),
             "{override_columns:?}"
+        );
+        assert!(
+            !override_columns.contains(&"slot".to_string()),
+            "the slot column must be gone, not merely unused: {override_columns:?}"
         );
     }
 

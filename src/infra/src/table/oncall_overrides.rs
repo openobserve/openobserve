@@ -60,7 +60,7 @@ fn to_override(m: oncall_overrides::Model) -> ScheduleOverride {
         id: m.id,
         org_id: m.org_id,
         team_id: m.team_id,
-        slot: m.slot,
+        rotation_id: m.rotation_id,
         user_email: m.user_email,
         start_at: m.start_at,
         end_at: m.end_at,
@@ -78,7 +78,7 @@ fn to_override(m: oncall_overrides::Model) -> ScheduleOverride {
 pub async fn create(
     org_id: &str,
     team_id: &str,
-    slot: Option<String>,
+    rotation_id: String,
     user_email: &str,
     start_at: i64,
     end_at: i64,
@@ -91,7 +91,7 @@ pub async fn create(
         id: ider::uuid(),
         org_id: org_id.to_string(),
         team_id: team_id.to_string(),
-        slot,
+        rotation_id,
         user_email: user_email.to_string(),
         start_at,
         end_at,
@@ -104,7 +104,7 @@ pub async fn create(
         id: Set(record.id.clone()),
         org_id: Set(record.org_id.clone()),
         team_id: Set(record.team_id.clone()),
-        slot: Set(record.slot.clone()),
+        rotation_id: Set(record.rotation_id.clone()),
         user_email: Set(record.user_email.clone()),
         covering_for: Set(record.covering_for.clone()),
         start_at: Set(record.start_at),
@@ -192,7 +192,7 @@ pub async fn list_for_resolution(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // Ordered **descending** so that the truncation keeps the covers that win.
     //
-    // Overlapping covers are legal, and `covering_override_in_slot` resolves
+    // Overlapping covers are legal, and `covering_override_for` resolves
     // them by newest `created_at` — so the rows the limit must not drop are the
     // newest ones. Ordering ascending here would have kept the 500 *oldest* and
     // discarded exactly the cover that was going to win, paging the person the
@@ -286,7 +286,7 @@ mod tests {
             id: id.into(),
             org_id: "default".into(),
             team_id: "team_1".into(),
-            slot: None,
+            rotation_id: "rot_primary".into(),
             user_email: "sam@o2.ai".into(),
             covering_for: Some("ana@o2.ai".into()),
             start_at: start,
@@ -343,8 +343,8 @@ mod tests {
             to_override(model("ov_b", 0, 1000, 20)),
         ];
         let reversed: Vec<_> = rows.iter().rev().cloned().collect();
-        assert_eq!(covering_override(&rows, 500).unwrap().id, "ov_b");
-        assert_eq!(covering_override(&reversed, 500).unwrap().id, "ov_b");
+        assert_eq!(covering_override(&rows, "rot_primary", 500).unwrap().id, "ov_b");
+        assert_eq!(covering_override(&reversed, "rot_primary", 500).unwrap().id, "ov_b");
     }
 
     /// Which end `list_for_resolution` must truncate from, pinned as an
@@ -360,14 +360,14 @@ mod tests {
         let all: Vec<_> = (0..5)
             .map(|i| to_override(model(&format!("ov_{i}"), 0, 1000, i as i64 * 10)))
             .collect();
-        let winner = covering_override(&all, 500).unwrap().id.clone();
+        let winner = covering_override(&all, "rot_primary", 500).unwrap().id.clone();
         assert_eq!(winner, "ov_4", "the newest cover wins");
 
         // Truncating from the newest end loses the winner; from the oldest end
         // does not. `list_for_resolution` therefore orders descending.
         let kept_oldest = &all[..2];
         let kept_newest = &all[all.len() - 2..];
-        assert_ne!(covering_override(kept_oldest, 500).unwrap().id, winner);
-        assert_eq!(covering_override(kept_newest, 500).unwrap().id, winner);
+        assert_ne!(covering_override(kept_oldest, "rot_primary", 500).unwrap().id, winner);
+        assert_eq!(covering_override(kept_newest, "rot_primary", 500).unwrap().id, winner);
     }
 }

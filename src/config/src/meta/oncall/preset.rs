@@ -24,7 +24,7 @@
 //! centrally is that the UI, the API and the demo harness generate the *same*
 //! thing rather than three slightly different things.
 //!
-//! Everything here is pure: `(inputs, timezone, anchor) -> Vec<Rotation>`. No
+//! Everything here is pure: `(inputs, timezone, anchor) -> Vec<ShiftRule>`. No
 //! clock is read and nothing is written, which is what lets the no-coverage-gap
 //! property below be a test rather than a hope.
 //!
@@ -51,7 +51,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::rotation::{DEFAULT_SLOT, MICROS_PER_DAY, MICROS_PER_WEEK, Rotation, TimeWindow};
+use super::rotation::{MICROS_PER_DAY, MICROS_PER_WEEK, ShiftRule, TimeWindow};
 
 /// Priority given to every restricted layer a preset generates.
 ///
@@ -438,8 +438,12 @@ impl PresetSpec {
 ///
 /// Pure: the timezone decides where the weekly handover falls on the local
 /// calendar and nothing else, the anchor is passed in rather than read from a
-/// clock, and the result is an ordinary `Vec<Rotation>` that
-/// `PUT /schedule` would have accepted verbatim.
+/// clock, and the result is the `Vec<ShiftRule>` of **one** rotation.
+///
+/// One rotation, deliberately. Every preset shape is a set of rules over a
+/// single position — follow-the-sun is one person on call across three
+/// timezones' working hours, not three people at once. A second *position* is a
+/// second rotation, and that is a decision only the team can make.
 ///
 /// Validation happens here rather than in a separate call the caller could
 /// forget: there is one way in, and it either refuses or returns something the
@@ -449,7 +453,7 @@ pub fn build(
     tz: chrono_tz::Tz,
     anchor_micros: i64,
     handover_micros: i64,
-) -> Result<Vec<Rotation>, PresetError> {
+) -> Result<Vec<ShiftRule>, PresetError> {
     validate(spec, handover_micros)?;
     // Handovers are a wall-clock fact, so the cycle starts at the top of a
     // local week rather than at whatever instant the request happened to
@@ -459,31 +463,21 @@ pub fn build(
     let anchor = week_start(anchor_micros, tz);
 
     let layer = |name: String, members: &[String], priority: i32, restrictions: Vec<TimeWindow>| {
-        Rotation {
+        ShiftRule {
             name,
-            // Every preset shape is a set of layers over one position, so they
-            // all land in the default slot. A second slot is a second pool of
-            // people, which is a decision only the team can make.
-            slot: DEFAULT_SLOT.to_string(),
             members: members.to_vec(),
             shift_micros: handover_micros,
             anchor_micros: anchor,
             priority,
             restrictions,
-            // Presets are layers over one position, so none of them derives a
-            // second slot, and a preset is a deliberate choice rather than a
-            // default the system staffed.
-            secondary_slot: None,
-            source: None,
             starts_at: None,
             ends_at: None,
-            secondary_offset: None,
         }
     };
 
     Ok(match spec {
         PresetSpec::FollowTheSun { groups, catch_all } => {
-            let mut out: Vec<Rotation> = groups
+            let mut out: Vec<ShiftRule> = groups
                 .iter()
                 .map(|g| {
                     layer(
@@ -1195,6 +1189,18 @@ fn minute_input(field: &str, label: &str) -> PresetInput {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A preset builds the rules of ONE rotation, so the tests wrap them in one
+    /// to ask who is on call. Which rule won is what they assert on — that is
+    /// the question a preset answers.
+    fn of(rules: &[ShiftRule]) -> crate::meta::oncall::Rotation {
+        crate::meta::oncall::Rotation {
+            id: "rot_1".to_string(),
+            name: "Primary".to_string(),
+            shift_rules: rules.to_vec(),
+            source: None,
+        }
+    }
     use crate::meta::oncall::rotation::{MICROS_PER_HOUR, resolve_on_call};
 
     /// Monday 2026-01-05 00:00:00 UTC — a Monday, so a week of hours walked
@@ -1278,7 +1284,7 @@ mod tests {
                 let rotations = build(&spec, tz, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
                 for hour in 0..(7 * 24) {
                     let at = MONDAY + hour * MICROS_PER_HOUR;
-                    let slots = resolve_on_call(&rotations, &[], &[], at, tz);
+                    let slots = resolve_on_call(&[of(&rotations)], &[], &[], at, tz);
                     assert!(
                         !slots.is_empty(),
                         "{id} in {tz} left hour {hour} of the week uncovered"
@@ -1307,7 +1313,7 @@ mod tests {
                 for step in 0..(7 * 24 * 4) {
                     let at = monday + step * (MICROS_PER_HOUR / 4);
                     assert!(
-                        !resolve_on_call(&rotations, &[], &[], at, tz).is_empty(),
+                        !resolve_on_call(&[of(&rotations)], &[], &[], at, tz).is_empty(),
                         "{id} left a gap at step {step} of a DST week"
                     );
                 }
@@ -1331,9 +1337,9 @@ mod tests {
                     .timestamp_micros()
             };
             let who = |t| {
-                resolve_on_call(&rotations, &[], &[], t, tz)
+                resolve_on_call(&[of(&rotations)], &[], &[], t, tz)
                     .first()
-                    .map(|s| s.rotation.clone())
+                    .map(|s| s.rule.clone())
                     .unwrap()
             };
             assert_eq!(who(at(8, 59)), "Nights and weekends", "{y}-{m}-{d} 08:59");
@@ -1396,9 +1402,9 @@ mod tests {
             let id = spec.id();
             let rotations = build(&spec, tz, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
             for (hour, expected) in samples {
-                let slots = resolve_on_call(&rotations, &[], &[], MONDAY + hour * MICROS_PER_HOUR, tz);
+                let slots = resolve_on_call(&[of(&rotations)], &[], &[], MONDAY + hour * MICROS_PER_HOUR, tz);
                 assert_eq!(
-                    slots.first().map(|s| s.rotation.as_str()),
+                    slots.first().map(|s| s.rule.as_str()),
                     Some(*expected),
                     "{id} at hour {hour}"
                 );
@@ -1443,7 +1449,7 @@ mod tests {
         let at = |h: i64| MONDAY + h * MICROS_PER_HOUR;
         for (hour, expected) in [(2, "naoto@o2.ai"), (12, "dee@o2.ai"), (20, "kelly@o2.ai")] {
             assert_eq!(
-                resolve_on_call(&rotations, &[], &[], at(hour), chrono_tz::UTC)
+                resolve_on_call(&[of(&rotations)], &[], &[], at(hour), chrono_tz::UTC)
                     .first()
                     .map(|s| s.user_email.as_str()),
                 Some(expected),
@@ -1501,7 +1507,7 @@ mod tests {
                     ],
                     "{id} rotation carries a field the schedule API does not know"
                 );
-                let back: Rotation = serde_json::from_value(json).unwrap();
+                let back: ShiftRule = serde_json::from_value(json).unwrap();
                 assert_eq!(&back, r, "{id}");
             }
         }
@@ -1841,14 +1847,14 @@ mod tests {
         for (hour, expected) in [(0, "Night"), (7, "Day"), (23, "Night")] {
             assert_eq!(
                 resolve_on_call(
-                    &rotations,
+                    &[of(&rotations)],
                     &[],
                     &[],
                     MONDAY + hour * MICROS_PER_HOUR,
                     chrono_tz::UTC
                 )
                 .first()
-                .map(|s| s.rotation.as_str()),
+                .map(|s| s.rule.as_str()),
                 Some(expected),
                 "hour {hour}"
             );
