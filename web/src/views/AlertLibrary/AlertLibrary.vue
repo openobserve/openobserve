@@ -384,7 +384,9 @@ const statItems = computed<StatItem[]>(() => [
     label: t("alert_library.statNeedsData"),
     value: missingCount.value,
     icon: "sensors-off",
-    tone: "neutral",
+    // Same tone as the chip on every card this tile selects — StatTone exists
+    // so one semantic state reads as one colour across the screen.
+    tone: "warning",
     max: packEntries.value.length,
     dataTest: "alert-library-stat-missing",
   },

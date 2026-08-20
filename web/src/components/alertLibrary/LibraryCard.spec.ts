@@ -80,11 +80,43 @@ describe("LibraryCard", () => {
     expect(note.text()).toContain("Not ingested");
     expect(note.text()).toContain("kube_pod_container_status_last_terminated_reason");
     expect(note.attributes("title")).toContain("would never fire");
-    // Inert, not urgent — an unavailable alert is not an error state.
-    expect(note.html()).not.toMatch(/error|warning/);
-    // Dashed border stays as a quiet grouping cue for scanning.
-    const root = wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]');
-    expect(root.classes().join(" ")).toMatch(/border-dashed/);
+  });
+
+  it("carries the warning tone, so the state is legible without comparing cards", () => {
+    // Colour is the signal now. Warning and not error: an alert with no data is
+    // not broken, it is waiting — installing it is a perfectly good thing to do.
+    const note = mountCard({ ready: false }).find('[data-test="alert-library-card-needs-data"]');
+    expect(note.html()).toMatch(/badge-warning/);
+    expect(note.html()).not.toMatch(/badge-error/);
+  });
+
+  it("shapes the note like the query-language chip beside it", () => {
+    // The user asked for the two to read as the same kind of thing — one chip
+    // says what language it speaks, the other says what it is missing — so the
+    // note must not drift into its own bespoke treatment.
+    const wrapper = mountCard({ ready: false });
+    const shapeOf = (test: string) =>
+      wrapper
+        .find(`[data-test="${test}"]`)
+        .classes()
+        .filter((c) => c.startsWith("rounded-") || c.startsWith("px-") || c.startsWith("text-3xs"))
+        .sort();
+    const shape = shapeOf("alert-library-card-needs-data");
+    expect(shape.length).toBeGreaterThan(0); // else the comparison is vacuous
+    expect(shape).toEqual(shapeOf("alert-library-card-query-type"));
+  });
+
+  it("drops the dashed border — it only meant anything next to a solid one", () => {
+    // The border was the original complaint: dashed vs solid is invisible until
+    // you happen to see both, so a pack where every stream is missing looked
+    // arbitrarily different from one where none were. The chip carries it now.
+    const dashed = (ready: boolean) =>
+      mountCard({ ready })
+        .find('[data-test="alert-library-card-k8s/pod-oom-killed"]')
+        .classes()
+        .join(" ");
+    expect(dashed(false)).not.toMatch(/border-dashed/);
+    expect(dashed(false)).toBe(dashed(true));
   });
 
   it("gives the note its own row, so a long stream name is not truncated away", () => {

@@ -7423,7 +7423,7 @@
     "statReady": "Ready to install",
     "statNeedsData": "Not ingested",
     "statAll": "In this pack",
-    "notIngested": "Not ingested:",
+    "notIngested": "Not ingested: {stream}",
     "notIngestedHint": "This organization is not receiving {stream}, so this alert would never fire. Install it anyway and it will start working once the data arrives.",
     "alertCount": "{count} alert | {count} alerts",
     "noCollectorTitle": "Nothing in this pack matches your data yet",

@@ -28,17 +28,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   with no stated relationship to it. The card posed a question ("why is this one
   different?") and answered it nowhere, so the difference read as arbitrary.
 
-  Now one signal carries the meaning: the stream becomes the message, marked
-  with a sensors-off icon, captioned "Not ingested", and given a row of its own
-  so the name survives at card width. The dashed border stays as a quiet
-  grouping cue for scanning; the opacity dim is gone — it faded the description
-  text people need in order to judge the alert, and overstated the state (an
-  unavailable alert can still be read, previewed and installed).
+  Now ONE signal carries the meaning: a warning-toned chip, shaped like the
+  query-language chip beside it, reading "Not ingested: <stream>". It gets a row
+  of its own so the stream name survives at card width. The dashed border and
+  the opacity dim are both gone — the border only ever meant anything by
+  comparison with a solid one, which is precisely what made it unreadable, and
+  the dim faded the description people need in order to judge the alert. Neither
+  is missed now that the card states its condition in words.
+
+  The chip is warning-toned, not error-toned: an alert with no data yet is not
+  broken. It can still be read, previewed and installed, and it starts working
+  when the stream arrives — which is what the tooltip says.
 -->
 <template>
   <article
     class="rounded-surface border-border-default bg-surface-base hover:border-border-strong focus-visible:ring-accent/40 flex h-full cursor-pointer flex-col gap-2 border p-3 outline-none focus-visible:ring-2"
-    :class="ready ? '' : 'border-dashed'"
     role="button"
     tabindex="0"
     :aria-label="t('alert_library.openDetails', { title: entry.title })"
@@ -85,19 +89,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
 
-      <!-- Unavailable: the stream becomes the message, and gets the full card
-           width — stream names run long, and squeezed beside the tag it would
-           truncate to a few characters, naming nothing. -->
-      <span
+      <!-- Unavailable: the same chip shape as the query language, in the warning
+           tone, on a row of its own — stream names run past 40 characters, and
+           squeezed beside the other chip this one would truncate to nothing,
+           naming the very thing it exists to name. -->
+      <OTag
         v-if="!ready"
-        class="text-text-secondary text-2xs flex items-center gap-1"
+        variant="warning-soft"
+        size="xs"
+        icon="sensors-off"
+        class="max-w-full min-w-0 self-start"
         :title="t('alert_library.notIngestedHint', { stream: entry.stream })"
         data-test="alert-library-card-needs-data"
       >
-        <OIcon name="sensors-off" size="xs" class="shrink-0" />
-        <span class="shrink-0">{{ t("alert_library.notIngested") }}</span>
-        <span class="min-w-0 truncate font-mono">{{ entry.stream }}</span>
-      </span>
+        <span class="truncate">{{ t("alert_library.notIngested", { stream: entry.stream }) }}</span>
+      </OTag>
     </div>
   </article>
 </template>
@@ -106,7 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { raw, useI18nTyped } from "@/types/i18n";
 
