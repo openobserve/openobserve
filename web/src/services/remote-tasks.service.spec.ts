@@ -34,7 +34,7 @@ describe("list", () => {
   it("returns the array directly when response.data is an array", async () => {
     mockGet.mockResolvedValue({ data: [{ id: "rt1" }, { id: "rt2" }] });
     const result = await remoteTasksService.list("org-1");
-    expect(mockGet).toHaveBeenCalledWith("/api/org-1/remote_tasks");
+    expect(mockGet).toHaveBeenCalledWith("/api/org-1/tasks");
     expect(result).toEqual([{ id: "rt1" }, { id: "rt2" }]);
   });
 
@@ -54,40 +54,8 @@ describe("versions", () => {
   it("hits the versions endpoint and unwraps the list", async () => {
     mockGet.mockResolvedValue({ data: { list: [{ version: 2 }, { version: 1 }] } });
     const result = await remoteTasksService.versions("org-1", "head-1");
-    expect(mockGet).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1/versions");
+    expect(mockGet).toHaveBeenCalledWith("/api/org-1/tasks/head-1/versions");
     expect(result).toHaveLength(2);
-  });
-});
-
-describe("secrets", () => {
-  it("lists metadata without reading secret material", async () => {
-    mockGet.mockResolvedValue({
-      data: { list: [{ secretRef: "secret-1", purpose: "auth" }] },
-    });
-
-    const result = await remoteTasksService.listSecrets("org-1", "head-1");
-
-    expect(mockGet).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1/secrets");
-    expect(result).toEqual([{ secretRef: "secret-1", purpose: "auth" }]);
-  });
-
-  it("stores material under an existing task head", async () => {
-    mockPost.mockResolvedValue({
-      data: {
-        metadata: { secretRef: "secret-1", purpose: "auth" },
-        material: { type: "token", value: "shown-once" },
-      },
-    });
-
-    await remoteTasksService.createSecret("org-1", "head-1", {
-      purpose: "auth",
-      material: { type: "token", value: "shown-once" },
-    });
-
-    expect(mockPost).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1/secrets", {
-      purpose: "auth",
-      material: { type: "token", value: "shown-once" },
-    });
   });
 });
 
@@ -119,7 +87,7 @@ describe("draft lifecycle", () => {
       ],
       signing: { enabled: true },
     });
-    expect(mockPost).toHaveBeenCalledWith("/api/org-1/remote_tasks", {
+    expect(mockPost).toHaveBeenCalledWith("/api/org-1/tasks", {
       name: "summarizer",
       endpoint: "https://tasks.example.com/run",
       auth: {
@@ -146,7 +114,7 @@ describe("draft lifecycle", () => {
       endpoint: "https://tasks.example.com/run",
     });
     expect(mockPut).toHaveBeenCalledWith(
-      "/api/org-1/remote_tasks/head-1",
+      "/api/org-1/tasks/head-1",
       expect.objectContaining({ name: "summarizer" }),
     );
   });
@@ -154,7 +122,54 @@ describe("draft lifecycle", () => {
   it("discardDraft deletes the draft, not the head", async () => {
     mockDelete.mockResolvedValue({});
     await remoteTasksService.discardDraft("org-1", "head-1");
-    expect(mockDelete).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1/draft");
+    expect(mockDelete).toHaveBeenCalledWith("/api/org-1/tasks/head-1/draft");
+  });
+});
+
+describe("task-owned credential lifecycle", () => {
+  it("never exposes or addresses a secret resource", async () => {
+    mockGet.mockResolvedValue({ data: { keys: [{ purpose: "signing", state: "current" }] } });
+    mockPut.mockResolvedValue({ data: { purpose: "auth", state: "current" } });
+    mockPost.mockResolvedValue({ data: { purpose: "signing", state: "candidate" } });
+    mockDelete.mockResolvedValue({});
+
+    await remoteTasksService.replaceAuth("org-1", "head-1", {
+      type: "token",
+      value: "replacement",
+    });
+    await remoteTasksService.replaceHeaderSecret("org-1", "head-1", "X.API+Key", {
+      type: "token",
+      value: "replacement",
+    });
+    await remoteTasksService.getSigningStatus("org-1", "head-1");
+    await remoteTasksService.rotateSigning("org-1", "head-1");
+    await remoteTasksService.testSigningCandidate("org-1", "head-1", { input: "probe" });
+    await remoteTasksService.activateSigning("org-1", "head-1", 60_000);
+    await remoteTasksService.endSigningGrace("org-1", "head-1");
+    await remoteTasksService.revokeAuth("org-1", "head-1");
+    await remoteTasksService.revokeHeaderSecret("org-1", "head-1", "X.API+Key");
+    await remoteTasksService.revokeSigning("org-1", "head-1");
+
+    expect(mockPut).toHaveBeenNthCalledWith(1, "/api/org-1/tasks/head-1/auth", {
+      material: { type: "token", value: "replacement" },
+    });
+    expect(mockPut).toHaveBeenNthCalledWith(
+      2,
+      "/api/org-1/tasks/head-1/headers/X.API%2BKey/secret",
+      { material: { type: "token", value: "replacement" } },
+    );
+    expect(mockGet).toHaveBeenCalledWith("/api/org-1/tasks/head-1/signing");
+    expect(mockPost.mock.calls.map(([path]) => path)).toEqual([
+      "/api/org-1/tasks/head-1/signing/rotate",
+      "/api/org-1/tasks/head-1/signing/test",
+      "/api/org-1/tasks/head-1/signing/activate",
+      "/api/org-1/tasks/head-1/signing/end_grace",
+    ]);
+    expect(mockDelete.mock.calls.map(([path]) => path)).toEqual([
+      "/api/org-1/tasks/head-1/auth",
+      "/api/org-1/tasks/head-1/headers/X.API%2BKey/secret",
+      "/api/org-1/tasks/head-1/signing",
+    ]);
   });
 });
 
@@ -166,7 +181,7 @@ describe("testConnection — the publish path", () => {
     const result = await remoteTasksService.testConnection("org-1", "head-1", {
       input: "hi",
     });
-    expect(mockPost).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1/test_connection", {
+    expect(mockPost).toHaveBeenCalledWith("/api/org-1/tasks/head-1/test_connection", {
       input: "hi",
     });
     expect(result.published).toBe(true);
@@ -203,7 +218,7 @@ describe("testRun — volatile bench", () => {
       { input: "a" },
       { input: "b" },
     ]);
-    expect(mockPost).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1/test_run", {
+    expect(mockPost).toHaveBeenCalledWith("/api/org-1/tasks/head-1/test_run", {
       samples: [{ input: "a" }, { input: "b" }],
     });
     expect(rows).toHaveLength(2);
@@ -220,6 +235,6 @@ describe("delete", () => {
   it("deletes the head", async () => {
     mockDelete.mockResolvedValue({});
     await remoteTasksService.delete("org-1", "head-1");
-    expect(mockDelete).toHaveBeenCalledWith("/api/org-1/remote_tasks/head-1");
+    expect(mockDelete).toHaveBeenCalledWith("/api/org-1/tasks/head-1");
   });
 });

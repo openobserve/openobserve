@@ -559,14 +559,16 @@ pub struct ApiDoc;
     openobserve_api_management::request::remote_tasks::publish_remote_task,
     openobserve_api_management::request::remote_tasks::delete_remote_task,
     openobserve_api_management::request::remote_tasks::test_run_remote_task,
-    openobserve_api_management::request::remote_tasks::list_remote_task_secrets,
-    openobserve_api_management::request::remote_tasks::create_remote_task_secret,
     openobserve_api_management::request::remote_tasks::replace_remote_task_auth_secret,
-    openobserve_api_management::request::remote_tasks::revoke_remote_task_secret,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_auth_secret,
+    openobserve_api_management::request::remote_tasks::replace_remote_task_header_secret,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_header_secret,
+    openobserve_api_management::request::remote_tasks::get_remote_task_signing_status,
     openobserve_api_management::request::remote_tasks::rotate_remote_task_signing_secret,
     openobserve_api_management::request::remote_tasks::test_remote_task_signing_candidate,
     openobserve_api_management::request::remote_tasks::activate_remote_task_signing_candidate,
     openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
 ))]
 struct EnterpriseExperimentApiDoc;
 

@@ -109,14 +109,11 @@ export interface RemoteTaskPayload {
   fromVersion?: number;
 }
 
-export type RemoteTaskSecretPurpose = "auth" | "signing";
-
 export type RemoteTaskSecretMaterial =
   { type: "token"; value: string } | { type: "basic"; username: string; password: string };
 
-export interface RemoteTaskSecretMetadata {
-  secretRef: string;
-  purpose: RemoteTaskSecretPurpose;
+export interface RemoteTaskCredentialMetadata {
+  purpose: "auth" | "signing";
   keyId?: string | null;
   state: string;
   lastVerifiedAt?: number | null;
@@ -125,16 +122,14 @@ export interface RemoteTaskSecretMetadata {
   updatedAt: number;
 }
 
-export interface RemoteTaskSecretWrite {
-  metadata: RemoteTaskSecretMetadata;
-  /** Returned exactly once for create and rotate operations. */
+export interface RemoteTaskCredentialWrite {
+  metadata: RemoteTaskCredentialMetadata;
+  /** Returned exactly once for a generated signing candidate. */
   material: RemoteTaskSecretMaterial;
 }
 
-export interface CreateRemoteTaskSecretPayload {
-  purpose: RemoteTaskSecretPurpose;
-  material?: RemoteTaskSecretMaterial;
-  keyId?: string;
+export interface RemoteTaskSigningStatus {
+  keys: RemoteTaskCredentialMetadata[];
 }
 
 export type CreateRemoteTaskAuthPayload =
@@ -231,45 +226,101 @@ const unwrapList = <T>(response: any, key = "list"): T[] => {
 
 const remoteTasksService = {
   list: async (orgId: string): Promise<RemoteTask[]> =>
-    unwrapList<RemoteTask>(await http().get(`/api/${orgId}/remote_tasks`)),
+    unwrapList<RemoteTask>(await http().get(`/api/${orgId}/tasks`)),
 
   get: async (orgId: string, entityId: string): Promise<RemoteTask> =>
-    (await http().get(`/api/${orgId}/remote_tasks/${entityId}`)).data,
+    (await http().get(`/api/${orgId}/tasks/${entityId}`)).data,
 
   versions: async (orgId: string, entityId: string): Promise<RemoteTask[]> =>
-    unwrapList<RemoteTask>(await http().get(`/api/${orgId}/remote_tasks/${entityId}/versions`)),
+    unwrapList<RemoteTask>(await http().get(`/api/${orgId}/tasks/${entityId}/versions`)),
 
   create: async (
     orgId: string,
     payload: CreateRemoteTaskPayload,
-  ): Promise<CreateRemoteTaskResult> =>
-    (await http().post(`/api/${orgId}/remote_tasks`, payload)).data,
+  ): Promise<CreateRemoteTaskResult> => (await http().post(`/api/${orgId}/tasks`, payload)).data,
 
-  listSecrets: async (orgId: string, entityId: string): Promise<RemoteTaskSecretMetadata[]> =>
-    unwrapList<RemoteTaskSecretMetadata>(
-      await http().get(`/api/${orgId}/remote_tasks/${entityId}/secrets`),
-    ),
-
-  createSecret: async (
+  replaceAuth: async (
     orgId: string,
     entityId: string,
-    payload: CreateRemoteTaskSecretPayload,
-  ): Promise<RemoteTaskSecretWrite> =>
-    (await http().post(`/api/${orgId}/remote_tasks/${entityId}/secrets`, payload)).data,
+    material: RemoteTaskSecretMaterial,
+  ): Promise<RemoteTaskCredentialMetadata> =>
+    (await http().put(`/api/${orgId}/tasks/${entityId}/auth`, { material })).data,
+
+  revokeAuth: async (orgId: string, entityId: string): Promise<void> => {
+    await http().delete(`/api/${orgId}/tasks/${entityId}/auth`);
+  },
+
+  replaceHeaderSecret: async (
+    orgId: string,
+    entityId: string,
+    headerName: string,
+    material: RemoteTaskSecretMaterial,
+  ): Promise<RemoteTaskCredentialMetadata> =>
+    (
+      await http().put(
+        `/api/${orgId}/tasks/${entityId}/headers/${encodeURIComponent(headerName)}/secret`,
+        { material },
+      )
+    ).data,
+
+  revokeHeaderSecret: async (
+    orgId: string,
+    entityId: string,
+    headerName: string,
+  ): Promise<void> => {
+    await http().delete(
+      `/api/${orgId}/tasks/${entityId}/headers/${encodeURIComponent(headerName)}/secret`,
+    );
+  },
+
+  getSigningStatus: async (orgId: string, entityId: string): Promise<RemoteTaskSigningStatus> =>
+    (await http().get(`/api/${orgId}/tasks/${entityId}/signing`)).data,
+
+  rotateSigning: async (
+    orgId: string,
+    entityId: string,
+    payload: { material?: RemoteTaskSecretMaterial; keyId?: string } = {},
+  ): Promise<RemoteTaskCredentialWrite> =>
+    (await http().post(`/api/${orgId}/tasks/${entityId}/signing/rotate`, payload)).data,
+
+  testSigningCandidate: async (
+    orgId: string,
+    entityId: string,
+    payload: RemoteTaskTestConnectionPayload = {},
+  ): Promise<{ verified: boolean; error?: string; report: RemoteTaskVerificationReport }> =>
+    (await http().post(`/api/${orgId}/tasks/${entityId}/signing/test`, payload)).data,
+
+  activateSigning: async (
+    orgId: string,
+    entityId: string,
+    gracePeriodMs: number,
+  ): Promise<RemoteTaskCredentialMetadata> =>
+    (
+      await http().post(`/api/${orgId}/tasks/${entityId}/signing/activate`, {
+        gracePeriodMs,
+      })
+    ).data,
+
+  endSigningGrace: async (orgId: string, entityId: string): Promise<void> => {
+    await http().post(`/api/${orgId}/tasks/${entityId}/signing/end_grace`);
+  },
+
+  revokeSigning: async (orgId: string, entityId: string): Promise<void> => {
+    await http().delete(`/api/${orgId}/tasks/${entityId}/signing`);
+  },
 
   /** Save the head's single draft. Published versions are untouched. */
   saveDraft: async (
     orgId: string,
     entityId: string,
     payload: RemoteTaskPayload,
-  ): Promise<RemoteTask> =>
-    (await http().put(`/api/${orgId}/remote_tasks/${entityId}`, payload)).data,
+  ): Promise<RemoteTask> => (await http().put(`/api/${orgId}/tasks/${entityId}`, payload)).data,
 
   getDraft: async (orgId: string, entityId: string): Promise<RemoteTask> =>
-    (await http().get(`/api/${orgId}/remote_tasks/${entityId}/draft`)).data,
+    (await http().get(`/api/${orgId}/tasks/${entityId}/draft`)).data,
 
   discardDraft: async (orgId: string, entityId: string): Promise<void> => {
-    await http().delete(`/api/${orgId}/remote_tasks/${entityId}/draft`);
+    await http().delete(`/api/${orgId}/tasks/${entityId}/draft`);
   },
 
   /** Test connection, and publish on success. The only way a version is minted. */
@@ -278,7 +329,7 @@ const remoteTasksService = {
     entityId: string,
     payload: RemoteTaskTestConnectionPayload = {},
   ): Promise<RemoteTaskPublishResult> =>
-    (await http().post(`/api/${orgId}/remote_tasks/${entityId}/test_connection`, payload)).data,
+    (await http().post(`/api/${orgId}/tasks/${entityId}/test_connection`, payload)).data,
 
   /** Volatile test-run bench. Returns the per-row exchange and nothing durable. */
   testRun: async (
@@ -286,14 +337,14 @@ const remoteTasksService = {
     entityId: string,
     samples: RemoteTaskTestRunSample[],
   ): Promise<RemoteTaskTestRunRow[]> => {
-    const response = await http().post(`/api/${orgId}/remote_tasks/${entityId}/test_run`, {
+    const response = await http().post(`/api/${orgId}/tasks/${entityId}/test_run`, {
       samples,
     });
     return response?.data?.results ?? [];
   },
 
   delete: async (orgId: string, entityId: string): Promise<void> => {
-    await http().delete(`/api/${orgId}/remote_tasks/${entityId}`);
+    await http().delete(`/api/${orgId}/tasks/${entityId}`);
   },
 };
 
