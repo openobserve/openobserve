@@ -1204,7 +1204,6 @@ const MSSQL_EVENTS_RECEIVER = `  sqlserver/dbm_events:
       db.server.query_sample: { enabled: true }
       db.server.top_query: { enabled: true }`;
 
-
 /** Assemble the full DBM config for an engine. */
 interface DbmRecipeSet {
   receivers: string[];

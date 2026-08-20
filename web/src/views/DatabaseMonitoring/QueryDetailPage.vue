@@ -861,8 +861,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else-if="plan.rawPlan"
                     class="text-text-secondary max-h-96 overflow-auto p-2 font-mono text-xs whitespace-pre-wrap"
                     :data-test="`dbm-detail-plan-raw-${plan.rowKey}`"
-                    >{{ plan.rawPlan }}</pre
-                  >
+                    >{{ plan.rawPlan }}</pre>
                   <p v-else class="text-text-muted p-2 text-xs">
                     {{ t("dbm.detail.plans.noTree") }}
                   </p>

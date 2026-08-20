@@ -506,7 +506,10 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
         xact_start: first_str(rec, &["postgresql_blocking_transaction_start_time"]),
         wait_start: first_str(
             rec,
-            &["postgresql_blocking_start_time", "sqlserver_blocking_start_time"],
+            &[
+                "postgresql_blocking_start_time",
+                "sqlserver_blocking_start_time",
+            ],
         ),
         exec_time_ms,
         // The SHARED wait columns (D-D): one wait-event view reads across
@@ -520,7 +523,11 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
         ),
         wait_event: first_str(
             rec,
-            &["postgresql_wait_event", "mysql_wait_type", "sqlserver_wait_type"],
+            &[
+                "postgresql_wait_event",
+                "mysql_wait_type",
+                "sqlserver_wait_type",
+            ],
         ),
         // `0` is the COALESCE sentinel, not a measured wait — the numeric twin
         // of the `{}` trap above. It is present on all 5495 unblocked rows, so
@@ -578,7 +585,10 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
         // is what the lock columns exist to name.
         lock_relation: first_str(
             rec,
-            &["postgresql_blocking_lock_relation", "sqlserver_wait_resource"],
+            &[
+                "postgresql_blocking_lock_relation",
+                "sqlserver_wait_resource",
+            ],
         ),
         // Postgres ships the peer address under the OTel network.* convention;
         // MySQL under client.*. There is no `client_addr` attribute on either.

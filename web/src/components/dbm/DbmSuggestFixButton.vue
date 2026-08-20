@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="aiEnabled"
     variant="ghost"
     :size="size"
-    class="group text-ai-accent! shrink-0 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+    class="group text-ai-accent! hover:shadow-glow-md hover:shadow-ai-accent/35 dark:shadow-glow-md dark:shadow-ai-accent/20 dark:hover:shadow-glow-md dark:hover:shadow-ai-accent/35 shrink-0 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:[background:var(--color-gradient-ai)]! dark:text-white!"
     :data-test="dataTest"
     @click.stop="emit('click')"
   >

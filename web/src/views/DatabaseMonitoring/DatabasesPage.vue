@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :persist-columns="true"
         table-id="dbm-databases"
         :enable-column-resize="true"
-        :row-class="rowClass"
+        :get-row-style="rowStyle"
         tree
         :get-row-warning="hasShortfall"
         v-model:expanded-ids="expandedIds"
@@ -1409,11 +1409,14 @@ const p95Tone = (row: TableRow): string => {
  * Child rows carry none — the rail states a verdict about a database, and
  * repeating it down the split would count one problem several times.
  */
-const rowClass = (row: TableRow) => {
-  if (isBreakdownRow(row)) return "";
-  if (row.critical) return "shadow-[inset_0.1875rem_0_0_var(--color-status-error-text)]";
-  if (row.drowning) return "shadow-[inset_0.1875rem_0_0_var(--color-status-warning-text)]";
-  return "";
+const rowStyle = (row: TableRow) => {
+  if (isBreakdownRow(row)) return {};
+  const color = row.critical
+    ? "var(--color-status-error-text)"
+    : row.drowning
+      ? "var(--color-status-warning-text)"
+      : "";
+  return color ? { boxShadow: `var(--shadow-rail-thin-geom) ${color}` } : {};
 };
 
 const rowActions = computed<DbmRowAction[]>(() => [

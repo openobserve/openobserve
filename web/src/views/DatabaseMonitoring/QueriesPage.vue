@@ -175,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         table-id="dbm-queries"
         :enable-column-resize="true"
         :row-class="rowClass"
+        :get-row-style="rowStyle"
         data-test="dbm-queries-table"
         @update:sort-by="onSortChange"
         @row-click="onRowClick"
@@ -1832,9 +1833,27 @@ const rowClass = (row: QueryRow) => {
   // rows and the remainder, rather than as another query.
   if (row.isFold) return "!bg-surface-panel";
   if (row.isOther) return "!bg-surface-panel";
-  if (row.critical) return "shadow-[inset_0.1875rem_0_0_var(--color-status-error-text)]";
-  if (row.flagged) return "shadow-[inset_0.1875rem_0_0_var(--color-status-warning-text)]";
   return "";
+};
+
+/**
+ * The severity rails, as geometry from the design tokens rather than an
+ * arbitrary shadow. Split out of [`rowClass`] because a rail is a style, not a
+ * class — the same split the other list pages (Alerts, Incidents, Pipelines,
+ * Nodes, LogStream) already make via `:get-row-style`.
+ *
+ * The precedence above is preserved: a revealed row, the fold and the remainder
+ * all return before a rail can apply, so those rows carry their tint and no rail.
+ */
+const rowStyle = (row: QueryRow) => {
+  if (row.fingerprint && row.fingerprint === revealedFingerprint.value) return {};
+  if (row.isFold || row.isOther) return {};
+  const color = row.critical
+    ? "var(--color-status-error-text)"
+    : row.flagged
+      ? "var(--color-status-warning-text)"
+      : "";
+  return color ? { boxShadow: `var(--shadow-rail-thin-geom) ${color}` } : {};
 };
 
 /**
