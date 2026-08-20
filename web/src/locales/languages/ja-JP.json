@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "録画がキャンセルされました — レコーダーウィンドウが閉じられました",
       "restoreFailedHint": "このステップが完了するまで、選択した地点にジャーニーは到達できません。",
       "recordBeforeFailedStep": "ステップ {step} の前に録画",
-      "recordingHere": "ここに録画",
+      "newStepsLandHere": "新しいステップがここに表示されます",
       "recordBeforeStep": "このステップの前に録画",
       "recordBeforeStepHint": "この時点までジャーニーを再生し、その前に新しいステップを録画します。",
       "recordBeforeNeedsNewerExtension": "特定のステップから記録するには、レコーダー拡張機能を更新してください。",

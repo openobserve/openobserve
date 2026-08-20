@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Aufnahme abgebrochen — das Aufnahmefenster wurde geschlossen",
       "restoreFailedHint": "die Reise kann den von dir gewählten Punkt nicht erreichen, bis dieser Schritt abgeschlossen ist",
       "recordBeforeFailedStep": "Vor Schritt {step} aufnehmen",
-      "recordingHere": "Hier aufnehmen",
+      "newStepsLandHere": "Neue Schritte landen hier",
       "recordBeforeStep": "Vor diesem Schritt aufnehmen",
       "recordBeforeStepHint": "Die Reise bis zu diesem Punkt wiedergeben und dann neue Schritte davor aufnehmen.",
       "recordBeforeNeedsNewerExtension": "Aktualisieren Sie die Rekorder-Erweiterung, um ab einem bestimmten Schritt aufzuzeichnen.",

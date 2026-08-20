@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Kayıt iptal edildi — kaydedici penceresi kapatıldı",
       "restoreFailedHint": "bu adım geçene kadar yolculuk seçtiğiniz noktaya ulaşamaz",
       "recordBeforeFailedStep": "Adım {step}'den önce kaydet",
-      "recordingHere": "Buraya kaydediliyor",
+      "newStepsLandHere": "Yeni adımlar buraya eklenir",
       "recordBeforeStep": "Bu adımdan önce kaydet",
       "recordBeforeStepHint": "Yolculuğu bu noktaya kadar yeniden oynatın, ardından ondan önce yeni adımlar kaydedin.",
       "recordBeforeNeedsNewerExtension": "Belirli bir adımdan kayıt almak için kaydedici eklentisini güncelleyin.",

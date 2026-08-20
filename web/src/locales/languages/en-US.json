@@ -12319,7 +12319,7 @@
       "restoreCancelledWindowClosed": "Recording cancelled — the recorder window was closed",
       "restoreFailedHint": "the journey can't reach the point you chose until this step passes",
       "recordBeforeFailedStep": "Record before step {step}",
-      "recordingHere": "Recording here",
+      "newStepsLandHere": "New steps land here",
       "recordBeforeStep": "Record before this step",
       "recordBeforeStepHint": "Replay the journey up to this point, then record new steps before it.",
       "recordBeforeNeedsNewerExtension": "Update the recorder extension to record from a specific step.",

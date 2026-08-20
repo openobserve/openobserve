@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "녹화 취소됨 — 녹화기 창이 닫힘",
       "restoreFailedHint": "이 단계가 지나가기 전에는 여정이 선택한 지점에 도달할 수 없습니다",
       "recordBeforeFailedStep": "단계 {step} 전에 녹화",
-      "recordingHere": "여기서 녹화",
+      "newStepsLandHere": "새 단계는 여기에 표시됩니다",
       "recordBeforeStep": "이 단계 전에 녹화",
       "recordBeforeStepHint": "여정을 이 지점까지 재생한 후, 그 앞에 새 단계를 녹화하세요.",
       "recordBeforeNeedsNewerExtension": "특정 단계부터 녹화하려면 녹화기 확장 프로그램을 업데이트하세요.",

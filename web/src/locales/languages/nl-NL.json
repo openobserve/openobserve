@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Opname geannuleerd — het recorder-venster is gesloten",
       "restoreFailedHint": "de reis kan het gekozen punt niet bereiken totdat deze stap is voltooid",
       "recordBeforeFailedStep": "Opnemen vóór stap {step}",
-      "recordingHere": "Hier opnemen",
+      "newStepsLandHere": "Nieuwe stappen landen hier",
       "recordBeforeStep": "Opnemen vóór deze stap",
       "recordBeforeStepHint": "Speel de reis af tot dit punt en neem daarna nieuwe stappen op vóór dit punt.",
       "recordBeforeNeedsNewerExtension": "Werk de recorder-extensie bij om vanaf een specifieke stap op te nemen.",

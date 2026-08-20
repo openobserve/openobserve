@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Gravação cancelada — a janela do gravador foi fechada",
       "restoreFailedHint": "a jornada não consegue alcançar o ponto que você escolheu até que esta etapa passe",
       "recordBeforeFailedStep": "Gravar antes da etapa {step}",
-      "recordingHere": "Gravar aqui",
+      "newStepsLandHere": "Novas etapas aparecem aqui",
       "recordBeforeStep": "Gravar antes desta etapa",
       "recordBeforeStepHint": "Reproduza a jornada até este ponto e depois grave novas etapas antes dela.",
       "recordBeforeNeedsNewerExtension": "Atualize a extensão do gravador para gravar a partir de uma etapa específica.",
