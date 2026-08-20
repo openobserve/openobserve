@@ -61,6 +61,9 @@ use tokio::{
 };
 
 use super::worker::{MergeBatch, MergeSender};
+use crate::merge::tsid_major::{TsidMajorMergeScope, tsid_major_merge_scope};
+
+mod tsid_major;
 
 /// Last microsecond of the range a merge job at `offset` covers: the hour of
 /// `offset`, or the whole day for daily-partitioned streams. No file of the
@@ -504,15 +507,29 @@ pub async fn merge_by_stream(
             if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
                 return Ok(vec![]);
             }
-            // A closed TSID-major hour made entirely of `tsid-major-v3-*` files
-            // is finalized: re-running the hour-end job leaves it alone. Any
-            // legacy or `tsid-sorted-*` file makes the whole hour merge again.
-            if mode.is_tsid_major()
-                && files_with_size
-                    .iter()
-                    .all(|f| MetricsFileLayout::of(&f.key) == MetricsFileLayout::TsidMajor)
-            {
-                return Ok(vec![]);
+            // A closed TSID-major hour merges only what it has to (see
+            // [`TsidMajorMergeScope`]): nothing when it is finalized, the late
+            // files alone while fragmentation is low, the whole hour once the
+            // fragmentation cap is hit.
+            if mode.is_tsid_major() {
+                match tsid_major_merge_scope(&files_with_size, cfg.compact.max_file_size) {
+                    TsidMajorMergeScope::Skip => return Ok(vec![]),
+                    TsidMajorMergeScope::LateFilesOnly => {
+                        files_with_size.retain(|f| {
+                            MetricsFileLayout::of(&f.key) != MetricsFileLayout::TsidMajor
+                        });
+                        log::debug!(
+                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] tsid_major late merge of {} files, finalized files untouched",
+                            files_with_size.len()
+                        );
+                    }
+                    TsidMajorMergeScope::WholeHour => {
+                        log::debug!(
+                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] tsid_major fragmentation cap hit, full rewrite of {} files",
+                            files_with_size.len()
+                        );
+                    }
+                }
             }
 
             // group files need to merge
