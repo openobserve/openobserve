@@ -19,7 +19,9 @@ import {
   useLocalCurrentUser,
   invalidateLoginData,
 } from "@/utils/zincutils";
+import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
+import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import About from "@/views/About.vue";
@@ -39,8 +41,25 @@ const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
-const ServiceGraphView = () => import("@/plugins/traces/views/ServiceGraphView.vue");
-const ServicesCatalogView = () => import("@/plugins/traces/views/ServicesCatalogView.vue");
+
+const supportedTraceTab = (tab: unknown): TraceSearchMode =>
+  resolveTraceSearchMode(tab, config.isEnterprise === "true");
+
+const canonicalTraceQuery = (
+  query: LocationQuery | undefined,
+  tab: TraceSearchMode,
+): LocationQueryRaw => {
+  const canonicalQuery: LocationQueryRaw = { ...(query ?? {}), tab };
+  delete canonicalQuery.search_mode;
+  return canonicalQuery;
+};
+
+const redirectToTraceTab =
+  (tab: "service-graph" | "services-catalog") =>
+  (to: { query: LocationQuery }): RouteLocationRaw => ({
+    name: "traces",
+    query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
+  });
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -265,38 +284,26 @@ const useRoutes = () => {
         titleKey: "menu.traces",
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
-      path: "traces/service-graph",
-      name: "serviceGraph",
-      component: ServiceGraphView,
-      meta: {
-        keepAlive: true,
-        titleKey: "menu.serviceGraph",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        // Enterprise-only, mirroring the nav flyout's `enterprise` gate. An OSS
-        // build lands on Traces rather than an empty page.
-        if (config.isEnterprise !== "true") {
-          next({ name: "traces", query: to.query });
+        const tab = supportedTraceTab(to.query?.tab);
+        if (to.query?.tab !== tab || to.query?.search_mode !== undefined) {
+          next({
+            name: "traces",
+            query: canonicalTraceQuery(to.query, tab),
+            hash: to.hash,
+            replace: true,
+          });
           return;
         }
         routeGuard(to, from, next);
       },
     },
     {
+      path: "traces/service-graph",
+      redirect: redirectToTraceTab("service-graph"),
+    },
+    {
       path: "traces/services",
-      name: "servicesCatalog",
-      component: ServicesCatalogView,
-      meta: {
-        keepAlive: true,
-        titleKey: "menu.services",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
+      redirect: redirectToTraceTab("services-catalog"),
     },
     {
       path: "traces/trace-details",
@@ -321,9 +328,9 @@ const useRoutes = () => {
       },
     },
     {
-      // Redirect old service-graph route to traces page
+      // Redirect the oldest Service Graph URL to the canonical in-page tab.
       path: "service-graph",
-      redirect: "/traces",
+      redirect: redirectToTraceTab("service-graph"),
     },
     {
       name: "streamExplorer",

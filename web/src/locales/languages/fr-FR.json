@@ -820,7 +820,13 @@
     "backTo": "Retour à {label}",
     "boolTrue": "Vrai",
     "boolFalse": "Faux",
-    "browserTimeWithZone": "Heure du navigateur ({zone})"
+    "browserTimeWithZone": "Heure du navigateur ({zone})",
+    "download": "Télécharger",
+    "openProviderOnRegistry": "Fournisseur OpenObserve sur {registry}",
+    "exportTerraformTabTooltip": "La même configuration s'applique avec Terraform ou OpenTofu.",
+    "exportTerraformEmpty": "Aucune ressource Terraform n'existe pour cette sélection. Exportez-la en JSON à la place.",
+    "exportTerraformSkipped": "Non inclus : {names}. Le fournisseur Terraform OpenObserve n'a pas de ressource pour ceux-ci.",
+    "exportTerraformDropped": "Omis — le schéma du fournisseur ne peut pas contenir ces champs : {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -2578,6 +2584,23 @@
     "triggerRequired": "Un déclencheur est requis",
     "addStepRequired": "Ajoutez au moins une étape après le déclencheur",
     "connectAllNodes": "Connectez tous les nœuds avant d'enregistrer",
+    "finishStepsBeforePublish": "Terminez la configuration de toutes les étapes avant de publier",
+    "draft": "Brouillon",
+    "saveDraft": "Enregistrer comme brouillon",
+    "publish": "Publier",
+    "draftSaveSuccess": "Brouillon enregistré avec succès",
+    "publishSuccess": "Workflow publié avec succès",
+    "publishError": "Erreur lors de la publication du workflow",
+    "comingSoon": "Ceci arrivera dans une étape ultérieure",
+    "triggerType": {
+      "pick": "Choisissez un déclencheur",
+      "dialogTitle": "Créer un nouveau workflow",
+      "dialogIntro": "Choisissez comment ce workflow est déclenché. D'autres types de déclencheurs arrivent bientôt.",
+      "cta": "Créer un workflow",
+      "soonCta": "Disponible dans une version future",
+      "comingSoon": "Bientôt",
+      "soon": "Bientôt"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alerte déclenchée",
@@ -2675,7 +2698,6 @@
       "linkError": "Impossible de lier les alertes."
     },
     "chooseTrigger": "Choisir un déclencheur",
-    "edgeDeleteHint": "Appuyez sur Retour arrière / Suppr pour supprimer la connexion",
     "node": {
       "kindTrigger": "Déclencheur",
       "kindLogic": "Logique",
@@ -2702,9 +2724,55 @@
       "conditionNoteNull": "Pour vérifier une valeur nulle, utilisez null. Exemple :",
       "conditionNoteCustom": "Pour ajouter une colonne personnalisée, tapez son nom et appuyez sur Entrée.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Reformez la charge utile avec une fonction",
+      "functionBodySet": "Applique {name}",
+      "functionSelect": "Sélectionner une fonction",
+      "functionCreateNew": "Créer une nouvelle fonction",
+      "functionRequired": "Une fonction est requise",
+      "functionLoadError": "Impossible de charger les fonctions",
+      "destinationBody": "Envoyer vers une destination",
+      "destinationBodySet": "Envoie vers {name}",
+      "destinationSelect": "Destination",
+      "destinationCreateNew": "Créer une nouvelle destination",
+      "destinationRequired": "Veuillez sélectionner une destination",
+      "destinationLoadError": "Impossible de charger les destinations",
+      "namePlaceholder": "Nommer cette étape (facultatif)",
+      "commentLabel": "Commentaire (facultatif)",
+      "commentPlaceholder": "Ajouter une note à propos de cette étape...",
+      "commentAdd": "Ajouter un commentaire",
+      "disable": "Désactiver l'étape",
+      "enable": "Activer l'étape",
+      "disabledBadge": "Désactivé",
+      "incompleteBadge": "Configurer plus tard",
+      "destinationSetUpLater": "Configurer plus tard",
+      "destinationSetUpLaterPrompt": "Vous n'avez pas encore de destination ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
+      "destinationSetUpLaterActive": "La destination est ignorée pour le moment — le nom et le commentaire sont tout de même enregistrés. Vous aurez besoin d'une destination avant de publier.",
+      "functionSetUpLater": "Configurer plus tard",
+      "functionSetUpLaterPrompt": "Vous n'avez pas encore de fonction ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
+      "functionSetUpLaterActive": "La fonction est ignorée pour le moment — le nom et le commentaire sont tout de même enregistrés. Vous aurez besoin d'une fonction avant de publier."
     },
-    "commonFieldsAbove": "champs communs ci-dessus"
+    "commonFieldsAbove": "champs communs ci-dessus",
+    "canvas": {
+      "undo": "Défaire",
+      "tidyUp": "Nettoyer",
+      "insertStep": "Insérer une étape",
+      "deleteEdge": "Supprimer la connexion"
+    },
+    "unsaved": {
+      "title": "Modifications non enregistrées",
+      "message": "Vous avez des modifications non enregistrées. Si vous quittez maintenant, elles seront perdues.",
+      "discard": "Ignorer les modifications",
+      "stay": "Continuer à modifier"
+    },
+    "results": {
+      "title": "Résultats de l'étape",
+      "collapse": "Réduire",
+      "expand": "Développer",
+      "close": "Effacer et fermer les résultats",
+      "nodesTitle": "Étapes",
+      "empty": "Exécutez un test pour voir les résultats des étapes ici."
+    }
   },
   "pipeline": {
     "validation": {
@@ -7302,7 +7370,9 @@
     "sloKind": "Type de condition",
     "sloLongWindow": "Fenêtre longue",
     "sloShortWindow": "Fenêtre courte",
-    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici."
+    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici.",
+    "exportDialogTitle": "Exporter l'alerte | Exporter {count} alertes",
+    "exportDialogSubtitle": "Examinez la définition, puis téléchargez-la au format JSON ou Terraform pour le fournisseur OpenObserve."
   },
   "alert_dependencies": {
     "actionOpen": "Ouvrir",
@@ -11454,19 +11524,19 @@
           "span": {
             "title": "Spans correspondants",
             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de spans que votre job correspondra.",
-            "matchedSuffix": "spans correspondants · dernières 24h",
+            "matchedSuffix": "spans correspondants · dernière 1h",
             "matchedLoading": "Comptage des spans correspondants…"
           },
           "trace": {
             "title": "Traces correspondantes",
             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de traces que votre job correspondra.",
-            "matchedSuffix": "traces correspondantes · dernières 24h",
+            "matchedSuffix": "traces correspondantes · dernière 1h",
             "matchedLoading": "Comptage des traces correspondantes…"
           },
           "session": {
             "title": "Sessions correspondantes",
             "hint": "Une fois que vous avez choisi un flux et un filtre, ce panneau affichera le nombre de sessions que votre job correspondra.",
-            "matchedSuffix": "sessions correspondantes · dernières 24h",
+            "matchedSuffix": "sessions correspondantes · dernière 1h",
             "matchedLoading": "Comptage des sessions correspondantes…"
           }
         },
@@ -12253,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Enregistrement annulé — la fenêtre de l'enregistreur a été fermée",
       "restoreFailedHint": "le parcours ne peut pas atteindre le point que vous avez choisi tant que cette étape n'est pas passée",
       "recordBeforeFailedStep": "Enregistrer avant l'étape {step}",
-      "recordingHere": "Enregistrer ici",
+      "newStepsLandHere": "Les nouvelles étapes arrivent ici",
       "recordBeforeStep": "Enregistrer avant cette étape",
       "recordBeforeStepHint": "Rejouez le parcours jusqu'à ce point, puis enregistrez de nouvelles étapes avant lui.",
       "recordBeforeNeedsNewerExtension": "Mettez à jour l'extension d'enregistrement pour enregistrer à partir d'une étape spécifique.",
@@ -12386,9 +12456,12 @@
       "statusConnecting": "Connexion en cours",
       "statusOffline": "Hors ligne",
       "statusDown": "Indisponible",
+      "statusUnknown": "Inconnu",
       "connectingMessage": "En attente du premier agent — il arrivera peu après l'installation.",
       "offlineMessage": "L'agent s'est déconnecté récemment — le contrôle ne s'exécutera pas depuis cet emplacement tant qu'il ne s'est pas reconnecté.",
       "downMessage": "Aucun agent depuis plus d'un jour — cet emplacement n'exécutera pas le contrôle tant qu'un agent ne se reconnecte pas.",
+      "unknownMessage": "Les agents signalent leur état de santé uniquement au cluster avec lequel ils sont enregistrés, donc celui-ci ne peut pas le confirmer. L'emplacement peut très bien être en cours d'exécution.",
+      "unknownAgents": "Statut de l'agent indisponible ici",
       "noSearchResults": "Aucun emplacement ne correspond à votre recherche",
       "noPublicMatches": "Aucun emplacement public ne correspond à votre recherche",
       "noPrivateMatches": "Aucun emplacement privé ne correspond à votre recherche",
@@ -12902,7 +12975,9 @@
       "status": {
         "online": "En ligne",
         "offline": "Hors ligne",
-        "pending": "En attente"
+        "pending": "En attente",
+        "unknown": "Inconnu",
+        "unknownHint": "Les agents signalent leur état de santé uniquement au cluster avec lequel ils sont enregistrés, donc celui-ci ne peut pas le confirmer. L'emplacement peut très bien être en cours d'exécution."
       },
       "table": {
         "name": "Nom",
@@ -12958,6 +13033,7 @@
         "agentName": "Agent",
         "restartConfig": "Redémarrer la configuration — copiez la commande d'installation de cet agent pour relancer l'installation / le redémarrage Docker (par exemple après une rotation de jeton).",
         "noAgents": "Aucun agent ne s'est encore enregistré pour cet emplacement.",
+        "agentsUnavailable": "Les agents de cet emplacement sont enregistrés auprès d'un autre cluster et ne sont pas visibles ici.",
         "checksTitle": "Vérifications en cours depuis cet emplacement",
         "checkName": "Nom",
         "noChecks": "Aucune vérification n'est encore assignée à cet emplacement.",
@@ -13678,7 +13754,8 @@
       "alertSavedSuccessfully": "Alerte enregistrée avec succès.",
       "alertUpdatedSuccessfully": "Alerte mise à jour avec succès.",
       "openingDedupConfig": "Ouverture de la configuration de déduplication pour : {name}",
-      "editingAlert": "Modification de l'alerte : {name}"
+      "editingAlert": "Modification de l'alerte : {name}",
+      "someAlertsCouldNotBeExported": "Impossible de lire {names}. Le reste est prêt à être exporté."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Clé de chiffrement mise à jour avec succès",
@@ -13992,7 +14069,6 @@
     "rolling": "glissant",
     "totalSlos": "Total des SLOs",
     "noGrouping": "Aucun (une seule série globale)",
-    "generation": "génération {n}",
     "newAlert": "Nouvelle alerte",
     "overRolling": "sur la période glissante {window}",
     "searchPlaceholder": "Rechercher un SLO ou une étiquette, p. ex. team:payments",
@@ -14248,7 +14324,12 @@
       "editTargetMissing": "Cette alerte ne fait plus partie de ce SLO.",
       "describeBurn": "Taux de combustion > {critical} sur {long} et {short}",
       "describeBudget": "Budget d'erreur consommé > {critical}%"
-    }
+    },
+    "exportTitle": "Exporter le SLO | Exporter {count} SLOs",
+    "exportSubtitle": "Passez en revue la définition, puis téléchargez-la en JSON ou en Terraform pour le fournisseur OpenObserve.",
+    "exportFailed": "Impossible de lire la définition du SLO. Veuillez réessayer.",
+    "exportPartial": "Impossible de lire {names}. Les autres sont prêts à être exportés.",
+    "exportSucceeded": "Exporté {count} SLO | Exportés {count} SLOs"
   },
   "promql": {
     "operations": {

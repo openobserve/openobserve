@@ -820,7 +820,13 @@
     "backTo": "{label}に戻る",
     "boolTrue": "真",
     "boolFalse": "偽",
-    "browserTimeWithZone": "ブラウザ時間（{zone}）"
+    "browserTimeWithZone": "ブラウザ時間（{zone}）",
+    "download": "ダウンロード",
+    "openProviderOnRegistry": "{registry} の OpenObserve プロバイダー",
+    "exportTerraformTabTooltip": "同じ設定は Terraform または OpenTofu でも適用されます。",
+    "exportTerraformEmpty": "この選択に対応する Terraform リソースはありません。代わりに JSON としてエクスポートしてください。",
+    "exportTerraformSkipped": "含まれていません: {names}。OpenObserve Terraform プロバイダーにはこれらに対応するリソースがありません。",
+    "exportTerraformDropped": "除外されました — プロバイダースキーマはこれらのフィールドを保持できないため: {fields}。"
   },
   "flow": {
     "stepPicker": {
@@ -2578,6 +2584,23 @@
     "triggerRequired": "トリガーが必要です",
     "addStepRequired": "トリガーの後に少なくとも1つのステップを追加してください",
     "connectAllNodes": "保存する前にすべてのノードを接続してください",
+    "finishStepsBeforePublish": "公開前にすべてのステップの設定を完了してください",
+    "draft": "下書き",
+    "saveDraft": "下書きとして保存",
+    "publish": "公開",
+    "draftSaveSuccess": "下書きが正常に保存されました",
+    "publishSuccess": "ワークフローが正常に公開されました",
+    "publishError": "ワークフローの公開中にエラーが発生しました",
+    "comingSoon": "これは後のステップで提供されます",
+    "triggerType": {
+      "pick": "トリガーを選択",
+      "dialogTitle": "新しいワークフローを作成",
+      "dialogIntro": "このワークフローのトリガー方法を選択してください。さらに多くのトリガータイプが近日公開予定です。",
+      "cta": "ワークフローを作成",
+      "soonCta": "将来のリリースで利用可能",
+      "comingSoon": "近日公開",
+      "soon": "まもなく"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "アラート発火",
@@ -2675,7 +2698,6 @@
       "linkError": "アラートをリンクできませんでした。"
     },
     "chooseTrigger": "トリガーを選択",
-    "edgeDeleteHint": "Backspace / Delete を押してエッジを削除",
     "node": {
       "kindTrigger": "トリガー",
       "kindLogic": "ロジック",
@@ -2702,9 +2724,55 @@
       "conditionNoteNull": "null値を確認するには、null を使用します。例：",
       "conditionNoteCustom": "カスタム列を追加するには、名前を入力してEnterキーを押します。",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "関数でペイロードを再形成する",
+      "functionBodySet": "{name} を適用",
+      "functionSelect": "関数を選択",
+      "functionCreateNew": "新しい関数を作成",
+      "functionRequired": "関数が必要です",
+      "functionLoadError": "関数を読み込めません",
+      "destinationBody": "送信先に送信",
+      "destinationBodySet": "{name} に送信",
+      "destinationSelect": "送信先",
+      "destinationCreateNew": "新しい送信先を作成",
+      "destinationRequired": "送信先を選択してください",
+      "destinationLoadError": "送信先を読み込めません",
+      "namePlaceholder": "ステップ名 (任意)",
+      "commentLabel": "コメント (任意)",
+      "commentPlaceholder": "このステップに関するメモを追加...",
+      "commentAdd": "コメントを追加",
+      "disable": "ステップを無効にする",
+      "enable": "ステップを有効にする",
+      "disabledBadge": "無効",
+      "incompleteBadge": "後で設定",
+      "destinationSetUpLater": "後で設定",
+      "destinationSetUpLaterPrompt": "まだ送信先がありませんか？これをオンにすると後で設定できます — 今すぐ下書きを保存してテストできます。",
+      "destinationSetUpLaterActive": "今のところ送信先はスキップされます — 名前とコメントは保存されます。公開前に送信先が必要です。",
+      "functionSetUpLater": "後で設定",
+      "functionSetUpLaterPrompt": "まだ関数がありませんか？これをオンにすると後で設定できます — 今すぐ下書きを保存してテストできます。",
+      "functionSetUpLaterActive": "今のところ関数はスキップされます — 名前とコメントは保存されます。公開前に関数が必要です。"
     },
-    "commonFieldsAbove": "上記の共通フィールド"
+    "commonFieldsAbove": "上記の共通フィールド",
+    "canvas": {
+      "undo": "元に戻す",
+      "tidyUp": "整理",
+      "insertStep": "ステップを挿入",
+      "deleteEdge": "接続を削除"
+    },
+    "unsaved": {
+      "title": "未保存の変更",
+      "message": "未保存の変更があります。今すぐ離れると変更は破棄されます。",
+      "discard": "変更を破棄",
+      "stay": "編集を続ける"
+    },
+    "results": {
+      "title": "ステップ結果",
+      "collapse": "折りたたむ",
+      "expand": "展開する",
+      "close": "結果をクリアして閉じる",
+      "nodesTitle": "ステップ",
+      "empty": "テストを実行すると、ここにステップ結果が表示されます。"
+    }
   },
   "pipeline": {
     "validation": {
@@ -7302,7 +7370,9 @@
     "sloKind": "条件タイプ",
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
-    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。"
+    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
+    "exportDialogTitle": "アラートをエクスポート | アラートを{count}件エクスポート",
+    "exportDialogSubtitle": "定義を確認して、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。"
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -11454,19 +11524,19 @@
           "span": {
             "title": "一致したスパン",
             "hint": "ストリームとフィルターを選択すると、このパネルにジョブが一致するスパンの数が表示されます。",
-            "matchedSuffix": "一致したスパン · 過去24時間",
+            "matchedSuffix": "スパン一致 · 過去1時間",
             "matchedLoading": "一致したスパンをカウント中…"
           },
           "trace": {
             "title": "一致したトレース",
             "hint": "ストリームとフィルターを選択すると、このパネルにジョブが一致するトレースの数が表示されます。",
-            "matchedSuffix": "一致したトレース · 過去24時間",
+            "matchedSuffix": "トレース一致 · 過去1時間",
             "matchedLoading": "一致したトレースをカウント中…"
           },
           "session": {
             "title": "一致したセッション",
             "hint": "ストリームとフィルターを選択すると、このパネルにジョブが一致するセッションの数が表示されます。",
-            "matchedSuffix": "一致したセッション · 過去24時間",
+            "matchedSuffix": "セッション一致 · 過去1時間",
             "matchedLoading": "一致したセッションをカウント中…"
           }
         },
@@ -12253,7 +12323,7 @@
       "restoreCancelledWindowClosed": "録画がキャンセルされました — レコーダーウィンドウが閉じられました",
       "restoreFailedHint": "このステップが完了するまで、選択した地点にジャーニーは到達できません。",
       "recordBeforeFailedStep": "ステップ {step} の前に録画",
-      "recordingHere": "ここに録画",
+      "newStepsLandHere": "新しいステップがここに表示されます",
       "recordBeforeStep": "このステップの前に録画",
       "recordBeforeStepHint": "この時点までジャーニーを再生し、その前に新しいステップを録画します。",
       "recordBeforeNeedsNewerExtension": "特定のステップから記録するには、レコーダー拡張機能を更新してください。",
@@ -12386,9 +12456,12 @@
       "statusConnecting": "接続中",
       "statusOffline": "オフライン",
       "statusDown": "ダウン",
+      "statusUnknown": "不明",
       "connectingMessage": "最初のエージェントのチェックインを待っています — インストール後すぐに到着します。",
       "offlineMessage": "エージェントが最近切断されました — 再接続するまで、ここからチェックは実行されません。",
       "downMessage": "1日以上エージェントがありません — エージェントが再接続するまで、このロケーションはチェックを実行しません。",
+      "unknownMessage": "エージェントは、登録先のクラスターにのみヘルスを報告するため、こちらからは確認できません。ロケーションは稼働している可能性があります。",
+      "unknownAgents": "ここではエージェントのステータスを利用できません",
       "noSearchResults": "検索条件に一致するロケーションがありません",
       "noPublicMatches": "検索条件に一致するパブリックロケーションがありません",
       "noPrivateMatches": "検索条件に一致するプライベートロケーションがありません",
@@ -12902,7 +12975,9 @@
       "status": {
         "online": "オンライン",
         "offline": "オフライン",
-        "pending": "保留中"
+        "pending": "保留中",
+        "unknown": "不明",
+        "unknownHint": "エージェントは、登録先のクラスターにのみヘルスを報告するため、こちらからは確認できません。ロケーションは稼働している可能性があります。"
       },
       "table": {
         "name": "名前",
@@ -12958,6 +13033,7 @@
         "agentName": "エージェント",
         "restartConfig": "再起動設定 — このエージェントのセットアップコマンドをコピーして、インストール / Docker 再起動を再実行します (例: トークンローテーション後)",
         "noAgents": "このロケーションにまだエージェントが登録されていません。",
+        "agentsUnavailable": "このロケーションのエージェントは別のクラスターに登録されているため、ここでは表示されません。",
         "checksTitle": "このロケーションから実行されるチェック",
         "checkName": "名前",
         "noChecks": "このロケーションにまだチェックが割り当てられていません。",
@@ -13678,7 +13754,8 @@
       "alertSavedSuccessfully": "アラートが正常に保存されました。",
       "alertUpdatedSuccessfully": "アラートが正常に更新されました。",
       "openingDedupConfig": "重複排除設定を開いています: {name}",
-      "editingAlert": "アラートを編集中: {name}"
+      "editingAlert": "アラートを編集中: {name}",
+      "someAlertsCouldNotBeExported": "{names} を読み込めませんでした。残りはエクスポートできます。"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "暗号鍵が正常に更新されました",
@@ -13992,7 +14069,6 @@
     "rolling": "ローリング",
     "totalSlos": "SLO総数",
     "noGrouping": "なし (単一の全体シリーズ)",
-    "generation": "世代 {n}",
     "newAlert": "新しいアラート",
     "overRolling": "ローリング {window} にわたる",
     "searchPlaceholder": "SLOまたはタグを検索、例: team:payments",
@@ -14248,7 +14324,12 @@
       "editTargetMissing": "そのアラートはこのSLOにはもうありません。",
       "describeBurn": "バーンレート > {critical}（{long} と {short} にわたって）",
       "describeBudget": "エラー予算消費 > {critical}%"
-    }
+    },
+    "exportTitle": "SLOをエクスポート | {count}個のSLOをエクスポート",
+    "exportSubtitle": "定義を確認し、JSONまたはOpenObserveプロバイダー用のTerraformとしてダウンロードしてください。",
+    "exportFailed": "SLO定義を読み取れませんでした。もう一度お試しください。",
+    "exportPartial": "{names}を読み取れませんでした。残りはエクスポートできます。",
+    "exportSucceeded": "{count}個のSLOをエクスポートしました | {count}個のSLOをエクスポートしました"
   },
   "promql": {
     "operations": {

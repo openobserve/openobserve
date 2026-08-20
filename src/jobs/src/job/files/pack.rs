@@ -42,7 +42,7 @@ use infra::{
 };
 use ingester::{PackSegment, PendingStreamStats};
 use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::merge;
+use search::datafusion::merge::{self, MergeMode, MergeOutput};
 use tantivy_utils::index_builder::create_tantivy_index;
 use tokio::sync::{Mutex, RwLock};
 
@@ -433,13 +433,12 @@ async fn upload_chunk(
             ..Default::default()
         };
         let merge_result = merge::merge_parquet_files(
-            stream_type,
-            stream_name,
             union_schema,
             tables,
             &bloom_filter_fields,
             new_file_meta,
-            true,
+            &MergeMode::for_ingester(stream_type, stream_name),
+            MergeOutput::for_ingester(stream_type),
         )
         .await?;
         // the ingester always merges into exactly one file

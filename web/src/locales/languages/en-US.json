@@ -625,6 +625,12 @@
     "delete": "Delete",
     "remove": "Remove",
     "export": "Export",
+    "download": "Download",
+    "openProviderOnRegistry": "OpenObserve provider on the {registry}",
+    "exportTerraformTabTooltip": "The same configuration applies with Terraform or OpenTofu.",
+    "exportTerraformEmpty": "No Terraform resource exists for this selection. Export it as JSON instead.",
+    "exportTerraformSkipped": "Not included: {names}. The OpenObserve Terraform provider has no resource for these.",
+    "exportTerraformDropped": "Left out — the provider schema cannot carry these fields: {fields}.",
     "actions": "Actions",
     "version": "Version",
     "updated_at": "Updated At",
@@ -6156,6 +6162,8 @@
       "legendNoData": "No data"
     },
     "importAlertTitle": "Import Alert",
+    "exportDialogTitle": "Export alert | Export {count} alerts",
+    "exportDialogSubtitle": "Review the definition, then download it as JSON or as Terraform for the OpenObserve provider.",
     "jsonFilesOnlyHint": ".json files only",
     "outputMessages": "Output Messages",
     "destinationsRequiredLabel": "Destinations *",
@@ -11512,19 +11520,19 @@
           "span": {
             "title": "Matched Spans",
             "hint": "Once you've picked a stream and filter, this panel will show how many spans your job will match.",
-            "matchedSuffix": "spans matched · last 24h",
+            "matchedSuffix": "spans matched · last 1h",
             "matchedLoading": "Counting matched spans…"
           },
           "trace": {
             "title": "Matched Traces",
             "hint": "Once you've picked a stream and filter, this panel will show how many traces your job will match.",
-            "matchedSuffix": "traces matched · last 24h",
+            "matchedSuffix": "traces matched · last 1h",
             "matchedLoading": "Counting matched traces…"
           },
           "session": {
             "title": "Matched Sessions",
             "hint": "Once you've picked a stream and filter, this panel will show how many sessions your job will match.",
-            "matchedSuffix": "sessions matched · last 24h",
+            "matchedSuffix": "sessions matched · last 1h",
             "matchedLoading": "Counting matched sessions…"
           }
         },
@@ -12311,7 +12319,7 @@
       "restoreCancelledWindowClosed": "Recording cancelled — the recorder window was closed",
       "restoreFailedHint": "the journey can't reach the point you chose until this step passes",
       "recordBeforeFailedStep": "Record before step {step}",
-      "recordingHere": "Recording here",
+      "newStepsLandHere": "New steps land here",
       "recordBeforeStep": "Record before this step",
       "recordBeforeStepHint": "Replay the journey up to this point, then record new steps before it.",
       "recordBeforeNeedsNewerExtension": "Update the recorder extension to record from a specific step.",
@@ -12444,9 +12452,12 @@
       "statusConnecting": "Connecting",
       "statusOffline": "Offline",
       "statusDown": "Down",
+      "statusUnknown": "Unknown",
       "connectingMessage": "Waiting for the first agent to check in — it will arrive shortly after install.",
       "offlineMessage": "Agent recently dropped — the check won't run from here until it reconnects.",
       "downMessage": "No agent for over a day — this location won't run the check until an agent reconnects.",
+      "unknownMessage": "Agents report their health only to the cluster they registered with, so this one can't confirm it. The location may well be running.",
+      "unknownAgents": "Agent status unavailable here",
       "noSearchResults": "No locations match your search",
       "noPublicMatches": "No public locations match your search",
       "noPrivateMatches": "No private locations match your search",
@@ -12960,7 +12971,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "Pending"
+        "pending": "Pending",
+        "unknown": "Unknown",
+        "unknownHint": "Agents report their health only to the cluster they registered with, so this one can't confirm it. The location may well be running."
       },
       "table": {
         "name": "Name",
@@ -13016,6 +13029,7 @@
         "agentName": "Agent",
         "restartConfig": "Restart config — copy this agent's setup command to re-run install / docker restart (e.g. after a token rotation)",
         "noAgents": "No agents have registered for this location yet.",
+        "agentsUnavailable": "This location's agents registered with another cluster and are not visible here.",
         "checksTitle": "Checks running from this location",
         "checkName": "Name",
         "noChecks": "No checks are assigned to this location yet.",
@@ -13682,6 +13696,7 @@
       "resumingAlerts": "Resuming alerts...",
       "pausingAlerts": "Pausing alerts...",
       "errorExportingAlertsPleaseTryAgain": "Error exporting alerts. Please try again.",
+      "someAlertsCouldNotBeExported": "Could not read {names}. The rest are ready to export.",
       "successfullyExportedAlert": "Successfully exported {count} alert | Successfully exported {count} alerts",
       "exportingAlerts": "Exporting alerts...",
       "pleaseWaitWhileSearchingForDashboards": "Please wait while searching for dashboards...",
@@ -14050,7 +14065,6 @@
     "rolling": "rolling",
     "totalSlos": "Total SLOs",
     "noGrouping": "None (a single overall series)",
-    "generation": "generation {n}",
     "newAlert": "New alert",
     "overRolling": "over rolling {window}",
     "searchPlaceholder": "Search SLO or tag, e.g. team:payments",
@@ -14252,6 +14266,11 @@
     "move": "Move",
     "moveTitle": "Move {count} SLO(s) to another folder",
     "moveSelected": "Move {count} selected",
+    "exportTitle": "Export SLO | Export {count} SLOs",
+    "exportSubtitle": "Review the definition, then download it as JSON or as Terraform for the OpenObserve provider.",
+    "exportFailed": "Could not read the SLO definition. Please try again.",
+    "exportPartial": "Could not read {names}. The rest are ready to export.",
+    "exportSucceeded": "Exported {count} SLO | Exported {count} SLOs",
     "moved": "Moved {count} SLO(s) to {folder}",
     "moveFailed": "Move failed",
     "preview": {

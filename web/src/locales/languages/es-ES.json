@@ -820,7 +820,13 @@
     "backTo": "Volver a {label}",
     "boolTrue": "Verdadero",
     "boolFalse": "Falso",
-    "browserTimeWithZone": "Hora del navegador ({zone})"
+    "browserTimeWithZone": "Hora del navegador ({zone})",
+    "download": "Descargar",
+    "openProviderOnRegistry": "Proveedor de OpenObserve en {registry}",
+    "exportTerraformTabTooltip": "La misma configuración se aplica con Terraform u OpenTofu.",
+    "exportTerraformEmpty": "No existe un recurso de Terraform para esta selección. Exprésalo como JSON en su lugar.",
+    "exportTerraformSkipped": "No incluidos: {names}. El proveedor de OpenObserve para Terraform no tiene un recurso para estos.",
+    "exportTerraformDropped": "Omitidos — el esquema del proveedor no puede contener estos campos: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -2578,6 +2584,23 @@
     "triggerRequired": "Se requiere un desencadenante",
     "addStepRequired": "Agrega al menos un paso después del desencadenante",
     "connectAllNodes": "Conecta todos los nodos antes de guardar",
+    "finishStepsBeforePublish": "Termina de configurar todos los pasos antes de publicar",
+    "draft": "Borrador",
+    "saveDraft": "Guardar como borrador",
+    "publish": "Publicar",
+    "draftSaveSuccess": "Borrador guardado correctamente",
+    "publishSuccess": "Flujo de trabajo publicado correctamente",
+    "publishError": "Error al publicar el flujo de trabajo",
+    "comingSoon": "Esto viene en un paso posterior",
+    "triggerType": {
+      "pick": "Elige un disparador",
+      "dialogTitle": "Crear un nuevo flujo de trabajo",
+      "dialogIntro": "Elige cómo se activa este flujo de trabajo. Pronto habrá más tipos de disparadores.",
+      "cta": "Crear flujo de trabajo",
+      "soonCta": "Disponible en una versión futura",
+      "comingSoon": "Próximamente",
+      "soon": "Pronto"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alerta disparada",
@@ -2675,7 +2698,6 @@
       "linkError": "No se pueden vincular las alertas."
     },
     "chooseTrigger": "Elige un disparador",
-    "edgeDeleteHint": "Presiona Retroceso / Suprimir para eliminar la conexión",
     "node": {
       "kindTrigger": "Disparador",
       "kindLogic": "Lógica",
@@ -2702,9 +2724,55 @@
       "conditionNoteNull": "Para verificar un valor nulo, use null. Ejemplo:",
       "conditionNoteCustom": "Para agregar una columna personalizada, escriba su nombre y presione Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Reformatea el payload con una función",
+      "functionBodySet": "Aplica {name}",
+      "functionSelect": "Seleccionar función",
+      "functionCreateNew": "Crear nueva función",
+      "functionRequired": "La función es obligatoria",
+      "functionLoadError": "No se pudieron cargar las funciones",
+      "destinationBody": "Enviar a un destino",
+      "destinationBodySet": "Envía a {name}",
+      "destinationSelect": "Destino",
+      "destinationCreateNew": "Crear nuevo destino",
+      "destinationRequired": "Por favor, selecciona un destino",
+      "destinationLoadError": "No se pudieron cargar los destinos",
+      "namePlaceholder": "Nombra este paso (opcional)",
+      "commentLabel": "Comentario (opcional)",
+      "commentPlaceholder": "Añade una nota sobre este paso...",
+      "commentAdd": "Añadir comentario",
+      "disable": "Desactivar paso",
+      "enable": "Activar paso",
+      "disabledBadge": "Desactivado",
+      "incompleteBadge": "Configurar más tarde",
+      "destinationSetUpLater": "Configurar más tarde",
+      "destinationSetUpLaterPrompt": "¿Aún no tienes un destino? Activa esto para configurarlo más tarde — puedes guardar un borrador y probar ahora.",
+      "destinationSetUpLaterActive": "El destino se omite por ahora — el nombre y el comentario se guardan igualmente. Necesitarás un destino antes de publicar.",
+      "functionSetUpLater": "Configurar más tarde",
+      "functionSetUpLaterPrompt": "¿Aún no tienes una función? Activa esto para configurarla más tarde — puedes guardar un borrador y probar ahora.",
+      "functionSetUpLaterActive": "La función se omite por ahora — el nombre y el comentario se guardan igualmente. Necesitarás una función antes de publicar."
     },
-    "commonFieldsAbove": "campos comunes arriba"
+    "commonFieldsAbove": "campos comunes arriba",
+    "canvas": {
+      "undo": "Deshacer",
+      "tidyUp": "Limpiar",
+      "insertStep": "Insertar paso",
+      "deleteEdge": "Eliminar conexión"
+    },
+    "unsaved": {
+      "title": "Cambios sin guardar",
+      "message": "Tienes cambios sin guardar. Si sales ahora, se descartarán.",
+      "discard": "Descartar cambios",
+      "stay": "Seguir editando"
+    },
+    "results": {
+      "title": "Resultados del paso",
+      "collapse": "Contraer",
+      "expand": "Expandir",
+      "close": "Limpiar y cerrar resultados",
+      "nodesTitle": "Pasos",
+      "empty": "Ejecuta una prueba para ver los resultados de los pasos aquí."
+    }
   },
   "pipeline": {
     "validation": {
@@ -7302,7 +7370,9 @@
     "sloKind": "Tipo de condición",
     "sloLongWindow": "Ventana larga",
     "sloShortWindow": "Ventana corta",
-    "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí."
+    "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí.",
+    "exportDialogTitle": "Exportar alerta | Exportar {count} alertas",
+    "exportDialogSubtitle": "Revisa la definición y luego descárgala como JSON o como Terraform para el proveedor de OpenObserve."
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -11454,19 +11524,19 @@
           "span": {
             "title": "Spans coincidentes",
             "hint": "Una vez que hayas elegido un stream y un filtro, este panel mostrará cuántos spans coincidirá tu tarea.",
-            "matchedSuffix": "spans coincidentes · últimas 24h",
+            "matchedSuffix": "spans coincidentes · última 1h",
             "matchedLoading": "Contando spans coincidentes…"
           },
           "trace": {
             "title": "Traces coincidentes",
             "hint": "Una vez que hayas elegido un stream y un filtro, este panel mostrará cuántos traces coincidirá tu tarea.",
-            "matchedSuffix": "traces coincidentes · últimas 24h",
+            "matchedSuffix": "traces coincidentes · última 1h",
             "matchedLoading": "Contando traces coincidentes…"
           },
           "session": {
             "title": "Sesiones coincidentes",
             "hint": "Una vez que hayas elegido un stream y un filtro, este panel mostrará cuántas sesiones coincidirá tu tarea.",
-            "matchedSuffix": "sesiones coincidentes · últimas 24h",
+            "matchedSuffix": "sesiones coincidentes · última 1h",
             "matchedLoading": "Contando sesiones coincidentes…"
           }
         },
@@ -12253,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Grabación cancelada — la ventana del grabador se cerró",
       "restoreFailedHint": "el recorrido no puede llegar al punto que elegiste hasta que este paso se complete",
       "recordBeforeFailedStep": "Grabar antes del paso {step}",
-      "recordingHere": "Grabar aquí",
+      "newStepsLandHere": "Los nuevos pasos aparecen aquí",
       "recordBeforeStep": "Grabar antes de este paso",
       "recordBeforeStepHint": "Reproduce el recorrido hasta este punto, luego graba nuevos pasos antes de él.",
       "recordBeforeNeedsNewerExtension": "Actualiza la extensión del grabador para grabar desde un paso específico.",
@@ -12386,9 +12456,12 @@
       "statusConnecting": "Conectando",
       "statusOffline": "Desconectado",
       "statusDown": "Caído",
+      "statusUnknown": "Desconocido",
       "connectingMessage": "Esperando a que el primer agente se registre — llegará poco después de la instalación.",
       "offlineMessage": "El agente se desconectó recientemente — la verificación no se ejecutará desde aquí hasta que se reconecte.",
       "downMessage": "Sin agente durante más de un día — esta ubicación no ejecutará la verificación hasta que un agente se reconecte.",
+      "unknownMessage": "Los agentes informan de su estado solo al clúster con el que se registraron, por lo que este no puede confirmarlo. Es posible que la ubicación esté en funcionamiento.",
+      "unknownAgents": "Estado del agente no disponible aquí",
       "noSearchResults": "Ninguna ubicación coincide con tu búsqueda",
       "noPublicMatches": "Ninguna ubicación pública coincide con tu búsqueda",
       "noPrivateMatches": "Ninguna ubicación privada coincide con tu búsqueda",
@@ -12902,7 +12975,9 @@
       "status": {
         "online": "En línea",
         "offline": "Desconectado",
-        "pending": "Pendiente"
+        "pending": "Pendiente",
+        "unknown": "Desconocido",
+        "unknownHint": "Los agentes informan de su estado solo al clúster con el que se registraron, por lo que este no puede confirmarlo. Es posible que la ubicación esté en funcionamiento."
       },
       "table": {
         "name": "Nombre",
@@ -12958,6 +13033,7 @@
         "agentName": "Agente",
         "restartConfig": "Reiniciar configuración — copie el comando de configuración de este agente para volver a ejecutar la instalación / reinicio de Docker (p. ej., después de una rotación de token)",
         "noAgents": "Aún no se han registrado agentes para esta ubicación.",
+        "agentsUnavailable": "Los agentes de esta ubicación se registraron en otro clúster y no son visibles aquí.",
         "checksTitle": "Verificaciones ejecutándose desde esta ubicación",
         "checkName": "Nombre",
         "noChecks": "Aún no se asignan verificaciones a esta ubicación.",
@@ -13678,7 +13754,8 @@
       "alertSavedSuccessfully": "Alerta guardada correctamente.",
       "alertUpdatedSuccessfully": "Alerta actualizada correctamente.",
       "openingDedupConfig": "Abriendo configuración de deduplicación para: {name}",
-      "editingAlert": "Editando alerta: {name}"
+      "editingAlert": "Editando alerta: {name}",
+      "someAlertsCouldNotBeExported": "No se pudieron leer {names}. El resto está listo para exportar."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Clave de cifrado actualizada correctamente",
@@ -13992,7 +14069,6 @@
     "rolling": "móvil",
     "totalSlos": "Total de SLOs",
     "noGrouping": "Ninguna (una sola serie general)",
-    "generation": "generación {n}",
     "newAlert": "Nueva alerta",
     "overRolling": "sobre ventana móvil de {window}",
     "searchPlaceholder": "Buscar SLO o etiqueta, p. ej. team:payments",
@@ -14248,7 +14324,12 @@
       "editTargetMissing": "Esa alerta ya no está en este SLO.",
       "describeBurn": "Tasa de consumo > {critical} en {long} y {short}",
       "describeBudget": "Presupuesto de errores consumido > {critical}%"
-    }
+    },
+    "exportTitle": "Exportar SLO | Exportar {count} SLOs",
+    "exportSubtitle": "Revise la definición, luego descárguela como JSON o como Terraform para el proveedor de OpenObserve.",
+    "exportFailed": "No se pudo leer la definición del SLO. Inténtelo de nuevo.",
+    "exportPartial": "No se pudo leer {names}. El resto está listo para exportar.",
+    "exportSucceeded": "Exportado {count} SLO | Exportados {count} SLOs"
   },
   "promql": {
     "operations": {

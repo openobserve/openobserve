@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="radar" size="sm" />
           <span>{{ t("synthetics.tabs.checks") }}</span>
         </OTab>
-        <OTab name="private">
+        <OTab v-if="privateLocationsEnabled" name="private">
           <OIcon name="location-on" size="sm" />
           <span>{{ t("synthetics.tabs.private") }}</span>
         </OTab>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- ── PRIVATE LOCATIONS TAB ── -->
       <PrivateLocations
-        v-if="activeSection === 'private'"
+        v-if="privateLocationsEnabled && activeSection === 'private'"
         :locations="privateLocations"
         :loading="locationsLoading"
         @refresh="loadPrivateLocations"
@@ -276,8 +276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
     </ODialog>
 
-    <!-- Agent setup drawer -->
+    <!-- Agent setup drawer — private locations only, so enterprise only -->
     <AgentSetupDrawer
+      v-if="privateLocationsEnabled"
       v-model:open="showSetupDrawer"
       :install="setupInstall"
       :location-name="setupLocationName"
@@ -555,11 +556,22 @@ onMounted(() => {
   initPage();
 });
 
+// Private locations are pools served by long-running agents deployed inside the
+// customer's network, and that agent fleet is the one part of synthetics that
+// is enterprise. Gated on its own /config flag rather than on
+// `synthetics_enabled`, so an OSS build shows synthetics without offering a
+// location kind it cannot serve.
+const privateLocationsEnabled = computed(() =>
+  Boolean(store.state.zoConfig?.synthetics_private_locations_enabled),
+);
+
 // Defaults to 'checks', but honors ?section=private so links back from the
 // private-location detail page (its own back button, deep links) land on
 // the tab the user actually came from instead of always resetting to Checks.
+// A ?section=private on a build without private locations falls back to
+// Checks rather than landing on a tab that is not rendered.
 const activeSection = ref<"checks" | "private">(
-  route.query.section === "private" ? "private" : "checks",
+  route.query.section === "private" && privateLocationsEnabled.value ? "private" : "checks",
 );
 // Private Locations data is never fetched on initial render (only on manual
 // refresh or after a delete) — load it the first time the tab is actually

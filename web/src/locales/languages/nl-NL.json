@@ -820,7 +820,13 @@
     "backTo": "Terug naar {label}",
     "boolTrue": "Waar",
     "boolFalse": "Onwaar",
-    "browserTimeWithZone": "Browsertijd ({zone})"
+    "browserTimeWithZone": "Browsertijd ({zone})",
+    "download": "Downloaden",
+    "openProviderOnRegistry": "OpenObserve-provider op de {registry}",
+    "exportTerraformTabTooltip": "Dezelfde configuratie is van toepassing met Terraform of OpenTofu.",
+    "exportTerraformEmpty": "Er bestaat geen Terraform-resource voor deze selectie. Exporteer het in plaats daarvan als JSON.",
+    "exportTerraformSkipped": "Niet inbegrepen: {names}. De OpenObserve Terraform-provider heeft hier geen resource voor.",
+    "exportTerraformDropped": "Weggelaten — het provider-schema kan deze velden niet bevatten: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -2578,6 +2584,23 @@
     "triggerRequired": "Een trigger is vereist",
     "addStepRequired": "Voeg ten minste één stap toe na de trigger",
     "connectAllNodes": "Verbind alle knooppunten voordat u opslaat",
+    "finishStepsBeforePublish": "Voltooi alle stappen voordat u publiceert.",
+    "draft": "Concept",
+    "saveDraft": "Opslaan als concept",
+    "publish": "Publiceren",
+    "draftSaveSuccess": "Concept succesvol opgeslagen",
+    "publishSuccess": "Workflow succesvol gepubliceerd",
+    "publishError": "Fout bij het publiceren van workflow",
+    "comingSoon": "Dit komt in een latere stap",
+    "triggerType": {
+      "pick": "Kies een trigger",
+      "dialogTitle": "Nieuwe workflow maken",
+      "dialogIntro": "Kies hoe deze workflow wordt geactiveerd. Meer triggertypen zijn binnenkort beschikbaar.",
+      "cta": "Workflow maken",
+      "soonCta": "Beschikbaar in een toekomstige release",
+      "comingSoon": "Binnenkort beschikbaar",
+      "soon": "Binnenkort"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alert geactiveerd",
@@ -2675,7 +2698,6 @@
       "linkError": "Kan meldingen niet koppelen."
     },
     "chooseTrigger": "Kies een trigger",
-    "edgeDeleteHint": "Druk op Backspace / Delete om de verbinding te verwijderen",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2702,9 +2724,55 @@
       "conditionNoteNull": "Om een null-waarde te controleren, gebruik null. Voorbeeld:",
       "conditionNoteCustom": "Om een aangepaste kolom toe te voegen, typt u de naam en drukt u op Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Vorm de payload om met een functie",
+      "functionBodySet": "Past {name} toe",
+      "functionSelect": "Selecteer functie",
+      "functionCreateNew": "Nieuwe functie maken",
+      "functionRequired": "Functie is vereist",
+      "functionLoadError": "Kan functies niet laden",
+      "destinationBody": "Verzenden naar een bestemming",
+      "destinationBodySet": "Verzendt naar {name}",
+      "destinationSelect": "Bestemming",
+      "destinationCreateNew": "Nieuwe bestemming maken",
+      "destinationRequired": "Selecteer een bestemming",
+      "destinationLoadError": "Kan bestemmingen niet laden",
+      "namePlaceholder": "Geef deze stap een naam (optioneel)",
+      "commentLabel": "Opmerking (optioneel)",
+      "commentPlaceholder": "Voeg een notitie toe over deze stap...",
+      "commentAdd": "Opmerking toevoegen",
+      "disable": "Stap uitschakelen",
+      "enable": "Stap inschakelen",
+      "disabledBadge": "Uitgeschakeld",
+      "incompleteBadge": "Stel later in",
+      "destinationSetUpLater": "Stel later in",
+      "destinationSetUpLaterPrompt": "Nog geen bestemming? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
+      "destinationSetUpLaterActive": "De bestemming wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een bestemming nodig voordat u publiceert.",
+      "functionSetUpLater": "Stel later in",
+      "functionSetUpLaterPrompt": "Nog geen functie? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
+      "functionSetUpLaterActive": "De functie wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een functie nodig voordat u publiceert."
     },
-    "commonFieldsAbove": "algemene velden hierboven"
+    "commonFieldsAbove": "algemene velden hierboven",
+    "canvas": {
+      "undo": "Ongedaan maken",
+      "tidyUp": "Opruimen",
+      "insertStep": "Stap invoegen",
+      "deleteEdge": "Verbinding verwijderen"
+    },
+    "unsaved": {
+      "title": "Niet-opgeslagen wijzigingen",
+      "message": "U hebt niet-opgeslagen wijzigingen. Als u nu weggaat, worden ze verwijderd.",
+      "discard": "Wijzigingen verwerpen",
+      "stay": "Doorgaan met bewerken"
+    },
+    "results": {
+      "title": "Stapresultaten",
+      "collapse": "Inklappen",
+      "expand": "Uitklappen",
+      "close": "Resultaten wissen en sluiten",
+      "nodesTitle": "Stappen",
+      "empty": "Voer een test uit om hier de stapresultaten te zien."
+    }
   },
   "pipeline": {
     "validation": {
@@ -7302,7 +7370,9 @@
     "sloKind": "Conditietype",
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
-    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond."
+    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
+    "exportDialogTitle": "Exporteer alert | Exporteer {count} alerts",
+    "exportDialogSubtitle": "Bekijk de definitie en download deze als JSON of als Terraform voor de OpenObserve-provider."
   },
   "alert_dependencies": {
     "actionOpen": "Openen",
@@ -11454,19 +11524,19 @@
           "span": {
             "title": "Overeenkomende spans",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel spans uw taak zal matchen.",
-            "matchedSuffix": "spans gematcht · laatste 24 uur",
+            "matchedSuffix": "overeenkomende spans · laatste 1 uur",
             "matchedLoading": "Overeenkomende spans tellen…"
           },
           "trace": {
             "title": "Overeenkomende traces",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel traces uw taak zal matchen.",
-            "matchedSuffix": "traces gematcht · laatste 24 uur",
+            "matchedSuffix": "overeenkomende traces · laatste 1 uur",
             "matchedLoading": "Overeenkomende traces tellen…"
           },
           "session": {
             "title": "Overeenkomende sessies",
             "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel sessies uw taak zal matchen.",
-            "matchedSuffix": "sessies gematcht · laatste 24 uur",
+            "matchedSuffix": "overeenkomende sessies · laatste 1 uur",
             "matchedLoading": "Overeenkomende sessies tellen…"
           }
         },
@@ -12253,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Opname geannuleerd — het recorder-venster is gesloten",
       "restoreFailedHint": "de reis kan het gekozen punt niet bereiken totdat deze stap is voltooid",
       "recordBeforeFailedStep": "Opnemen vóór stap {step}",
-      "recordingHere": "Hier opnemen",
+      "newStepsLandHere": "Nieuwe stappen landen hier",
       "recordBeforeStep": "Opnemen vóór deze stap",
       "recordBeforeStepHint": "Speel de reis af tot dit punt en neem daarna nieuwe stappen op vóór dit punt.",
       "recordBeforeNeedsNewerExtension": "Werk de recorder-extensie bij om vanaf een specifieke stap op te nemen.",
@@ -12386,9 +12456,12 @@
       "statusConnecting": "Verbinden",
       "statusOffline": "Offline",
       "statusDown": "Niet beschikbaar",
+      "statusUnknown": "Onbekend",
       "connectingMessage": "Wachten op de eerste agent die incheckt — deze zal kort na installatie arriveren.",
       "offlineMessage": "Agent is recent weggevallen — de controle wordt vanaf hier niet uitgevoerd totdat deze opnieuw verbinding maakt.",
       "downMessage": "Al meer dan een dag geen agent — deze locatie zal de controle niet uitvoeren totdat een agent opnieuw verbinding maakt.",
+      "unknownMessage": "Agents rapporteren hun gezondheid alleen aan het cluster waarmee ze zijn geregistreerd, dus deze kan het niet bevestigen. De locatie draait mogelijk gewoon.",
+      "unknownAgents": "Agentstatus hier niet beschikbaar",
       "noSearchResults": "Geen locaties gevonden voor uw zoekopdracht",
       "noPublicMatches": "Geen openbare locaties gevonden voor uw zoekopdracht",
       "noPrivateMatches": "Geen privélocaties gevonden voor uw zoekopdracht",
@@ -12902,7 +12975,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "In behandeling"
+        "pending": "In behandeling",
+        "unknown": "Onbekend",
+        "unknownHint": "Agents rapporteren hun gezondheid alleen aan het cluster waarmee ze zijn geregistreerd, dus deze kan het niet bevestigen. De locatie draait mogelijk gewoon."
       },
       "table": {
         "name": "Naam",
@@ -12958,6 +13033,7 @@
         "agentName": "Agent",
         "restartConfig": "Configuratie opnieuw starten — kopieer het installatiecommando van deze agent om de installatie opnieuw uit te voeren / docker opnieuw te starten (bijv. na een tokenrotatie)",
         "noAgents": "Er hebben zich nog geen agenten geregistreerd voor deze locatie.",
+        "agentsUnavailable": "De agents van deze locatie zijn geregistreerd bij een ander cluster en zijn hier niet zichtbaar.",
         "checksTitle": "Controles die vanaf deze locatie worden uitgevoerd",
         "checkName": "Naam",
         "noChecks": "Er zijn nog geen controles toegewezen aan deze locatie.",
@@ -13678,7 +13754,8 @@
       "alertSavedSuccessfully": "Waarschuwing succesvol opgeslagen.",
       "alertUpdatedSuccessfully": "Waarschuwing succesvol bijgewerkt.",
       "openingDedupConfig": "Deduplicatieconfiguratie openen voor: {name}",
-      "editingAlert": "Waarschuwing bewerken: {name}"
+      "editingAlert": "Waarschuwing bewerken: {name}",
+      "someAlertsCouldNotBeExported": "Kon {names} niet lezen. De rest is klaar om te exporteren."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Coderingssleutel succesvol bijgewerkt",
@@ -13992,7 +14069,6 @@
     "rolling": "rollend",
     "totalSlos": "Totaal SLO's",
     "noGrouping": "Geen (een enkele overkoepelende reeks)",
-    "generation": "generatie {n}",
     "newAlert": "Nieuw alarm",
     "overRolling": "over rollend {window}",
     "searchPlaceholder": "Zoek SLO of tag, bijv. team:payments",
@@ -14248,7 +14324,12 @@
       "editTargetMissing": "Die melding staat niet meer op deze SLO.",
       "describeBurn": "Verbrandingssnelheid > {critical} over {long} en {short}",
       "describeBudget": "Foutbudget verbruikt > {critical}%"
-    }
+    },
+    "exportTitle": "Exporteer SLO | Exporteer {count} SLO's",
+    "exportSubtitle": "Bekijk de definitie en download deze vervolgens als JSON of als Terraform voor de OpenObserve-provider.",
+    "exportFailed": "De SLO-definitie kon niet worden gelezen. Probeer het opnieuw.",
+    "exportPartial": "Kon {names} niet lezen. De rest is klaar om te exporteren.",
+    "exportSucceeded": "{count} SLO geëxporteerd | {count} SLO's geëxporteerd"
   },
   "promql": {
     "operations": {

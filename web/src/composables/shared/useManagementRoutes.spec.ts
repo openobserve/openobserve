@@ -401,14 +401,17 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should NOT have syntheticsLocations route when enterprise is disabled", () => {
+    // Synthetics ships in OSS, so the route registers in every build — the
+    // feature gate is the backend `/config` flag, not the build type.
+    it("should have syntheticsLocations route in an OSS build", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
       const synthRoute = routes[0].children.find(
         (child: any) => child.name === "syntheticsLocations",
       );
-      expect(synthRoute).toBeUndefined();
+      expect(synthRoute).toBeDefined();
+      expect(synthRoute.path).toBe("synthetics_locations");
     });
 
     it("should have beforeEnter hook for syntheticsLocations route", () => {
@@ -559,7 +562,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 10 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(10); // 5 base (incl. alert_sources redirect) + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 1 cloud
+      expect(routes[0].children).toHaveLength(11); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 1 cloud
     });
   });
 
@@ -676,63 +679,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should return the same structure on multiple calls", () => {

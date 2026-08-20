@@ -45,13 +45,10 @@ use infra::{
     },
     storage,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
-    merge::{self, MergeParquetResult, MergedFile},
-    sort_order::FileSortOrder,
+    merge::{self, MergeMode, MergeOutput, MergeParquetResult, MergedFile},
 };
 use search_service::file_list;
 use tantivy_utils::index_builder::create_tantivy_index;
@@ -61,6 +58,18 @@ use tokio::{
 };
 
 use super::worker::{MergeBatch, MergeSender};
+
+/// Last microsecond of the range a merge job at `offset` covers: the hour of
+/// `offset`, or the whole day for daily-partitioned streams. No file of the
+/// job can be newer, so "is the range old enough" is decided against this.
+fn job_range_end(offset: i64, partition_time_level: PartitionTimeLevel) -> i64 {
+    let offset = offset - offset % hour_micros(1);
+    if partition_time_level == PartitionTimeLevel::Daily {
+        offset - offset % day_micros(1) + day_micros(1) - 1
+    } else {
+        offset + hour_micros(1) - 1
+    }
+}
 
 /// Generate merging job by stream
 /// 1. get offset from db
@@ -311,6 +320,11 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // -- third period, we can do the merge, so, at least 3 times of
     // -- 1 day, downsampling is in day level
     // max_file_retention_time
+    // The job merges the hour of `offset` and decides the downsampling rule
+    // against the end of that hour (see merge_by_stream), so only enqueue it
+    // once the whole hour is older than the rule's offset; otherwise the job
+    // would run as a plain merge and the advanced offset would skip the hour.
+    let job_end_ts = job_range_end(offset, get_partition_time_level(stream_type));
     if offset >= time_now_day
         || time_now.timestamp_micros() - offset
             <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
@@ -319,7 +333,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
                 .unwrap()
                 * 3
                 + day_micros(1)
-        || time_now.timestamp_micros() - rule.0 * 1_000_000 < offset
+        || time_now.timestamp_micros() - rule.0 * 1_000_000 < job_end_ts
     {
         return Ok(()); // the time is future, just wait
     }
@@ -387,10 +401,11 @@ pub async fn merge_by_stream(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
-    // A job whose offset hour has not yet fully passed is an incremental round on the
-    // still-open current hour (enqueued by the ingester, see service::compaction::incremental):
-    // only seal full-size groups and carry the remainder, so each file is merged into a
-    // sealed output exactly once. The scheduled hour-end pass seals whatever is left.
+    // A job whose offset hour has not yet settled (hour end + 3 * max_file_retention_time,
+    // see is_past_hour) is an incremental round on a hour that can still receive files
+    // (enqueued by the ingester, see service::compaction::incremental): only seal full-size
+    // groups and carry the remainder, so each file is merged into a sealed output exactly
+    // once. The scheduled hour-end pass seals whatever is left.
     let offset = offset - offset % hour_micros(1);
     let is_incremental = !super::is_past_hour(offset);
 
@@ -408,10 +423,28 @@ pub async fn merge_by_stream(
             offset_time.format("%Y/%m/%d/%H").to_string(),
         )
     };
-    let files =
-        file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
-            .await
-            .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
+    // What this hour of files turns into. Decided once here — the workers and
+    // the merge only read it — from the end of the range, so a whole-hour
+    // mode applies to the hour as a unit.
+    let range_end_ts = job_range_end(offset, partition_time_level);
+    let mode = MergeMode::for_compactor(stream_type, stream_name, range_end_ts, !is_incremental);
+    // a whole-hour merge needs every file of the hour, even those already
+    // above the size target that a normal merge would leave alone
+    let max_original_size = if mode.merges_whole_batch() {
+        i64::MAX
+    } else {
+        infra_file_list::merge_max_original_size()
+    };
+    let files = file_list::query_for_merge(
+        org_id,
+        stream_type,
+        stream_name,
+        &date_start,
+        &date_end,
+        max_original_size,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] date range: [{date_start},{date_end}], files: {}",
@@ -441,6 +474,7 @@ pub async fn merge_by_stream(
     for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
+        let mode = mode.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
         let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
@@ -459,24 +493,13 @@ pub async fn merge_by_stream(
                 }
             }
 
-            #[cfg(feature = "enterprise")]
-            let skip_group_files = stream_type == StreamType::Metrics
-                && get_largest_downsampling_rule(
-                    &stream_name,
-                    files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
-                )
-                .is_some();
-
-            #[cfg(not(feature = "enterprise"))]
-            let skip_group_files = false;
-
-            if files_with_size.len() <= 1 && !skip_group_files {
+            if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
                 return Ok(vec![]);
             }
 
             // group files need to merge
             let mut batch_groups = Vec::new();
-            if skip_group_files {
+            if mode.merges_whole_batch() {
                 batch_groups.push(MergeBatch {
                     batch_id: 0,
                     org_id: org_id.clone(),
@@ -484,6 +507,7 @@ pub async fn merge_by_stream(
                     stream_name: stream_name.clone(),
                     prefix: prefix.clone(),
                     files: files_with_size.clone(),
+                    mode: mode.clone(),
                 });
             } else {
                 let mut new_file_list = Vec::new();
@@ -509,6 +533,7 @@ pub async fn merge_by_stream(
                             stream_name: stream_name.clone(),
                             prefix: prefix.clone(),
                             files: new_file_list.clone(),
+                            mode: mode.clone(),
                         });
                         new_file_size = 0;
                         new_file_list.clear();
@@ -529,6 +554,7 @@ pub async fn merge_by_stream(
                         stream_name: stream_name.clone(),
                         prefix: prefix.clone(),
                         files: new_file_list.clone(),
+                        mode: mode.clone(),
                     });
                 }
 
@@ -670,6 +696,7 @@ pub async fn merge_by_stream(
 // - stream_name: the name of the stream
 // - prefix: the prefix of the files
 // - files_with_size: the files to merge
+// - mode: what the merge produces (decided by the scheduler)
 // returns:
 // - new_files: the files that are merged
 // - retain_file_list: the files that are not merged
@@ -680,19 +707,13 @@ pub async fn merge_files(
     stream_name: &str,
     prefix: &str,
     files_with_size: &[FileKey],
+    mode: &MergeMode,
 ) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
     let start = std::time::Instant::now();
-    #[cfg(feature = "enterprise")]
-    let is_match_downsampling_rule = get_largest_downsampling_rule(
-        stream_name,
-        files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
-    )
-    .is_some();
-
-    #[cfg(not(feature = "enterprise"))]
-    let is_match_downsampling_rule = false;
-
-    if files_with_size.len() <= 1 && !is_match_downsampling_rule {
+    // a whole-batch mode (downsampling) merges everything it is given, even a
+    // single file; otherwise 0/1 files means nothing to do
+    let merge_whole_batch = mode.merges_whole_batch();
+    if files_with_size.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -704,7 +725,7 @@ pub async fn merge_files(
         if (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
             || new_compressed_file_size + file.meta.compressed_size
                 > cfg.compact.max_file_size as i64)
-            && !is_match_downsampling_rule
+            && !merge_whole_batch
         {
             break;
         }
@@ -720,7 +741,7 @@ pub async fn merge_files(
             .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge
-    if new_file_list.len() <= 1 && !is_match_downsampling_rule {
+    if new_file_list.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -736,7 +757,7 @@ pub async fn merge_files(
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
-    if new_file_list.len() <= 1 && !is_match_downsampling_rule {
+    if new_file_list.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), retain_file_list));
     }
 
@@ -847,7 +868,7 @@ pub async fn merge_files(
     };
 
     let tables = match TableBuilder::new()
-        .sort_order(FileSortOrder::TimestampDesc)
+        .sort_order(mode.input_sort_order())
         .build(session, files.clone(), schema.clone())
         .await
     {
@@ -859,17 +880,16 @@ pub async fn merge_files(
     };
 
     let merge_result = {
-        let stream_name = stream_name.to_string();
+        let mode = mode.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 merge::merge_parquet_files(
-                    stream_type,
-                    &stream_name,
                     schema,
                     tables,
                     &bloom_filter_fields,
                     new_file_meta,
-                    false,
+                    &mode,
+                    MergeOutput::for_compactor(stream_type),
                 )
                 .await
             })
@@ -905,6 +925,12 @@ pub async fn merge_files(
         files: merged_files,
         file_format,
     } = buf;
+    // an empty result would delete the source files without a replacement
+    if merged_files.is_empty() {
+        return Err(anyhow::anyhow!(
+            "merge_parquet_files error: produced no files"
+        ));
+    }
     let mut new_files = Vec::with_capacity(merged_files.len());
     for MergedFile {
         buf,
@@ -1190,6 +1216,29 @@ mod tests {
     use config::meta::stream::{FileKey, FileMeta};
 
     use super::*;
+
+    #[test]
+    fn test_job_range_end_hourly_and_daily() {
+        // 2026-08-18 10:10:00 UTC
+        let offset = Utc
+            .with_ymd_and_hms(2026, 8, 18, 10, 10, 0)
+            .unwrap()
+            .timestamp_micros();
+        assert_eq!(
+            job_range_end(offset, PartitionTimeLevel::Hourly),
+            Utc.with_ymd_and_hms(2026, 8, 18, 11, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+                - 1
+        );
+        assert_eq!(
+            job_range_end(offset, PartitionTimeLevel::Daily),
+            Utc.with_ymd_and_hms(2026, 8, 19, 0, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+                - 1
+        );
+    }
 
     // Helper function to create test FileKey
     fn create_file_key(key: &str, min_ts: i64, max_ts: i64, original_size: i64) -> FileKey {

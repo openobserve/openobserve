@@ -820,7 +820,13 @@
     "backTo": "Wróć do {label}",
     "boolTrue": "Prawda",
     "boolFalse": "Fałsz",
-    "browserTimeWithZone": "Czas przeglądarki ({zone})"
+    "browserTimeWithZone": "Czas przeglądarki ({zone})",
+    "download": "Pobierz",
+    "openProviderOnRegistry": "Dostawca OpenObserve w {registry}",
+    "exportTerraformTabTooltip": "Ta sama konfiguracja dotyczy Terraform lub OpenTofu.",
+    "exportTerraformEmpty": "Dla tego wyboru nie istnieje zasób Terraform. Wyeksportuj go jako JSON.",
+    "exportTerraformSkipped": "Nieuwzględnione: {names}. Dostawca Terraform OpenObserve nie ma zasobu dla tych elementów.",
+    "exportTerraformDropped": "Pominięto — schemat dostawcy nie może przenosić tych pól: {fields}."
   },
   "flow": {
     "stepPicker": {
@@ -2578,6 +2584,23 @@
     "triggerRequired": "Wymagany jest wyzwalacz",
     "addStepRequired": "Dodaj co najmniej jeden krok po wyzwalaczu",
     "connectAllNodes": "Połącz wszystkie węzły przed zapisaniem",
+    "finishStepsBeforePublish": "Skonfiguruj wszystkie kroki przed publikacją",
+    "draft": "Wersja robocza",
+    "saveDraft": "Zapisz jako wersję roboczą",
+    "publish": "Opublikuj",
+    "draftSaveSuccess": "Wersja robocza zapisana pomyślnie",
+    "publishSuccess": "Przepływ pracy opublikowany pomyślnie",
+    "publishError": "Błąd podczas publikowania przepływu pracy",
+    "comingSoon": "To pojawi się w późniejszym kroku",
+    "triggerType": {
+      "pick": "Wybierz wyzwalacz",
+      "dialogTitle": "Utwórz nowy przepływ pracy",
+      "dialogIntro": "Wybierz, jak ten przepływ pracy jest wyzwalany. Wkrótce pojawi się więcej typów wyzwalaczy.",
+      "cta": "Utwórz przepływ pracy",
+      "soonCta": "Dostępne w przyszłej wersji",
+      "comingSoon": "Wkrótce",
+      "soon": "Wkrótce"
+    },
     "triggerKind": {
       "alertFired": {
         "label": "Alert wyzwolony",
@@ -2675,7 +2698,6 @@
       "linkError": "Nie udało się połączyć alertów."
     },
     "chooseTrigger": "Wybierz wyzwalacz",
-    "edgeDeleteHint": "Naciśnij Backspace / Delete, aby usunąć krawędź",
     "node": {
       "kindTrigger": "Wyzwalacz",
       "kindLogic": "Logika",
@@ -2702,9 +2724,55 @@
       "conditionNoteNull": "Aby sprawdzić wartość null, użyj null. Przykład:",
       "conditionNoteCustom": "Aby dodać niestandardową kolumnę, wpisz jej nazwę i naciśnij Enter.",
       "conditionExampleEmpty": "severity != \"\"",
-      "conditionExampleNull": "severity != null"
+      "conditionExampleNull": "severity != null",
+      "functionBody": "Przekształć dane wejściowe za pomocą funkcji",
+      "functionBodySet": "Stosuje {name}",
+      "functionSelect": "Wybierz funkcję",
+      "functionCreateNew": "Utwórz nową funkcję",
+      "functionRequired": "Funkcja jest wymagana",
+      "functionLoadError": "Nie można wczytać funkcji",
+      "destinationBody": "Wyślij do miejsca docelowego",
+      "destinationBodySet": "Wysyła do {name}",
+      "destinationSelect": "Miejsce docelowe",
+      "destinationCreateNew": "Utwórz nowe miejsce docelowe",
+      "destinationRequired": "Wybierz miejsce docelowe",
+      "destinationLoadError": "Nie można wczytać miejsc docelowych",
+      "namePlaceholder": "Nazwij ten krok (opcjonalnie)",
+      "commentLabel": "Komentarz (opcjonalnie)",
+      "commentPlaceholder": "Dodaj notatkę o tym kroku...",
+      "commentAdd": "Dodaj komentarz",
+      "disable": "Wyłącz krok",
+      "enable": "Włącz krok",
+      "disabledBadge": "Wyłączony",
+      "incompleteBadge": "Skonfiguruj później",
+      "destinationSetUpLater": "Skonfiguruj później",
+      "destinationSetUpLaterPrompt": "Nie masz jeszcze miejsca docelowego? Włącz to, aby skonfigurować je później — możesz zapisać wersję roboczą i przetestować teraz.",
+      "destinationSetUpLaterActive": "Miejsce docelowe jest na razie pomijane — nazwa i komentarz nadal zostaną zapisane. Będziesz potrzebować miejsca docelowego przed publikacją.",
+      "functionSetUpLater": "Skonfiguruj później",
+      "functionSetUpLaterPrompt": "Nie masz jeszcze funkcji? Włącz to, aby skonfigurować ją później — możesz zapisać wersję roboczą i przetestować teraz.",
+      "functionSetUpLaterActive": "Funkcja jest na razie pomijana — nazwa i komentarz nadal zostaną zapisane. Będziesz potrzebować funkcji przed publikacją."
     },
-    "commonFieldsAbove": "Wspólne pola powyżej"
+    "commonFieldsAbove": "Wspólne pola powyżej",
+    "canvas": {
+      "undo": "Cofnij",
+      "tidyUp": "Uporządkuj",
+      "insertStep": "Wstaw krok",
+      "deleteEdge": "Usuń połączenie"
+    },
+    "unsaved": {
+      "title": "Niezapisane zmiany",
+      "message": "Masz niezapisane zmiany. Opuszczenie teraz spowoduje ich odrzucenie.",
+      "discard": "Odrzuć zmiany",
+      "stay": "Kontynuuj edycję"
+    },
+    "results": {
+      "title": "Wyniki kroków",
+      "collapse": "Zwiń",
+      "expand": "Rozwiń",
+      "close": "Wyczyść i zamknij wyniki",
+      "nodesTitle": "Kroki",
+      "empty": "Uruchom test, aby zobaczyć wyniki kroków tutaj."
+    }
   },
   "pipeline": {
     "validation": {
@@ -7302,7 +7370,9 @@
     "sloKind": "Typ warunku",
     "sloLongWindow": "Długie okno",
     "sloShortWindow": "Krótkie okno",
-    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować."
+    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
+    "exportDialogTitle": "Eksportuj alert | Eksportuj {count} alertów",
+    "exportDialogSubtitle": "Przejrzyj definicję, a następnie pobierz ją jako JSON lub jako Terraform dla dostawcy OpenObserve."
   },
   "alert_dependencies": {
     "actionOpen": "Otwórz",
@@ -11454,19 +11524,19 @@
           "span": {
             "title": "Dopasowane spany",
             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile spanów dopasuje Twoje zadanie.",
-            "matchedSuffix": "dopasowane spany · ostatnie 24h",
+            "matchedSuffix": "dopasowane spany · ostatnia 1h",
             "matchedLoading": "Liczenie dopasowanych spanów..."
           },
           "trace": {
             "title": "Dopasowane trace'y",
             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile trace'y dopasuje Twoje zadanie.",
-            "matchedSuffix": "dopasowane trace'y · ostatnie 24h",
+            "matchedSuffix": "dopasowane trace'e · ostatnia 1h",
             "matchedLoading": "Liczenie dopasowanych trace'ów..."
           },
           "session": {
             "title": "Dopasowane sesje",
             "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile sesji dopasuje Twoje zadanie.",
-            "matchedSuffix": "dopasowane sesje · ostatnie 24h",
+            "matchedSuffix": "dopasowane sesje · ostatnia 1h",
             "matchedLoading": "Liczenie dopasowanych sesji..."
           }
         },
@@ -12253,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Nagrywanie anulowane — okno rejestratora zostało zamknięte",
       "restoreFailedHint": "podróż nie może dotrzeć do wybranego punktu, dopóki ten krok nie zostanie ukończony",
       "recordBeforeFailedStep": "Nagraj przed krokiem {step}",
-      "recordingHere": "Nagrywanie tutaj",
+      "newStepsLandHere": "Nowe kroki trafiają tutaj",
       "recordBeforeStep": "Nagraj przed tym krokiem",
       "recordBeforeStepHint": "Odtwórz podróż do tego punktu, a następnie nagraj nowe kroki przed nim.",
       "recordBeforeNeedsNewerExtension": "Zaktualizuj rozszerzenie rejestratora, aby nagrywać od konkretnego kroku.",
@@ -12386,9 +12456,12 @@
       "statusConnecting": "Łączenie",
       "statusOffline": "Offline",
       "statusDown": "Niedostępny",
+      "statusUnknown": "Nieznany",
       "connectingMessage": "Oczekiwanie na pierwsze zgłoszenie agenta — pojawi się wkrótce po instalacji.",
       "offlineMessage": "Agent niedawno się rozłączył — sprawdzenie nie będzie uruchamiane z tego miejsca, dopóki się nie połączy.",
       "downMessage": "Brak agenta od ponad dnia — ta lokalizacja nie uruchomi sprawdzenia, dopóki agent nie połączy się ponownie.",
+      "unknownMessage": "Agenci raportują swój stan tylko do klastra, z którym się zarejestrowali, więc ten nie może tego potwierdzić. Lokalizacja może działać.",
+      "unknownAgents": "Status agenta niedostępny tutaj",
       "noSearchResults": "Żadne lokalizacje nie odpowiadają Twojemu wyszukiwaniu",
       "noPublicMatches": "Żadne lokalizacje publiczne nie odpowiadają Twojemu wyszukiwaniu",
       "noPrivateMatches": "Żadne lokalizacje prywatne nie odpowiadają Twojemu wyszukiwaniu",
@@ -12902,7 +12975,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "Oczekujący"
+        "pending": "Oczekujący",
+        "unknown": "Nieznany",
+        "unknownHint": "Agenci raportują swój stan tylko do klastra, z którym się zarejestrowali, więc ten nie może tego potwierdzić. Lokalizacja może działać."
       },
       "table": {
         "name": "Nazwa",
@@ -12958,6 +13033,7 @@
         "agentName": "Agent",
         "restartConfig": "Konfiguracja restartu — skopiuj polecenie konfiguracji tego agenta, aby ponownie uruchomić instalację / restart dockera (np. po rotacji tokenu)",
         "noAgents": "Żaden agent nie zarejestrował się jeszcze dla tej lokalizacji.",
+        "agentsUnavailable": "Agenci tej lokalizacji zarejestrowali się w innym klastrze i nie są tutaj widoczni.",
         "checksTitle": "Kontrole uruchamiane z tej lokalizacji",
         "checkName": "Nazwa",
         "noChecks": "Żadne kontrole nie zostały jeszcze przypisane do tej lokalizacji.",
@@ -13678,7 +13754,8 @@
       "alertSavedSuccessfully": "Alert został zapisany.",
       "alertUpdatedSuccessfully": "Alert został zaktualizowany.",
       "openingDedupConfig": "Otwieranie konfiguracji deduplikacji dla: {name}",
-      "editingAlert": "Edytowanie alertu: {name}"
+      "editingAlert": "Edytowanie alertu: {name}",
+      "someAlertsCouldNotBeExported": "Nie można odczytać {names}. Pozostałe są gotowe do wyeksportowania."
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Klucz szyfrowania został zaktualizowany",
@@ -13992,7 +14069,6 @@
     "rolling": "przesuwne",
     "totalSlos": "Łączna liczba SLO",
     "noGrouping": "Brak (pojedyncza seria ogólna)",
-    "generation": "generacja {n}",
     "newAlert": "Nowy alert",
     "overRolling": "w przesuwnym oknie {window}",
     "searchPlaceholder": "Szukaj SLO lub tagu, np. team:payments",
@@ -14248,7 +14324,12 @@
       "editTargetMissing": "Ten alert nie jest już przypisany do tego SLO.",
       "describeBurn": "Wskaźnik wypalania > {critical} w ciągu {long} i {short}",
       "describeBudget": "Zużyty budżet błędów > {critical}%"
-    }
+    },
+    "exportTitle": "Eksportuj SLO | Eksportuj {count} SLO",
+    "exportSubtitle": "Przejrzyj definicję, a następnie pobierz ją jako JSON lub jako Terraform dla dostawcy OpenObserve.",
+    "exportFailed": "Nie można odczytać definicji SLO. Spróbuj ponownie.",
+    "exportPartial": "Nie można odczytać {names}. Pozostałe są gotowe do eksportu.",
+    "exportSucceeded": "Wyeksportowano {count} SLO | Wyeksportowano {count} SLO"
   },
   "promql": {
     "operations": {

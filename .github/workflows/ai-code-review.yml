@@ -109,10 +109,32 @@ jobs:
           fi
           echo "force_full=false" >> "$GITHUB_OUTPUT"
 
+      # Mint a GitHub App installation token so the review comment is authored by the
+      # "OpenObserve Code Reviewer" app (branded name + avatar) instead of github-actions[bot].
+      # Gated on the OO_REVIEWER_APP_ID repo/org variable: if the app isn't configured the step is
+      # skipped. `continue-on-error` makes it fail-safe even when the variable IS set but the app
+      # isn't installed yet (or the key is wrong): minting fails, the token output is empty, and
+      # the run step's `|| github.token` fallback posts as github-actions[bot] instead of breaking
+      # CI. So this is safe at every rollout stage; it auto-activates once the app is installed and
+      # OO_REVIEWER_APP_ID + OO_REVIEWER_APP_PRIVATE_KEY are provisioned.
+      - name: Generate OpenObserve Code Reviewer app token
+        id: app_token
+        if: ${{ steps.skip.outputs.skip_review == 'false' && vars.OO_REVIEWER_APP_ID != '' }}
+        continue-on-error: true
+        # Pinned to a full commit SHA (not a mutable tag) because this action receives the app's
+        # signing private key — a repointed/compromised release could exfiltrate it. Same pin
+        # discipline as OPENCODE_VERSION above. Bump deliberately after review.
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ vars.OO_REVIEWER_APP_ID }}
+          private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
+
       - name: Run AI Code Review
         if: steps.skip.outputs.skip_review == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
+          # App token when the app is configured (comment posts as OpenObserve Code Reviewer),
+          # else github.token (posts as github-actions[bot]). Same engine either way.
+          GH_TOKEN: ${{ steps.app_token.outputs.token || github.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           FORCE_FULL: ${{ steps.skip.outputs.force_full }}
           # Provider selection for this matrix leg (see run-review.mjs for how these are used).
