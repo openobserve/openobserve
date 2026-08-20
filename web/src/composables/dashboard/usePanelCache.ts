@@ -36,6 +36,51 @@ import {
   orgScopedKey,
 } from "@/composables/query/idbStorage";
 import { panelKeyDigest } from "@/composables/query/panelKey";
+import { toRaw } from "vue";
+
+/**
+ * Strip Vue's reactive proxies so structured clone can take the value.
+ *
+ * `toRaw` only unwraps the level it is handed, and a panel's result reaches
+ * this file as a proxy several containers deep — every write threw
+ * `DataCloneError: [object Array] could not be cloned` and the cache stayed
+ * empty. Recursion is limited to arrays and plain objects: a raw target holds
+ * its children raw, so the walk stops as soon as `toRaw` returns the same
+ * object it was given, and anything exotic (Date, TypedArray) is already
+ * cloneable and passed through untouched.
+ */
+const toStorable = <T>(value: T, seen = new WeakMap<object, any>()): T => {
+  if (value === null || typeof value !== "object") return value;
+
+  const raw = toRaw(value as object);
+
+  // Result sets repeat the same series object across partitions; without this
+  // a shared child is copied once per reference.
+  const hit = seen.get(raw);
+  if (hit !== undefined) return hit;
+
+  if (Array.isArray(raw)) {
+    const out: any[] = [];
+    seen.set(raw, out);
+    for (let i = 0; i < raw.length; i++) out[i] = toStorable(raw[i], seen);
+    return out as T;
+  }
+
+  // Only plain objects: a Date or a TypedArray clones as-is, and walking one
+  // would rebuild it as a bag of properties.
+  const proto = Object.getPrototypeOf(raw);
+  if (proto !== Object.prototype && proto !== null) return raw as T;
+
+  const out: Record<string, any> = {};
+  seen.set(raw, out);
+  for (const key of Object.keys(raw)) {
+    const child = (raw as Record<string, any>)[key];
+    // Functions are not cloneable and never carry panel state.
+    if (typeof child === "function") continue;
+    out[key] = toStorable(child, seen);
+  }
+  return out as T;
+};
 
 declare global {
   interface Window {
@@ -131,7 +176,7 @@ export const usePanelCache = (
     try {
       await cacheSetOrThrow<PanelCacheEntry>(
         panelKey(org, folderId, dashboardId, panelId, panelKeyDigest(key)),
-        { key, value: data, cacheTimeRange, timestamp: Date.now() },
+        toStorable({ key, value: data, cacheTimeRange, timestamp: Date.now() }),
         PANEL_TTL_MS,
       );
       // The SQL executor saves per partition, so sweep occasionally rather than
