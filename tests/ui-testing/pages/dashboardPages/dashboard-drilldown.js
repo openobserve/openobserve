@@ -113,6 +113,89 @@ export default class DashboardDrilldownPage {
     }).toPass({ timeout: 20000, intervals: [200, 500, 1000] });
   }
 
+  /**
+   * Pick an option out of one of the byDashboard OSelects by its `data-test-value`.
+   *
+   * The three selects cascade through async refetches (folders -> dashboards ->
+   * tabs) driven by watchers in DrilldownPopUp.vue, and the watcher bodies `await`
+   * before they touch the form. That leaves two windows where a plain
+   * "open the dropdown, click the option" sequence silently does the wrong thing:
+   *
+   *  1. The refetch has not STARTED yet, so the select still looks idle
+   *     (`:disabled` is still false) while its `options` are the previous
+   *     dashboard's. Opening it here shows a stale list — the wanted tab is
+   *     simply not in it, and the click then waits out its full timeout against
+   *     an option that was never going to render in that open session.
+   *  2. The dashboard watcher finishes AFTER our click and runs
+   *     `setFormField("data.tab", tabList[0].value)`, overwriting the tab we
+   *     just chose with the destination's first tab ("Default").
+   *
+   * So: re-open until the option is really there, and treat the trigger's own
+   * `data-test-selected-value` as the proof the choice stuck. Both windows are
+   * self-healing on the next attempt because by then the fetch has landed.
+   *
+   * The search box is used to narrow the list first — the popover virtualises its
+   * rows (@tanstack/vue-virtual), so an option far down a long list (the dashboard
+   * select sees every dashboard in the folder, including the ones the other
+   * parallel workers are creating) has no DOM node until it is scrolled to.
+   *
+   * @param {string} baseTestId - e.g. "dashboard-drilldown-tab-select"
+   * @param {string|null} value - `data-test-value` to pick; null picks the first option
+   */
+  async selectOptionByValue(baseTestId, value) {
+    const trigger = this.selectTrigger(baseTestId);
+    const search = this.page.locator(`[data-test="${baseTestId}-search"]`);
+    const option =
+      value === null
+        ? this.page.locator(`[data-test="${baseTestId}-option"]`).first()
+        : this.page
+            .locator(`[data-test="${baseTestId}-option"][data-test-value="${value}"]`)
+            .first();
+
+    await expect(async () => {
+      await this.openSelectDropdown(baseTestId);
+
+      // Filtering also forces the virtualiser to re-render around the match.
+      if (value !== null && (await search.count())) {
+        await search.fill(value);
+      }
+
+      const appeared = await option
+        .waitFor({ state: "visible", timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (!appeared) {
+        // Close before retrying: the option list only re-reads `options` on the
+        // next open, and leaving the popover open would make openSelectDropdown
+        // a no-op on the next attempt (it short-circuits on data-state="open").
+        await this.page.keyboard.press("Escape");
+        await expect(trigger)
+          .not.toHaveAttribute("data-state", "open", { timeout: 5000 })
+          .catch(() => {});
+        throw new Error(
+          `${value === null ? "no option" : `"${value}"`} in ${baseTestId} yet (list still loading)`
+        );
+      }
+
+      await option.click();
+      await expect(trigger).not.toHaveAttribute("data-state", "open", { timeout: 5000 });
+
+      if (value !== null) {
+        await expect(trigger).toHaveAttribute("data-test-selected-value", value, {
+          timeout: 5000,
+        });
+        // Re-assert after a beat: a watcher still in flight can reset the field
+        // right after we read it, and that must fail THIS attempt (so we pick
+        // again) rather than leaving the drilldown pointing at the wrong tab.
+        await this.page.waitForTimeout(600);
+        await expect(trigger).toHaveAttribute("data-test-selected-value", value, {
+          timeout: 2000,
+        });
+      }
+    }).toPass({ timeout: 60000, intervals: [500, 1000, 2000] });
+  }
+
   // Backward-compatible alias for dashboard.spec.js (old signature: folderName, drilldownName, dashboardName, tabName)
   async addDrilldownDashboard(folderName, drilldownName, dashboardName, tabName) {
     return this.addDrilldownByDashboard(drilldownName, folderName, dashboardName, tabName);
@@ -192,20 +275,13 @@ export default class DashboardDrilldownPage {
     await this.openPopup(name);
     // byDashboard is the default drilldown type
     await this.folderSelect.waitFor({ state: 'visible', timeout: 10000 });
-    await this.openSelectDropdown("dashboard-drilldown-folder-select");
-    await this.folderOptionByValue(folderName).first().click();
+    await this.selectOptionByValue("dashboard-drilldown-folder-select", folderName);
 
     await this.dashboardSelect.waitFor({ state: 'visible', timeout: 10000 });
-    await this.openSelectDropdown("dashboard-drilldown-dashboard-select");
-    await this.dashboardOptionByValue(dashboardTitle).first().click();
+    await this.selectOptionByValue("dashboard-drilldown-dashboard-select", dashboardTitle);
 
     await this.tabSelect.waitFor({ state: 'visible', timeout: 10000 });
-    await this.openSelectDropdown("dashboard-drilldown-tab-select");
-    if (tabName) {
-      await this.tabOptionByValue(tabName).first().click();
-    } else {
-      await this.tabOptionAny().first().click();
-    }
+    await this.selectOptionByValue("dashboard-drilldown-tab-select", tabName ?? null);
 
     if (openInNewTab) {
       await this.newTabToggle.waitFor({ state: 'visible', timeout: 5000 });
@@ -238,6 +314,39 @@ export default class DashboardDrilldownPage {
     await tableRow.click();
     await this.page.waitForTimeout(500);
     return this.drilldownMenu;
+  }
+
+  /**
+   * Wait for a same-tab byDashboard drilldown to actually land on the destination.
+   *
+   * `page.waitForURL(/\/dashboards\/view/)` cannot be used for this: the panel we
+   * click the drilldown FROM is itself at /dashboards/view, and waitForURL tests
+   * the current url first, so it resolves before the router has moved anywhere.
+   * That let the test continue while the drilldown's `router.push` was still in
+   * flight — the next navigation (sidebar -> dashboards list) then raced it and
+   * the late push dropped the page back onto a dashboard view, where the list
+   * assertions had nothing to find.
+   *
+   * The destination's id is generated server-side, so key off "the `dashboard`
+   * query param is no longer the one we came from" instead.
+   *
+   * @param {string} previousUrl - page.url() captured BEFORE clicking the menu item
+   */
+  async waitForSameTabDashboardNavigation(previousUrl) {
+    const previousDashboardId = new URL(previousUrl).searchParams.get("dashboard");
+    await this.page.waitForURL(
+      (url) =>
+        url.pathname.includes("/dashboards/view") &&
+        url.searchParams.get("dashboard") !== previousDashboardId,
+      { timeout: 20000 }
+    );
+    // The push has committed; let the destination view mount before the caller
+    // navigates again, so we are not racing a half-rendered route once more.
+    await this.page.locator('[data-test="dashboard-tab-list"]').waitFor({
+      state: "visible",
+      timeout: 20000,
+    });
+    return this.page.url();
   }
 
   /**
