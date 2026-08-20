@@ -130,6 +130,12 @@ const mountView = async () => {
   return wrapper;
 };
 
+/** Rail rows are checkboxes; the click target is the box, not the label. */
+const tickRail = async (wrapper: ReturnType<typeof mount>, test: string) => {
+  await wrapper.find(`[data-test="${test}"]`).find('[role="checkbox"]').trigger("click");
+  await flushPromises();
+};
+
 describe("AlertLibrary", () => {
   beforeEach(async () => {
     manifestRef.value = manifestFixture;
@@ -194,12 +200,29 @@ describe("AlertLibrary", () => {
     expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(true);
   });
 
-  it("shows the first pack's alerts only", async () => {
+  it("opens on the whole library, not on one pack", async () => {
+    // The rail narrows; it does not gate. Landing pre-filtered to whichever
+    // pack happens to sort first hides most of the catalogue behind a click
+    // nobody knows to make.
     const wrapper = await mountView();
     expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(true);
     expect(
       wrapper.find('[data-test="alert-library-card-openobserve/ingest-errors"]').exists(),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it("names the pack in group headings only while more than one is on screen", async () => {
+    // Category names are pack-scoped, so a heading has to say which pack it
+    // belongs to — but repeating it on every group of a single pack is noise.
+    const wrapper = await mountView();
+    expect(wrapper.find('[data-test="alert-library-group-k8s/pod"]').text()).toContain(
+      "Kubernetes",
+    );
+
+    await tickRail(wrapper, "alert-library-rail-pack-k8s");
+    expect(wrapper.find('[data-test="alert-library-group-k8s/pod"]').text()).not.toContain(
+      "Kubernetes",
+    );
   });
 
   it("marks only the alert whose stream is missing, and names that stream", async () => {
@@ -211,7 +234,7 @@ describe("AlertLibrary", () => {
     ).not.toContain("Not ingested");
   });
 
-  it("counts ready, needs-data and total for the active pack, with All last", async () => {
+  it("counts ready, needs-data and total over the packs in view, with All last", async () => {
     const wrapper = await mountView();
     const tiles = wrapper.findAll('[data-test^="alert-library-stat-"]');
     expect(tiles.map((tile) => tile.attributes("data-test"))).toEqual([
@@ -219,9 +242,19 @@ describe("AlertLibrary", () => {
       "alert-library-stat-missing",
       "alert-library-stat-all",
     ]);
-    expect(tiles[0].text()).toContain("2");
+    // All four alerts are in view; only cert-expiring's stream is missing.
+    expect(tiles[0].text()).toContain("3");
     expect(tiles[1].text()).toContain("1");
-    expect(tiles[2].text()).toContain("3");
+    expect(tiles[2].text()).toContain("4");
+  });
+
+  it("recounts the strip when the rail narrows to one pack", async () => {
+    // The tiles describe what is on screen. Left counting the whole library
+    // they would contradict the grid under them.
+    const wrapper = await mountView();
+    await tickRail(wrapper, "alert-library-rail-pack-openobserve");
+    const tiles = wrapper.findAll('[data-test^="alert-library-stat-"]');
+    expect(tiles[2].text()).toContain("1");
   });
 
   it("filters to the unusable alerts when the needs-data tile is clicked", async () => {
@@ -253,25 +286,50 @@ describe("AlertLibrary", () => {
     expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').exists()).toBe(true);
   });
 
-  it("switches packs from the rail and resets the category with it", async () => {
+  it("narrows to the ticked packs, and holds more than one at a time", async () => {
     const wrapper = await mountView();
-    // The rail lists one axis at a time behind a segmented control, so the
-    // categories tab has to be opened before a category row exists.
-    await wrapper.find('[data-test="alert-library-rail-axis-categories"]').trigger("click");
-    await wrapper.find('[data-test="alert-library-rail-category-node"]').trigger("click");
-    await flushPromises();
-    await wrapper.find('[data-test="alert-library-rail-axis-packs"]').trigger("click");
-    await wrapper.find('[data-test="alert-library-rail-pack-openobserve"]').trigger("click");
-    await flushPromises();
+    await tickRail(wrapper, "alert-library-rail-pack-openobserve");
     expect(
       wrapper.find('[data-test="alert-library-card-openobserve/ingest-errors"]').exists(),
     ).toBe(true);
+    expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(
+      false,
+    );
 
-    // Reopen the categories tab to see the reset: the new pack's categories are
-    // a different set, so carrying "node" across would filter to nothing.
+    await tickRail(wrapper, "alert-library-rail-pack-k8s");
+    expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="alert-library-card-openobserve/ingest-errors"]').exists(),
+    ).toBe(true);
+  });
+
+  it("narrows by category, across whichever packs are in view", async () => {
+    const wrapper = await mountView();
+    // The rail lists one axis at a time behind a segmented control.
+    await wrapper.find('[data-test="alert-library-rail-axis-categories"]').trigger("click");
+    await tickRail(wrapper, "alert-library-rail-category-node");
+    expect(wrapper.find('[data-test="alert-library-card-k8s/node-disk-pressure"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("keeps a category ticked when the pack selection changes under it", async () => {
+    // Filters are independent axes, as they are on the metrics explorer rail.
+    // Silently dropping one because another moved would undo a choice the user
+    // can still see ticked.
+    const wrapper = await mountView();
+    await wrapper.find('[data-test="alert-library-rail-axis-categories"]').trigger("click");
+    await tickRail(wrapper, "alert-library-rail-category-node");
+
+    await wrapper.find('[data-test="alert-library-rail-axis-packs"]').trigger("click");
+    await tickRail(wrapper, "alert-library-rail-pack-k8s");
+
     await wrapper.find('[data-test="alert-library-rail-axis-categories"]').trigger("click");
     expect(
-      wrapper.find('[data-test="alert-library-rail-category-all"]').attributes("data-active"),
+      wrapper.find('[data-test="alert-library-rail-category-node"]').attributes("data-active"),
     ).toBe("true");
   });
 
@@ -303,9 +361,14 @@ describe("AlertLibrary", () => {
     expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(false);
   });
 
-  it("shows the collector banner only when nothing in the pack can run", async () => {
+  it("shows the collector banner only when nothing in the one pack in view can run", async () => {
+    // The copy names the pack to send telemetry for, so it is only advice while
+    // exactly one pack is on screen.
     getStreams.mockResolvedValue({ name: "all", list: [] });
     const wrapper = await mountView();
+    expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(false);
+
+    await tickRail(wrapper, "alert-library-rail-pack-k8s");
     expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-library-empty-state"]').text()).toContain("Kubernetes");
   });

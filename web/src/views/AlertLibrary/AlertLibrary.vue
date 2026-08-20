@@ -65,13 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="w-rail border-border-default h-full shrink-0 border-r">
           <LibraryRail
             :packs="packFacets"
-            :pack="activePack"
+            :selected-packs="selectedPacks"
             :categories="categoryFacets"
-            :category="category"
+            :selected-categories="selectedCategories"
             :severities="severityFacets"
             :severity="severity"
-            @update:pack="onPackChange"
-            @update:category="category = $event"
+            @update:selected-packs="selectedPacks = $event"
+            @update:selected-categories="selectedCategories = $event"
             @update:severity="severity = $event"
           />
         </div>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="showCollectorBanner" class="px-page-edge shrink-0 pb-2">
               <LibraryEmptyState
                 :pack-label="activePackLabel"
-                :count="packEntries.length"
+                :count="scopedEntries.length"
                 @action="goToIngestion"
               />
             </div>
@@ -155,6 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-secondary text-2xs flex items-center gap-2 pb-2 font-semibold uppercase"
                     :data-test="`alert-library-group-${group.id}`"
                   >
+                    <span v-if="group.packLabel" class="opacity-70"
+                      >{{ group.packLabel }} &middot;</span
+                    >
                     <span>{{ group.label }}</span>
                     <span class="tabular-nums opacity-70">{{ group.entries.length }}</span>
                   </h2>
@@ -236,8 +239,9 @@ const router = useRouter();
 const { manifest, isLoading, error, loadManifest, isReady } = useAlertLibrary();
 const { getStreams } = useStreams(t);
 
-const selectedPack = ref("");
-const category = ref("all");
+/** Empty = every pack / every category. The rail narrows, it does not gate. */
+const selectedPacks = ref<string[]>([]);
+const selectedCategories = ref<string[]>([]);
 const severity = ref("all");
 /** Stat-strip facet. `null` = no availability filter; "all" never sticks. */
 const facet = ref<"ready" | "missing" | null>(null);
@@ -305,13 +309,26 @@ const packIds = computed<string[]>(() => {
   return ids;
 });
 
-const activePack = computed(() => {
-  if (selectedPack.value && packIds.value.includes(selectedPack.value)) return selectedPack.value;
-  return packIds.value[0] ?? "";
-});
-const activePackLabel = computed(() => packLabel(activePack.value));
+/**
+ * The packs actually on screen. An empty selection means all of them, so the
+ * gallery opens on the whole library and the rail narrows it — the same
+ * contract as the metrics explorer's facet rails.
+ */
+const scopedPackIds = computed(() =>
+  selectedPacks.value.length > 0
+    ? packIds.value.filter((id) => selectedPacks.value.includes(id))
+    : packIds.value,
+);
 
-const packEntries = computed(() => entries.value.filter((e) => e.pack === activePack.value));
+/** Non-null only when one pack is in view — see showCollectorBanner. */
+const solePack = computed(() => (scopedPackIds.value.length === 1 ? scopedPackIds.value[0] : null));
+const activePackLabel = computed(() => packLabel(solePack.value ?? ""));
+
+const scopedEntries = computed(() =>
+  selectedPacks.value.length > 0
+    ? entries.value.filter((entry) => selectedPacks.value.includes(entry.pack))
+    : entries.value,
+);
 
 const packFacets = computed<LibraryFacet[]>(() =>
   packIds.value.map((id) => ({
@@ -325,47 +342,57 @@ const packFacets = computed<LibraryFacet[]>(() =>
 const entryReady = (entry: AlertLibraryEntry): boolean =>
   readinessKnown.value ? isReady(entry, streamsByType.value) : true;
 
-const readyCount = computed(() => packEntries.value.filter(entryReady).length);
-const missingCount = computed(() => packEntries.value.length - readyCount.value);
+const readyCount = computed(() => scopedEntries.value.filter(entryReady).length);
+const missingCount = computed(() => scopedEntries.value.length - readyCount.value);
 
 /**
- * The one case a number cannot express: not a single alert in this pack can
- * run, so the answer is a CTA rather than a count. Anything else and the strip
- * already says it.
+ * The one case a number cannot express: not a single alert in view can run, so
+ * the answer is a CTA rather than a count. Anything else and the strip already
+ * says it.
+ *
+ * Gated on ONE pack being in view because the copy names it — "send {pack}
+ * telemetry" is only advice while there is a single pack to send.
  */
 const showCollectorBanner = computed(
-  () => readinessKnown.value && packEntries.value.length > 0 && readyCount.value === 0,
+  () =>
+    readinessKnown.value &&
+    solePack.value !== null &&
+    scopedEntries.value.length > 0 &&
+    readyCount.value === 0,
 );
 
 // ── facets ─────────────────────────────────────────────────────────────────
 /** Availability filter applies before the rail facets, so rail counts are stable. */
 const availableEntries = computed(() =>
-  packEntries.value.filter((entry) => {
+  scopedEntries.value.filter((entry) => {
     if (facet.value === "ready") return entryReady(entry);
     if (facet.value === "missing") return !entryReady(entry);
     return true;
   }),
 );
 
+/**
+ * Categories of the packs in scope. A selected category that no longer exists
+ * in scope is kept at count 0 so the rail can still list it and the user can
+ * untick it — see the rail's dead-end rule.
+ */
 const categoryFacets = computed<LibraryFacet[]>(() => {
   const counts = new Map<string, number>();
-  for (const entry of packEntries.value) {
+  for (const id of selectedCategories.value) counts.set(id, 0);
+  for (const entry of scopedEntries.value) {
     counts.set(entry.category, (counts.get(entry.category) ?? 0) + 1);
   }
-  return [
-    { id: "all", label: t("alert_library.allCategories"), count: packEntries.value.length },
-    ...[...counts.keys()]
-      .sort((a, b) => a.localeCompare(b))
-      .map((id) => ({ id, label: categoryLabel(id), count: counts.get(id) ?? 0 })),
-  ];
+  return [...counts.keys()]
+    .sort((a, b) => a.localeCompare(b))
+    .map((id) => ({ id, label: categoryLabel(id), count: counts.get(id) ?? 0 }));
 });
 
 const severityFacets = computed<LibraryFacet[]>(() => [
-  { id: "all", label: t("alert_library.severityAll"), count: packEntries.value.length },
+  { id: "all", label: t("alert_library.severityAll"), count: scopedEntries.value.length },
   ...SEVERITY_ORDER.map((id) => ({
     id: id as string,
     label: severityLabel(t, id),
-    count: packEntries.value.filter((entry) => entry.severity === id).length,
+    count: scopedEntries.value.filter((entry) => entry.severity === id).length,
   })),
 ]);
 
@@ -376,7 +403,7 @@ const statItems = computed<StatItem[]>(() => [
     value: readyCount.value,
     icon: "check-circle",
     tone: "success",
-    max: packEntries.value.length,
+    max: scopedEntries.value.length,
     dataTest: "alert-library-stat-ready",
   },
   {
@@ -387,14 +414,14 @@ const statItems = computed<StatItem[]>(() => [
     // Same tone as the chip on every card this tile selects — StatTone exists
     // so one semantic state reads as one colour across the screen.
     tone: "warning",
-    max: packEntries.value.length,
+    max: scopedEntries.value.length,
     dataTest: "alert-library-stat-missing",
   },
   // Last, and never highlighted: it is the way OUT of a filter, not a filter.
   {
     key: "all",
     label: t("alert_library.statAll"),
-    value: packEntries.value.length,
+    value: scopedEntries.value.length,
     icon: "widgets",
     tone: "neutral",
     dataTest: "alert-library-stat-all",
@@ -405,7 +432,10 @@ const statItems = computed<StatItem[]>(() => [
 const visibleEntries = computed(() => {
   const needle = search.value.trim().toLowerCase();
   return availableEntries.value
-    .filter((entry) => category.value === "all" || entry.category === category.value)
+    .filter(
+      (entry) =>
+        selectedCategories.value.length === 0 || selectedCategories.value.includes(entry.category),
+    )
     .filter((entry) => severity.value === "all" || entry.severity === severity.value)
     .filter((entry) => {
       if (!needle) return true;
@@ -418,32 +448,44 @@ const visibleEntries = computed(() => {
     );
 });
 
+/**
+ * Grouped by pack AND category, never category alone: category names are
+ * pack-scoped in the manifest, so two packs can both ship a "connections"
+ * category and merging them under one heading would assert a relationship that
+ * does not exist. The pack is named in the heading only when more than one is
+ * on screen — with a single pack it would repeat on every group.
+ */
 const groupedEntries = computed(() => {
   const groups = new Map<string, AlertLibraryEntry[]>();
   for (const entry of visibleEntries.value) {
-    const bucket = groups.get(entry.category);
+    const key = `${entry.pack}/${entry.category}`;
+    const bucket = groups.get(key);
     if (bucket) bucket.push(entry);
-    else groups.set(entry.category, [entry]);
+    else groups.set(key, [entry]);
   }
+  const packsOnScreen = new Set(visibleEntries.value.map((entry) => entry.pack));
   return [...groups.keys()]
     .sort((a, b) => a.localeCompare(b))
-    .map((id) => ({ id, label: categoryLabel(id), entries: groups.get(id) ?? [] }));
+    .map((key) => {
+      const entriesInGroup = groups.get(key) ?? [];
+      const { pack, category } = entriesInGroup[0];
+      return {
+        id: key,
+        label: categoryLabel(category),
+        packLabel: packsOnScreen.size > 1 ? packLabel(pack) : null,
+        entries: entriesInGroup,
+      };
+    });
 });
 
 const hasActiveFilters = computed(
   () =>
-    category.value !== "all" ||
+    selectedPacks.value.length > 0 ||
+    selectedCategories.value.length > 0 ||
     severity.value !== "all" ||
     facet.value !== null ||
     search.value.trim() !== "",
 );
-
-// ── actions ────────────────────────────────────────────────────────────────
-const onPackChange = (id: string) => {
-  selectedPack.value = id;
-  // A category belongs to a pack; carrying it across would land on an empty grid.
-  category.value = "all";
-};
 
 const onStatSelect = (key: string) => {
   if (key === "all") {
@@ -455,7 +497,8 @@ const onStatSelect = (key: string) => {
 };
 
 const clearFilters = () => {
-  category.value = "all";
+  selectedPacks.value = [];
+  selectedCategories.value = [];
   severity.value = "all";
   facet.value = null;
   search.value = "";
