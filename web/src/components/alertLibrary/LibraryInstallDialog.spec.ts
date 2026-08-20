@@ -353,8 +353,53 @@ describe("LibraryInstallDialog", () => {
       expect(wrapper.find('[data-test="alert-library-install-destinations-failed"]').exists()).toBe(
         true,
       );
-      expect(wrapper.find('[data-test="prebuilt-selector"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="alert-library-install-destination"]').exists()).toBe(true);
+      // NOT the empty-org state: the list is unknown, not known to be empty.
+      expect(wrapper.find('[data-test="alert-library-install-destinations-empty"]').exists()).toBe(
+        false,
+      );
+      // And a way forward either way.
+      expect(wrapper.find('[data-test="alert-library-install-destinations-retry"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="alert-library-install-open-destinations"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("says so plainly when the org genuinely has no destinations", async () => {
+      // A legitimate first-run condition, not an error — and no longer
+      // something this dialog can fix, so it has to point somewhere real.
+      mocks.listDestinations.mockResolvedValue({ data: [] });
+      const wrapper = await mountDialog();
+
+      expect(wrapper.find('[data-test="alert-library-install-destinations-empty"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="alert-library-install-destinations-failed"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="alert-library-install-open-destinations"]').exists()).toBe(
+        true,
+      );
+      // Nothing to pick, so nothing to advance with.
+      expect(
+        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
+      ).toBeDefined();
+    });
+
+    it("routes to the Destinations page for every type, not just a custom one", async () => {
+      const wrapper = await mountDialog();
+      await click(wrapper, "alert-library-install-open-destinations");
+
+      expect(mocks.resolveRoute).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "alertDestinations" }),
+      );
+      expect(windowOpen).toHaveBeenCalledWith(
+        "/web/alerts/destinations?action=add",
+        "_blank",
+        expect.stringContaining("noopener"),
+      );
     });
 
     it("offers a retry that recovers the list", async () => {
@@ -370,206 +415,6 @@ describe("LibraryInstallDialog", () => {
       expect(
         wrapper.find('[data-test="alert-library-install-destination"]').attributes("data-options"),
       ).toBe("ops-slack");
-    });
-
-    it("does not re-create the destination when the reload after creating it fails", async () => {
-      // The reload is not the create. Flipping back to create mode on its
-      // failure — while `chosenDestination` already holds the new name — meant
-      // Back then Next ran createDestination a second time, with the same name.
-      mocks.listDestinations.mockResolvedValueOnce({ data: [] });
-      const wrapper = await mountDialog();
-
-      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
-      await flushPromises();
-      await wrapper
-        .find('[data-test="alert-library-install-destination-name"]')
-        .setValue("library-slack");
-      await wrapper
-        .find('[data-test="alert-library-install-credential-webhookUrl"]')
-        .setValue("https://hooks.slack.com/services/T/B/X");
-
-      // Succeeds but comes back empty — the backend has not caught up with the
-      // create yet. A failed reload is covered by the test above; THIS is the
-      // case that flips mode back to "create" while the name is already chosen.
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      await click(wrapper, "alert-library-install-next");
-
-      expect(mocks.createDestination).toHaveBeenCalledTimes(1);
-      expect(wrapper.find('[data-test="alert-library-install-alerts-step"]').exists()).toBe(true);
-
-      await click(wrapper, "alert-library-install-back");
-      expect(wrapper.find('[data-test="prebuilt-selector"]').exists()).toBe(false);
-
-      await click(wrapper, "alert-library-install-next");
-      expect(mocks.createDestination).toHaveBeenCalledTimes(1);
-    });
-
-    it("sends a test notification before committing to the destination", async () => {
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      mocks.testDestination.mockResolvedValue({ success: false, error: "channel not found" });
-      const wrapper = await mountDialog();
-
-      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
-      await flushPromises();
-      await wrapper
-        .find('[data-test="alert-library-install-credential-webhookUrl"]')
-        .setValue("https://hooks.slack.com/services/T/B/X");
-      await flushPromises();
-      await click(wrapper, "alert-library-install-destination-test");
-
-      expect(mocks.testDestination).toHaveBeenCalledWith(
-        "slack",
-        expect.objectContaining({ webhookUrl: "https://hooks.slack.com/services/T/B/X" }),
-      );
-      expect(
-        wrapper.find('[data-test="alert-library-install-destination-test-result"]').text(),
-      ).toContain("channel not found");
-      // Testing alone must not create anything...
-      expect(mocks.createDestination).not.toHaveBeenCalled();
-
-      // ...and a FAILED test is information, not a gate: the webhook may be
-      // fine and the org's egress blocked. Proving that needs the Next click,
-      // since creation is bound to Next and never to the test button.
-      await wrapper
-        .find('[data-test="alert-library-install-destination-name"]')
-        .setValue("library-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      expect(mocks.createDestination).toHaveBeenCalledTimes(1);
-      expect(wrapper.find('[data-test="alert-library-install-alerts-step"]').exists()).toBe(true);
-    });
-
-    it("starts in create mode when the org has no destination to pick", async () => {
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      const wrapper = await mountDialog();
-      expect(wrapper.find('[data-test="prebuilt-selector"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="alert-library-install-destination"]').exists()).toBe(false);
-    });
-
-    /** Fill in the create form for a Slack destination and advance. */
-    const createSlackDestination = async (wrapper: any) => {
-      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
-      await flushPromises();
-      await wrapper
-        .find('[data-test="alert-library-install-destination-name"]')
-        .setValue("library-slack");
-      await wrapper
-        .find('[data-test="alert-library-install-credential-webhookUrl"]')
-        .setValue("https://hooks.slack.com/services/T/B/X");
-      await flushPromises();
-      await click(wrapper, "alert-library-install-next");
-    };
-
-    it("creates the chosen prebuilt destination from the credentials entered", async () => {
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      const wrapper = await mountDialog();
-      await createSlackDestination(wrapper);
-
-      // First three args only: the real signature takes six (headers,
-      // skipTlsVerify, templateOverride) and an arity-exact assertion would
-      // reject a correct implementation that passes them explicitly.
-      expect(mocks.createDestination.mock.calls[0].slice(0, 3)).toEqual([
-        "slack",
-        "library-slack",
-        expect.objectContaining({ webhookUrl: "https://hooks.slack.com/services/T/B/X" }),
-      ]);
-    });
-
-    it("advances only once the new destination exists", async () => {
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      mocks.createDestination.mockRejectedValue({
-        response: { data: { message: "name already in use" } },
-      });
-      const wrapper = await mountDialog();
-      await createSlackDestination(wrapper);
-
-      // Advancing past a failed create would install alerts pointing at a
-      // destination that was never made.
-      expect(wrapper.find('[data-test="alert-library-install-alerts-step"]').exists()).toBe(false);
-      expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
-    });
-
-    it("adopts the destination it just created for the install", async () => {
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      const wrapper = await mountDialog();
-      await createSlackDestination(wrapper);
-      expect(wrapper.find('[data-test="alert-library-install-alerts-step"]').exists()).toBe(true);
-
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-run");
-      expect(mocks.createAlert.mock.calls[0][1].destinations).toEqual(["library-slack"]);
-    });
-
-    it("stays on the step and shows the field errors when credentials are invalid", async () => {
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      mocks.validateCredentials.mockReturnValue({
-        isValid: false,
-        errors: { webhookUrl: "Webhook URL is required" },
-      });
-      const wrapper = await mountDialog();
-
-      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
-      await flushPromises();
-      await wrapper
-        .find('[data-test="alert-library-install-destination-name"]')
-        .setValue("library-slack");
-      await click(wrapper, "alert-library-install-next");
-
-      expect(mocks.createDestination).not.toHaveBeenCalled();
-      expect(wrapper.find('[data-test="alert-library-install-alerts-step"]').exists()).toBe(false);
-      // Blocked is not enough — the user has to be told which field is wrong.
-      expect(
-        wrapper
-          .find('[data-test="alert-library-install-credential-webhookUrl"]')
-          .attributes("data-error"),
-      ).toBe("Webhook URL is required");
-    });
-
-    it("does not offer to build a custom webhook inline — that is the destinations page", async () => {
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      const wrapper = await mountDialog();
-
-      // Pick a real type and fill the name FIRST, so the block below can only
-      // be attributable to "custom" and not to an empty name.
-      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
-      await flushPromises();
-      await wrapper
-        .find('[data-test="alert-library-install-destination-name"]')
-        .setValue("library-slack");
-      await flushPromises();
-      expect(
-        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeUndefined();
-
-      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "custom");
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="alert-library-install-custom-hint"]').exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeDefined();
-    });
-
-    it("sends the user to the destinations page for a custom webhook", async () => {
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      const wrapper = await mountDialog();
-
-      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "custom");
-      await flushPromises();
-      await click(wrapper, "alert-library-install-open-destinations");
-
-      expect(mocks.resolveRoute).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "alertDestinations" }),
-      );
-      // Features string is loose on purpose: "noopener,noreferrer" is at least
-      // as correct as "noopener", and pinning the exact string rejects it.
-      expect(windowOpen).toHaveBeenCalledWith(
-        "/web/alerts/destinations?action=add",
-        "_blank",
-        expect.stringContaining("noopener"),
-      );
     });
   });
 
@@ -1124,83 +969,6 @@ describe("LibraryInstallDialog", () => {
       await flushPromises();
       await click(wrapper, "alert-library-install-done");
       expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
-    });
-  });
-
-  describe("a session that was left behind", () => {
-    it("does not let a stale destination create poison the next batch", async () => {
-      // Close mid-create, reopen, pick a real destination, THEN let the old
-      // create land. Without a session guard it adopts the post-reset (empty)
-      // name and self-advances, so every alert POSTs destinations: [""] behind
-      // a summary screen claiming the destination was fine.
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      let releaseCreate: () => void = () => {};
-      mocks.createDestination.mockReturnValue(
-        new Promise<void>((resolve) => {
-          releaseCreate = resolve;
-        }),
-      );
-
-      const wrapper = await mountDialog();
-      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
-      await flushPromises();
-      await wrapper
-        .find('[data-test="alert-library-install-destination-name"]')
-        .setValue("library-slack");
-      await wrapper
-        .find('[data-test="alert-library-install-credential-webhookUrl"]')
-        .setValue("https://hooks.slack.com/services/T/B/X");
-      await click(wrapper, "alert-library-install-next");
-
-      // Abandon this session while the create is still in flight.
-      await wrapper.setProps({ open: false });
-      mocks.listDestinations.mockResolvedValue({ data: [{ name: "ops-slack" }] });
-      await wrapper.setProps({ open: true });
-      await flushPromises();
-
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await flushPromises();
-
-      releaseCreate();
-      await flushPromises();
-
-      // Still on step 1, still holding the destination the user just picked.
-      expect(wrapper.find('[data-test="alert-library-install-destination-step"]').exists()).toBe(
-        true,
-      );
-
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-run");
-      expect(mocks.createAlert.mock.calls[0][1].destinations).toEqual(["ops-slack"]);
-    });
-
-    it("does not show a test verdict for a destination the new session never tested", async () => {
-      mocks.listDestinations.mockResolvedValue({ data: [] });
-      let releaseTest: (value: unknown) => void = () => {};
-      mocks.testDestination.mockReturnValue(
-        new Promise((resolve) => {
-          releaseTest = resolve;
-        }),
-      );
-
-      const wrapper = await mountDialog();
-      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
-      await flushPromises();
-      await click(wrapper, "alert-library-install-destination-test");
-
-      await wrapper.setProps({ open: false });
-      await wrapper.setProps({ open: true });
-      await flushPromises();
-
-      releaseTest({ success: true });
-      await flushPromises();
-
-      expect(
-        wrapper.find('[data-test="alert-library-install-destination-test-result"]').exists(),
-      ).toBe(false);
     });
   });
 
