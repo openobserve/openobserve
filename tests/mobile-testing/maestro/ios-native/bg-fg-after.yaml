@@ -1,0 +1,7 @@
+appId: com.o2native.ios
+---
+# App is already foregrounded (via simctl launch, no clearState/relaunch). Navigate to Details so a
+# second view (DetailsViewController, viewB) is recorded in the SAME session.
+- assertVisible: "O2 Native iOS"
+- tapOn: "Go to Details"
+- assertVisible: "Details screen"

@@ -407,10 +407,11 @@ pub async fn merge_by_stream(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
-    // A job whose offset hour has not yet fully passed is an incremental round on the
-    // still-open current hour (enqueued by the ingester, see service::compaction::incremental):
-    // only seal full-size groups and carry the remainder, so each file is merged into a
-    // sealed output exactly once. The scheduled hour-end pass seals whatever is left.
+    // A job whose offset hour has not yet settled (hour end + 3 * max_file_retention_time,
+    // see is_past_hour) is an incremental round on a hour that can still receive files
+    // (enqueued by the ingester, see service::compaction::incremental): only seal full-size
+    // groups and carry the remainder, so each file is merged into a sealed output exactly
+    // once. The scheduled hour-end pass seals whatever is left.
     let offset = offset - offset % hour_micros(1);
     let is_incremental = !super::is_past_hour(offset);
 

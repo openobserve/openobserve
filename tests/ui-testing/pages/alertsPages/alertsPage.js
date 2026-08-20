@@ -1421,13 +1421,25 @@ export class AlertsPage {
         ).first();
         const tabVisible = await folderTab.isVisible({ timeout: 10000 }).catch(() => false);
         if (tabVisible) {
-            // Force-click past the reflow, retrying, until the tab reports data-state="active".
-            // Re-clicking each iteration self-heals a click that landed mid-animation; the
-            // active-state assertion is the real completion signal (activeFolderId switched).
+            // Force-click past the reflow until data-state="active". But data-state flips
+            // before activeFolderId (AlertList.vue) settles, and the "New alert" route reads
+            // activeFolderId — so a createAlert() right after can create in the stale "default"
+            // folder. Also gate on the folder-scoped list refetch (GET .../alerts?...folder=<id>,
+            // id != "default"), which only fires once activeFolderId has actually flipped.
             await expect(async () => {
                 if ((await folderTab.getAttribute('data-state')) !== 'active') {
                     await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+                    const scopedListSettled = folderName === 'default'
+                        ? Promise.resolve()
+                        : this.page.waitForResponse(
+                            resp => resp.request().method() === 'GET'
+                                && resp.url().includes('/alerts?')
+                                && /[?&]folder=/.test(resp.url())
+                                && !/[?&]folder=default(?:&|$)/.test(resp.url()),
+                            { timeout: 8000 }
+                          ).catch(() => {});
                     await folderTab.click({ force: true, timeout: 5000 });
+                    await scopedListSettled;
                 }
                 await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
             }).toPass({ timeout: 30000 });

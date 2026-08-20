@@ -57,9 +57,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
-      <!-- Status -->
+      <!-- Status — "unknown" is not a state of the location, it is the limit of
+           what this region can see, so it carries the explanation with it. -->
       <template #cell-status="{ row }">
-        <OBadge :variant="statusVariant((row as any).status)" :dot="true" size="sm">
+        <OTooltip
+          v-if="liveStatus(row as SyntheticLocation) === 'unknown'"
+          :content="t('synthetics.privateLocations.status.unknownHint')"
+        >
+          <OBadge variant="default-outline" :dot="true" size="sm">
+            {{ t("synthetics.privateLocations.status.unknown") }}
+          </OBadge>
+        </OTooltip>
+        <OBadge v-else :variant="statusVariant((row as any).status)" :dot="true" size="sm">
           {{ t(`synthetics.privateLocations.status.${(row as any).status}`) }}
         </OBadge>
       </template>
@@ -76,7 +85,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            agents). Names/health are on the detail page; shown here on hover. -->
       <template #cell-agents="{ row }">
         <div class="flex min-w-0 flex-col" :title="agentSubtext(row as any) || ''">
-          <span class="truncate"
+          <!-- 0/0 would read as "no agents installed"; this region simply has
+               no count to give. -->
+          <span v-if="liveStatus(row as SyntheticLocation) === 'unknown'" class="text-text-muted"
+            >—</span
+          >
+          <span v-else class="truncate"
             >{{ (row as any).live_agents ?? 0
             }}<span class="text-text-muted">/{{ (row as any).agents_total ?? 0 }}</span></span
           >
@@ -171,9 +185,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { SyntheticLocation } from "@/types/synthetics";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
+import { locationLiveStatus as liveStatus } from "@/utils/synthetics/locationLiveStatus";
 import { syntheticsPrivateLocationRoute } from "@/utils/synthetics/routes";
 
 const props = defineProps<{
