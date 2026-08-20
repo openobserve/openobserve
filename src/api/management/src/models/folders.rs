@@ -194,6 +194,7 @@ mod tests {
         let req = CreateFolderRequestBody {
             name: "New Folder".to_string(),
             description: "A description".to_string(),
+            icon: None,
         };
         let f = config::meta::folder::Folder::from(req);
         assert!(f.folder_id.is_empty());
