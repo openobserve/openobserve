@@ -508,10 +508,7 @@ pub async fn merge_by_stream(
             if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
                 return Ok(vec![]);
             }
-            // A closed TSID-major hour merges only what it has to (see
-            // [`TsidMajorMergeScope`]): nothing when it is finalized, the late
-            // files alone while fragmentation is low, the whole hour once the
-            // fragmentation cap is hit.
+            // what a closed TSID-major hour merges, see [`TsidMajorMergeScope`]
             if mode.is_tsid_major() {
                 match tsid_major_merge_scope(&files_with_size, cfg.compact.max_file_size) {
                     TsidMajorMergeScope::Skip => return Ok(vec![]),

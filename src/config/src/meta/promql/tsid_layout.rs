@@ -24,9 +24,7 @@ use crate::{FileFormat, meta::stream::StreamType};
 
 /// True when `stream_type` uses the TSID-major layout
 /// (`ZO_METRICS_TSID_MAJOR_ENABLED`): Parquet metrics files ordered by
-/// `(__hash__, _timestamp)`, written hash-sorted by the ingester and
-/// size-split by the compactor. Readers must not assume a `_timestamp` order
-/// for such streams.
+/// `(__hash__, _timestamp)`, so readers must not assume a `_timestamp` order.
 pub fn metrics_tsid_major_enabled(stream_type: StreamType) -> bool {
     if stream_type != StreamType::Metrics {
         return false;

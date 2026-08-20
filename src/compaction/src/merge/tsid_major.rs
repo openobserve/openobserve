@@ -13,36 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! What the compactor merges in a closed TSID-major hour
-//! (`ZO_METRICS_TSID_MAJOR_ENABLED`): nothing when the hour is finalized,
-//! the late files alone while fragmentation is low, the whole hour once the
-//! fragmentation cap is hit.
+//! What the compactor merges in a closed TSID-major hour: nothing when it is
+//! finalized, the late files alone while fragmentation is low, else the
+//! whole hour.
 
 use config::meta::{promql::tsid_layout::MetricsFileLayout, stream::FileKey};
 
-/// How many finalized `tsid-major-v3-*` files a closed hour may hold beyond
-/// the ideal count (`total_size / max_file_size`) before late data triggers a
-/// full rewrite of the hour instead of a late-files-only merge.
+/// Finalized `tsid-major-v3-*` files a closed hour may hold beyond the ideal
+/// `total_size / max_file_size` before the whole hour is rewritten.
 const TSID_MAJOR_REWRITE_SLACK: usize = 4;
 
 /// What the merge of a closed TSID-major hour covers.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum TsidMajorMergeScope {
-    /// Every file is `tsid-major-v3-*` and the hour holds an acceptable
-    /// number of them for the current `max_file_size`: leave it alone.
+    /// Every file is `tsid-major-v3-*` and the count fits the current
+    /// `max_file_size`: leave the hour alone.
     Skip,
-    /// Merge only the late (non-v3) files into one new v3 file; the finalized
-    /// files are not touched. Hash ranges of the hour's v3 files then overlap,
-    /// which readers already handle per file (single-file scan partitions).
+    /// Merge only the late (non-v3) files into one new v3; finalized files
+    /// stay. The hour's v3 hash ranges then overlap, which readers handle
+    /// per file.
     LateFilesOnly,
-    /// Fragmentation cap: more finalized files than the ideal count plus
-    /// [`TSID_MAJOR_REWRITE_SLACK`] — rewrite the whole hour. Two ways here:
-    /// late-merge fragments piled up (LSM-style amortization — persistent
-    /// late data pays one full rewrite per several late merges instead of one
-    /// per late batch), or `max_file_size` was raised so the ideal count
-    /// dropped (such hours are re-enqueued by the old-data sweep, which
-    /// selects hours of `>= old_data_min_files` files sized `<=
-    /// max_file_size / 2` against the current config).
+    /// Too many finalized files: rewrite the whole hour. Reached by late
+    /// merges piling up fragments (amortizes their full-rewrite cost) or by
+    /// a raised `max_file_size` shrinking the ideal count (such hours are
+    /// re-enqueued by the old-data sweep).
     WholeHour,
 }
 

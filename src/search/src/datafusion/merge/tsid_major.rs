@@ -146,6 +146,7 @@ impl ActiveSizeTsidWriter {
             ..
         } = self;
 
+        // below the target so a finalized file never advertises >= max_file_size
         file_meta.original_size =
             proportional_original_size(source_meta, file_meta.records).min(max_file_size - 1);
         append_metadata(&mut writer, &file_meta)?;
@@ -161,8 +162,7 @@ impl ActiveSizeTsidWriter {
     }
 }
 
-/// The share of the source `original_size` that `records` rows carry: the
-/// batch of inputs' average logical bytes per row, times `records`.
+/// The share of the source `original_size` that `records` rows carry.
 fn proportional_original_size(source_meta: &FileMeta, records: i64) -> i64 {
     let estimate = (i128::from(source_meta.original_size.max(0)) * i128::from(records.max(0)))
         / i128::from(source_meta.records.max(1));

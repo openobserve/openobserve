@@ -56,15 +56,12 @@ pub enum MergeMode {
     /// as a whole.
     #[cfg(feature = "enterprise")]
     Downsampling(DownsamplingRule),
-    /// TSID-major metrics stream (`ZO_METRICS_TSID_MAJOR_ENABLED`, `__hash__:
-    /// UInt64`), hour still open: the ingester and the incremental compactor
-    /// merges write one Parquet file ordered by `(__hash__, _timestamp)`,
-    /// named `tsid-sorted-*`. The hour-end merge turns those into
-    /// [`MergeMode::TsidMajor`].
+    /// TSID-major metrics stream, hour still open: the ingester and the
+    /// incremental compactor merges write one `tsid-sorted-*` Parquet file
+    /// ordered by `(__hash__, _timestamp)`.
     HashSorted,
-    /// TSID-major metrics stream, closed hour: the whole hour is merged as one
-    /// batch into size-split `tsid-major-v3-*` Parquet files ordered by
-    /// `(__hash__, _timestamp)`.
+    /// TSID-major metrics stream, closed hour: the whole hour merges into
+    /// size-split `tsid-major-v3-*` files in the same order.
     TsidMajor,
 }
 
@@ -150,12 +147,10 @@ impl MergeMode {
 
     /// Physical order of the input `files` the merge query may rely on.
     ///
-    /// A hash-ordered output over inputs that are all `(__hash__, _timestamp)`
-    /// ordered (`tsid-sorted-*` / `tsid-major-v3-*`) declares that order, so
-    /// DataFusion merges the pre-sorted files (SortPreservingMerge, one file per
-    /// partition) instead of a full sort. Any hash-ordered file in a batch that
-    /// is not merged that way (mixed layouts, or the layout switched off) means
-    /// no order can be assumed. Otherwise the classic `_timestamp DESC`.
+    /// A hash-ordered merge whose inputs are all hash-ordered declares that
+    /// order, so DataFusion merges the pre-sorted files instead of a full
+    /// sort. Any mix with other layouts declares no order; otherwise the
+    /// classic `_timestamp DESC`.
     pub fn input_sort_order(&self, files: &[FileKey]) -> FileSortOrder {
         let hash_ordered = files
             .iter()
