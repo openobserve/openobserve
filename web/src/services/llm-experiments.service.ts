@@ -678,10 +678,13 @@ const llmExperimentsService = {
     orgId: string,
     baselineId: string,
     candidateId: string,
-    threshold = 0,
+    // Omitted rather than defaulted: the server owns the neutral threshold, and
+    // a client-side default silently overrides it (a 0 here makes every
+    // movement a regression).
+    threshold?: number,
   ): Promise<ExperimentComparison> {
     const response = await http().get(`${base(orgId)}/compare`, {
-      params: { baselineId, candidateId, threshold },
+      params: { baselineId, candidateId, ...(threshold === undefined ? {} : { threshold }) },
     });
     return normalizeExperimentComparison(response.data);
   },

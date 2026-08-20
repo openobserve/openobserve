@@ -39,6 +39,20 @@ export function aiExperimentDetailRoute(
   };
 }
 
+/** The side-by-side comparison of two runs. The ids are path params so the
+ *  comparison is a shareable, bookmarkable address. */
+export function aiExperimentCompareRoute(
+  orgIdentifier: string,
+  baselineId: string,
+  candidateId: string,
+): RouteLocationRaw {
+  return {
+    name: "aiExperimentCompare",
+    params: { baselineId, candidateId },
+    query: { org_identifier: orgIdentifier },
+  };
+}
+
 /** The create form. `datasetId` preselects the dataset the user came from. */
 export function aiExperimentCreateRoute(
   orgIdentifier: string,

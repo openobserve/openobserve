@@ -12,35 +12,6 @@
     @update:open="$emit('update:open', $event)"
   >
     <div v-if="detail" class="flex h-full min-h-0 flex-col">
-      <header class="border-border-default flex items-center justify-between border-b px-5 py-3">
-        <OButton
-          size="sm"
-          variant="outline"
-          :disabled="!detail.navigation.previousRowId"
-          data-test="ai-experiment-row-previous"
-          @click="navigate(detail.navigation.previousRowId)"
-        >
-          {{ t("aiObservability.experiments.rowDetail.previousRow") }}
-        </OButton>
-        <span class="text-text-secondary text-xs">
-          {{
-            t("aiObservability.experiments.rowDetail.rowPosition", {
-              index: detail.navigation.rowIndex + 1,
-              total: detail.navigation.totalRows,
-            })
-          }}
-        </span>
-        <OButton
-          size="sm"
-          variant="outline"
-          :disabled="!detail.navigation.nextRowId"
-          data-test="ai-experiment-row-next"
-          @click="navigate(detail.navigation.nextRowId)"
-        >
-          {{ t("aiObservability.experiments.rowDetail.nextRow") }}
-        </OButton>
-      </header>
-
       <div class="min-h-0 flex-1 space-y-5 overflow-auto px-5 py-4">
         <!-- Full-width stacked sections, matching DatasetItemDetail so an item
              reads the same in the dataset and in an experiment row. -->
@@ -259,6 +230,18 @@
         </section>
       </div>
     </div>
+
+    <template v-if="detail" #footer>
+      <ExperimentRowNav
+        :index="detail.navigation.rowIndex + 1"
+        :total="detail.navigation.totalRows"
+        :has-previous="!!detail.navigation.previousRowId"
+        :has-next="!!detail.navigation.nextRowId"
+        data-test="ai-experiment-row"
+        @previous="navigate(detail.navigation.previousRowId)"
+        @next="navigate(detail.navigation.nextRowId)"
+      />
+    </template>
   </ODrawer>
 </template>
 
@@ -277,6 +260,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
+import ExperimentRowNav from "./ExperimentRowNav.vue";
 import type {
   ExperimentExecution,
   ExperimentResultSlot,

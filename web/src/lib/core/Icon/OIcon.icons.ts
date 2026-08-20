@@ -285,6 +285,7 @@ import ThumbUpOffAltIcon from "~icons/material-symbols/thumb-up-outline";
 import PersonPinCircleIcon from "~icons/material-symbols/person-pin-circle-outline";
 import ToggleOffIcon from "~icons/material-symbols/toggle-off-outline";
 import TrendingDownIcon from "~icons/material-symbols/trending-down";
+import TrendingFlatIcon from "~icons/material-symbols/trending-flat";
 import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
 import UpdateIcon from "~icons/material-symbols/update";
 import VerifiedIcon from "~icons/material-symbols/verified-outline";
@@ -656,6 +657,7 @@ export const iconRegistry = {
   // "group-work": GroupWorkIcon,
   "toggle-off": ToggleOffIcon,
   "trending-down": TrendingDownIcon,
+  "trending-flat": TrendingFlatIcon,
   troubleshoot: TroubleshootIcon,
   update: UpdateIcon,
   verified: VerifiedIcon,
