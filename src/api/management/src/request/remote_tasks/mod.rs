@@ -23,17 +23,16 @@ use openobserve_core::llm_evaluations::{
     remote_tasks::{
         PublishOutcome, RenderContext, VerificationOutcome, bench, verify::verify_candidate,
     },
-    secrets::{self, SecretError, SecretMaterial, SecretOwnerKind, SecretPurpose},
+    secrets::{self, SecretError, SecretMaterial, SecretOwnerKind},
 };
 
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::remote_tasks::{
         ActivateRemoteTaskSecretRequestBody, CreateRemoteTaskRequestBody,
-        CreateRemoteTaskResponseBody, CreateRemoteTaskSecretRequestBody,
-        ListRemoteTaskSecretsResponseBody, ListRemoteTasksResponseBody,
-        PublishRemoteTaskResponseBody, RemoteTaskRequestBody, RemoteTaskResponseBody,
-        RemoteTaskSecretMetadataBody, ReplaceRemoteTaskSecretRequestBody,
+        CreateRemoteTaskResponseBody, ListRemoteTasksResponseBody, PublishRemoteTaskResponseBody,
+        RemoteTaskRequestBody, RemoteTaskResponseBody, RemoteTaskSecretMetadataBody,
+        RemoteTaskSigningStatusResponseBody, ReplaceRemoteTaskSecretRequestBody,
         RotateRemoteTaskSecretRequestBody, TestConnectionRequestBody,
         TestRemoteTaskSecretCandidateResponseBody, TestRunRequestBody, TestRunResponseBody,
         VerificationReportBody, WrittenRemoteTaskSecretResponseBody,
@@ -82,13 +81,6 @@ fn secret_error_response(value: SecretError) -> Response {
     }
 }
 
-async fn ensure_task_exists(org_id: &str, entity_id: &str) -> Result<(), Response> {
-    remote_tasks::get(org_id, entity_id)
-        .await
-        .map(|_| ())
-        .map_err(remote_task_error_response)
-}
-
 /// The sample a test connection sends when the operator entered none.
 fn sample_context(body: TestConnectionRequestBody) -> RenderContext {
     RenderContext {
@@ -107,108 +99,76 @@ fn sample_context(body: TestConnectionRequestBody) -> RenderContext {
     }
 }
 
-/// ListRemoteTaskSecrets
-#[utoipa::path(
-    get,
-    path = "/{org_id}/remote_tasks/{entity_id}/secrets",
-    context_path = "/api",
-    tag = "RemoteTasks",
-    operation_id = "ListRemoteTaskSecrets",
-    summary = "List remote task secret metadata",
-    description = "Lists non-sensitive metadata only. Secret values are never returned by a read API.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("entity_id" = String, Path, description = "Remote task head id"),
-    ),
-    responses(
-        (status = 200, body = inline(ListRemoteTaskSecretsResponseBody)),
-        (status = 404, description = "Not Found", body = ()),
-    ),
-)]
-pub async fn list_remote_task_secrets(
-    Path((org_id, entity_id)): Path<(String, String)>,
-) -> Response {
-    if let Err(response) = ensure_task_exists(&org_id, &entity_id).await {
-        return response;
-    }
-    if let Err(error) = secrets::sweep_expired().await {
-        return secret_error_response(error);
-    }
-    match secrets::list_for_owner(&org_id, SecretOwnerKind::Task, &entity_id).await {
-        Ok(list) => MetaHttpResponse::json(ListRemoteTaskSecretsResponseBody {
-            list: list.into_iter().map(Into::into).collect(),
-        }),
-        Err(error) => secret_error_response(error),
-    }
+async fn configured_auth_secret_ref(org_id: &str, entity_id: &str) -> Result<String, Response> {
+    let task = remote_tasks::get(org_id, entity_id)
+        .await
+        .map_err(remote_task_error_response)?;
+    task.spec
+        .auth
+        .secret_ref()
+        .map(str::to_string)
+        .ok_or_else(|| MetaHttpResponse::bad_request("Remote task has no configured auth secret"))
 }
 
-/// CreateRemoteTaskSecret
-#[utoipa::path(
-    post,
-    path = "/{org_id}/remote_tasks/{entity_id}/secrets",
-    context_path = "/api",
-    tag = "RemoteTasks",
-    operation_id = "CreateRemoteTaskSecret",
-    summary = "Create a write-only remote task secret",
-    description = "Returns plaintext exactly once in this response. Signing material is generated when omitted.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("entity_id" = String, Path, description = "Remote task head id"),
+async fn configured_header_secret_ref(
+    org_id: &str,
+    entity_id: &str,
+    header_name: &str,
+) -> Result<String, Response> {
+    let task = remote_tasks::get(org_id, entity_id)
+        .await
+        .map_err(remote_task_error_response)?;
+    task.spec
+        .custom_headers
+        .iter()
+        .find(|header| header.key.eq_ignore_ascii_case(header_name))
+        .and_then(|header| header.secret_ref.clone())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            MetaHttpResponse::bad_request(format!(
+                "Remote task header '{header_name}' has no configured secret"
+            ))
+        })
+}
+
+async fn configured_signing_task(
+    org_id: &str,
+    entity_id: &str,
+) -> Result<
+    (
+        openobserve_core::llm_evaluations::remote_tasks::RemoteTask,
+        String,
     ),
-    request_body(content = inline(CreateRemoteTaskSecretRequestBody)),
-    responses(
-        (status = 200, body = inline(WrittenRemoteTaskSecretResponseBody)),
-        (status = 400, description = "Bad Request", body = ()),
-        (status = 404, description = "Not Found", body = ()),
-    ),
-)]
-pub async fn create_remote_task_secret(
-    Path((org_id, entity_id)): Path<(String, String)>,
-    axum::Json(body): axum::Json<CreateRemoteTaskSecretRequestBody>,
-) -> Response {
-    if let Err(response) = ensure_task_exists(&org_id, &entity_id).await {
-        return response;
-    }
-    let purpose: SecretPurpose = body.purpose.into();
-    let material = match (purpose, body.material) {
-        (SecretPurpose::Signing, Some(material)) => material.into(),
-        (SecretPurpose::Signing, None) => secrets::generate_signing_material(),
-        (SecretPurpose::Auth, Some(material)) => material.into(),
-        (SecretPurpose::Auth, None) => {
-            return MetaHttpResponse::bad_request("auth secret material is required");
-        }
-    };
-    match secrets::create(
-        &org_id,
-        SecretOwnerKind::Task,
-        &entity_id,
-        purpose,
-        body.key_id,
-        material,
-    )
-    .await
-    {
-        Ok(secret) => MetaHttpResponse::json(WrittenRemoteTaskSecretResponseBody::from(secret)),
-        Err(error) => secret_error_response(error),
-    }
+    Response,
+> {
+    let task = remote_tasks::get(org_id, entity_id)
+        .await
+        .map_err(remote_task_error_response)?;
+    let secret_ref = task
+        .spec
+        .signing
+        .secret_ref
+        .clone()
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            MetaHttpResponse::bad_request("Remote task has no configured signing secret")
+        })?;
+    Ok((task, secret_ref))
 }
 
 /// ReplaceRemoteTaskAuthSecret
 #[utoipa::path(
     put,
-    path = "/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}",
+    path = "/{org_id}/tasks/{entity_id}/auth",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "ReplaceRemoteTaskAuthSecret",
-    summary = "Replace an auth secret without changing its reference",
-    description = "Re-encrypts the replacement behind the same reference. The response contains metadata only and remote task versions are unchanged.",
+    summary = "Replace the remote task auth secret",
+    description = "Re-encrypts the replacement for the configured auth method. Remote task versions are unchanged.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("entity_id" = String, Path, description = "Remote task head id"),
-        ("secret_ref" = String, Path, description = "Stable secret reference"),
     ),
     request_body(content = inline(ReplaceRemoteTaskSecretRequestBody)),
     responses(
@@ -218,9 +178,13 @@ pub async fn create_remote_task_secret(
     ),
 )]
 pub async fn replace_remote_task_auth_secret(
-    Path((org_id, entity_id, secret_ref)): Path<(String, String, String)>,
+    Path((org_id, entity_id)): Path<(String, String)>,
     axum::Json(body): axum::Json<ReplaceRemoteTaskSecretRequestBody>,
 ) -> Response {
+    let secret_ref = match configured_auth_secret_ref(&org_id, &entity_id).await {
+        Ok(secret_ref) => secret_ref,
+        Err(response) => return response,
+    };
     match secrets::replace_auth(
         &org_id,
         SecretOwnerKind::Task,
@@ -235,30 +199,154 @@ pub async fn replace_remote_task_auth_secret(
     }
 }
 
-/// RevokeRemoteTaskSecret
+/// RevokeRemoteTaskAuthSecret
 #[utoipa::path(
     delete,
-    path = "/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}",
+    path = "/{org_id}/tasks/{entity_id}/auth",
     context_path = "/api",
     tag = "RemoteTasks",
-    operation_id = "RevokeRemoteTaskSecret",
-    summary = "Revoke a remote task secret",
+    operation_id = "RevokeRemoteTaskAuthSecret",
+    summary = "Revoke the remote task auth secret",
+    description = "Revokes the value behind the configured auth reference without changing remote task versions.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("entity_id" = String, Path, description = "Remote task head id"),
-        ("secret_ref" = String, Path, description = "Stable secret reference"),
     ),
     responses(
         (status = 200, description = "Success", body = ()),
+        (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
 )]
-pub async fn revoke_remote_task_secret(
-    Path((org_id, entity_id, secret_ref)): Path<(String, String, String)>,
+pub async fn revoke_remote_task_auth_secret(
+    Path((org_id, entity_id)): Path<(String, String)>,
 ) -> Response {
+    let secret_ref = match configured_auth_secret_ref(&org_id, &entity_id).await {
+        Ok(secret_ref) => secret_ref,
+        Err(response) => return response,
+    };
     match secrets::revoke(&org_id, SecretOwnerKind::Task, &entity_id, &secret_ref).await {
-        Ok(()) => MetaHttpResponse::ok("Remote task secret revoked"),
+        Ok(()) => MetaHttpResponse::ok("Remote task auth secret revoked"),
+        Err(error) => secret_error_response(error),
+    }
+}
+
+/// ReplaceRemoteTaskHeaderSecret
+#[utoipa::path(
+    put,
+    path = "/{org_id}/tasks/{entity_id}/headers/{header_name}/secret",
+    context_path = "/api",
+    tag = "RemoteTasks",
+    operation_id = "ReplaceRemoteTaskHeaderSecret",
+    summary = "Replace a secret-backed remote task header",
+    description = "Re-encrypts the replacement behind the named header's configured reference. Remote task versions are unchanged.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("entity_id" = String, Path, description = "Remote task head id"),
+        ("header_name" = String, Path, description = "Configured custom header name"),
+    ),
+    request_body(content = inline(ReplaceRemoteTaskSecretRequestBody)),
+    responses(
+        (status = 200, body = inline(RemoteTaskSecretMetadataBody)),
+        (status = 400, description = "Bad Request", body = ()),
+        (status = 404, description = "Not Found", body = ()),
+    ),
+)]
+pub async fn replace_remote_task_header_secret(
+    Path((org_id, entity_id, header_name)): Path<(String, String, String)>,
+    axum::Json(body): axum::Json<ReplaceRemoteTaskSecretRequestBody>,
+) -> Response {
+    let secret_ref = match configured_header_secret_ref(&org_id, &entity_id, &header_name).await {
+        Ok(secret_ref) => secret_ref,
+        Err(response) => return response,
+    };
+    match secrets::replace_auth(
+        &org_id,
+        SecretOwnerKind::Task,
+        &entity_id,
+        &secret_ref,
+        body.material.into(),
+    )
+    .await
+    {
+        Ok(metadata) => MetaHttpResponse::json(RemoteTaskSecretMetadataBody::from(metadata)),
+        Err(error) => secret_error_response(error),
+    }
+}
+
+/// RevokeRemoteTaskHeaderSecret
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/tasks/{entity_id}/headers/{header_name}/secret",
+    context_path = "/api",
+    tag = "RemoteTasks",
+    operation_id = "RevokeRemoteTaskHeaderSecret",
+    summary = "Revoke a secret-backed remote task header",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("entity_id" = String, Path, description = "Remote task head id"),
+        ("header_name" = String, Path, description = "Configured custom header name"),
+    ),
+    responses(
+        (status = 200, description = "Success", body = ()),
+        (status = 400, description = "Bad Request", body = ()),
+        (status = 404, description = "Not Found", body = ()),
+    ),
+)]
+pub async fn revoke_remote_task_header_secret(
+    Path((org_id, entity_id, header_name)): Path<(String, String, String)>,
+) -> Response {
+    let secret_ref = match configured_header_secret_ref(&org_id, &entity_id, &header_name).await {
+        Ok(secret_ref) => secret_ref,
+        Err(response) => return response,
+    };
+    match secrets::revoke(&org_id, SecretOwnerKind::Task, &entity_id, &secret_ref).await {
+        Ok(()) => MetaHttpResponse::ok("Remote task header secret revoked"),
+        Err(error) => secret_error_response(error),
+    }
+}
+
+/// GetRemoteTaskSigningStatus
+#[utoipa::path(
+    get,
+    path = "/{org_id}/tasks/{entity_id}/signing",
+    context_path = "/api",
+    tag = "RemoteTasks",
+    operation_id = "GetRemoteTaskSigningStatus",
+    summary = "Get the remote task signing lifecycle status",
+    description = "Returns current, candidate, and grace metadata without secret values or storage references.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("entity_id" = String, Path, description = "Remote task head id"),
+    ),
+    responses(
+        (status = 200, body = inline(RemoteTaskSigningStatusResponseBody)),
+        (status = 400, description = "Bad Request", body = ()),
+        (status = 404, description = "Not Found", body = ()),
+    ),
+)]
+pub async fn get_remote_task_signing_status(
+    Path((org_id, entity_id)): Path<(String, String)>,
+) -> Response {
+    let (_, configured_ref) = match configured_signing_task(&org_id, &entity_id).await {
+        Ok(configured) => configured,
+        Err(response) => return response,
+    };
+    if let Err(error) = secrets::sweep_expired().await {
+        return secret_error_response(error);
+    }
+    match secrets::list_for_owner(&org_id, SecretOwnerKind::Task, &entity_id).await {
+        Ok(list) => MetaHttpResponse::json(RemoteTaskSigningStatusResponseBody {
+            keys: list
+                .into_iter()
+                .filter(|metadata| metadata.secret_ref == configured_ref)
+                .map(Into::into)
+                .collect(),
+        }),
         Err(error) => secret_error_response(error),
     }
 }
@@ -266,7 +354,7 @@ pub async fn revoke_remote_task_secret(
 /// RotateRemoteTaskSigningSecret
 #[utoipa::path(
     post,
-    path = "/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/rotate",
+    path = "/{org_id}/tasks/{entity_id}/signing/rotate",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "RotateRemoteTaskSigningSecret",
@@ -276,7 +364,6 @@ pub async fn revoke_remote_task_secret(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("entity_id" = String, Path, description = "Remote task head id"),
-        ("secret_ref" = String, Path, description = "Stable secret reference"),
     ),
     request_body(content = inline(RotateRemoteTaskSecretRequestBody)),
     responses(
@@ -287,9 +374,13 @@ pub async fn revoke_remote_task_secret(
     ),
 )]
 pub async fn rotate_remote_task_signing_secret(
-    Path((org_id, entity_id, secret_ref)): Path<(String, String, String)>,
+    Path((org_id, entity_id)): Path<(String, String)>,
     axum::Json(body): axum::Json<RotateRemoteTaskSecretRequestBody>,
 ) -> Response {
+    let (_, secret_ref) = match configured_signing_task(&org_id, &entity_id).await {
+        Ok(configured) => configured,
+        Err(response) => return response,
+    };
     let material = body
         .material
         .map(SecretMaterial::from)
@@ -312,7 +403,7 @@ pub async fn rotate_remote_task_signing_secret(
 /// TestRemoteTaskSigningCandidate
 #[utoipa::path(
     post,
-    path = "/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/test",
+    path = "/{org_id}/tasks/{entity_id}/signing/test",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "TestRemoteTaskSigningCandidate",
@@ -322,7 +413,6 @@ pub async fn rotate_remote_task_signing_secret(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("entity_id" = String, Path, description = "Remote task head id"),
-        ("secret_ref" = String, Path, description = "Stable secret reference"),
     ),
     request_body(content = inline(TestConnectionRequestBody)),
     responses(
@@ -332,21 +422,16 @@ pub async fn rotate_remote_task_signing_secret(
     ),
 )]
 pub async fn test_remote_task_signing_candidate(
-    Path((org_id, entity_id, secret_ref)): Path<(String, String, String)>,
+    Path((org_id, entity_id)): Path<(String, String)>,
     axum::Json(body): axum::Json<TestConnectionRequestBody>,
 ) -> Response {
     // Rotation is independent of draft versioning, so test against the latest
     // published configuration. `get` falls back to the draft only for a head
     // that has never published.
-    let task = match remote_tasks::get(&org_id, &entity_id).await {
-        Ok(task) => task,
-        Err(error) => return remote_task_error_response(error),
+    let (task, secret_ref) = match configured_signing_task(&org_id, &entity_id).await {
+        Ok(configured) => configured,
+        Err(response) => return response,
     };
-    if task.spec.signing.secret_ref.as_deref() != Some(secret_ref.as_str()) {
-        return MetaHttpResponse::bad_request(
-            "secret_ref is not the signing secret configured on this remote task",
-        );
-    }
 
     let outcome = verify_candidate(&task, &sample_context(body)).await;
     let (verified, error, report) = match outcome {
@@ -379,7 +464,7 @@ pub async fn test_remote_task_signing_candidate(
 /// ActivateRemoteTaskSigningCandidate
 #[utoipa::path(
     post,
-    path = "/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/activate",
+    path = "/{org_id}/tasks/{entity_id}/signing/activate",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "ActivateRemoteTaskSigningCandidate",
@@ -389,7 +474,6 @@ pub async fn test_remote_task_signing_candidate(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("entity_id" = String, Path, description = "Remote task head id"),
-        ("secret_ref" = String, Path, description = "Stable secret reference"),
     ),
     request_body(content = inline(ActivateRemoteTaskSecretRequestBody)),
     responses(
@@ -400,9 +484,13 @@ pub async fn test_remote_task_signing_candidate(
     ),
 )]
 pub async fn activate_remote_task_signing_candidate(
-    Path((org_id, entity_id, secret_ref)): Path<(String, String, String)>,
+    Path((org_id, entity_id)): Path<(String, String)>,
     axum::Json(body): axum::Json<ActivateRemoteTaskSecretRequestBody>,
 ) -> Response {
+    let (_, secret_ref) = match configured_signing_task(&org_id, &entity_id).await {
+        Ok(configured) => configured,
+        Err(response) => return response,
+    };
     match secrets::activate_signing(
         &org_id,
         SecretOwnerKind::Task,
@@ -420,7 +508,7 @@ pub async fn activate_remote_task_signing_candidate(
 /// EndRemoteTaskSigningGrace
 #[utoipa::path(
     post,
-    path = "/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/end_grace",
+    path = "/{org_id}/tasks/{entity_id}/signing/end_grace",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "EndRemoteTaskSigningGrace",
@@ -429,7 +517,6 @@ pub async fn activate_remote_task_signing_candidate(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("entity_id" = String, Path, description = "Remote task head id"),
-        ("secret_ref" = String, Path, description = "Stable secret reference"),
     ),
     responses(
         (status = 200, description = "Success", body = ()),
@@ -437,10 +524,47 @@ pub async fn activate_remote_task_signing_candidate(
     ),
 )]
 pub async fn end_remote_task_signing_grace(
-    Path((org_id, entity_id, secret_ref)): Path<(String, String, String)>,
+    Path((org_id, entity_id)): Path<(String, String)>,
 ) -> Response {
+    let (_, secret_ref) = match configured_signing_task(&org_id, &entity_id).await {
+        Ok(configured) => configured,
+        Err(response) => return response,
+    };
     match secrets::end_grace_early(&org_id, SecretOwnerKind::Task, &entity_id, &secret_ref).await {
         Ok(()) => MetaHttpResponse::ok("Signing-key grace period ended"),
+        Err(error) => secret_error_response(error),
+    }
+}
+
+/// RevokeRemoteTaskSigningSecret
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/tasks/{entity_id}/signing",
+    context_path = "/api",
+    tag = "RemoteTasks",
+    operation_id = "RevokeRemoteTaskSigningSecret",
+    summary = "Revoke the remote task signing secret",
+    description = "Revokes all values behind the configured signing reference without changing remote task versions.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("entity_id" = String, Path, description = "Remote task head id"),
+    ),
+    responses(
+        (status = 200, description = "Success", body = ()),
+        (status = 400, description = "Bad Request", body = ()),
+        (status = 404, description = "Not Found", body = ()),
+    ),
+)]
+pub async fn revoke_remote_task_signing_secret(
+    Path((org_id, entity_id)): Path<(String, String)>,
+) -> Response {
+    let (_, secret_ref) = match configured_signing_task(&org_id, &entity_id).await {
+        Ok(configured) => configured,
+        Err(response) => return response,
+    };
+    match secrets::revoke(&org_id, SecretOwnerKind::Task, &entity_id, &secret_ref).await {
+        Ok(()) => MetaHttpResponse::ok("Remote task signing secret revoked"),
         Err(error) => secret_error_response(error),
     }
 }
@@ -448,7 +572,7 @@ pub async fn end_remote_task_signing_grace(
 /// ListRemoteTasks
 #[utoipa::path(
     get,
-    path = "/{org_id}/remote_tasks",
+    path = "/{org_id}/tasks",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "ListRemoteTasks",
@@ -505,7 +629,7 @@ pub async fn list_remote_tasks(
 /// CreateRemoteTask
 #[utoipa::path(
     post,
-    path = "/{org_id}/remote_tasks",
+    path = "/{org_id}/tasks",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "CreateRemoteTask",
@@ -545,7 +669,7 @@ pub async fn create_remote_task(
 /// GetRemoteTask
 #[utoipa::path(
     get,
-    path = "/{org_id}/remote_tasks/{entity_id}",
+    path = "/{org_id}/tasks/{entity_id}",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "GetRemoteTask",
@@ -578,7 +702,7 @@ pub async fn get_remote_task(Path((org_id, entity_id)): Path<(String, String)>) 
 /// ListRemoteTaskVersions
 #[utoipa::path(
     get,
-    path = "/{org_id}/remote_tasks/{entity_id}/versions",
+    path = "/{org_id}/tasks/{entity_id}/versions",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "ListRemoteTaskVersions",
@@ -611,7 +735,7 @@ pub async fn list_remote_task_versions(
 /// SaveRemoteTaskDraft
 #[utoipa::path(
     put,
-    path = "/{org_id}/remote_tasks/{entity_id}",
+    path = "/{org_id}/tasks/{entity_id}",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "SaveRemoteTaskDraft",
@@ -659,7 +783,7 @@ pub async fn save_remote_task_draft(
 /// GetRemoteTaskDraft
 #[utoipa::path(
     get,
-    path = "/{org_id}/remote_tasks/{entity_id}/draft",
+    path = "/{org_id}/tasks/{entity_id}/draft",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "GetRemoteTaskDraft",
@@ -692,7 +816,7 @@ pub async fn get_remote_task_draft(Path((org_id, entity_id)): Path<(String, Stri
 /// DiscardRemoteTaskDraft
 #[utoipa::path(
     delete,
-    path = "/{org_id}/remote_tasks/{entity_id}/draft",
+    path = "/{org_id}/tasks/{entity_id}/draft",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "DiscardRemoteTaskDraft",
@@ -722,7 +846,7 @@ pub async fn discard_remote_task_draft(
 /// PublishRemoteTask
 #[utoipa::path(
     post,
-    path = "/{org_id}/remote_tasks/{entity_id}/test_connection",
+    path = "/{org_id}/tasks/{entity_id}/test_connection",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "PublishRemoteTask",
@@ -781,7 +905,7 @@ pub async fn publish_remote_task(
 /// DeleteRemoteTask
 #[utoipa::path(
     delete,
-    path = "/{org_id}/remote_tasks/{entity_id}",
+    path = "/{org_id}/tasks/{entity_id}",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "DeleteRemoteTask",
@@ -814,7 +938,7 @@ pub async fn delete_remote_task(Path((org_id, entity_id)): Path<(String, String)
 /// TestRunRemoteTask
 #[utoipa::path(
     post,
-    path = "/{org_id}/remote_tasks/{entity_id}/test_run",
+    path = "/{org_id}/tasks/{entity_id}/test_run",
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "TestRunRemoteTask",

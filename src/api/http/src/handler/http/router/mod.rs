@@ -385,7 +385,14 @@ fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
         return false;
     }
     let segments = path.split('/').collect::<Vec<_>>();
-    segments.contains(&"remote_tasks") && segments.contains(&"secrets")
+    let Some(tasks) = segments.iter().position(|segment| *segment == "tasks") else {
+        return false;
+    };
+    let task_path = &segments[tasks + 1..];
+    (method == Method::POST && task_path.is_empty())
+        || task_path
+            .iter()
+            .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -1185,18 +1192,19 @@ pub fn service_routes() -> Router {
 
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
-                .route("/{org_id}/remote_tasks", get(remote_tasks::list_remote_tasks).post(remote_tasks::create_remote_task))
-                .route("/{org_id}/remote_tasks/{entity_id}/secrets", get(remote_tasks::list_remote_task_secrets).post(remote_tasks::create_remote_task_secret))
-                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/rotate", post(remote_tasks::rotate_remote_task_signing_secret))
-                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/test", post(remote_tasks::test_remote_task_signing_candidate))
-                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/activate", post(remote_tasks::activate_remote_task_signing_candidate))
-                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/end_grace", post(remote_tasks::end_remote_task_signing_grace))
-                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}", put(remote_tasks::replace_remote_task_auth_secret).delete(remote_tasks::revoke_remote_task_secret))
-                .route("/{org_id}/remote_tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
-                .route("/{org_id}/remote_tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
-                .route("/{org_id}/remote_tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
-                .route("/{org_id}/remote_tasks/{entity_id}/test_run", post(remote_tasks::test_run_remote_task))
-                .route("/{org_id}/remote_tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
+                .route("/{org_id}/tasks", get(remote_tasks::list_remote_tasks).post(remote_tasks::create_remote_task))
+                .route("/{org_id}/tasks/{entity_id}/auth", put(remote_tasks::replace_remote_task_auth_secret).delete(remote_tasks::revoke_remote_task_auth_secret))
+                .route("/{org_id}/tasks/{entity_id}/headers/{header_name}/secret", put(remote_tasks::replace_remote_task_header_secret).delete(remote_tasks::revoke_remote_task_header_secret))
+                .route("/{org_id}/tasks/{entity_id}/signing/rotate", post(remote_tasks::rotate_remote_task_signing_secret))
+                .route("/{org_id}/tasks/{entity_id}/signing/test", post(remote_tasks::test_remote_task_signing_candidate))
+                .route("/{org_id}/tasks/{entity_id}/signing/activate", post(remote_tasks::activate_remote_task_signing_candidate))
+                .route("/{org_id}/tasks/{entity_id}/signing/end_grace", post(remote_tasks::end_remote_task_signing_grace))
+                .route("/{org_id}/tasks/{entity_id}/signing", get(remote_tasks::get_remote_task_signing_status).delete(remote_tasks::revoke_remote_task_signing_secret))
+                .route("/{org_id}/tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
+                .route("/{org_id}/tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
+                .route("/{org_id}/tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
+                .route("/{org_id}/tasks/{entity_id}/test_run", post(remote_tasks::test_run_remote_task))
+                .route("/{org_id}/tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
                 .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
@@ -1647,22 +1655,20 @@ mod tests {
     #[test]
     fn audit_redacts_every_remote_task_secret_write_body() {
         for (method, path) in [
-            (Method::POST, "api/org/remote_tasks/task-1/secrets"),
-            (Method::PUT, "api/org/remote_tasks/task-1/secrets/ref-1"),
-            (
-                Method::POST,
-                "api/org/remote_tasks/task-1/secrets/ref-1/rotate",
-            ),
+            (Method::POST, "api/org/tasks"),
+            (Method::PUT, "api/org/tasks/task-1/auth"),
+            (Method::PUT, "api/org/tasks/task-1/headers/x-api-key/secret"),
+            (Method::POST, "api/org/tasks/task-1/signing/rotate"),
         ] {
             assert!(is_remote_task_secret_write(&method, path));
         }
         assert!(!is_remote_task_secret_write(
             &Method::GET,
-            "api/org/remote_tasks/task-1/secrets"
+            "api/org/tasks/task-1"
         ));
         assert!(!is_remote_task_secret_write(
             &Method::POST,
-            "api/org/remote_tasks/task-1/test_run"
+            "api/org/tasks/task-1/test_run"
         ));
     }
 

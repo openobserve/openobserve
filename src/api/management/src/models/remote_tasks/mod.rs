@@ -809,16 +809,6 @@ impl From<RemoteTaskSecretMaterialBody> for SecretMaterial {
 
 #[derive(Clone, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateRemoteTaskSecretRequestBody {
-    pub purpose: RemoteTaskSecretPurposeBody,
-    /// Optional only for signing secrets, where OpenObserve generates a
-    /// cryptographically random value and returns it exactly once.
-    pub material: Option<RemoteTaskSecretMaterialBody>,
-    pub key_id: Option<String>,
-}
-
-#[derive(Clone, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ReplaceRemoteTaskSecretRequestBody {
     pub material: RemoteTaskSecretMaterialBody,
 }
@@ -857,7 +847,6 @@ impl From<SecretMaterial> for RemoteTaskSecretMaterialResponseBody {
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteTaskSecretMetadataBody {
-    pub secret_ref: String,
     pub purpose: RemoteTaskSecretPurposeBody,
     pub key_id: Option<String>,
     pub state: String,
@@ -871,7 +860,6 @@ impl From<SecretMetadata> for RemoteTaskSecretMetadataBody {
     fn from(value: SecretMetadata) -> Self {
         debug_assert_eq!(value.owner_kind, SecretOwnerKind::Task);
         Self {
-            secret_ref: value.secret_ref,
             purpose: value.purpose.into(),
             key_id: value.key_id,
             state: value.state,
@@ -883,13 +871,18 @@ impl From<SecretMetadata> for RemoteTaskSecretMetadataBody {
     }
 }
 
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTaskSigningStatusResponseBody {
+    pub keys: Vec<RemoteTaskSecretMetadataBody>,
+}
+
 #[derive(Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WrittenRemoteTaskSecretResponseBody {
     #[serde(flatten)]
     pub metadata: RemoteTaskSecretMetadataBody,
-    /// Returned only from this create/rotate response. No read route
-    /// exposes it later.
+    /// Returned only from a rotate response. No read route exposes it later.
     pub material: RemoteTaskSecretMaterialResponseBody,
 }
 
@@ -934,12 +927,6 @@ impl From<RemoteTaskRegistrationOutcome> for CreateRemoteTaskResponseBody {
             generated_signing_secret,
         }
     }
-}
-
-#[derive(Clone, Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ListRemoteTaskSecretsResponseBody {
-    pub list: Vec<RemoteTaskSecretMetadataBody>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
