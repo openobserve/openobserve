@@ -212,18 +212,19 @@ pub async fn work_group_checking(
     caller: &str,
 ) -> Result<()> {
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    if SEARCH_SERVER
+    if let Err(err) = SEARCH_SERVER
         .insert_sender(trace_id, abort_sender, false)
         .await
-        .is_err()
     {
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .dec();
         dist_lock::unlock_with_trace_id(trace_id, locker).await?;
-        log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
+        log::warn!(
+            "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
+        );
         return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-            "[trace_id {trace_id}] search->cluster: request canceled before enter queue"
+            "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
         ))));
     }
     tokio::select! {

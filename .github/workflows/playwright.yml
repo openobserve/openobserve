@@ -312,8 +312,23 @@ jobs:
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
 
-          # Install apt system dependencies (always needed)
-          npx playwright install-deps chromium
+          # Install apt system dependencies (always needed).
+          # azure.archive.ubuntu.com intermittently times out fetching font/lib
+          # packages, which makes `install-deps` exit 100 and fails the whole job.
+          # Give apt its own per-fetch retries and wrap the call in a backoff loop.
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/99retries >/dev/null
+          for attempt in 1 2 3; do
+            if npx playwright install-deps chromium; then
+              echo "install-deps succeeded on attempt ${attempt}"
+              break
+            fi
+            if [ "${attempt}" = 3 ]; then
+              echo "::error::playwright install-deps chromium failed after 3 attempts"
+              exit 1
+            fi
+            echo "install-deps attempt ${attempt} failed; retrying in $((attempt * 20))s"
+            sleep $((attempt * 20))
+          done
 
           # Get revision from playwright's own metadata
           CHROMIUM_REV=$(node -pe "
