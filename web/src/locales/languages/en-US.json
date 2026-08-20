@@ -7459,6 +7459,7 @@
       "metricConditionHint": "Compared against the value the query returns. A real field beside the query, not a number inside it.",
       "operator": "Operator",
       "threshold": "Threshold",
+      "matchCount": "Matching rows required",
       "thresholdHintPromql": "How many matching series are needed, compared with {operator}.",
       "thresholdHintSql": "How many matching rows are needed, compared with {operator}.",
       "period": "Evaluation window",
@@ -10269,7 +10270,11 @@
     "annotate": {
       "button": "Annotate",
       "title": "Annotate · {scope}",
-      "scope": { "span": "Span", "trace": "Trace", "session": "Session" },
+      "scope": {
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Session"
+      },
       "viaAnnotation": "Annotation",
       "addDimension": "Add A Dimension To Score",
       "addDimensionHint": "Pick any dimensions you want — fill each one in below, review them together, then save them all at once.",
@@ -10588,7 +10593,7 @@
             "item": "Item",
             "versions": "Versions"
           },
-          "versionPill": "v{version} \u00b7 {count} Version | v{version} \u00b7 {count} Versions",
+          "versionPill": "v{version} · {count} Version | v{version} · {count} Versions",
           "sourceSection": "Source",
           "sourceTrace": "Trace",
           "sourceSpan": "Span",
@@ -10596,7 +10601,7 @@
           "sourceImport": "Imported From",
           "inputSection": "Input",
           "expectedSection": "Expected Output",
-          "editNewVersion": "Edit \u00b7 New Version",
+          "editNewVersion": "Edit · New Version",
           "tagsSection": "Tags",
           "noTags": "No Tags",
           "metadataSection": "Metadata",
@@ -10604,7 +10609,7 @@
           "deleteButton": "Delete Item",
           "versionsIntro": "Every edit appends an immutable version. The newest one is the live item.",
           "versionCurrent": "Current",
-          "versionMeta": "{user} \u00b7 {time}",
+          "versionMeta": "{user} · {time}",
           "versionsEmpty": "No Version History",
           "versionsError": "Failed to load item versions"
         },
@@ -14280,7 +14285,7 @@
       "aggregatePromql": "PromQL expression",
       "aggregatePromqlHint": "A metrics stream is queried in PromQL. The expression is evaluated at the end of each slice and compared against the threshold below, so give its range selector the width of one slice, and reduce it to a single series: histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
       "countGoodPromql": "Good events (PromQL)",
-      "countGoodPromqlHint": "The numerator: the counter increase over the events that count as good \u2014 usually the total's counter narrowed by a label matcher.",
+      "countGoodPromqlHint": "The numerator: the counter increase over the events that count as good — usually the total's counter narrowed by a label matcher.",
       "countTotalPromql": "Total events (PromQL)",
       "countTotalPromqlHint": "The denominator, not the complement of the numerator: the same counter without the good filter. The SLI is good divided by total.",
       "countPromqlRangeHint": "Give both expressions a range selector one slice wide — increase(http_requests_total[{range}]) for a {range} slice. A wider or narrower window silently over- or under-counts.",

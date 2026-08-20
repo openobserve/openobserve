@@ -220,6 +220,27 @@ describe("LibraryDrawer", () => {
     ).toBe("100");
   });
 
+  it("shows one threshold on a PromQL alert, not two", async () => {
+    // The metric condition IS the threshold ("fire above 80% CPU"). The
+    // trigger_condition threshold is a series COUNT, and every PromQL alert in
+    // the library pins it at 1 — so rendering both put an editable field with a
+    // single sensible value directly beneath the number the user came to change,
+    // under the same label. Verified across the catalog: 69/69 PromQL alerts.
+    const wrapper = await mountDrawer();
+
+    expect(wrapper.find('[data-test="alert-library-drawer-promql-value"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').exists()).toBe(false);
+  });
+
+  it("keeps the match count on a SQL alert, where it is the only threshold", async () => {
+    // No metric condition exists here, so this field carries the real meaning
+    // and must not disappear with it.
+    mocks.loadAlertFile.mockResolvedValue(sqlFile());
+    const wrapper = await mountDrawer({ entry: sqlEntry });
+
+    expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').exists()).toBe(true);
+  });
+
   it("seeds the structured knobs from the file rather than from a default", async () => {
     const wrapper = await mountDrawer();
     const value = (test: string) => wrapper.find(`[data-test="${test}"]`).attributes("value");

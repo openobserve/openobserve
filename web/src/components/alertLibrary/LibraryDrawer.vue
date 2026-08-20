@@ -198,11 +198,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
+            <!-- Series/row COUNT, not a magnitude — "how many matched", where
+                 Metric condition above is "how much". Hidden when the alert has
+                 a structured metric condition: every PromQL alert in the library
+                 pins this at 1, so it was an editable field with one sensible
+                 value sitting directly under the threshold people actually came
+                 to change, sharing its label and reading as a contradiction.
+                 SQL alerts have no metric condition, so there it is the only
+                 threshold and stays. -->
             <OInput
+              v-if="showMatchCount"
               type="number"
               size="sm"
               :model-value="tunables.threshold"
-              :label="t('alert_library.drawer.threshold')"
+              :label="t('alert_library.drawer.matchCount')"
               :help-text="thresholdHint"
               data-test="alert-library-drawer-threshold"
               @update:model-value="setTunable('threshold', $event)"
@@ -556,6 +565,12 @@ const priorityText = computed(() => {
 
 const hasPromqlCondition = computed(() => tunables.value.promqlOperator !== null);
 const operatorOptions = computed(() => NUMERIC_OPERATORS.map((operator) => raw(operator)));
+
+// The match-count field is only meaningful where there is no structured metric
+// condition to carry the real threshold — i.e. the SQL alerts. Keyed off the
+// same condition as the metric block so the two can never both claim to be
+// "the threshold".
+const showMatchCount = computed(() => !hasPromqlCondition.value);
 
 const thresholdHint = computed(() => {
   const operator = triggerCondition.value.operator;
