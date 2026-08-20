@@ -33,6 +33,8 @@ pub async fn upsert(
     timestamp: i64,
     error_data: &PipelineError,
 ) -> Result<(), infra::errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = infra::table::get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // Serialize node_errors to JSON
@@ -129,6 +131,8 @@ pub async fn batch_upsert(
     let errors = dedup_and_sort(errors);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = infra::table::get_lock().await;
     let txn = client.begin().await?;
 
     // Collect all pipeline_ids to check which exist
@@ -225,6 +229,8 @@ pub async fn get_by_pipeline_id(
 
 /// Deletes a pipeline error record by pipeline_id.
 pub async fn delete(pipeline_id: &str) -> Result<(), infra::errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = infra::table::get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     PipelineLastErrors::delete_many()
@@ -237,6 +243,8 @@ pub async fn delete(pipeline_id: &str) -> Result<(), infra::errors::Error> {
 
 /// Deletes all pipeline error records for an organization.
 pub async fn delete_by_org(org_id: &str) -> Result<(), infra::errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = infra::table::get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     PipelineLastErrors::delete_many()
