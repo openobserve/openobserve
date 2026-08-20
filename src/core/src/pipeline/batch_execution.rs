@@ -215,34 +215,26 @@ impl PipelineExt for Workflow {
         for node in &self.nodes {
             if let NodeData::Function(func_params) = &node.data {
                 // this can be the case where there is dummy node for fn in draft stage
-                if func_params.name.is_empty() {
-                    continue;
-                }
-
-                let transform = get_transforms(&self.org_id, &func_params.name).await?;
-
-                // Check if function is JS or VRL
-                let compiled_runtime = if transform.is_js() {
-                    // Compile JS function
-                    let js_config = compile_js_function(&transform.function, &self.org_id)?;
-                    CompiledFunctionRuntime::JS(js_config, transform.is_result_array_js())
+                let (func, res_array) = if func_params.name.is_empty() {
+                    // if there is a raw fn provided, then we use that as the fn
+                    if let Some(raw) = func_params.raw_fn.as_ref() {
+                        (
+                            raw.to_owned(),
+                            config::meta::function::RESULT_ARRAY.is_match(raw),
+                        )
+                    } else {
+                        // if no fn name and no raw fn, then we cannot do anything, just skip
+                        continue;
+                    }
                 } else {
-                    // Compile VRL function (default)
-                    let vrl_runtime_config =
-                        compile_vrl_function(&transform.function, &self.org_id)?;
-                    let registry = vrl_runtime_config
-                        .config
-                        .get_custom::<vector_enrichment::TableRegistry>()
-                        .unwrap();
-                    registry.finish_load();
-                    CompiledFunctionRuntime::VRL(
-                        Box::new(VRLResultResolver {
-                            program: vrl_runtime_config.program,
-                            fields: vrl_runtime_config.fields,
-                        }),
-                        transform.is_result_array_vrl(),
-                    )
+                    // there is a fn name, so ue that fn
+                    let transform = get_transforms(&self.org_id, &func_params.name).await?;
+                    let res_arr = transform.is_result_array_js();
+                    (transform.function, res_arr)
                 };
+
+                let js_config = compile_js_function(&func, &self.org_id)?;
+                let compiled_runtime = CompiledFunctionRuntime::JS(js_config, res_array);
 
                 function_map.insert(node.get_node_id(), compiled_runtime);
             }
@@ -3108,6 +3100,7 @@ mod tests {
                 name: "test_function".to_string(),
                 after_flatten: true,
                 num_args: 1,
+                raw_fn: None,
             }),
             children: vec![],
             is_disabled: false,
@@ -3140,6 +3133,7 @@ mod tests {
                     name: "func1".to_string(),
                     after_flatten: false,
                     num_args: 0,
+                    raw_fn: None,
                 }),
                 children: vec!["C".to_string()],
                 is_disabled: false,
@@ -3631,6 +3625,7 @@ mod tests {
                 name: "should-not-run".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
             children: vec!["child-1".to_string()],
             is_disabled: true,

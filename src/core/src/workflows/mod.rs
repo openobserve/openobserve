@@ -282,6 +282,15 @@ async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), an
             }
 
             if let NodeData::Function(function_params) = &node.data {
+                // ideally FE should not send raw fn here, and additionally
+                // we should not allow raw fns for published workflows, so we check and deny
+                if function_params.raw_fn.is_some() || function_params.name.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "function node {} still has some unsaved function changes associated with it. Either save or discard those.",
+                        node.id
+                    ));
+                }
+
                 // Load the function to check its trans_type
                 let function = super::db::functions::get(&workflow.org_id, &function_params.name)
                     .await
