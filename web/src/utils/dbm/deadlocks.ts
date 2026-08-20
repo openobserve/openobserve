@@ -14,14 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Deadlock grouping — the decision that makes this tab a diagnosis rather than
- * a log.
+ * Deadlock grouping — what makes this tab a diagnosis rather than a log.
  *
- * The lab produced 43 deadlocks from 2 query pairs. An event list is 43
- * near-identical rows and leaves the reader to notice the repetition; grouping
- * by pair puts the bug on row 1 with its frequency attached. So ROWS are pairs
- * and the TAB BADGE is events — "how much is happening" and "what is wrong" are
- * different questions and each gets the number that answers it.
+ * A handful of query pairs typically produce dozens of deadlocks. An event list
+ * is dozens of near-identical rows and leaves the reader to notice the
+ * repetition; grouping by pair puts the offending pair on row 1 with its
+ * frequency attached. So rows are pairs and the tab badge is events — "how much
+ * is happening" and "what is wrong" are different questions and each gets the
+ * number that answers it.
  */
 
 import type { DeadlockEvent, DeadlockParticipant } from "@/services/db_monitoring";
@@ -33,7 +33,7 @@ import { oneLine } from "./format";
  *
  * The server sends the assembled DTO — `participants` is already an array, the
  * victim verdict is already applied per side, and MySQL's per-transaction
- * entries are already stitched into whole deadlocks. So this is a GUARD, not a
+ * entries are already stitched into whole deadlocks. So this is a guard, not a
  * decoder: it rejects an event with no sides, because a deadlock with no
  * participants is not something the UI can say anything true about.
  *

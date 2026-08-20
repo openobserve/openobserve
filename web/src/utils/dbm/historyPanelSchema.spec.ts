@@ -76,12 +76,12 @@ describe("buildLatencyPanelSchema", () => {
   });
 
   /**
-   * Regression: the three percentiles all rendered the SAME colour, because the
-   * schema asked for `palette-classic` + `fixedColor` — a combination the
-   * renderer silently discards (getSeriesColor returns null for that mode and
-   * never reads fixedColor). `fixed` is not the fix either: it collapses every
-   * series onto fixedColor[0]. Only the by-series mode gives one colour per
-   * percentile, so assert the mode rather than a colour list nothing consumes.
+   * `palette-classic` + `fixedColor` renders all three percentiles the same
+   * colour: the renderer silently discards that combination (getSeriesColor
+   * returns null for the mode and never reads fixedColor). `fixed` collapses
+   * every series onto fixedColor[0]. Only the by-series mode gives one colour
+   * per percentile, so assert the mode rather than a colour list nothing
+   * consumes.
    */
   it("gives each percentile its own colour", () => {
     const color = config(latency()).color as { mode: string; fixedColor?: string[] };
@@ -94,10 +94,10 @@ describe("buildLatencyPanelSchema", () => {
    * meaning, and calls is pinned too because name-hashing picked magenta for
    * ordinary throughput.
    *
-   * Regression guard on the second bug here: `colorBySeries` colours reach
-   * ECharts VERBATIM (getSeriesColor returns customMapping.color with no
-   * resolution, unlike the palette), so an unresolved `--color-*` token name
-   * paints the bars black. Assert a real colour value, never a token name.
+   * `colorBySeries` colours reach ECharts verbatim (getSeriesColor returns
+   * customMapping.color with no resolution, unlike the palette), so an
+   * unresolved `--color-*` token name paints the bars black. Assert a real
+   * colour value, never a token name.
    */
   it("pins both volume series to resolved colour values, not token names", () => {
     const color = config(volume()).color as {

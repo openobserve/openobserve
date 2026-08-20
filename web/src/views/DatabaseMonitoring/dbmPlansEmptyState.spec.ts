@@ -75,7 +75,7 @@ describe("the Plans empty state means zero captures, not zero drift", () => {
   it("does not show the config hint merely because no drift was detected", () => {
     const guard = emptyStateGuard();
 
-    // A guard that fires on "not drifted" — however it is spelled — is the bug.
+    // A guard that fires on "not drifted" — however it is spelled — is wrong.
     expect(
       guard,
       `the no-plans hint is gated on "${guard}", which is true for a stable plan`,
@@ -181,10 +181,9 @@ describe("the Plans empty state means zero captures, not zero drift", () => {
  * The drift finding is promoted; the section is not.
  *
  * "It got slow because the plan changed" is the most actionable sentence this
- * page can produce, and the section that computes it used to sit below three
- * tables. The contract pinned here: the FINDING surfaces beside the headline
- * stats — only when there IS drift, reusing the section's own state and copy —
- * and the plans section itself reads before the raw samples it explains.
+ * page can produce, so the finding surfaces beside the headline stats — only
+ * when there is drift, reusing the section's own state and copy — and the plans
+ * section itself reads before the raw samples it explains.
  */
 describe("the drift finding is promoted and plans precede samples", () => {
   /** The promoted callout's opening tag, attributes included. */

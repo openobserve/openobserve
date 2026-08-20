@@ -53,8 +53,8 @@ const read = (file: string) => readFileSync(join(here, file), "utf8");
 
 /**
  * The template half of an SFC. The script holds component names in imports and
- * strings in computeds, which would satisfy a naive `toContain` and let the
- * real regression through — the same reason `dbmFallbackScopeVisible` does this.
+ * strings in computeds, which would satisfy a naive `toContain` — the same
+ * reason `dbmFallbackScopeVisible` does this.
  */
 const templateOf = (source: string): string => {
   const end = source.indexOf("<script setup");

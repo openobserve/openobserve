@@ -49,8 +49,7 @@ export const DBM_SOFT_TONES: Record<DbmRowChipTone, string> = {
 
 /**
  * The icon that rides with each soft badge on the strips. Kept beside the
- * colours because a warning chip with an `error` glyph is the bug this pairing
- * exists to prevent.
+ * colours so a chip's glyph cannot drift out of step with its tone.
  */
 export const DBM_TONE_ICONS: Record<DbmChipTone, IconName> = {
   error: "error",

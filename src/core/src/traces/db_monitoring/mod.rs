@@ -23,7 +23,7 @@
 //! `infer_service_*`. Old and new semconv attribute names resolve to the SAME identity and the
 //! SAME fingerprint: mixed fleets mid-migration must not split one query across two rows.
 //!
-//! The RED-phase golden corpus lives in `corpus/*.json`, driven by `tests.rs`.
+//! The golden corpus lives in `corpus/*.json`, driven by `tests.rs`.
 
 pub mod api;
 pub mod rollup;
@@ -32,30 +32,22 @@ pub mod server_vantage;
 /// The hits of a search, or an error when the read was PARTIAL.
 ///
 /// `crate::search::search` answers `Ok` with `is_partial: true` when part of the
-/// read did not complete — a leaf that dropped out, or (the case seen live on
-/// the rig) a WAL parquet file rotating underneath the query. The `hits` it
-/// carries are then an ARBITRARY SUBSET of the window, and for a read whose
-/// only surviving leaf contributed nothing, the EMPTY vec.
+/// read did not complete (a leaf dropping out, a WAL parquet file rotating under
+/// the query). Its `hits` are then an arbitrary subset of the window — possibly
+/// empty — which every DBM screen would misread as fact:
 ///
-/// Returning that as `Ok` is a false-verdict generator of exactly the shape
-/// `api::present_dbm_columns` refuses for schema reads, and it produces two
-/// distinct wrong answers on the DBM screens:
+///  1. An empty partial read is byte-identical to a healthy empty window, so the tab renders
+///     "nothing happened" over a window that may be full of deadlocks.
+///  2. The envelopes gate `not_collecting` on `hits.is_empty()`, so an empty partial read tells the
+///     operator their collector is broken when it is fine — the false alarm
+///     `api::LIVENESS_PROBE_MICROS` must never raise.
 ///
-///  1. **The false "no data" page.** An empty partial read is byte-identical to a healthy empty
-///     window, so the tab renders "nothing happened" over a window that may be full of deadlocks.
-///  2. **The false `not_collecting: true` alarm.** The envelopes gate their collection diagnostic
-///     on `hits.is_empty()`, so an empty partial read trips the probe and tells the operator their
-///     collector is broken when it is fine — the false alarm the `api::LIVENESS_PROBE_MICROS`
-///     design note says must never be raised.
-///
-/// Erroring costs the honest cases nothing: a stream that does not exist is
-/// short-circuited before the search runs, and a genuinely empty window comes
-/// back complete (`is_partial: false`) and still renders its self-diagnosing
-/// empty state. What it buys is "we could not read the whole window" — a
-/// visible failure — in place of an invented verdict.
+/// Erroring costs the honest cases nothing: a missing stream is short-circuited
+/// before the search runs, and a genuinely empty window comes back complete
+/// (`is_partial: false`) and still renders its self-diagnosing empty state.
 ///
 /// `function_error` is quoted when present because it is the only description of
-/// WHY the read tore. It is NOT itself a failure condition: on a complete read
+/// WHY the read tore. It is not itself a failure condition — on a complete read
 /// it carries per-row VRL notes about rows that *were* read, and failing those
 /// would 500 pages that are fine.
 pub(crate) fn hits_or_partial_error(
@@ -78,12 +70,10 @@ pub(crate) fn hits_or_partial_error(
 
 /// Deadlock and blocking canonicalization is an Enterprise capability.
 ///
-/// The types and functions below moved to `o2_enterprise` together with the
-/// chain assembler (which used to be `db_monitoring::chains` here). They are
-/// re-exported at their ORIGINAL paths so every `super::chains::…` and
-/// `server_vantage::DeadlockEvent` call site in `api.rs` resolves unchanged on
-/// an enterprise build; on OSS the read handlers that use them are `cfg`-gated
-/// off and answer 403.
+/// These types live in `o2_enterprise` and are re-exported here so that
+/// `super::chains::…` and `server_vantage::DeadlockEvent` call sites in `api.rs`
+/// resolve on an enterprise build; on OSS the read handlers that use them are
+/// `cfg`-gated off and answer 403.
 #[cfg(feature = "enterprise")]
 pub use o2_enterprise::enterprise::db_monitoring::{
     blocking::BlockingSample,
@@ -105,17 +95,14 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-/// `MAX_NORM_INPUT` moved to `config` with the normalizer that reads it, but it
-/// was `pub` here before the move — re-exported so `db_monitoring::MAX_NORM_INPUT`
-/// keeps resolving for existing callers.
+/// Re-exported so `db_monitoring::MAX_NORM_INPUT` resolves for callers of this
+/// module; the constant lives with the normalizer that reads it.
 pub use config::meta::db_monitoring::MAX_NORM_INPUT;
-/// Likewise for the shared DBM vocabulary — `canonical_system`, `route_dialect`
-/// and `strip_port` are read from `config` now, not defined here.
+/// The shared DBM vocabulary lives in `config` alongside the normalizer.
 use config::meta::db_monitoring::{canonical_system, route_dialect, strip_port};
-/// The statement normalizer moved DOWN into `config` so `o2_enterprise` can reach
-/// it — enterprise cannot depend on this crate (Cargo cycle), but both depend on
-/// `config`. Aliased back to `normalizer` here so the existing `normalizer::…`
-/// call sites in this module tree keep resolving unchanged.
+/// The statement normalizer lives in `config` so `o2_enterprise` can reach it —
+/// enterprise cannot depend on this crate (Cargo cycle), but both depend on
+/// `config`. Aliased to `normalizer` for the call sites in this module tree.
 pub use config::meta::db_normalizer::{
     self as normalizer, Dialect, NormalizeError, NormalizedStatement, StmtClass, normalize,
     normalize_with_opts,
@@ -156,20 +143,17 @@ pub const ALL_DB_FIELDS: [&str; 11] = [
 /// the timestamp, the trace/service identity, and the two ends of the duration
 /// arithmetic (`end_time - start_time`, the module's nanosecond convention).
 ///
-/// A trace stream that carries `o2_db_fingerprint` is normally a full span
-/// stream and has all of these. It is NOT guaranteed to: `ensure_db_fields_in_schema`
-/// provisions the eleven `o2_db_*` columns through `infra::schema::merge`, and on a
-/// stream with no schema yet that takes merge's CREATE branch — persisting, and
-/// caching on the node, a schema whose ONLY fields are `o2_db_*`. A stream in that
-/// state passes an `o2_db_fingerprint`-only gate and then fails EVERY DBM query at
-/// plan time with `No field named _timestamp` (seen live on `rig4_ent_t/default`:
-/// samples 500ed and the rollup refused to advance its offset), because DataFusion
-/// resolves column references against the stream schema and the projection narrows
-/// to the columns actually present.
+/// A trace stream carrying `o2_db_fingerprint` is normally a full span stream and
+/// has all of these, but it is not guaranteed to: `ensure_db_fields_in_schema`
+/// provisions the eleven `o2_db_*` columns through `infra::schema::merge`, and on
+/// a stream with no schema yet that takes merge's CREATE branch, persisting a
+/// schema whose only fields are `o2_db_*`. Such a stream passes an
+/// `o2_db_fingerprint`-only gate and then fails every DBM query at plan time with
+/// `No field named _timestamp`, since DataFusion resolves column references
+/// against the stream schema.
 ///
-/// Gating on these too turns that stream into what it actually is — a stream with
-/// no DB spans to report — and the endpoints answer an empty window instead of an
-/// error, which is the behaviour the gate always claimed.
+/// Gating on these too makes that stream read as what it is — a stream with no DB
+/// spans to report — so the endpoints answer an empty window instead of an error.
 pub const REQUIRED_SPAN_FIELDS: [&str; 5] = [
     config::TIMESTAMP_COL_NAME,
     "trace_id",
@@ -192,13 +176,12 @@ pub fn stream_supports_db_monitoring(schema: &arrow_schema::Schema) -> bool {
 /// note: a bump is a trend discontinuity for every stored fingerprint.
 ///
 /// * **v1** — initial lexer-based normalizer.
-/// * **v2** — the hash stream stopped reproducing the author's whitespace. Space is now emitted
-///   only between two adjacent word/quoted/placeholder tokens; space adjacent to punctuation is
-///   dropped. Reason: the SERVER vantage never sees driver text. `pg_stat_statements` and MySQL's
-///   `performance_schema` hand us statements their own jumbler already re-spaced, padding every
-///   paren and comma, so every INSERT and every aggregate SELECT hashed differently from the client
-///   span for the same statement, and the captured plan was invisible under the client's
-///   fingerprint. Display text (`o2_db_query_norm`) is unaffected — only the hash changed.
+/// * **v2** — whitespace-insensitive hashing: space is emitted only between two adjacent
+///   word/quoted/placeholder tokens, never adjacent to punctuation. The server vantage never sees
+///   driver text — `pg_stat_statements` and MySQL's `performance_schema` hand back statements their
+///   own jumbler re-spaced, padding every paren and comma — so reproducing the author's whitespace
+///   would hash the same statement differently from the client span and hide the captured plan.
+///   Display text (`o2_db_query_norm`) is unaffected; only the hash changed.
 pub const FP_VERSION: u32 = 2;
 
 /// Cap on the stored `o2_db_query_norm` text (bytes).
@@ -351,11 +334,9 @@ impl SpanAttrs for SpanWithResource<'_> {
     }
 }
 
-/// Options for [`enrich_with_opts`] (design §8). These are NOT configurable —
-/// the config knobs that used to feed them were removed when DBM collapsed to
-/// a single `enabled` switch — and every ingest call site uses [`Default`],
-/// which carries the values the old knobs defaulted to. The struct survives as
-/// a parameter so tests can exercise the non-default behaviors.
+/// Options for [`enrich_with_opts`] (design §8). Not configurable: DBM exposes a
+/// single `enabled` switch and every ingest call site uses [`Default`]. The
+/// struct exists as a parameter so tests can exercise the non-default behaviors.
 #[derive(Debug, Clone)]
 pub struct EnrichOptions {
     /// false stores the fingerprint only — no `o2_db_query_norm` on the span

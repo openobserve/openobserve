@@ -56,9 +56,9 @@ describe("resolving the tab from the URL", () => {
   /**
    * The default is Overview — the headline numbers and the trend, which is
    * what minute 0 of an incident needs. Every unusable value lands there
-   * rather than on a blank page: absent (the ordinary deep link and every link
-   * pasted before this feature existed), unknown, or an array, which is what
-   * vue-router hands back for a repeated `?tab=a&tab=b`.
+   * rather than on a blank page: absent (the ordinary deep link), unknown, or
+   * an array, which is what vue-router hands back for a repeated
+   * `?tab=a&tab=b`.
    */
   it("defaults to overview when no tab is in the URL", () => {
     expect(resolveQueryDetailTab(undefined)).toBe("overview");

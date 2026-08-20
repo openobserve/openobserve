@@ -75,11 +75,11 @@ describe("buildDbmNotCollectingChecks", () => {
    *
    * `/badges` there returns `databases.hits = []` (trace fleet count 0) while
    * the server fallback returns 50 database-reported statements, so the signals
-   * arriving here are `queryCount: 50, databaseCount: 0`. The check PASSES on
-   * the query count — correctly, that org's databases are reporting — but the
-   * detail used to interpolate the trace-vantage zero and read
-   * "50 kinds of query from 0 databases", a sentence that contradicts its own
-   * ✓ and blames a healthy server-only deployment for the absence of tracing.
+   * arriving here are `queryCount: 50, databaseCount: 0`. The check passes on
+   * the query count — correctly, that org's databases are reporting — but
+   * interpolating the trace-vantage zero would read "50 kinds of query from 0
+   * databases", a sentence that contradicts its own tick and blames a healthy
+   * server-only deployment for the absence of tracing.
    *
    * So the database clause is dropped rather than printed as a zero. The check
    * still passes, and what it says is true in both deployments.

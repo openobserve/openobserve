@@ -159,10 +159,10 @@ pub fn resolve_event_name(rec: &Map<String, Value>) -> Option<&str> {
 // into the same `o2_dbm_*` namespace the deadlock and blocking paths use.
 //
 // Attribute names below are the MEASURED v0.158.0 wire shape (captures under
-// `tests/dbm-server-vantage/captures/`), not the documented one. Where the two
-// disagree the measurement wins — three of the columns an earlier draft
-// specified (`state_change`, `duration_ms`, `client_addr`) do not exist on the
-// wire at all, and reserving them would have shipped permanently-null columns.
+// `tests/dbm-server-vantage/captures/`), not the documented one: where the two
+// disagree the measurement wins. `state_change`, `duration_ms` and
+// `client_addr` are documented but do not exist on the wire, so no canonical
+// column reserves them.
 
 /// The unblocked sentinel for `postgresql.blocking.pids`.
 ///
@@ -406,13 +406,11 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
             "postgresql_pid",
             "mysql_session_id",
             "mysql_threads_thread_id",
-            // SQL Server's SPID. Its absence here is what silently DROPPED
-            // every SQL Server sample: sqlserverreceiver emits a complete
+            // SQL Server's SPID. Required: sqlserverreceiver emits a complete
             // `db.server.query_sample` (session id, request status, wait type,
-            // blocking spid, reads, cpu time), but with no key in this list the
-            // `?` below bailed and the whole record was discarded. The Activity
-            // tab was then empty on SQL Server for want of one field name, and
-            // the rows arrived carrying no `o2_dbm_kind` at all.
+            // blocking spid, reads, cpu time), but without a key in this list
+            // the `?` below bails and the whole record is discarded, leaving the
+            // Activity tab empty on SQL Server.
             "sqlserver_session_id",
         ],
     )?;
@@ -529,34 +527,29 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
                 "sqlserver_wait_type",
             ],
         ),
-        // `0` is the COALESCE sentinel, not a measured wait — the numeric twin
-        // of the `{}` trap above. It is present on all 5495 unblocked rows, so
-        // storing it would pollute every AVG/percentile over
-        // `o2_dbm_wait_seconds` with thousands of zero-wait sessions and flatten
-        // the wait-time chart during a real incident. Note the receiver ships
-        // WHOLE SECONDS, so sub-second lock waits round to 0 and are
-        // indistinguishable from the sentinel — dropping both is the honest
-        // reading of a field with that resolution.
-        // UNITS DIFFER, and getting this wrong would misreport lock waits by
-        // 1000x. Postgres's `blocking.wait_duration` is SECONDS; SQL Server's
-        // `wait_time` is MILLISECONDS (measured: 11.839 on a row whose
-        // `total_elapsed_time` is also 11.839 ms). The same `> 0.0` filter
-        // applies to both — a zero wait is the COALESCE sentinel, not a
-        // measurement.
-        // MYSQL IS GATED ON THE WAIT CLASS, and that is the whole point of the
-        // arm rather than an extra safeguard on it.
+        // Three rules, all load-bearing:
         //
-        // Postgres and SQL Server publish a duration that is already specific
-        // to a LOCK wait. MySQL's `events_waits_current.timer_wait` is the
-        // current wait of ANY performance_schema instrument, so the same column
-        // carries `wait/io/file/innodb/innodb_data_file` and
-        // `wait/synch/mutex/...` alongside `wait/lock/...`. `wait_seconds` is
-        // read only by Blocked queries — it ranks contention severity and picks
-        // out the notably-longest waiter — so an ungated map would let a slow
-        // disk read present as a lock wait and outrank a genuine blocker.
+        // UNITS DIFFER by 1000x. Postgres's `blocking.wait_duration` is SECONDS;
+        // SQL Server's `wait_time` is MILLISECONDS (measured: 11.839 on a row
+        // whose `total_elapsed_time` is also 11.839 ms), so it is divided here.
         //
-        // `mysql_wait_type` is the instrument name the same sample already
-        // carries, so the class is decided by the row itself, not inferred.
+        // `0` IS THE COALESCE SENTINEL, not a measured wait — the numeric twin
+        // of the `{}` trap above, present on every unblocked row. Storing it
+        // would pollute every AVG/percentile over `o2_dbm_wait_seconds` and
+        // flatten the wait-time chart during a real incident. The receiver ships
+        // whole seconds, so a genuine sub-second lock wait rounds to 0 and is
+        // indistinguishable from the sentinel; both are dropped.
+        //
+        // MYSQL IS GATED ON THE WAIT CLASS — the point of the arm, not a
+        // safeguard on it. Postgres and SQL Server publish a duration already
+        // specific to a LOCK wait, but MySQL's `events_waits_current.timer_wait`
+        // is the current wait of ANY performance_schema instrument, so the same
+        // column carries `wait/io/...` and `wait/synch/mutex/...` alongside
+        // `wait/lock/...`. `wait_seconds` is read only by Blocked queries, where
+        // it ranks contention severity, so an ungated map would let a slow disk
+        // read present as a lock wait and outrank a genuine blocker.
+        // `mysql_wait_type` is the instrument name the same sample carries, so
+        // the class is decided by the row, not inferred.
         wait_seconds: first_f64(rec, &["postgresql_blocking_wait_duration"])
             .or_else(|| first_f64(rec, &["sqlserver_wait_time"]).map(|ms| ms / 1000.0))
             .or_else(|| {
@@ -617,14 +610,14 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
 
 // ─── Canonicalization entry points ───────────────────────────────────────────
 //
-// DEADLOCKS AND BLOCKING MOVED TO ENTERPRISE. `Participant`, `DeadlockEvent`,
-// `BlockingSample`, the six deadlock canonicalizers, `merge_mysql_deadlocks`,
-// `participants_of`, `canonicalize_blocking` and the whole chain assembler now
-// live in `o2_enterprise::enterprise::db_monitoring::{deadlock, blocking,
-// chains}`. They are reached from [`canonicalize_record`] through the two
-// `#[cfg(feature = "enterprise")]` hooks, at exactly the positions their arms
-// occupied, and re-exported from this module's parent so existing `api.rs` call
-// sites resolve unchanged on an enterprise build.
+// Deadlocks and blocking are ENTERPRISE capabilities. `Participant`,
+// `DeadlockEvent`, `BlockingSample`, the six deadlock canonicalizers,
+// `merge_mysql_deadlocks`, `participants_of`, `canonicalize_blocking` and the
+// chain assembler live in
+// `o2_enterprise::enterprise::db_monitoring::{deadlock, blocking, chains}`.
+// They are reached from [`canonicalize_record`] through the two
+// `#[cfg(feature = "enterprise")]` hooks and re-exported from this module's
+// parent, so `api.rs` call sites resolve unchanged on an enterprise build.
 //
 // The shared vocabulary they consume (`first_str`, `detect_engine`,
 // `fingerprint_statement`, the `O2_DBM_*` consts) is in `config`, which both
@@ -663,24 +656,18 @@ pub fn take_unrecognized_recipe(rec: &Map<String, Value>) -> Option<String> {
 /// What this BUILD can do with an `o2_recipe` tag.
 ///
 /// W8's job is to make sure the author of a recipe whose rows produce no
-/// `o2_dbm_*` columns learns WHY. Before the enterprise split there were only
-/// two answers — a canonicalizer claims the tag, or nobody does — and
-/// [`take_unrecognized_recipe`] returning `None`/`Some` expressed both.
+/// `o2_dbm_*` columns learns WHY, and there are three distinct answers, not two.
 ///
-/// The split adds a third, and it is the dangerous one. Every one of the 11
-/// [`RECOGNIZED_RECIPES`] is ENTERPRISE-owned, so on an OSS build all 13 tags
-/// dispatch to nothing: the row canonicalizes to zero `o2_dbm_*` columns, no
-/// read endpoint can see it, and the liveness probe counts it as a
-/// `non_event_record` — the "the tail is running and none of those lines was an
-/// event" signal. Left as `None` (i.e. "recognized, stay quiet"), the read path
-/// would answer the author's empty page with an affirmative *wrong* story about
-/// a healthy quiet database. That is exactly the failure W8 exists to prevent,
-/// reintroduced by the split.
+/// The third is the dangerous one: every [`RECOGNIZED_RECIPES`] member is
+/// ENTERPRISE-owned, so on an OSS build all 13 tags dispatch to nothing — the
+/// row canonicalizes to zero `o2_dbm_*` columns, no read endpoint can see it,
+/// and the liveness probe counts it as a `non_event_record`, the "the tail is
+/// running and none of those lines was an event" signal. Classifying that as
+/// "recognized, stay quiet" would answer the author's empty page with an
+/// affirmative *wrong* story about a healthy quiet database.
 ///
-/// A `log::warn!` alone is not enough here: no log-capture harness exists in
-/// this suite, so a warning-only fix is a behaviour no test can observe. This
-/// enum is the assertable form, and it makes the W8 classification tests
-/// behavioural on BOTH builds.
+/// An enum rather than a `log::warn!` alone: no log-capture harness exists in
+/// this suite, so a warning is a behaviour no test can observe.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecipeStatus {
     /// A canonicalizer in THIS build claims the tag.
@@ -695,14 +682,14 @@ pub enum RecipeStatus {
 }
 
 /// Every [`RECOGNIZED_RECIPES`] member whose canonicalizer lives in
-/// `o2_enterprise`. All 13 of them: the four blocking recipes, `mssql_deadlock`,
-/// and the eight table/index-stats recipes.
+/// `o2_enterprise` — currently all 13: the four blocking recipes,
+/// `mssql_deadlock`, and the eight table/index-stats recipes.
 ///
-/// Kept as a predicate over the array rather than a second list, so it cannot
-/// drift from it. `w8_every_recognized_recipe_is_enterprise_only_on_oss` pins
-/// that all 13 members are covered, count included — if an OSS-owned recipe is
-/// ever added to the array, that test fails and this function must grow a real
-/// distinction rather than answering "every member".
+/// A predicate over the array rather than a second list, so it cannot drift from
+/// it. `w8_every_recognized_recipe_is_enterprise_only_on_oss` pins that all 13
+/// members are covered, count included: adding an OSS-owned recipe to the array
+/// fails that test, and this function must then grow a real distinction rather
+/// than answering "every member".
 fn is_enterprise_owned_recipe(tag: &str) -> bool {
     RECOGNIZED_RECIPES.contains(&tag)
 }
@@ -814,7 +801,7 @@ fn warn_unrecognized_recipe(tag: &str) {
 ///
 /// Shares the same warn-once set, so a 200-row/second table-stats recipe logs
 /// once rather than 200 times a second. The set stays bounded for free here —
-/// the tag must be one of the 11 [`RECOGNIZED_RECIPES`] members to reach this
+/// the tag must be one of the 13 [`RECOGNIZED_RECIPES`] members to reach this
 /// function at all, so it is not an author-controlled growth vector the way the
 /// unrecognized path is. The key is prefixed so the two paths cannot silence
 /// each other for the same string.
@@ -857,10 +844,9 @@ pub(crate) fn has_reserved_dbm_key(rec: &Map<String, Value>) -> bool {
 // ─── Read-path pruning: the `o2_dbm_kind` secondary index ────────────────────
 //
 // Every DBM read over the server-vantage stream is `WHERE _timestamp BETWEEN …
-// AND o2_dbm_kind = '<one kind>'`, and until this seed landed NOTHING could
-// skip rows for it. Measured on a stream carrying 2.84 M rows/hour of which
-// 21.6 % were DBM records, `/badges` took 7.33 s against 0.14 s on an empty
-// org — same binary, same query, same window.
+// AND o2_dbm_kind = '<one kind>'`, and without this seed nothing can skip rows
+// for it: on a stream carrying 2.84 M rows/hour of which 21.6 % were DBM
+// records, `/badges` measured 7.33 s against 0.14 s on an empty org.
 //
 // This seeds `o2_dbm_kind` as a SECONDARY INDEX (`index_fields`), i.e. a
 // tantivy inverted index. Explicitly NOT full-text search, and the distinction
@@ -915,7 +901,7 @@ pub(crate) fn has_reserved_dbm_key(rec: &Map<String, Value>) -> bool {
 // This is the same shape for the same reason — the settings must be in place on
 // the node about to write parquet, and only ingest knows the stream exists.
 //
-// ── KNOWN RISK: selectivity. Read this before claiming the fix works. ────────
+// ── Known risk: selectivity ─────────────────────────────────────────────────
 //
 // A tantivy index only pays off when the predicate is SELECTIVE. `guard_matched_rows`
 // returns `Skipped` — falling back to DataFusion for that file — when matched
@@ -925,17 +911,15 @@ pub(crate) fn has_reserved_dbm_key(rec: &Map<String, Value>) -> bool {
 //
 // The effective default threshold is **35%** (declared `default = 35`, and a
 // configured 0 is rewritten to 35 at config load). On the measured stream
-// `o2_dbm_kind='activity'` was ~21.6% of rows — UNDER 35, so it should index
-// today, but it is the same order of magnitude as the cutoff and not a
-// comfortable margin. A deployment whose activity share runs higher (a stream
-// carrying little else, or a tightened threshold) will trip the guard, skip
-// tantivy, and see NO improvement at all.
+// `o2_dbm_kind='activity'` was ~21.6% of rows — under 35, but the same order of
+// magnitude as the cutoff, not a comfortable margin. A deployment whose activity
+// share runs higher (a stream carrying little else, or a tightened threshold)
+// trips the guard, skips tantivy, and sees no improvement at all.
 //
-// So this is NOT an unconditional fix for the 7.33 s: it helps when the kind
-// being queried is a small minority of the file, and degrades to exactly
-// today's behavior when it is not. The rarer kinds (deadlock, blocking,
-// explain) are the strongest case; `activity` is the weakest. Measure before
-// claiming a win.
+// So the index is conditional: it helps when the kind being queried is a small
+// minority of the file and degrades to an unindexed scan when it is not. The
+// rarer kinds (deadlock, blocking, explain) are the strongest case; `activity`
+// is the weakest. Measure before claiming a win.
 
 /// The canonical secondary-index field: the column every DBM read filters on.
 ///
@@ -952,8 +936,8 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// # Why this is a SET and not just `o2_dbm_kind`
 ///
 /// Seeding the kind column alone looks sufficient — every DBM read filters on
-/// it — but it silently delivers NOTHING for the two kinds that need the index
-/// most. `api.rs`'s `build_dbm_events_sql` does not emit a bare
+/// it — but it delivers NOTHING for the two kinds that need the index most.
+/// `api.rs`'s `build_dbm_events_sql` does not emit a bare
 /// `o2_dbm_kind = 'deadlock'` when the A1 read-time fallback is active; it
 /// widens the predicate to an OR across marker COLUMNS:
 ///
@@ -975,12 +959,12 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// to a full scan. Seeding four of the five fields is therefore worth exactly
 /// as much as seeding none of them.
 ///
-/// That failure lands in the worst possible place. Deadlock and blocking are
-/// the RARE kinds — the ones whose row share sits far below
-/// `inverted_index_skip_threshold` (35%), where a tantivy index actually pays
-/// off. The common kinds are already past that cutoff (`statement` was measured
-/// at 50.4% of rows) and gain nothing from the index either way. So the kinds
-/// the single-field seed helped were precisely the kinds that needed no help.
+/// That failure lands in the worst possible place: deadlock and blocking are the
+/// RARE kinds, whose row share sits far below `inverted_index_skip_threshold`
+/// (35%) where a tantivy index actually pays off. The common kinds are already
+/// past that cutoff (`statement` measured at 50.4% of rows) and gain nothing
+/// from the index either way — so a kind-only seed helps only the kinds that
+/// need no help.
 ///
 /// # Why exactly these fields, and no others
 ///
@@ -1067,33 +1051,30 @@ pub fn server_stream_index_fields() -> Vec<&'static str> {
 /// 3. **Sets the index cutoff explicitly, for every field it adds.** `normalize_stream_settings`
 ///    stamps `index_fields_updated_at` only for fields it promotes out of `bloom_filter_fields`; a
 ///    field appended straight to `index_fields` gets NO timestamp and would inherit the stream-wide
-///    `index_updated_at`, which on an old stream is its creation time. That would advertise the
-///    index over files written long before it existed, whose parquet carries no index at all. We
-///    stamp `now` per field so the cutoff means what it says — and never re-stamp a field that was
-///    already there, which would un-index everything written since.
+///    `index_updated_at`, which on an old stream is its creation time — advertising the index over
+///    files written long before it existed, whose parquet carries no index at all. Each added field
+///    is stamped `now` so the cutoff means what it says, and a field already present is never
+///    re-stamped, which would un-index everything written since.
 /// 4. **Declines PER FIELD when that field is already a PARTITION KEY or an FTS key.** The store's
 ///    rejections are per field but fail the whole settings write, so one conflicted field must not
 ///    take the rest down with it. The partition-key arm is the migration case, and it is a genuine
 ///    dead end rather than a case we can seed through — see below.
-/// 5. **Completes a half-seeded stream.** A stream carrying only `o2_dbm_kind` — the shape the
-///    single-field version of this code left behind — still has three un-indexed operands in its
-///    deadlock OR and so still gets no index. The missing markers are added; the field already
-///    present keeps its original cutoff.
+/// 5. **Completes a half-seeded stream.** A stream carrying only `o2_dbm_kind` still has three
+///    un-indexed operands in its deadlock OR and so still gets no index. The missing markers are
+///    added; the field already present keeps its original cutoff.
 ///
-/// **The migration case (a stream carrying the previous implementation's
-/// partition key).** `persist_stream_settings` rejects any field that is both a
-/// partition key and a secondary index, and the check is SYMMETRIC — it fails
-/// the same way whichever list we add to. Worse, partition keys are effectively
-/// APPEND-ONLY: a key omitted from an incoming settings write is not dropped,
-/// it is marked `disabled: true` and KEPT, and it stays in `partition_keys`
-/// where the intersection check still sees it. So a stream that was already
-/// seeded by the partition-key implementation **cannot** be converted to the
-/// index from this code path at all — not by removing the key, not by disabling
-/// it. We detect that shape and stand down, logging once, rather than failing
-/// the settings save on every batch forever. Such a stream keeps the partition
-/// key it already has (which does prune, at file granularity) and simply does
-/// not gain the index; converting it requires an operator to edit the stream
-/// settings, which is the only place that can rewrite `partition_keys`.
+/// **A stream already carrying one of these fields as a PARTITION KEY is a dead
+/// end.** `persist_stream_settings` rejects any field that is both a partition
+/// key and a secondary index, and the check is SYMMETRIC — it fails the same way
+/// whichever list the field is added to. Partition keys are also effectively
+/// APPEND-ONLY: a key omitted from an incoming settings write is marked
+/// `disabled: true` and KEPT in `partition_keys`, where the intersection check
+/// still sees it. Such a field therefore cannot be converted to an index from
+/// this code path at all, so it is detected and stood down on, rather than
+/// failing the settings save on every batch forever. The stream keeps the
+/// partition key (which does prune, at file granularity) and does not gain the
+/// index; converting it requires an operator to edit the stream settings, the
+/// only place that can rewrite `partition_keys`.
 pub fn needs_kind_index_field(settings: &mut config::meta::stream::StreamSettings) -> bool {
     // Every property below is decided PER FIELD, not once for the set. That is
     // what makes the multi-field form correct rather than merely longer:
@@ -1102,28 +1083,27 @@ pub fn needs_kind_index_field(settings: &mut config::meta::stream::StreamSetting
     //    fail the WHOLE settings write — including one conflicted field would take the other four
     //    down with it, forever, on every batch. Skipping only the conflicted one keeps the rest
     //    indexed and keeps the write legal.
-    //  * the already-present check must be per field because of the UPGRADE case: a stream seeded
-    //    by the single-field version of this code has `o2_dbm_kind` and nothing else, and its
-    //    deadlock/blocking reads still get no index at all. Asking only about the first field would
-    //    report "nothing to do" and leave it permanently half-seeded.
+    //  * the already-present check must be per field because a stream may be half-seeded — it has
+    //    `o2_dbm_kind` and nothing else, and its deadlock/blocking reads still get no index at all.
+    //    Asking only about the first field would report "nothing to do" and leave it that way
+    //    permanently.
     //
-    // Idempotency is preserved across both: a field that is present, or that is
-    // blocked and can never be added, contributes no work — so a stream seeded
-    // as far as it legally can be reports `false` forever, exactly as before.
+    // Idempotency holds across both: a field that is present, or that is blocked
+    // and can never be added, contributes no work, so a stream seeded as far as
+    // it legally can be reports `false` forever.
     let mut added_any = false;
     for field in server_stream_index_fields() {
         if settings.index_fields.iter().any(|f| f == field) {
-            // Already indexed — by us on an earlier batch, or by the user.
-            // Either way we must not re-stamp its cutoff: moving it forward
-            // would silently un-index every file written since it was seeded.
+            // Already indexed — by an earlier batch or by the user. Its cutoff
+            // must not be re-stamped: moving it forward would un-index every
+            // file written since it was seeded.
             continue;
         }
         // The store rejects a field that is both a secondary index and an FTS
-        // key, and rejects one that is both a secondary index and a partition
-        // key. The partition-key arm is the migration case: it cannot be
-        // cleared from here (keys are append-only; omitting one only disables
-        // it), so we stand down on that field rather than fail the save on
-        // every batch forever.
+        // key, and one that is both a secondary index and a partition key. A
+        // partition key cannot be cleared from here (keys are append-only;
+        // omitting one only disables it), so stand down on that field rather
+        // than fail the save on every batch forever.
         if settings.full_text_search_keys.iter().any(|f| f == field)
             || settings.partition_keys.iter().any(|p| p.field == field)
         {
@@ -1142,14 +1122,13 @@ pub fn needs_kind_index_field(settings: &mut config::meta::stream::StreamSetting
 
 /// Does this batch contain at least one canonicalized DBM record?
 ///
-/// The seed trigger is DATA-driven, not name-driven, and that is deliberate.
-/// The read API defaults to the `dbm_server` stream but every endpoint accepts
-/// a `stream` override, so a deployment may export the recipes anywhere; keying
-/// the seed on the literal name would miss those and would also fire on a
-/// user's own stream that merely happened to be called `dbm_server`. Asking
-/// "did canonicalization actually stamp a kind onto anything in this batch"
-/// answers exactly the question that matters — this stream carries DBM data, so
-/// DBM reads will filter it by kind.
+/// The seed trigger is DATA-driven, not name-driven. The read API defaults to
+/// the `dbm_server` stream but every endpoint accepts a `stream` override, so a
+/// deployment may export the recipes anywhere; keying the seed on the literal
+/// name would miss those and would also fire on a user's own stream that merely
+/// happened to be called `dbm_server`. "Did canonicalization stamp a kind onto
+/// anything in this batch" is the question that matters — this stream carries
+/// DBM data, so DBM reads will filter it by kind.
 ///
 /// Cheap by construction: it stops at the first hit, and on the overwhelmingly
 /// common case (a stream carrying no DBM data at all) it is one `get` per
@@ -1178,8 +1157,8 @@ pub fn batch_has_dbm_records(records: &[(i64, Map<String, Value>)]) -> bool {
 /// `index_fields_updated_at` is a "from here on" cutoff, never a backfill
 /// trigger. Pre-seed files fall to the ordinary DataFusion scan and remain
 /// fully queryable — old and new coexist in one window. The improvement
-/// therefore arrives as pre-seed data ages out, which is why a before/after
-/// measurement MUST use post-change data only.
+/// therefore arrives as pre-seed data ages out, so a before/after measurement
+/// must use post-seed data only.
 ///
 /// **Untagged rows stay queryable.** Rows with no `o2_dbm_kind` — the
 /// receiver-native events and the customer's ordinary log lines — simply
@@ -1188,12 +1167,11 @@ pub fn batch_has_dbm_records(records: &[(i64, Map<String, Value>)]) -> bool {
 /// for `kind = 'activity'` matches only rows carrying that term. Nothing is
 /// dropped.
 ///
-/// **Reversible**, which the partition key it replaces was not. A partition key
-/// is append-only — omitting it from a settings write marks it `disabled: true`
-/// and keeps it forever, so seeding one was a one-way door per stream. An
-/// `index_fields` entry can simply be removed by an operator, and the stream
-/// reverts to full scans with no residue in its layout. That is a real
-/// operational advantage of this approach.
+/// **Reversible**, unlike a partition key. A partition key is append-only —
+/// omitting it from a settings write marks it `disabled: true` and keeps it
+/// forever, making it a one-way door per stream. An `index_fields` entry can be
+/// removed by an operator, and the stream reverts to full scans with no residue
+/// in its layout.
 pub async fn ensure_server_stream_index_field(org_id: &str, stream_name: &str) {
     use config::meta::stream::StreamType;
 
@@ -1214,8 +1192,7 @@ pub async fn ensure_server_stream_index_field(org_id: &str, stream_name: &str) {
         schema::save_stream_settings(org_id, stream_name, StreamType::Logs, settings).await
     {
         // Warn, never fail: the ingest this is attached to must land either
-        // way. A stream stuck without the index reads exactly as slowly as it
-        // does today — the pre-fix status quo, not a regression.
+        // way. An unindexed stream still reads correctly, just with full scans.
         log::warn!(
             "[DbMonitoring] could not seed the {} secondary index fields on {org_id}/{stream_name}; \
              DBM reads on this stream will keep scanning every row: {e}",
@@ -1238,29 +1215,25 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     // The strip is gated on a fast pre-scan: this function runs on EVERY log
     // record every customer ships, and essentially all of them carry no
     // reserved key at all — for those, one O(record keys) scan replaces 83
-    // `remove` calls. A record that DOES carry a reserved-looking key takes
-    // the identical strip path it always did (the strip still removes exact
-    // `ALL_DBM_FIELDS` members only), so behavior is unchanged either way.
-    // The event-name save/restore is skipped with it: `O2_EVENT_NAME` is
-    // itself covered by the pre-scan, so a record the scan clears cannot
-    // carry one.
+    // `remove` calls. The strip itself still removes exact `ALL_DBM_FIELDS`
+    // members only. The event-name save/restore is skipped with it, since
+    // `O2_EVENT_NAME` is covered by the pre-scan: a record the scan clears
+    // cannot carry one.
     let event_name = if has_reserved_dbm_key(local_val) {
         // The event name has to survive the strip, because for some engines it is the ONLY
         // discriminator there is.
         //
         // `O2_EVENT_NAME` is an `ALL_DBM_FIELDS` member, so the loop below removes it along
         // with every other caller-settable key — correctly, since a forged value and a
-        // receiver-derived one are byte-identical in a flattened map. But `canonicalize_record`
-        // then has nothing to dispatch on and falls back to `sniff_event_name`, which matches
-        // Postgres attribute shapes ONLY. MySQL records carry no `postgresql.*` attribute at
-        // all, so every MySQL receiver event was dropped: measured 0 of 170 `top_query` and
-        // 0 of 11 `query_sample` canonicalized in one window, against 373/373 and 242/242 for
-        // Postgres on the same binary. Postgres survived purely by accident of the sniff.
+        // receiver-derived one are byte-identical in a flattened map. Without it
+        // `canonicalize_record` has nothing to dispatch on and falls back to
+        // `sniff_event_name`, which matches Postgres attribute shapes ONLY; MySQL records
+        // carry no `postgresql.*` attribute at all, so every MySQL receiver event would be
+        // dropped.
         //
-        // Carrying the value across the strip restores dispatch WITHOUT weakening the strip:
-        // the name is re-read from the record we were handed, and the ingest paths still
-        // overwrite it afterwards with the value taken from the OTLP envelope, which is what
-        // makes the stored field trusted. This only decides which arm runs.
+        // Carrying the value across the strip does not weaken it: the name only decides
+        // which arm runs, and the ingest paths still overwrite the STORED field afterwards
+        // with the value taken from the OTLP envelope, which is what makes it trusted.
         let event_name = local_val
             .get(O2_EVENT_NAME)
             .and_then(|v| v.as_str())
@@ -1295,11 +1268,10 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
         warn_unrecognized_recipe(&tag);
         return;
     }
-    // The enterprise-split half of the same defect. On OSS every shipped recipe
-    // tag is `EnterpriseOnly`: the recipe is CORRECT, and staying silent about
-    // it would tell exactly the wrong story — "recognized" plus an empty page
-    // plus a liveness probe reporting a healthy quiet database. The message
-    // must therefore be distinct from the unrecognized-tag one: the fix is a
+    // On OSS every shipped recipe tag is `EnterpriseOnly`: the recipe is
+    // CORRECT, so silence would read as "recognized" beside an empty page and a
+    // liveness probe reporting a healthy quiet database. The message is
+    // deliberately distinct from the unrecognized-tag one — the fix here is a
     // licence, not a collector-config edit.
     #[cfg(not(feature = "enterprise"))]
     if let Some(tag) = local_val.get("o2_recipe").and_then(|v| v.as_str())
@@ -1317,9 +1289,7 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
 pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, Value>> {
     // No per-signal gating: DBM is a single switch (`ZO_DB_MONITORING_ENABLED`,
     // checked by the CALLER before dispatch reaches this function), so every
-    // arm below canonicalizes whenever DBM is enabled. The per-kind knobs that
-    // used to gate the explain/statement/activity/top_query arms were removed
-    // when the config collapsed to that one flag.
+    // arm below canonicalizes whenever DBM is enabled.
     //
     // Deadlocks — Postgres DETAIL entries and MySQL/MariaDB per-transaction
     // entries. ENTERPRISE-OWNED: the canonicalizers moved to
@@ -1330,10 +1300,10 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     // function's source to prove the two sides of that contract still agree —
     // a check that cannot reach across the repo boundary.
     //
-    // The three lookups are performed HERE rather than only inside the hook so
-    // that the marker set stays visible to the source-scraping contract test and
-    // so an OSS build still cheaply distinguishes "this is an enterprise
-    // deadlock record" from "this is not a DBM record at all".
+    // The three lookups stay HERE rather than only inside the hook so the marker
+    // set remains visible to that source-scraping test, and so an OSS build can
+    // cheaply distinguish "an enterprise deadlock record" from "not a DBM record
+    // at all".
     let is_enterprise_deadlock = rec.get("o2_pg_event").and_then(|v| v.as_str())
         == Some("deadlock")
         || rec.get("o2_my_event").and_then(|v| v.as_str()) == Some("deadlock")
@@ -1358,8 +1328,7 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
         use o2_enterprise::enterprise::db_monitoring::Claim;
         match o2_enterprise::enterprise::db_monitoring::claim_deadlock_markers(rec) {
             Claim::Canonicalized(canon) => return Some(canon),
-            // Mirrors today's `return canonicalize_pg_deadlock(rec).map(…)`
-            // yielding None: a claimed record ends dispatch either way.
+            // A claimed record ends dispatch either way.
             Claim::ClaimedButUnparsed => return None,
             Claim::NotMine => {}
         }
@@ -1374,12 +1343,12 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     // filelog records. Same tag family as deadlock/explain: filelog produces
     // no OTLP EventName, so the collector tag is the discriminator.
     //
-    // POSTGRES ONLY, deliberately: MySQL/MariaDB's per-execution equivalent
-    // is the slow query log, which no shipped recipe tails (only error.log
-    // is) and whose records span multiple lines (`# Time:` / `# User@Host:` /
-    // `# Query_time:` headers), needing multi-line stitching nothing here
-    // does yet. An arm without a producer would be dead code that reads as
-    // coverage — add the MySQL arm together with a slow-log tailer recipe.
+    // Postgres only, deliberately: MySQL/MariaDB's per-execution equivalent is
+    // the slow query log, which no shipped recipe tails (only error.log is) and
+    // whose records span multiple lines (`# Time:` / `# User@Host:` /
+    // `# Query_time:` headers), needing multi-line stitching nothing here does
+    // yet. Add the MySQL arm together with a slow-log tailer recipe — an arm
+    // with no producer is dead code that reads as coverage.
     if rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("statement_duration") {
         return canonicalize_pg_statement_duration(rec).map(|e| e.to_record());
     }
@@ -1400,14 +1369,15 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     // Every ENTERPRISE-OWNED sqlquery recipe tag, named here in the
     // dispatcher's own body: MSSQL deadlocks (a sqlquery recipe, not a filelog
     // one, so keyed on the tag), the four engine-agnostic blocking recipes, and
-    // the six table/index-stats recipes. `claim_recipe_tags` above claims all
-    // eleven.
+    // the eight table/index-stats recipes. `claim_recipe_tags` above claims all
+    // thirteen.
     //
-    // The literals are NOT redundant with the hook. `shipped_recipe_tags_and_
-    // backend_dispatch_agree` reads THIS function's source to prove the shipped
-    // collector recipes (`dbmShared.ts`) and the backend still tag the same set
-    // — a check that cannot reach across the repo boundary, so deleting the
-    // literals would make it silently pass over a shorter list.
+    // The literals are NOT redundant with the hook.
+    // `shipped_recipe_tags_and_backend_dispatch_agree` reads THIS function's
+    // source to prove the shipped collector recipes (`dbmShared.ts`) and the
+    // backend tag the same set — a check that cannot reach across the repo
+    // boundary, so deleting the literals would make it silently pass over a
+    // shorter list.
     let recipe = rec.get("o2_recipe").and_then(|v| v.as_str()).unwrap_or("");
     let is_enterprise_recipe = recipe == "mssql_deadlock"
         || recipe == "pg_blocking_chain"
@@ -1415,10 +1385,9 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
         || recipe == "mariadb_lock_waits"
         || recipe == "mssql_blocking_chain"
         // Table health (W10) and index health (W11) — one row per relation /
-        // per index per 60 s. The three engines' recipes emit the SAME column
-        // aliases (the `mariadb_lock_waits` precedent), so one enterprise
-        // canonicalizer serves all three and `detect_engine` reads the engine
-        // off the tag.
+        // per index per 60 s. The engines' recipes emit the SAME column aliases
+        // (the `mariadb_lock_waits` precedent), so one enterprise canonicalizer
+        // serves all of them and `detect_engine` reads the engine off the tag.
         || recipe == "pg_table_stats"
         || recipe == "mysql_table_stats"
         || recipe == "mariadb_table_stats"
@@ -1531,28 +1500,19 @@ impl TopQuerySample {
         insert_opt(&mut out, O2_DBM_ACTIVITY_QUERY, self.query.clone());
         insert_opt(&mut out, O2_DBM_FINGERPRINT, self.fingerprint.clone());
 
-        // A HASH REQUIRES A PLAN, but a plan does NOT require a hash.
+        // A HASH REQUIRES A PLAN, but a plan does NOT require a hash. Plan
+        // comparison is one feature of this column and inspection is the other;
+        // only comparison needs the hash. `plan_hash` walks JSON structure, so
+        // SQL Server's XML showplans hash to None while remaining perfectly
+        // readable — gating the plan on the hash would discard all of them.
+        // Readers gate on the hash where they diff (see `plan_drift`), so an
+        // unhashed plan renders and simply never claims to have drifted.
         //
-        // These used to travel strictly together, on the reasoning that a plan
-        // with no hash cannot be compared. That is true and still worth having
-        // — but it silently DISCARDED every SQL Server plan: `plan_hash`
-        // canonicalizes a plan by walking its JSON structure, and SQL Server
-        // ships XML, so the hash is legitimately None and the plan went with
-        // it. The receiver produced a perfectly readable showplan, the
-        // canonicalizer read it, and this condition threw it away.
-        //
-        // A plan you can READ but not diff is worth strictly more than no plan
-        // at all: plan comparison is one feature of this column, inspection is
-        // the other, and only comparison needs the hash. Readers already gate
-        // on the hash where they diff (see `plan_drift`), so an unhashed plan
-        // renders and simply never claims to have drifted.
-        // A BLANK or LITERAL-NULL plan is not a plan. The hash requirement used
-        // to filter these as a side effect — `plan_hash` parses the text and
-        // declines on anything structureless — so dropping that requirement
-        // means filtering them HERE, explicitly, rather than leaning on a
-        // second rule to do it. Storing `"   "` or `"null"` (which a VRL
-        // pipeline or a transformed record really can deliver) puts a blank
-        // plan tree in the UI beside a query that looks like it was explained.
+        // A BLANK or LITERAL-NULL plan is not a plan, and is filtered here
+        // explicitly rather than as a side effect of the hash. Storing `"   "`
+        // or `"null"` — which a VRL pipeline or a transformed record really can
+        // deliver — puts a blank plan tree in the UI beside a query that looks
+        // like it was explained.
         if let Some(plan) = self
             .plan
             .as_ref()
@@ -1635,10 +1595,9 @@ pub fn canonicalize_top_query(rec: &Map<String, Value>) -> Option<TopQuerySample
     // receiver bug that EXPLAINs the normalised text. `first_str` already treats
     // "" as absent, which is the correct reading: "no plan THIS interval", not
     // "no plan exists".
-    // SQL Server ships an obfuscated XML SHOWPLAN under its own vendor prefix.
-    // Its absence from this list is why SQL Server top queries carried no plan
-    // while the receiver was emitting one: the attribute reached the stream
-    // (`sqlserver.query_plan` is in the raw capture) and nothing read it.
+    // SQL Server ships an obfuscated XML SHOWPLAN under its own vendor prefix
+    // (`sqlserver.query_plan`), which must be listed here or its top queries
+    // carry no plan while the receiver is emitting one.
     //
     // The three engines' plans are DIFFERENT FORMATS — Postgres JSON, MySQL
     // JSON, SQL Server XML — and are deliberately stored in one column anyway:
@@ -1745,9 +1704,6 @@ pub fn plan_hash(plan_json: &str) -> Option<String> {
     // mints a stable hash for "no plan", which every reader downstream would
     // treat as a real plan that never changes.
     if fields == 0 {
-        // Parsed, but contained nothing structural — a bare scalar, `[]`, `{}`,
-        // or a document whose keys we do not recognise. Hashing that would mint
-        // a stable hash for "no plan", which reads downstream as a real plan.
         return None;
     }
     Some(crate::traces::db_monitoring::normalizer::fingerprint_hex(
@@ -1798,12 +1754,11 @@ fn walk_plan_structure(node: &Value, out: &mut String, fields: &mut usize) {
                     match v {
                         // Escaped, so a delimiter INSIDE an identifier cannot
                         // forge a field boundary. Postgres identifiers are
-                        // freely unicode and may contain any punctuation, so an
-                        // unescaped join collides a relation literally named
-                        // `a;Index Name=b` with the genuine pair
-                        // (`Relation Name`=a, `Index Name`=b) — two different
-                        // plans reporting as unchanged. Measured: they hashed
-                        // identically before this escape.
+                        // freely unicode and may contain any punctuation:
+                        // unescaped, a relation literally named
+                        // `a;Index Name=b` hashes identically to the genuine
+                        // pair (`Relation Name`=a, `Index Name`=b), so two
+                        // different plans would report as unchanged.
                         Value::String(s) => {
                             out.push_str(&s.replace('\\', r"\\").replace(';', r"\;"))
                         }
@@ -1992,10 +1947,10 @@ pub fn canonicalize_pg_auto_explain(rec: &Map<String, Value>) -> Option<AutoExpl
         engine,
         database: detect_database(rec),
         // Same derivation chain as the receiver-event siblings (N5): the
-        // collector's resource attributes first, then the shared detectors —
-        // filelog records carry no receiver endpoint field, so without the
-        // resource-attr fallback these rows stored NO instance and the
-        // `?instance=` filter silently excluded every one of them.
+        // collector's resource attributes first, then the shared detectors.
+        // Filelog records carry no receiver endpoint field, so without the
+        // resource-attr fallback they store NO instance and the `?instance=`
+        // filter silently excludes every one of them.
         instance: first_str(rec, &["mysql_instance_endpoint", "service_instance_id"])
             .map(|a| super::strip_port(&a))
             .or_else(|| detect_instance(rec)),

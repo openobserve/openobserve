@@ -279,13 +279,13 @@ export interface DbmInsightInput {
 /**
  * I1 · Query regression — "it was fast yesterday".
  *
- * p95 tripled at flat volume. Four guards keep it honest, and each one exists
- * because of a specific false positive:
+ * p95 tripled at flat volume. Four guards keep it honest, each ruling out one
+ * class of false positive:
  *   • minCalls    — a percentile over 3 calls is noise.
- *   • volume ratio— a query whose volume collapsed will show a wild p95; that
- *                   is a sampling artifact, not a regression.
+ *   • volume ratio— a query whose volume collapsed shows a wild p95; that is a
+ *                   sampling artifact, not a regression.
  *   • baseline floor — a 0.1ms query going to 0.3ms is not an incident.
- *   • fp_version  — a normalizer bump re-buckets traffic and MANUFACTURES
+ *   • fp_version  — a normalizer bump re-buckets traffic and manufactures
  *                   regressions. Comparing across versions is meaningless.
  */
 export const detectRegression = (input: DbmInsightInput): DbmInsight | null => {
@@ -966,11 +966,11 @@ export const DBM_DATABASE_RULES = {
 /**
  * When a failure rate is worth a red rail rather than a number in a column.
  *
- * Any errors at all used to redden the row, which on real data meant one failed
- * call in 26,000 painted a database as critical — so the colour stopped meaning
- * "look here" and started meaning "this database exists". A rate floor asks the
- * question the operator is actually asking (is a meaningful share of traffic
- * failing?), and the call floor stops a 1-in-3 sample being called 33%.
+ * Reddening on any error at all means one failed call in 26,000 paints a
+ * database as critical, so the colour stops meaning "look here" and starts
+ * meaning "this database exists". A rate floor asks the question the operator
+ * is actually asking — is a meaningful share of traffic failing? — and the call
+ * floor stops a 1-in-3 sample being called 33%.
  */
 export const DBM_CRITICAL_ERROR_RULES = {
   /** Failures must be at least this share of calls, `0`–`1`. */

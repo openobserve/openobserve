@@ -429,8 +429,8 @@ describe("isNotablyLongestWait", () => {
     expect(isNotablyLongestWait(20, 4)).toBe(true);
   });
 
-  // The badge used to fire on row 1 unconditionally, which labelled a
-  // 0.1-second wait as the worst thing on screen.
+  // Firing on row 1 unconditionally would label a 0.1-second wait as the worst
+  // thing on screen.
   it("stays quiet when every wait is trivially short", () => {
     expect(isNotablyLongestWait(0.1, 0.1)).toBe(false);
     expect(isNotablyLongestWait(4.9, 0)).toBe(false);
@@ -452,9 +452,9 @@ describe("isNotablyLongestWait", () => {
 });
 
 /**
- * The "Waiting for" column used to print one constant on every row. These lock
- * it to the row's own wait event: a row lock, a table lock and a buffer read are
- * three different problems with three different fixes.
+ * The "Waiting for" column is locked to the row's own wait event rather than one
+ * constant: a row lock, a table lock and a buffer read are three different
+ * problems with three different fixes.
  */
 describe("wait events", () => {
   it("translates the Postgres lock wait events into distinct sentences", () => {

@@ -354,12 +354,10 @@ const router = useRouter();
 // the shell's badge snapshot, refresh/date-change handlers and the load
 // envelope. See useDbmListPage.
 //
-// This page used to pass `syncUrl: null` — it read the URL but never wrote it.
-// That was defensible while it had no filters of its own: there was nothing to
-// publish beyond the range. Now that it carries scope, silence would be a bug:
-// the reader's engine/database pick would apply to the table but vanish from
-// the URL, so a tab switch or a shared link would reopen an unfiltered page
-// while the chip had promised otherwise.
+// This page writes the URL as well as reading it, because it carries scope of
+// its own: with `syncUrl: null` the reader's engine/database pick would apply
+// to the table but vanish from the URL, so a tab switch or a shared link would
+// reopen an unfiltered page while the chip promised otherwise.
 const {
   scope: { range, current, queryParams },
   requestSeq,

@@ -776,10 +776,10 @@ const notCollectingChecks = computed<DbmLockCheck[]>(() =>
 /**
  * A row opens the query it is running (W4/B13).
  *
- * The table used to be inert, so an operator who found the session saturating
- * an instance had no way through to what that statement costs over the window
- * — they retyped the fingerprint into the Queries search. The `fingerprint` is
- * exactly what joins a live session to a Top-queries row, so it is the hop.
+ * The `fingerprint` is exactly what joins a live session to a Top-queries row,
+ * so it is the whole of the hop: an operator who finds the session saturating
+ * an instance reaches what that statement costs over the window without
+ * retyping the fingerprint into the Queries search.
  *
  * The helper owns the destination, including the refusal: a session running no
  * statement carries no fingerprint, and pushing on one would open a detail page

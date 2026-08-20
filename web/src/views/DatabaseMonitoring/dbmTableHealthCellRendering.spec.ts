@@ -23,12 +23,12 @@
  * CORRECTLY, and a claim about how another component interprets your input
  * cannot be checked by reading your own input. Only the component can answer.
  *
- * It shipped wrong for exactly that reason. `OTableColumnDef.cell` is typed
- * `string | Component` and `useTableCore` wraps it as `() => col.cell`, so a
- * TanStack-style `({ row }) => string` was never invoked — it was returned to
- * FlexRender, which stringified the arrow function into every data cell of
- * every row. Sixteen source-reading assertions and a green formatter suite all
- * held while the page rendered `(( row )) => tableSize…` eight rows deep.
+ * `OTableColumnDef.cell` is typed `string | Component` and `useTableCore`
+ * wraps it as `() => col.cell`, so a TanStack-style `({ row }) => string` is
+ * never invoked — it is returned to FlexRender, which stringifies the arrow
+ * function into every data cell of every row. Source-reading assertions and a
+ * green formatter suite all hold while the page renders
+ * `(( row )) => tableSize…` in each row.
  *
  * The mount is cheap: OTable needs only i18n (its own spec does the same), and
  * this file runs in tens of milliseconds. That was measured before choosing

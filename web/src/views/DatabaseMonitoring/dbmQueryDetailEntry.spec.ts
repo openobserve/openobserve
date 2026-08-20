@@ -183,10 +183,10 @@ describe("the detail page's own reads are collapsed", () => {
 
 describe("the badge fan-out fires only where a strip renders it", () => {
   /**
-   * The detail route renders no `DbmSectionTabs`, and opening a row ADDS the
-   * row's engine as `?system=` to the URL — which used to re-key the shell's
-   * watcher and fire every count read on every detail entry, for badges
-   * nobody paints.
+   * The detail route renders no `DbmSectionTabs`, and opening a row adds the
+   * row's engine as `?system=` to the URL — which re-keys the shell's watcher.
+   * Without the guard that fires every count read on every detail entry, for
+   * badges nobody paints.
    */
   it("the shell guards the fan-out on the strip routes", () => {
     expect(shell).toMatch(/if \(!rendersTabStrip\.value\) return;/);

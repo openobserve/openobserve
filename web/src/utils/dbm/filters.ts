@@ -17,17 +17,16 @@
  * The dimension-filter plumbing every DBM list page shares.
  *
  * The Databases, Samples and Top-queries toolbars each build a set of
- * `DbmScopeFilter` entries, and every entry's `onChange` used to repeat the
- * same four lines: write the ref, publish the scope to the URL, reload. Eleven
- * copies of that handler is eleven chances for one of them to drop the URL
- * write — which narrows the table while the route (and everything reading it:
- * the shell's badge fan-out, a shared link, a reload) still describes the
- * unfiltered question.
+ * `DbmScopeFilter` entries whose `onChange` all do the same thing: write the
+ * ref, publish the scope to the URL, reload. Hand-rolling that per entry is one
+ * chance per copy to drop the URL write, which narrows the table while the
+ * route — and everything reading it: the shell's badge fan-out, a shared link,
+ * a reload — still describes the unfiltered question.
  *
- * `createDbmFilterEntry` owns the handler ONCE per page: the page states what
- * happens after a filter changes (`syncUrl(); load();`) a single time, and
- * each entry shrinks to its actual content — which dimension, which ref,
- * which options.
+ * `createDbmFilterEntry` owns the handler once per page: the page states what
+ * happens after a filter changes (`syncUrl(); load();`) a single time, and each
+ * entry shrinks to its actual content — which dimension, which ref, which
+ * options.
  */
 
 import type { Ref } from "vue";

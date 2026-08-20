@@ -136,10 +136,10 @@ const range = computed(() => rangeFromQuery(route.query));
  *
  * All five dimensions, not `system` alone. The badges endpoint forwards each
  * to exactly the slices whose endpoint accepts it, so a badge counts what its
- * tab would show — and a dimension the shell never reads could never get
- * there. That was the bug: a URL carrying `instance=postgres` produced the
- * same badges as one without it, while the Slowest-calls TAB it labelled had
- * already narrowed from 73 rows to 0.
+ * tab would show — and a dimension the shell never reads can never get there.
+ * Read only `system` and a URL carrying `instance=postgres` produces the same
+ * badges as one without it, while the tab each badge labels has already
+ * narrowed.
  */
 const scopeFilters = computed<DbmCountFilters>(() => ({
   system: (route.query.system as string) ?? null,

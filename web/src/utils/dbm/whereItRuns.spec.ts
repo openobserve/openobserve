@@ -99,7 +99,7 @@ describe("active row and click transitions", () => {
 
   it("marks exactly one row active per scope", () => {
     expect(isWhereRowActive(parent, { instance: "pg-primary" })).toBe(true);
-    // A namespace narrows further, so the parent is no longer THE filter.
+    // A namespace narrows further, so the parent is not the active filter.
     expect(isWhereRowActive(parent, { instance: "pg-primary", namespace: "orders" })).toBe(false);
     expect(isWhereRowActive(child, { instance: "pg-primary", namespace: "orders" })).toBe(true);
     expect(isWhereRowActive(child, { instance: "pg-primary" })).toBe(false);

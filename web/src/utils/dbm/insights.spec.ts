@@ -718,12 +718,11 @@ describe("splitLongTail — the fold", () => {
   });
 
   it("folds even when a large remainder keeps the listed rows short of 95%", () => {
-    // The bug this pins: shares are measured against the whole scope, which
-    // includes a remainder bucket we have no per-query numbers for. On real
-    // data that bucket held 7.7%, so the ranked rows summed to ~92% and a
-    // 95%-OF-SCOPE gate could never be reached — the fold silently never fired
-    // on exactly the Pareto-shaped data it exists for. Normalising to the
-    // listed rows' own total is what makes the cut reachable.
+    // Shares are measured against the whole scope, which includes a remainder
+    // bucket with no per-query numbers. When that bucket is large the ranked
+    // rows sum to well under 95%, so a 95%-of-scope gate would be unreachable
+    // and the fold would never fire on exactly the Pareto-shaped data it exists
+    // for. Normalising to the listed rows' own total keeps the cut reachable.
     const heavy = [
       tail("a", 0.3726),
       tail("b", 0.2296),
@@ -893,8 +892,8 @@ describe("splitLongTail — the fold", () => {
 });
 
 describe("isCriticalErrorRate", () => {
-  // The bug this exists for: one failed call in 26,000 reddened a whole
-  // database row, so red stopped meaning "look here".
+  // One failed call in 26,000 must not redden a whole database row, or red
+  // stops meaning "look here".
   it("does not redden a busy database over a single failure", () => {
     expect(isCriticalErrorRate(1, 26_000)).toBe(false);
   });
@@ -924,12 +923,11 @@ describe("isCriticalErrorRate", () => {
 /**
  * W5/B12. The rule line is the insight engine's honesty surface: it states the
  * arithmetic that fired the card, so the numbers on screen cannot drift from
- * the numbers in the predicate. Once the baseline is SELECTABLE, a rule line
- * that says only "than earlier" no longer identifies which comparison produced
- * the number — the same 3x could be against the previous hour or against
- * yesterday, and a reader cannot tell them apart.
+ * the numbers in the predicate. Because the baseline is selectable, a rule line
+ * saying only "than earlier" does not identify which comparison produced the
+ * number — the same 3x could be against the previous hour or against yesterday.
  *
- * So every rule that compares two windows must NAME its baseline, and every
+ * So every rule that compares two windows must name its baseline, and every
  * rule that does not compare windows must not claim one.
  */
 describe("insightRuleParams names the baseline it compared against", () => {

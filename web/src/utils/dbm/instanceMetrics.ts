@@ -295,7 +295,7 @@ export const DBM_INSTANCE_METRICS: readonly DbmMetricSpec[] = [
     aggregate: "max",
     identityColumn: MYSQL_IDENTITY,
   },
-  // ONE STREAM, TWO ROLES. Postgres publishes hits and disk reads as two
+  // One stream, two roles. Postgres publishes hits and disk reads as two
   // separate metrics; mysqlreceiver publishes `mysql.buffer_pool.operations`
   // with an `operation` dimension, so both roles read the same stream and are
   // told apart by `filter` — the arrangement `connections` already uses for

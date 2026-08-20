@@ -370,9 +370,9 @@ describe("planRows keeps a plan it cannot walk", () => {
 
   it("carries an unparseable plan as raw text so the page can render it", () => {
     // SQL Server ships XML. `flattenPlanTree` cannot walk it, so `nodes` is
-    // empty — and the page then showed "The plan could not be read" over a plan
-    // that had been collected, stored and returned perfectly well. A plan a
-    // reader can READ beats one the page refuses to show.
+    // empty — without the raw text the page would show "The plan could not be
+    // read" over a plan collected, stored and returned perfectly well. A plan a
+    // reader can read beats one the page refuses to show.
     const [row] = planRows(response({ hits: [plan({ plan: SHOWPLAN, plan_hash: null })] }));
     expect(row.nodes).toHaveLength(0);
     expect(row.rawPlan, "an XML showplan must survive as text").toBe(SHOWPLAN);
@@ -444,9 +444,9 @@ describe("planEmptyReason", () => {
 
   /**
    * An older backend, or one mid-rollout, sends no `plan_capture` at all.
-   * Falling back to the config hint is the safe half: it is the copy that
-   * shipped before this field existed, so an old server degrades to exactly
-   * today's behaviour rather than asserting a capture state it never reported.
+   * Falling back to the config hint is the safe half: an old server degrades to
+   * the pre-field behaviour rather than asserting a capture state it never
+   * reported.
    */
   it("falls back to the config hint when the backend sent no capture state", () => {
     const legacy = response({ hits: [] });
@@ -633,9 +633,9 @@ describe("per-row plan provenance (W-E3)", () => {
   });
 
   it("keeps a generic row latency-free even against a response that lies", () => {
-    // The API sends duration keys ABSENT on generic hits; this pins the UI's
-    // own belt-and-braces gate so a backend regression cannot render a latency
-    // beside a plan that never ran (D-H).
+    // The API sends duration keys absent on generic hits; this pins the UI's own
+    // belt-and-braces gate so a backend cannot render a latency beside a plan
+    // that never ran (D-H).
     const rows = planRows(
       response({
         hits: [

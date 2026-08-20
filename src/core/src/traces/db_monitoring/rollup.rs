@@ -16,10 +16,10 @@
 //! Database Monitoring rollup: the Phase-2 `_o2_db_stats` writer
 //! (design: `docs/___databsepages/dbm-design-doc.md` §5).
 //!
-//! A dedicated windowed job (structurally cloned from the service-graph
-//! processor, but with no enterprise cfg — unlike parts of the read API in
-//! `api.rs`, this module is identical in both builds) that, per `(org, trace
-//! stream)` and per window, runs THREE aggregation queries over the
+//! A dedicated windowed job — structurally the service-graph processor, but
+//! with no enterprise cfg, since unlike parts of the read API in `api.rs` this
+//! module is identical in both builds. Per `(org, trace stream)` and per
+//! window it runs THREE aggregation queries over the
 //! ingest-stamped `o2_db_*` columns and writes three record families into the
 //! `_o2_db_stats` summary stream:
 //!
@@ -82,22 +82,19 @@ pub fn rollup_interval_secs() -> u64 {
 
 /// How many rollup intervals of raw spans one delta read may span.
 ///
-/// The delta aggregates RAW SPANS; its cost scales with the window it covers.
-/// When the rollup job is healthy the window is under one interval and this
-/// bound never binds. When the job STALLS, `offset` falls arbitrarily far
-/// behind and an unbounded delta would try to aggregate every span since the
-/// stall — on a busy stream that is hours of raw data on a user's page load,
-/// growing without limit for as long as the job stays down. That is the one
-/// shape a read path must never take: the harder the system is struggling, the
+/// The delta aggregates RAW SPANS, so its cost scales with the window it covers.
+/// A healthy job keeps that under one interval and this bound never binds. A
+/// STALLED job leaves `offset` arbitrarily far behind, and an unbounded delta
+/// would aggregate every span since the stall on a user's page load — the one
+/// shape a read path must never take, where the harder the system struggles the
 /// more expensive every page becomes.
 ///
-/// So a stalled job degrades into STALENESS instead, which the response already
-/// knows how to say: `tail_covers_from` later than `data_through` is precisely
-/// "the gap between these two is covered by neither source", and the UI draws
-/// its staleness banner from it. Bounded wrong-but-labelled beats unbounded
-/// right.
+/// Capping it degrades a stalled job into STALENESS instead, which the response
+/// already says: `tail_covers_from` later than `data_through` means "the gap
+/// between these two is covered by neither source", and the UI draws its
+/// staleness banner from it.
 ///
-/// Four intervals (1 h at the 900 s default) is the same catch-up budget the
+/// Four intervals (1 h at the 900 s default) matches the catch-up budget the
 /// WRITER gives itself per tick (`MAX_CATCHUP_WINDOWS`), so a reader never asks
 /// for a wider span of raw spans than the rollup would process in one go.
 pub(crate) const MAX_DELTA_INTERVALS: i64 = 4;
@@ -125,18 +122,17 @@ pub(crate) fn delta_start(offset: i64, q_start: i64, q_end: i64) -> i64 {
 /// window is later SUPERSEDED by the rollup's own row for that window rather
 /// than double-counted beside it.
 ///
-/// Stamping raw `now` instead would put every execution on its own boundary:
-/// the cache could never match two entries, and two overlapping deltas for the
-/// same window would both survive the merge — the +33% shape
-/// `stats_read_range` already documents.
+/// Stamping raw `now` would put every execution on its own boundary: the cache
+/// could never match two entries, and two overlapping deltas for the same window
+/// would both survive the merge — the double-counting shape `stats_read_range`
+/// documents.
 pub(crate) fn floor_to_grid(t: i64) -> i64 {
     let w = rollup_interval_secs() as i64 * 1_000_000;
     if w <= 0 { t } else { t - t.rem_euclid(w) }
 }
 
 /// Query fingerprints kept per (db system, instance) per rollup window; the
-/// rest folds into an 'other' bucket. Fixed (unlike the interval), carrying
-/// the old knob's default.
+/// rest folds into an 'other' bucket. Fixed, unlike the interval.
 pub const ROLLUP_TOP_N: usize = 200;
 
 /// Catch-up cap: never scan more than this many windows per (stream, tick).
@@ -155,24 +151,21 @@ struct RecentIngestedTraceStream {
 
 // ─── SQL builders (pure — unit-tested against exact strings) ─────────────────
 //
-// **No builder here spells a `_timestamp` bound.** The window is carried by the
-// request payload: every one of these strings is executed through
-// [`run_dbm_search`], which puts `(start_time, end_time)` on
-// `config::meta::search::Query`, and the search planner pushes that down as a
-// physical `_timestamp >= start AND _timestamp < end` FilterExec attached to
-// EACH scan (`search/src/datafusion/table_provider/helpers.rs`) — per table
-// alias, so even a self-join is bounded on both sides. An inline copy of the
-// same predicate is therefore pure duplication: a second literal window that
-// has to be kept in sync with the payload's by hand, with nothing checking it.
-// `Sql::time_range` is unconditionally `(query.start_time, query.end_time)`
-// (`search/src/sql/mod.rs`); nothing parses the window back out of the WHERE
-// clause, so removing the text cannot narrow the scan.
+// **No builder here spells a `_timestamp` bound**, and none elsewhere in DBM
+// does either ([`super::api::build_stats_sql`] included). The window travels in
+// the request payload: every string here is executed through [`run_dbm_search`],
+// which puts `(start_time, end_time)` on `config::meta::search::Query`, and the
+// planner pushes that down as a physical `_timestamp >= start AND _timestamp <
+// end` FilterExec attached to EACH scan
+// (`search/src/datafusion/table_provider/helpers.rs`) — per table alias, so even
+// a self-join is bounded on both sides. An inline copy would be a second literal
+// window to keep in sync by hand with nothing checking it: `Sql::time_range` is
+// unconditionally `(query.start_time, query.end_time)` (`search/src/sql/mod.rs`)
+// and nothing parses the window back out of the WHERE clause, so inline text can
+// never narrow the scan.
 //
-// NO DBM builder carries its own bound any more, [`super::api::build_stats_sql`]
-// included. That family wants `(start, end]` over rows stamped at the window
-// END, which is not the payload's interval — but the inline predicate it used
-// to spell was measured to be a NO-OP (the payload admitted the boundary rows
-// either way). The shift is applied to the PAYLOAD instead, in
+// The stats family wants `(start, end]` over rows stamped at the window END,
+// which is not the payload's interval; that shift is applied to the PAYLOAD, in
 // [`super::api::stats_read_range`].
 
 /// The shared §5.1 metric block: batch-aware statement count, call/error
@@ -584,8 +577,8 @@ fn build_records(
 /// Main entry point, called by the OSS `db_monitoring` job each tick.
 ///
 /// Discovery = usage-active trace streams ∪ every trace stream in the schema
-/// cache (same union + rationale as the service-graph processor). Each stream
-/// is schema-gated on `o2_db_fingerprint` via the DB-BACKED lookup BEFORE any
+/// cache (the same union the service-graph processor uses). Each stream is
+/// schema-gated on `o2_db_fingerprint` via the DB-BACKED lookup BEFORE any
 /// search — a cold in-memory cache on this node must not silently disable the
 /// rollup — then processed independently against its own offset.
 pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
@@ -688,7 +681,7 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
                 // Fingerprint alone is NOT enough: an `o2_db_*`-only schema
                 // (merge's CREATE branch, see `REQUIRED_SPAN_FIELDS`) has the
                 // fingerprint column and none of the span columns the rollup
-                // SQL spells, and would fail every window at plan time while
+                // SQL spells, so every window would fail at plan time while
                 // holding this stream's offset back forever.
                 if !super::stream_supports_db_monitoring(&schema) {
                     return;
@@ -718,9 +711,8 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
 /// It is the window's `start_time` on every iteration BUT the first of a fresh
 /// stream: a fresh stream seeds its in-memory offset to `now - window` without
 /// writing it, so the stored value is still `0` while `start_time` is the seed.
-/// Comparing against the seed there would fail the CAS forever and the stream
-/// would never advance; comparing against `0` is what "nobody has written this
-/// stream yet" actually looks like on disk.
+/// Comparing against the seed there fails the CAS forever and the stream never
+/// advances; `0` is what "nobody has written this stream yet" looks like on disk.
 ///
 /// `stored_before` is the value read from the store this tick, and `processed`
 /// the number of windows already advanced in this loop — after the first
@@ -794,7 +786,7 @@ async fn process_stream(
 
     // First run: begin one window back — never a full-history backfill. The
     // STORED value is still 0 here (nothing has written the seeded offset), so
-    // the first advance must compare against 0, not against the seed — see
+    // the first advance compares against 0, not the seed — see
     // [`expected_stored_offset`].
     let stored_before = offset;
     if offset == 0 {
@@ -891,11 +883,10 @@ async fn process_window(
     write_db_stats(org_id, stream_name, records).await
 }
 
-/// The one `config::meta::search::Request` shape every DBM search issues —
-/// this 30-field literal used to be restated verbatim at three sites (here,
-/// the read API's `run_stats_search` and `run_events_search`), which is
-/// exactly how field drift starts. `size` and `timeout` are the only knobs
-/// that legitimately differ between the rollup job and the read API.
+/// The one `config::meta::search::Request` shape every DBM search issues. The
+/// rollup job and the read API's `run_stats_search`/`run_events_search` all
+/// build through here so the 30-field literal cannot drift between them; `size`
+/// and `timeout` are the only knobs that legitimately differ.
 pub(crate) fn dbm_search_request(
     sql: String,
     start_time: i64,
@@ -1059,9 +1050,9 @@ mod tests {
         assert_eq!(delta_start(offset, q_start, q_end), offset);
     }
 
-    /// THE REGRESSION THIS EXISTS FOR. A rollup stalled for days must not make
-    /// the delta read days of raw spans; it reads at most the catch-up budget,
-    /// and the uncovered span becomes staleness the response reports.
+    /// Pins that a rollup stalled for days does not make the delta read days of
+    /// raw spans: it reads at most the catch-up budget, and the uncovered span
+    /// becomes staleness the response reports.
     #[test]
     fn delta_start_refuses_to_read_past_the_catch_up_budget() {
         let w = rollup_interval_secs() as i64 * 1_000_000;
@@ -1107,8 +1098,8 @@ mod tests {
 
     /// The delta and the rollup must stamp the SAME lattice. If they drift, a
     /// cached delta row and the rollup row for the same window stop being the
-    /// same window: the merge (`merge_rows` sums additive metrics) would count
-    /// both — the +33% shape `stats_read_range` already documents live.
+    /// same window and the merge (`merge_rows` sums additive metrics) counts
+    /// both — the double-counting shape `stats_read_range` documents.
     #[test]
     fn floor_to_grid_lands_on_window_boundaries() {
         let w = rollup_interval_secs() as i64 * 1_000_000;
@@ -1148,9 +1139,9 @@ mod tests {
         assert!(f <= -1 && f % w == 0, "negative input floored to {f}");
     }
 
-    /// The writer stamps `end_time` and `to_record` re-stamps the same value,
-    /// so the row is self-consistent. Asserted on the builder because that is
-    /// where a future edit would silently diverge.
+    /// The writer stamps `end_time` and `to_record` re-stamps the same value, so
+    /// the row is self-consistent. Asserted on the builder, where an edit could
+    /// silently diverge.
     #[test]
     fn rank_sql_stamp_is_the_window_end_the_writer_passes() {
         let end = 1_700_000_900_000_000_i64;
@@ -1208,11 +1199,11 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
         assert!(sql.ends_with(") AS ranked WHERE rnk <= 50"));
     }
 
-    // Property assertions (not an exact golden — the rank golden above pins
-    // the live-verified shape; here only the load-bearing structure matters):
-    // two grains via one UNION ALL, each with the NULL marker for the OTHER
-    // grain's discriminator, the shared metric block, and the fingerprint
-    // filter. (No time bound to assert: the window is the request payload's.)
+    // Property assertions rather than an exact golden — only the load-bearing
+    // structure matters here: two grains via one UNION ALL, each with the NULL
+    // marker for the OTHER grain's discriminator, the shared metric block, and
+    // the fingerprint filter. (No time bound to assert: the window is the
+    // request payload's.)
     #[test]
     fn test_totals_sql_shape() {
         let sql = build_totals_sql("s", false, 1_700_000_900_000_000);
@@ -1233,7 +1224,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
         assert!(class_arm.contains("GROUP BY o2_db_system, o2_db_instance, o2_db_stmt_class"));
         for arm in [ns_arm, class_arm] {
             assert!(arm.contains(r#"FROM "s""#));
-            // Leading WHERE term now that the time bound is the payload's.
+            // Leading WHERE term: the time bound is the payload's.
             assert!(arm.contains("WHERE o2_db_fingerprint IS NOT NULL"));
             for agg in [
                 "AS statements",
@@ -1260,7 +1251,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
     fn test_error_class_sql_shape() {
         let sql = build_error_class_sql("s");
         assert!(sql.contains(r#"FROM "s""#));
-        // Leading WHERE term now that the time bound is the payload's.
+        // Leading WHERE term: the time bound is the payload's.
         assert!(sql.contains("WHERE o2_db_fingerprint IS NOT NULL"));
         assert!(sql.contains("AND span_status = 'ERROR'"));
         assert!(sql.contains("COALESCE(o2_db_status_code, 'unknown') AS status_code"));
@@ -1535,10 +1526,9 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
         assert_eq!(expected_stored_offset(3_000, 1_000, 2), 3_000);
     }
 
-    /// A FRESH stream seeds its offset in memory (`now - window`) without ever
-    /// writing it, so the stored value is still 0 when the first advance runs.
-    /// Expecting the seed there fails the CAS on every tick forever — the
-    /// stream silently never rolls up at all.
+    /// Pins that the first advance of a FRESH stream expects 0: the seeded
+    /// in-memory offset (`now - window`) is never written, so expecting the seed
+    /// would fail the CAS every tick and the stream would never roll up.
     #[test]
     fn test_expected_stored_offset_first_window_of_a_fresh_stream_is_zero() {
         let seeded_start = 9_999_000;

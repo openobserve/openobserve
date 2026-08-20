@@ -17,25 +17,22 @@
  * A scope filter that is APPLIED must be VISIBLE, in every state that applies
  * it — and the coverage line must follow the table it describes.
  *
- * The bug this pins, on both trace-derived pages: `DbmScopeFilters` lived
- * inside the CLIENT table's `#toolbar` slot, and that table is `v-if`-ed away
- * in fallback mode. So the control unmounted with it — while the load kept
- * spreading all five dimensions into the request. Measured against the live
- * fleet, that was not theoretical: a fallback fetched under
- * `instance=<nonexistent>` returned 0 rows (the server DOES apply `instance`),
- * so a reader who had set an instance and then hit a traceless window got a
- * database-reported list silently narrowed to it, with no chip saying so and
- * no control to clear it, beneath a subtitle claiming the list spanned every
- * client. The page stated one scope and applied another.
+ * On both trace-derived pages `DbmScopeFilters` must sit outside the CLIENT
+ * table's `#toolbar` slot, because that table is `v-if`-ed away in fallback
+ * mode while the load still spreads all five dimensions into the request. With
+ * the control inside it, a reader who set an instance and then hit a traceless
+ * window gets a database-reported list silently narrowed to it — the server
+ * does apply `instance` — with no chip saying so and no control to clear it,
+ * beneath a subtitle claiming the list spans every client.
  *
- * The same unmount took `DbmCoverageLine` with it, so freshness, the top-N
- * truncation disclosure and the "counted to" timestamp all vanished at exactly
- * the moment the numbers changed vantage.
+ * The same unmount takes `DbmCoverageLine` with it, so freshness, the top-N
+ * truncation disclosure and the "counted to" timestamp all vanish at exactly
+ * the moment the numbers change vantage.
  *
  * Source-read like dbmFallbackCoversLoading.spec.ts, and for the same reason:
  * these views need a router, a store and a dozen O2 children to mount, and a
  * harness that heavy fails for unrelated reasons and gets deleted. What is
- * pinned here is structural and survives that: WHERE the control is rendered
+ * pinned here is structural and survives that: where the control is rendered
  * relative to the table that can unmount.
  */
 
@@ -56,8 +53,7 @@ const PAGES = ["QueriesPage.vue", "SamplesPage.vue"] as const;
  *
  * The structural claims below are about MARKUP, and the script holds strings
  * (`"DbmScopeFilters"` in an import, `serverListShown` in a computed) that
- * would otherwise satisfy a naive `toContain` and let the real regression
- * through.
+ * would otherwise satisfy a naive `toContain`.
  */
 const templateOf = (source: string): string => {
   const end = source.indexOf("<script setup");
@@ -112,9 +108,9 @@ describe("DBM scope filter survives the fallback", () => {
 
 describe("DBM fallback options describe the list on screen", () => {
   /**
-   * The options used to derive from the CLIENT rows alone — which are empty
-   * exactly when the fallback fires. Hoisting the control without this would
-   * have produced a visible filter with five empty selects.
+   * Deriving the options from the CLIENT rows alone gives a visible filter with
+   * five empty selects, because those rows are empty exactly when the fallback
+   * fires.
    */
   it.each(PAGES)("%s unions the server rows into the option derivation", (page) => {
     const source = read(page);

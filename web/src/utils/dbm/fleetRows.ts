@@ -187,9 +187,9 @@ export const unionFleetRows = (
   const clientRows: DbmFleetRow[] = rows.map((row) => {
     const key = instanceIdentityKey(row.db_system, row.db_instance);
     if (key) claimed.add(key);
-    // The METRIC-ALIAS key too: a MariaDB client row's readings live under the
+    // The metric-alias key too: a MariaDB client row's readings live under the
     // mysql identity (see `metricSystemFor`), and without this claim the same
-    // host would come back as a second, trafficless "mysql" row.
+    // host comes back as a second, trafficless "mysql" row.
     const aliasKey = instanceIdentityKey(metricSystemFor(row.db_system), row.db_instance);
     if (aliasKey) claimed.add(aliasKey);
     return {
@@ -248,8 +248,8 @@ export const unionFleetRows = (
     });
   }
 
-  // The engine-only degradation. Emitted only when NOTHING names an instance
-  // of this engine — a client row or a discovered instance is strictly better
+  // The engine-only degradation. Emitted only when nothing names an instance of
+  // this engine — a client row or a discovered instance is strictly better
   // evidence, and the unnamed statements very likely ran on it. The row states
   // engine identity and nothing else: no instance, no figures.
   const knownEngines = new Set([

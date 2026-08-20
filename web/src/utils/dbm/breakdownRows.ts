@@ -16,12 +16,11 @@
 /**
  * Turns one database's breakdown into CHILD ROWS of the Databases table.
  *
- * The split used to be drawn as its own mini-table inside an expansion panel,
- * with its own headers at its own widths. Two tables on one screen means the
- * same figure — this database's time — appears at two different x-positions, so
- * the split could not be compared by eye against the total it came out of. Here
- * the children are real rows in the parent's columns, so alignment is a
- * property of the table rather than something kept in sync by hand.
+ * The children are real rows in the parent's columns rather than a mini-table
+ * with its own headers and widths. Two tables on one screen put the same figure
+ * — this database's time — at two different x-positions, so the split could not
+ * be compared by eye against the total it came out of. As real rows, alignment
+ * is a property of the table rather than something kept in sync by hand.
  *
  * Two things the shape has to say honestly:
  *

@@ -67,9 +67,9 @@ export type DbmRecommendationId =
 /**
  * Every rule, in one list so the contract tests can iterate it.
  *
- * `regression` is deliberately NOT here. It already exists as an insight rule
- * in `insights.ts` and is surfaced by the insight strip; re-deriving it would
- * put two predicates for one finding in two files, free to disagree.
+ * `regression` is deliberately not here: it exists as an insight rule in
+ * `insights.ts` and is surfaced by the insight strip. Re-deriving it would put
+ * two predicates for one finding in two files, free to disagree.
  */
 export const RECOMMENDATION_IDS = [
   "unused-index",

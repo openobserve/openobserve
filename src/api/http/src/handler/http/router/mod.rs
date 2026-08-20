@@ -798,16 +798,15 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
-        // Database Monitoring — its own top-level module, NOT under /traces.
-        // The path matches the OFGA resource these routes authorize against
-        // (`db_monitoring:{org}`, see o2_openfga ROUTE_PERMISSIONS); a path
-        // saying `traces` while the permission says `db_monitoring` invites a
-        // later "fix" back to the wrong object.
+        // Database Monitoring — its own top-level module, not under /traces.
+        // The path segment must stay `db_monitoring` to match the OFGA resource
+        // these routes authorize against (`db_monitoring:{org}`, see o2_openfga
+        // ROUTE_PERMISSIONS).
         //
-        // Every route below is registered in BOTH builds; the build-type gate
+        // Every route below is registered in both builds; the build-type gate
         // lives in the handlers, three of which (deadlocks/blocking/
-        // table_health) are dual-implemented and answer 403 on OSS. Moving them
-        // into the enterprise-gated block would 404 them instead, losing the
+        // table_health) are dual-implemented and answer 403 on OSS. Registering
+        // them in the enterprise-gated block instead would 404 them, losing the
         // distinction between "not licensed" and "no such endpoint". Runtime
         // off-switch is ZO_DB_MONITORING_ENABLED.
         .route("/{org_id}/db_monitoring/databases", get(traces::get_dbm_databases))
@@ -819,9 +818,10 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/db_monitoring/deadlocks", get(traces::get_dbm_deadlocks))
         .route("/{org_id}/db_monitoring/blocking", get(traces::get_dbm_blocking))
         .route("/{org_id}/db_monitoring/activity", get(traces::get_dbm_activity))
-        // The query-detail page's Logs-side pair in ONE round trip. The two
-        // routes below are SUPERSEDED by it (same sections, same envelopes) and
-        // stay registered for compatibility.
+        // `query/insights` returns the query-detail page's Logs-side pair in one
+        // round trip; `query/plans` and `query/server_metrics` are superseded by
+        // it (same sections, same envelopes) and stay registered for
+        // compatibility.
         .route("/{org_id}/db_monitoring/query/insights", get(traces::get_dbm_query_insights))
         .route("/{org_id}/db_monitoring/query/plans", get(traces::get_dbm_query_plans))
         .route("/{org_id}/db_monitoring/query/server_metrics", get(traces::get_dbm_query_server_metrics))
@@ -829,6 +829,10 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/db_monitoring/server_samples", get(traces::get_dbm_server_samples))
         .route("/{org_id}/db_monitoring/table_health", get(traces::get_dbm_table_health))
         .route("/{org_id}/db_monitoring/instances", get(traces::get_dbm_instances))
+        .route(
+            "/{org_id}/db_monitoring/instance_metrics",
+            get(traces::get_dbm_instance_metrics),
+        )
         .route("/{org_id}/db_monitoring/badges", get(traces::get_dbm_badges))
 
         // LLM Model Pricing

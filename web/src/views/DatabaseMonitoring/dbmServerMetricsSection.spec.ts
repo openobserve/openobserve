@@ -42,8 +42,8 @@ describe("W6 server metrics section wiring", () => {
    */
   it("reads the endpoint through the service layer", () => {
     expect(page).toContain("getQueryInsights");
-    // And no longer pays for a second round trip to the endpoint the merged
-    // one supersedes.
+    // And pays for no second round trip to the endpoints the merged one
+    // supersedes.
     expect(page).not.toContain("getQueryServerMetrics");
     expect(page).not.toContain("getQueryPlans");
   });
@@ -81,10 +81,9 @@ describe("W6 server metrics section wiring", () => {
     expect(page).toContain("dbm.detail.serverMetrics.subtitle");
     expect(page).toContain("dbm.detail.serverMetrics.clientSubtitle");
     expect(messages.dbm.detail.serverMetrics.subtitle).toBe("Server-side — all clients");
-    // The client label carries the NFR-5 STANDING disclosure: client-vantage
-    // figures cover completed calls only. It used to be a conditional insight
-    // card, which meant the one bias that is always true was only ever stated
-    // when a heuristic happened to fire.
+    // The client label carries the NFR-5 standing disclosure: client-vantage
+    // figures cover completed calls only. Stated always, not as a conditional
+    // insight card — the bias is always true, so a heuristic must not gate it.
     expect(messages.dbm.detail.serverMetrics.clientSubtitle).toBe(
       "Client-observed — instrumented callers only, finished calls only. " +
         "A query still running, or one that hung, isn't in these numbers.",
@@ -108,12 +107,11 @@ describe("W6 server metrics section wiring", () => {
    * from its result: a failed read lands in `failed` — never in the empty
    * envelope's `off` — and the failed copy must not claim capture is off.
    *
-   * The merge did not weaken this; it moved where the distinction is MADE. The
-   * server now tells us which of the two happened, because it can: a `null`
-   * section with `server_metrics_read_failed` false means "we did not look"
-   * (no join key), and with it true means "we looked and could not read". The
-   * page reads the flag rather than inferring failure from a thrown request,
-   * so a per-section failure inside a 200 is no longer invisible to it.
+   * The distinction is made server-side: a `null` section with
+   * `server_metrics_read_failed` false means "we did not look" (no join key),
+   * and with it true means "we looked and could not read". The page reads the
+   * flag rather than inferring failure from a thrown request, so a per-section
+   * failure inside a 200 stays visible to it.
    */
   it("keeps a failed read distinct from capture-off", () => {
     const sm = messages.dbm.detail.serverMetrics;

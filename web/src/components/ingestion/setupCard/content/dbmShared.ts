@@ -15,9 +15,9 @@
 
 // Database Monitoring (server-vantage) collector recipes.
 //
-// THE FIELD NAMES BELOW ARE A CONTRACT, NOT A STYLE CHOICE. The ingest-side
-// parser (src/core/src/traces/db_monitoring/server_vantage.rs) canonicalizes on
-// exact keys — `o2_recipe`, `o2_pg_event`, `o2_my_event`, `dl_query_1`,
+// The field names below are a contract. The ingest-side parser
+// (src/core/src/traces/db_monitoring/server_vantage.rs) canonicalizes on exact
+// keys — `o2_recipe`, `o2_pg_event`, `o2_my_event`, `dl_query_1`,
 // `blocked_pid`, `blocking_query`, `my_trx_side`, … Renaming a SQL alias or a
 // regex capture group here silently produces records the parser skips, which
 // surfaces as "we are collecting but nothing appears". Keep them in lockstep.
@@ -287,11 +287,11 @@ const MYSQL_BLOCKING_RECEIVER = `  sqlquery/mysql_locks:
 /**
  * MySQL deadlocks, tailed from the error log.
  *
- * TWO GOTCHAS. (1) MySQL splits ONE deadlock across MANY separately timestamped
+ * Two gotchas. (1) MySQL splits one deadlock across many separately timestamped
  * entries: MY-012468 is only the banner, and each `*** (N) TRANSACTION:` block
  * is its own MY-012469 entry — so both codes route to the deadlock branch and
  * the sides are stitched back together at read time. (2) Unless
- * `innodb_print_all_deadlocks` is ON, MySQL keeps only the MOST RECENT
+ * `innodb_print_all_deadlocks` is on, MySQL keeps only the most recent
  * deadlock, so history is lost; the prepare step turns it on.
  */
 const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
@@ -362,23 +362,24 @@ const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
 /**
  * MariaDB deadlocks. A SEPARATE receiver from MySQL's, not a loosened shared one.
  *
- * WHY SEPARATE. The InnoDB body is identical, but the log-line ENVELOPE differs
- * (space separator, no `T`, no fractional seconds, no `[MY-nnnnnn]` code, bare
+ * The InnoDB body is identical, but the log-line envelope differs (space
+ * separator, no `T`, no fractional seconds, no `[MY-nnnnnn]` code, bare
  * `InnoDB:` prefix) and one body literal differs fatally: `MariaDB thread id`
  * where MySQL writes `MySQL thread id`. Loosening the MySQL regex to accept
- * both would let its fallback deadlock-text branch start catching MySQL notes
- * that merely MENTION deadlocks.
+ * both would let its fallback deadlock-text branch catch MySQL notes that
+ * merely mention deadlocks.
  *
- * SPLIT-ENTRY, EXACTLY LIKE MYSQL: every physical line carries its own
+ * Split-entry, exactly like MySQL: every physical line carries its own
  * timestamp prefix, so `line_start_pattern` cuts one deadlock into separate
- * entries with side 1, side 2 and the rollback verdict each on a DIFFERENT
- * record. ONE side-regex per record is therefore correct here.
+ * entries with side 1, side 2 and the rollback verdict each on a different
+ * record. One side-regex per record is therefore correct here.
  *
- * DISTINCT `o2_maria_event` KEY, NOT `o2_my_event`. Reusing the MySQL key would
- * make `detect_engine` report "mysql" (it maps any `my_*` key to MySQL), and —
- * worse — `stitch_mysql_deadlocks` groups on (engine, instance, database) where
- * instance and database both default to "", so under-tagged MariaDB and MySQL
- * rows would land in the SAME group and could fabricate a cross-server deadlock.
+ * The `o2_maria_event` key must stay distinct from `o2_my_event`: reusing the
+ * MySQL key makes `detect_engine` report "mysql" (it maps any `my_*` key to
+ * MySQL), and `stitch_mysql_deadlocks` groups on (engine, instance, database)
+ * where instance and database both default to "", so under-tagged MariaDB and
+ * MySQL rows would land in the same group and could fabricate a cross-server
+ * deadlock.
  */
 const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
     include: [{logpath}]
@@ -574,14 +575,14 @@ const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
  * buffer. `.nodes()`/`.value()` flattens the graph server-side into the same
  * one-row-per-participant shape the other recipes emit.
  *
- * NO STITCHING NEEDED, UNLIKE MYSQL. SQL Server names the victim INLINE
+ * No stitching needed, unlike MySQL: SQL Server names the victim inline
  * (`<victim-list><victimProcess id=…>`) and that id resolves to a `<process>` in
- * the SAME document, so `mssql_is_victim` is decided per row at query time —
+ * the same document, so `mssql_is_victim` is decided per row at query time —
  * hence a resolved flag rather than a `side`/`victim_side` pair.
  *
- * `SET QUOTED_IDENTIFIER ON` IS REQUIRED, NOT STYLE: XML methods fail without
- * it, and the sqlqueryreceiver's session does not enable it by default. Omit it
- * and every collection errors with msg 1934 while the pipeline looks healthy.
+ * `SET QUOTED_IDENTIFIER ON` is required: XML methods fail without it, and the
+ * sqlqueryreceiver's session does not enable it by default. Omit it and every
+ * collection errors with msg 1934 while the pipeline looks healthy.
  *
  * The `timestamp` filter keeps the ring buffer from being re-shredded in full on
  * every interval — `system_health` retains hours of deadlocks, so without it the
@@ -593,11 +594,10 @@ const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
  * The column ALIASES match the pg/mysql/mariadb stats recipes exactly, so one
  * canonicalizer serves every engine and reads the engine off `o2_recipe`.
  *
- * WHAT IS DELIBERATELY ABSENT: SQL Server has no autovacuum and no dead-tuple
- * accounting, so there are no vacuum/analyze counters, no timestamps and no
- * bloat estimate. Those columns are OMITTED rather than zero-filled — a
- * fabricated 0% bloat reads as "healthy" and would silence the very rule a
- * reader is looking at the tab for.
+ * SQL Server has no autovacuum and no dead-tuple accounting, so there are no
+ * vacuum/analyze counters, no timestamps and no bloat estimate. Those columns
+ * are omitted rather than zero-filled — a fabricated 0% bloat reads as
+ * "healthy" and would silence the very rule the tab exists for.
  */
 const MSSQL_TABLE_STATS_RECEIVER = `  sqlquery/mssql_table_stats:
     driver: sqlserver
@@ -738,10 +738,10 @@ const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
  *    The API states both on its response envelope so the page cannot label a
  *    lifetime total as a per-window one.
  *
- * THE BOUND IS A PREDICATE, NOT A LIMIT — deliberately. A LIMIT with no stable
- * ORDER BY keeps whichever tables the catalog scan reached first, so WHICH
- * tables vanish changes between ticks and the tab gains and loses rows
- * non-deterministically. `n_live_tup > 0` drops the same relations every tick.
+ * The bound is a predicate rather than a LIMIT: a LIMIT with no stable ORDER BY
+ * keeps whichever tables the catalog scan reached first, so which tables vanish
+ * changes between ticks and the tab gains and loses rows non-deterministically.
+ * `n_live_tup > 0` drops the same relations every tick.
  */
 const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
     driver: postgres
@@ -846,21 +846,21 @@ const PG_INDEX_STATS_RECEIVER = `  sqlquery/pg_index_stats:
 
 /**
  * MySQL table health — the twin of PG_TABLE_STATS_RECEIVER, same column
- * CONTRACT, different catalogs. The aliases are deliberately IDENTICAL to the
- * Postgres recipe's: `canonicalize_table_stats` reads one set of names and the
+ * contract, different catalogs. The aliases are identical to the Postgres
+ * recipe's: `canonicalize_table_stats` reads one set of names and the
  * `o2_recipe` tag names the engine, so no engine-conditional branch can drift.
  *
- * WHAT MYSQL CANNOT SAY IS OMITTED, NOT ZEROED. There is no dead-tuple state,
+ * What MySQL cannot say is omitted, not zeroed. There is no dead-tuple state,
  * no vacuum timestamps and no xid age here because InnoDB has no equivalent —
  * selecting a `'0' AS dead_tup_pct` would render "0% bloat" about a
  * measurement that never happened.
  *
  * `n_live_tup` comes from `mysql.innodb_table_stats.n_rows` (falling back to
- * `information_schema.TABLES.TABLE_ROWS`) — BOTH are estimates, exactly as
+ * `information_schema.TABLES.TABLE_ROWS`) — both are estimates, exactly as
  * Postgres's `n_live_tup` is, and the canonicalizer's estimated-tuples flag
  * discloses that on every row.
  */
-// Keep the 'o2_recipe' tag a STATIC literal in a static template literal: the
+// Keep the 'o2_recipe' tag a static literal in a static template literal: the
 // Rust contract test shipped_recipe_tags_and_backend_dispatch_agree
 // (tests_server_vantage.rs) parses this file's raw text and skips dynamic tags.
 const MYSQL_TABLE_STATS_RECEIVER = `  sqlquery/mysql_table_stats:
@@ -1089,8 +1089,8 @@ const PG_EVENTS_RECEIVER = `  postgresql/dbm_events:
  * MySQL activity samples + server top queries, from the stock `mysqlreceiver`'s
  * log events. Same v0.148.0 `events:` trap as Postgres — see PG_EVENTS_RECEIVER.
  *
- * SPELLING ASYMMETRY: mysql says `top_query_count` where postgres says
- * `top_n_query`, and mysql REJECTS `max_rows_per_query` /
+ * Spelling asymmetry: mysql says `top_query_count` where postgres says
+ * `top_n_query`, and mysql rejects `max_rows_per_query` /
  * `max_explain_each_interval` inside top_query_collection. Estimated plans
  * (`mysql.query_plan`) need MySQL >= 8.0.22.
  */
@@ -1126,19 +1126,19 @@ const MYSQL_EVENTS_RECEIVER = `  mysql/dbm_events:
  * MariaDB activity samples + server top queries, from the stock `mysqlreceiver`
  * pointed at MariaDB.
  *
- * THERE IS NO `mariadbreceiver` — and there does not need to be. MariaDB speaks
- * the MySQL wire protocol and mysqlreceiver detects the product correctly. Same
- * v0.148.0 `events:` trap as Postgres and MySQL — see PG_EVENTS_RECEIVER — and
- * the same `top_query_count` spelling MySQL uses.
+ * There is no `mariadbreceiver` and none is needed: MariaDB speaks the MySQL
+ * wire protocol and mysqlreceiver detects the product correctly. Same v0.148.0
+ * `events:` trap as Postgres and MySQL — see PG_EVENTS_RECEIVER — and the same
+ * `top_query_count` spelling MySQL uses.
  *
- * ONE HONEST LIMIT, which the receiver discloses itself: it reports
- * `supports_query_sample_text: false` against MariaDB. MariaDB does not expose
+ * One limit, which the receiver discloses itself: it reports
+ * `supports_query_sample_text: false` against MariaDB, which does not expose
  * the statement text the sampler wants, so Activity rows describe a session
  * without carrying its SQL. Top queries and their digests are unaffected.
  *
- * ENGINE IDENTITY — see `transform/mariadb_engine` in dbmConfig(). mysqlreceiver
+ * Engine identity — see `transform/mariadb_engine` in dbmConfig(). mysqlreceiver
  * stamps `db.system.name: mysql` even against MariaDB, so without a correction
- * ONE SERVER ANSWERS TO TWO ENGINES and appears twice in the fleet list. The
+ * one server answers to two engines and appears twice in the fleet list. The
  * correction belongs at the collector, not the reader: a record-level attribute
  * is the engine's own claim about itself.
  */
@@ -1287,7 +1287,7 @@ const dbmConfig = (engine: keyof typeof RECIPES) => {
   const { receivers, names, events, eventsEngineFix } = RECIPES[engine];
   const allReceivers = events ? [...receivers, events.receiver] : receivers;
 
-  // ENGINE IDENTITY CORRECTION, on engines that borrow another engine's
+  // Engine identity correction, for engines that borrow another engine's
   // receiver (MariaDB borrows mysqlreceiver). Both halves are generated from
   // the same flag: a processor listed in a pipeline but not defined fails the
   // collector at startup.
@@ -1409,7 +1409,7 @@ export const MSSQL_DBM_CONFIG_YAML = dbmConfig("mssql");
  * only start filling once shared_preload_libraries carries it and Postgres has
  * RESTARTED — which is the logging step's job.
  *
- * KNOWN LIMIT, stated on the card: pg_monitor does NOT include SELECT on user
+ * Known limit, stated on the card: pg_monitor does not include SELECT on user
  * tables, so on a locked-down instance the receiver's EXPLAIN-based estimated
  * plans silently come back empty while everything else works.
  */
