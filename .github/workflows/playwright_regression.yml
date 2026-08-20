@@ -260,13 +260,30 @@ jobs:
       - name: Install Playwright browser
         run: |
           cd tests/ui-testing
+          # azure.archive.ubuntu.com intermittently times out fetching font/lib
+          # packages, which makes apt (via install-deps / --with-deps) exit 100 and
+          # fails the whole job. Give apt its own per-fetch retries and wrap the
+          # browser/deps install in a backoff loop.
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/99retries >/dev/null
           if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
             echo "Browser cache hit — installing system deps only"
-            npx playwright install-deps chromium
+            install_cmd="npx playwright install-deps chromium"
           else
             echo "Browser cache miss — installing browser + system deps"
-            npx playwright install --with-deps chromium
+            install_cmd="npx playwright install --with-deps chromium"
           fi
+          for attempt in 1 2 3; do
+            if ${install_cmd}; then
+              echo "playwright install succeeded on attempt ${attempt}"
+              break
+            fi
+            if [ "${attempt}" = 3 ]; then
+              echo "::error::${install_cmd} failed after 3 attempts"
+              exit 1
+            fi
+            echo "install attempt ${attempt} failed; retrying in $((attempt * 20))s"
+            sleep $((attempt * 20))
+          done
 
       - name: Write .env and run ui-tests
         run: |

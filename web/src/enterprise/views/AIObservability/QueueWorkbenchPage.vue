@@ -967,19 +967,17 @@ async function loadCurrentItem() {
   if (!item) return;
 
   detailLoading.value = true;
-  const [detailResult, reviewsResult] = await Promise.allSettled([
-    llmQueuesService.getItemDetail(orgId.value, queueId.value, item.id),
-    llmQueuesService.listReviews(orgId.value, queueId.value, item.id),
-  ]);
-  if (request !== detailRequest) return;
-
-  if (detailResult.status === "fulfilled") {
-    currentDetail.value = detailResult.value;
-    currentReviews.value = reviewsResult.status === "fulfilled" ? reviewsResult.value : [];
-  } else {
+  try {
+    const detail = await llmQueuesService.getItemDetail(orgId.value, queueId.value, item.id);
+    if (request !== detailRequest) return;
+    currentDetail.value = detail;
+    currentReviews.value = detail.reviews;
+  } catch {
+    if (request !== detailRequest) return;
     toast({ variant: "error", message: t("aiObservability.queues.detail.loadError") });
+  } finally {
+    if (request === detailRequest) detailLoading.value = false;
   }
-  detailLoading.value = false;
 }
 
 function selectItem(index: number) {
