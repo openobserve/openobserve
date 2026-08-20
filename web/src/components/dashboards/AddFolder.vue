@@ -77,7 +77,7 @@ export default defineComponent({
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const { track } = useReo();
 
-    const { iconFor, setIcon } = useFolderIcons("dashboards");
+    const { iconFor } = useFolderIcons();
 
     const findFolder = () =>
       store.state.organizationData.folders.find((item: any) => item.folderId === props.folderId);
@@ -120,7 +120,6 @@ export default defineComponent({
             icon,
           };
           await updateFolder(store, props.folderId, payload);
-          setIcon(props.folderId, icon);
           showPositiveNotification(t("dashboard.addFolder.folderUpdated"), {
             timeout: 2000,
           });
@@ -133,7 +132,6 @@ export default defineComponent({
             description,
             icon,
           });
-          setIcon(newFolder?.data?.folderId ?? newFolder?.folderId, icon);
           emit("update:modelValue", newFolder);
           showPositiveNotification(t("dashboard.addFolder.folderAdded"), {
             timeout: 2000,

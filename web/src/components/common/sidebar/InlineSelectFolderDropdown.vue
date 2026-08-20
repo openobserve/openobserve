@@ -157,7 +157,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store: any = useStore();
     const showDialog = ref(false);
-    const { iconFor } = useFolderIcons(() => props.type);
+    const { iconFor } = useFolderIcons();
 
     const selectedFolderIcon = computed(() =>
       iconFor(

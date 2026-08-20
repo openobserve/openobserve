@@ -312,7 +312,7 @@ export default defineComponent({
     const store = useStore();
     const route = useRoute();
     // This dropdown lists dashboard folders, so it reads the dashboards icon scope.
-    const { iconFor } = useFolderIcons("dashboards");
+    const { iconFor } = useFolderIcons();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 

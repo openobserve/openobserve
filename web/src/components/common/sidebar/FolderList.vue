@@ -200,7 +200,7 @@ export default defineComponent({
     const confirmDeleteFolderDialog = ref(false);
     const searchQuery = ref("");
     const { track } = useReo();
-    const { iconFor, removeIcon } = useFolderIcons(() => props.type);
+    const { iconFor } = useFolderIcons();
 
     const router = useRouter();
 
@@ -249,7 +249,6 @@ export default defineComponent({
         try {
           //delete folder
           await deleteFolderByIdByType(store, selectedFolderDelete.value, props.type);
-          removeIcon(selectedFolderDelete.value);
 
           //check activeFolderId to be deleted
           if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";

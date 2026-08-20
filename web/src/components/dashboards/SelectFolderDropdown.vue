@@ -92,7 +92,7 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const store: any = useStore();
-    const { iconFor } = useFolderIcons("dashboards");
+    const { iconFor } = useFolderIcons();
 
     const selectedFolderIcon = computed(() =>
       iconFor(

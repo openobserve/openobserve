@@ -127,7 +127,7 @@ export default defineComponent({
     const store: any = useStore();
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
-    const { iconFor } = useFolderIcons(() => props.type);
+    const { iconFor } = useFolderIcons();
 
     const selectedFolderIcon = computed(() =>
       iconFor(

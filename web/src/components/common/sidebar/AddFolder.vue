@@ -97,7 +97,7 @@ export default defineComponent({
     const addFolderSchema = makeAddFolderSchema(t);
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const { track } = useReo();
-    const { iconFor, setIcon } = useFolderIcons(() => props.type);
+    const { iconFor } = useFolderIcons();
 
     const findFolder = () =>
       store.state.organizationData.foldersByType[props.type]?.find(
@@ -142,7 +142,6 @@ export default defineComponent({
             icon,
           };
           await updateFolderByType(store, props.folderId, payload, props.type);
-          setIcon(props.folderId, icon);
           showPositiveNotification(t("toastMessages.sidebar.folderUpdatedSuccessfully"), {
             timeout: 2000,
           });
@@ -154,9 +153,6 @@ export default defineComponent({
             { name, description, icon },
             props.type,
           );
-          // The service hands back the raw axios response; the folder body is
-          // the newtype-serialized Folder inside `data`.
-          setIcon(newFolder?.data?.folderId ?? newFolder?.folderId, icon);
           emit("update:modelValue", newFolder);
           emit("update:open", false);
           showPositiveNotification(t("toastMessages.sidebar.folderAddedSuccessfully"), {
