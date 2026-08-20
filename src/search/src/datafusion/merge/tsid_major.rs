@@ -57,16 +57,10 @@ pub(super) async fn write_files(
             continue;
         }
         // rotate between input batches once the logical size target is reached
-        if active.as_ref().is_some_and(|writer| {
+        if let Some(full) = active.take_if(|writer| {
             proportional_original_size(metadata, writer.file_meta.records) >= max_file_size
         }) {
-            files.push(
-                active
-                    .take()
-                    .unwrap()
-                    .finish(metadata, max_file_size)
-                    .await?,
-            );
+            files.push(full.finish(metadata, max_file_size).await?);
         }
         let writer = active.get_or_insert_with(|| {
             ActiveSizeTsidWriter::new(schema, bloom_filter_fields, metadata, timestamp_index)
