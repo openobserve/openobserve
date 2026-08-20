@@ -70,16 +70,48 @@ describe("LibraryCard", () => {
     expect(mountCard().text()).not.toContain("Ready");
   });
 
-  it("labels only the exception, and recedes rather than shouting", () => {
+  it("names the missing stream, so the card says WHY it differs", () => {
+    // The whole point of the treatment: a reader must not have to infer the
+    // cause from a border style. The stream that is absent is stated on the
+    // card, and the tooltip explains the consequence.
     const wrapper = mountCard({ ready: false });
-    const chip = wrapper.find('[data-test="alert-library-card-needs-data"]');
-    expect(chip.exists()).toBe(true);
-    expect(chip.text()).toContain("Needs data");
-    // Neutral chip: an alert that cannot run is inert, not urgent.
-    expect(chip.html()).not.toMatch(/error|warning/);
-    // And the card itself is the thing that fades.
+    const note = wrapper.find('[data-test="alert-library-card-needs-data"]');
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain("Not ingested");
+    expect(note.text()).toContain("kube_pod_container_status_last_terminated_reason");
+    expect(note.attributes("title")).toContain("would never fire");
+    // Inert, not urgent — an unavailable alert is not an error state.
+    expect(note.html()).not.toMatch(/error|warning/);
+    // Dashed border stays as a quiet grouping cue for scanning.
     const root = wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]');
     expect(root.classes().join(" ")).toMatch(/border-dashed/);
+  });
+
+  it("gives the note its own row, so a long stream name is not truncated away", () => {
+    // Stream names run to 40+ characters. Sharing the footer row with the
+    // query-language tag left roughly a word's worth of space, so the string
+    // the message exists to name would ellipsis into nothing.
+    const wrapper = mountCard({ ready: false });
+    const note = wrapper.find('[data-test="alert-library-card-needs-data"]').element;
+    const tag = wrapper.find('[data-test="alert-library-card-query-type"]').element;
+    // Not flex siblings: the note is on a line the tag does not share.
+    expect(note.parentElement).not.toBe(tag.parentElement);
+  });
+
+  it("does not dim the card, so its description stays readable", () => {
+    // The old opacity-65 faded the description people need in order to judge
+    // the alert, and overstated the state — an unavailable alert can still be
+    // read, previewed and installed.
+    const root = mountCard({ ready: false }).find(
+      '[data-test="alert-library-card-k8s/pod-oom-killed"]',
+    );
+    expect(root.classes().join(" ")).not.toMatch(/opacity-/);
+  });
+
+  it("shows the stream as plain provenance when it is available", () => {
+    const wrapper = mountCard({ ready: true });
+    expect(wrapper.find('[data-test="alert-library-card-needs-data"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("kube_pod_container_status_last_terminated_reason");
   });
 
   it("keeps a stable data-test keyed on the library id", () => {

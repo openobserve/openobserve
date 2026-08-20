@@ -18,16 +18,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   LibraryCard — one alert in the gallery.
 
   Colour marks the exception only. There is deliberately no "Ready" pill: it
-  would describe ~75 of 86 cards, and a grid where almost everything is tinted
-  green says nothing. Only an alert whose streams are missing is labelled, and
-  that label is NEUTRAL — the card is already receding (dashed, faded), so a
-  saturated chip would make it shout and fade at the same time. The one coloured
-  thing here is severity, which is genuinely per-card information.
+  would describe most cards, and a grid where almost everything is tinted green
+  says nothing. The one coloured thing here is severity, which is genuinely
+  per-card information.
+
+  UNAVAILABLE CARDS SAY WHY. The earlier treatment stacked three signals —
+  dashed border, 65% opacity, and a chip reading "Needs data" — none of which
+  named the missing stream, even though the stream was printed on the same card
+  with no stated relationship to it. The card posed a question ("why is this one
+  different?") and answered it nowhere, so the difference read as arbitrary.
+
+  Now one signal carries the meaning: the stream becomes the message, marked
+  with a sensors-off icon, captioned "Not ingested", and given a row of its own
+  so the name survives at card width. The dashed border stays as a quiet
+  grouping cue for scanning; the opacity dim is gone — it faded the description
+  text people need in order to judge the alert, and overstated the state (an
+  unavailable alert can still be read, previewed and installed).
 -->
 <template>
   <article
     class="rounded-surface border-border-default bg-surface-base hover:border-border-strong focus-visible:ring-accent/40 flex h-full cursor-pointer flex-col gap-2 border p-3 outline-none focus-visible:ring-2"
-    :class="ready ? '' : 'border-dashed opacity-65'"
+    :class="ready ? '' : 'border-dashed'"
     role="button"
     tabindex="0"
     :aria-label="t('alert_library.openDetails', { title: entry.title })"
@@ -54,28 +65,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ entry.description }}
     </p>
 
-    <div class="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
-      <OTag
-        v-if="!ready"
-        variant="default-soft"
-        size="xs"
-        icon="sensors-off"
-        :label="t('alert_library.needsData')"
-        data-test="alert-library-card-needs-data"
-      />
-      <!-- Neutral for the same reason: 69 of 86 alerts are PromQL, so colouring
-           the query language would colour the norm. -->
-      <OTag
-        variant="default-soft"
-        size="xs"
-        :label="queryTypeLabel"
-        data-test="alert-library-card-query-type"
-      />
+    <div class="mt-auto flex flex-col gap-1 pt-1">
+      <div class="flex items-center gap-1.5">
+        <!-- Neutral because most alerts are PromQL: colouring the query language
+             would colour the norm. -->
+        <OTag
+          variant="default-soft"
+          size="xs"
+          :label="queryTypeLabel"
+          data-test="alert-library-card-query-type"
+        />
+
+        <!-- Available: the stream is quiet provenance, tucked opposite the tag. -->
+        <span
+          v-if="ready"
+          class="text-text-secondary text-2xs min-w-0 flex-1 truncate text-right font-mono"
+          :title="entry.stream"
+          >{{ entry.stream }}</span
+        >
+      </div>
+
+      <!-- Unavailable: the stream becomes the message, and gets the full card
+           width — stream names run long, and squeezed beside the tag it would
+           truncate to a few characters, naming nothing. -->
       <span
-        class="text-text-secondary text-2xs min-w-0 flex-1 truncate text-right font-mono"
-        :title="entry.stream"
-        >{{ entry.stream }}</span
+        v-if="!ready"
+        class="text-text-secondary text-2xs flex items-center gap-1"
+        :title="t('alert_library.notIngestedHint', { stream: entry.stream })"
+        data-test="alert-library-card-needs-data"
       >
+        <OIcon name="sensors-off" size="xs" class="shrink-0" />
+        <span class="shrink-0">{{ t("alert_library.notIngested") }}</span>
+        <span class="min-w-0 truncate font-mono">{{ entry.stream }}</span>
+      </span>
     </div>
   </article>
 </template>
@@ -84,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { raw, useI18nTyped } from "@/types/i18n";
 

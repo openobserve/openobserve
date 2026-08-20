@@ -174,7 +174,9 @@ describe("AlertLibrary", () => {
 
     const wrapper = await mountView();
     // Manifest has resolved, streams have not: skeleton, no cards to flip.
-    expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(
+      false,
+    );
 
     releaseStreams();
     await flushPromises();
@@ -200,13 +202,13 @@ describe("AlertLibrary", () => {
     ).toBe(false);
   });
 
-  it("greys out only the alert whose stream is missing", async () => {
+  it("marks only the alert whose stream is missing, and names that stream", async () => {
     const wrapper = await mountView();
     const unusable = wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]');
-    expect(unusable.text()).toContain("Needs data");
+    expect(unusable.text()).toContain("Not ingested");
     expect(
       wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').text(),
-    ).not.toContain("Needs data");
+    ).not.toContain("Not ingested");
   });
 
   it("counts ready, needs-data and total for the active pack, with All last", async () => {
@@ -313,7 +315,7 @@ describe("AlertLibrary", () => {
     const wrapper = await mountView();
     expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').text()).not.toContain(
-      "Needs data",
+      "Not ingested",
     );
   });
 
