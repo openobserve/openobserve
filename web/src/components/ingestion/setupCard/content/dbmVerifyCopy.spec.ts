@@ -83,9 +83,7 @@ const tableStatsInterval = (yaml: string): string | null => {
 };
 
 const yamlOf = (card: unknown): string =>
-  JSON.stringify(
-    (card as { sections?: unknown[] })?.sections ?? [],
-  );
+  JSON.stringify((card as { sections?: unknown[] })?.sections ?? []);
 
 describe("the DBM verify step promises the wait each engine really has", () => {
   it("gives Postgres the five-minute table-health wording, not the 60-second one", () => {

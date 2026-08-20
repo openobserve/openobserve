@@ -370,7 +370,7 @@ pub const MAX_PARTICIPANT_QUERY: usize = 4096;
 /// to its author as unrecognized while working perfectly, which is a worse lie
 /// than the silence W8 exists to fix.
 ///
-/// 🚨 **The two sides now live in DIFFERENT REPOS.** All 11 members are
+/// 🚨 **The two sides now live in DIFFERENT REPOS.** All 13 members are
 /// enterprise-owned: the array is here in `config`, and every arm that handles
 /// one is in `o2_enterprise::enterprise::db_monitoring::claim_recipe_tags`.
 /// Nothing in the OSS repo can see both — `include_str!` does not cross the
@@ -381,7 +381,7 @@ pub const MAX_PARTICIPANT_QUERY: usize = 4096;
 /// `shipped_recipe_tags_and_backend_dispatch_agree` against the shipped
 /// collector recipes).
 ///
-/// Because all 11 are enterprise-owned, an OSS build canonicalizes NONE of them.
+/// Because all 13 are enterprise-owned, an OSS build canonicalizes NONE of them.
 /// `server_vantage::classify_recipe` reports that as `EnterpriseOnly` rather than
 /// leaving them silently "recognized" — silence here would be the W8
 /// wrong-story defect arriving through a new door. If an OSS-owned recipe is

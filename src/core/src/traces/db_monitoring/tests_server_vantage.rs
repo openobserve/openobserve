@@ -1747,7 +1747,11 @@ fn mssql_query_sample_is_not_discarded_for_want_of_a_session_id() {
     let sample = server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked())
         .expect("a SQL Server sample must canonicalize, not be dropped");
 
-    assert_eq!(sample.session_pid, Some(66), "the SPID is the session identity");
+    assert_eq!(
+        sample.session_pid,
+        Some(66),
+        "the SPID is the session identity"
+    );
     assert_eq!(sample.engine.as_deref(), Some("mssql"));
     assert_eq!(sample.database.as_deref(), Some("dbmlab"));
     assert_eq!(
@@ -1759,7 +1763,8 @@ fn mssql_query_sample_is_not_discarded_for_want_of_a_session_id() {
 
 #[test]
 fn mssql_query_sample_carries_its_blocker_state_and_wait() {
-    let sample = server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked()).expect("sample");
+    let sample =
+        server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked()).expect("sample");
 
     // The blocked-ness predicate. SQL Server ships a scalar SPID where
     // Postgres ships an array; both must read the same downstream.
@@ -1783,7 +1788,8 @@ fn mssql_wait_time_is_milliseconds_not_seconds() {
     // UNITS DIFFER BETWEEN ENGINES and this is the easy 1000x bug: Postgres's
     // `blocking.wait_duration` is SECONDS, SQL Server's `wait_time` is
     // MILLISECONDS. 11.839 ms is a sub-second wait, not a twelve-second one.
-    let sample = server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked()).expect("sample");
+    let sample =
+        server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked()).expect("sample");
     let wait = sample.wait_seconds.expect("a measured wait");
     assert!(
         (wait - 0.011_839).abs() < 1e-9,
@@ -1814,7 +1820,10 @@ fn mssql_session_blocked_by_itself_is_not_reported() {
     let mut rec = mssql_query_sample_blocked();
     rec.insert("sqlserver_blocking_session_id".into(), json!(66));
     let sample = server_vantage::canonicalize_query_sample(&rec).expect("sample");
-    assert!(sample.blocking_pids.is_empty(), "a session cannot block itself");
+    assert!(
+        sample.blocking_pids.is_empty(),
+        "a session cannot block itself"
+    );
 }
 
 fn pg_query_sample_unblocked() -> Map<String, Value> {
@@ -3269,7 +3278,10 @@ fn mysql_non_instrument_wait_types_report_no_duration() {
 #[test]
 fn a_zero_duration_lock_wait_is_still_a_sentinel() {
     let mut rec = mysql_query_sample();
-    rec.insert("mysql_wait_type".into(), json!("wait/lock/table/sql/handler"));
+    rec.insert(
+        "mysql_wait_type".into(),
+        json!("wait/lock/table/sql/handler"),
+    );
     rec.insert("mysql_events_waits_current_timer_wait".into(), json!(0));
 
     assert_eq!(
@@ -3286,7 +3298,10 @@ fn a_zero_duration_lock_wait_is_still_a_sentinel() {
 #[test]
 fn a_mysql_lock_wait_still_names_no_blocker() {
     let mut rec = mysql_query_sample();
-    rec.insert("mysql_wait_type".into(), json!("wait/lock/table/sql/handler"));
+    rec.insert(
+        "mysql_wait_type".into(),
+        json!("wait/lock/table/sql/handler"),
+    );
     rec.insert("mysql_events_waits_current_timer_wait".into(), json!(2.5));
 
     let s = server_vantage::canonicalize_query_sample(&rec).expect("mysql");
@@ -3396,7 +3411,10 @@ fn mssql_top_query_with_plan() -> Map<String, Value> {
 fn mssql_top_query_plan_is_not_dropped() {
     let sample = server_vantage::canonicalize_top_query(&mssql_top_query_with_plan())
         .expect("a SQL Server top query must canonicalize");
-    let plan = sample.plan.as_deref().expect("the XML showplan must be kept");
+    let plan = sample
+        .plan
+        .as_deref()
+        .expect("the XML showplan must be kept");
     assert!(
         plan.starts_with("<ShowPlanXML"),
         "SQL Server ships XML, not JSON — the column holds whichever format the \
@@ -3423,12 +3441,12 @@ fn mssql_top_query_plan_is_not_dropped() {
     // the column is what the UI reads.
     let rec = sample.to_record();
     assert!(
-        rec.get(config::meta::db_monitoring::O2_DBM_PLAN).is_some(),
+        rec.contains_key(config::meta::db_monitoring::O2_DBM_PLAN),
         "the plan must reach the record even with no hash — a plan you can read \
          but not diff beats no plan at all"
     );
     assert!(
-        rec.get(config::meta::db_monitoring::O2_DBM_PLAN_HASH).is_none(),
+        !rec.contains_key(config::meta::db_monitoring::O2_DBM_PLAN_HASH),
         "no hash was computed, so none must be claimed"
     );
 }
@@ -6610,7 +6628,7 @@ fn w8_recognized_recipes_match_the_dispatch_arms() {
 fn w8_every_recognized_recipe_is_enterprise_only_on_oss() {
     assert_eq!(
         server_vantage::RECOGNIZED_RECIPES.len(),
-        11,
+        13,
         "all 13 shipped recipes are enterprise-owned; if this count changed, \
          `is_enterprise_owned_recipe` needs a real OSS-vs-enterprise distinction \
          rather than 'every array member'"

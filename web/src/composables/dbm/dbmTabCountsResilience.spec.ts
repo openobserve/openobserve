@@ -355,10 +355,7 @@ describe("what one page learns is visible from every tab", () => {
 
     await load("acme", RANGE, WINDOW, { instance: "mssql-prod-1" });
 
-    expect(
-      counts.value.activityCount,
-      "an unmeasured slice must not claim zero",
-    ).toBeNull();
+    expect(counts.value.activityCount, "an unmeasured slice must not claim zero").toBeNull();
   });
 
   it("drops published counts when the SCOPE moves, not only the window", async () => {

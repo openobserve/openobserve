@@ -99,8 +99,9 @@ describe("DBM_INSTANCE_METRICS", () => {
     // them both roles would read every row and the ratio would be 1 - 1 = 0 on
     // every instance.
     const specs = Object.fromEntries(
-      DBM_INSTANCE_METRICS.filter((s) => s.system === "mysql" && s.stream.includes("buffer_pool"))
-        .map((s) => [s.role, s.filter]),
+      DBM_INSTANCE_METRICS.filter(
+        (s) => s.system === "mysql" && s.stream.includes("buffer_pool"),
+      ).map((s) => [s.role, s.filter]),
     );
     expect(specs.cacheHit).toEqual({ column: "operation", value: "read_requests" });
     expect(specs.cacheRead).toEqual({ column: "operation", value: "reads" });

@@ -419,7 +419,10 @@ const {
   // which lets the shared fan-out's own count stand rather than blanking the
   // badge.
   ownCounts: [
-    { key: "activityCount", value: () => (loading.value ? undefined : (sampleTotal.value ?? undefined)) },
+    {
+      key: "activityCount",
+      value: () => (loading.value ? undefined : (sampleTotal.value ?? undefined)),
+    },
   ],
 });
 

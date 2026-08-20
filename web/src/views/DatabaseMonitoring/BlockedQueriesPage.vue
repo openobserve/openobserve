@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         :show-global-filter="false"
         table-id="dbm-blocked"
-        :row-class="rowClass"
+        :get-row-style="rowStyle"
         :total-count-exact="!truncated"
         data-test="dbm-blocked-table"
       >
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                an open transaction without running anything. -->
           <div
             v-if="idleRootWarning"
-            class="bg-status-warning-bg text-text-body text-2xs px-page-edge flex shrink-0 items-start gap-2 border-b border-(--color-border-subtle) py-1.5"
+            class="bg-status-warning-bg text-text-body text-2xs px-page-edge border-border-subtle flex shrink-0 items-start gap-2 border-b py-1.5"
             data-test="dbm-blocked-degraded"
           >
             <OIcon name="info-outline" class="text-status-warning-text mt-px size-3.5 shrink-0" />
@@ -964,10 +964,16 @@ const waitTone = (share: number) =>
       ? "bg-status-warning-text"
       : "bg-accent";
 
-// eslint-disable-next-line local/no-hardcoded-px -- state rail: a 3-device-pixel inset shadow, which must not scale with text or it blurs at fractional zoom
-const ROOT_RAIL = "shadow-[inset_3px_0_0_var(--color-status-error-text)]";
-
-const rowClass = (row: BlockedRow) => (row.kind === "root" ? ROOT_RAIL : "");
+/**
+ * The blocking-root rail, as design-token geometry rather than an arbitrary
+ * shadow — the same `:get-row-style` split the other list pages (Alerts,
+ * Incidents, Pipelines, Nodes, LogStream) already use.
+ */
+const rowStyle = (row: BlockedRow) => {
+  if (row.kind !== "root") return {};
+  const color = "var(--color-status-error-text)";
+  return { boxShadow: `var(--shadow-rail-thin-geom) ${color}` };
+};
 
 // ── behaviour ───────────────────────────────────────────────────────────────
 

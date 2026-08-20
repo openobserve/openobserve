@@ -391,11 +391,17 @@ describe("groupNavLinks", () => {
   });
 
   it("no longer offers Databases on the Traces flyout", () => {
-    // Databases moved to Infra; Traces keeps its three trace-data views.
-    expect(NAV_SUBNAV.traces.map((c) => c.name)).toEqual([
+    // Databases moved to Infra; Traces keeps its own trace-data views.
+    //
+    // Asserted on `tab`, not `name`: every child of this flyout now routes to
+    // the SAME `traces` route and is distinguished by its tab, so a list of
+    // names is four copies of "traces" and could not tell the entries apart —
+    // nor notice a fifth arriving. The tab list is the identity that matters.
+    expect(NAV_SUBNAV.traces.map((c) => c.tab)).toEqual([
+      "spans",
       "traces",
-      "serviceGraph",
-      "servicesCatalog",
+      "service-graph",
+      "services-catalog",
     ]);
     expect(NAV_SUBNAV.traces.some((c) => c.name === "dbmDatabases")).toBe(false);
   });

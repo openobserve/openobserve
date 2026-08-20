@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :expand-on-row-click="true"
         :show-global-filter="false"
         table-id="dbm-deadlocks"
-        :row-class="rowClass"
+        :get-row-style="rowStyle"
         :total-count-exact="!truncated"
         data-test="dbm-deadlocks-table"
       >
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             inline-actions
             icon="warning-amber"
-            class="rounded-none border-b border-(--color-status-error-text)/25"
+            class="border-status-error-text/25 rounded-none border-b"
             data-test="dbm-deadlocks-storm"
           >
             <span class="font-bold">{{ t("dbm.deadlocks.storm.title") }}</span>
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="absolute top-1 size-2 -translate-x-1/2 rounded-full"
                         :class="
                           point.id === row.selectedEvent?.id
-                            ? 'bg-status-error-text ring-2 ring-(--color-accent)'
+                            ? 'bg-status-error-text ring-accent ring-2'
                             : 'bg-status-error-text/80 hover:bg-status-error-text'
                         "
                         :style="leftPercent(point.offset)"
@@ -946,10 +946,16 @@ const formatClockMs = (micros: number): string => {
 /** A dot's position along its lane, as a percentage of the pair's time span. */
 const leftPercent = (offset: number) => ({ left: `${Math.round(offset * 100)}%` });
 
-// eslint-disable-next-line local/no-hardcoded-px -- state rail: a 3-device-pixel inset shadow, which must not scale with text or it blurs at fractional zoom
-const CRITICAL_RAIL = "shadow-[inset_3px_0_0_var(--color-status-error-text)]";
-
-const rowClass = (row: DeadlockRow) => (row.critical ? CRITICAL_RAIL : "");
+/**
+ * The critical-state rail, as design-token geometry rather than an arbitrary
+ * shadow — the same `:get-row-style` split the other list pages (Alerts,
+ * Incidents, Pipelines, Nodes, LogStream) already use.
+ */
+const rowStyle = (row: DeadlockRow) => {
+  if (!row.critical) return {};
+  const color = "var(--color-status-error-text)";
+  return { boxShadow: `var(--shadow-rail-thin-geom) ${color}` };
+};
 
 // ── behaviour ───────────────────────────────────────────────────────────────
 

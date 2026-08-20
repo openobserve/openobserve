@@ -347,10 +347,7 @@ describe("flattenShowPlanXml", () => {
     // rejected the whole document and the REAL showplan produced zero nodes
     // while a hand-written fixture parsed fine — the exact gap that let this
     // ship as raw XML.
-    const dup = nested.replace(
-      `<ShowPlanXML ${NS}>`,
-      `<ShowPlanXML ${NS} ${NS} Version="1.564">`,
-    );
+    const dup = nested.replace(`<ShowPlanXML ${NS}>`, `<ShowPlanXML ${NS} ${NS} Version="1.564">`);
     const nodes = flattenShowPlanXml(dup);
     expect(nodes.length, "a duplicated namespace must not lose the plan").toBe(3);
     expect(nodes[0].nodeType).toBe("Nested Loops");
