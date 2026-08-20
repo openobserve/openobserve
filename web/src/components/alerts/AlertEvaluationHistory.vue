@@ -142,6 +142,8 @@
 </template>
 
 <script setup lang="ts">
+import { alertHistoryQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -155,7 +157,6 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { alertHistoryQuery } from "@/services/alerts";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
 
 const props = withDefaults(defineProps<{ alertId: string; isComposite?: boolean }>(), {
@@ -215,14 +216,15 @@ const fetchHistory = async (force = false) => {
   try {
     const endTime = Date.now() * 1000;
     const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
-    const read = force ? alertHistoryQuery.refresh : alertHistoryQuery.get;
-    const data = await read(orgId, {
+    const read = <T,>(options: any): Promise<T> =>
+      queryClient.fetchQuery(force ? { ...options, staleTime: 0 } : options);
+    const data = await read<any>(alertHistoryQuery(orgId, {
       alert_id: props.alertId,
       start_time: startTime,
       end_time: endTime,
       from: (currentPage.value - 1) * pageSize.value,
       size: pageSize.value,
-    });
+    }));
     history.value = data?.hits || [];
     totalCount.value = data?.total || 0;
   } catch {

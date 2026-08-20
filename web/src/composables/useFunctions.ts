@@ -13,20 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { functionsQuery } from "@/services/jstransform.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { useStore } from "vuex";
-import { functionsQuery } from "@/services/jstransform";
 
 const useFunctions = () => {
   const store = useStore();
 
   /**
-   * Called on every Logs entry, alert form open and panel editor open. It now
-   * reads the query cache first, so those five call sites share one request
-   * inside the tier's staleTime instead of each issuing their own.
+   * Called on every Logs entry, alert form open and panel editor open. Outside a
+   * component scope, so the same options object is read imperatively — no
+   * request while the entry is fresh, and concurrent callers share the promise.
    */
   const getAllFunctions = async () => {
     try {
-      const list = await functionsQuery.get(store.state.selectedOrganization.identifier);
+      const list = await queryClient.fetchQuery(
+        functionsQuery(store.state.selectedOrganization.identifier),
+      );
       // Bridge for consumers still reading `organizationData.functions`.
       store.dispatch("setFunctions", list);
     } catch (e: any) {

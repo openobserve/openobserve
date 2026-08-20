@@ -487,13 +487,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 </template>
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { pipelinesQuery } from "@/services/pipelines.queries";
+import { pipelineKeys } from "@/services/pipelines.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, computed, watch, onMounted  , nextTick } from "vue";
 import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
-import pipelineService, { pipelinesQuery } from "@/services/pipelines";
+import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 
@@ -540,7 +545,76 @@ const filterQuery = ref("");
 
 const showCreatePipeline = ref(false);
 
-const pipelines = ref<any[]>([]);
+/**
+ * Pure: builds a new row per pipeline rather than writing onto the argument, so
+ * this can be derived straight from the cached query data without rewriting the
+ * cache entry in place.
+ */
+const shapePipelines = (list: any[]) =>
+  list.map((pipeline: any) => {
+    const updatedEdges = pipeline.edges.map((edge: any) => ({
+      ...edge,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20, // Increase arrow width
+        height: 20, // Increase arrow height
+      },
+      type: "custom",
+
+      style: {
+        strokeWidth: 2,
+      },
+      animated: true,
+      updatable: true,
+    }));
+
+    const derived =
+      pipeline.source.source_type === "realtime"
+        ? {
+            stream_name: pipeline.source.stream_name,
+            stream_type: pipeline.source.stream_type,
+            frequency: "--",
+            period: "--",
+            cron: "--",
+            sql_query: "--",
+          }
+        : {
+            stream_type: pipeline.source.stream_type,
+            // These three feed accessor-only table columns (no #cell-* slot), so
+            // whatever is written here renders verbatim — hence t() rather than
+            // bare literals.
+            frequency:
+              pipeline.source.trigger_condition.frequency_type == "minutes"
+                ? t("pipeline.frequencyMins", {
+                    count: pipeline.source.trigger_condition.frequency,
+                  })
+                : pipeline.source.trigger_condition.cron,
+            period: t("pipeline.frequencyMins", {
+              count: pipeline.source.trigger_condition.period,
+            }),
+            cron:
+              pipeline.source.trigger_condition.frequency_type == "minutes"
+                ? t("common.boolFalse")
+                : t("common.boolTrue"),
+            sql_query: pipeline.source.query_condition.sql,
+          };
+
+    return {
+      ...pipeline,
+      type: pipeline.source.source_type,
+      ...derived,
+      edges: updatedEdges,
+    };
+  });
+
+const orgIdForList = useOrgId();
+const pipelinesList = useQuery(() =>
+  Object.assign(pipelinesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+
+// The list is the query, not a copy of it: anything invalidating the pipelines
+// scope repaints these rows with no wiring here.
+const pipelines = computed(() => shapePipelines(pipelinesList.data.value ?? []));
 
 const store = useStore();
 
@@ -947,79 +1021,25 @@ const goToImportPipeline = () => {
   });
 };
 
-const loading = ref(true);
+const loading = pipelinesList.isPending;
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
-const fetching = ref(false);
+const fetching = pipelinesList.isFetching;
 // Bound to the refresh button: always hits the server.
 const refreshPipelines = () => getPipelines(true);
 
-const shapePipelines = (list: any[]) =>
-  list.map((pipeline: any) => {
-    const updatedEdges = pipeline.edges.map((edge: any) => ({
-      ...edge,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20, // Increase arrow width
-        height: 20, // Increase arrow height
-      },
-      type: "custom",
-
-      style: {
-        strokeWidth: 2,
-      },
-      animated: true,
-      updatable: true,
-    }));
-    pipeline.type = pipeline.source.source_type;
-    if (pipeline.source.source_type === "realtime") {
-      pipeline.stream_name = pipeline.source.stream_name;
-      pipeline.stream_type = pipeline.source.stream_type;
-      pipeline.frequency = "--";
-      pipeline.period = "--";
-      pipeline.cron = "--";
-      pipeline.sql_query = "--";
-    } else {
-      pipeline.stream_type = pipeline.source.stream_type;
-      // These three feed accessor-only table columns (no #cell-* slot), so whatever
-      // is written here renders verbatim — hence t() rather than bare literals.
-      pipeline.frequency =
-        pipeline.source.trigger_condition.frequency_type == "minutes"
-          ? t("pipeline.frequencyMins", { count: pipeline.source.trigger_condition.frequency })
-          : pipeline.source.trigger_condition.cron;
-      pipeline.period = t("pipeline.frequencyMins", {
-        count: pipeline.source.trigger_condition.period,
-      });
-      pipeline.cron =
-        pipeline.source.trigger_condition.frequency_type == "minutes"
-          ? t("common.boolFalse")
-          : t("common.boolTrue");
-      pipeline.sql_query = pipeline.source.query_condition.sql;
-    }
-
-    pipeline.edges = updatedEdges;
-    return {
-      ...pipeline,
-    };
-  });
-
-const getPipelines = async (force = false) => {
-  try {
-    const org = store.state.selectedOrganization.identifier;
-    // `force` only bypasses staleTime — the rows on screen stay either way.
-    await pipelinesQuery.load({
-      org: org,
-      apply: (data) => (pipelines.value = shapePipelines(data)),
-      loading: loading,
-      fetching,
-      force,
-    });
-  } catch (error) {
-    console.error(error);
-  } finally {
-    loading.value = false;
-  }
+// An explicit call always reads; mount and invalidation-driven repaints come
+// from the query itself.
+const getPipelines = async (_force = false) => {
+  await pipelinesList.refetch();
+  // `refetch` resolves before vue-query has propagated the new value into its
+  // reactive refs, so callers reading `pipelines` straight after need a tick.
+  await nextTick();
 };
+
+watch(pipelinesList.error, (error: any) => {
+  if (error) console.error(error);
+});
 const editPipeline = (pipeline: any) => {
   pipeline.nodes.forEach((node: any) => {
     node.type = node.io_type;
@@ -1097,9 +1117,8 @@ const deletePipeline = async () => {
       });
       // Drop the row from the cache first so it disappears now, not when the
       // reload in `finally` lands.
-      pipelinesQuery.patchAll(org_id, (list: any) =>
-        Array.isArray(list) ? list.filter((p: any) => p.pipeline_id !== pipeline_id) : list,
-      );
+      queryClient.setQueriesData({ queryKey: pipelineKeys.all(org_id) }, (list: any) =>
+        Array.isArray(list) ? list.filter((p: any) => p.pipeline_id !== pipeline_id) : list);
     })
     .catch((error) => {
       if (error.response.status != 403) {

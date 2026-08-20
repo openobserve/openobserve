@@ -279,6 +279,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { orgUsersQuery } from "@/services/users.queries";
+import { userKeys } from "@/services/users.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onActivated, onBeforeMount, watch, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -294,7 +297,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
-import usersService, { orgUsersQuery } from "@/services/users";
+import usersService from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
 import AddUser from "@/components/iam/users/AddUser.vue";
 import organizationsService from "@/services/organizations";
@@ -819,7 +822,7 @@ export default defineComponent({
       // invited-members merge only happens on the fresh pass, so the cached
       // paint is org members alone — rows on screen beat an empty table.
       // Not gated on `force`: a manual refresh keeps the rows on screen.
-      const cached = orgUsersQuery.peek(org);
+      const cached = queryClient.getQueryData<any[]>(userKeys.users(org));
       const warm = cached !== undefined;
       if (cached) applyUsers([...cached]);
 
@@ -834,7 +837,7 @@ export default defineComponent({
       loading.value = !warm;
       fetching.value = true;
       return new Promise((resolve, reject) => {
-        (force ? orgUsersQuery.refresh(org) : orgUsersQuery.get(org))
+        (force ? queryClient.fetchQuery({ ...orgUsersQuery(org), staleTime: 0 }) : queryClient.fetchQuery(orgUsersQuery(org)))
           .then(async (orgUsers: any[]) => {
             let users = [...orgUsers];
 

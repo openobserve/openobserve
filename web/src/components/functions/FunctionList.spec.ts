@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { queryClient } from "@/composables/query/queryClient";
+import { functionKeys } from "@/services/jstransform.querykeys";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -29,17 +31,18 @@ const { mockJsTransformList, mockJsTransformDelete, mockBulkDelete, mockGetAssoc
     mockGetAssociatedPipelines: vi.fn(),
   }));
 
-vi.mock("../../services/jstransform", async (importOriginal) => {
-  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
-  return overlayServiceMock(await importOriginal(), {
-    default: {
-      list: mockJsTransformList,
-      delete: mockJsTransformDelete,
-      bulkDelete: mockBulkDelete,
-      getAssociatedPipelines: mockGetAssociatedPipelines,
-    },
-  });
-});
+// A plain module mock. The query declarations live in `jstransform.queries.ts`
+// and reach the transport through a normal import, so this replacement is what
+// their queryFn calls — no overlay helper, and nothing left pointing at the real
+// endpoint.
+vi.mock("@/services/jstransform", () => ({
+  default: {
+    list: mockJsTransformList,
+    delete: mockJsTransformDelete,
+    bulkDelete: mockBulkDelete,
+    getAssociatedPipelines: mockGetAssociatedPipelines,
+  },
+}));
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -686,14 +689,12 @@ describe("FunctionList", () => {
       expect(vm.showAddJSTransformDialog).toBe(false);
     });
 
-    it("should refresh list and hide form when refreshList is called", async () => {
+    it("should hide form when refreshList is called", async () => {
       const wrapper = mount(FunctionList, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
 
       await flushPromises();
-      vi.clearAllMocks();
-      mockJsTransformList.mockResolvedValue(mockFunctionData);
 
       const vm = wrapper.vm as any;
       vm.showAddJSTransformDialog = true;
@@ -701,6 +702,24 @@ describe("FunctionList", () => {
 
       await flushPromises();
       expect(vm.showAddJSTransformDialog).toBe(false);
+    });
+
+    // `refreshList` used to re-call the list endpoint itself. It no longer does:
+    // the write invalidates the scope and the mounted query reloads. This is the
+    // assertion that replaces it — and unlike the old one it fails if a key stops
+    // matching the scope the writes declare.
+    it("should reload the list when the functions scope is invalidated", async () => {
+      mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+      vi.clearAllMocks();
+      mockJsTransformList.mockResolvedValue(mockFunctionData);
+
+      await queryClient.invalidateQueries({ queryKey: functionKeys.all("test-org") });
+      await flushPromises();
+
       expect(mockJsTransformList).toHaveBeenCalled();
     });
   });

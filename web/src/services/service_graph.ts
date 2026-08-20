@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery, quantizeRange } from "@/composables/query/queryClient";
+import { quantizeRange } from "@/composables/query/queryClient";
 
 export interface ServiceGraphParams {
   streamName?: string;
@@ -105,14 +105,3 @@ export const OVERVIEW_BUCKET_MS = 5 * 60_000;
 /** Exposed so callers that build their own query params round the same way. */
 export const overviewRange = (startTime: number, endTime: number) =>
   quantizeRange(startTime, endTime, OVERVIEW_BUCKET_MS);
-
-export const serviceTopologyQuery = defineQuery<[range: TopologyRange], any>({
-  key: (range) => [
-    "traces",
-    "topology",
-    quantizeRange(range.startTime, range.endTime, OVERVIEW_BUCKET_MS),
-  ],
-  fetch: async (org, range) => (await serviceGraphService.getCurrentTopology(org, range)).data,
-  refetchOnWindowFocus: true,
-  scope: ["traces", "topology"],
-});

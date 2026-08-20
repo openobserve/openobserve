@@ -151,7 +151,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, computed } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { deleteGroupMutation, bulkDeleteGroupsMutation } from "@/services/iam.queries";
+import { groupsQuery } from "@/services/iam.queries";
+import { ref, onBeforeMount, computed , watch } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -163,7 +168,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getGroups, deleteGroup, bulkDeleteGroups, getGroup, groupsQuery } from "@/services/iam";
+import { getGroup } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -275,10 +280,17 @@ const editGroup = (group: any) => {
   });
 };
 
-const loading = ref(false);
+const orgIdForList = useOrgId();
+const groupsList = useQuery(() =>
+  Object.assign(groupsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+
+// Bound to the query rather than hand-managed: `isPending` is the cold read,
+// `isFetching` is any request in flight.
+const loading = groupsList.isPending;
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
-const fetching = ref(false);
+const fetching = groupsList.isFetching;
 // `force` for every reload that follows a write or an explicit refresh —
 // an "added" event means the server has something new to show.
 // Named handler: binding setupGroups straight to @click puts the MouseEvent
@@ -292,23 +304,35 @@ const applyGroups = (res: any) => {
   updateTable();
 };
 
-const setupGroups = async (force = false) => {
-  const org = store.state.selectedOrganization.identifier;
-  // Stale-while-revalidate: the rows stay on screen while the list
-  // revalidates, so only a cold cache spins.
-  await groupsQuery
-    .load({ org, apply: applyGroups, loading, fetching, force })
-    .catch((err) => {
-      console.log(err);
-    })
-    .finally(() => {
-      loading.value = false;
-    });
+// The list is the query now: anything that invalidates the scope repaints these
+// rows without this component asking.
+watch(
+  groupsList.data,
+  (rows: any) => {
+    if (rows) applyGroups(rows);
+  },
+  { immediate: true },
+);
+watch(groupsList.error, (err: any) => {
+  if (err) console.log(err);
+});
+
+// An explicit call always reads — `refetch` bypasses staleTime either way, so
+// `force` no longer changes anything. Mount and invalidation-driven repaints
+// come from the query itself.
+const setupGroups = async (_force = false) => {
+  await groupsList.refetch();
 };
 
+const orgId = useOrgId();
+const deleteGroupOne = useMutation(() => deleteGroupMutation(orgId.value));
+const bulkDeleteGroupsAll = useMutation(() => bulkDeleteGroupsMutation(orgId.value));
+
 const deleteUserGroup = (group: any) => {
-  groupsQuery.invalidate(store.state.selectedOrganization.identifier);
-  deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
+  // Was: invalidate, then delete — the refetch raced the write. The mutation
+  // invalidates on success, so the order is now correct by construction.
+  deleteGroupOne
+    .mutateAsync(group.group_name)
     .then(() => {
       toast({
         message: t("iam.appGroups.groupDeletedSuccess"),
@@ -385,10 +409,7 @@ const bulkDeleteUserGroups = async () => {
   const groupNames = selectedGroups.value.map((group: any) => group.group_name);
 
   try {
-    groupsQuery.invalidate(store.state.selectedOrganization.identifier);
-    const response = await bulkDeleteGroups(store.state.selectedOrganization.identifier, {
-      ids: groupNames,
-    });
+    const response = await bulkDeleteGroupsAll.mutateAsync(groupNames);
 
     const { successful = [], unsuccessful = [], err } = response.data || {};
 

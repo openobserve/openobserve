@@ -1,15 +1,13 @@
+import { evalJobsQuery } from "@/services/online-evals.service.queries";
+import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
+import { scorersQuery } from "@/services/online-evals.service.queries";
+import { providersQuery } from "@/services/online-evals.service.queries";
+import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { fetchInto } from "@/composables/query/fetchInto";
 import { ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import onlineEvalsService, {
-  evalJobsQuery,
-  providersQuery,
-  scoreConfigsQuery,
-  scorersQuery,
-  type EvalJob,
-  type Provider,
-  type ScoreConfig,
-  type Scorer,
-} from "@/services/online-evals.service";
+import onlineEvalsService, { type EvalJob, type Provider, type ScoreConfig, type Scorer } from "@/services/online-evals.service";
 import { entityId } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
 
@@ -35,19 +33,19 @@ export function useOnlineEvalsData() {
     // the network with the skeleton up, throwing away what the user was reading.
     // Only a genuinely cold page — nothing cached for any of the four — spins.
     isLoading.value =
-      providersQuery.peek(orgId) === undefined &&
-      scoreConfigsQuery.peek(orgId) === undefined &&
-      scorersQuery.peek(orgId) === undefined &&
-      evalJobsQuery.peek(orgId) === undefined;
+      queryClient.getQueryData(onlineEvalKeys.providers(orgId)) === undefined &&
+      queryClient.getQueryData(onlineEvalKeys.scoreConfigs(orgId)) === undefined &&
+      queryClient.getQueryData(onlineEvalKeys.scorers(orgId)) === undefined &&
+      queryClient.getQueryData(onlineEvalKeys.jobs(orgId)) === undefined;
     try {
       // The four requests still fan out in parallel, and each list settles on
       // its own so one failing endpoint cannot blank the other three.
       const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
         [
-          providersQuery.load({ org: orgId, apply: (rows) => (providers.value = rows), force }),
-          scoreConfigsQuery.load({ org: orgId, apply: applyScoreConfigs, force }),
-          scorersQuery.load({ org: orgId, apply: (rows) => (scorers.value = rows), force }),
-          evalJobsQuery.load({ org: orgId, apply: (rows) => (jobs.value = rows), force }),
+          fetchInto(providersQuery(orgId), { apply: (rows) => (providers.value = rows), force }),
+          fetchInto(scoreConfigsQuery(orgId), { apply: applyScoreConfigs, force }),
+          fetchInto(scorersQuery(orgId), { apply: (rows) => (scorers.value = rows), force }),
+          fetchInto(evalJobsQuery(orgId), { apply: (rows) => (jobs.value = rows), force }),
         ],
       );
 
@@ -71,7 +69,7 @@ export function useOnlineEvalsData() {
   async function loadProviders(orgId: string) {
     if (!orgId) return;
     try {
-      providers.value = await providersQuery.refresh(orgId);
+      providers.value = await queryClient.fetchQuery({ ...providersQuery(orgId), staleTime: 0 });
     } catch (err: any) {
       showError(err, t("onlineEvals.loadError"));
     }

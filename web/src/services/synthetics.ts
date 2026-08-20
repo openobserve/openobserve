@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import http from "./http";
 import store from "@/stores";
-import { defineQuery } from "@/composables/query/queryClient";
 
 const STREAM_NAME = "synthetics_results";
 
@@ -239,25 +238,3 @@ const syntheticsService = {
 };
 
 export default syntheticsService;
-
-export const syntheticsMonitorsQuery = defineQuery<[folderId?: string], any[]>({
-  key: (folderId) => ["synthetics", "monitors", folderId ?? "all"],
-  fetch: async (org, folderId) =>
-    ((await syntheticsService.listByFolderId(org, folderId)).data as any)?.monitors ?? [],
-  refetchOnWindowFocus: true,
-  scope: ["synthetics"],
-});
-
-export const monitorDetailQuery = defineQuery<[id: string, folderId?: string], any>({
-  key: (id, folderId) => ["synthetics", "detail", id, folderId ?? ""],
-  fetch: async (org, id, folderId) => (await syntheticsService.get(org, id, folderId)).data,
-  scope: ["synthetics"],
-});
-
-/** A credential list — memory only, never persisted. */
-export const agentTokensQuery = defineQuery<[], any>({
-  key: ["synthetics", "agentTokens"],
-  fetch: async (org) => (await syntheticsService.listAgentTokens(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["synthetics", "agentTokens"],
-});

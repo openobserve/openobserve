@@ -101,6 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { groupsQuery } from "@/services/iam.queries";
+import { rolesQuery } from "@/services/iam.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, computed, ref, watch } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -112,14 +115,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import service_accounts from "@/services/service_accounts";
-import {
-  getRoles,
-  getGroups,
-  updateRole,
-  updateGroup,
-  groupsQuery,
-  rolesQuery,
-} from "@/services/iam";
+import { updateRole, updateGroup } from "@/services/iam";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -206,8 +202,8 @@ export default defineComponent({
       if (!showAccessPickers.value) return;
       try {
         const [rolesRes, groupsRes] = await Promise.all([
-          rolesQuery.get(orgId.value),
-          groupsQuery.get(orgId.value),
+          queryClient.fetchQuery(rolesQuery(orgId.value)),
+          queryClient.fetchQuery(groupsQuery(orgId.value)),
         ]);
         // Merged, not replaced: a role created inline while this load is still
         // in flight would otherwise be wiped from the picker when it lands.

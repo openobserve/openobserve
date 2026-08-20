@@ -17,13 +17,11 @@ export {
   queryClient,
   purgeOrgQueries,
   purgeAllQueries,
-  defineQuery,
-  defineGlobalQuery,
+  setMutationNotifier,
   stableFilters,
   quantizeRange,
-  GLOBAL_SCOPE,
 } from "./queryClient";
-export type { QueryDefinition } from "./queryClient";
+export { GLOBAL_SCOPE, orgKey, globalKey } from "./keys";
 export {
   DEFAULT_STALE_TIME,
   CONFIG_STALE_TIME,
@@ -33,5 +31,5 @@ export {
 export { localPersister, idbPersister, purgePersistedOrg, purgeAllPersisted } from "./persisters";
 export { useOrgId } from "./useOrgId";
 export { useServerTable } from "./useServerTable";
+export { fetchInto } from "./fetchInto";
 export type { ServerTableResult, ServerTableParams } from "./useServerTable";
-export { useOrgMutation } from "./useOrgMutation";

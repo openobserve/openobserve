@@ -1,3 +1,5 @@
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
@@ -8,10 +10,7 @@ import {
   buildFieldEntry,
 } from "@/utils/query/sqlCompletion";
 import { mergeServerFunctions } from "@/utils/query/serverFunctions";
-import queryFunctions, {
-  queryFunctionsQuery,
-  type ServerQueryFunction,
-} from "@/services/query_functions";
+import { type ServerQueryFunction } from "@/services/query_functions";
 
 const useSqlSuggestions = () => {
   // Both lists come from the shared catalog (web/src/utils/query/sqlCompletion.ts).
@@ -105,8 +104,7 @@ const useSqlSuggestions = () => {
     // Cached: reopening the editor for the same org inside the tier's staleTime
     // costs nothing. The org/sequence guards below still matter — they cover a
     // fast org switch, which the cache key alone would not sequence.
-    inFlight = queryFunctionsQuery
-      .get(org)
+    inFlight = queryClient.fetchQuery(queryFunctionsQuery(org))
       .then((list: any[]) => {
         // Discard if the org changed, or if the catalog was superseded while we
         // were waiting (setServerFunctions, or a newer request).

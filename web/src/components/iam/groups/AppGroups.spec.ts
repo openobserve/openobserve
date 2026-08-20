@@ -13,20 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { queryClient } from "@/composables/query/queryClient";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import AppGroups from "@/components/iam/groups/AppGroups.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-import { queryClient } from "@/composables/query/queryClient";
 
 vi.mock("@/services/iam", async (importOriginal) => {
-  const { overlayServiceMock, queryStub } = await import("@/test/unit/helpers/mockService");
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   const getGroups = vi.fn();
   return overlayServiceMock(await importOriginal(), {
     getGroups,
-    groupsQuery: queryStub(getGroups),
     deleteGroup: vi.fn(),
     bulkDeleteGroups: vi.fn(async () => ({
       data: { successful: [], unsuccessful: [] },

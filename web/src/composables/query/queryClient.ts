@@ -13,16 +13,93 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, toValue } from "vue";
-import type { MaybeRefOrGetter } from "vue";
-import { QueryClient, useQuery } from "@tanstack/vue-query";
-import { useStore } from "vuex";
-import type { Ref } from "vue";
-import type { QueryPersister } from "@tanstack/query-core";
+import { MutationCache, QueryClient } from "@tanstack/vue-query";
 import { purgeAllPersisted, purgePersistedOrg } from "./persisters";
 import { DEFAULT_STALE_TIME } from "./cachePolicy";
+// Type-only: erased at build time. This module must not pull UI or i18n into its
+// runtime graph — the unit-test setup imports it eagerly, so a runtime edge here
+// evaluates that module before a spec's `vi.mock` can replace it.
+import type { I18nText } from "@/types/i18n";
+
+type MutationNotifier = (variant: "success" | "error", message: I18nText) => void;
+
+let notifyMutation: MutationNotifier = () => {};
+
+/**
+ * Wired once in `main.ts`, so the toast implementation stays out of this file's
+ * import graph (see the note on the type-only import above). Unwired, mutation
+ * feedback is simply silent — which is what a unit test wants by default.
+ */
+export const setMutationNotifier = (fn: MutationNotifier): void => {
+  notifyMutation = fn;
+};
+
+/** `raw()` from @/types/i18n, inlined to avoid importing that module at runtime. */
+const asText = (value: string): I18nText => value as unknown as I18nText;
+
+/**
+ * What a write declares about itself, next to the endpoint it calls.
+ *
+ * TanStack passes the mutation through to the cache-level callbacks below, so
+ * this is read once, centrally — a component never invalidates anything by hand
+ * and never repeats the success/error toast.
+ */
+declare module "@tanstack/query-core" {
+  interface Register {
+    mutationMeta: {
+      /** Scopes to refetch. Prefer a domain's `all` key over a precise one. */
+      invalidates?: readonly (readonly unknown[])[];
+      /**
+       * Scopes whose *inactive* entries are dropped outright. Use after a
+       * delete: invalidation alone leaves the deleted entity's detail query
+       * cached and ready to serve the next reader.
+       */
+      removes?: readonly (readonly unknown[])[];
+      successMessage?: I18nText;
+      /**
+       * Set when the call site renders the failure itself — a field error, or a
+       * toast with an action button. Suppresses the default error toast only;
+       * `invalidates`/`removes` are unaffected (they never run on error).
+       */
+      silentError?: boolean;
+    };
+  }
+}
+
+// Server-authored text: it has no translation key, so it passes through as-is.
+const serverMessage = (err: any): I18nText =>
+  asText(
+    err?.response?.data?.message ?? err?.response?.data?.error ?? err?.message ?? "Request failed",
+  );
 
 export const queryClient = new QueryClient({
+  /**
+   * Declarative invalidation, applied to every mutation that opts in by
+   * declaring `meta`. A mutation with no `meta` is untouched, which is what
+   * makes the migration to this incremental.
+   */
+  mutationCache: new MutationCache({
+    onSuccess: (_data, _vars, _onMutateResult, mutation) => {
+      const meta = mutation.meta;
+      if (!meta) return;
+      for (const key of meta.removes ?? []) {
+        queryClient.removeQueries({ queryKey: key, type: "inactive" });
+      }
+      for (const key of meta.invalidates ?? []) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+      if (meta.successMessage) {
+        notifyMutation("success", meta.successMessage);
+      }
+    },
+    onError: (err: any, _vars, _onMutateResult, mutation) => {
+      const meta = mutation.meta;
+      if (!meta || meta.silentError) return;
+      // 403s are surfaced by the shared http interceptor, not per call site.
+      if (err?.response?.status === 403) return;
+      notifyMutation("error", serverMessage(err));
+    },
+  }),
   defaultOptions: {
     queries: {
       // The common freshness window. A declaration only states staleTime when
@@ -71,8 +148,9 @@ export const purgeAllQueries = (): void => {
 
 // ── Key helpers ─────────────────────────────────────────────────────────────
 
-/** Org segment for reads that are not org-scoped (app config, build info). */
-export const GLOBAL_SCOPE = "__global__";
+// The key convention now lives in `keys.ts` — re-exported so the ~40 existing
+// importers of `GLOBAL_SCOPE` need no edit.
+export { GLOBAL_SCOPE, orgKey, globalKey } from "./keys";
 
 /**
  * Build a filter object with a stable field order. TanStack hashes keys with a
@@ -109,233 +187,3 @@ export const quantizeRange = (
     end: Math.floor(endTime / bucket) * bucket,
   };
 };
-
-// ── defineQuery ─────────────────────────────────────────────────────────────
-
-type KeySegments = readonly unknown[];
-
-export interface QueryDefinition<TArgs extends unknown[], TData> {
-  /**
-   * Key segments *after* `["org", org]`. A function when the key is
-   * parameterised — it receives the same arguments as `fetch`, minus the org.
-   */
-  key: KeySegments | ((...args: TArgs) => KeySegments);
-  fetch: (org: string, ...args: TArgs) => Promise<TData>;
-
-  // Everything below is a TanStack query option, passed straight through.
-  // Omit them and the client defaults apply.
-
-  /** Only when this read is not the common case — use a cachePolicy constant. */
-  staleTime?: number;
-  gcTime?: number;
-  refetchOnWindowFocus?: boolean;
-  /** `localPersister` or `idbPersister`. Omitted means memory only. */
-  persister?: QueryPersister<any, any, any>;
-  /**
-   * Prefix that `invalidate()` drops. Defaults to the first key segment, which
-   * is right for a static key; a parameterised key should state it, so that
-   * sibling queries in the same domain are dropped together.
-   */
-  scope?: KeySegments;
-}
-
-/**
- * Declare a cached read next to the endpoint it calls.
- *
- * The full key is `["org", org, ...key]`, so the org-switch and logout purges
- * find it without the declaration doing anything, and `scope` is the prefix that
- * invalidation drops.
- *
- *   export const foldersQuery = defineQuery({
- *     key:   (type: string) => ["folders", type],
- *     fetch: (org, type: string) => common.list_Folders(org, type).then(r => r.data.list),
- *     tier:  "ORG_CONFIG",
- *     scope: ["folders"],
- *   });
- *
- * Then `foldersQuery.get(org, "dashboards")` to read, `.refresh(...)` behind a
- * refresh button or after a write, and `.invalidate(org)` from a mutation.
- */
-export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
-  def: QueryDefinition<TArgs, TData>,
-) {
-  const segments = (...args: TArgs): KeySegments =>
-    typeof def.key === "function" ? def.key(...args) : def.key;
-
-  const fullKey = (org: string, ...args: TArgs) => ["org", org, ...segments(...args)] as const;
-
-  const scopeKey = (org: string) => {
-    const prefix = def.scope ?? (typeof def.key === "function" ? [] : def.key.slice(0, 1));
-    return ["org", org, ...prefix] as const;
-  };
-
-  const policy = {
-    ...(def.staleTime !== undefined && { staleTime: def.staleTime }),
-    ...(def.gcTime !== undefined && { gcTime: def.gcTime }),
-    ...(def.refetchOnWindowFocus !== undefined && {
-      refetchOnWindowFocus: def.refetchOnWindowFocus,
-    }),
-    ...(def.persister !== undefined && { persister: def.persister }),
-  };
-
-  const options = (org: string, ...args: TArgs) => ({
-    queryKey: fullKey(org, ...args),
-    queryFn: () => def.fetch(org, ...args),
-    ...policy,
-  });
-
-  return {
-    /** Marks the object as a query for test helpers that automock a service. */
-    __isQuery: true as const,
-
-    /** Cached read — no request while the entry is fresh. */
-    get: (org: string, ...args: TArgs): Promise<TData> =>
-      queryClient.fetchQuery(options(org, ...args)),
-
-    /** Bypasses staleTime: refresh buttons, post-write reloads, explicit search. */
-    refresh: (org: string, ...args: TArgs): Promise<TData> =>
-      queryClient.fetchQuery({ ...options(org, ...args), staleTime: 0 }),
-
-    /**
-     * Read into the page: one call that fetches, applies and drives the flags.
-     *
-     * The cached value is applied at once when there is one — including on a
-     * manual refresh — so the rows on screen never go away while the request
-     * runs. The two flags are TanStack's own distinction:
-     *
-     *   `loading`  nothing to show yet. This is the skeleton: OTable replaces
-     *              the whole body while it is true, so anything that already
-     *              has rows must leave it false.
-     *   `fetching` a request is in flight, with or without rows on screen.
-     *              This is the refresh button's spinner.
-     *
-     *   await thingQuery.load({
-     *     org,
-     *     apply: (rows) => (list.value = rows),
-     *     loading,        // skeleton — only ever true on a cold read
-     *     fetching,       // button spinner — true for every request
-     *     force,          // refresh button, post-write reload
-     *   });
-     */
-    load: async (opts: {
-      org: string;
-      args?: TArgs;
-      apply: (data: TData) => void;
-      loading?: Ref<boolean>;
-      fetching?: Ref<boolean>;
-      force?: boolean;
-    }): Promise<TData> => {
-      const args = (opts.args ?? []) as TArgs;
-
-      // Paint what is already in hand first, whether or not this is a refresh.
-      const cached = queryClient.getQueryData<TData>(fullKey(opts.org, ...args));
-      if (cached !== undefined) opts.apply(cached);
-
-      if (opts.loading) opts.loading.value = cached === undefined;
-      if (opts.fetching) opts.fetching.value = true;
-
-      try {
-        const fresh = await queryClient.fetchQuery({
-          ...options(opts.org, ...args),
-          ...(opts.force && { staleTime: 0 }),
-        });
-        opts.apply(fresh);
-        return fresh;
-      } finally {
-        if (opts.loading) opts.loading.value = false;
-        if (opts.fetching) opts.fetching.value = false;
-      }
-    },
-
-    /**
-     * `queryClient.getQueryData` for this key — the cached value or undefined,
-     * no request. For deciding whether there is anything to show before
-     * `load()` runs (a loading toast, say).
-     */
-    peek: (org: string, ...args: TArgs): TData | undefined =>
-      queryClient.getQueryData<TData>(fullKey(org, ...args)),
-
-    /** Drop this query's scope so the next read goes to the server. */
-    invalidate: (org: string) => queryClient.invalidateQueries({ queryKey: scopeKey(org) }),
-
-    /**
-     * Drop inactive entries outright. Use after a delete — invalidation alone
-     * leaves the deleted entity cached and ready to serve the next reader.
-     */
-    remove: (org: string) =>
-      queryClient.removeQueries({ queryKey: scopeKey(org), type: "inactive" }),
-
-    /**
-     * Rewrite every cached entry under the scope, in place, with no request.
-     *
-     * For deletes: the row has to disappear from the pages the user is *not*
-     * looking at too, or the next cached paint brings it back. `invalidate`
-     * cannot do this — it keeps the data, and keeping it is the problem.
-     */
-    patchAll: (org: string, update: (data: TData) => TData) =>
-      queryClient.setQueriesData({ queryKey: scopeKey(org) }, (old: unknown) =>
-        old === undefined ? old : update(old as TData),
-      ),
-
-    /** Seed a value the caller already applied optimistically. */
-    prime: (org: string, data: TData, ...args: TArgs) =>
-      queryClient.setQueryData(fullKey(org, ...args), data),
-
-    /** Reactive form, for a `setup()` that wants isPending / isFetching. */
-    use: (
-      argsFn: () => TArgs,
-      opts: {
-        enabled?: MaybeRefOrGetter<boolean>;
-        refetchInterval?: MaybeRefOrGetter<number | false>;
-      } = {},
-    ) => {
-      const store = useStore();
-      const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-      return useQuery(
-        {
-          queryKey: computed(() => fullKey(org.value, ...argsFn())),
-          queryFn: () => def.fetch(org.value, ...argsFn()),
-          enabled: computed(() => !!org.value && (toValue(opts.enabled) ?? true)),
-          refetchInterval: opts.refetchInterval as never,
-          ...policy,
-        },
-        queryClient,
-      );
-    },
-
-    /** Warm an entry without rendering it — next-page prefetch, hover prefetch. */
-    prefetch: (org: string, ...args: TArgs): void => {
-      void queryClient.prefetchQuery(options(org, ...args));
-    },
-
-    /** The raw options, for one-off client calls. */
-    options,
-    key: fullKey,
-  };
-}
-
-/**
- * A read that is not org-scoped — `/config`, the org list itself, the license.
- * Same declaration, minus the org argument: the key is rooted at
- * `["org", GLOBAL_SCOPE, ...]` so the logout purge still reaches it, while the
- * org-switch purge deliberately does not.
- */
-export function defineGlobalQuery<TArgs extends unknown[] = [], TData = unknown>(
-  def: Omit<QueryDefinition<TArgs, TData>, "fetch"> & { fetch: (...args: TArgs) => Promise<TData> },
-) {
-  const q = defineQuery<TArgs, TData>({
-    ...def,
-    fetch: (_org: string, ...args: TArgs) => def.fetch(...args),
-  });
-  return {
-    __isQuery: true as const,
-    get: (...args: TArgs) => q.get(GLOBAL_SCOPE, ...args),
-    refresh: (...args: TArgs) => q.refresh(GLOBAL_SCOPE, ...args),
-    invalidate: () => q.invalidate(GLOBAL_SCOPE),
-    remove: () => q.remove(GLOBAL_SCOPE),
-    prime: (data: TData, ...args: TArgs) => q.prime(GLOBAL_SCOPE, data, ...args),
-    prefetch: (...args: TArgs) => q.prefetch(GLOBAL_SCOPE, ...args),
-    options: (...args: TArgs) => q.options(GLOBAL_SCOPE, ...args),
-    key: (...args: TArgs) => q.key(GLOBAL_SCOPE, ...args),
-  };
-}

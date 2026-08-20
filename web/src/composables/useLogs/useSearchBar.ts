@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { savedViewsQuery } from "@/services/saved_views.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
@@ -37,7 +39,6 @@ import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
-import { savedViewsQuery } from "@/services/saved_views";
 
 export const useSearchBar = (t: TranslateFn) => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams(t);
@@ -114,7 +115,7 @@ export const useSearchBar = (t: TranslateFn) => {
     try {
       searchObj.loadingSavedView = true;
       const org = store.state.selectedOrganization.identifier;
-      (force ? savedViewsQuery.refresh(org) : savedViewsQuery.get(org))
+      (force ? queryClient.fetchQuery({ ...savedViewsQuery(org), staleTime: 0 }) : queryClient.fetchQuery(savedViewsQuery(org)))
         .then((views: any[]) => {
           searchObj.loadingSavedView = false;
           searchObj.data.savedViews = views;

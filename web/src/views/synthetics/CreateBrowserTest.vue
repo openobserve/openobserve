@@ -15,6 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import { saveMonitorMutation } from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -66,12 +71,12 @@ import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTest
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
-import { destinationsQuery } from "@/services/alert_destination";
-import { syntheticsMonitorsQuery } from "@/services/synthetics";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
+const orgIdForWrites = useOrgId();
+const saveMonitor = useMutation(() => saveMonitorMutation(orgIdForWrites.value));
 const { t } = useI18nTyped();
 // Shared with CheckConfigure so a drag on either page carries to the other.
 const { variablesSplitter } = useCheckWizardUi();
@@ -301,8 +306,7 @@ async function openAgentSetup(locationId?: string) {
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getAgentSetup(org);
+    const res = await syntheticsService.getAgentSetup(orgIdForWrites.value);
     agentSetup.value = (res.data ?? null) as AgentSetup | null;
   } catch {
     agentSetup.value = null;
@@ -312,8 +316,7 @@ async function openAgentSetup(locationId?: string) {
 async function fetchLocations() {
   locationsLoading.value = true;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getLocations(org);
+    const res = await syntheticsService.getLocations(orgIdForWrites.value);
     const data = res.data ?? {};
     // Public browser locations (Lambda) plus private locations whose agents
     // advertise `browser` (self-hosted browser agent). A protocol-only private
@@ -339,7 +342,7 @@ async function fetchLocations() {
 
 async function loadDestinations() {
   try {
-    const list = await destinationsQuery.get(store.state.selectedOrganization.identifier);
+    const list = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier));
     destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
@@ -731,19 +734,19 @@ async function persist(): Promise<boolean> {
     timeout: 0,
   });
   try {
-    const org = store.state.selectedOrganization.identifier;
     if (props.editId) {
-      await syntheticsService.update(org, props.editId, apiPayload.value, check.value.folder);
-      // The monitors list is cache-first — without this the page we return
-      // to would paint its previous rows and not refetch inside staleTime.
-      syntheticsMonitorsQuery.invalidate(org);
+      await saveMonitor.mutateAsync({
+        id: props.editId,
+        payload: apiPayload.value,
+        folderId: check.value.folder,
+      });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
     } else {
-      await syntheticsService.create(org, apiPayload.value, check.value.folder);
-      // The monitors list is cache-first — without this the page we return
-      // to would paint its previous rows and not refetch inside staleTime.
-      syntheticsMonitorsQuery.invalidate(org);
+      await saveMonitor.mutateAsync({
+        payload: apiPayload.value,
+        folderId: check.value.folder,
+      });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }

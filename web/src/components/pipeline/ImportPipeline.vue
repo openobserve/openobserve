@@ -405,6 +405,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -423,7 +425,6 @@ import {
   convertV1ToV2,
   convertV1BEToV2,
 } from "@/utils/alerts/alertDataTransforms";
-import { destinationsQuery } from "@/services/alert_destination";
 
 export default defineComponent({
   name: "ImportPipeline",
@@ -648,10 +649,7 @@ export default defineComponent({
     };
 
     const getAlertDestinations = async () => {
-      const destinations = await destinationsQuery.get(
-        store.state.selectedOrganization.identifier,
-        "alert",
-      );
+      const destinations = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "alert"));
       alertDestinations.value = destinations.map((dest: any) => dest.name);
     };
 

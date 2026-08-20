@@ -130,6 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { aiToolsetsQuery } from "@/services/ai_toolsets.queries";
+import { aiToolsetKeys } from "@/services/ai_toolsets.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, computed, watch, onMounted, onUpdated, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -147,7 +150,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import aiToolsetsService, { aiToolsetsQuery } from "@/services/ai_toolsets";
+import aiToolsetsService from "@/services/ai_toolsets";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -265,16 +268,25 @@ export default defineComponent({
       // in hand, then swaps in the server's answer.
       // Not gated on `force`: a manual refresh keeps its rows too, and only
       // the toast is suppressed when there is already something on screen.
-      const painted = aiToolsetsQuery.peek(org) !== undefined;
-      const source = aiToolsetsQuery.load({
-        org: org,
-        apply: (data) => {
+      const options = aiToolsetsQuery(org);
+      const cached = queryClient.getQueryData<any[]>(options.queryKey);
+      const painted = cached !== undefined;
+      if (painted) applyToolsets(cached as any[]);
+
+      loading.value = !painted;
+      fetching.value = true;
+      // TODO: fold into `useQuery` — this call site drives its own flags because
+      // the surrounding refresh/toast flow is imperative.
+      const source = queryClient
+        .fetchQuery(force ? { ...options, staleTime: 0 } : options)
+        .then((data) => {
           applyToolsets(data);
-        },
-        force,
-        loading,
-        fetching,
-      });
+          return data;
+        })
+        .finally(() => {
+          loading.value = false;
+          fetching.value = false;
+        });
 
       const dismiss = painted
         ? () => {}
@@ -392,9 +404,8 @@ export default defineComponent({
           toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
           // Drop the row from the cache first so it disappears now, not when
           // the refetch lands; the forced reload re-persists the list.
-          aiToolsetsQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
-            Array.isArray(list) ? list.filter((tool: any) => tool.id !== row.id) : list,
-          );
+          queryClient.setQueriesData({ queryKey: aiToolsetKeys.all(store.state.selectedOrganization.identifier) }, (list: any) =>
+            Array.isArray(list) ? list.filter((tool: any) => tool.id !== row.id) : list);
           getData(true);
         })
         .catch((err) => {

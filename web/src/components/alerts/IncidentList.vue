@@ -250,12 +250,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { incidentsQuery } from "@/services/incidents.queries";
 import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
-import incidentsService, { Incident, incidentsQuery } from "@/services/incidents";
+import incidentsService, { Incident } from "@/services/incidents";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -300,10 +303,18 @@ export default defineComponent({
     const route = useRoute();
 
     const qTableRef: any = ref(null);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const incidentsList = useQuery(() =>
+      Object.assign(
+        incidentsQuery(orgIdForList.value, undefined as unknown as string, 1000, 0),
+        { enabled: !!orgIdForList.value },
+      ),
+    );
+
+    const loading = incidentsList.isPending;
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
-    const fetching = ref(false);
+    const fetching = incidentsList.isFetching;
     // The incident dataset is read-only display data replaced wholesale on every
     // reload, so hold it in a shallowRef (and freeze each row on load — see
     // loadIncidents). Vue then never deep-proxies the hundreds of objects, which
@@ -557,23 +568,25 @@ export default defineComponent({
       store.dispatch("incidents/setCachedData", items);
     };
 
-    const loadIncidents = async (force = false) => {
-      try {
-        await incidentsQuery.load({
-          org: store.state.selectedOrganization.identifier,
-          args: [undefined as unknown as string, 1000, 0],
-          apply: applyIncidents,
-          loading,
-          fetching,
-          force,
-        });
-      } catch (error: any) {
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.errorLoading"),
-        });
-        console.error("Failed to load incidents:", error);
-      }
+    // The list is the query now: anything that invalidates the incidents scope
+    // repaints these rows without this component asking.
+    watch(
+      incidentsList.data,
+      (data: any) => {
+        if (data) applyIncidents(data);
+      },
+      { immediate: true },
+    );
+    watch(incidentsList.error, (error: any) => {
+      if (!error) return;
+      toast({ variant: "error", message: t("alerts.incidents.errorLoading") });
+      console.error("Failed to load incidents:", error);
+    });
+
+    // An explicit call always reads; mount and invalidation-driven repaints
+    // come from the query itself.
+    const loadIncidents = async (_force = false) => {
+      await incidentsList.refetch();
     };
 
     const viewIncident = (incident: Incident) => {

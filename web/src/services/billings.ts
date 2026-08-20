@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
 
 const billings = {
   get_quota_threshold: (org_identifier: string) => {
@@ -91,40 +90,3 @@ const billings = {
 };
 
 export default billings;
-
-/**
- * Only the billing reads that are safe to cache, all memory-only: subscription
- * state and usage counters must not be served from disk after a reload.
- *
- * NOT here, on purpose, and must never be added — hosted_subscription_url,
- * billing_portal, hosted_page_status/{id} and change_payment_detail/{id} return
- * single-use URLs and page tokens; list_paymentsource returns payment
- * instrument data; unsubscribe and resume_subscription mutate through a GET.
- */
-export const subscriptionQuery = defineQuery<[], any>({
-  key: ["billing", "subscription"],
-  fetch: async (org) => (await billings.list_subscription(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["billing"],
-});
-
-export const invoiceHistoryQuery = defineQuery<[], any>({
-  key: ["billing", "invoices"],
-  fetch: async (org) => (await billings.list_invoice_history(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["billing"],
-});
-
-export const aiUsageQuery = defineQuery<[], any>({
-  key: ["billing", "aiUsage"],
-  fetch: async (org) => (await billings.get_ai_usage(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["billing"],
-});
-
-export const billingGroupMembersQuery = defineQuery<[], any>({
-  key: ["billing", "groupMembers"],
-  fetch: async (org) => (await billings.list_billing_group_members(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["billing"],
-});

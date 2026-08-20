@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { actionsQuery } from "@/services/action_scripts.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { computed } from "vue";
-import { actionsQuery } from "@/services/action_scripts";
 
 const useActions = () => {
   const store = useStore();
@@ -35,7 +36,7 @@ const useActions = () => {
       // Cached: this runs on every Logs entry alongside the functions list.
       // `force` is for the Actions page's refresh and its post-write reloads.
       const org = store.state.selectedOrganization.identifier;
-      const data = force ? await actionsQuery.refresh(org) : await actionsQuery.get(org);
+      const data = force ? await queryClient.fetchQuery({ ...actionsQuery(org), staleTime: 0 }) : await queryClient.fetchQuery(actionsQuery(org));
       // Bridge for consumers still reading `organizationData.actions`.
       store.dispatch("setActions", data);
       return (data as any[]) ?? [];

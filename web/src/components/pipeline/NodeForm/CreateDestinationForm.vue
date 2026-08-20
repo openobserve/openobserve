@@ -430,12 +430,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import destinationService, { destinationsQuery } from "@/services/alert_destination";
-import { useStore } from "vuex";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -461,13 +462,17 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
-const store = useStore();
 const { t } = useI18nTyped();
 
 // Co-located Zod schema (factory keeps the required message i18n-driven).
 const destinationSchema = makeDestinationSchema(t);
 
 const isEditMode = computed(() => !!props.destination);
+
+const orgIdForWrites = useOrgId();
+const saveDestinationWrite = useMutation(() =>
+  saveDestinationMutation(orgIdForWrites.value, () => isEditMode.value),
+);
 
 const apiMethods = [
   { label: raw("GET"), value: "get" },
@@ -1152,15 +1157,9 @@ const createDestination = (value?: DestinationForm) => {
   // (its isSubmitting drives the Save button spinner).
   if (isEditMode.value) {
     // Update existing destination
-    return destinationService
-      .update({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: name,
-        data: payload,
-        module: "pipeline",
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: name, data: payload, module: "pipeline" })
       .then(() => {
-        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         dismiss();
         emit("updated", name);
       })
@@ -1176,15 +1175,9 @@ const createDestination = (value?: DestinationForm) => {
       });
   } else {
     // Create new destination
-    return destinationService
-      .create({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: name,
-        data: payload,
-        module: "pipeline",
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: name, data: payload, module: "pipeline" })
       .then(() => {
-        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         dismiss();
         emit("created", name);
       })

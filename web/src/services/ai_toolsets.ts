@@ -14,9 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 export type ToolsetKind = "mcp" | "cli" | "skill" | "generic";
 
@@ -51,12 +48,3 @@ const aiToolsets = {
 };
 
 export default aiToolsets;
-
-export const aiToolsetsQuery = defineQuery<[], any[]>({
-  key: ["settings", "aiToolsets"],
-  fetch: async (org) => (await aiToolsets.list(org, { limit: 100000 })).data?.toolsets ?? [],
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["settings", "aiToolsets"],
-});

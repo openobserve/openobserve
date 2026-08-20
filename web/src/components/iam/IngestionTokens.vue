@@ -219,7 +219,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, computed, defineComponent, onBeforeMount } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import {
+  createIngestionTokenMutation,
+  setIngestionTokenEnabledMutation,
+} from "@/services/organizations.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { ingestionTokensQuery } from "@/services/organizations.queries";
+import { ref, computed, defineComponent, onBeforeMount , watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -243,7 +251,6 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getBasicAuth } from "@/utils/auth";
-import organizationsService, { ingestionTokensQuery } from "@/services/organizations";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -284,11 +291,21 @@ export default defineComponent({
     // :schema/:default-values resolve to undefined.
     const createTokenSchema = makeCreateTokenSchema(t);
 
-    const tokens = ref<Token[]>([]);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const tokensList = useQuery(() =>
+      Object.assign(ingestionTokensQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    // The table is the query, not a copy of it: a token write invalidates the
+    // scope and these rows repaint with no wiring here.
+    const tokens = computed(() => {
+      const data = tokensList.data.value;
+      return (data as any)?.data ?? [];
+    });
+    const loading = tokensList.isPending;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
-    const fetching = ref(false);
+    const fetching = tokensList.isFetching;
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
@@ -353,27 +370,21 @@ export default defineComponent({
       },
     ];
 
-    const fetchTokens = async (force = false) => {
-      const org = store.state.selectedOrganization.identifier;
-      try {
-        // Stale-while-revalidate: the table keeps its rows while the list
-        // revalidates. Memory-only either way — these are never persisted.
-        await ingestionTokensQuery.load({
-          org,
-          apply: (data: any) => (tokens.value = data.data),
-          loading,
-          fetching,
-          force,
-        });
-      } catch (e: any) {
-        toast({
-          variant: "error",
-          message: e.response?.data?.message || t("ingestion.tokenFetchError"),
-          timeout: 5000,
-        });
-      } finally {
-        loading.value = false;
-      }
+    // The query owns its failure now, so this reports it once per error however
+    // the read was triggered.
+    watch(tokensList.error, (e: any) => {
+      if (!e) return;
+      toast({
+        variant: "error",
+        message: e.response?.data?.message || t("ingestion.tokenFetchError"),
+        timeout: 5000,
+      });
+    });
+
+    // An explicit call always reads; mount and invalidation-driven repaints come
+    // from the query itself.
+    const fetchTokens = async (_force = false) => {
+      await tokensList.refetch();
     };
 
     // Named handler: binding fetchTokens straight to @click puts the DOM event
@@ -384,23 +395,27 @@ export default defineComponent({
     // required + max 256). Awaited by OForm, so the footer Save spinner spans the
     // request automatically (no disabled gate). The dialog unmounts its body on
     // close, so there's no model to reset.
+    const orgIdForWrites = useOrgId();
+    const createIngestionToken = useMutation(() =>
+      createIngestionTokenMutation(orgIdForWrites.value),
+    );
+    const setIngestionTokenEnabled = useMutation(() =>
+      setIngestionTokenEnabledMutation(orgIdForWrites.value),
+    );
+
     const createToken = async (value: CreateTokenForm) => {
       loading.value = true;
       try {
-        const res = await organizationsService.create_org_ingestion_token(
-          store.state.selectedOrganization.identifier,
-          {
-            name: value.name.trim(),
-            description: (value.description ?? "").trim(),
-          },
-        );
+        const res = await createIngestionToken.mutateAsync({
+          name: value.name.trim(),
+          description: (value.description ?? "").trim(),
+        });
         revealedToken.value = {
           name: value.name.trim(),
           token: res.data.data.token,
         };
         showCreateForm.value = false;
         showRevealedDialog.value = true;
-        ingestionTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({
@@ -422,12 +437,7 @@ export default defineComponent({
     const toggleEnabled = async (name: string, enabled: boolean) => {
       loading.value = true;
       try {
-        await organizationsService.enable_disable_org_ingestion_token(
-          store.state.selectedOrganization.identifier,
-          name,
-          enabled,
-        );
-        ingestionTokensQuery.invalidate(store.state.selectedOrganization.identifier);
+        await setIngestionTokenEnabled.mutateAsync({ name, enabled });
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({

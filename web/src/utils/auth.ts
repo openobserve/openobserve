@@ -1,12 +1,13 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import config from "../aws-exports";
 import { useStore } from "vuex";
 import userService from "@/services/users";
 import { b64DecodeUnicode, b64EncodeStandard, b64DecodeStandard } from "@/utils/formatters";
 import { useLocalUserInfo } from "@/utils/storage";
 import { getUUID, getUUIDv7 } from "@/utils/uuid";
-import { orgSummaryQuery } from "@/services/organizations";
 
 // Exact paths that stay reachable when the org has ingested nothing yet. The
 // empty-data redirect exists to push people toward ingestion rather than show
@@ -143,7 +144,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       }
       // Shares the Usage tab's cached summary — this runs on every guarded
       // navigation, so an uncached read here re-requested on each one.
-      const data: any = await orgSummaryQuery.get(orgIdentifier);
+      const data: any = await queryClient.fetchQuery(orgSummaryQuery(orgIdentifier));
       if (!data?.streams?.num_streams) {
         store.dispatch("setIsDataIngested", false);
         next({ path: "/ingestion" });

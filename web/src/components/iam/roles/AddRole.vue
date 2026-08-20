@@ -62,7 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { createRole, rolesQuery } from "@/services/iam";
+import { useMutation } from "@tanstack/vue-query";
+import { createRoleMutation } from "@/services/iam.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -70,7 +72,6 @@ import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
@@ -103,8 +104,6 @@ const startFromOptions = computed(() => [
   { label: t("iam.role.startFrom.readonly"), value: "readonly" },
 ]);
 
-const store = useStore();
-
 const addRoleSchema = makeAddRoleSchema(t);
 
 // The OForm owns `name` + `startFrom`. The ODialog unmounts its body on close +
@@ -121,11 +120,14 @@ const addRoleDefaults = computed((): AddRoleForm => ({
 // matches (mirrors the old `v-model.trim`). `saveRole` always calls createRole
 // (even when prefilled in edit mode) — behavior preserved from the original.
 // Emits the "start from" preset so AppRoles can seed EditRole's permissions.
+const orgId = useOrgId();
+const createRoleMutation_ = useMutation(() => createRoleMutation(orgId.value));
+
 const saveRole = async (value: AddRoleForm) => {
   const name = value.name.trim();
   try {
-    await createRole(name, store.state.selectedOrganization.identifier);
-    rolesQuery.invalidate(store.state.selectedOrganization.identifier);
+    // The mutation declares the scope it drops; this component never names a cache.
+    await createRoleMutation_.mutateAsync(name);
     emits("update:open", false);
     emits("added:role", { role_name: name, startFrom: value.startFrom });
     toast({

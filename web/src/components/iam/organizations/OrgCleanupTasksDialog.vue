@@ -242,6 +242,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { cleanupTasksQuery } from "@/services/organizations.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -249,7 +252,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import { cleanupTasksQuery } from "@/services/organizations";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 interface CleanupTask {
@@ -393,10 +395,15 @@ export default defineComponent({
     // The 5s poll is the query's own `refetchInterval`, which stops on its own
     // once every step is done and is torn down with the component — no manual
     // timer to start, clear and leak.
-    const cleanupTasks = cleanupTasksQuery.use(() => [props.orgId], {
-      enabled: () => props.open && !!props.orgId,
-      refetchInterval: () => (props.open && !isComplete.value ? 5000 : false),
-    });
+    const orgId = useOrgId();
+    // `Object.assign`, not a spread: `queryOptions()` brands its key with the
+    // result type and a fresh object literal drops that brand.
+    const cleanupTasks = useQuery(() =>
+      Object.assign(cleanupTasksQuery(orgId.value, props.orgId), {
+        enabled: props.open && !!props.orgId && !!orgId.value,
+        refetchInterval: props.open && !isComplete.value ? 5000 : false,
+      }),
+    );
 
     watch(
       cleanupTasks.data,

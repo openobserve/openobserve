@@ -1,8 +1,9 @@
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import pipelines from "@/services/pipelines";
 import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { destinationsQuery } from "@/services/alert_destination";
 
 export const usePipelines = (t: TranslateFn) => {
   const store = useStore();
@@ -23,10 +24,7 @@ export const usePipelines = (t: TranslateFn) => {
     }
   }
   const getPipelineDestinations = async () => {
-    const destinations = await destinationsQuery.get(
-      store.state.selectedOrganization.identifier,
-      "pipeline",
-    );
+    const destinations = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "pipeline"));
     return destinations.map((dest: any) => dest.name);
   };
   return {

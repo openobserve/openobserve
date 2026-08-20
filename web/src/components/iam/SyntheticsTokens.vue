@@ -269,7 +269,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, computed, defineComponent, onBeforeMount } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import {
+  createAgentTokenMutation,
+  rotateAgentTokenMutation,
+  setAgentTokenEnabledMutation,
+} from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { agentTokensQuery } from "@/services/synthetics.queries";
+import { ref, computed, defineComponent, onBeforeMount , watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -294,7 +303,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import syntheticsService, { agentTokensQuery } from "@/services/synthetics";
+import syntheticsService from "@/services/synthetics";
 import type { AgentSetup } from "@/types/synthetics";
 
 interface AgentToken {
@@ -329,11 +338,21 @@ export default defineComponent({
 
     const createTokenSchema = makeCreateTokenSchema(t);
 
-    const tokens = ref<AgentToken[]>([]);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const tokensList = useQuery(() =>
+      Object.assign(agentTokensQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    // The table is the query, not a copy of it: a token write invalidates the
+    // scope and these rows repaint with no wiring here.
+    const tokens = computed(() => {
+      const data = tokensList.data.value;
+      return (data as any)?.tokens ?? [];
+    });
+    const loading = tokensList.isPending;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
-    const fetching = ref(false);
+    const fetching = tokensList.isFetching;
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
@@ -421,27 +440,21 @@ export default defineComponent({
       },
     ];
 
-    const fetchTokens = async (force = false) => {
-      const org = store.state.selectedOrganization.identifier;
-      try {
-        // Stale-while-revalidate: the table keeps its rows while the list
-        // revalidates. Memory-only either way — these are never persisted.
-        await agentTokensQuery.load({
-          org,
-          apply: (data: any) => (tokens.value = data.tokens ?? []),
-          loading,
-          fetching,
-          force,
-        });
-      } catch (e: any) {
-        toast({
-          variant: "error",
-          message: e.response?.data?.message || t("synthetics.tokens.fetchError"),
-          timeout: 5000,
-        });
-      } finally {
-        loading.value = false;
-      }
+    // The query owns its failure now, so this reports it once per error however
+    // the read was triggered.
+    watch(tokensList.error, (e: any) => {
+      if (!e) return;
+      toast({
+        variant: "error",
+        message: e.response?.data?.message || t("synthetics.tokens.fetchError"),
+        timeout: 5000,
+      });
+    });
+
+    // An explicit call always reads; mount and invalidation-driven repaints come
+    // from the query itself.
+    const fetchTokens = async (_force = false) => {
+      await tokensList.refetch();
     };
 
     // Named handler: binding fetchTokens straight to @click puts the DOM event
@@ -456,13 +469,9 @@ export default defineComponent({
     const createToken = async (value: CreateTokenForm) => {
       loading.value = true;
       try {
-        const res = await syntheticsService.createAgentToken(
-          store.state.selectedOrganization.identifier,
-          value.name.trim(),
-        );
+        const res = await createAgentToken.mutateAsync(value.name.trim());
         showCreateForm.value = false;
         reveal(res.data.name, res.data.token);
-        agentTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         toast({ variant: "success", message: t("synthetics.tokens.createSuccess"), timeout: 4000 });
       } catch (e: any) {
@@ -476,14 +485,18 @@ export default defineComponent({
       }
     };
 
+    const orgIdForWrites = useOrgId();
+    const createAgentToken = useMutation(() => createAgentTokenMutation(orgIdForWrites.value));
+    const rotateAgentToken = useMutation(() => rotateAgentTokenMutation(orgIdForWrites.value));
+    const setAgentTokenEnabled = useMutation(() =>
+      setAgentTokenEnabledMutation(orgIdForWrites.value),
+    );
+
     const rotateDefault = async () => {
       loading.value = true;
       try {
-        const res = await syntheticsService.rotateAgentToken(
-          store.state.selectedOrganization.identifier,
-        );
+        const res = await rotateAgentToken.mutateAsync(undefined);
         reveal(res.data.name, res.data.token);
-        agentTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         toast({ variant: "success", message: t("synthetics.tokens.rotateSuccess"), timeout: 4000 });
       } catch (e: any) {
@@ -500,12 +513,7 @@ export default defineComponent({
     const toggleEnabled = async (name: string, enabled: boolean) => {
       loading.value = true;
       try {
-        await syntheticsService.setAgentTokenEnabled(
-          store.state.selectedOrganization.identifier,
-          name,
-          enabled,
-        );
-        agentTokensQuery.invalidate(store.state.selectedOrganization.identifier);
+        await setAgentTokenEnabled.mutateAsync({ name, enabled });
         await fetchTokens();
         toast({
           variant: "success",

@@ -394,6 +394,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { rolesQuery } from "@/services/iam.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   computed,
@@ -417,7 +419,6 @@ import { useTheme } from "@/composables/useTheme";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { getRoles, rolesQuery } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
@@ -910,7 +911,7 @@ export default defineComponent({
       //so we need to get the roles from the api
       try {
         isRolesLoading.value = true;
-        const response = await rolesQuery.get(selectedOrganization.value?.value);
+        const response = await queryClient.fetchQuery(rolesQuery(selectedOrganization.value?.value));
         rolesLimitRows.value = response.map((role: any) => ({
           role_name: role,
           uuid: getUUID(),

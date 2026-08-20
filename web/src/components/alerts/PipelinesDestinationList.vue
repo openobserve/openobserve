@@ -171,12 +171,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
+import { bulkDeleteDestinationsMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
-import destinationService, { destinationsQuery } from "@/services/alert_destination";
+import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -343,7 +349,7 @@ export default defineComponent({
     const getDestinations = (force = false) => {
       const org = store.state.selectedOrganization.identifier;
       // Only a cold read spins and toasts — the rows stay put on a refresh.
-      const warm = destinationsQuery.peek(org, "pipeline") !== undefined;
+      const warm = queryClient.getQueryData(destinationKeys.list(org, "pipeline")) !== undefined;
       const dismiss = warm
         ? () => {}
         : toast({
@@ -352,21 +358,22 @@ export default defineComponent({
             timeout: 0,
           });
 
-      return destinationsQuery
-        .load({
-          org,
-          args: ["pipeline"],
-          apply: (list: any[]) => {
-            resultTotal.value = list.length;
-            destinations.value = list;
-            updateRoute();
-          },
-          loading,
-          fetching,
-          force,
-        })
-        .then(() => {})
-        .catch((err) => {
+      const options = destinationsQuery(org, "pipeline");
+      const applyRows = (list: any[]) => {
+        resultTotal.value = list.length;
+        destinations.value = list;
+        updateRoute();
+      };
+      const cached = queryClient.getQueryData<any[]>(options.queryKey);
+      if (cached !== undefined) applyRows(cached);
+      loading.value = cached === undefined;
+      fetching.value = true;
+
+      // TODO: fold into `useQuery` when this list drops its imperative refresh.
+      return queryClient
+        .fetchQuery(force ? { ...options, staleTime: 0 } : options)
+        .then((list: any[]) => applyRows(list))
+        .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
               variant: "error",
@@ -552,6 +559,11 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const orgIdForWrites = useOrgId();
+    const bulkDeleteWrite = useMutation(() =>
+      bulkDeleteDestinationsMutation(orgIdForWrites.value),
+    );
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -578,11 +590,7 @@ export default defineComponent({
           ids: selectedDestinations.value.map((d: any) => d.name),
         };
 
-        const response = await destinationService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
-        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
+        const response = await bulkDeleteWrite.mutateAsync(payload.ids);
 
         dismiss();
 

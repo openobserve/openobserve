@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
 
 const users = {
   list: (page_num: number, page_size: number, sort_by: string, desc: boolean, name: string) => {
@@ -81,17 +80,3 @@ const users = {
 };
 
 export default users;
-
-export const orgUsersQuery = defineQuery<[], any[]>({
-  key: ["iam", "users"],
-  fetch: async (org) => (await users.orgUsers(org)).data?.data ?? [],
-  refetchOnWindowFocus: true,
-  scope: ["iam", "users"],
-});
-
-export const pendingInvitesQuery = defineQuery<[], any>({
-  key: ["iam", "invitations"],
-  fetch: async () => (await users.getPendingInvites()).data,
-  refetchOnWindowFocus: true,
-  scope: ["iam", "invitations"],
-});

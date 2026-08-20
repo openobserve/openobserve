@@ -81,7 +81,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, ref } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { deleteRoleMutation, bulkDeleteRolesMutation } from "@/services/iam.queries";
+import { rolesQuery } from "@/services/iam.queries";
+import { onBeforeMount, ref , watch } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -89,7 +94,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
-import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers, rolesQuery } from "@/services/iam";
+import { getRoleUsers } from "@/services/iam";
 import usersService from "@/services/users";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
@@ -179,10 +184,17 @@ const editRole = (role: any) => {
   });
 };
 
-const loading = ref(false);
+const orgIdForList = useOrgId();
+const rolesList = useQuery(() =>
+  Object.assign(rolesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+
+// Bound to the query rather than hand-managed: `isPending` is the cold read,
+// `isFetching` is any request in flight.
+const loading = rolesList.isPending;
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
-const fetching = ref(false);
+const fetching = rolesList.isFetching;
 
 // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
 // its name. The one fact worth surfacing — is anyone actually in this role — comes
@@ -240,23 +252,34 @@ const applyRoles = (res: any) => {
   void loadRoleUserCounts().then(applyRoleUserCounts);
 };
 
-const setupRoles = async (force = false) => {
-  const org = store.state.selectedOrganization.identifier;
-  // Stale-while-revalidate: the rows stay on screen while the list
-  // revalidates, so only a cold cache spins.
-  await rolesQuery
-    .load({ org, apply: applyRoles, loading, fetching, force })
-    .catch((err) => {
-      console.log(err);
-    })
-    .finally(() => {
-      loading.value = false;
-    });
+// The list is the query now: anything that invalidates the scope repaints these
+// rows without this component asking.
+watch(
+  rolesList.data,
+  (rows: any) => {
+    if (rows) applyRoles(rows);
+  },
+  { immediate: true },
+);
+watch(rolesList.error, (err: any) => {
+  if (err) console.log(err);
+});
+
+// An explicit call always reads — `refetch` bypasses staleTime either way, so
+// `force` no longer changes anything. Mount and invalidation-driven repaints
+// come from the query itself.
+const setupRoles = async (_force = false) => {
+  await rolesList.refetch();
 };
 
+const orgId = useOrgId();
+const deleteRoleOne = useMutation(() => deleteRoleMutation(orgId.value));
+const bulkDeleteRolesAll = useMutation(() => bulkDeleteRolesMutation(orgId.value));
+
 const deleteUserRole = (role: any) => {
-  rolesQuery.invalidate(store.state.selectedOrganization.identifier);
-  deleteRole(role.role_name, store.state.selectedOrganization.identifier)
+  // Was: invalidate, then delete — the refetch raced the write.
+  deleteRoleOne
+    .mutateAsync(role.role_name)
     .then(() => {
       toast({
         message: t("iam.appRoles.roleDeletedSuccess"),
@@ -337,10 +360,7 @@ const bulkDeleteUserRoles = async () => {
   bulkDeleteLoading.value = true;
 
   try {
-    rolesQuery.invalidate(store.state.selectedOrganization.identifier);
-    const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
-      ids: roleNames,
-    });
+    const response = await bulkDeleteRolesAll.mutateAsync(roleNames);
 
     const { successful = [], unsuccessful = [], err } = response.data || {};
 

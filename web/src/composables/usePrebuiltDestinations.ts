@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
 // Services
-import alertDestinationService, { destinationsQuery } from "@/services/alert_destination";
+import alertDestinationService from "@/services/alert_destination";
 import templatesService from "@/services/alert_templates";
 
 // Types and configurations
@@ -553,7 +555,7 @@ export function usePrebuiltDestinations() {
         destination_name: name,
         data: destinationData,
       });
-      destinationsQuery.invalidate(organizationIdentifier.value);
+      queryClient.invalidateQueries({ queryKey: destinationKeys.all(organizationIdentifier.value) });
 
       toast({
         variant: "success",
@@ -691,7 +693,7 @@ export function usePrebuiltDestinations() {
         destination_name: originalName, // Use original name for lookup
         data: destinationData,
       });
-      destinationsQuery.invalidate(organizationIdentifier.value);
+      queryClient.invalidateQueries({ queryKey: destinationKeys.all(organizationIdentifier.value) });
 
       toast({
         variant: "success",
@@ -786,7 +788,7 @@ export function usePrebuiltDestinations() {
         destination_name: destinationName,
         data: updatedData,
       });
-      destinationsQuery.invalidate(organizationIdentifier.value);
+      queryClient.invalidateQueries({ queryKey: destinationKeys.all(organizationIdentifier.value) });
 
       toast({
         variant: "success",

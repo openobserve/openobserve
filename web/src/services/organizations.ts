@@ -14,9 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 const organizations = {
   os_list: (
@@ -127,65 +124,3 @@ const organizations = {
 };
 
 export default organizations;
-
-const ALL_ORGS = 100000;
-
-/** Re-read on every org switch by MainLayout, and again by the settings pages. */
-export const orgSettingsQuery = defineQuery<[], any>({
-  key: ["organizations", "settings"],
-  fetch: async (org) => (await organizations.get_organization_settings(org)).data,
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["organizations", "settings"],
-});
-
-export const orgListQuery = defineQuery<[], any[]>({
-  key: ["organizations", "list"],
-  fetch: async (org) =>
-    (await organizations.os_list(0, ALL_ORGS, "id", false, "", org)).data?.data ?? [],
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["organizations", "list"],
-});
-
-/** Shared by the Usage tab and the route guard, which runs on every navigation. */
-export const orgSummaryQuery = defineQuery<[], any>({
-  key: ["organizations", "summary"],
-  fetch: async (org) => (await organizations.get_organization_summary(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["organizations", "summary"],
-});
-
-export const cleanupTasksQuery = defineQuery<[targetOrg: string], any[]>({
-  key: (targetOrg) => ["organizations", "cleanupTasks", targetOrg],
-  // A failed poll must not surface an error; the next tick retries.
-  fetch: (_org, targetOrg) =>
-    organizations
-      .get_cleanup_tasks(targetOrg)
-      .then((res: any) => res.data ?? [])
-      .catch(() => []),
-  staleTime: 0,
-  gcTime: 60_000,
-  refetchOnWindowFocus: true,
-  scope: ["organizations", "cleanupTasks"],
-});
-
-// ── Credentials: persistence pinned off on the query itself ─────────────────
-// These are org configuration by shape and would otherwise reach localStorage.
-// The override is what keeps a token off disk, so it must survive a re-tiering.
-
-export const ingestionTokensQuery = defineQuery<[], any>({
-  key: ["organizations", "ingestionTokens"],
-  fetch: async (org) => (await organizations.list_org_ingestion_tokens(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["organizations", "ingestionTokens"],
-});
-
-export const orgPasscodeQuery = defineQuery<[], any>({
-  key: ["organizations", "passcode"],
-  fetch: async (org) => (await organizations.get_organization_passcode(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["organizations", "passcode"],
-});

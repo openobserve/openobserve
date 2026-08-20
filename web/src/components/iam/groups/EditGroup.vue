@@ -90,6 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { updateGroupMutation } from "@/services/iam.queries";
 import { ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import GroupRoles from "./GroupRoles.vue";
@@ -99,13 +102,12 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
-import { getGroup, updateGroup } from "@/services/iam";
+import { getGroup } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { groupsQuery } from "@/services/iam";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -233,6 +235,9 @@ const updateActiveTab = (tab: string) => {
   activeTab.value = tab;
 };
 
+const orgId = useOrgId();
+const updateGroupOne = useMutation(() => updateGroupMutation(orgId.value));
+
 const saveGroupChanges = () => {
   // Users and service accounts are both sent as users; merge the two staging
   // sets (dedup via Set) for the request payload.
@@ -261,12 +266,11 @@ const saveGroupChanges = () => {
     return;
   }
 
-  groupsQuery.invalidate(store.state.selectedOrganization.identifier);
-  updateGroup({
-    group_name: groupDetails.value.group_name,
-    org_identifier: store.state.selectedOrganization.identifier,
-    payload,
-  })
+  // Was: invalidate, then update — the refetch raced the write.
+  // Returned so callers (and tests) can await the whole save, not just the
+  // request: `mutateAsync` settles a tick later than a bare promise did.
+  return updateGroupOne
+    .mutateAsync({ group_name: groupDetails.value.group_name, payload })
     .then(() => {
       toast({
         variant: "success",

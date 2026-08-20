@@ -1,4 +1,6 @@
-import { configQuery } from "@/services/config"; // Copyright 2026 OpenObserve Inc.
+import { configQuery } from "@/services/config.queries";
+import { queryClient } from "@/composables/query/queryClient";
+ // Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -65,7 +67,7 @@ class BuildVersionChecker {
       return this.cachedConfig.commit_hash;
     }
 
-    this.cachedConfig = await configQuery.refresh();
+    this.cachedConfig = await queryClient.fetchQuery({ ...configQuery(), staleTime: 0 });
     this.lastCheckTime = now;
 
     return this.cachedConfig.commit_hash;

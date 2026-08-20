@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
 
 const anomaly_detection = {
   list: (org_identifier: string) => {
@@ -78,17 +77,3 @@ const anomaly_detection = {
 };
 
 export default anomaly_detection;
-
-export const anomalyConfigsQuery = defineQuery<[], any[]>({
-  key: ["anomalyDetection", "list"],
-  fetch: async (org) => (await anomaly_detection.list(org)).data ?? [],
-  refetchOnWindowFocus: true,
-  scope: ["anomalyDetection"],
-});
-
-export const anomalyHistoryQuery = defineQuery<[limit: number], any>({
-  key: (limit) => ["anomalyDetection", "history", limit],
-  fetch: async (org, limit) => (await anomaly_detection.getAllHistory(org, limit)).data,
-  refetchOnWindowFocus: true,
-  scope: ["anomalyDetection"],
-});

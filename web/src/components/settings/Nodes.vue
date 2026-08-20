@@ -550,7 +550,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, computed } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { nodesQuery } from "@/services/common.queries";
+import { defineComponent, reactive, ref, computed  , watch , nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -569,7 +572,6 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
-import CommonService, { nodesQuery } from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -617,10 +619,26 @@ export default defineComponent({
 
     const tabledata: any = ref([]);
     const originalData: any = ref([]);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    // `applyNodes` seeds the usage-range sliders from the response, so the read
+    // must not start until the page asks for it — otherwise those bounds are
+    // rewritten before the component has finished initialising them. `enabled`
+    // holds the query until `getData()` runs; after that it is live, and any
+    // invalidation of the nodes scope repaints the table on its own.
+    const hasRequested = ref(false);
+    const lastFilterFlag = ref(false);
+    const nodesList = useQuery(() =>
+      Object.assign(nodesQuery(orgIdForList.value), {
+        enabled: hasRequested.value && !!orgIdForList.value,
+      }),
+    );
+
+    // `isLoading`, not `isPending`: a gated query stays "pending" forever, but
+    // `isLoading` is pending-AND-fetching — i.e. a cold read actually in flight.
+    const loading = nodesList.isLoading;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
-    const fetching = ref(false);
+    const fetching = nodesList.isFetching;
     const splitterModel = ref(250);
     const filterQuery = ref("");
 
@@ -908,52 +926,51 @@ export default defineComponent({
       }
     };
 
-    const getData = (filterFlag: boolean = false, force: boolean = false) => {
-      const org = store.state.selectedOrganization.identifier;
-      // Stale-while-revalidate: the rows stay on screen while the topology
-      // revalidates, so only a cold cache spins and toasts.
-      // Only a cold cache spins and toasts — `load` paints whatever is already
-      // in hand, then swaps in the server's answer.
-      // Not gated on `force`: a manual refresh keeps its rows too, and only
-      // the toast is suppressed when there is already something on screen.
-      const painted = nodesQuery.peek(org) !== undefined;
-      const source = nodesQuery.load({
-        org: org,
-        apply: (data) => {
-          applyNodes(data, filterFlag);
-        },
-        force,
-        loading,
-        fetching,
-      });
+    // The table is the query now: once the page has asked once, anything that
+    // invalidates the nodes scope repaints it without asking again.
+    watch(nodesList.data, (data: any) => {
+      if (data) applyNodes(data, lastFilterFlag.value);
+    });
 
-      const dismiss = painted
-        ? () => {}
-        : toast({
-            variant: "loading",
-            message: t("settings.nodesPage.loadingData"),
-            timeout: 0,
-          });
-
-      // Returned so callers can await the load — it never was, which only
-      // worked while the fetch resolved in a single microtask.
-      return source
-        .then((responseData: any) => {
-          applyNodes(responseData, filterFlag);
-          loading.value = false;
-          dismiss();
-        })
-        .catch((error) => {
-          loading.value = false;
-          dismiss();
-          if (error.status != 403) {
-            toast({
-              variant: "error",
-              message: error.response?.data?.message || t("settings.nodesPage.fetchFailed"),
-              timeout: 5000,
-            });
-          }
+    // The cold-read toast, kept: shown only while there is nothing on screen.
+    let dismissLoadingToast: (() => void) | null = null;
+    watch(loading, (isCold) => {
+      if (isCold && hasRequested.value && !dismissLoadingToast) {
+        dismissLoadingToast = toast({
+          variant: "loading",
+          message: t("settings.nodesPage.loadingData"),
+          timeout: 0,
         });
+      } else if (!isCold && dismissLoadingToast) {
+        dismissLoadingToast();
+        dismissLoadingToast = null;
+      }
+    });
+
+    watch(nodesList.error, (error: any) => {
+      if (!error) return;
+      dismissLoadingToast?.();
+      dismissLoadingToast = null;
+      if (error.status != 403) {
+        toast({
+          variant: "error",
+          message: error.response?.data?.message || t("settings.nodesPage.fetchFailed"),
+          timeout: 5000,
+        });
+      }
+    });
+
+    const getData = async (filterFlag: boolean = false, _force: boolean = false) => {
+      lastFilterFlag.value = filterFlag;
+      if (!hasRequested.value) {
+        // First ask: enabling the query is what performs the read. `suspense()`
+        // waits for that initial fetch to settle without issuing a second one.
+        hasRequested.value = true;
+        await nextTick();
+        await nodesList.suspense();
+        return;
+      }
+      await nodesList.refetch();
     };
 
     if (isMetaOrg.value) {

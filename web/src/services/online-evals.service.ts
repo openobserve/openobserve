@@ -6,9 +6,6 @@
 // (at your option) any later version.
 
 import http from "@/services/http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 export type EvalJobStatus = "draft" | "active" | "paused" | "degraded" | "archived";
 export type EvalTargetScope = "span" | "trace" | "session";
@@ -345,34 +342,3 @@ const onlineEvalsService = {
 };
 
 export default onlineEvalsService;
-
-/** Providers change rarely and gate the job form, so they persist. */
-export const providersQuery = defineQuery<[], any[]>({
-  key: ["onlineEvals", "providers"],
-  fetch: (org) => onlineEvalsService.providers.list(org),
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["onlineEvals"],
-});
-
-export const scoreConfigsQuery = defineQuery<[], any[]>({
-  key: ["onlineEvals", "scoreConfigs"],
-  fetch: (org) => onlineEvalsService.scoreConfigs.list(org),
-  refetchOnWindowFocus: true,
-  scope: ["onlineEvals"],
-});
-
-export const scorersQuery = defineQuery<[], any[]>({
-  key: ["onlineEvals", "scorers"],
-  fetch: (org) => onlineEvalsService.scorers.list(org),
-  refetchOnWindowFocus: true,
-  scope: ["onlineEvals"],
-});
-
-export const evalJobsQuery = defineQuery<[], any[]>({
-  key: ["onlineEvals", "jobs"],
-  fetch: (org) => onlineEvalsService.jobs.list(org),
-  refetchOnWindowFocus: true,
-  scope: ["onlineEvals"],
-});

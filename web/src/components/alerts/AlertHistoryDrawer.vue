@@ -380,6 +380,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { alertHistoryQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -397,7 +399,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
-import alertsService, { alertHistoryQuery } from "@/services/alerts";
 import type { AlertHistoryQuery } from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
@@ -794,10 +795,7 @@ const fetchAlertHistory = async (alertId: string) => {
     }
     // Same cached page query as the Alert History page — paging back to a page
     // already fetched keeps its rows instead of blanking.
-    const data = await alertHistoryQuery.get(
-      store?.state?.selectedOrganization?.identifier,
-      historyParams,
-    );
+    const data = await queryClient.fetchQuery(alertHistoryQuery(store?.state?.selectedOrganization?.identifier, historyParams));
     alertHistory.value = data?.hits || [];
     resultTotal.value = data?.total || 0;
   } catch (error: any) {

@@ -16,9 +16,6 @@
 import { generateTraceContext } from "@/utils/zincutils";
 import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { indexedDbPersister } from "@/composables/query/persisters";
 
 const search = {
   search: (
@@ -528,29 +525,3 @@ const search = {
 };
 
 export default search;
-
-/**
- * A trace is immutable once written, so a given DAG can never change:
- * staleTime Infinity, persisted to IndexedDB because a wide trace's graph is
- * large. The time window is part of the key — the endpoint bounds which spans it
- * walks, so a different range can legitimately return a different graph.
- */
-export const traceDagQuery = defineQuery<
-  [streamName: string, traceId: string, startTime: number, endTime: number],
-  any
->({
-  key: (streamName, traceId, startTime, endTime) => [
-    "traces",
-    "dag",
-    traceId,
-    streamName,
-    startTime,
-    endTime,
-  ],
-  fetch: async (org, streamName, traceId, startTime, endTime) =>
-    (await search.getTraceDAG(org, streamName, traceId, startTime, endTime)).data,
-  staleTime: 0,
-  gcTime: LONG_GC_TIME,
-  persister: indexedDbPersister,
-  scope: ["traces", "dag"],
-});

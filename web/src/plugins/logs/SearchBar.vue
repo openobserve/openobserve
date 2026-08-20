@@ -1902,6 +1902,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
+import { saveFunctionMutation } from "@/services/jstransform.queries";
+import {
+  createSavedViewMutation,
+  updateSavedViewMutation,
+  deleteSavedViewMutation,
+} from "@/services/saved_views.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import {
   defineComponent,
   ref,
@@ -1933,7 +1941,6 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
-import jsTransformService, { functionsQuery } from "@/services/jstransform";
 import searchService from "@/services/search";
 
 import segment from "@/services/segment_analytics";
@@ -1960,7 +1967,7 @@ import {
 } from "@/utils/zincutils";
 
 import { debounce } from "lodash-es";
-import savedviewsService, { savedViewsQuery } from "@/services/saved_views";
+import savedviewsService from "@/services/saved_views";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -2230,6 +2237,16 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const store = useStore();
+    const orgIdForWrites = useOrgId();
+    const createSavedView = useMutation(() => createSavedViewMutation(orgIdForWrites.value));
+    const updateSavedView = useMutation(() => updateSavedViewMutation(orgIdForWrites.value));
+    const deleteSavedView = useMutation(() => deleteSavedViewMutation(orgIdForWrites.value));
+    const createFunctionWrite = useMutation(() =>
+      saveFunctionMutation(orgIdForWrites.value, () => false),
+    );
+    const updateFunctionWrite = useMutation(() =>
+      saveFunctionMutation(orgIdForWrites.value, () => true),
+    );
     const { isDark } = useTheme();
     const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
@@ -3341,11 +3358,7 @@ export default defineComponent({
 
       if (value.isSavedFunctionAction == "create") {
         try {
-          const res: { data: any } = await jsTransformService.create(
-            store.state.selectedOrganization.identifier,
-            formData.value,
-          );
-          functionsQuery.invalidate(store.state.selectedOrganization.identifier);
+          const res: { data: any } = await createFunctionWrite.mutateAsync(formData.value);
           toast({
             variant: "success",
             message: res.data.message,
@@ -3380,14 +3393,10 @@ export default defineComponent({
     }
 
     const executeFunctionUpdate = () => {
-      const callTransform = jsTransformService.update(
-        store.state.selectedOrganization.identifier,
-        formData.value,
-      );
+      const callTransform = updateFunctionWrite.mutateAsync(formData.value);
 
       callTransform
         .then(() => {
-          functionsQuery.invalidate(store.state.selectedOrganization.identifier);
           toast({
             variant: "success",
             message: t("logs.searchBar.functionUpdatedSuccess"),
@@ -4010,10 +4019,9 @@ export default defineComponent({
 
     const deleteSavedViews = async () => {
       try {
-        savedviewsService
-          .delete(store.state.selectedOrganization.identifier, deleteViewID.value)
-          .then((res) => {
-            savedViewsQuery.invalidate(store.state.selectedOrganization.identifier);
+        deleteSavedView
+          .mutateAsync(deleteViewID.value)
+          .then((res: any) => {
             //remove it from localstorage as well
             const localStoredSavedViews = JSON.parse(localStorage.getItem("savedViews") || "[]");
             delete localStoredSavedViews[deleteViewID.value];
@@ -4117,10 +4125,9 @@ export default defineComponent({
           view_name: viewName,
         };
 
-        return savedviewsService
-          .post(store.state.selectedOrganization.identifier, viewObj)
-          .then((res) => {
-            savedViewsQuery.invalidate(store.state.selectedOrganization.identifier);
+        return createSavedView
+          .mutateAsync(viewObj)
+          .then((res: any) => {
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               if (Object.prototype.hasOwnProperty.call(searchObj.data, "savedViews") === false) {
@@ -4177,10 +4184,9 @@ export default defineComponent({
           timeout: 0,
         });
 
-        savedviewsService
-          .put(store.state.selectedOrganization.identifier, viewID, viewObj)
-          .then((res) => {
-            savedViewsQuery.invalidate(store.state.selectedOrganization.identifier);
+        updateSavedView
+          .mutateAsync({ viewId: viewID, view: viewObj })
+          .then((res: any) => {
             dismiss();
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);

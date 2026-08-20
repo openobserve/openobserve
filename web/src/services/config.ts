@@ -14,8 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineGlobalQuery } from "@/composables/query/queryClient";
-import { SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
 
 const zo_config = {
   get_config: () => {
@@ -24,16 +22,3 @@ const zo_config = {
 };
 
 export default zo_config;
-
-/**
- * Read by main.ts, MainLayout, Login, General and UsageTab — one cached entry
- * serves all of them. Not persisted despite being session-static: the payload
- * carries the RUM client token, and secrets stay memory-only.
- */
-export const configQuery = defineGlobalQuery<[], any>({
-  key: ["config", "get"],
-  fetch: async () => (await zo_config.get_config()).data,
-  staleTime: SESSION_STALE_TIME,
-  gcTime: SESSION_STALE_TIME,
-  scope: ["config"],
-});

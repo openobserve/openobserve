@@ -586,6 +586,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
+import { configQuery } from "@/services/config.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   computed,
   defineComponent,
@@ -621,7 +623,6 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeGeneralSettingsSchema, type GeneralSettingsForm } from "./General.schema";
-import { configQuery } from "@/services/config";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -1021,7 +1022,7 @@ export default defineComponent({
                 }),
               });
 
-              store.dispatch("setConfig", await configQuery.refresh());
+              store.dispatch("setConfig", await queryClient.fetchQuery({ ...configQuery(), staleTime: 0 }));
 
               // Clear the appropriate file ref
               if (mode === "dark") {
@@ -1078,7 +1079,7 @@ export default defineComponent({
               }),
             });
 
-            store.dispatch("setConfig", await configQuery.refresh());
+            store.dispatch("setConfig", await queryClient.fetchQuery({ ...configQuery(), staleTime: 0 }));
           } else {
             toast({
               variant: "error",

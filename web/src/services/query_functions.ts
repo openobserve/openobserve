@@ -14,9 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 /** One entry of the server's SQL function catalog. */
 export interface ServerQueryFunction {
@@ -42,24 +39,3 @@ const queryFunctions = {
 };
 
 export default queryFunctions;
-
-/** SQL-editor autocomplete catalogue — needed before the first completion popup. */
-export const queryFunctionsQuery = defineQuery<[], any[]>({
-  key: ["functions", "queryFunctions"],
-  fetch: async (org) => {
-    try {
-      return (await queryFunctions.list(org)).data?.list ?? [];
-    } catch (e: any) {
-      // A backend older than the catalogue endpoint answers 404. That is a
-      // stable fact about the deployment, not a transient failure — cache the
-      // empty catalogue so it is asked once instead of on every staleTime
-      // boundary. Autocomplete falls back to its local list either way.
-      if (e?.response?.status === 404) return [];
-      throw e;
-    }
-  },
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["functions"],
-});

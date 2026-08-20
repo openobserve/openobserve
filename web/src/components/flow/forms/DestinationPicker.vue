@@ -64,6 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -77,7 +80,6 @@ import {
   makeExternalDestinationSchema,
   type ExternalDestinationForm,
 } from "@/components/pipeline/NodeForm/ExternalDestination.schema";
-import { destinationsQuery } from "@/services/alert_destination";
 
 // `forcedType`, when set, is forwarded to the inline create form to lock its
 // destination type and skip the type-selection step (workflows → "custom").
@@ -133,7 +135,7 @@ watch(createNewDestination, async (v) => {
   // Returning from create (either cancelled or just created) — refetch once so a
   // newly-created destination shows, then apply any pending selection. Drop the
   // cached list first so this is a real refetch and not a cache hit.
-  await destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
+  await queryClient.invalidateQueries({ queryKey: destinationKeys.all(store.state.selectedOrganization.identifier) });
   await getDestinations();
   if (pendingSelection.value) {
     form.setFieldValue("selectedDestination", pendingSelection.value);
@@ -154,10 +156,7 @@ const destinationOptions = computed(() =>
 // Pipeline-module external destinations.
 const getDestinations = async () => {
   try {
-    destinations.value = await destinationsQuery.get(
-      store.state.selectedOrganization.identifier,
-      "pipeline",
-    );
+    destinations.value = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "pipeline"));
   } catch (e: any) {
     if (e?.response?.status !== 403) {
       toast({ variant: "error", message: t("flow.destination.loadError") });

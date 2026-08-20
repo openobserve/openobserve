@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { configQuery } from "@/services/config.queries";
 import { createApp } from "vue";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import store from "./stores";
@@ -31,11 +32,10 @@ import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
-import { queryClient } from "./composables/query/queryClient";
+import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
-import { configQuery } from "@/services/config";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -50,6 +50,10 @@ app.use(i18n);
 app.use(store).use(router);
 
 app.use(VueQueryPlugin, { queryClient });
+
+// Mutation success/error feedback. Injected rather than imported by the query
+// client so that module stays free of UI and i18n at runtime.
+setMutationNotifier((variant, message) => toast({ variant, message }));
 
 // Initialize default context provider globally
 const defaultProvider = createDefaultContextProvider(router, store);
@@ -83,7 +87,7 @@ interface ConfigResponse {
 const getConfig = async () => {
   // Seeds the shared `/config` query — MainLayout, Login, General and UsageTab
   // read the same cached entry instead of each issuing their own request.
-  await configQuery.get().then((data: ConfigResponse["data"]) => {
+  await queryClient.fetchQuery(configQuery()).then((data: ConfigResponse["data"]) => {
     const res: ConfigResponse = { data };
     if (!res.data) return;
 

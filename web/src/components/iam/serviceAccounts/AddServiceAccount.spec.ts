@@ -21,6 +21,7 @@
 // event rather than thrown. These tests mount the REAL <OForm> (only ODialog
 // is stubbed) so the conditional name schema actually gates the submit.
 
+import { queryClient } from "@/composables/query/queryClient";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
@@ -38,20 +39,17 @@ vi.mock("@/services/service_accounts", async (importOriginal) => {
 });
 
 vi.mock("@/services/iam", async (importOriginal) => {
-  const { overlayServiceMock, queryStub } = await import("@/test/unit/helpers/mockService");
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   const getRoles = vi.fn().mockResolvedValue({ data: [] });
   const getGroups = vi.fn().mockResolvedValue({ data: [] });
   const getResources = vi.fn().mockResolvedValue({ data: [] });
   return overlayServiceMock(await importOriginal(), {
     getRoles,
     getGroups,
-    rolesQuery: queryStub(getRoles),
-    groupsQuery: queryStub(getGroups),
     updateRole: vi.fn(),
     updateGroup: vi.fn(),
     createRole: vi.fn(),
     getResources,
-    resourcesQuery: queryStub(getResources),
   });
 });
 
@@ -70,7 +68,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import AddServiceAccount from "./AddServiceAccount.vue";
 import service_accounts from "@/services/service_accounts";
 import { updateRole, updateGroup, getResources } from "@/services/iam";
-import { queryClient } from "@/composables/query/queryClient";
 import {
   buildServiceAccountEmail,
   serviceAccountDisplayName,

@@ -13,8 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { settingQuery } from "@/services/settings.queries";
+import { settingKeys } from "@/services/settings.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
-import settings, { settingQuery } from "@/services/settings";
+import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
 
@@ -54,17 +58,12 @@ export function useFavoriteDashboards() {
     try {
       if (force) {
         isLoading.value = true;
-        apply(await settingQuery.refresh(org, SETTING_KEY, userId));
+        apply(await queryClient.fetchQuery({ ...settingQuery(org, SETTING_KEY, userId), staleTime: 0 }));
         return;
       }
       // Stale-while-revalidate: the favourites rail keeps its rows while the
       // setting revalidates.
-      await settingQuery.load({
-        org,
-        args: [SETTING_KEY, userId],
-        apply,
-        loading: isLoading,
-      });
+      await fetchInto(settingQuery(org, SETTING_KEY, userId), { apply, loading: isLoading });
     } catch {
       // Missing setting / 404 → no favorites yet for this user.
       favorites.value = [];
@@ -86,7 +85,7 @@ export function useFavoriteDashboards() {
       : [...prev, d]; // optimistic
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
-      settingQuery.prime(org, favorites.value, SETTING_KEY, userId);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
     } catch (e: any) {
       favorites.value = prev; // revert
       toast({
@@ -111,11 +110,11 @@ export function useFavoriteDashboards() {
     favorites.value = next;
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
-      settingQuery.prime(org, favorites.value, SETTING_KEY, userId);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
     } catch {
       // The cached copy is now behind the screen; drop it so the next load
       // reconciles from the server.
-      settingQuery.invalidate(org);
+      queryClient.invalidateQueries({ queryKey: settingKeys.all(org) });
       // Best-effort cleanup that trails a successful delete — leave the local
       // list pruned so the row disappears now, and let the next load() reconcile
       // rather than resurrecting a row for a dashboard that is already gone.

@@ -48,7 +48,7 @@ vi.mock("@/composables/useStreams", () => ({
 
 // Mock all external services used inside EditRole.vue
 vi.mock("@/services/iam", async (importOriginal) => {
-  const { overlayServiceMock, queryStub } = await import("@/test/unit/helpers/mockService");
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   const getResources = vi.fn(async () => ({
     data: [
       {
@@ -188,10 +188,8 @@ vi.mock("@/services/iam", async (importOriginal) => {
   const getAllRolePermissions = vi.fn(async () => ({ data: [] }));
   return overlayServiceMock(await importOriginal(), {
     getResources,
-    resourcesQuery: queryStub(getResources),
     getResourcePermission: vi.fn(async () => ({ data: [] })),
     getAllRolePermissions,
-    rolePermissionsQuery: queryStub(getAllRolePermissions),
     getRoleUsers: vi.fn(async () => ({ data: ["u1@example.com", "u2@example.com"] })),
     updateRole: vi.fn(async () => ({ data: { code: 200 } })),
     getGroups: vi.fn(async () => ({ data: [] })),

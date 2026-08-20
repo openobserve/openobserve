@@ -169,6 +169,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { configQuery } from "@/services/config.queries";
+import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import AppHeader from "../components/Header.vue";
@@ -215,7 +217,6 @@ import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
-import organizations, { orgSettingsQuery } from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -224,10 +225,9 @@ import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
-import { purgeOrgQueries } from "@/composables/query/queryClient";
+import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
-import { configQuery } from "@/services/config";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -1082,7 +1082,7 @@ export default defineComponent({
         // Cached: MainLayout re-reads this on every org switch, and the
         // settings pages read it again on mount.
         const orgSettings: any = {
-          data: await orgSettingsQuery.get(store.state?.selectedOrganization?.identifier),
+          data: await queryClient.fetchQuery(orgSettingsQuery(store.state?.selectedOrganization?.identifier)),
         };
 
         //set settings in store
@@ -1160,8 +1160,7 @@ export default defineComponent({
      * @throws {Error} If the request fails.
      */
     const getConfig = async () => {
-      await configQuery
-        .get()
+      await queryClient.fetchQuery(configQuery())
         .then(async (data: any) => {
           const res = { data };
           if (config.isCloud == "false") {

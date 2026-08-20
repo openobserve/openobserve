@@ -241,6 +241,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { actionKeys } from "@/services/action_scripts.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -263,7 +265,7 @@ import type { Alert } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
-import { actionsQuery } from "@/services/action_scripts";
+
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -470,7 +472,7 @@ export default defineComponent({
     const getActionScripts = (force = false) => {
       const org = store.state.selectedOrganization.identifier;
       // Only a cold read spins and toasts — the rows stay put on a refresh.
-      const warm = actionsQuery.peek(org) !== undefined;
+      const warm = queryClient.getQueryData(actionKeys.list(org)) !== undefined;
       const dismiss = warm
         ? () => {}
         : toast({

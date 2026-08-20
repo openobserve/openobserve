@@ -255,6 +255,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -270,7 +272,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import templateService from "@/services/alert_templates";
-import destinationService, { destinationsQuery } from "@/services/alert_destination";
+import destinationService from "@/services/alert_destination";
 import type { ContentSpec } from "./contentSpec";
 
 // Wire values the backend documents for POST …/templates/preview. Kept local
@@ -491,10 +493,7 @@ const loadDestinations = async () => {
   try {
     // Same shared query the alert form and destination lists read, so opening
     // this panel reuses their cached list instead of issuing its own request.
-    const destinations = await destinationsQuery.get(
-      store.state.selectedOrganization?.identifier,
-      "alert",
-    );
+    const destinations = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization?.identifier, "alert"));
     destinationOptions.value = destinations.map((dest: { name: string }) => ({
       // Destination names are user data, not prose — nothing to translate.
       label: raw(dest.name),

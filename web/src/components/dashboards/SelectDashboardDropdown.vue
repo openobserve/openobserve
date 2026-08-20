@@ -69,7 +69,7 @@ import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { useDashboards } from "@/services/dashboards";
+import { useDashboards } from "@/services/dashboards.queries";
 
 export default defineComponent({
   name: "SelectDashboardDropdown",

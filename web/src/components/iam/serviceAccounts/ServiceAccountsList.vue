@@ -438,7 +438,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, computed } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { serviceAccountsQuery } from "@/services/service_accounts.queries";
+import { defineComponent, ref, onBeforeMount, computed , watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -475,7 +478,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import service_accounts, { serviceAccountsQuery } from "@/services/service_accounts";
+import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -746,10 +749,15 @@ export default defineComponent({
       deleteUserEmail = row.email;
       deleteUserEmailIdentifier.value = row.email;
     };
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const serviceAccountsList = useQuery(() =>
+      Object.assign(serviceAccountsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    const loading = serviceAccountsList.isPending;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
-    const fetching = ref(false);
+    const fetching = serviceAccountsList.isFetching;
     // Bound to refresh / post-write reloads: always hits the server.
     const refreshServiceAccounts = () => getServiceAccountsUsers(true);
 
@@ -770,45 +778,43 @@ export default defineComponent({
       });
     };
 
-    const getServiceAccountsUsers = async (force = false) => {
-      const org = store.state.selectedOrganization.identifier;
-      // Only a cold cache spins and toasts — `load` paints whatever is already
-      // in hand, then swaps in the server's answer.
-      // Not gated on `force`: a manual refresh keeps its rows too, and only
-      // the toast is suppressed when there is already something on screen.
-      const painted = serviceAccountsQuery.peek(org) !== undefined;
-      const source = serviceAccountsQuery.load({
-        org: org,
-        apply: (data) => {
-          applyServiceAccounts(data);
-        },
-        force,
-        loading,
-        fetching,
-      });
+    // The table is the query now: a service-account write invalidates the scope
+    // and these rows repaint without this component asking.
+    watch(serviceAccountsList.data, (rows: any) => {
+      if (rows) applyServiceAccounts(rows);
+    });
 
-      const dismiss = painted
-        ? () => {}
-        : toast({
+    // The cold-read toast, kept: shown only while there is nothing on screen.
+    let dismissLoadingToast: (() => void) | null = null;
+    watch(
+      loading,
+      (isCold) => {
+        if (isCold && !dismissLoadingToast) {
+          dismissLoadingToast = toast({
             variant: "loading",
             message: t("serviceAccounts.toast.loading"),
             timeout: 0,
           });
+        } else if (!isCold && dismissLoadingToast) {
+          dismissLoadingToast();
+          dismissLoadingToast = null;
+        }
+      },
+      { immediate: true },
+    );
 
-      return new Promise((resolve, reject) => {
-        source
-          .then(() => {
-            dismiss();
-            resolve(true);
-          })
-          .catch(() => {
-            dismiss();
-            reject(false);
-          })
-          .finally(() => {
-            loading.value = false;
-          });
-      });
+    watch(serviceAccountsList.error, (error: any) => {
+      if (!error) return;
+      dismissLoadingToast?.();
+      dismissLoadingToast = null;
+    });
+
+    // An explicit call always reads; mount and invalidation-driven repaints
+    // come from the query itself. The cold-read toast is driven by `loading`
+    // above, so it no longer has to be sequenced here.
+    const getServiceAccountsUsers = async (_force = false) => {
+      await serviceAccountsList.refetch();
+      return true;
     };
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;

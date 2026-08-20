@@ -251,6 +251,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { alertKeys } from "@/services/alerts.querykeys";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { templateKeys } from "@/services/alert_templates.querykeys";
 import { computed, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -265,9 +269,9 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import DependencyEntityRow from "./DependencyEntityRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import destinationService, { destinationsQuery } from "@/services/alert_destination";
-import templateService, { templatesQuery } from "@/services/alert_templates";
-import alertsService, { alertsListQuery } from "@/services/alerts";
+import destinationService from "@/services/alert_destination";
+import templateService from "@/services/alert_templates";
+import alertsService from "@/services/alerts";
 import useDependencyGraph, {
   buildFocusChain,
   invalidateDependencyGraphCache,
@@ -451,12 +455,15 @@ const performDelete = async () => {
     // stale entry can still be served to the next reader.
     const deletedFrom =
       n.kind === "destination"
-        ? destinationsQuery
+        ? destinationKeys.all(org_identifier)
         : n.kind === "template"
-          ? templatesQuery
-          : alertsListQuery;
-    deletedFrom.invalidate(org_identifier);
-    deletedFrom.remove(org_identifier);
+          ? templateKeys.all(org_identifier)
+          : alertKeys.all(org_identifier);
+    // Picking a *scope* rather than a query object: the keys module is the seam
+    // that makes this polymorphic drop possible without importing three
+    // transports.
+    void queryClient.invalidateQueries({ queryKey: deletedFrom });
+    queryClient.removeQueries({ queryKey: deletedFrom, type: "inactive" });
 
     invalidateDependencyGraphCache();
     toast({ variant: "success", message: t("alert_dependencies.deletedToast", { name: n.name }) });

@@ -310,7 +310,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import type { ReportListFilters } from "@/services/reports";
+import { useQuery } from "@tanstack/vue-query";
+import { reportsQuery } from "@/services/reports.queries";
+import { reportKeys } from "@/services/reports.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent , nextTick } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -323,8 +329,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { useI18nTyped } from "@/types/i18n";
-import reports, { reportsQuery } from "@/services/reports";
+import { useI18nTyped , raw } from "@/types/i18n";
+import reports from "@/services/reports";
 import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -364,6 +370,26 @@ const reportsTableRows: Ref<any[]> = ref([]);
 const staticReportsList: Ref<any[]> = ref([]);
 // Start in the loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
+// What the current read is aimed at. Held reactively so the query key forks on
+// a folder/tab/search change — which is also what makes the old "is this
+// response stale?" guard unnecessary: a late response lands under its own key
+// and can no longer render into the current view.
+const orgIdForReports = useOrgId();
+const readFilters = ref<ReportListFilters>({
+  folder: undefined,
+  isCache: false,
+  nameQuery: undefined,
+});
+const readNameQuery = ref<string | undefined>(undefined);
+
+const hasRequestedReports = ref(false);
+
+const reportsList = useQuery(() =>
+  Object.assign(reportsQuery(orgIdForReports.value, readFilters.value), {
+    enabled: hasRequestedReports.value && !!orgIdForReports.value,
+  }),
+);
+
 const isLoadingReports = ref(true);
 // Request in flight with rows still on screen — the refresh button's spinner.
 const isRefreshingReports = ref(false);
@@ -480,6 +506,40 @@ const columns = computed<OTableColumnDef[]>(() => {
 });
 
 // ── Load reports ──────────────────────────────────────────────────────────────
+const shapeReports = (rows: any[]) =>
+  rows.map((report: any) => ({
+    ...report,
+    last_triggered_at_raw: report.last_triggered_at || null,
+    last_triggered_at: report.last_triggered_at
+      ? convertUnixToDateFormat(report.last_triggered_at)
+      : "-",
+  }));
+
+const renderReports = (rows: any[]) => {
+  const mapped = shapeReports(rows);
+  if (!readNameQuery.value) cachedFolderReports.value = mapped;
+  staticReportsList.value = mapped;
+  filterReports();
+};
+
+// The list is the query now: anything that invalidates the reports scope
+// repaints these rows without this component asking.
+watch(reportsList.data, (rows: any) => {
+  if (rows) renderReports(rows);
+});
+
+watch(reportsList.error, (err: any) => {
+  if (!err) return;
+  isLoadingReports.value = false;
+  isRefreshingReports.value = false;
+  if (err?.response?.status !== 403) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("reports.fetchReportsError"),
+    });
+  }
+});
+
 const loadReports = async (folderId: string, nameQuery?: string, force = false) => {
   // The skeleton is for a cold read only — a refresh keeps its rows and spins
   // the button instead.
@@ -495,69 +555,36 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
       });
 
   try {
-    // Folder, tab and name search are all applied by the server, so each
-    // combination is its own cache entry — including searches, which used to
-    // bypass the cache entirely.
-    const filters = {
+    readNameQuery.value = nameQuery;
+    readFilters.value = {
       folder: searchAcrossFolders.value ? undefined : folderId,
       isCache: activeTab.value === "cached",
       nameQuery,
     };
-    const shape = (rows: any[]) =>
-      rows.map((report: any) => ({
-        ...report,
-        last_triggered_at_raw: report.last_triggered_at || null,
-        last_triggered_at: report.last_triggered_at
-          ? convertUnixToDateFormat(report.last_triggered_at)
-          : "-",
-      }));
+    // Let the key pick up the new parameters before asking for the data.
+    await nextTick();
 
-    // The result is cached under its own key regardless, so a folder switch
-    // mid-flight only has to skip the render, not the caching.
-    const isStale = () => folderId !== activeFolderId.value && !nameQuery;
-
-    const render = (rows: any[]) => {
-      const mapped = shape(rows);
-      if (!nameQuery) cachedFolderReports.value = mapped;
-      staticReportsList.value = mapped;
-      filterReports();
-    };
-
-    let rows: any[];
-    // `force` only bypasses staleTime — the rows on screen stay either way.
-    rows = await reportsQuery.load({
-      org: store.state.selectedOrganization.identifier,
-      args: [filters],
-      apply: (data) => {
-        if (!isStale()) render(data);
-      },
-      force,
-    });
-
-    if (isStale()) {
-      dismiss();
-      return;
+    if (!hasRequestedReports.value) {
+      hasRequestedReports.value = true;
+      await nextTick();
+      await reportsList.suspense();
+    } else if (force) {
+      await reportsList.refetch();
+    } else {
+      await reportsList.suspense();
     }
-
-    render(rows);
-  } catch (err: any) {
-    if (err?.response?.status !== 403) {
-      toast({
-        variant: "error",
-        message: err?.data?.message || t("reports.fetchReportsError"),
-      });
-    }
+    await nextTick();
   } finally {
+    dismiss();
     isLoadingReports.value = false;
     isRefreshingReports.value = false;
-    dismiss();
   }
 };
 
 // Called after every write and by the refresh button. Prefix invalidation, so
 // the cached/scheduled tab and any active name search all refetch too.
 const invalidateFolderCache = (_folderId?: string) => {
-  reportsQuery.invalidate(store.state.selectedOrganization.identifier);
+  queryClient.invalidateQueries({ queryKey: reportKeys.all(store.state.selectedOrganization.identifier) });
 };
 
 const filterReports = () => {

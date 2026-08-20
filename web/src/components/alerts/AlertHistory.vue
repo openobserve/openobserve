@@ -467,7 +467,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import type { AlertHistoryQuery } from "@/services/alerts";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { alertHistoryQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, onMounted, watch , nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -476,7 +481,7 @@ import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import alertsService, { alertHistoryQuery } from "@/services/alerts";
+import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -495,10 +500,36 @@ const store = useStore();
 const router = useRouter();
 
 // Data
-const loading = ref(false);
+// The query shape this page is currently reading (range + page + sort +
+// filter). Held reactively so the key forks per shape — paging back to a page
+// already seen renders from cache instead of blanking the table.
+const orgIdForHistory = useOrgId();
+const readQuery = ref<AlertHistoryQuery | null>(null);
+const hasRequestedHistory = ref(false);
+
+// `enabled: false` does not stop the options factory from running, and the key
+// builder reads fields off the query — so a placeholder stands in until the page
+// has actually asked for a page of history.
+const EMPTY_HISTORY_QUERY = {
+  start_time: 0,
+  end_time: 0,
+  from: 0,
+  size: 0,
+} as unknown as AlertHistoryQuery;
+
+const historyList = useQuery(() =>
+  Object.assign(
+    alertHistoryQuery(orgIdForHistory.value, readQuery.value ?? EMPTY_HISTORY_QUERY),
+    {
+      enabled: hasRequestedHistory.value && !!readQuery.value && !!orgIdForHistory.value,
+    },
+  ),
+);
+
+const loading = historyList.isLoading;
 // A request in flight while rows stay on screen — the refresh button's
 // spinner. `loading` is the skeleton, which only a cold read wants.
-const fetching = ref(false);
+const fetching = historyList.isFetching;
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
 const selectedAlert = ref<any>(null);
@@ -754,22 +785,27 @@ const fetchAlertHistory = async (force = false) => {
     // a page already seen renders from cache instead of blanking the table.
     // Stale-while-revalidate otherwise: the page keeps its rows while the
     // refetch runs.
-    let historyData: any;
-    // `force` only bypasses staleTime — the rows on screen stay either way.
-    historyData = await alertHistoryQuery.load({
-      org,
-      args: [query],
-      apply: applyHistory,
-      loading,
-      fetching,
-      force,
-    });
+    readQuery.value = query;
+    // Let the key pick up the new query shape before asking for the data.
+    await nextTick();
+
+    if (!hasRequestedHistory.value) {
+      hasRequestedHistory.value = true;
+      await nextTick();
+      await historyList.suspense();
+    } else if (force) {
+      await historyList.refetch();
+    } else {
+      await historyList.suspense();
+    }
+    await nextTick();
+
     {
-      applyHistory(historyData);
+      if (historyList.data.value) applyHistory(historyList.data.value);
 
       const nextFrom = currentPage.value * pageSize.value;
       if (nextFrom < totalCount.value) {
-        alertHistoryQuery.prefetch(org, { ...query, from: nextFrom.toString() });
+        queryClient.prefetchQuery(alertHistoryQuery(org, { ...query, from: nextFrom.toString() }));
       }
 
       if (rows.value.length === 0) {

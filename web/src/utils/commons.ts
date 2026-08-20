@@ -15,15 +15,19 @@
 
 //Dashboard Manipulation Functions
 
+import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import { foldersQuery } from "@/services/common.queries";
+import { dashboardKeys } from "@/services/dashboards.querykeys";
+import { folderKeys } from "@/services/common.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { fetchInto } from "@/composables/query/fetchInto";
 import dashboardService from "../services/dashboards";
 import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
 import type { TranslateFn } from "@/types/i18n";
-import { foldersQuery } from "@/services/common";
 import type { Ref } from "vue";
-import { dashboardsByFolderQuery } from "@/services/dashboards";
 
 let moment: any;
 let momentInitialized = false;
@@ -159,8 +163,8 @@ export const getAllDashboards = async (store: any, folderId: any, force = false)
   // Reads the query cache; `force` is for post-mutation reloads, which must
   // reach the server.
   const dashboards = force
-    ? await dashboardsByFolderQuery.refresh(org, folderId)
-    : await dashboardsByFolderQuery.get(org, folderId);
+    ? await queryClient.fetchQuery({ ...dashboardsByFolderQuery(org, folderId), staleTime: 0 })
+    : await queryClient.fetchQuery(dashboardsByFolderQuery(org, folderId));
 
   return applyDashboards(store, folderId, dashboards);
 };
@@ -180,7 +184,7 @@ export const loadDashboardsByFolderId = (
 ) => {
   const org = store.state.selectedOrganization.identifier;
   const fallback =
-    dashboardsByFolderQuery.peek(org, folderId) === undefined
+    queryClient.getQueryData(dashboardKeys.byFolder(org, folderId)) === undefined
       ? store.state.organizationData.allDashboardList[String(folderId)]
       : undefined;
   if (fallback) {
@@ -188,17 +192,12 @@ export const loadDashboardsByFolderId = (
     if (opts.loading) opts.loading.value = false;
   }
 
-  return dashboardsByFolderQuery.load({
-    org,
-    args: [folderId],
-    apply: (list: any[]) => opts.apply(applyDashboards(store, folderId, list)),
-    ...(fallback ? {} : { loading: opts.loading }),
-  });
+  return fetchInto(dashboardsByFolderQuery(org, folderId), { apply: (list: any[]) => opts.apply(applyDashboards(store, folderId, list)), ...(fallback ? {} : { loading: opts.loading }) });
 };
 export const getFoldersListByType = async (store: any, type: any) => {
   // Reads the query cache: within the tier's staleTime a remount is a cache hit
   // instead of a request, and concurrent callers share one in-flight fetch.
-  const folders = await foldersQuery.get(store.state.selectedOrganization.identifier, type);
+  const folders = await queryClient.fetchQuery(foldersQuery(store.state.selectedOrganization.identifier, type));
 
   // Bridge for consumers still reading Vuex directly. Deleted with the last one.
   store.dispatch("setFoldersByType", { [type]: folders });
@@ -669,11 +668,11 @@ const generateUniquePanelId = (existingIds: Set<string>): string => {
 const pruneDashboardQueryCache = (store: any, folderId: string, ids: string[]) => {
   const org = store.state.selectedOrganization?.identifier;
   if (!org) return;
-  const cached = dashboardsByFolderQuery.peek(org, folderId);
+  const cached = queryClient.getQueryData(dashboardKeys.byFolder(org, folderId));
   if (!Array.isArray(cached)) return;
   const remaining = cached.filter((d: any) => !ids.includes(d.dashboard_id ?? d.dashboardId));
   if (remaining.length !== cached.length) {
-    dashboardsByFolderQuery.prime(org, remaining, folderId);
+    queryClient.setQueryData(dashboardKeys.byFolder(org, folderId), remaining);
   }
 };
 
@@ -951,7 +950,7 @@ export const movePanelToAnotherTab = async (
  * loading the dashboards page no longer issues the request twice.
  */
 export const getFoldersList = async (store: any) => {
-  const folders = await foldersQuery.get(store.state.selectedOrganization.identifier, "dashboards");
+  const folders = await queryClient.fetchQuery(foldersQuery(store.state.selectedOrganization.identifier, "dashboards"));
 
   store.dispatch("setFolders", folders);
 
@@ -967,7 +966,7 @@ const refreshFolderLists = async (store: any, type: any) => {
   // The list just changed on the server, so drop the cached copy first —
   // `getFoldersListByType` reads the query cache and would otherwise return the
   // still-fresh pre-mutation entry.
-  await foldersQuery.invalidate(store.state.selectedOrganization.identifier);
+  await queryClient.invalidateQueries({ queryKey: folderKeys.all(store.state.selectedOrganization.identifier) });
   return Promise.all([
     getFoldersListByType(store, type),
     ...(type === "dashboards" ? [getFoldersList(store)] : []),

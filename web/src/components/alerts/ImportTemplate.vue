@@ -184,11 +184,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { saveTemplateMutation } from "@/services/alert_templates.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, ref, computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import templateService, { templatesQuery } from "@/services/alert_templates";
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -430,11 +432,15 @@ export default defineComponent({
       return templatesList.includes(templateName);
     };
 
+    const orgIdForWrites = useOrgId();
+    const createTemplateWrite = useMutation(() =>
+      saveTemplateMutation(orgIdForWrites.value, () => false),
+    );
+
     const createTemplate = async (input: any, index: number) => {
       try {
-        templatesQuery.invalidate(store.state.selectedOrganization.identifier);
-        await templateService.create({
-          org_identifier: store.state.selectedOrganization.identifier,
+        // Was: invalidate, then create — the refetch raced the write.
+        await createTemplateWrite.mutateAsync({
           template_name: input.name,
           data: {
             name: input.name.trim(),

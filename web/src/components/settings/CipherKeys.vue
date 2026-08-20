@@ -145,6 +145,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { cipherKeysQuery } from "@/services/cipher_keys.queries";
+import { cipherKeyKeys } from "@/services/cipher_keys.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -152,7 +157,7 @@ import { useI18nTyped } from "@/types/i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
-import CipherKeysService, { cipherKeysQuery } from "@/services/cipher_keys";
+import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -183,10 +188,15 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const cipherKeysList = useQuery(() =>
+      Object.assign(cipherKeysQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    const loading = cipherKeysList.isPending;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
-    const fetching = ref(false);
+    const fetching = cipherKeysList.isFetching;
     const filterQuery = ref("");
     const columns: OTableColumnDef[] = [
       {
@@ -313,47 +323,53 @@ export default defineComponent({
       resultTotal.value = responseData.length;
     };
 
-    const getData = (force = false) => {
-      const org = store.state.selectedOrganization.identifier;
-      // Only a cold cache spins and toasts — `load` paints whatever is already
-      // in hand, then swaps in the server's answer.
-      // Not gated on `force`: a manual refresh keeps its rows too, and only
-      // the toast is suppressed when there is already something on screen.
-      const painted = cipherKeysQuery.peek(org) !== undefined;
-      const source = cipherKeysQuery.load({
-        org: org,
-        apply: (data) => {
-          applyCipherKeys(data);
-        },
-        force,
-        loading,
-        fetching,
-      });
+    // The table is the query now: anything that invalidates the cipher-keys
+    // scope repaints these rows without this component asking.
+    watch(
+      cipherKeysList.data,
+      (rows: any) => {
+        if (rows) applyCipherKeys(rows);
+      },
+      { immediate: true },
+    );
 
-      const dismiss = painted
-        ? () => {}
-        : toast({
+    // The cold-read toast, kept: it is shown only while there is nothing on
+    // screen, and dismissed as soon as the first rows land or the read fails.
+    let dismissLoadingToast: (() => void) | null = null;
+    watch(
+      loading,
+      (isCold) => {
+        if (isCold && !dismissLoadingToast) {
+          dismissLoadingToast = toast({
             variant: "loading",
             message: t("settings.cipherKeysPage.loadingData"),
             timeout: 0,
           });
+        } else if (!isCold && dismissLoadingToast) {
+          dismissLoadingToast();
+          dismissLoadingToast = null;
+        }
+      },
+      { immediate: true },
+    );
 
-      source
-        .then((responseData: any[]) => {
-          applyCipherKeys(responseData);
-          dismiss();
-        })
-        .catch((error) => {
-          loading.value = false;
-          dismiss();
-          if (error.status != 403) {
-            toast({
-              variant: "error",
-              message: error.response?.data?.message || t("settings.cipherKeysPage.fetchFailed"),
-              timeout: 5000,
-            });
-          }
+    watch(cipherKeysList.error, (error: any) => {
+      if (!error) return;
+      dismissLoadingToast?.();
+      dismissLoadingToast = null;
+      if (error.status != 403) {
+        toast({
+          variant: "error",
+          message: error.response?.data?.message || t("settings.cipherKeysPage.fetchFailed"),
+          timeout: 5000,
         });
+      }
+    });
+
+    // An explicit call always reads; mount and invalidation-driven repaints
+    // come from the query itself.
+    const getData = async (_force = false) => {
+      await cipherKeysList.refetch();
     };
 
     getData();
@@ -390,9 +406,8 @@ export default defineComponent({
             // Drop the row from the cache first so it disappears now, not when
             // the refetch lands.
             const deletedName = confirmDelete.value.data.name;
-            cipherKeysQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
-              Array.isArray(list) ? list.filter((k: any) => k.name !== deletedName) : list,
-            );
+            queryClient.setQueriesData({ queryKey: cipherKeyKeys.all(store.state.selectedOrganization.identifier) }, (list: any) =>
+              Array.isArray(list) ? list.filter((k: any) => k.name !== deletedName) : list);
             getData(true);
           })
           .catch((err) => {

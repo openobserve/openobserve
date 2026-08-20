@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -82,7 +84,7 @@ vi.mock("vue-router", () => ({
 
 // Import mocked services after mocking
 import templateService from "@/services/alert_templates";
-import destinationService, { destinationsQuery } from "@/services/alert_destination";
+import destinationService from "@/services/alert_destination";
 
 const mockTemplateService = templateService as any;
 const mockDestinationService = destinationService as any;
@@ -448,7 +450,7 @@ describe("AppAlerts", () => {
       expect(wrapper.vm.destinations).toEqual(firstDestinations);
 
       // Cached until something invalidates it — mirrors a destination edit.
-      await destinationsQuery.invalidate("test-org-123");
+      await queryClient.invalidateQueries({ queryKey: destinationKeys.all("test-org-123") });
       mockDestinationService.list.mockResolvedValueOnce({ data: secondDestinations });
       await wrapper.vm.getDestinations();
       expect(wrapper.vm.destinations).toEqual(secondDestinations);

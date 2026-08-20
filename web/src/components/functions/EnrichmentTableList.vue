@@ -414,6 +414,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { streamKeys } from "@/services/stream.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -428,7 +430,6 @@ import segment from "../../services/segment_analytics";
 import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
-import { streamNameListQuery } from "@/services/stream";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
@@ -604,10 +605,7 @@ export default defineComponent({
       // refresh there are rows to keep — only a cold read spins and toasts.
       const warm =
         jsTransforms.value.length > 0 ||
-        streamNameListQuery.peek(
-          store.state.selectedOrganization.identifier,
-          "enrichment_tables",
-        ) !== undefined;
+        queryClient.getQueryData(streamKeys.nameList(store.state.selectedOrganization.identifier, "enrichment_tables")) !== undefined;
       loading.value = !warm;
       fetching.value = true;
       const dismiss = warm

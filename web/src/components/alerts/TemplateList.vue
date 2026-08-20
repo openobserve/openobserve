@@ -264,11 +264,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
+import { templatesQuery } from "@/services/alert_templates.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { templateKeys } from "@/services/alert_templates.querykeys";
 import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import templateService, { templatesQuery } from "@/services/alert_templates";
+import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
@@ -391,7 +394,7 @@ const refreshTemplates = () => getTemplates(true);
 const getTemplates = (force = false) => {
   const org = store.state.selectedOrganization.identifier;
   // Only a cold read spins and toasts — the rows stay put on a refresh.
-  const warm = templatesQuery.peek(org) !== undefined;
+  const warm = queryClient.getQueryData(templateKeys.list(org)) !== undefined;
   const dismiss = warm
     ? () => {}
     : toast({
@@ -400,19 +403,22 @@ const getTemplates = (force = false) => {
         timeout: 0,
       });
 
-  return templatesQuery
-    .load({
-      org,
-      apply: (list) => {
-        resultTotal.value = list.length;
-        templates.value = list;
-        updateRoute();
-      },
-      loading,
-      fetching,
-      force,
-    })
-    .then(() => {
+  const options = templatesQuery(org);
+  const applyRows = (list: any[]) => {
+    resultTotal.value = list.length;
+    templates.value = list;
+    updateRoute();
+  };
+  const cached = queryClient.getQueryData<any[]>(options.queryKey);
+  if (cached !== undefined) applyRows(cached);
+  loading.value = cached === undefined;
+  fetching.value = true;
+
+  // TODO: fold into `useQuery` when this list drops its imperative refresh.
+  return queryClient
+    .fetchQuery(force ? { ...options, staleTime: 0 } : options)
+    .then((list: any[]) => {
+      applyRows(list);
       // Kept out of `apply`, which runs again for the cached paint: rebuilding
       // the graph is three more list calls. Only a forced read can have changed
       // it — every add/edit/delete reloads with force — so a plain mount leaves
@@ -531,9 +537,8 @@ const deleteTemplate = () => {
         // persists, so without it the deleted template would come back on a
         // browser reload, hydrated from localStorage.
         const deletedName = confirmDelete.value.data.name;
-        templatesQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
-          Array.isArray(list) ? list.filter((tpl: any) => tpl.name !== deletedName) : list,
-        );
+        queryClient.setQueriesData({ queryKey: templateKeys.all(store.state.selectedOrganization.identifier) }, (list: any) =>
+          Array.isArray(list) ? list.filter((tpl: any) => tpl.name !== deletedName) : list);
         getTemplates(true);
       })
       .catch((err) => {

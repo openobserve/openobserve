@@ -37,6 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { configQuery } from "@/services/config.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
@@ -59,7 +61,6 @@ import organizationsService from "@/services/organizations";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
-import { configQuery } from "@/services/config";
 import { isSameOriginRedirect } from "@/utils/safeUrl";
 
 export default defineComponent({
@@ -84,8 +85,7 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {
-        await configQuery
-          .get()
+        await queryClient.fetchQuery(configQuery())
           .then(async (data) => {
             store.commit("setConfig", data);
           })
@@ -302,8 +302,7 @@ export default defineComponent({
      */
 
     if (this.$route.hash) {
-      configQuery
-        .get()
+      queryClient.fetchQuery(configQuery())
         .then(async (data) => {
           this.store.commit("setZoConfig", data);
           const token = getUserInfo(this.$route.hash);

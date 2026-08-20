@@ -13,8 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { settingQuery } from "@/services/settings.queries";
+import { settingKeys } from "@/services/settings.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
-import settings, { settingQuery } from "@/services/settings";
+import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
@@ -43,17 +47,12 @@ export function useHomeDashboard(t: TranslateFn) {
     try {
       if (force) {
         isLoading.value = true;
-        apply(await settingQuery.refresh(org, SETTING_KEY));
+        apply(await queryClient.fetchQuery({ ...settingQuery(org, SETTING_KEY), staleTime: 0 }));
         return;
       }
       // Stale-while-revalidate: the pinned dashboard stays put while the
       // setting revalidates, so the home button never flickers back to empty.
-      await settingQuery.load({
-        org,
-        args: [SETTING_KEY],
-        apply,
-        loading: isLoading,
-      });
+      await fetchInto(settingQuery(org, SETTING_KEY), { apply, loading: isLoading });
     } catch {
       // Missing setting / 404 → no home dashboard for this org.
       homeDashboard.value = null;
@@ -73,7 +72,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard.value = d; // optimistic
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
-      settingQuery.prime(org, d, SETTING_KEY);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), d);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
       toast({
@@ -89,7 +88,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard.value = null; // optimistic
     try {
       await settings.deleteOrgSetting(org, SETTING_KEY);
-      settingQuery.prime(org, null, SETTING_KEY);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), null);
     } catch (e: any) {
       // A 404 means the setting is already gone — this is the desired end state,
       // not a failure. The backend now clears home_dashboard itself when the

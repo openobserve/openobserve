@@ -284,13 +284,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
+import { bulkDeleteDestinationsMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
-import destinationService, { destinationsQuery } from "@/services/alert_destination";
+import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -499,7 +505,7 @@ export default defineComponent({
     const getDestinations = (force = false) => {
       const org = store.state.selectedOrganization.identifier;
       // Only a cold read spins and toasts — the rows stay put on a refresh.
-      const warm = destinationsQuery.peek(org, "alert") !== undefined;
+      const warm = queryClient.getQueryData(destinationKeys.list(org, "alert")) !== undefined;
       const dismiss = warm
         ? () => {}
         : toast({
@@ -508,26 +514,32 @@ export default defineComponent({
             timeout: 0,
           });
 
-      return destinationsQuery
-        .load({
-          org,
-          args: ["alert"],
-          apply: (list: any[]) => {
-            const rows = list.filter(
-              (destination: any) =>
-                destination.type == "http" ||
-                destination.type == "email" ||
-                destination.type === "action",
-            );
-            resultTotal.value = rows.length;
-            destinations.value = rows;
-            updateRoute();
-          },
-          loading,
-          fetching,
-          force,
-        })
-        .then(() => {
+      const options = destinationsQuery(org, "alert");
+      const applyRows = (list: any[]) => {
+        const rows = list.filter(
+          (destination: any) =>
+            destination.type == "http" ||
+            destination.type == "email" ||
+            destination.type === "action",
+        );
+        resultTotal.value = rows.length;
+        destinations.value = rows;
+        updateRoute();
+      };
+
+      // Paint the cached rows before the request goes out, so a refresh never
+      // blanks the table.
+      const cached = queryClient.getQueryData<any[]>(options.queryKey);
+      if (cached !== undefined) applyRows(cached);
+      loading.value = cached === undefined;
+      fetching.value = true;
+
+      // TODO: fold into `useQuery` — kept imperative for now because the
+      // surrounding toast/dependency-graph flow is sequenced by hand.
+      return queryClient
+        .fetchQuery(force ? { ...options, staleTime: 0 } : options)
+        .then((list: any[]) => {
+          applyRows(list);
           // Kept out of `apply`, which runs again for the cached paint:
           // rebuilding the graph is three more list calls. Only a forced read
           // can have changed it — every add/edit/delete reloads with force — so
@@ -536,7 +548,7 @@ export default defineComponent({
           if (force) invalidateDependencyGraphCache();
           loadDepGraph(org);
         })
-        .catch((err) => {
+        .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
               variant: "error",
@@ -548,6 +560,7 @@ export default defineComponent({
         .finally(() => {
           dismiss();
           loading.value = false;
+          fetching.value = false;
         });
     };
     const getTemplates = () => {
@@ -617,9 +630,8 @@ export default defineComponent({
             // with `force`: this query persists, so only a real fetch rewrites
             // the localStorage copy that a browser reload would hydrate from.
             const deletedName = confirmDelete.value.data.name;
-            destinationsQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
-              Array.isArray(list) ? list.filter((d: any) => d.name !== deletedName) : list,
-            );
+            queryClient.setQueriesData({ queryKey: destinationKeys.all(store.state.selectedOrganization.identifier) }, (list: any) =>
+              Array.isArray(list) ? list.filter((d: any) => d.name !== deletedName) : list);
             getDestinations(true);
           })
           .catch((err) => {
@@ -745,6 +757,11 @@ export default defineComponent({
       return filterData(byTab, filterQuery.value);
     });
 
+    const orgIdForWrites = useOrgId();
+    const bulkDeleteWrite = useMutation(() =>
+      bulkDeleteDestinationsMutation(orgIdForWrites.value),
+    );
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -771,11 +788,7 @@ export default defineComponent({
           ids: selectedDestinations.value.map((d: any) => d.name),
         };
 
-        const response = await destinationService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
-        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
+        const response = await bulkDeleteWrite.mutateAsync(payload.ids);
 
         dismiss();
 

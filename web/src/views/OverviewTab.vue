@@ -498,6 +498,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { alertHistoryQuery } from "@/services/alerts.queries";
+import { incidentsQuery } from "@/services/incidents.queries";
+import { serviceTopologyQuery } from "@/services/service_graph.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
+import { anomalyHistoryQuery } from "@/services/anomaly_detection.queries";
 import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
 
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -505,10 +511,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import anomalyService, {
-  anomalyConfigsQuery,
-  anomalyHistoryQuery,
-} from "@/services/anomaly_detection";
+import anomalyService from "@/services/anomaly_detection";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -519,9 +522,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
-import { alertHistoryQuery } from "@/services/alerts";
-import { incidentsQuery } from "@/services/incidents";
-import { overviewRange, serviceTopologyQuery } from "@/services/service_graph";
+import { overviewRange } from "@/services/service_graph";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -706,9 +707,11 @@ const loadAnomalies = async (force = false) => {
 
     let rawHits: Array<{ cfg: any; hits: any[] }>;
 
-    // `force` picks the member, not an argument: .refresh bypasses staleTime.
-    const readConfigs = force ? anomalyConfigsQuery.refresh : anomalyConfigsQuery.get;
-    const readHistory = force ? anomalyHistoryQuery.refresh : anomalyHistoryQuery.get;
+    // `force` bypasses staleTime; the options object is the same either way.
+    const read = <T>(options: any): Promise<T> =>
+      queryClient.fetchQuery(force ? { ...options, staleTime: 0 } : options);
+    const readConfigs = (org: string) => read<any[]>(anomalyConfigsQuery(org));
+    const readHistory = (org: string, limit: number) => read<any>(anomalyHistoryQuery(org, limit));
 
     // Fire list first; only fetch history if configs exist
     try {
@@ -794,8 +797,7 @@ const loadHistoryAndSplit = async (force = false) => {
     // Quantised range: the raw timestamps move on every mount, so a key built
     // from them could never hit — which is why switching tabs re-requested this.
     const q = overviewRange(timeRange.value.startTime, timeRange.value.endTime);
-    const historyFetch = force ? alertHistoryQuery.refresh : alertHistoryQuery.get;
-    const res = await historyFetch(orgId.value, {
+    const historyOptions = alertHistoryQuery(orgId.value, {
       start_time: q.start,
       end_time: q.end,
       from: 0,
@@ -803,6 +805,9 @@ const loadHistoryAndSplit = async (force = false) => {
       sort_by: "timestamp",
       sort_order: "desc",
     });
+    const res: any = await queryClient.fetchQuery(
+      force ? { ...historyOptions, staleTime: 0 } : historyOptions,
+    );
     const hits: any[] = res?.hits ?? [];
 
     // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
@@ -859,8 +864,10 @@ const loadHistoryAndSplit = async (force = false) => {
 const loadIncidents = async (force = false) => {
   if (!isIncidentsEnabled.value) return;
   try {
-    const read = force ? incidentsQuery.refresh : incidentsQuery.get;
-    const res = await read(orgId.value, "open", 4, 0);
+    const incidentOptions = incidentsQuery(orgId.value, "open", 4, 0);
+    const res: any = await queryClient.fetchQuery(
+      force ? { ...incidentOptions, staleTime: 0 } : incidentOptions,
+    );
     incidents.value = res?.incidents ?? [];
     incidentsTotal.value = res?.total ?? incidents.value.length;
   } catch {
@@ -874,11 +881,13 @@ const loadServiceGraph = async (force = false) => {
   try {
     graphStream.value = "all";
 
-    const read = force ? serviceTopologyQuery.refresh : serviceTopologyQuery.get;
-    const res = await read(orgId.value, {
+    const topologyOptions = serviceTopologyQuery(orgId.value, {
       startTime: timeRange.value.startTime,
       endTime: timeRange.value.endTime,
     });
+    const res: any = await queryClient.fetchQuery(
+      force ? { ...topologyOptions, staleTime: 0 } : topologyOptions,
+    );
     const nodes: any[] = res?.nodes ?? [];
     const edges: any[] = res?.edges ?? [];
     graphData.value = { nodes, edges };

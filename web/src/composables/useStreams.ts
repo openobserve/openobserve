@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { streamNameListQuery } from "@/services/stream.queries";
+import { streamKeys } from "@/services/stream.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { useStore } from "vuex";
-import StreamService, { streamNameListQuery } from "@/services/stream";
+import StreamService from "@/services/stream";
 import { computed, ComputedRef } from "vue";
 import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -64,7 +67,7 @@ const useStreams = (t: TranslateFn) => {
           // `force` must reach the server: drop the cached list first, otherwise
           // the query would answer from cache and force would be a no-op.
           if (force) {
-            await streamNameListQuery.invalidate(store.state.selectedOrganization.identifier);
+            await queryClient.invalidateQueries({ queryKey: streamKeys.all(store.state.selectedOrganization.identifier) });
           }
           if (!isStreamFetched(streamName || "all") || force) {
             // Added adddtional check to fetch all streamstype separately if streamName is all
@@ -95,7 +98,7 @@ const useStreams = (t: TranslateFn) => {
               // One cached query per type: a hit resolves without a request.
               Promise.allSettled(
                 [...streamsToFetch].map((streamType) =>
-                  streamNameListQuery.get(store.state.selectedOrganization.identifier, streamType),
+                  queryClient.fetchQuery(streamNameListQuery(store.state.selectedOrganization.identifier, streamType)),
                 ),
               )
                 .then((results: any) => {
@@ -117,8 +120,7 @@ const useStreams = (t: TranslateFn) => {
                   reject(new Error(e.message));
                 });
             } else {
-              streamNameListQuery
-                .get(store.state.selectedOrganization.identifier, _streamName)
+              queryClient.fetchQuery(streamNameListQuery(store.state.selectedOrganization.identifier, _streamName))
                 .then((list: any) => {
                   setStreams(streamName, list);
                   const streamData = {
@@ -483,7 +485,7 @@ const useStreams = (t: TranslateFn) => {
     }
     // Whole streams prefix, not just this type's name list: the paginated
     // Log Streams pages cache the deleted row too.
-    void streamNameListQuery.invalidate(store.state.selectedOrganization.identifier);
+    void queryClient.invalidateQueries({ queryKey: streamKeys.all(store.state.selectedOrganization.identifier) });
   };
 
   const addStream = async (stream: any) => {

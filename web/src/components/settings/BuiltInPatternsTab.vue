@@ -221,9 +221,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { builtInRegexPatternsQuery } from "@/services/regex_pattern.queries";
+import { defineComponent, ref, computed, onMounted , watch , nextTick } from "vue";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
-import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -235,7 +237,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { builtInRegexPatternsQuery } from "@/services/regex_pattern";
 
 interface PatternExample {
   Valid: string[];
@@ -270,13 +271,19 @@ export default defineComponent({
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
-    const store = useStore();
 
     const patterns = ref<BuiltInPattern[]>([]);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const builtInList = useQuery(() =>
+      Object.assign(builtInRegexPatternsQuery(orgIdForList.value), {
+        enabled: !!orgIdForList.value,
+      }),
+    );
+
+    const loading = builtInList.isLoading;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
-    const fetching = ref(false);
+    const fetching = builtInList.isFetching;
     const error = ref("");
     const searchQuery = ref("");
     const selectedTags = ref<string[]>([]);
@@ -318,6 +325,36 @@ export default defineComponent({
       return filtered;
     });
 
+    // `refetch()` resolves rather than rejecting, so the read's failure is
+    // surfaced from the query instead of a try/catch around the call.
+    watch(builtInList.error, (e: any) => {
+      if (!e) return;
+      error.value = e.response?.data?.message || e.message || t("regex_patterns.failed_to_load");
+      toast({
+        // Server-authored or already-translated text: `raw` is the escape hatch.
+        message: raw(error.value),
+        variant: "error",
+      });
+    });
+
+    // `patterns` stays local because each row carries a user-toggled `selected`
+    // flag — but it is driven by the query, so an invalidation repaints the rows
+    // while preserving whatever the user had ticked.
+    watch(
+      builtInList.data,
+      (list: any) => {
+        if (!list) return;
+        const wasSelected = new Set(
+          patterns.value.filter((p: any) => p.selected).map((p: any) => p.name),
+        );
+        patterns.value = (list as BuiltInPattern[]).map((p: BuiltInPattern) => ({
+          ...p,
+          selected: wasSelected.has((p as any).name),
+        }));
+      },
+      { immediate: true },
+    );
+
     const selectedPatterns = computed(() => {
       return patterns.value.filter((p) => p.selected);
     });
@@ -329,28 +366,13 @@ export default defineComponent({
       error.value = "";
 
       try {
-        const orgId = store.state.selectedOrganization.identifier;
-
-        const shape = (list: BuiltInPattern[]) =>
-          list.map((p: BuiltInPattern) => ({ ...p, selected: false }));
 
         // `clearCache` is the manual refresh button — it must reach the server.
-        // Otherwise stale-while-revalidate: the cached rows stay on screen
-        // while the refetch runs.
-        let fetchedPatterns: BuiltInPattern[];
-        if (clearCache) {
-          loading.value = true;
-          fetchedPatterns = await builtInRegexPatternsQuery.refresh(orgId);
-        } else {
-          fetchedPatterns = await builtInRegexPatternsQuery.load({
-            org: orgId,
-            apply: (data) => (patterns.value = shape(data)),
-            loading,
-            fetching,
-          });
-        }
-
-        patterns.value = shape(fetchedPatterns);
+        // Otherwise `suspense()` settles from the cache without a request, which
+        // is what "cache hit" means here.
+        if (clearCache) await builtInList.refetch();
+        else await builtInList.suspense();
+        await nextTick();
 
         toast({
           message: t("regex_patterns.patterns_loaded", {

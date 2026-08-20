@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="showImportRegexPatternDialog"
       @cancel:hideform="showImportRegexPatternDialog = false"
       @update:list="refreshRegexPatterns"
-      :regex-patterns="regexPatterns.map((pattern) => pattern.name)"
+      :regex-patterns="regexPatterns.map((pattern: any) => pattern.name)"
     />
     <ConfirmDialog
       v-model="deleteDialog.show"
@@ -197,14 +197,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, onMounted, defineComponent, computed } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { regexPatternsQuery } from "@/services/regex_pattern.queries";
+import { regexPatternKeys } from "@/services/regex_pattern.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, onMounted, defineComponent, computed, watch } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { convertUnixToDateFormat } from "@/utils/zincutils";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import regexPatternsService, { regexPatternsQuery } from "@/services/regex_pattern";
+import regexPatternsService from "@/services/regex_pattern";
 import AddRegexPattern from "./AddRegexPattern.vue";
 import ImportRegexPattern from "./ImportRegexPattern.vue";
 import config from "@/aws-exports";
@@ -300,17 +305,30 @@ export default defineComponent({
       data: "" as any,
     });
 
-    const regexPatterns = ref<any[]>([]);
+    const orgIdForList = useOrgId();
+    const regexPatternsList = useQuery(() =>
+      Object.assign(regexPatternsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    // The list is the query, not a copy of it: any invalidation of the scope
+    // repaints these rows with no wiring here.
+    const regexPatterns = computed(() =>
+      (regexPatternsList.data.value ?? []).map((pattern: any) => ({
+        ...pattern,
+        created_at: convertUnixToDateFormat(pattern.created_at),
+        updated_at: convertUnixToDateFormat(pattern.updated_at),
+      })),
+    );
     const selectedPatterns: Ref<any[]> = ref([]);
     const confirmBulkDelete = ref(false);
     const bulkDeleteLoading = ref(false);
 
     const resultTotal = ref(0);
 
-    const listLoading = ref(false);
+    const listLoading = regexPatternsList.isPending;
     // Request in flight, with rows still on screen — the refresh button's
     // spinner. `listLoading` stays for the skeleton, which only a cold read wants.
-    const fetching = ref(false);
+    const fetching = regexPatternsList.isFetching;
 
     const showImportRegexPatternDialog = ref(false);
 
@@ -363,35 +381,30 @@ export default defineComponent({
     // Bound to refresh / "list changed" events: always hits the server.
     const refreshRegexPatterns = () => getRegexPatterns(true);
 
-    const applyRegexPatterns = (patterns: any[]) => {
-      regexPatterns.value = patterns.map((pattern: any) => ({
-        ...pattern,
-        created_at: convertUnixToDateFormat(pattern.created_at),
-        updated_at: convertUnixToDateFormat(pattern.updated_at),
-      }));
-      store.dispatch("setRegexPatterns", regexPatterns.value);
-      resultTotal.value = regexPatterns.value.length;
-    };
+    // Bridge for consumers still reading the Vuex copy.
+    watch(
+      regexPatterns,
+      (rows: any[]) => {
+        store.dispatch("setRegexPatterns", rows);
+        resultTotal.value = rows.length;
+      },
+      { immediate: true },
+    );
 
+    // The query owns its failure now, so this reports it once per error however
+    // the read was triggered.
+    watch(regexPatternsList.error, (error: any) => {
+      if (!error) return;
+      toast({
+        message: error.data?.message || t("settings.regexPatternList.errorFetching"),
+        variant: "error",
+      });
+    });
+
+    // `force` is only meaningful for an explicit refresh now: a write that
+    // invalidates the scope repaints these rows on its own.
     const getRegexPatterns = async (force = false) => {
-      try {
-        const org = store.state.selectedOrganization.identifier;
-        // `force` only bypasses staleTime — the rows on screen stay either way.
-        await regexPatternsQuery.load({
-          org,
-          apply: applyRegexPatterns,
-          loading: listLoading,
-          fetching,
-          force,
-        });
-      } catch (error: any) {
-        toast({
-          message: error.data.message || t("settings.regexPatternList.errorFetching"),
-          variant: "error",
-        });
-      } finally {
-        listLoading.value = false;
-      }
+      if (force) await regexPatternsList.refetch();
     };
 
     const editRegexPattern = (row: any) => {
@@ -414,11 +427,10 @@ export default defineComponent({
         // Drop the row from the cache first so it disappears now, not when the
         // refetch lands; the forced reload re-persists the corrected list.
         const deletedId = deleteDialog.value.data;
-        regexPatternsQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
+        queryClient.setQueriesData({ queryKey: regexPatternKeys.all(store.state.selectedOrganization.identifier) }, (list: any) =>
           Array.isArray(list)
             ? list.filter((p: any) => p.id !== deletedId && p.name !== deletedId)
-            : list,
-        );
+            : list);
         getRegexPatterns(true);
         toast({
           message: t("settings.regexPatternList.deletedSuccess"),

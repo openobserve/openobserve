@@ -14,8 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
 
 interface AkeylessStore {
   store: {
@@ -70,18 +68,3 @@ const cipherKeys = {
 };
 
 export default cipherKeys;
-
-/** Key material is a secret — cached in memory, never written to storage. */
-export const cipherKeysQuery = defineQuery<[], any[]>({
-  key: ["settings", "cipherKeys"],
-  fetch: async (org) => (await cipherKeys.list(org)).data?.keys ?? [],
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  scope: ["settings", "cipherKeys"],
-});
-
-export const cipherKeyDetailQuery = defineQuery<[name: string], any>({
-  key: (name) => ["settings", "cipherKeys", "detail", name],
-  fetch: async (org, name) => (await cipherKeys.get_by_name(org, name)).data,
-  scope: ["settings", "cipherKeys"],
-});

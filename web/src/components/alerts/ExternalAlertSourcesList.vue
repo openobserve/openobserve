@@ -279,6 +279,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { alertSourcesQuery } from "@/services/alert_sources.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -292,7 +294,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddExternalAlertSource from "./AddExternalAlertSource.vue";
-import alertSources, { alertSourcesQuery } from "@/services/alert_sources";
+import alertSources from "@/services/alert_sources";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { getAlertSourceStatus } from "@/utils/alertSourceStatus";
@@ -552,13 +554,17 @@ export default defineComponent({
       try {
         // `force` only bypasses staleTime — the rows on screen stay either way,
         // and the skeleton is reserved for a genuinely cold read.
-        this.loading = alertSourcesQuery.peek(this.orgIdentifier) === undefined;
+        const options = alertSourcesQuery(this.orgIdentifier);
+        // Paint what is already cached before the request goes out.
+        const cached = queryClient.getQueryData<any>(options.queryKey);
+        if (cached !== undefined) this.integrations = cached;
+        this.loading = cached === undefined;
         this.fetching = true;
-        await alertSourcesQuery.load({
-          org: this.orgIdentifier,
-          apply: (data: any) => (this.integrations = data),
-          force,
-        });
+        // Options API, so this reads imperatively rather than through useQuery.
+        // TODO: move to `useQuery` when this component moves to `setup()`.
+        this.integrations = await queryClient.fetchQuery(
+          force ? { ...options, staleTime: 0 } : options,
+        );
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       } finally {

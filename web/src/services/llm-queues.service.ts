@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "@/services/http";
-import { defineQuery } from "@/composables/query/queryClient";
 
 // ─── LLM Annotation · Queues ────────────────────────────────────────────────
 
@@ -449,10 +448,3 @@ const llmQueuesService = {
 };
 
 export default llmQueuesService;
-
-/** The annotation queues list, shared by the Queues page and the discovery view. */
-export const llmQueuesQuery = defineQuery<[], LlmQueue[]>({
-  key: ["llm", "queues", "list"],
-  fetch: (org) => llmQueuesService.list(org),
-  scope: ["llm", "queues"],
-});

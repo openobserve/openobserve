@@ -378,6 +378,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { licenseQuery } from "@/services/license_server.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -391,7 +393,6 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { licenseQuery } from "@/services/license_server";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -477,7 +478,7 @@ export default defineComponent({
       if (isEnterprise && hasLicense && !isCloud) {
         isLoadingLicense.value = true;
         try {
-          licenseData.value = await licenseQuery.get();
+          licenseData.value = await queryClient.fetchQuery(licenseQuery());
           // Generate dashboard after license data is fetched
           generateUsageDashboard();
         } catch (error) {

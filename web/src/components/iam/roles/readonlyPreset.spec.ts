@@ -6,11 +6,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/services/iam", async (importOriginal) => {
-  const { overlayServiceMock, queryStub } = await import("@/test/unit/helpers/mockService");
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   const getResources = vi.fn();
   return overlayServiceMock(await importOriginal(), {
     getResources,
-    resourcesQuery: queryStub(getResources),
     updateRole: vi.fn(),
   });
 });

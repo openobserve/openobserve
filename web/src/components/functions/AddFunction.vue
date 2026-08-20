@@ -173,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { saveFunctionMutation } from "@/services/jstransform.queries";
 import {
   defineComponent,
   ref,
@@ -184,7 +185,6 @@ import {
   nextTick,
 } from "vue";
 
-import jsTransformService from "../../services/jstransform";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -202,7 +202,8 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
-import { functionsQuery } from "@/services/jstransform";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
 export const defaultValue: any = () => {
   return {
     name: "",
@@ -327,6 +328,12 @@ export default defineComponent({
 
     const beingUpdated = computed(() => props.isUpdated);
 
+    // Create vs update is the caller's decision; the cache consequence is not.
+    const orgId = useOrgId();
+    const saveFunction = useMutation(() =>
+      saveFunctionMutation(orgId.value, () => beingUpdated.value),
+    );
+
     // AddFunction OWNS the <OForm> but also reads form state (transType drives
     // the Monaco editor language + placeholder) and writes it (the editor's
     // language toggle). The owner cannot inject the form it renders, so it
@@ -441,10 +448,9 @@ export default defineComponent({
       forceSkipBeforeUnloadListener = true;
 
       try {
-        const res = beingUpdated.value
-          ? await jsTransformService.update(store.state.selectedOrganization.identifier, payload)
-          : await jsTransformService.create(store.state.selectedOrganization.identifier, payload);
-        functionsQuery.invalidate(store.state.selectedOrganization.identifier);
+        // The write no longer knows what it invalidates — `saveFunctionMutation`
+        // declares that beside the endpoint, and the mutation cache applies it.
+        const res = await saveFunction.mutateAsync(payload);
 
         const _formData: any = { ...payload };
         formData.value = { ...defaultValue() };

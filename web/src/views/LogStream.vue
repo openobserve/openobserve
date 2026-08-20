@@ -375,6 +375,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { streamPageQuery } from "@/services/stream.queries";
+import { streamKeys } from "@/services/stream.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -410,7 +413,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { streamPageQuery } from "@/services/stream";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -701,13 +703,13 @@ export default defineComponent({
         // page revalidates, so only a cold cache spins and toasts.
         // Paint what is cached first even on a manual refresh — replacing the
         // table with a skeleton throws away rows the user is still reading.
-        const cachedPage = streamPageQuery.peek(org, type, params);
+        const cachedPage = queryClient.getQueryData(streamKeys.page(org, type, params));
         const painted = cachedPage !== undefined;
         if (painted) applyStreams(cachedPage);
         isRefreshing.value = true;
         const streamResponse = _refresh
-          ? streamPageQuery.refresh(org, type, params)
-          : streamPageQuery.get(org, type, params);
+          ? queryClient.fetchQuery({ ...streamPageQuery(org, type, params), staleTime: 0 })
+          : queryClient.fetchQuery(streamPageQuery(org, type, params));
 
         loadingState.value = !painted;
         const dismiss = painted
@@ -733,10 +735,10 @@ export default defineComponent({
 
             // Warm the next page so paging forward is a cache hit.
             if (params.offset + params.limit < res.total) {
-              streamPageQuery.prefetch(org, type, {
+              queryClient.prefetchQuery(streamPageQuery(org, type, {
                 ...params,
                 offset: params.offset + params.limit,
-              });
+              }));
             }
 
             dismiss();
@@ -965,7 +967,7 @@ export default defineComponent({
       // Prune every cached page, not just the one on screen: navigation is
       // cache-first, so a page still holding the deleted row would paint it
       // again — and inside staleTime nothing would refetch to correct it.
-      streamPageQuery.patchAll(store.state.selectedOrganization.identifier, (page: any) => {
+      queryClient.setQueriesData({ queryKey: streamKeys.all(store.state.selectedOrganization.identifier) }, (page: any) => {
         if (!page?.list) return page;
         const list = page.list.filter((s: any) => !removedKeys.has(`${s.name}-${s.stream_type}`));
         if (list.length === page.list.length) return page;

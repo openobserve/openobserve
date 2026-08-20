@@ -14,9 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 const modelPricing = {
   list: (org_identifier: string) => {
@@ -50,12 +47,3 @@ const modelPricing = {
 };
 
 export default modelPricing;
-
-export const modelPricingQuery = defineQuery<[], any[]>({
-  key: ["settings", "modelPricing"],
-  fetch: async (org) => (await modelPricing.list(org)).data ?? [],
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["settings", "modelPricing"],
-});

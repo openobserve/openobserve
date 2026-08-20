@@ -809,6 +809,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { alertDetailQuery } from "@/services/alerts.queries";
+import { alertsListQuery } from "@/services/alerts.queries";
+import { alertKeys } from "@/services/alerts.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { destinationsQuery } from "@/services/alert_destination.queries";
 import {
   defineComponent,
   ref,
@@ -832,7 +837,7 @@ import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
-import alertsService, { alertDetailQuery, alertsListQuery } from "@/services/alerts";
+import alertsService from "@/services/alerts";
 import {
   isSloAlert,
   isUnplaceableSloAlert,
@@ -883,7 +888,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { destinationsQuery } from "@/services/alert_destination";
+
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -1863,11 +1868,13 @@ export default defineComponent({
       // renderAlerts reports whether it rendered — the folder can change
       // mid-flight — so the paint is driven here rather than through `apply`.
       // Painted even on a manual refresh: the rows stay while the request runs.
-      const cachedRows = alertsListQuery.peek(org, folderId, query, alertType);
+      const cachedRows = queryClient.getQueryData<any[]>(
+        alertKeys.list(org, folderId, query, alertType),
+      );
       const painted = cachedRows ? renderAlerts(cachedRows) : false;
       const pending = force
-        ? alertsListQuery.refresh(org, folderId, query, alertType)
-        : alertsListQuery.get(org, folderId, query, alertType);
+        ? queryClient.fetchQuery({ ...alertsListQuery(org, folderId, query, alertType), staleTime: 0 })
+        : queryClient.fetchQuery(alertsListQuery(org, folderId, query, alertType));
 
       loading.value = !painted;
       fetching.value = true;
@@ -1961,7 +1968,7 @@ export default defineComponent({
         // Cached for the editor-open path only. The read-modify-write in
         // WorkflowLinkAlertsDialog deliberately still goes straight to the
         // service — a stale alert there would overwrite someone else's edit.
-        const data = await alertDetailQuery.get(store.state.selectedOrganization.identifier, id);
+        const data = await queryClient.fetchQuery(alertDetailQuery(store.state.selectedOrganization.identifier, id));
         dismiss();
         return data;
       } catch (error) {
@@ -2188,9 +2195,9 @@ export default defineComponent({
       { immediate: true }, // Run immediately to handle direct navigation
     );
     const getDestinations = async () => {
-      destinationsQuery
-        .get(store.state.selectedOrganization.identifier, "alert")
-        .then((list) => {
+      queryClient
+        .fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "alert"))
+        .then((list: any) => {
           destinations.value = list as any;
         })
         .catch(() =>

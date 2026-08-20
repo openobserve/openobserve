@@ -19,7 +19,9 @@ import { nextTick, ref } from "vue";
 import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import reports, { reportsQuery } from "@/services/reports";
+import reports from "@/services/reports";
+import { reportKeys } from "@/services/reports.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import * as vueRouter from "vue-router";
 
 // Mock vue-router
@@ -284,7 +286,9 @@ describe("ReportList Component", () => {
 
       // Mark the shared reports query stale so this mount really calls the API
       // instead of being served from an earlier test's cached result.
-      reportsQuery.invalidate(store.state.selectedOrganization.identifier);
+      queryClient.invalidateQueries({
+        queryKey: reportKeys.all(store.state.selectedOrganization.identifier),
+      });
 
       const newWrapper = mount(ReportList, {
         global: {

@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery, stableFilters } from "@/composables/query/queryClient";
 import type {
   CompositeAlertValidationRequest,
   CompositeAlertValidationResponse,
@@ -317,48 +316,6 @@ const alerts = {
 
 export default alerts;
 
-/**
- * Alerts for one folder, or a name search across all of them. The folder, the
- * search term and the tab's `alert_type` are all applied by the server, so all
- * three are in the key — searches used to bypass the cache entirely.
- *
- * An absent type normalises to "all", which is what the server falls back to
- * when `alert_type` is omitted — so the mount read and the "all" tab share one
- * entry instead of issuing the same request twice.
- */
-export const alertsListQuery = defineQuery<
-  [folderId: string, query?: string, alertType?: string],
-  any[]
->({
-  key: (folderId, query, alertType) =>
-    query
-      ? ["alerts", "search", folderId || "__all__", { q: query, type: alertType || "all" }]
-      : ["alerts", "list", folderId, alertType || "all"],
-  fetch: async (org, folderId, query, alertType) =>
-    (
-      await alerts.listByFolderId(
-        1,
-        1000,
-        "name",
-        false,
-        "",
-        org,
-        folderId,
-        query ?? "",
-        alertType ?? "",
-      )
-    ).data?.list ?? [],
-  refetchOnWindowFocus: true,
-  scope: ["alerts"],
-});
-
-/** Opened for edit. The read-modify-write in WorkflowLinkAlertsDialog stays uncached. */
-export const alertDetailQuery = defineQuery<[alertId: string], any>({
-  key: (id) => ["alerts", "detail", id],
-  fetch: async (org, id) => (await alerts.get_by_alert_id(org, id)).data,
-  scope: ["alerts"],
-});
-
 export interface AlertHistoryQuery {
   // string | number because the callers build these differently and the wrapper
   // must not change what any of them sends.
@@ -371,11 +328,3 @@ export interface AlertHistoryQuery {
   sort_order?: string;
   [extra: string]: unknown;
 }
-
-/** Server-paginated; every server-applied parameter is in the key. */
-export const alertHistoryQuery = defineQuery<[query: AlertHistoryQuery], any>({
-  key: (query) => ["alerts", "history", query.alert_id ?? "__all__", stableFilters(query as any)],
-  fetch: async (org, query) => (await alerts.getHistory(org, query)).data ?? {},
-  refetchOnWindowFocus: true,
-  scope: ["alerts", "history"],
-});

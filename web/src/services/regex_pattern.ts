@@ -14,13 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import {
-  CONFIG_STALE_TIME,
-  LONG_GC_TIME,
-  SESSION_STALE_TIME,
-} from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 type PatternPayload = {
   name: string;
   pattern: string;
@@ -68,22 +61,3 @@ const regexPatterns = {
 };
 
 export default regexPatterns;
-
-export const regexPatternsQuery = defineQuery<[], any[]>({
-  key: ["settings", "regexPatterns"],
-  fetch: async (org) => (await regexPatterns.list(org)).data?.patterns ?? [],
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["settings", "regexPatterns"],
-});
-
-/** Ships with the release, so static for the session. Replaces RegexPatternCache. */
-export const builtInRegexPatternsQuery = defineQuery<[], any[]>({
-  key: ["settings", "builtInRegexPatterns"],
-  fetch: async (org) => (await regexPatterns.getBuiltInPatterns(org)).data.patterns ?? [],
-  staleTime: SESSION_STALE_TIME,
-  gcTime: SESSION_STALE_TIME,
-  persister: localStoragePersister,
-  scope: ["settings", "builtInRegexPatterns"],
-});

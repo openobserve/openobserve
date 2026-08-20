@@ -14,9 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 const destination = {
   create: ({ org_identifier, data, module }: any) => {
@@ -72,26 +69,3 @@ const destination = {
 };
 
 export default destination;
-
-export type DestinationModule = "alert" | "pipeline";
-
-/** Read by the alert form, pipelines and IAM — hence the persisted tier. */
-export const destinationsQuery = defineQuery<[module?: DestinationModule], any[]>({
-  key: (module) => ["alerts", "destinations", module ?? "all"],
-  fetch: async (org, module) =>
-    (
-      await destination.list({
-        page_num: 1,
-        page_size: 100000,
-        sort_by: "name",
-        desc: false,
-        org_identifier: org,
-        module,
-      })
-    ).data ?? [],
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  // Prefix, not the exact module: an edit can move a destination between modules.
-  scope: ["alerts", "destinations"],
-});

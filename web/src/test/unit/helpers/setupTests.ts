@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // @ts-ignore
+import { queryClient } from "@/composables/query/queryClient";
 import { beforeAll, afterEach, afterAll, vi } from "vitest";
 
 import { setupServer } from "msw/node";
@@ -28,6 +29,17 @@ import "../../__mocks__/index";
 import i18n from "@/locales";
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
+// Mirrors main.ts: components call `useQuery`/`useMutation` with no explicit
+// client, so the plugin has to provide one. It is the app's own client — the
+// same instance this file already configures (retry off) and clears after every
+// test, so nothing leaks between specs.
+import { VueQueryPlugin } from "@tanstack/vue-query";
+import { queryClient as appQueryClient } from "@/composables/query/queryClient";
+config.global.plugins = [
+  ...(config.global.plugins ?? []),
+  [VueQueryPlugin, { queryClient: appQueryClient }],
+];
+
 import { restHandlers } from "./handlers";
 
 // Wire the badge registry's i18n resolver for tests WITHOUT pulling in vue-i18n
@@ -35,7 +47,6 @@ import { restHandlers } from "./handlers";
 // registry-labelled badges render real text in component tests.
 import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
 import enMessages from "@/locales/languages/en-US.json";
-import { queryClient } from "@/composables/query/queryClient";
 import { purgeAllPersisted } from "@/composables/query/persisters";
 setBadgeTranslator(
   (key: string) =>

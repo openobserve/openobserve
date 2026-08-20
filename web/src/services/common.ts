@@ -1,7 +1,4 @@
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 const common = {
   list_Folders: (organization: string, folder_type: string) => {
@@ -44,34 +41,3 @@ export interface Folder {
   description?: string;
   [extra: string]: unknown;
 }
-
-const DEFAULT_FOLDER: Folder = { name: "default", folderId: "default", description: "default" };
-
-/** "default" first, then the rest alphabetically — the order the sidebar expects. */
-const normalizeFolders = (list: Folder[]): Folder[] => {
-  const defaultFolder = list.find((f) => f.folderId === "default") ?? DEFAULT_FOLDER;
-  const rest = list
-    .filter((f) => f.folderId !== "default")
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return [defaultFolder, ...rest];
-};
-
-/** Needed before the sidebar can paint on Dashboards, Alerts, Reports and Synthetics. */
-export const foldersQuery = defineQuery<[type: string], Folder[]>({
-  key: (type) => ["folders", type],
-  fetch: async (org, type) =>
-    normalizeFolders((await common.list_Folders(org, type)).data.list ?? []),
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["folders"],
-});
-
-export const nodesQuery = defineQuery<[], any>({
-  key: ["settings", "nodes"],
-  fetch: async (org) => (await common.list_nodes(org)).data,
-  // Not persisted: stale cluster state is more confusing than a second of loading.
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  scope: ["settings", "nodes"],
-});

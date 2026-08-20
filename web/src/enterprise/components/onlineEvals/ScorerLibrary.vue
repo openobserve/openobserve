@@ -121,6 +121,8 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
+import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -130,11 +132,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
-  scoreConfigsQuery,
-  type Provider,
-  type ScoreConfig,
-} from "@/services/online-evals.service";
+import onlineEvalsService, { type Provider, type ScoreConfig } from "@/services/online-evals.service";
 import {
   fetchOnlineEvalsCatalog,
   type CatalogScoreConfig,
@@ -318,7 +316,7 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
     );
   } catch (err: any) {
     if (err?.response?.status === 409) {
-      const refreshed = await scoreConfigsQuery.refresh(props.orgId);
+      const refreshed = await queryClient.fetchQuery({ ...scoreConfigsQuery(props.orgId), staleTime: 0 });
       const found = refreshed.find((row) => row.name === name);
       if (found) return found;
     }

@@ -14,9 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 const template = {
   create: ({ org_identifier, data }: any) => {
@@ -56,12 +53,3 @@ const template = {
 };
 
 export default template;
-
-export const templatesQuery = defineQuery<[], any[]>({
-  key: ["alerts", "templates"],
-  fetch: async (org) => (await template.list({ org_identifier: org })).data ?? [],
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["alerts", "templates"],
-});

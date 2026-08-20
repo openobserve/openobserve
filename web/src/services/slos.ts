@@ -16,7 +16,6 @@
 import { gt } from "@/types/i18n";
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
 
 /**
  * Reject when the body carries an error code, even on HTTP 200.
@@ -115,16 +114,3 @@ const slos = {
 };
 
 export default slos;
-
-export const slosQuery = defineQuery<[folder?: string], any[]>({
-  key: (folder) => ["slos", "list", folder ?? "all"],
-  fetch: async (org, folder) => (await slos.list(org, folder)).data?.list ?? [],
-  refetchOnWindowFocus: true,
-  scope: ["slos"],
-});
-
-export const sloDetailQuery = defineQuery<[sloId: string], any>({
-  key: (id) => ["slos", "detail", id],
-  fetch: async (org, id) => (await slos.get(org, id)).data,
-  scope: ["slos"],
-});

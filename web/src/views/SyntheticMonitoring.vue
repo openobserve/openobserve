@@ -343,7 +343,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { syntheticsKeys } from "@/services/synthetics.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useQuery } from "@tanstack/vue-query";
+import { syntheticsMonitorsQuery } from "@/services/synthetics.queries";
+import { ref, computed, onMounted, watch , nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -380,7 +384,7 @@ import { CHECK_TYPE_CARDS } from "@/constants/synthetics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import syntheticsService, { syntheticsMonitorsQuery } from "@/services/synthetics";
+import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import {
   syntheticsCreateRoute,
@@ -480,14 +484,25 @@ type DisplayMonitor = ReturnType<typeof mapMonitor>;
 // ── Data loading ───────────────────────────────────────────────────────
 // Start in loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
-const loading = ref(true);
-// Request in flight, with rows still on screen — the refresh button's
-// spinner. `loading` stays for the skeleton, which only a cold read wants.
-const fetching = ref(false);
-
+// The folder a read is currently aimed at. `loadMonitors` may be handed a
+// folder the route refs have not caught up with, and "search across folders"
+// means *no* folder, so the key tracks this rather than `activeFolderId`.
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
 );
+
+const readFolder = ref<string | undefined>(undefined);
+
+const monitorsList = useQuery(() =>
+  Object.assign(syntheticsMonitorsQuery(orgIdentifier.value, readFolder.value), {
+    enabled: !!orgIdentifier.value,
+  }),
+);
+
+const loading = monitorsList.isPending;
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = monitorsList.isFetching;
 
 /** Resolves once orgIdentifier is populated — on browser back-navigation the
  *  store may not be hydrated synchronously yet. */
@@ -503,7 +518,7 @@ function waitForOrgIdentifier(): Promise<void> {
   });
 }
 
-async function loadMonitors(folderId?: string, force = false) {
+async function loadMonitors(folderId?: string, _force = false) {
   if (!orgIdentifier.value) return;
   const targetFolder =
     folderId !== undefined
@@ -511,19 +526,10 @@ async function loadMonitors(folderId?: string, force = false) {
       : searchAcrossFolders.value
         ? undefined
         : activeFolderId.value;
-  try {
-    // `force` only bypasses staleTime — the rows on screen stay either way.
-    await syntheticsMonitorsQuery.load({
-      org: orgIdentifier.value,
-      args: [targetFolder],
-      apply: (data) => (monitors.value = data.map(mapMonitor)),
-      loading: loading,
-      fetching,
-      force,
-    });
-  } finally {
-    loading.value = false;
-  }
+  readFolder.value = targetFolder;
+  // Let the key pick up the new folder before asking for the data.
+  await nextTick();
+  await monitorsList.refetch();
 }
 
 async function initPage() {
@@ -814,7 +820,11 @@ async function loadLocations() {
   }
 }
 
-const monitors = ref<DisplayMonitor[]>([]);
+// The list is the query, not a copy of it: a monitor write invalidates the
+// synthetics scope and these rows repaint with no wiring here.
+const monitors = computed<DisplayMonitor[]>(() =>
+  (monitorsList.data.value ?? []).map(mapMonitor),
+);
 
 // Enrich monitors with folder names from Vuex store
 const enrichedMonitors = computed(() => {
@@ -1296,7 +1306,12 @@ async function deleteMonitor(m: any) {
   });
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value);
-    monitors.value = monitors.value.filter((mon) => String(mon.id) !== String(m.id));
+    // Drop it from the cached entry rather than waiting for the invalidation's
+  // refetch to repaint.
+  queryClient.setQueryData<any[]>(
+    syntheticsKeys.monitors(orgIdentifier.value, readFolder.value),
+    (old) => (old ?? []).filter((mon: any) => String(mon.id) !== String(m.id)),
+  );
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.deleteSuccessSingle") });
   } catch (err: any) {

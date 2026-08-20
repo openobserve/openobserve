@@ -552,6 +552,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
+import { configQuery } from "@/services/config.queries";
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -573,8 +576,6 @@ import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
-import { configQuery } from "@/services/config";
-import { orgSummaryQuery } from "@/services/organizations";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -637,8 +638,7 @@ const getSummary = (org_id: any) => {
     message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
     timeout: 0,
   });
-  orgSummaryQuery
-    .get(org_id)
+  queryClient.fetchQuery(orgSummaryQuery(org_id))
     .then((data: any) => {
       const res = { data };
       if (
@@ -960,7 +960,7 @@ onMounted(() => {
 
 const refreshConfig = async () => {
   try {
-    store.dispatch("setConfig", await configQuery.refresh());
+    store.dispatch("setConfig", await queryClient.fetchQuery({ ...configQuery(), staleTime: 0 }));
   } catch (error) {
     console.log(error);
   }

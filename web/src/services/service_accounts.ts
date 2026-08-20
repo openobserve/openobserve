@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
 
 const service_accounts = {
   list: (org_identifier: string) => {
@@ -37,10 +36,3 @@ const service_accounts = {
   },
 };
 export default service_accounts;
-
-export const serviceAccountsQuery = defineQuery<[], any[]>({
-  key: ["iam", "serviceAccounts"],
-  fetch: async (org) => (await service_accounts.list(org)).data?.data ?? [],
-  refetchOnWindowFocus: true,
-  scope: ["iam", "serviceAccounts"],
-});

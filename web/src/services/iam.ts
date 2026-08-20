@@ -1,7 +1,4 @@
 import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 // ----------- Groups -------------
 export const getGroups = (org_identifier: string) => {
@@ -116,38 +113,3 @@ export const getAllRolePermissions = ({
   const url = `/api/${org_identifier}/roles/${role_name}/permissions`;
   return http().get(url);
 };
-
-/**
- * Groups and roles are read from six places — both list pages, the role editor,
- * the group editor, the service-account form and the quota page.
- */
-export const groupsQuery = defineQuery<[], any>({
-  key: ["iam", "groups"],
-  fetch: async (org) => (await getGroups(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["iam", "groups"],
-});
-
-export const rolesQuery = defineQuery<[], any>({
-  key: ["iam", "roles"],
-  fetch: async (org) => (await getRoles(org)).data,
-  refetchOnWindowFocus: true,
-  scope: ["iam", "roles"],
-});
-
-/** Enum-like: it enumerates what the product can grant permissions on. */
-export const resourcesQuery = defineQuery<[], any>({
-  key: ["iam", "resources"],
-  fetch: async (org) => (await getResources(org)).data,
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["iam", "resources"],
-});
-
-export const rolePermissionsQuery = defineQuery<[roleName: string], any>({
-  key: (roleName) => ["iam", "roles", "permissions", roleName],
-  fetch: async (org, roleName) =>
-    (await getAllRolePermissions({ role_name: roleName, org_identifier: org })).data,
-  scope: ["iam", "roles"],
-});
