@@ -61,9 +61,14 @@ watch(
     rangeEnd.value = props.endTime;
   },
 );
+let dateReady = false;
 const onDateChange = (d: { startTime: number; endTime: number }) => {
-  rangeStart.value = Number.isFinite(d.startTime) ? Math.trunc(d.startTime) : rangeStart.value;
-  rangeEnd.value = Number.isFinite(d.endTime) ? Math.trunc(d.endTime) : rangeEnd.value;
+  if (!dateReady) return;
+  const s = Number.isFinite(d.startTime) ? Math.trunc(d.startTime) : rangeStart.value;
+  const e = Number.isFinite(d.endTime) ? Math.trunc(d.endTime) : rangeEnd.value;
+  if (s === rangeStart.value && e === rangeEnd.value) return;
+  rangeStart.value = s;
+  rangeEnd.value = e;
   loadEvents();
 };
 
@@ -585,6 +590,7 @@ async function restoreEventDetail() {
 
 watch(pageSize, () => goToPage(0));
 onMounted(async () => {
+  dateReady = true;
   await loadEvents();
   await restoreEventDetail();
 });

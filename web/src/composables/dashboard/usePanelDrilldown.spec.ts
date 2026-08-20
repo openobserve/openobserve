@@ -182,11 +182,15 @@ describe("usePanelDrilldown", () => {
     expect(deps.drilldownPopUpRef.value.style.left).toContain("px");
   });
 
-  it("fetches cross-links through result schema watch", async () => {
+  it("fetches cross-links lazily on the first drilldown interaction, not on panel render", async () => {
     const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);
 
     await nextTick();
+    // Lazy: a panel render (dashboard refresh) must NOT fire result_schema.
+    expect(resultSchemaMock).not.toHaveBeenCalled();
+
+    await api.ensureDrilldownSchema();
 
     expect(resultSchemaMock).toHaveBeenCalledTimes(1);
     expect(api.crossLinksData.value.stream_links).toHaveLength(1);
@@ -198,6 +202,7 @@ describe("usePanelDrilldown", () => {
 
     const api = usePanelDrilldown(deps as any);
     await nextTick();
+    await api.ensureDrilldownSchema();
 
     expect(resultSchemaMock).not.toHaveBeenCalled();
     expect(api.crossLinksData.value).toEqual({ stream_links: [], org_links: [] });
@@ -269,7 +274,7 @@ describe("usePanelDrilldown", () => {
     });
     const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);
-    await flush();
+    await api.ensureDrilldownSchema();
 
     expect(api.panelWhereByStream.value).toEqual({
       stream_a: "env = 'prod'",
@@ -286,8 +291,50 @@ describe("usePanelDrilldown", () => {
     });
     const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);
-    await flush();
+    await api.ensureDrilldownSchema();
 
+    expect(api.panelBaseWhere.value).toBe("level = 'error'");
+  });
+
+  it("fetches per clicked query index for multi-query panels (2nd-query cell fires result_schema)", async () => {
+    // result_schema returns a WHERE keyed off the SQL it was sent, so we can tell the two apart.
+    resultSchemaMock.mockImplementation((payload: any) => {
+      const sql = payload?.query?.query?.sql ?? "";
+      return Promise.resolve({
+        data: {
+          where_clause: sql.includes("stream_b") ? "region = 'us'" : "level = 'error'",
+          cross_links: { stream_links: [], org_links: [] },
+        },
+      });
+    });
+
+    const deps = makeDeps();
+    deps.panelSchema.value.queries = [
+      { fields: { stream: "stream_a", stream_type: "logs" }, query: "select * from stream_a" },
+      { fields: { stream: "stream_b", stream_type: "logs" }, query: "select * from stream_b" },
+    ] as any;
+    deps.metadata.value.queries = [
+      { query: "select * from stream_a where level = 'error'" },
+      { query: "select * from stream_b where region = 'us'" },
+    ] as any;
+
+    const api = usePanelDrilldown(deps as any);
+
+    // Click a query-0 cell.
+    await api.ensureDrilldownSchema(0);
+    expect(api.panelBaseWhere.value).toBe("level = 'error'");
+
+    // Click a query-1 cell — must fire a fresh result_schema for query 1, not reuse query 0's cache.
+    await api.ensureDrilldownSchema(1);
+    expect(resultSchemaMock).toHaveBeenCalledTimes(2);
+    expect(api.panelBaseWhere.value).toBe("region = 'us'");
+    // The query-1 request carried query 1's SQL.
+    const secondCallSql = resultSchemaMock.mock.calls[1][0]?.query?.query?.sql ?? "";
+    expect(secondCallSql).toContain("stream_b");
+
+    // Re-clicking query 0 hits the cache (no third call).
+    await api.ensureDrilldownSchema(0);
+    expect(resultSchemaMock).toHaveBeenCalledTimes(2);
     expect(api.panelBaseWhere.value).toBe("level = 'error'");
   });
 });

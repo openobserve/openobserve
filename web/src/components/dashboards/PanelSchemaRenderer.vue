@@ -1545,6 +1545,7 @@ export default defineComponent({
       getCellDrilldownField,
       panelBaseWhere,
       panelWhereByStream,
+      ensureDrilldownSchema,
     } = usePanelDrilldown({
       panelSchema,
       variablesData,
@@ -1749,31 +1750,25 @@ export default defineComponent({
       }
     }
 
-    // Panel query's WHERE clause (between WHERE and GROUP/ORDER/LIMIT/HAVING/WINDOW).
-    function extractPanelWhere(sql: string): string {
-      if (!sql) return "";
-      const m =
-        /\bwhere\b([\s\S]+?)(?:\bgroup\s+by\b|\border\s+by\b|\blimit\b|\bhaving\b|\bwindow\b|$)/i.exec(
-          sql,
-        );
-      return m ? m[1].trim() : "";
-    }
-
     // Called directly by the search icon so it works even with a panel drilldown config.
-    function exploreCellInLogs(alias: string, value: unknown, row: any) {
+    async function exploreCellInLogs(alias: string, value: unknown, row: any) {
       const queries = props.panelSchema.queries ?? [];
       const qi = Number.isInteger(row?.__q) && queries[row.__q] ? row.__q : 0;
       const query = queries[qi];
       const executedSql = String(metadata.value?.queries?.[qi]?.query ?? query?.query ?? "");
+
+      // Panel WHERE is fetched lazily (not on panel render) — resolve it for THIS query
+      await ensureDrilldownSchema(qi);
 
       const cell = getCellDrilldownField(qi, alias);
       const stream = cell?.streamName ?? query?.fields?.stream ?? query?.stream ?? "";
       const streamType =
         cell?.streamType ?? query?.fields?.stream_type ?? query?.stream_type ?? "logs";
       const realField = cell?.column ?? resolveAliasToColumn(alias, query, executedSql);
+      // Base WHERE is BE-only (result_schema); no FE fallback — if the BE gives none, use none.
       const baseWhere = cell?.isJoin
         ? (panelWhereByStream.value[cell.streamName] ?? "")
-        : panelBaseWhere.value || extractPanelWhere(executedSql);
+        : panelBaseWhere.value;
 
       const metaStartµs = Number(metadata.value?.queries?.[qi]?.startTime ?? 0);
       const metaEndµs = Number(metadata.value?.queries?.[qi]?.endTime ?? 0);
