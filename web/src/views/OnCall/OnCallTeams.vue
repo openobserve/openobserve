@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <OTable
-        :error="loadError"
+      :error="loadError"
       :frame="false"
       :data="filteredTeams"
       :columns="columns"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="search"
             class="flex-1"
             clearable
-            :placeholder="t('oncall.searchTeams')"
+            :placeholder="t('oncall.searchTeamsPeople')"
             data-test="oncall-teams-search"
           />
         </div>
@@ -97,29 +97,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- The question this page is really asked: if something breaks now, who
-           wakes up? Without it, coverage gaps are only findable one team at a
-           time. -->
-      <template #cell-on_call_now="{ row }">
+           wakes up? Two columns rather than one stacked cell — a primary and a
+           secondary in one box read as one long address, and neither could be
+           sorted or scanned down the page on its own. -->
+      <template #cell-primary="{ row }">
         <span v-if="onCallByTeam[row.id] === undefined" class="text-text-muted text-sm">
           {{ t("oncall.loadingShort") }}
         </span>
+        <!-- Nobody in the primary pool is this page's one alarm, and it was
+             invisible while a staffed secondary filled the cell they shared. -->
         <OTag
-          v-else-if="!onCallByTeam[row.id].length"
+          v-else-if="!(slotsByTeam[row.id]?.primary.length ?? 0)"
           type="oncallCoverage"
           value="gap"
           size="sm"
+          :data-test="`oncall-teams-primary-gap-${row.id}`"
         />
-        <!-- One entry PER SLOT: two bare emails joined by a space read as one
-             long address, and said nothing about which pool each holds. -->
+        <span v-else class="flex flex-col gap-0.5">
+          <OUserCell
+            v-for="slot in slotsByTeam[row.id]?.primary ?? []"
+            :key="slot.user_email"
+            :value="slot.user_email"
+          />
+        </span>
+      </template>
+
+      <template #cell-secondary="{ row }">
+        <span v-if="onCallByTeam[row.id] === undefined" class="text-text-muted text-sm">
+          {{ t("oncall.loadingShort") }}
+        </span>
+        <!-- A team with no second pool is ordinary, not a gap: a muted dash,
+             not the alarm colour the primary column spends. -->
+        <span v-else-if="!(slotsByTeam[row.id]?.backup.length ?? 0)" class="text-text-muted">
+          {{ raw("—") }}
+        </span>
         <span v-else class="flex flex-col gap-0.5">
           <span
-            v-for="slot in onCallByTeam[row.id]"
+            v-for="slot in slotsByTeam[row.id]?.backup ?? []"
             :key="slot.user_email"
             class="flex flex-wrap items-center gap-1.5"
           >
             <OUserCell :value="slot.user_email" />
+            <!-- The header already says "secondary". Only a pool the header
+                 does not name has to announce itself. -->
             <OTag
-              v-if="slot.slot && !sameSlot(slot.slot, DEFAULT_SLOT)"
+              v-if="slot.slot && !sameSlot(slot.slot, SECONDARY_SLOT)"
               variant="default-soft"
               size="sm"
               :data-test="`oncall-teams-slot-${row.id}-${slot.slot}`"
@@ -207,11 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
 
-    <OnCallTeamForm
-      v-model:open="formOpen"
-      :team="editingTeam"
-      @saved="onSaved"
-    />
+    <OnCallTeamForm v-model:open="formOpen" :team="editingTeam" @saved="onSaved" />
 
     <!-- Named in the prompt: deleting the wrong rotation silently stops
          paging, and the team name is the only thing that distinguishes two
@@ -242,7 +260,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import oncallService from "@/services/oncall";
 import type { OnCallSlot, OnCallTeam } from "@/ts/interfaces/oncall";
 import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
@@ -271,53 +289,107 @@ const onCallByTeam = ref<Record<string, OnCallSlot[]>>({});
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => [
-  {
-    id: "name",
-    header: t("oncall.teamName"),
-    accessorKey: "name",
-    sortable: true,
-    meta: { isName: true },
-  },
-  {
-    // The question this page is really asked: if something breaks now, who
-    // wakes up? Without it, coverage gaps are only findable one team at a time.
-    id: "on_call_now",
-    header: t("oncall.onCallNow"),
-    size: 240,
-    enableSorting: false,
-    accessorFn: (row: OnCallTeam) => row.id,
-  },
-  {
-    id: "actions",
-    header: t("oncall.actions"),
-    isAction: true,
-    sortable: false,
-    size: 160,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
-  },
-  {
-    id: "timezone",
-    header: t("oncall.timezone"),
-    accessorKey: "timezone",
-    sortable: true,
-    hideable: true,
-  },
-  {
-    id: "description",
-    header: t("oncall.description"),
-    accessorFn: (row: OnCallTeam) => row.description || "—",
-    hideable: true,
-  },
-]);
+// `slot` is an open vocabulary: "primary" is the default and the backend
+// auto-staffs "secondary", but a team can declare its own pool. So the split is
+// primary vs everything-else — a third pool keeps its name and stays on the
+// page rather than being dropped by a column that only knows two.
+const SECONDARY_SLOT = "secondary";
+
+const slotsByTeam = computed<Record<string, { primary: OnCallSlot[]; backup: OnCallSlot[] }>>(() =>
+  Object.fromEntries(
+    Object.entries(onCallByTeam.value).map(([teamId, held]) => [
+      teamId,
+      {
+        primary: held.filter((slot) => sameSlot(slot.slot, DEFAULT_SLOT)),
+        backup: held.filter((slot) => !sameSlot(slot.slot, DEFAULT_SLOT)),
+      },
+    ]),
+  ),
+);
+
+const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => {
+  // Read the split HERE rather than inside the accessor: the sort key has to
+  // change with the rotations, and a closure that reads the ref lazily leaves
+  // the table ordered on what it knew before the rotations landed.
+  const held = slotsByTeam.value;
+  const holders = (teamId: string, pool: "primary" | "backup") =>
+    (held[teamId]?.[pool] ?? []).map((slot) => slot.user_email).join(", ");
+
+  return [
+    {
+      id: "name",
+      header: t("oncall.teamName"),
+      accessorKey: "name",
+      sortable: true,
+      size: COL.name,
+      minSize: 160,
+      meta: { isName: true },
+    },
+    {
+      // Sorted ascending an unstaffed pool has no holder to sort by, so the
+      // gaps float to the top — the rows worth finding first.
+      id: "primary",
+      header: t("oncall.rolePrimary"),
+      size: 220,
+      minSize: 180,
+      sortable: true,
+      accessorFn: (row: OnCallTeam) => holders(row.id, "primary"),
+    },
+    {
+      id: "secondary",
+      header: t("oncall.roleSecondary"),
+      size: 220,
+      minSize: 180,
+      sortable: true,
+      hideable: true,
+      accessorFn: (row: OnCallTeam) => holders(row.id, "backup"),
+    },
+    {
+      id: "timezone",
+      header: t("oncall.timezone"),
+      accessorKey: "timezone",
+      sortable: true,
+      hideable: true,
+      size: 170,
+    },
+    {
+      id: "description",
+      header: t("oncall.description"),
+      accessorFn: (row: OnCallTeam) => row.description || "—",
+      sortable: true,
+      hideable: true,
+      size: COL.description,
+      minSize: 200,
+      // Free text and the widest value in the row, so it absorbs the leftover
+      // width instead of every fixed column being stretched to fill it.
+      meta: { flex: true },
+    },
+    {
+      // Declared last because it renders last — OTable pins an action column to
+      // the right edge. No `size`: OTable derives the exact width from the icon
+      // count, and any number we pass can only make it wider than the buttons.
+      id: "actions",
+      header: t("oncall.actions"),
+      isAction: true,
+      sortable: false,
+      meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+    },
+  ];
+});
 
 const filteredTeams = computed(() => {
   const q = search.value.trim().toLowerCase();
   if (!q) return teams.value;
-  return teams.value.filter(
-    (team) =>
-      team.name.toLowerCase().includes(q) ||
-      (team.description ?? "").toLowerCase().includes(q),
+  return teams.value.filter((team) =>
+    [
+      team.name,
+      team.description ?? "",
+      team.timezone,
+      // "Which team would page Priya right now" is a question this list can
+      // answer in one keystroke; without the holders it costs a drill-in per
+      // team, which is the same search done by hand.
+      ...(onCallByTeam.value[team.id] ?? []).map((slot) => slot.user_email),
+    ].some((field) => field.toLowerCase().includes(q)),
   );
 });
 

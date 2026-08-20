@@ -181,6 +181,45 @@ describe("OnCallTeams", () => {
     expect(cell.findComponent({ name: "OTag" }).props("value")).toBe("gap");
   });
 
+  /// The gap that used to hide: a team whose secondary is staffed but whose
+  /// primary is empty filled the single shared cell and read as covered.
+  it("flags a missing primary even when the secondary is staffed", async () => {
+    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+    service.whoIsOnCall.mockResolvedValue({
+      data: [{ slot: "secondary", rotation: "r1", user_email: "backup@example.com" }],
+    } as any);
+
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-teams-primary-gap-team_1"]').exists()).toBe(true);
+    expect(onCallCell(wrapper).findComponent({ name: "OUserCell" }).props("value")).toBe(
+      "backup@example.com",
+    );
+  });
+
+  /// `slot` is an open vocabulary, so two fixed columns must not silently drop
+  /// the third pool a team declared.
+  it("keeps a pool neither column is named after", async () => {
+    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+    service.whoIsOnCall.mockResolvedValue({
+      data: [
+        { slot: "primary", rotation: "r1", user_email: "primary@example.com" },
+        { slot: "db-oncall", rotation: "r2", user_email: "dba@example.com" },
+      ],
+    } as any);
+
+    const wrapper = render();
+    await flushPromises();
+
+    const emails = wrapper
+      .findAllComponents({ name: "OUserCell" })
+      .map((cell: any) => cell.props("value"));
+    expect(emails).toEqual(["primary@example.com", "dba@example.com"]);
+    // The pool keeps its own name rather than being filed under "Secondary".
+    expect(wrapper.find('[data-test="oncall-teams-slot-team_1-db-oncall"]').exists()).toBe(true);
+  });
+
   /// "We could not load it" and "nobody is on call" are different claims, and
   /// showing the second for the first sends someone chasing a phantom gap.
   it("does not call a failed lookup a coverage gap", async () => {
@@ -211,9 +250,7 @@ describe("OnCallTeams", () => {
     await flushPromises();
 
     wrapper.findComponent({ name: "OTable" }).vm.$emit("row-click", team("team_1", "Platform"));
-    expect(push).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "onCallTeamDetail" }),
-    );
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallTeamDetail" }));
   });
 
   /// Named in review: every mistake was permanent, because the delete endpoint
@@ -333,7 +370,12 @@ describe("OnCallTeams", () => {
           reached_anyone: true,
           channels: ["email"],
           attempts: [
-            { channel: "email", recipient: "engineer@example.com", reason: "on call now", delivered: true },
+            {
+              channel: "email",
+              recipient: "engineer@example.com",
+              reason: "on call now",
+              delivered: true,
+            },
           ],
         },
       } as any);
@@ -342,9 +384,7 @@ describe("OnCallTeams", () => {
       await wrapper.find('[data-test="oncall-team-test-page-team_1"]').trigger("click");
       await flushPromises();
 
-      expect(service.testPage).toHaveBeenCalledWith(
-        expect.objectContaining({ team_id: "team_1" }),
-      );
+      expect(service.testPage).toHaveBeenCalledWith(expect.objectContaining({ team_id: "team_1" }));
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success", message: expect.stringContaining("1") }),
       );
