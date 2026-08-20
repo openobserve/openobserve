@@ -142,7 +142,7 @@ export default class DashboardDrilldownPage {
    * @param {string} baseTestId - e.g. "dashboard-drilldown-tab-select"
    * @param {string|null} value - `data-test-value` to pick; null picks the first option
    */
-  async selectOptionByValue(baseTestId, value) {
+  async selectOptionByValue(baseTestId, value, { timeout = 30000 } = {}) {
     const trigger = this.selectTrigger(baseTestId);
     const search = this.page.locator(`[data-test="${baseTestId}-search"]`);
     const option =
@@ -193,7 +193,92 @@ export default class DashboardDrilldownPage {
           timeout: 2000,
         });
       }
-    }).toPass({ timeout: 60000, intervals: [500, 1000, 2000] });
+    }).toPass({ timeout, intervals: [500, 1000, 2000] });
+  }
+
+  /**
+   * Wait until no tab-list fetch is in flight, so the NEXT dashboard change
+   * actually refetches instead of being swallowed.
+   *
+   * DrilldownPopUp's loaders go through `useLoading`, whose `execute()` opens with
+   * a hard re-entrancy guard — `if (isLoading.value) return;` — so a call made
+   * while the previous one is still running is DROPPED, not queued. The tab list
+   * is only ever refetched from the `data.dashboard` watcher, so once a drop
+   * happens nothing re-triggers it: `tabList` keeps the previously-selected
+   * dashboard's tabs for the rest of the popup's life and the wanted tab can
+   * never render, no matter how often the dropdown is re-opened.
+   *
+   * That is exactly what happens on the folder pick: the folder watcher
+   * auto-selects `dashboardList[0]`, whose tab fetch is still in flight when the
+   * test picks the real destination a moment later.
+   *
+   * `:disabled` on the tab select mirrors `getTabListLoading.isLoading`, so an
+   * enabled trigger is the precondition for `execute()` NOT being dropped, and a
+   * non-empty selected value proves the fetch got far enough for the watcher to
+   * run `setFormField("data.tab", tabList[0].value)` — enabled-but-unset is the
+   * pre-fetch state, not the settled one.
+   */
+  async waitForTabListIdle() {
+    const tabTrigger = this.selectTrigger("dashboard-drilldown-tab-select");
+    await this.tabSelect.waitFor({ state: "visible", timeout: 20000 });
+    await expect(tabTrigger).toBeEnabled({ timeout: 30000 });
+    await expect(tabTrigger).toHaveAttribute("data-test-selected-value", /.+/, {
+      timeout: 30000,
+    });
+  }
+
+  /**
+   * Pick the drilldown's destination tab, recovering from a dropped tab-list fetch.
+   *
+   * waitForTabListIdle() closes the window that causes the drop, but the guard in
+   * useLoading is racy by nature, so keep an escape hatch: the watcher only fires
+   * when `data.dashboard` CHANGES, so bounce the dashboard select off some other
+   * option and back to force a fresh fetch — this time with nothing in flight.
+   *
+   * @param {string} dashboardTitle - the destination dashboard, for the bounce
+   * @param {string|null} tabName
+   */
+  async selectTabOption(dashboardTitle, tabName) {
+    const attempts = 3;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        await this.selectOptionByValue("dashboard-drilldown-tab-select", tabName ?? null, {
+          timeout: 15000,
+        });
+        return;
+      } catch (error) {
+        if (attempt === attempts) throw error;
+        await this.repickDashboard(dashboardTitle);
+      }
+    }
+  }
+
+  /**
+   * Re-select `dashboardTitle` via a different option, so the `data.dashboard`
+   * watcher genuinely re-fires and refetches the tab list.
+   */
+  async repickDashboard(dashboardTitle) {
+    const baseTestId = "dashboard-drilldown-dashboard-select";
+    const decoy = this.page
+      .locator(`[data-test="${baseTestId}-option"]:not([data-test-value="${dashboardTitle}"])`)
+      .first();
+
+    await this.openSelectDropdown(baseTestId);
+    if (await decoy.count()) {
+      await decoy.click();
+      await expect(this.selectTrigger(baseTestId)).not.toHaveAttribute("data-state", "open", {
+        timeout: 5000,
+      });
+      // Let the decoy's own fetch finish, or re-picking the destination would be
+      // dropped by the very same guard we are working around.
+      await this.waitForTabListIdle();
+    } else {
+      // Folder holds only this dashboard — nothing to bounce off.
+      await this.page.keyboard.press("Escape");
+    }
+
+    await this.selectOptionByValue(baseTestId, dashboardTitle);
+    await this.waitForTabListIdle();
   }
 
   // Backward-compatible alias for dashboard.spec.js (old signature: folderName, drilldownName, dashboardName, tabName)
@@ -278,10 +363,13 @@ export default class DashboardDrilldownPage {
     await this.selectOptionByValue("dashboard-drilldown-folder-select", folderName);
 
     await this.dashboardSelect.waitFor({ state: 'visible', timeout: 10000 });
+    // Drain the folder watcher's auto-selected dashboard BEFORE switching to ours,
+    // otherwise our tab fetch is dropped by useLoading's re-entrancy guard.
+    await this.waitForTabListIdle();
     await this.selectOptionByValue("dashboard-drilldown-dashboard-select", dashboardTitle);
 
     await this.tabSelect.waitFor({ state: 'visible', timeout: 10000 });
-    await this.selectOptionByValue("dashboard-drilldown-tab-select", tabName ?? null);
+    await this.selectTabOption(dashboardTitle, tabName ?? null);
 
     if (openInNewTab) {
       await this.newTabToggle.waitFor({ state: 'visible', timeout: 5000 });
