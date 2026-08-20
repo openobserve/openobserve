@@ -15,15 +15,15 @@
 
 //! The TSID-major metrics layout (`ZO_METRICS_TSID_MAJOR_ENABLED`): when it
 //! applies to a stream, how the physical layout of a metrics file is encoded
-//! in its name, and the names of the `.sidx` series-index sidecar columns.
+//! in its name, and the names of the `.midx` series-index columns.
 
 use arrow_schema::{DataType, Schema};
 
 use super::HASH_LABEL;
 use crate::{FileFormat, meta::stream::StreamType};
 
-pub const TSID_SERIES_INDEX_ROW_START: &str = "__oo_sidx_row_start";
-pub const TSID_SERIES_INDEX_ROW_COUNT: &str = "__oo_sidx_row_count";
+pub const TSID_SERIES_INDEX_ROW_START: &str = "__oo_midx_row_start";
+pub const TSID_SERIES_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
 
 /// True when `stream_type` uses the TSID-major layout
 /// (`ZO_METRICS_TSID_MAJOR_ENABLED`): Parquet metrics files ordered by
@@ -57,15 +57,16 @@ pub enum MetricsFileLayout {
     /// still-open hour (`tsid-sorted-{id}.parquet`).
     HashSorted,
     /// Size-bounded Parquet ordered by `(__hash__ ASC, _timestamp ASC)` with a
-    /// sibling `.sidx` series index; written by the compactor's hour-end merge
-    /// (`tsid-major-v3-{id}.parquet`).
+    /// `.midx` series index (see [`MetricsFileLayout::series_index_path`]);
+    /// written by the compactor's hour-end merge (`tsid-major-v3-{id}.parquet`).
     TsidMajor,
 }
 
 impl MetricsFileLayout {
     const HASH_SORTED_PREFIX: &'static str = "tsid-sorted-";
     const TSID_MAJOR_PREFIX: &'static str = "tsid-major-v3-";
-    const SERIES_INDEX_EXT: &'static str = ".sidx";
+    const SERIES_INDEX_DIR: &'static str = "midx";
+    const SERIES_INDEX_EXT: &'static str = ".midx";
 
     /// Layout of the file at `path` (a full object key or a bare file name).
     pub fn of(path: &str) -> Self {
@@ -115,13 +116,26 @@ impl MetricsFileLayout {
         }
     }
 
-    /// The sibling `.sidx` series-index object of a TSID-major file.
+    /// The `.midx` series-index object of a TSID-major data file. Stored like
+    /// the Tantivy index — under its own root instead of next to the data —
+    /// but in a distinct tree:
+    /// `files/{org}/metrics/{stream}/{date}/{hour}/tsid-major-v3-{id}.parquet`
+    /// -> `files/{org}/midx/{stream}/{date}/{hour}/tsid-major-v3-{id}.midx`.
     pub fn series_index_path(path: &str) -> Option<String> {
         if Self::of(path) != Self::TsidMajor {
             return None;
         }
-        path.strip_suffix(".parquet")
-            .map(|path| format!("{path}{}", Self::SERIES_INDEX_EXT))
+        let mut parts: Vec<&str> = path.split('/').collect();
+        // files/{org}/metrics/{stream}/.../{file}
+        if parts.len() < 5 || parts[2] != StreamType::Metrics.as_str() {
+            return None;
+        }
+        parts[2] = Self::SERIES_INDEX_DIR;
+        let file_name_pos = parts.len() - 1;
+        let file_name = parts[file_name_pos].strip_suffix(".parquet")?;
+        let file_name = format!("{file_name}{}", Self::SERIES_INDEX_EXT);
+        parts[file_name_pos] = &file_name;
+        Some(parts.join("/"))
     }
 }
 
@@ -206,17 +220,35 @@ mod metrics_file_layout_tests {
     }
 
     #[test]
-    fn series_index_path_only_for_tsid_major() {
+    fn series_index_path_only_for_tsid_major_metrics_keys() {
         assert_eq!(
-            MetricsFileLayout::series_index_path("files/default/tsid-major-v3-456.parquet"),
-            Some("files/default/tsid-major-v3-456.sidx".to_string())
+            MetricsFileLayout::series_index_path(
+                "files/default/metrics/cpu/2026/08/19/07/tsid-major-v3-456.parquet"
+            ),
+            Some("files/default/midx/cpu/2026/08/19/07/tsid-major-v3-456.midx".to_string())
         );
+        // other layouts have no series index
         assert_eq!(
-            MetricsFileLayout::series_index_path("files/default/tsid-sorted-456.parquet"),
+            MetricsFileLayout::series_index_path(
+                "files/default/metrics/cpu/2026/08/19/07/tsid-sorted-456.parquet"
+            ),
             None
         );
         assert_eq!(
-            MetricsFileLayout::series_index_path("files/default/456.parquet"),
+            MetricsFileLayout::series_index_path(
+                "files/default/metrics/cpu/2026/08/19/07/456.parquet"
+            ),
+            None
+        );
+        // not a full metrics object key
+        assert_eq!(
+            MetricsFileLayout::series_index_path("files/default/tsid-major-v3-456.parquet"),
+            None
+        );
+        assert_eq!(
+            MetricsFileLayout::series_index_path(
+                "files/default/logs/app/2026/08/19/07/tsid-major-v3-456.parquet"
+            ),
             None
         );
     }

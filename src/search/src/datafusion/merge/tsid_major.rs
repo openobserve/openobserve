@@ -102,7 +102,7 @@ pub(super) async fn write_files(
     Ok(files)
 }
 
-/// One output file in progress: the Parquet writer, its `.sidx` series-index
+/// One output file in progress: the Parquet writer, its `.midx` series-index
 /// writer and the running file meta.
 struct ActiveSizeTsidWriter {
     writer: AsyncArrowWriter<Vec<u8>>,
@@ -194,8 +194,8 @@ fn proportional_original_size(source_meta: &FileMeta, records: i64) -> i64 {
     i64::try_from(estimate).unwrap_or(i64::MAX)
 }
 
-/// Streaming writer for a TSID-major `.sidx` sidecar. Every row describes one
-/// contiguous TSID run in the sibling data file: `(row_start, row_count)` plus
+/// Streaming writer for a TSID-major `.midx` series index. Every row describes
+/// one contiguous TSID run in the data file: `(row_start, row_count)` plus
 /// every label column of the run's first row. Runs that cross an input
 /// RecordBatch boundary appear as two adjacent entries; query-time range
 /// coalescing makes that representation equivalent without buffering samples.

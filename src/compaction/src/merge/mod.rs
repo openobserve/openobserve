@@ -1006,7 +1006,7 @@ pub async fn merge_files(
             storage::put(&account, &new_file_key, buf.clone()).await?;
         }
 
-        // TSID-major files own a `.sidx` series index; it is not tracked in
+        // TSID-major files own a `.midx` series index; it is not tracked in
         // file_list and is deleted together with the data file
         if let Some(series_index) = series_index {
             let series_index_key =

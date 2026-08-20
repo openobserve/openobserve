@@ -105,7 +105,7 @@ impl SeriesSelectionCache {
 static SERIES_SELECTION_CACHE: LazyLock<Mutex<SeriesSelectionCache>> =
     LazyLock::new(|| Mutex::new(SeriesSelectionCache::default()));
 
-/// Apply the `.sidx` sidecars of the TSID-major files in `files` before
+/// Apply the `.midx` series indexes of the TSID-major files in `files` before
 /// registering the metrics table.
 ///
 /// This mirrors the PromQL Tantivy path: matching physical rows are attached

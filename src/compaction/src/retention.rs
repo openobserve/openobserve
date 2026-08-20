@@ -682,6 +682,18 @@ fn generate_local_dirs(
         if day_path.exists() {
             dirs_to_delete.push(day_path.to_path_buf());
         }
+        // TSID-major metrics series index (`.midx`)
+        if stream_type == StreamType::Metrics {
+            let day_dir = format!(
+                "{}files/{org_id}/midx/{stream_name}/{}",
+                cfg.common.data_stream_dir,
+                date_start.format("%Y/%m/%d")
+            );
+            let day_path = std::path::Path::new(&day_dir);
+            if day_path.exists() {
+                dirs_to_delete.push(day_path.to_path_buf());
+            }
+        }
         date_start += Duration::days(1); // Move to the next day
     }
 

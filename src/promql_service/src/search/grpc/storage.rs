@@ -205,7 +205,7 @@ pub(crate) async fn create_context(
         use_inverted_index: false,
     });
 
-    // Prune the TSID-major files through their `.sidx` sidecars: matching
+    // Prune the TSID-major files through their `.midx` series indexes: matching
     // physical rows are attached to each FileKey before the metrics table is
     // built. Files of any other layout (legacy or not yet finalized hours) are
     // scanned in full; the PromQL matchers are always applied by the query.
