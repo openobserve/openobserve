@@ -19,6 +19,7 @@ import {
   DEFAULT_TUNABLES,
   NUMERIC_OPERATORS,
   applyTunables,
+  coerceTunable,
   lockedSqlThreshold,
   readTunables,
 } from "./libraryTunables";
@@ -183,5 +184,40 @@ describe("lockedSqlThreshold", () => {
 describe("NUMERIC_OPERATORS", () => {
   it("offers only comparisons that make sense against a metric value", () => {
     expect([...NUMERIC_OPERATORS]).toEqual(["=", "!=", ">=", "<=", ">", "<"]);
+  });
+});
+
+describe("coerceTunable", () => {
+  it("parses what a number input actually emits — a string", () => {
+    expect(coerceTunable("period", "15")).toBe(15);
+    expect(coerceTunable("promqlValue", "0.75")).toBe(0.75);
+  });
+
+  it("floors a CLEARED field at 1 instead of letting it read as zero", () => {
+    // OInput emits "" on clear, and Number("") is 0 — an alert that evaluates
+    // over 0 minutes, or every 0 minutes, can never fire.
+    expect(coerceTunable("period", "")).toBe(1);
+    expect(coerceTunable("frequency", "")).toBe(1);
+    expect(coerceTunable("threshold", "")).toBe(1);
+  });
+
+  it("mirrors the alert form's own validation floors", () => {
+    // AlertSettings.schema: period ≥ 1; QueryConfig.schema: threshold ≥ 1,
+    // frequency ≥ 1; AddAlert.schema: silence ≥ 0.
+    expect(coerceTunable("period", -5)).toBe(1);
+    expect(coerceTunable("threshold", 0)).toBe(1);
+    expect(coerceTunable("frequency", 0)).toBe(1);
+    expect(coerceTunable("silence", 0)).toBe(0);
+    expect(coerceTunable("silence", -3)).toBe(0);
+  });
+
+  it("leaves the PromQL threshold unfloored — a metric value may be zero or negative", () => {
+    expect(coerceTunable("promqlValue", 0)).toBe(0);
+    expect(coerceTunable("promqlValue", -12.5)).toBe(-12.5);
+  });
+
+  it("falls back rather than propagating NaN from unparseable text", () => {
+    expect(coerceTunable("period", "soon")).toBe(1);
+    expect(coerceTunable("promqlValue", "soon")).toBe(0);
   });
 });

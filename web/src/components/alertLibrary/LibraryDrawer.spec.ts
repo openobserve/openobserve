@@ -326,6 +326,15 @@ describe("LibraryDrawer", () => {
     expect((payload.file.trigger_condition as Record<string, unknown>).silence).toBe(45);
   });
 
+  it("will not let a cleared window become an alert that evaluates over zero minutes", async () => {
+    const wrapper = await mountDrawer();
+    await wrapper.find('[data-test="alert-library-drawer-period"]').setValue("");
+    await wrapper.find('[data-test="alert-library-drawer-install"]').trigger("click");
+
+    const payload = wrapper.emitted("install")?.[0]?.[0] as { file: AlertLibraryFile };
+    expect((payload.file.trigger_condition as Record<string, unknown>).period).toBe(1);
+  });
+
   it("reports a file that could not be fetched instead of rendering an empty alert", async () => {
     mocks.loadAlertFile.mockRejectedValue(new Error("boom"));
     const wrapper = await mountDrawer();

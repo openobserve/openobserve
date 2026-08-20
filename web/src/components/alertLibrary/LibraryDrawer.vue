@@ -412,10 +412,12 @@ import {
   DEFAULT_TUNABLES,
   NUMERIC_OPERATORS,
   applyTunables,
+  coerceTunable,
   lockedSqlThreshold,
   readTunables,
   type LibraryTunables,
   type LockedSqlThreshold,
+  type NumericTunableKey,
 } from "./libraryTunables";
 
 const props = defineProps<{
@@ -564,11 +566,8 @@ const thresholdHint = computed(() => {
 });
 
 // ── tuning ─────────────────────────────────────────────────────────────────
-type NumericTunable = "threshold" | "period" | "frequency" | "silence" | "promqlValue";
-
-const setTunable = (key: NumericTunable, value: string | number) => {
-  const next = typeof value === "number" ? value : Number(value);
-  tunables.value = { ...tunables.value, [key]: Number.isFinite(next) ? next : 0 };
+const setTunable = (key: NumericTunableKey, value: string | number) => {
+  tunables.value = { ...tunables.value, [key]: coerceTunable(key, value) };
 };
 
 const setOperator = (value: unknown) => {

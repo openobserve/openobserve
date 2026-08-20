@@ -70,6 +70,41 @@ export const DEFAULT_TUNABLES: LibraryTunables = {
  */
 export const NUMERIC_OPERATORS = ["=", "!=", ">=", "<=", ">", "<"] as const;
 
+/** The knobs bound to a number input, and therefore edited as text. */
+export type NumericTunableKey = "threshold" | "period" | "frequency" | "silence" | "promqlValue";
+
+/**
+ * Smallest value each knob may hold; `null` means unbounded.
+ *
+ * These are the alert form's own validation floors (`AlertSettings.schema`
+ * period ≥ 1, `QueryConfig.schema` threshold/frequency ≥ 1, `AddAlert.schema`
+ * silence ≥ 0) rather than new rules — a value the drawer accepts must still
+ * save. `promqlValue` is unbounded because it is compared against a metric,
+ * and a metric is legitimately zero or negative.
+ */
+const TUNABLE_MINIMUM: Record<NumericTunableKey, number | null> = {
+  threshold: 1,
+  period: 1,
+  frequency: 1,
+  silence: 0,
+  promqlValue: null,
+};
+
+/**
+ * One number-input edit → a value that is safe to store.
+ *
+ * OInput emits the raw string and does not coerce, so a CLEARED field arrives
+ * as `""` — and `Number("")` is `0`, which would quietly turn "evaluation
+ * window" into "look at 0 minutes of data": an alert that can never fire, with
+ * nothing on screen to say so. Flooring here is what makes that unreachable.
+ */
+export const coerceTunable = (key: NumericTunableKey, value: string | number): number => {
+  const minimum = TUNABLE_MINIMUM[key];
+  const parsed = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isFinite(parsed)) return minimum ?? 0;
+  return minimum === null ? parsed : Math.max(minimum, parsed);
+};
+
 /** A threshold that lives inside the SQL text, and therefore cannot be a field. */
 export interface LockedSqlThreshold {
   /** The whole matched clause, for display. */
