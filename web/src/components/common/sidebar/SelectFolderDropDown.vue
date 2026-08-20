@@ -28,6 +28,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mr-1 flex-1"
       :disabled="disableDropdown"
     >
+      <!-- The trigger paints no per-option icon of its own, so the selected
+           folder's icon comes in through #icon-left. Omitted entirely while
+           nothing is selected — an empty field has no folder to stand for. -->
+      <template v-if="selectedFolder" #icon-left>
+        <FolderIcon :token="selectedFolderIcon" />
+      </template>
       <template #empty>{{ t("search.noResult") }}</template>
     </OSelect>
 
@@ -72,10 +78,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { folderIconOption } from "./folderIconOption";
+import FolderIcon from "./FolderIcon.vue";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder, OButton, OSelect },
+  components: { AddFolder, OButton, OSelect, FolderIcon },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -121,6 +128,14 @@ export default defineComponent({
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
     const { iconFor } = useFolderIcons(() => props.type);
+
+    const selectedFolderIcon = computed(() =>
+      iconFor(
+        (store.state.organizationData.foldersByType[props.type] ?? []).find(
+          (item: any) => item.folderId === selectedFolder.value,
+        ),
+      ),
+    );
 
     const folderOptions = computed(() =>
       (store.state.organizationData.foldersByType[props.type] ?? [])
@@ -200,6 +215,7 @@ export default defineComponent({
       t,
       store,
       selectedFolder,
+      selectedFolderIcon,
       folderOptions,
       updateFolderList,
       showAddFolderDialog,

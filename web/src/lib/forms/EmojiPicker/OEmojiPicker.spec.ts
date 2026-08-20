@@ -78,19 +78,35 @@ describe("OEmojiPicker", () => {
     expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([null]);
   });
 
-  it("should emit null from the clear button, which only shows with a value", async () => {
-    wrapper = mount(OEmojiPicker, { attachTo: document.body });
-    await openPicker(wrapper);
-    expect(panelQuery('[data-test="emoji-picker-clear"]')).toBeNull();
-    wrapper.unmount();
-    document.body.innerHTML = "";
-
+  // The clear control sits ON the trigger, not inside the panel — removing an
+  // icon should not cost a round trip through the picker.
+  it("should clear from the trigger without opening the panel", async () => {
     wrapper = mount(OEmojiPicker, { props: { modelValue: "🔥" }, attachTo: document.body });
-    await openPicker(wrapper);
-    panelQuery<HTMLButtonElement>('[data-test="emoji-picker-clear"]')?.click();
+
+    const clear = panelQuery<HTMLButtonElement>('[data-test="emoji-picker-clear"]');
+    expect(clear).not.toBeNull();
+    // Panel never opened, so the grid must not be in the document.
+    expect(panelQuery('[data-emoji-cell]')).toBeNull();
+
+    clear!.click();
     await nextTick();
     expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([null]);
     expect(wrapper.emitted("select")?.[0]).toEqual([null]);
+    // It is a sibling of PopoverTrigger, so clearing must not open the picker.
+    expect(panelQuery('[data-emoji-cell]')).toBeNull();
+  });
+
+  it("should show no clear control while there is nothing to clear", () => {
+    wrapper = mount(OEmojiPicker, { attachTo: document.body });
+    expect(panelQuery('[data-test="emoji-picker-clear"]')).toBeNull();
+  });
+
+  it("should hide the clear control when disabled", () => {
+    wrapper = mount(OEmojiPicker, {
+      props: { modelValue: "🔥", disabled: true },
+      attachTo: document.body,
+    });
+    expect(panelQuery('[data-test="emoji-picker-clear"]')).toBeNull();
   });
 
   it("should filter the grid by keyword", async () => {

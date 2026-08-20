@@ -31,13 +31,15 @@ describe("FolderIcon", () => {
     // Not empty: an empty slot would leave a ragged gap in the list.
     expect(wrapper.find("svg").exists()).toBe(true);
     expect(wrapper.find('[data-test="glyph-emoji"]').exists()).toBe(false);
-    expect(wrapper.find(".text-text-muted").exists()).toBe(true);
+    // Inherits the row's colour rather than pinning a grey — a fixed muted grey
+    // stayed grey on the tinted active row and washed out there.
+    expect(wrapper.find(".text-current").exists()).toBe(true);
   });
 
   it("should show the favourites star instead of the folder fallback", () => {
     wrapper = mount(FolderIcon, { props: { token: null, favorite: true } });
     expect(wrapper.find(".text-favorite").exists()).toBe(true);
-    expect(wrapper.find(".text-text-muted").exists()).toBe(false);
+    expect(wrapper.find(".text-current").exists()).toBe(false);
   });
 
   it("should let a chosen icon win over the favourite star", () => {

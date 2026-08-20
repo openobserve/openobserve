@@ -130,6 +130,9 @@ const globalConfig = {
     OSelect: {
       template: `
         <div class="o-select-stub" :data-disable="String(disabled)">
+          <span v-if="$slots['icon-left']" data-test="stub-icon-left">
+            <slot name="icon-left" />
+          </span>
           <select
             :value="modelValue"
             @change="$emit('update:modelValue', $event.target.value)"
@@ -274,6 +277,39 @@ describe("InlineSelectFolderDropdown.vue", () => {
       for (const option of vm.folderOptions) {
         expect(option.iconComponent).toBeTruthy();
       }
+    });
+
+    // OSelect paints per-option icons in the OPEN list only; the closed trigger
+    // renders whatever #icon-left supplies. Without this the icon appeared while
+    // browsing and vanished the moment you picked a folder.
+    it("feeds the selected folder's icon to the trigger, not just the option rows", () => {
+      setStoreFolders("alerts", [{ folderId: "folder-2", name: "Production", icon: "🚀" }]);
+      wrapper = createWrapper({ modelValue: "folder-2" });
+      expect((wrapper.vm as any).selectedFolderIcon).toBe("🚀");
+    });
+
+    // With nothing selected there is no folder to stand for, so the slot must be
+    // withheld entirely — FolderIcon would otherwise paint its folder-outline
+    // fallback next to an empty field, and OSelect's icon-left wrapper carries a
+    // me-1.5 margin that would leave a gap even if the icon itself were hidden.
+    // `modelValue` defaults to "default", so this dropdown normally always has a
+    // folder — the empty case only arises when a caller passes one explicitly.
+    // The whole SLOT must go, not just the icon: OSelect wraps #icon-left in a
+    // span carrying a margin, which would leave a gap around nothing.
+    it("shows no trigger icon at all when no folder is selected", () => {
+      wrapper = createWrapper({ modelValue: "" });
+      expect(wrapper.find('[data-test="stub-icon-left"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="folder-icon"]').exists()).toBe(false);
+    });
+
+    it("shows the trigger icon for the default folder it starts on", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="folder-icon"]').exists()).toBe(true);
+    });
+
+    it("shows the trigger icon once a folder is selected", () => {
+      wrapper = createWrapper({ modelValue: "folder-2" });
+      expect(wrapper.find('[data-test="folder-icon"]').exists()).toBe(true);
     });
 
     it("returns [] when foldersByType has no entry for the given type", () => {

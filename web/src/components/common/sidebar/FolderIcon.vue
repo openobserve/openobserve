@@ -40,6 +40,6 @@ withDefaults(
   <span class="flex size-4 shrink-0 items-center justify-center" data-test="folder-icon">
     <OGlyph v-if="token" :token="token" size="sm" />
     <OIcon v-else-if="favorite" name="star" size="sm" class="text-favorite" />
-    <OIcon v-else name="folder-outline" size="sm" class="text-text-muted" />
+    <OIcon v-else name="folder-outline" size="sm" class="text-current" />
   </span>
 </template>

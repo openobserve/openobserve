@@ -25,7 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="index-dropdown-stream_type"
       labelKey="label"
       class="flex-1"
-    />
+    >
+      <template v-if="selectedFolder" #icon-left>
+        <FolderIcon :token="selectedFolderIcon" />
+      </template>
+    </OSelect>
 
     <OButton
       data-test="dashboard-folder-move-new-add"
@@ -68,10 +72,11 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useRoute } from "vue-router";
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { folderIconOption } from "@/components/common/sidebar/folderIconOption";
+import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder, OButton, ODialog, OSelect },
+  components: { AddFolder, OButton, ODialog, OSelect, FolderIcon },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -88,6 +93,14 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const { iconFor } = useFolderIcons("dashboards");
+
+    const selectedFolderIcon = computed(() =>
+      iconFor(
+        store.state.organizationData.folders.find(
+          (item: any) => item.folderId === selectedFolder.value,
+        ),
+      ),
+    );
 
     const folderOptions = computed(() =>
       store.state.organizationData.folders.map((item: any) => ({
@@ -153,6 +166,7 @@ export default defineComponent({
 
     return {
       folderOptions,
+      selectedFolderIcon,
       t,
       store,
       selectedFolder,

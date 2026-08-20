@@ -116,6 +116,11 @@ import Okta from "~icons/logos/okta-icon";
 import OsQuery from "~icons/logos/osquery";
 import GoogleWorkspace from "~icons/logos/google-icon";
 
+// ── Operating systems ────────────────────────────────────────────────────────
+import MacOs from "~icons/logos/apple";
+import Windows from "~icons/logos/microsoft-windows-icon";
+import Curl from "~icons/logos/curl";
+
 // ── Repo assets: services `logos` has no entry for ───────────────────────────
 // These are the same files the Ingestion pages render.
 import oracleUrl from "@/assets/images/ingestion/oracle.svg";
@@ -136,6 +141,11 @@ import syslogUrl from "@/assets/images/ingestion/syslog.svg";
 import netflowUrl from "@/assets/images/ingestion/netflow.svg";
 import kinesisUrl from "@/assets/images/ingestion/kinesis_firehose.svg";
 import cloudwatchUrl from "@/assets/images/ingestion/cloud_watch.svg";
+import filebeatUrl from "@/assets/images/ingestion/filebeat.png";
+import loongcollectorUrl from "@/assets/images/ingestion/loongcollector.svg";
+import categrafUrl from "@/assets/images/ingestion/categraf.png";
+import nightingaleUrl from "@/assets/images/ingestion/nightingale.svg";
+import vmagentUrl from "@/assets/images/ingestion/vmagent.svg";
 
 /** Prefix marking a stored icon value as a registry glyph rather than an emoji. */
 export const GLYPH_TOKEN_PREFIX = "o2:";
@@ -216,6 +226,11 @@ export const GLYPH_REGISTRY = {
   fluentbit: fluentbitUrl,
   telegraf: telegrafUrl,
   cribl: criblUrl,
+  filebeat: filebeatUrl,
+  loongcollector: loongcollectorUrl,
+  categraf: categrafUrl,
+  nightingale: nightingaleUrl,
+  vmagent: vmagentUrl,
 
   // Languages & frameworks
   java: Java,
@@ -243,7 +258,131 @@ export const GLYPH_REGISTRY = {
   jumpcloud: jumpcloudUrl,
   googleworkspace: GoogleWorkspace,
   office365: office365Url,
+
+  // Operating systems & transports (linux sits under Orchestration above)
+  macos: MacOs,
+  windows: Windows,
+  curl: Curl,
 } as const satisfies Record<string, GlyphValue>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI INTEGRATION LOGOS — from the AI Integrations pages' own assets
+// (generated/<slug>/logo.*, synced from o2-datasource), so no extra bundle cost.
+// Kept out of GLYPH_REGISTRY because that sync regenerates the slugs (named
+// imports would break on a rename) and "databricks" exists in both spaces.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Prefix distinguishing an AI-integration logo from a curated service glyph. */
+export const AI_GLYPH_PREFIX = "o2:ai-";
+
+// Only `logo.*` — the `logo_dark` variants are handled by --color-glyph-plate.
+const aiLogoModules = import.meta.glob(
+  "@/assets/ai-datasource-content/generated/*/logo.{svg,png,webp,jpg,jpeg}",
+  { query: "?url", import: "default", eager: true },
+) as Record<string, string>;
+
+const AI_LOGO_URLS: Record<string, string> = {};
+for (const [path, url] of Object.entries(aiLogoModules)) {
+  // .../generated/<slug>/logo.svg -> the second-to-last segment is the slug.
+  const slug = path.split("/").at(-2);
+  if (slug) AI_LOGO_URLS[slug] = url;
+}
+
+/**
+ * One entry per BRAND, not per SDK (anthropic-jsts folds into `anthropic`).
+ * Measure new logos by hand — OGlyph.spec's wordmark guard reads a viewBox, so
+ * it can't see these <img> glyphs; `restate` (3.25:1) was cut for smearing.
+ */
+export const AI_GLYPH_SLUGS = [
+  "agno",
+  "amazon-bedrock",
+  "anannas",
+  "anthropic",
+  "autogen",
+  "beeai",
+  "byteplus",
+  "cerebras",
+  "claude-code",
+  "codename-goose",
+  "codex",
+  "cognee",
+  "cohere",
+  "cometapi",
+  "crewai",
+  "cursor",
+  "deepagents",
+  "deepseek",
+  "dspy",
+  "exa",
+  "firecrawl",
+  "fireworks",
+  "flowise",
+  "gemini",
+  "github-copilot",
+  "google-adk",
+  "gradio",
+  "groq",
+  "haystack",
+  "huggingface",
+  "instructor",
+  "kong-gateway",
+  "koog",
+  "langchain",
+  "langflow",
+  "langgraph",
+  "langserve",
+  "librechat",
+  "litellm",
+  "livekit",
+  "llamaindex",
+  "lobechat",
+  "mastra",
+  "mcp-use",
+  "microsoft-agent-framework",
+  "milvus",
+  "mirascope",
+  "mistral",
+  "mixpanel",
+  "n8n",
+  "novita",
+  "ollama",
+  "openai",
+  "opencode",
+  "openrouter",
+  "openwebui",
+  "parallel",
+  "pipecat",
+  "portkey",
+  "posthog",
+  "promptfoo",
+  "pydantic-ai",
+  "quarkus-langchain4j",
+  "ragas",
+  "semantic-kernel",
+  "smolagents",
+  "spring-ai",
+  "strands-agents",
+  "swiftide",
+  "temporal",
+  "together-ai",
+  "trubrics",
+  "vapi",
+  "vercel-ai-sdk",
+  "vllm",
+  "voltagent",
+  "xai-grok",
+  "zapier",
+] as const;
+
+/** Build the stored token for an AI logo, e.g. "o2:ai-anthropic". */
+export function aiGlyphToken(slug: (typeof AI_GLYPH_SLUGS)[number]): string {
+  return `${AI_GLYPH_PREFIX}${slug}`;
+}
+
+/** True when the token names an AI-integration logo. */
+export function isAiGlyphToken(token: string | null | undefined): boolean {
+  return !!token?.startsWith(AI_GLYPH_PREFIX);
+}
 
 /** Closed union of registered glyph names — an unknown name is a type error. */
 export type GlyphName = keyof typeof GLYPH_REGISTRY;
@@ -255,6 +394,11 @@ export function glyphToken(name: GlyphName): string {
 
 /** The glyph for an icon token, or null when it isn't a known glyph. */
 export function resolveGlyph(token: string | null | undefined): GlyphValue | null {
+  // Checked before the curated set: "o2:ai-anthropic" also starts with "o2:",
+  // and the two namespaces share slugs (databricks).
+  if (isAiGlyphToken(token)) {
+    return AI_LOGO_URLS[token!.slice(AI_GLYPH_PREFIX.length)] ?? null;
+  }
   if (!token?.startsWith(GLYPH_TOKEN_PREFIX)) return null;
   const name = token.slice(GLYPH_TOKEN_PREFIX.length);
   return (GLYPH_REGISTRY as Record<string, GlyphValue>)[name] ?? null;

@@ -87,7 +87,7 @@ describe("glyphRegistry", () => {
   it("should use icon-only marks, not wordmark lockups", () => {
     // Brands whose ONLY official mark is inherently wide — there is no
     // icon-only variant to switch to, so these are accepted as-is.
-    const INHERENTLY_WIDE = new Set(["sqlite", "cloudflare", "saphana", "aws"]);
+    const INHERENTLY_WIDE = new Set(["sqlite", "cloudflare", "saphana", "aws", "curl"]);
     const MAX_RATIO = 1.6;
 
     const offenders: string[] = [];

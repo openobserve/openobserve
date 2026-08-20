@@ -137,6 +137,12 @@ watch(flatEmojis, (list) => {
 </script>
 
 <template>
+  <!-- The clear control is a SIBLING of the popover, not part of #trigger:
+       PopoverTrigger uses as-child, so anything inside the trigger slot either
+       nests a button in a button or steals the trigger's aria wiring. PopoverRoot
+       renders no element of its own, so this span is what the badge positions
+       against. -->
+  <span class="relative inline-flex">
   <OPopover
     v-model:open="open"
     side="bottom"
@@ -156,40 +162,26 @@ watch(flatEmojis, (list) => {
           triggerClasses[size],
           modelValue
             ? 'border-border-default bg-surface-base hover:bg-surface-subtle-hover'
-            : 'border-border-default text-text-muted hover:bg-surface-subtle-hover border-dashed',
+            : 'border-border-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading border-dashed',
           disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         ]"
       >
         <OGlyph v-if="modelValue" :token="modelValue" :size="size === 'sm' ? 'md' : 'lg'" />
-        <OIcon v-else name="add" size="xs" />
+        <OIcon v-else name="add" size="sm" />
       </button>
     </template>
 
     <div class="flex flex-col gap-2">
-      <div class="flex items-center gap-1">
-        <OSearchInput
-          v-model="query"
-          size="sm"
-          class="min-w-0 flex-1"
-          :placeholder="t('components.emojiPicker.searchPlaceholder')"
-          data-test="emoji-picker-search"
-        />
-        <button
-          v-if="modelValue"
-          type="button"
-          :aria-label="t('components.emojiPicker.removeIcon')"
-          :title="t('components.emojiPicker.removeIcon')"
-          data-test="emoji-picker-clear"
-          class="rounded-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center transition-colors"
-          @click="clear"
-        >
-          <OIcon name="close" size="xs" />
-        </button>
-      </div>
+      <OSearchInput
+        v-model="query"
+        size="sm"
+        :placeholder="t('components.emojiPicker.searchPlaceholder')"
+        data-test="emoji-picker-search"
+      />
 
       <div
         ref="gridRef"
-        class="flex max-h-64 flex-col gap-2 overflow-y-auto"
+        class="-mx-1 flex max-h-64 flex-col gap-2 overflow-y-auto px-1 py-1"
         @keydown="onGridKeydown"
       >
         <div v-for="group in visibleGroups" :key="group.id" class="flex flex-col gap-1">
@@ -231,4 +223,17 @@ watch(flatEmojis, (list) => {
       </div>
     </div>
   </OPopover>
+
+    <button
+      v-if="modelValue && !disabled"
+      type="button"
+      :aria-label="t('components.emojiPicker.removeIcon')"
+      :title="t('components.emojiPicker.removeIcon')"
+      data-test="emoji-picker-clear"
+      class="border-border-default bg-surface-base text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-accent ring-offset-surface-base absolute -top-1 -right-1 inline-flex size-4 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+      @click="clear"
+    >
+      <OIcon name="close" size="xs" />
+    </button>
+  </span>
 </template>
