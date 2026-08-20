@@ -39,6 +39,15 @@
       <OButton
         size="sm"
         variant="outline"
+        :disabled="!detail"
+        data-test="ai-experiment-detail-compare"
+        @click="comparePickerOpen = true"
+      >
+        {{ t("aiObservability.experiments.detail.compare") }}
+      </OButton>
+      <OButton
+        size="sm"
+        variant="outline"
         :disabled="acting || !detail"
         data-test="ai-experiment-detail-clone"
         @click="cloneExperiment"
@@ -174,6 +183,15 @@
       </div>
     </div>
 
+    <ExperimentComparePickerDialog
+      v-if="detail"
+      v-model:open="comparePickerOpen"
+      :org-id="orgId"
+      :experiment-id="detail.experiment.id"
+      :dataset-id="detail.experiment.datasetId"
+      @compare="openComparison"
+    />
+
     <ExperimentRowDetailDrawer
       :open="rowDrawerOpen"
       :detail="selectedRowDetail"
@@ -196,6 +214,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import ExperimentComparePickerDialog from "@/enterprise/components/AIObservability/ExperimentComparePickerDialog.vue";
 import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -212,7 +231,7 @@ import llmExperimentsService, {
   type ExperimentRowDetail,
 } from "@/services/llm-experiments.service";
 import ExperimentRowDetailDrawer from "@/enterprise/components/AIObservability/ExperimentRowDetailDrawer.vue";
-import { aiExperimentsRoute } from "./experimentRoutes";
+import { aiExperimentCompareRoute, aiExperimentsRoute } from "./experimentRoutes";
 import { experimentScoreValue, openExperimentTrace } from "./experimentResults";
 
 defineOptions({ name: "AIExperimentDetailPage" });
@@ -227,6 +246,7 @@ const experimentId = computed<string>(() => String(route.params.id ?? ""));
 const detail = ref<ExperimentDetail | null>(null);
 const loading = ref(false);
 const acting = ref(false);
+const comparePickerOpen = ref(false);
 const page = ref(1);
 const pageSize = 50;
 const rowDrawerOpen = ref(false);
@@ -523,6 +543,13 @@ async function cancelExperiment() {
 
 async function retryExperiment() {
   await runAction(() => llmExperimentsService.retry(orgId.value, experimentId.value));
+}
+
+/** This run is the candidate; the picker supplies the baseline it is measured against. */
+function openComparison(baselineId: string) {
+  const experimentId = detail.value?.experiment.id;
+  if (!experimentId) return;
+  void router.push(aiExperimentCompareRoute(orgId.value, baselineId, experimentId));
 }
 
 async function cloneExperiment() {

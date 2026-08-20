@@ -10794,7 +10794,20 @@
           "run": "Run"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progress"
+        "progress": "Progress",
+        "compare": "Compare",
+        "comparePicker": {
+          "title": "Compare Against a Baseline",
+          "hint": "This run becomes the candidate. Pick the baseline it is measured against — only runs on the same dataset can be compared.",
+          "baselineLabel": "Baseline",
+          "baselinePlaceholder": "Select a baseline run",
+          "confirm": "Compare",
+          "noPeers": "No other runs on this dataset yet, so there is nothing to compare against.",
+          "loadError": "Failed to load the runs available for comparison",
+          "errors": {
+            "baseline": "Select a baseline to compare against."
+          }
+        }
       },
       "rowDetail": {
         "fallbackTitle": "Experiment Row",
