@@ -50,7 +50,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     future::Future,
-    sync::{Arc, LazyLock, Mutex},
 };
 
 use axum::{
@@ -65,8 +64,6 @@ use o2_openfga::config::get_config as get_openfga_config;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-/// The chain assembler moved to `o2_enterprise` with the blocking canonicalizer
-/// it consumes; `super::chains` is the re-export that keeps this path valid.
 #[cfg(feature = "enterprise")]
 use super::chains;
 use super::{
@@ -1027,7 +1024,7 @@ pub(crate) fn search_matches(row: &Value, needle_lower: &str) -> bool {
     norm_hit || get_str_ref(row, "fingerprint").starts_with(needle_lower)
 }
 
-// ─── Live-tail cache (D4) ────────────────────────────────────────────────────
+// ─── Live delta over the un-rolled-up window (D4) ────────────────────────────
 
 /// One computed (unfiltered) live tail for a `(org, trace stream)`.
 #[derive(Debug, Default, Clone)]
@@ -1041,136 +1038,70 @@ pub(crate) struct TailData {
     pub totals_rows: Vec<Value>,
     /// A tail query answered exactly the request cap (D4 guard rail).
     pub truncated: bool,
-    /// The stream has the `o2_db_fingerprint` column (negative results are
-    /// cached too so non-DBM streams don't re-probe the schema every request).
+    /// The stream has the `o2_db_fingerprint` column — i.e. it can answer a DBM
+    /// read at all. A stream without it contributes no delta.
     pub relevant: bool,
-    /// Tail computation failed — cached so an erroring stream cannot turn every
-    /// page load into a retry storm; callers treat it as "no tail".
+    /// Delta computation failed; callers treat it as "no delta" and the read
+    /// degrades to rollup-only rather than failing the request.
     pub failed: bool,
 }
 
-struct TailCacheEntry {
-    computed_at: i64, // µs
-    offset: i64,      // the rollup offset the tail was computed against
-    /// `Arc`, so a hit hands out a pointer copy instead of deep-cloning two
-    /// row vectors under the global mutex — the hold time is what every other
-    /// request in the process queues on.
-    data: Arc<TailData>,
-}
-
-/// In-process tail cache. Keyed per `(org, stream)` with the rollup OFFSET as
-/// the window-bucket validity check: entries are served only while younger
-/// than the TTL AND while the stored offset still matches — when the rollup
-/// job advances a stream's offset, the old tail (which starts at the old
-/// offset) would double-count against the new rollup rows, so it is treated as
-/// a miss immediately. The key deliberately contains NO filter components:
-/// the tail is cached unfiltered and every distinct filter combination shares
-/// one entry (keying on filters would make every filter a miss and unwind the
-/// coalescing entirely — D4).
-pub(crate) struct TailCache {
-    map: Mutex<HashMap<(String, String), TailCacheEntry>>,
-}
-
-impl TailCache {
-    pub(crate) fn new() -> Self {
-        Self {
-            map: Mutex::new(HashMap::new()),
-        }
-    }
-
-    pub(crate) fn get(
-        &self,
-        org_id: &str,
-        stream: &str,
-        offset: i64,
-        now: i64,
-        ttl_micros: i64,
-    ) -> Option<Arc<TailData>> {
-        let map = self.map.lock().unwrap();
-        let entry = map.get(&(org_id.to_string(), stream.to_string()))?;
-        if entry.offset != offset || now - entry.computed_at >= ttl_micros {
-            return None;
-        }
-        Some(Arc::clone(&entry.data))
-    }
-
-    /// Store one computed tail; returns the shared handle so the computing
-    /// caller keeps the same allocation it just cached.
-    pub(crate) fn put(
-        &self,
-        org_id: &str,
-        stream: &str,
-        offset: i64,
-        now: i64,
-        data: TailData,
-    ) -> Arc<TailData> {
-        let data = Arc::new(data);
-        let mut map = self.map.lock().unwrap();
-        map.insert(
-            (org_id.to_string(), stream.to_string()),
-            TailCacheEntry {
-                computed_at: now,
-                offset,
-                data: Arc::clone(&data),
-            },
-        );
-        data
-    }
-}
-
-static TAIL_CACHE: LazyLock<TailCache> = LazyLock::new(TailCache::new);
-
-/// Single-flight guard for tail computation. The current and the Δ-baseline
-/// windows resolve the same `(org, stream)` tails CONCURRENTLY, and on a cache
-/// miss both used to compute the identical tail — two full two-stage searches
-/// for one answer. One caller computes under the per-key lock, the other
-/// awaits it and re-reads the cache. Entries are one small `Arc` per
-/// `(org, stream)` — the same bounded population the cache itself holds.
-type TailFlights = HashMap<(String, String), Arc<tokio::sync::Mutex<()>>>;
-static TAIL_FLIGHTS: LazyLock<Mutex<TailFlights>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-
-/// Tail cache TTL: `min(30 s, interval/10)` (D4), floored at 1 s.
-pub(crate) fn tail_ttl_micros(interval_secs: u64) -> i64 {
-    let tenth = (interval_secs as i64).saturating_mul(1_000_000) / 10;
-    tenth.clamp(1_000_000, 30_000_000)
-}
-
-/// Compute (or serve from cache) the live tail for one `(org, trace stream)`.
-/// Returns `None` when the live tail is disabled.
+/// Compute the delta for one `(org, trace stream)` — the part of the caller's
+/// window the rollup has not covered. Returns `None` when the delta is
+/// disabled.
+///
+/// NOT memoised here. There was a process-local cache keyed `(org, stream)` +
+/// offset, with its own TTL and single-flight lock; the search RESULT cache
+/// replaced it. That cache keys on the query AND its time range — which is what
+/// identifies a delta now that the window comes from the request rather than
+/// the clock — and it is shared across the cluster, where the old one was per
+/// process (N queriers meant N cold misses on the same window). It also needs no
+/// invalidation of its own: once the rollup advances, `delta_start` moves and
+/// the read is simply a different query.
 ///
 /// `offset` is the stream's rollup offset, resolved by the caller — the whole
-/// fleet's offsets come from ONE prefix read in [`collect_tails`], where this
-/// function used to issue its own per-stream meta-DB round trip on every
-/// request.
-async fn get_or_compute_tail(org_id: &str, stream: &str, offset: i64) -> Option<Arc<TailData>> {
-    let now = now_micros();
-    let interval_micros = rollup::ROLLUP_INTERVAL_SECS as i64 * 1_000_000;
-    let ttl = tail_ttl_micros(rollup::ROLLUP_INTERVAL_SECS);
+/// fleet's offsets come from ONE prefix read in [`collect_tails`].
+async fn compute_tail(
+    org_id: &str,
+    stream: &str,
+    offset: i64,
+    q_start: i64,
+    q_end: i64,
+) -> Option<TailData> {
+    // THE DELTA IS THE PART OF THE CALLER'S RANGE THE ROLLUP HAS NOT COVERED.
+    //
+    // The rollup offset is the split point: everything at or before it is
+    // already in `_o2_db_stats` (cheap), everything after it is still only raw
+    // spans (expensive). So the delta is exactly `[max(offset, q_start), q_end]`
+    // — both bounds derived from the REQUEST.
+    //
+    // This used to be `[max(offset, now − interval), now]`: a window off the
+    // WALL CLOCK that ignored the caller's range entirely (it was not even
+    // passed in). Two consequences, both fixed by deriving it from the query:
+    //
+    //  - it answered a question about the past with data from the present, so
+    //    `collect_tails` had to DISCARD any tail that did not overlap the
+    //    requested window. A historical read paid for a delta it then threw
+    //    away.
+    //  - `now` moved on every request, so no two requests ever asked the same
+    //    question and the search result cache could never match one. Anchoring
+    //    both bounds to the request is what makes the read cacheable at all —
+    //    every viewer of the same window now asks the identical query.
+    //
+    // Clamped to the request: a rollup ahead of `q_end` (a historical window
+    // fully rolled up) leaves nothing to do, and `tail_start > tail_end` would
+    // otherwise invert the window.
+    //
+    // BOUNDED. `delta_start` also refuses to read further back than the
+    // catch-up budget: a stalled rollup must not turn every page load into an
+    // ever-widening raw-span scan. When the bound binds, the span between
+    // `data_through` and `tail_start` is covered by neither source — which is
+    // exactly what `tail_covers_from` reports, and what the UI's staleness
+    // banner is for.
+    let tail_start = rollup::delta_start(offset, q_start, q_end);
+    let tail_end = q_end;
 
-    if let Some(t) = TAIL_CACHE.get(org_id, stream, offset, now, ttl) {
-        return Some(t);
-    }
-
-    // Single-flight: whoever holds the per-key lock computes; everyone else
-    // waits and finds the fresh entry on the re-check below.
-    let flight = {
-        let mut flights = TAIL_FLIGHTS.lock().unwrap();
-        Arc::clone(
-            flights
-                .entry((org_id.to_string(), stream.to_string()))
-                .or_default(),
-        )
-    };
-    let _guard = flight.lock().await;
-    if let Some(t) = TAIL_CACHE.get(org_id, stream, offset, now_micros(), ttl) {
-        return Some(t);
-    }
-
-    // Tail cap (D4): [max(offset, now − 1 rollup interval), now] — a stalled
-    // job's gap beyond the cap surfaces as staleness, never as a raw scan.
-    let tail_start = offset.max(now - interval_micros).min(now);
-
-    // Schema gate; negative results are cached like everything else.
+    // Schema gate: a stream without the DBM columns contributes no delta.
     let schema = infra::schema::get(org_id, stream, StreamType::Traces).await;
     let (relevant, has_rows_col) = match &schema {
         Ok(s) => (
@@ -1182,28 +1113,34 @@ async fn get_or_compute_tail(org_id: &str, stream: &str, offset: i64) -> Option<
     if !relevant {
         let data = TailData {
             tail_start,
-            tail_end: now,
+            tail_end,
             ..Default::default()
         };
-        return Some(TAIL_CACHE.put(org_id, stream, offset, now, data));
+        return Some(data);
     }
 
     // The BOUNDED two-stage form (§5.2), reusing the rollup's own builders —
     // never the raw unbounded aggregate.
-    let rank_sql = rollup::build_rank_sql(stream, rollup::ROLLUP_TOP_N, has_rows_col);
-    let totals_sql = rollup::build_totals_sql(stream, has_rows_col);
+    // Stamp the delta rows on the SAME grid the rollup writes to: the window
+    // the rollup will itself write once it catches up, so a cached delta row
+    // and the eventual rollup row are the same window on the same lattice —
+    // comparable, and not double-counted. Derived from the request's end, not
+    // the clock, so the stamp is stable for a given window.
+    let grid_stamp = rollup::floor_to_grid(tail_end);
+    let rank_sql = rollup::build_rank_sql(stream, rollup::ROLLUP_TOP_N, has_rows_col, grid_stamp);
+    let totals_sql = rollup::build_totals_sql(stream, has_rows_col, grid_stamp);
 
     let mut data = TailData {
         tail_start,
-        tail_end: now,
+        tail_end,
         relevant: true,
         ..Default::default()
     };
     // Rank and totals are independent stages of the same bounded form — run
     // them concurrently rather than back to back.
     let (rank_rows, totals_rows) = tokio::join!(
-        rollup::run_dbm_search(org_id, rank_sql, tail_start, now),
-        rollup::run_dbm_search(org_id, totals_sql, tail_start, now),
+        rollup::run_dbm_search(org_id, None, rank_sql, tail_start, tail_end, true),
+        rollup::run_dbm_search(org_id, None, totals_sql, tail_start, tail_end, true),
     );
     match (rank_rows, totals_rows) {
         (Ok(rank), Ok(totals)) => {
@@ -1237,7 +1174,7 @@ async fn get_or_compute_tail(org_id: &str, stream: &str, offset: i64) -> Option<
             data.failed = true;
         }
     }
-    Some(TAIL_CACHE.put(org_id, stream, offset, now, data))
+    Some(data)
 }
 
 // ─── Search harnesses ────────────────────────────────────────────────────────
@@ -1266,7 +1203,11 @@ async fn run_stats_search(
     // a `_timestamp` bound — and it is shifted to `(start, end]` here, at the one
     // chokepoint every stats read passes through, so no call site can forget.
     let (lo, hi) = stats_read_range(start_time, end_time);
-    let req = rollup::dbm_search_request(sql, lo, hi, STATS_READ_SIZE as i64, 30);
+    // Cached. The range is the CALLER'S (shifted to `(start, end]` above), so
+    // every viewer of the same window asks the identical question and the
+    // result cache can answer it — the rollup read is the cheap half, but it is
+    // also the one every DBM tab issues on every load.
+    let req = rollup::dbm_search_request(sql, lo, hi, STATS_READ_SIZE as i64, 30, true);
     // The caller's identity is carried into the search, not dropped. It does NOT
     // authorize the read — `search_service` performs no permission check; that is
     // the handler's job (see `can_read_stream`). What it does carry is the
@@ -1274,12 +1215,21 @@ async fn run_stats_search(
     // attribution every search task, cancellation and audit record is keyed on.
     // `None` is reserved for the background rollup writer, which has no user.
     let trace_id = config::ider::generate();
-    let resp = crate::search::search(
+    // Through the CACHE wrapper, not the bare planner: `search_service::search`
+    // only stores `use_cache` on the request and never consults the cache —
+    // the caching lives in `search_service::cache::search`
+    // (`prepare_cache_response`/`check_cache`). Same entrypoint every sibling
+    // traces read uses.
+    let resp = search_service::cache::search(
         &trace_id,
         org_id,
         StreamType::Logs,
         user_id.map(str::to_string),
         &req,
+        String::new(),
+        false,
+        None,
+        false,
     )
     .await?;
     // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
@@ -1404,7 +1354,7 @@ impl Freshness {
 
 /// Tails + freshness bookkeeping for the involved streams.
 struct CollectedTails {
-    tails: Vec<Arc<TailData>>,
+    tails: Vec<TailData>,
     data_through: i64,
     tail_covers_from: Option<i64>,
     tail_through: Option<i64>,
@@ -1485,7 +1435,7 @@ async fn collect_tails(
         let computed = join_all(
             streams
                 .iter()
-                .map(|stream| get_or_compute_tail(org_id, stream, offset_of(stream))),
+                .map(|stream| compute_tail(org_id, stream, offset_of(stream), start_time, end_time)),
         )
         .await;
         for t in computed.into_iter().flatten() {
@@ -2486,7 +2436,7 @@ pub async fn get_dbm_query_history(
         (names.len() == 1).then(|| names.into_iter().next().unwrap())
     });
 
-    let interval_micros = rollup::ROLLUP_INTERVAL_SECS as i64 * 1_000_000;
+    let interval_micros = rollup::rollup_interval_secs() as i64 * 1_000_000;
     let mut series: Vec<Value> = Vec::new();
     for (window_end, rows) in &fp_by_window {
         let mut point = merge_rows(rows.iter().copied());
@@ -2502,7 +2452,8 @@ pub async fn get_dbm_query_history(
         let mut point = json!({ "timestamp": window_end, "below_top_n": true });
         if let Some(stream) = backfill_stream_ref {
             let sql = build_backfill_sql(stream, fingerprint);
-            match rollup::run_dbm_search(org, sql, window_end - interval_micros, *window_end).await
+            match rollup::run_dbm_search(org, user_id, sql, window_end - interval_micros, *window_end, true)
+                    .await
             {
                 Ok(rows) if !rows.is_empty() && get_i64(&rows[0], "calls") > 0 => {
                     let mut merged = rows[0].clone();
@@ -2568,7 +2519,7 @@ pub async fn get_dbm_query_history(
             &filters.span_sql_preds_for("dbspan."),
             endpoints_limit,
         );
-        Some(rollup::run_dbm_search(org, sql, start_time, end_time).await)
+        Some(rollup::run_dbm_search(org, user_id, sql, start_time, end_time, true).await)
     };
 
     let (backfill_points, collected, endpoints) =
@@ -2747,13 +2698,15 @@ pub async fn get_dbm_query_endpoints(
         namespace: q.namespace.clone(),
         ..Default::default()
     };
+    // Carried into the search — see `run_dbm_search`.
+    let user_id = Some(user_email.user_id.as_str());
     let sql = build_endpoints_sql(
         stream,
         fingerprint,
         &scope.span_sql_preds_for("dbspan."),
         limit,
     );
-    match rollup::run_dbm_search(&org_id, sql, start_time, end_time).await {
+    match rollup::run_dbm_search(&org_id, user_id, sql, start_time, end_time, true).await {
         Ok(hits) => MetaHttpResponse::json(json!({ "hits": hits })),
         Err(e) => {
             log::error!("[DbMonitoring] endpoints query failed for {org_id}/{stream}: {e}");
@@ -2976,7 +2929,7 @@ async fn read_samples_body(
         futures::stream::iter(db_streams.clone().into_iter().map(|stream| {
             let sql = build_samples_sql(&stream, &preds, limit);
             async move {
-                let rows = rollup::run_dbm_search(org, sql, start_time, end_time).await;
+                let rows = rollup::run_dbm_search(org, Some(user_id), sql, start_time, end_time, true).await;
                 (stream, rows)
             }
         }))
@@ -4079,18 +4032,30 @@ async fn run_events_search(
     if !infra::schema::exists(org_id, StreamType::Logs, stream).await {
         return Ok(Vec::new());
     }
-    let req = rollup::dbm_search_request(sql, start_time, end_time, STATS_READ_SIZE as i64, 30);
+    // Cached, for the same reason as `run_stats_search`: the window is the
+    // caller's, so repeated views of one window share one answer.
+    let req =
+        rollup::dbm_search_request(sql, start_time, end_time, STATS_READ_SIZE as i64, 30, true);
     // The caller's identity is carried into the search — see `run_stats_search`
     // for why (query-range limits and attribution, NOT authorization). This
     // function still does not authorize itself: every handler that reaches it
     // must check the caller's read permission on `stream` first.
     let trace_id = config::ider::generate();
-    let resp = crate::search::search(
+    // Through the CACHE wrapper, not the bare planner: `search_service::search`
+    // only stores `use_cache` on the request and never consults the cache —
+    // the caching lives in `search_service::cache::search`
+    // (`prepare_cache_response`/`check_cache`). Same entrypoint every sibling
+    // traces read uses.
+    let resp = search_service::cache::search(
         &trace_id,
         org_id,
         StreamType::Logs,
         user_id.map(str::to_string),
         &req,
+        String::new(),
+        false,
+        None,
+        false,
     )
     .await?;
     // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
@@ -11038,90 +11003,6 @@ mod tests {
         }
     }
 
-    // ── Tail cache (D4: unfiltered key, TTL, offset window-bucket) ──────────
-
-    fn tail_fixture() -> TailData {
-        TailData {
-            tail_start: 1_000,
-            tail_end: 2_000,
-            rank_rows: vec![json!({"fingerprint": "abc", "calls": 5})],
-            totals_rows: vec![json!({"db_system": "pg", "calls": 5})],
-            truncated: false,
-            relevant: true,
-            failed: false,
-        }
-    }
-
-    #[test]
-    fn test_tail_cache_hit_within_ttl() {
-        let cache = TailCache::new();
-        cache.put("org1", "s1", 1_000, 10_000, tail_fixture());
-        let hit = cache.get("org1", "s1", 1_000, 10_000 + 29_999_999, 30_000_000);
-        assert!(hit.is_some());
-        assert_eq!(hit.unwrap().rank_rows.len(), 1);
-        // other (org, stream) keys miss
-        assert!(cache.get("org2", "s1", 1_000, 10_001, 30_000_000).is_none());
-        assert!(cache.get("org1", "s2", 1_000, 10_001, 30_000_000).is_none());
-    }
-
-    #[test]
-    fn test_tail_cache_expires_after_ttl() {
-        let cache = TailCache::new();
-        cache.put("org1", "s1", 1_000, 10_000, tail_fixture());
-        assert!(
-            cache
-                .get("org1", "s1", 1_000, 10_000 + 30_000_000, 30_000_000)
-                .is_none()
-        );
-    }
-
-    // The rollup offset is the window-bucket: when the job advances the
-    // offset, the cached tail (which starts at the OLD offset) would
-    // double-count against the new rollup rows — it must miss immediately,
-    // even inside the TTL.
-    #[test]
-    fn test_tail_cache_offset_advance_invalidates() {
-        let cache = TailCache::new();
-        cache.put("org1", "s1", 1_000, 10_000, tail_fixture());
-        assert!(cache.get("org1", "s1", 2_000, 10_001, 30_000_000).is_none());
-    }
-
-    // The cache key carries NO filter components: the same (unfiltered) entry
-    // serves every filter combination — filters apply at merge time. The
-    // stored rows are the full unfiltered aggregate.
-    #[test]
-    fn test_tail_cache_key_is_unfiltered() {
-        let cache = TailCache::new();
-        let mut data = tail_fixture();
-        data.rank_rows = vec![
-            json!({"fingerprint": "a", "db_system": "pg", "calls": 1}),
-            json!({"fingerprint": "b", "db_system": "redis", "calls": 2}),
-        ];
-        cache.put("org1", "s1", 1_000, 10_000, data);
-        // two "requests" with different scopes read the SAME entry…
-        let for_pg = cache.get("org1", "s1", 1_000, 10_001, 30_000_000).unwrap();
-        let for_redis = cache.get("org1", "s1", 1_000, 10_002, 30_000_000).unwrap();
-        assert_eq!(for_pg.rank_rows, for_redis.rank_rows);
-        // …and each applies its own filter at merge time.
-        let pg = ScopeFilters {
-            system: Some("pg".into()),
-            ..Default::default()
-        };
-        let redis = ScopeFilters {
-            system: Some("redis".into()),
-            ..Default::default()
-        };
-        assert_eq!(for_pg.rank_rows.iter().filter(|r| pg.matches(r)).count(), 1);
-        assert_eq!(
-            for_redis
-                .rank_rows
-                .iter()
-                .filter(|r| redis.matches(r))
-                .count(),
-            1
-        );
-    }
-
     // ── Server-vantage endpoints ────────────────────────────────────────────
 
     /// Note `all_cols()` is derived from `ALL_DBM_FIELDS`, so this golden grows
@@ -13757,18 +13638,6 @@ mod tests {
 
         let b: BlockingQuery = serde_json::from_value(json!({"namespace": "dbmlab"})).unwrap();
         assert_eq!(b.database(), Some("dbmlab"));
-    }
-
-    #[test]
-    fn test_tail_ttl_micros() {
-        // default interval 900 s → min(30 s, 90 s) = 30 s
-        assert_eq!(tail_ttl_micros(900), 30_000_000);
-        // short interval 60 s → min(30 s, 6 s) = 6 s
-        assert_eq!(tail_ttl_micros(60), 6_000_000);
-        // degenerate interval → floored at 1 s
-        assert_eq!(tail_ttl_micros(1), 1_000_000);
-        // huge interval → capped at 30 s
-        assert_eq!(tail_ttl_micros(86_400), 30_000_000);
     }
 
     // ── collection diagnostics ──────────────────────────────────────────────
@@ -17080,10 +16949,17 @@ mod tests {
             ("rollup.rs", include_str!("rollup.rs")),
             ("server_vantage.rs", include_str!("server_vantage.rs")),
         ];
+        // BOTH entrypoints count. A DBM read reaches the search layer either
+        // through the bare planner (`crate::search::search`) or through the
+        // result-cache wrapper (`search_service::cache::search`) — the latter is
+        // what a cached read must use, because the planner never consults the
+        // cache. A partial response is equally possible through either, so
+        // discovering only one would let a whole family of reads skip this guard.
+        let entrypoints = ["crate::search::search(", "search_service::cache::search("];
         let mut total = 0;
         for (name, src) in modules {
             let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
-            for (i, _) in code.match_indices("crate::search::search(") {
+            for (i, _) in entrypoints.iter().flat_map(|e| code.match_indices(e)) {
                 total += 1;
                 // The guard must appear in the lines that consume the response,
                 // before the function's own closing brace.
@@ -17102,11 +16978,15 @@ mod tests {
                 );
             }
         }
+        // FOUR, not three: the stats harness, the events harness, and the rollup
+        // harness — the last spelling the call TWICE, once through the cache
+        // wrapper (reads) and once through the bare planner (the rollup writer,
+        // which must not cache). Both branches consume a response; both guarded.
         assert_eq!(
-            total, 3,
-            "expected the stats, events and rollup read harnesses; found \
-             {total} — a new search was added, and it must decide what it does \
-             with a partial response"
+            total, 4,
+            "expected the stats and events harnesses plus the rollup harness's \
+             cached/uncached pair; found {total} — a new search was added, and \
+             it must decide what it does with a partial response"
         );
     }
 

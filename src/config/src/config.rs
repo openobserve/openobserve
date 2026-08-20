@@ -863,6 +863,12 @@ pub struct DatabaseMonitoring {
         help = "Enable Database Monitoring: ingest-time db span fingerprinting, server-vantage log canonicalization, the query-stats rollup job, and the DBM read APIs"
     )]
     pub enabled: bool,
+    #[env_config(
+        name = "ZO_DB_MONITORING_ROLLUP_INTERVAL_SECS",
+        default = 900,
+        help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
+    )]
+    pub rollup_interval_secs: u64,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -5413,13 +5419,31 @@ mod tests {
 
     #[test]
     fn test_db_monitoring_config_defaults() {
-        // The DBM backend config is a SINGLE feature flag (product decision):
-        // enabled means every DBM signal is canonicalized and served, disabled
-        // means none is. The old per-signal knobs and operational tunables are
-        // consts in their consuming modules now, so `enabled` is the whole
-        // config surface — and it ships ON.
+        // DBM's config surface is the feature flag plus ONE operational knob.
+        // The per-SIGNAL flags stay gone (product decision: enabled means every
+        // DBM signal is canonicalized and served, disabled means none is), but
+        // the rollup interval is back as config because it is the freshness
+        // floor of every rollup-backed page and the sizing input for the read
+        // path's live delta — a deployment's right value depends on its span
+        // volume, which no shipped constant can know. It ships ON, at 900 s.
         let cfg = Config::init().unwrap();
         assert!(cfg.db_monitoring.enabled);
+        assert_eq!(cfg.db_monitoring.rollup_interval_secs, 900);
+    }
+
+    /// The interval is read through `rollup_interval_secs()`, which clamps to
+    /// [60, 3600]. A deployment that sets 0 (or omits the var into a 0 default
+    /// on some loader path) would otherwise divide the job cadence to zero and
+    /// spin, and an unbounded upper value makes the read path's delta a
+    /// full-window scan on every miss.
+    #[test]
+    fn test_db_monitoring_rollup_interval_is_clamped() {
+        // Mirrors the accessor's clamp, asserted here so the bound is pinned
+        // next to the field it guards.
+        assert_eq!(0_u64.clamp(60, 3600), 60);
+        assert_eq!(30_u64.clamp(60, 3600), 60);
+        assert_eq!(900_u64.clamp(60, 3600), 900);
+        assert_eq!(86_400_u64.clamp(60, 3600), 3600);
     }
 
     /// The UI gates the whole DBM menu/route surface on this flag, so it only
