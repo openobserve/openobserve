@@ -173,7 +173,9 @@ pub fn extract_where(sql: &str) -> WhereInfo {
                         let kept: Vec<String> = conjuncts
                             .iter()
                             .filter(|c| {
-                                conjunct_streams(c, &alias_to_stream).iter().all(|s| s == stream)
+                                conjunct_streams(c, &alias_to_stream)
+                                    .iter()
+                                    .all(|s| s == stream)
                             })
                             .map(|c| {
                                 let mut e = (*c).clone();
@@ -182,7 +184,8 @@ pub fn extract_where(sql: &str) -> WhereInfo {
                             })
                             .collect();
                         if !kept.is_empty() {
-                            info.where_by_stream.insert(stream.clone(), kept.join(" AND "));
+                            info.where_by_stream
+                                .insert(stream.clone(), kept.join(" AND "));
                         }
                     }
                 }
@@ -427,10 +430,8 @@ mod tests {
         assert_eq!(m.get("stream_b").map(String::as_str), Some("tier = 'gold'"));
 
         // A cross-stream conjunct (a.x = b.y) is dropped from both streams.
-        let m2 = wbs(
-            "SELECT a.x FROM stream_a a JOIN stream_b b ON a.id = b.id \
-             WHERE a.x = b.y AND a.env = 'prod'",
-        );
+        let m2 = wbs("SELECT a.x FROM stream_a a JOIN stream_b b ON a.id = b.id \
+             WHERE a.x = b.y AND a.env = 'prod'");
         assert_eq!(m2.get("stream_a").map(String::as_str), Some("env = 'prod'"));
         assert!(!m2.contains_key("stream_b"));
 
