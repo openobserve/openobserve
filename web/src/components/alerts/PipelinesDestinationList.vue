@@ -183,7 +183,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
 import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
@@ -388,11 +388,9 @@ export default defineComponent({
         });
     };
     const getTemplates = () => {
-      templateService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-        })
-        .then((res) => (templates.value = res.data));
+      queryClient
+        .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
+        .then((list: any) => (templates.value = list));
     };
     const updateRoute = () => {
       if (router.currentRoute.value.query.action === "add") editDestination(null);

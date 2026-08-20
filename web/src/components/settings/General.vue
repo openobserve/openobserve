@@ -588,6 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-ignore
 import { configQuery } from "@/services/config.queries";
 import { queryClient } from "@/composables/query/queryClient";
+import { orgSummaryQuery } from "@/services/organizations.queries";
 import {
   computed,
   defineComponent,
@@ -856,11 +857,11 @@ export default defineComponent({
       if (!orgId || orgScope.value || orgScopeLoading.value) return;
       orgScopeLoading.value = true;
       try {
-        const res = await organizations.get_organization_summary(orgId);
+        const data: any = await queryClient.fetchQuery(orgSummaryQuery(orgId));
         orgScope.value = t("settings.deleteOrganizationScope", {
-          dashboards: res.data?.total_dashboards ?? 0,
-          streams: res.data?.streams?.num_streams ?? 0,
-          size: formatSizeFromMB(String(res.data?.streams?.total_storage_size ?? 0)),
+          dashboards: data?.total_dashboards ?? 0,
+          streams: data?.streams?.num_streams ?? 0,
+          size: formatSizeFromMB(String(data?.streams?.total_storage_size ?? 0)),
         });
       } catch {
         // Contextual only — the delete flow stays usable without the counts.

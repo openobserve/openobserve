@@ -30,7 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref } from "vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
+import { templatesQuery } from "@/services/alert_templates.queries";
+import { queryClient } from "@/composables/query/queryClient";
 
 export type DepNodeKind = "template" | "destination" | "alert";
 
@@ -458,12 +459,12 @@ export function useDependencyGraph() {
           org_identifier: org,
           module: "alert",
         }),
-        templateService.list({ org_identifier: org }),
+        queryClient.fetchQuery(templatesQuery(org)),
       ]);
 
       const alerts = alertsRes.data?.list ?? alertsRes.data ?? [];
       const destinations = destinationsRes.data ?? [];
-      const templates = templatesRes.data ?? [];
+      const templates = templatesRes ?? [];
 
       graph.value = buildGraph(alerts, destinations, templates);
       graphCache = { org, graph: graph.value, at: Date.now() };

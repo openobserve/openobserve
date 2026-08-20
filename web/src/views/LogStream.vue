@@ -378,6 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { streamPageQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
+import { orgSummaryQuery } from "@/services/organizations.queries";
 import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -391,7 +392,6 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem, StatTrend } from "@/lib/data/StatStrip/OStatStrip.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import streamService from "../services/stream";
-import organizationsService from "../services/organizations";
 import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -830,10 +830,10 @@ export default defineComponent({
     const getStreamSummary = () => {
       if (!store.state.selectedOrganization?.identifier) return;
       summaryLoading.value = true;
-      organizationsService
-        .get_organization_summary(store.state.selectedOrganization.identifier)
-        .then((res: any) => {
-          streamSummary.value = res.data?.streams ?? null;
+      queryClient
+        .fetchQuery(orgSummaryQuery(store.state.selectedOrganization.identifier))
+        .then((data: any) => {
+          streamSummary.value = data?.streams ?? null;
         })
         .catch(() => {
           // Silent: the strip is context, not the page's payload. Tiles fall back
