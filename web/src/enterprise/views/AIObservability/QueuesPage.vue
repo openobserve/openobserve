@@ -504,13 +504,13 @@ const columns = computed<OTableColumnDef[]>(() => [
 // `force`.
 const refreshQueues = () => refresh(true);
 
-async function refresh(_force = true) {
+async function refresh(force = true) {
   if (!orgId.value) return;
   try {
     // ONE request: the list row now carries targetDatasetName and the review
     // counts, so nothing else is needed to render the table. The Score Config
     // and Dataset catalogs are create-drawer concerns and load on first open.
-    await queuesList.refetch();
+    if (force) await queuesList.refetch();
     // Org-wide catalogs, so a manual refresh invalidates them; the next drawer
     // open re-fetches.
     optionsLoaded.value = false;

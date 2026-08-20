@@ -793,7 +793,7 @@ const refresh = () => load(null, undefined, true);
 // org and folder are both optional: mount and refresh call `load()` bare and
 // fall back to the current org and active folder — the folder-change path is the
 // only caller that passes a folder the refs have not caught up with yet.
-async function load(orgId?: string | null, folderId?: string, _force = false) {
+async function load(orgId?: string | null, folderId?: string, force = false) {
   if (!org.value) return;
   error.value = null;
   // sometimes the folder id might not be updated so passed via
@@ -803,7 +803,7 @@ async function load(orgId?: string | null, folderId?: string, _force = false) {
   // Let the key pick up the new org/folder before asking for the data.
   await nextTick();
   try {
-    await slosList.refetch();
+    if (force) await slosList.refetch();
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
     selectedIds.value = [];

@@ -809,11 +809,11 @@ export default defineComponent({
       dismissLoadingToast = null;
     });
 
-    // An explicit call always reads; mount and invalidation-driven repaints
-    // come from the query itself. The cold-read toast is driven by `loading`
-    // above, so it no longer has to be sequenced here.
-    const getServiceAccountsUsers = async (_force = false) => {
-      await serviceAccountsList.refetch();
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself. The cold-read
+    // toast is driven by `loading` above, so it is not sequenced here.
+    const getServiceAccountsUsers = async (force = false) => {
+      if (force) await serviceAccountsList.refetch();
       return true;
     };
     const addUser = (props: any, is_updated: boolean) => {

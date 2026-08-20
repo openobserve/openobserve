@@ -186,7 +186,8 @@ describe("AppGroups Component", () => {
       // Drop the cached read so this override is the one that runs.
       queryClient.clear();
 
-      await wrapper.vm.setupGroups();
+      // Explicit read: mount-path reads now come from the query itself.
+      await wrapper.vm.setupGroups(true);
       await flushPromises();
 
       expect(wrapper.vm.rows).toHaveLength(3);
@@ -494,7 +495,8 @@ describe("AppGroups Component", () => {
       // Drop the cached read so this override is the one that runs.
       queryClient.clear();
 
-      await wrapper.vm.setupGroups();
+      // Explicit read: mount-path reads now come from the query itself.
+      await wrapper.vm.setupGroups(true);
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
@@ -545,7 +547,8 @@ describe("AppGroups Component", () => {
       // Drop the cached read so this override is the one that runs.
       queryClient.clear();
 
-      await wrapper.vm.setupGroups();
+      // Explicit read: mount-path reads now come from the query itself.
+      await wrapper.vm.setupGroups(true);
       await flushPromises();
 
       expect(wrapper.vm.rows).toHaveLength(0);

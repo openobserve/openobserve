@@ -1028,10 +1028,10 @@ const fetching = pipelinesList.isFetching;
 // Bound to the refresh button: always hits the server.
 const refreshPipelines = () => getPipelines(true);
 
-// An explicit call always reads; mount and invalidation-driven repaints come
-// from the query itself.
-const getPipelines = async (_force = false) => {
-  await pipelinesList.refetch();
+// Only an explicit call reads: refresh, post-write reload, search. Mount and
+// invalidation-driven repaints come from the query itself.
+const getPipelines = async (force = false) => {
+  if (force) await pipelinesList.refetch();
   // `refetch` resolves before vue-query has propagated the new value into its
   // reactive refs, so callers reading `pipelines` straight after need a tick.
   await nextTick();

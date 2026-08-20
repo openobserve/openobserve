@@ -519,7 +519,7 @@ function waitForOrgIdentifier(): Promise<void> {
   });
 }
 
-async function loadMonitors(folderId?: string, _force = false) {
+async function loadMonitors(folderId?: string, force = false) {
   if (!orgIdentifier.value) return;
   const targetFolder =
     folderId !== undefined
@@ -530,7 +530,7 @@ async function loadMonitors(folderId?: string, _force = false) {
   readFolder.value = targetFolder;
   // Let the key pick up the new folder before asking for the data.
   await nextTick();
-  await monitorsList.refetch();
+  if (force) await monitorsList.refetch();
 }
 
 async function initPage() {

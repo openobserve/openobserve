@@ -381,12 +381,12 @@ const columns = computed<OTableColumnDef[]>(() => [
 // `force`.
 const refreshDatasets = () => refresh(true);
 
-async function refresh(_force = true) {
+async function refresh(force = true) {
   if (!orgId.value) return;
   try {
     // `force` by default: every caller here is a post-write reload or the
     // refresh control. A plain mount passes false and keeps the cached rows.
-    await datasetsList.refetch();
+    if (force) await datasetsList.refetch();
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
   }

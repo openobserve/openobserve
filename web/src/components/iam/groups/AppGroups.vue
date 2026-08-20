@@ -317,11 +317,10 @@ watch(groupsList.error, (err: any) => {
   if (err) console.log(err);
 });
 
-// An explicit call always reads — `refetch` bypasses staleTime either way, so
-// `force` no longer changes anything. Mount and invalidation-driven repaints
-// come from the query itself.
-const setupGroups = async (_force = false) => {
-  await groupsList.refetch();
+// Only an explicit call reads: refresh, post-write reload, search. Mount and
+// invalidation-driven repaints come from the query itself.
+const setupGroups = async (force = false) => {
+  if (force) await groupsList.refetch();
 };
 
 const orgId = useOrgId();

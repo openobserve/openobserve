@@ -583,10 +583,10 @@ export default defineComponent({
       console.error("Failed to load incidents:", error);
     });
 
-    // An explicit call always reads; mount and invalidation-driven repaints
-    // come from the query itself.
-    const loadIncidents = async (_force = false) => {
-      await incidentsList.refetch();
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself.
+    const loadIncidents = async (force = false) => {
+      if (force) await incidentsList.refetch();
     };
 
     const viewIncident = (incident: Incident) => {

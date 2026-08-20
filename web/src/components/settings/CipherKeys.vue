@@ -366,10 +366,10 @@ export default defineComponent({
       }
     });
 
-    // An explicit call always reads; mount and invalidation-driven repaints
-    // come from the query itself.
-    const getData = async (_force = false) => {
-      await cipherKeysList.refetch();
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself.
+    const getData = async (force = false) => {
+      if (force) await cipherKeysList.refetch();
     };
 
     getData();

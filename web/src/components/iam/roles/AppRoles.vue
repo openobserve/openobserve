@@ -265,11 +265,10 @@ watch(rolesList.error, (err: any) => {
   if (err) console.log(err);
 });
 
-// An explicit call always reads — `refetch` bypasses staleTime either way, so
-// `force` no longer changes anything. Mount and invalidation-driven repaints
-// come from the query itself.
-const setupRoles = async (_force = false) => {
-  await rolesList.refetch();
+// Only an explicit call reads: refresh, post-write reload, search. Mount and
+// invalidation-driven repaints come from the query itself.
+const setupRoles = async (force = false) => {
+  if (force) await rolesList.refetch();
 };
 
 const orgId = useOrgId();
