@@ -14,7 +14,9 @@ import {
 const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
-test.describe.configure({ retries: 1 });
+// No file-level `retries` override: it pinned this file to 1 retry, which both added
+// a retry locally (project default 0, hiding flakes during development) and *cut*
+// CI's 3 retries down to 1. The project-level policy is the right one.
 
 test.describe("ConfigPanel — Axis Settings", () => {
   test.beforeEach(async ({ page }) => {
@@ -35,6 +37,11 @@ test.describe("ConfigPanel — Axis Settings", () => {
 
     await pm.dashboardPanelConfigs.Y_AxisMin("50");
     await pm.dashboardPanelConfigs.Y_AxisMax("1000");
+    // Confirm the values actually landed. Without this the test is vacuous: its only
+    // persistence assertion is that both fields end up EMPTY, which a pair of fills
+    // that silently no-opped would satisfy just as well as a real set-then-clear.
+    await expect(yAxisMinInput.locator('[data-test$="-field"]')).toHaveValue("50");
+    await expect(yAxisMaxInput.locator('[data-test$="-field"]')).toHaveValue("1000");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Y-axis min=50, max=1000");
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -86,7 +93,12 @@ test.describe("ConfigPanel — Axis Settings", () => {
 
     const axisBorderToggle = pm.dashboardPanelConfigs.axisBorder;
     await expect(axisBorderToggle).toBeVisible();
+    // Default is axis_border_show: false. Asserting the starting state makes the
+    // post-save "true" assertion meaningful — otherwise a toggle that was already
+    // on, or a click that did nothing, is indistinguishable from a working one.
+    await expect(axisBorderToggle.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "false");
     await axisBorderToggle.click();
+    await expect(axisBorderToggle.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Axis border enabled");
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -108,7 +120,11 @@ test.describe("ConfigPanel — Axis Settings", () => {
 
     const gridlinesToggle = pm.dashboardPanelConfigs.showGridlines;
     await expect(gridlinesToggle).toBeVisible();
+    // Default is show_gridlines: true — assert it starts on so "disable" is a real
+    // state change rather than a no-op that happens to end in the expected state.
+    await expect(gridlinesToggle.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await gridlinesToggle.click();
+    await expect(gridlinesToggle.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "false");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Gridlines disabled");
     await pm.dashboardPanelActions.waitForChartToRender();

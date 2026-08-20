@@ -30,10 +30,30 @@ export async function reopenPanelConfig(page, pm) {
   // Wait for the add_panel page to fully load before interacting with the config sidebar
   await page.waitForURL(/\/add_panel/, { timeout: 15000 });
   await page.locator('[data-test="dashboard-sidebar"]').waitFor({ state: "visible", timeout: 15000 });
-  // Config panel may already be open (state preserved); only open if not already visible
-  const isConfigOpen = await page.locator('[data-test="dashboard-config-description"]').isVisible();
-  if (!isConfigOpen) {
+
+  // Ask whether the sidebar is COLLAPSED, which is the app's own condition:
+  // `panel-sidebar-header-collapsed` is rendered under v-if="!isOpen", and
+  // openConfigPanel() clicks exactly that element to expand the sidebar.
+  //
+  // The previous probe used `dashboard-config-description` as the "already open"
+  // signal, which cannot work: that field lives inside the General OCollapsible,
+  // and every section starts collapsed on mount (no section sets defaultExpanded).
+  // So an open sidebar with collapsed sections read as "closed", openConfigPanel()
+  // then waited for a collapsed-header element that does not exist while the
+  // sidebar is open, and the helper died on a selector timeout. The sidebar's own
+  // open flag lives in the shared dashboardPanelData.layout store while
+  // expandedSections is per-mount state, so the two genuinely can disagree.
+  const isCollapsed = await pm.dashboardPanelConfigs.configBtn
+    .isVisible()
+    .catch(() => false);
+
+  if (isCollapsed) {
+    // openConfigPanel() expands the sidebar and then expands all sections.
     await pm.dashboardPanelConfigs.openConfigPanel();
+  } else {
+    // Already open — the sections still need expanding, since config controls are
+    // inside collapsibles. expandAllConfigSections() is idempotent.
+    await pm.dashboardPanelConfigs.expandAllConfigSections();
   }
 }
 
