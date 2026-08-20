@@ -198,7 +198,7 @@ fn degraded_classes_differ_from_text_classes() {
 //
 // Every SERVER string below is verbatim `o2_dbm_activity_query` captured off the
 // live rig (`dbm_server`, `o2_dbm_kind='top_query'`), and every CLIENT string is
-// the paired `query_norm` from `/traces/db_monitoring/queries` — producer output,
+// the paired `query_norm` from `/db_monitoring/queries` — producer output,
 // not hand-written approximations.
 
 /// Pair a CLIENT statement text with the SERVER text of the SAME statement and

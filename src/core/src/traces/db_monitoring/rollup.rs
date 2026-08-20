@@ -957,7 +957,14 @@ pub(crate) async fn run_dbm_search(
     // name: the background rollup WRITER, and the shared/cached delta, whose
     // one computation answers every viewer of that window.
 
-    let req = dbm_search_request(sql, start_time, end_time, SEARCH_SIZE as i64, 300, use_cache);
+    let req = dbm_search_request(
+        sql,
+        start_time,
+        end_time,
+        SEARCH_SIZE as i64,
+        300,
+        use_cache,
+    );
 
     let trace_id = config::ider::generate();
     let resp = if use_cache {
@@ -1110,7 +1117,10 @@ mod tests {
         for probe in [0_i64, 1, w - 1, w, w + 1, 5 * w + 7] {
             let f = floor_to_grid(probe);
             assert_eq!(f % w, 0, "{probe} floored to {f}, not on the grid");
-            assert!(f <= probe && probe - f < w, "{probe} floored outside its own window");
+            assert!(
+                f <= probe && probe - f < w,
+                "{probe} floored outside its own window"
+            );
         }
     }
 

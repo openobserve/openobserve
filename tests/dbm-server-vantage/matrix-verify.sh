@@ -21,7 +21,7 @@ check() {
   for ep in $EPS; do
     local body code hits note
     body=$(curl -s -m 90 -w $'\n%{http_code}' -u "$USER:$PASS" \
-      "http://localhost:$port/api/$org/traces/db_monitoring/$ep?start_time=$AGO&end_time=$NOW" 2>/dev/null)
+      "http://localhost:$port/api/$org/db_monitoring/$ep?start_time=$AGO&end_time=$NOW" 2>/dev/null)
     code=$(printf '%s' "$body" | tail -1)
     payload=$(printf '%s' "$body" | sed '$d')
     read -r hits note <<<"$(printf '%s' "$payload" | python3 -c '

@@ -616,7 +616,7 @@ describe("DatabasesPage gates the coverage caveat on the shared rule", () => {
  * when the database's own list is non-empty.
  *
  * The payloads below are the LIVE bodies, captured from
- * `/api/dbm_notraces/traces/db_monitoring/badges` at both windows.
+ * `/api/dbm_nodb_monitoring/badges` at both windows.
  */
 describe("an empty vantage withholds its overlap badge (D6/L2)", () => {
   beforeEach(() => vi.clearAllMocks());

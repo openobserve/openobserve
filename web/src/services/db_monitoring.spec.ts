@@ -42,7 +42,7 @@ describe("db_monitoring service · getActivity", () => {
   it("GETs the activity endpoint under the org", () => {
     dbMonitoringService.getActivity("myorg");
     expect(mockClient.get).toHaveBeenCalledWith(
-      "/api/myorg/traces/db_monitoring/activity",
+      "/api/myorg/db_monitoring/activity",
       expect.anything(),
     );
   });
@@ -158,7 +158,7 @@ describe("db_monitoring service · getQueryPlans", () => {
   it("GETs the plans endpoint under the org", () => {
     dbMonitoringService.getQueryPlans("myorg", { fingerprint: "3a74e60b4bd45cc6" });
     expect(mockClient.get).toHaveBeenCalledWith(
-      "/api/myorg/traces/db_monitoring/query/plans",
+      "/api/myorg/db_monitoring/query/plans",
       expect.anything(),
     );
   });
@@ -254,7 +254,7 @@ describe("db_monitoring service · getSamples", () => {
   it("GETs the samples endpoint under the org", () => {
     dbMonitoringService.getSamples("myorg");
     expect(mockClient.get).toHaveBeenCalledWith(
-      "/api/myorg/traces/db_monitoring/samples",
+      "/api/myorg/db_monitoring/samples",
       expect.anything(),
     );
   });
@@ -301,7 +301,7 @@ describe("db_monitoring service · getQueryInsights", () => {
   it("GETs the merged endpoint under the org", () => {
     dbMonitoringService.getQueryInsights("myorg", { fingerprint: "fp" });
     expect(mockClient.get).toHaveBeenCalledWith(
-      "/api/myorg/traces/db_monitoring/query/insights",
+      "/api/myorg/db_monitoring/query/insights",
       expect.anything(),
     );
   });

@@ -104,7 +104,7 @@ def _stats_sql(client: OpenObserveClient, sql: str, minutes: int = 30):
 
 
 def _dbm_get(client: OpenObserveClient, path: str, **params) -> dict:
-    resp = client.get(f"traces/db_monitoring/{path}", params=params)
+    resp = client.get(f"db_monitoring/{path}", params=params)
     assert resp.status_code == 200, f"{path}: {resp.status_code} {resp.text[:300]}"
     return resp.json()
 
@@ -411,9 +411,9 @@ class TestEndpointsEndpoint:
             assert h.get("endpoint"), h
 
     def test_missing_params_are_400(self, client):
-        assert client.get("traces/db_monitoring/query/endpoints").status_code == 400
+        assert client.get("db_monitoring/query/endpoints").status_code == 400
         assert (
-            client.get("traces/db_monitoring/query/endpoints", params={"fingerprint": "x"}).status_code
+            client.get("db_monitoring/query/endpoints", params={"fingerprint": "x"}).status_code
             == 400
         )
 
