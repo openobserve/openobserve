@@ -263,6 +263,34 @@ describe("useAlertLibrary — loadManifest", () => {
     expect(a.alerts).toHaveLength(1);
   });
 
+  it("does not let force join an already in-flight request", async () => {
+    // The Retry path. If force joins the in-flight promise, a request that
+    // hangs (no timeout on fetch) makes Retry a permanent no-op: every retry
+    // re-awaits the same stuck promise. "Force" means "get me fresh data now",
+    // which a request that started before the user asked cannot satisfy.
+    let releaseFirst: () => void = () => {};
+    fetchMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releaseFirst = () =>
+          resolve({ ok: true, status: 200, json: async () => manifest({ alert_count: 1 }) });
+      }),
+    );
+    const lib = useAlertLibrary();
+    const stuck = lib.loadManifest();
+
+    respondOnceWith(manifest({ alert_count: 2 }));
+    const forced = await lib.loadManifest({ force: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(forced.alert_count).toBe(2);
+
+    releaseFirst();
+    await stuck;
+    // The forced result must survive: a late-settling first request must not
+    // clear the in-flight slot belonging to a newer one, nor overwrite it.
+    expect(mockStore.state.alertLibrary.manifest).toEqual(manifest({ alert_count: 2 }));
+  });
+
   it("rejects on an HTTP error and caches nothing", async () => {
     respondOnceWith(null, { ok: false, status: 503 });
 
@@ -382,20 +410,49 @@ describe("useAlertLibrary — loadAlertFile", () => {
     expect(file.trigger_condition.threshold).toBe(1);
   });
 
-  it("caches the file under the entry's stable id", async () => {
-    // `id` is <pack>/<name> — the same key install stamps as provenance. Keying
-    // the cache on bare `name` would collide across packs.
+  it("caches the file under its id AND content hash", async () => {
+    // `id` is <pack>/<name>; bare `name` would collide across packs.
+    //
+    // The hash is in the key because the file cache has no TTL while the
+    // MANIFEST refreshes every 10 minutes. Keyed on id alone, a mid-session
+    // republish showed "update available" from the new manifest while install
+    // POSTed the stale cached body — defeating the very field it cited.
     respondOnceWith({ name: "pod_oom_killed" });
     await useAlertLibrary().loadAlertFile(entry());
 
-    expect(mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed"]).toBeDefined();
+    expect(mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed@1c09e8f6ac33"]).toBeDefined();
+  });
+
+  it("refetches when the same alert is republished with a new hash", async () => {
+    respondOnceWith({ name: "old-body" });
+    const lib = useAlertLibrary();
+    await lib.loadAlertFile(entry());
+
+    respondOnceWith({ name: "new-body" });
+    const updated = await lib.loadAlertFile(entry({ content_hash: "deadbeef9999" }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(updated.name).toBe("new-body");
+  });
+
+  it("returns a clone, so a caller cannot mutate the cache", async () => {
+    // The install path mutates the file it is handed (drops `id`, sets
+    // folder/owner, replaces destinations). Handing out the cached Vuex proxy
+    // would write those edits into the session cache for every later reader.
+    respondOnceWith({ name: "pod_oom_killed", destinations: ["k8s_alert"] });
+    const lib = useAlertLibrary();
+    const first = await lib.loadAlertFile(entry());
+    (first as Record<string, unknown>).destinations = ["mutated"];
+
+    const second = await lib.loadAlertFile(entry());
+    expect(second.destinations).toEqual(["k8s_alert"]);
   });
 
   it("serves a file cached in the STORE even with a cold module", async () => {
     // Same requirement as the manifest: the store is the cache. A module-scope
     // Map that is written through to Vuex but never read back passes every
     // other test in this block.
-    mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed"] = { name: "from-store" };
+    mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed@1c09e8f6ac33"] = { name: "from-store" };
 
     const file = await useAlertLibrary().loadAlertFile(entry());
 
@@ -458,7 +515,11 @@ describe("useAlertLibrary — loadAlertFile", () => {
     const [a, b] = await Promise.all([first, second]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(a).toBe(b);
+    // Deep equality, NOT identity: both callers share the one request, but each
+    // receives its own clone so that an installer mutating its copy cannot
+    // corrupt the other caller's — or the session cache.
+    expect(a).toEqual(b);
+    expect(a).not.toBe(b);
     expect(a.name).toBe("once");
   });
 
@@ -467,7 +528,7 @@ describe("useAlertLibrary — loadAlertFile", () => {
 
     await expect(useAlertLibrary().loadAlertFile(entry())).rejects.toThrow();
     expect(committedTypes()).not.toContain("setAlertLibraryFile");
-    expect(mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed"]).toBeUndefined();
+    expect(mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed@1c09e8f6ac33"]).toBeUndefined();
   });
 
   it("rejects when the network call itself fails", async () => {
@@ -487,6 +548,24 @@ describe("useAlertLibrary — loadAlertFile", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(file.name).toBe("pod_oom_killed");
+  });
+
+  it("does not treat a prototype-named id as a cache hit", async () => {
+    // `id` is untrusted and lands in an object key. A bare
+    // `fileCache[entry.id]` returns Object.prototype.constructor for this —
+    // truthy, so the fetch is skipped and a FUNCTION is handed back as the
+    // alert file, which JSON.stringify turns into `undefined` at install time.
+    //
+    // NOTE: jsdom masks the sibling `__proto__` write hazard, so a test that
+    // merely asserted "__proto__ is harmless" would pass and be wrong. The
+    // real defence is the composite `id@hash` key, which cannot collide with
+    // an Object.prototype member at all.
+    respondOnceWith({ name: "genuinely-fetched" });
+    const file = await useAlertLibrary().loadAlertFile(entry({ id: "constructor" }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(file.name).toBe("genuinely-fetched");
+    expect(typeof file).toBe("object");
   });
 
   it("rejects a file body that is not an alert object", async () => {
@@ -567,6 +646,19 @@ describe("useAlertLibrary — isReady", () => {
     expect(() => useAlertLibrary().isReady(entry({ required_streams: undefined }), available)).not.toThrow();
     expect(useAlertLibrary().isReady(entry({ required_streams: undefined }), available)).toBe(false);
     expect(useAlertLibrary().isReady(entry({ required_streams: "a_string" }), available)).toBe(false);
+  });
+
+  it("does not throw on a prototype-named stream_type", () => {
+    // `stream_type` comes from a fetched document, and a bare
+    // `streamsByType[type]` returns a truthy FUNCTION for these — which then
+    // throws on `.has(...)`. isReady runs once per card across 87 cards, so a
+    // single poisoned entry would blank the entire gallery.
+    const available = streams({ metrics: ["kube_pod_container_status_terminated_reason"] });
+    for (const poisoned of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+      const bad = entry({ stream_type: poisoned });
+      expect(() => useAlertLibrary().isReady(bad, available)).not.toThrow();
+      expect(useAlertLibrary().isReady(bad, available)).toBe(false);
+    }
   });
 
   it("matches stream names exactly, without case folding", () => {
