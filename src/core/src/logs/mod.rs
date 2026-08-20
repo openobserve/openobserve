@@ -24,7 +24,7 @@ use ::stream::get_stream;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    DISTINCT_FIELDS, META_ORG_ID, SIZE_IN_MB, get_config,
+    META_ORG_ID, SIZE_IN_MB, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -35,7 +35,6 @@ use config::{
         json::{Map, Value, estimate_json_bytes, get_string_value},
         schema_ext::SchemaExt,
         time::now_micros,
-        util::DISTINCT_STREAM_PREFIX,
     },
 };
 use db;
@@ -50,7 +49,6 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-    metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
 };
 
 pub mod bulk;
@@ -381,8 +379,6 @@ async fn write_logs(
         None => Arc::new(latest_schema),
     };
 
-    let mut distinct_values = Vec::with_capacity(16);
-
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     for (timestamp, mut record_val) in json_data {
@@ -490,30 +486,6 @@ async fn write_logs(
         }
         // end check for alert triggers
 
-        // get distinct_value items
-        if stream_settings.enable_distinct_fields {
-            let mut map = Map::new();
-            for field in DISTINCT_FIELDS.iter().chain(
-                stream_settings
-                    .distinct_value_fields
-                    .iter()
-                    .map(|f| &f.name),
-            ) {
-                if let Some(val) = record_val.get(field) {
-                    map.insert(field.clone(), val.clone());
-                }
-            }
-
-            if !map.is_empty() {
-                // add distinct values
-                distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
-                    value: map,
-                }));
-            }
-        }
-
         // get hour key
         let hour_key = get_write_partition_key(
             timestamp,
@@ -564,15 +536,6 @@ async fn write_logs(
         !cfg.common.wal_fsync_disabled,
     )
     .await?;
-
-    // send distinct_values
-    if !distinct_values.is_empty()
-        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-        && stream_settings.enable_distinct_fields
-        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
-    {
-        log::error!("Error while writing distinct values: {e}");
-    }
 
     // only one trigger per request
     if !triggers.is_empty() {

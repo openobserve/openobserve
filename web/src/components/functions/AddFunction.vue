@@ -282,8 +282,9 @@ export default defineComponent({
     const splitterModel = ref(50);
     const aiChatInputContext = ref("");
     const confirmDialogMeta = ref({
-      title: "",
-      message: "",
+      // raw("") is only the empty placeholder — the real values are assigned from t().
+      title: raw(""),
+      message: raw(""),
       show: false,
       onConfirm: () => {},
       data: null,
@@ -318,7 +319,7 @@ export default defineComponent({
       const editingJsFunction = String((props.modelValue as any)?.transType ?? "0") === "1";
 
       if (isJsAllowed.value || editingJsFunction) {
-        options.push({ label: t("function.javascript"), value: "1" });
+        options.push({ label: raw("JavaScript"), value: "1" });
       }
 
       return options;
@@ -452,13 +453,13 @@ export default defineComponent({
         loadingNotification();
         toast({
           variant: "success",
-          message: res.data.message || "Function saved successfully",
+          message: res.data.message || t("functions.functionSaved"),
         });
       } catch (err: any) {
         compilationErr.value = err?.response?.data?.["message"];
         toast({
           variant: "error",
-          message: err.response?.data?.message ?? "Function creation failed",
+          message: err.response?.data?.message ?? t("functions.functionCreationFailed"),
         });
         loadingNotification();
       }
@@ -523,8 +524,9 @@ export default defineComponent({
 
     const resetConfirmDialog = () => {
       confirmDialogMeta.value.show = false;
-      confirmDialogMeta.value.title = "";
-      confirmDialogMeta.value.message = "";
+      // raw("") clears the fields back to the empty placeholder.
+      confirmDialogMeta.value.title = raw("");
+      confirmDialogMeta.value.message = raw("");
       confirmDialogMeta.value.onConfirm = () => {};
       confirmDialogMeta.value.data = null;
     };

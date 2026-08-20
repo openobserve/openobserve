@@ -524,7 +524,7 @@ async function fetchTraces() {
 
         traceMetadata.value = metadata;
       } catch (err: any) {
-        metadataError.value = err?.message || "Failed to fetch trace metadata";
+        metadataError.value = err?.message || t("rum.fetchTraceMetadataFailed");
         console.warn("Trace metadata fetch failed:", err);
       } finally {
         metadataLoading.value = false;

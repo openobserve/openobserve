@@ -71,6 +71,13 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
+
+// Private locations are served by agents deployed inside the customer's network,
+// the one enterprise part of synthetics. Gated on its own /config flag so an OSS
+// build still offers public, Lambda-served locations.
+const privateLocationsEnabled = computed(() =>
+  Boolean(store.state.zoConfig?.synthetics_private_locations_enabled),
+);
 const { t } = useI18nTyped();
 // Shared with CheckConfigure so a drag on either page carries to the other.
 const { variablesSplitter } = useCheckWizardUi();
@@ -152,7 +159,7 @@ const saveSchema = computed(() => makeBrowserCheckSaveSchema(t));
 
 // Extension setup state — persists across phases in this session.
 // `extensionInstalled` is now driven by a real runtime probe (not a manual click).
-const recorder = useSyntheticsRecorder();
+const recorder = useSyntheticsRecorder(t);
 const extensionInstalled = ref(false);
 // Session-only on purpose: persisting the attestations would keep tasks
 // pre-completed after the extension is removed. After the connect step's
@@ -183,6 +190,26 @@ const setupBlockingHint = computed(() => {
 });
 const extensionReady = ref(false);
 const checkingExtension = ref(false);
+
+/**
+ * Whether the installed extension can restore the journey before recording.
+ *
+ * Computed here because this component owns the recorder instance that probed, and
+ * read as a capability rather than a version so an older extension degrades to plain
+ * recording instead of getting a command it would refuse.
+ */
+const canRecordFrom = computed(() => extensionReady.value && recorder.hasCapability("recordFrom"));
+
+/**
+ * Whether it can also record on the session a FAILED restore left open.
+ *
+ * A separate capability from `recordFrom`, and read separately, because the two
+ * shipped in different extension builds — an installed base that updates on the Web
+ * Store's schedule always contains both.
+ */
+const canRecordFromFailure = computed(
+  () => extensionReady.value && recorder.hasCapability("recordFromFailure"),
+);
 
 async function probeExtension() {
   checkingExtension.value = true;
@@ -1078,6 +1105,8 @@ function onClearResults() {
                     v-model="check.journey"
                     :start-url="check.url"
                     :extension-ready="extensionReady"
+                    :can-record-from="canRecordFrom"
+                    :can-record-from-failure="canRecordFromFailure"
                     :auto-record="autoRecord"
                     :replay-phase="replayPhase"
                     :step-results="stepResults"
@@ -1131,7 +1160,7 @@ function onClearResults() {
               :folders="folders"
               :folders-loading="foldersLoading"
               :validation-errors="validationErrors"
-              allow-private-locations
+              :allow-private-locations="privateLocationsEnabled"
               class="border-border-default w-full! border-t"
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
@@ -1145,6 +1174,7 @@ function onClearResults() {
         <!-- Private browser-agent setup drawer; locations reload on close so a
            freshly registered location becomes selectable without leaving. -->
         <AgentSetupDrawer
+          v-if="privateLocationsEnabled"
           v-model:open="showAgentSetup"
           agent-type="browser"
           :token="agentSetup?.token"

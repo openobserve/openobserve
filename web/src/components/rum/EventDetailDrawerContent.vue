@@ -452,7 +452,7 @@ import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -510,7 +510,7 @@ const { formatTimestamp, formatId, getStatusIcon, getStatusColorClass, getEventT
 
 const copyAttributesToClipboard = () => {
   copyToClipboard(JSON.stringify(props.rawEvent, null, 2), t, {
-    successMessage: t("common.copyToClipboard") + " - " + t("common.success"),
+    successMessage: t("common.copyToClipboardSuccess"),
     errorMessage: t("common.copyContentError"),
     timeout: 1500,
   });
@@ -524,13 +524,13 @@ const actionFields = computed(() => [
   {
     key: "action_type",
     label: t("common.actionType"),
-    value: props.rawEvent?.action_type || t("common.notAvailable"),
+    value: props.rawEvent?.action_type || raw("N/A"),
     valueClass: "capitalize",
   },
   {
     key: "action_target_name",
     label: t("common.actionTarget"),
-    value: props.rawEvent?.action_target_name || t("common.notAvailable"),
+    value: props.rawEvent?.action_target_name || raw("N/A"),
   },
   {
     key: "action_id",

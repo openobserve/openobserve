@@ -198,11 +198,22 @@ pub struct AnnotationQueueMachineScoreResponseBody {
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct QueueReviewSubmissionResponseBody {
+    pub submission_id: String,
+    pub reviewer: Option<String>,
+    pub comments: Option<String>,
+    pub submitted_at: i64,
+    pub scores: Vec<AnnotationQueueMachineScoreResponseBody>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AnnotationQueueItemDetailResponseBody {
     pub item: AnnotationQueueItemResponseBody,
     pub source_stream: String,
     pub content: AnnotationQueueItemContentResponseBody,
     pub machine_scores: Vec<AnnotationQueueMachineScoreResponseBody>,
+    pub reviews: Vec<QueueReviewSubmissionResponseBody>,
 }
 
 impl From<CreateAnnotationQueueRequestBody> for CreateAnnotationQueue {
@@ -372,6 +383,18 @@ impl From<LlmScoreRecord> for AnnotationQueueMachineScoreResponseBody {
     }
 }
 
+impl From<QueueReviewSubmission> for QueueReviewSubmissionResponseBody {
+    fn from(value: QueueReviewSubmission) -> Self {
+        Self {
+            submission_id: value.submission_id,
+            reviewer: value.reviewer,
+            comments: value.comments,
+            submitted_at: value.submitted_at,
+            scores: value.scores.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 impl From<AnnotationQueueItemDetail> for AnnotationQueueItemDetailResponseBody {
     fn from(value: AnnotationQueueItemDetail) -> Self {
         Self {
@@ -379,6 +402,7 @@ impl From<AnnotationQueueItemDetail> for AnnotationQueueItemDetailResponseBody {
             source_stream: value.source_stream,
             content: value.content.into(),
             machine_scores: value.machine_scores.into_iter().map(Into::into).collect(),
+            reviews: value.reviews.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -512,6 +536,22 @@ mod tests {
                 _timestamp: 200,
                 ..LlmScoreRecord::default()
             }],
+            reviews: vec![QueueReviewSubmission {
+                submission_id: "submission-1".to_string(),
+                reviewer: Some("reviewer@example.com".to_string()),
+                comments: None,
+                submitted_at: 300,
+                scores: vec![LlmScoreRecord {
+                    id: "score-2".to_string(),
+                    name: "faithfulness".to_string(),
+                    value_numeric: Some(1.0),
+                    data_type: LlmScoreDataType::Numeric,
+                    source_type: LlmScoreDataSourceType::Annotation,
+                    source_stream: Some("traces".to_string()),
+                    _timestamp: 300,
+                    ..LlmScoreRecord::default()
+                }],
+            }],
         };
         let value =
             serde_json::to_value(AnnotationQueueItemDetailResponseBody::from(detail)).unwrap();
@@ -520,6 +560,8 @@ mod tests {
         assert_eq!(value["content"]["input"]["question"], "hello");
         assert_eq!(value["machineScores"][0]["sourceType"], "llm_judge");
         assert_eq!(value["machineScores"][0]["valueNumeric"], 0.9);
+        assert_eq!(value["reviews"][0]["submissionId"], "submission-1");
+        assert_eq!(value["reviews"][0]["scores"][0]["valueNumeric"], 1.0);
     }
 
     #[test]

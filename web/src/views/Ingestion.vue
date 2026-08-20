@@ -183,16 +183,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmRUMUpdate"
     />
     <!-- Empty-data warning banner -->
-    <div
+    <OBanner
       v-if="
         store.state.zoConfig.hasOwnProperty('restricted_routes_on_empty_data') &&
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       "
-      class="text-subtitle bg-warning rounded-default mx-2.5 mt-1 p-2 font-bold"
-    >
-      {{ t("ingestion.redirectionIngestionMsg") }}
-    </div>
+      variant="promo"
+      dense
+      class="mx-2.5 mt-1 font-bold"
+      :content="t('ingestion.redirectionIngestionMsg')"
+    />
+
     <div class="min-h-0 flex-1">
       <router-view
         :title="ingestTabType"
@@ -224,6 +226,7 @@ import { getImageURL } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 import { awsIntegrations } from "@/utils/awsIntegrations";
@@ -231,7 +234,16 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { OPageLayout, ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput, OSelect },
+  components: {
+    OPageLayout,
+    ConfirmDialog,
+    OTabs,
+    ORouteTab,
+    OButton,
+    OSearchInput,
+    OSelect,
+    OBanner,
+  },
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
@@ -496,7 +508,7 @@ export default defineComponent({
           if (e.response.status != 403) {
             toast({
               variant: "error",
-              message: e.response?.data?.message || "Error while generating RUM Token.",
+              message: e.response?.data?.message || t("ingestion.errorWhileGeneratingRumToken"),
               timeout: 5000,
             });
           }
@@ -528,7 +540,7 @@ export default defineComponent({
           if (e.response.status != 403) {
             toast({
               variant: "error",
-              message: e.response?.data?.message || "Error while refreshing RUM Token.",
+              message: e.response?.data?.message || t("ingestion.errorWhileRefreshingRumToken"),
               timeout: 5000,
             });
           }

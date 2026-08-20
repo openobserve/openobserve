@@ -51,7 +51,7 @@ export const usePatternActions = () => {
   const store = useStore();
   const { t } = useI18nTyped();
   const { searchObj } = searchState();
-  const { patternsState } = usePatterns();
+  const { patternsState } = usePatterns(t);
 
   const selectedPattern = ref<any>(null);
   const showPatternDetails = ref(false);

@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #separator>
         <slot name="separator">
           <div
-            class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
           ></div>
         </slot>
       </template>

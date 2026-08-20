@@ -110,6 +110,7 @@ export interface LlmQueueItemDetail {
     trace: Record<string, unknown>[];
   };
   machineScores: LlmQueueMachineScore[];
+  reviews: LlmQueueReview[];
 }
 
 export interface LlmQueueReviewScore {
@@ -265,6 +266,7 @@ function normalizeItemDetail(detail: any): LlmQueueItemDetail {
     machineScores: unwrapList(detail.machine_scores ?? detail.machineScores).map(
       normalizeMachineScore,
     ),
+    reviews: unwrapList(detail.reviews).map(normalizeReview),
   };
 }
 

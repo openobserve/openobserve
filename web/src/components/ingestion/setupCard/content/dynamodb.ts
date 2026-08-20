@@ -18,7 +18,7 @@
 // changes flow DynamoDB Streams → Kinesis Data Stream → Kinesis Firehose → the
 // OpenObserve Firehose endpoint (an AWS-console flow; no OTel collector).
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -28,14 +28,14 @@ import { applySubs, applySubsMasked } from "../subs";
 const FIREHOSE = `HTTP endpoint URL: {url}/aws/{org}/dynamodb/_kinesis_firehose
 Access key: Basic {token}`;
 
-export default function dynamodbCard(subs: CardSubstitutions): RichCardContent {
+export default function dynamodbCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
-      name: "DynamoDB",
-      tagline: gt("ingestion.setupCard.dynamodbTagline"),
+      name: raw("DynamoDB"),
+      tagline: t("ingestion.setupCard.dynamodbTagline"),
       logo: getImageURL("images/ingestion/dynamodb.png"),
       tone: "#4053D6",
-      metaBadges: [gt("common.logs")],
+      metaBadges: [t("common.logs")],
     },
     steps: [
       {
@@ -64,9 +64,15 @@ export default function dynamodbCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
-        // DynamoDB Streams record kinds — they mirror the `eventName` values
-        // (INSERT / MODIFY / REMOVE) the user sees verbatim in the ingested stream.
-        pills: [raw("Item Changes"), raw("Inserts"), raw("Updates"), raw("Deletes")],
+        // What the verify step will show, in prose. These are NOT the `eventName` values
+        // in the ingested stream (those are INSERT / MODIFY / REMOVE) — they are a
+        // plain-English summary of them, so they are translated.
+        pills: [
+          t("ingestion.setupCard.pillItemChanges"),
+          t("ingestion.setupCard.pillInserts"),
+          t("ingestion.setupCard.pillUpdates"),
+          t("ingestion.setupCard.pillDeletes"),
+        ],
       },
     ],
     detect: { streamType: "logs", match: "keyword", streamName: "dynamodb", filter: "" },

@@ -210,7 +210,7 @@ const {
   rows: configRows,
   isLoading: isConfigsLoading,
   refresh: refreshConfigs,
-} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, agentFilterRef);
+} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, t, agentFilterRef);
 
 const selectedConfigId = ref<string | null>(routeConfigId());
 const detailScope = ref<QualityScope>("all");
@@ -239,7 +239,7 @@ const {
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
-} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef, detailScope);
+} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef, detailScope, t);
 
 const {
   isLoading: isChartsLoading,

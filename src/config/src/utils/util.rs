@@ -15,7 +15,8 @@
 
 use crate::meta::stream::StreamType;
 
-pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
+pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values_";
+pub const TRACE_TIME_INDEX_STREAM_PREFIX: &str = "trace_time_index_";
 
 pub fn zero_or<T>(v: T, def: T) -> T
 where
@@ -29,7 +30,15 @@ pub fn is_power_of_two(n: u64) -> bool {
 }
 
 pub fn get_distinct_stream_name(st: StreamType, s: &str) -> String {
-    format!("{}_{}_{}", DISTINCT_STREAM_PREFIX, st.as_str(), s)
+    format!("{DISTINCT_STREAM_PREFIX}{st}_{s}")
+}
+
+pub fn get_trace_time_index_stream_name(s: &str) -> String {
+    format!("{TRACE_TIME_INDEX_STREAM_PREFIX}{s}")
+}
+
+pub fn is_trace_time_index_stream(s: &str) -> bool {
+    s.starts_with(TRACE_TIME_INDEX_STREAM_PREFIX)
 }
 
 #[cfg(test)]
@@ -108,7 +117,12 @@ mod tests {
     }
 
     #[test]
-    fn test_distinct_stream_prefix_constant() {
-        assert_eq!(DISTINCT_STREAM_PREFIX, "distinct_values");
+    fn test_trace_time_index_stream_name() {
+        assert_eq!(
+            get_trace_time_index_stream_name("default"),
+            "trace_time_index_default"
+        );
+        assert!(is_trace_time_index_stream("trace_time_index_default"));
+        assert!(!is_trace_time_index_stream("default"));
     }
 }

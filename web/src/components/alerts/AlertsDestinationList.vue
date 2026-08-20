@@ -238,6 +238,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </template>
+
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
+              :focus="{ kind: 'destination', name: row.name }"
+              @deleted="getDestinations"
+            />
+          </template>
         </OTable>
       </div>
     </OPageLayout>
@@ -292,6 +300,10 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+} from "@/composables/alerts/useDependencyGraph";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -329,11 +341,13 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
+    DependencyUsageCell,
   },
   setup() {
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18nTyped();
+    const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
     const { getAllActions } = useActions();
     const { track } = useReo();
 
@@ -391,11 +405,21 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "used_by",
+        header: t("alert_dependencies.usedByColumn"),
+        cell: " ",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 200,
+        meta: { align: "left" },
+      },
+      {
         id: "actions",
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 120,
+        size: 130,
         meta: { align: "center", actionCount: 3 },
       },
     ];
@@ -491,6 +515,11 @@ export default defineComponent({
           );
           resultTotal.value = res.data.length;
           destinations.value = res.data;
+          // Any destination add/edit/delete lands here on refresh — drop the
+          // shared dependency-graph cache and rebuild it so the "Used by" counts
+          // (and the impact dialog) are current.
+          invalidateDependencyGraphCache();
+          loadDepGraph(store.state.selectedOrganization.identifier);
           updateRoute();
         })
         .catch((err) => {
@@ -576,7 +605,7 @@ export default defineComponent({
               const message =
                 err.response.data?.message ||
                 err.response.data?.error ||
-                "Error while deleting destination";
+                t("alerts.messages.deleteDestinationFailed");
               toast({
                 variant: "error",
                 message,
@@ -770,7 +799,7 @@ export default defineComponent({
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting destinations. Please try again.";
+          t("alerts.messages.bulkDeleteDestinationsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -815,6 +844,7 @@ export default defineComponent({
     ]);
     return {
       t,
+      depGraph,
       showDestinationEditor,
       destinations,
       columns,

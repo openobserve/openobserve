@@ -179,10 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:selected-ids="handleSelectedStatusIdsUpdate"
                   >
                     <template #cell-name="{ row }">
-                      <span
-                        :class="`status-${row.name.toLowerCase()}`"
-                        class="mr-1 self-stretch"
-                      ></span
+                      <span :class="statusIndicatorClass(row.name)" class="mr-1 self-stretch"></span
                       >{{ row.name }}
                     </template>
                   </OTable>
@@ -277,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="sidebar"
                 :model-value="sectionOpen.tcp"
                 @update:model-value="(v) => (sectionOpen.tcp = v)"
-                :label="t('nodes.tcpusage')"
+                :label="raw('TCP')"
               >
                 <div class="px-1 pb-2">
                   <OCheckbox
@@ -556,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, reactive, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1044,6 +1041,25 @@ export default defineComponent({
           : "";
     };
 
+    // Left rail on each row of the status filter list. The class was previously
+    // `status-<name>` styled by three scoped CSS rules; the colour is the only
+    // thing that varied, so the mapping now returns the border utilities
+    // directly and the token is reached through its registered utility.
+    // An unknown status yields no rail, exactly as an unmatched selector did.
+    const statusIndicatorClass = (name: unknown): string => {
+      const base = "border-l-[0.3125rem]! border-solid";
+      switch (String(name ?? "").toLowerCase()) {
+        case "online":
+          return `${base} border-l-status-positive!`;
+        case "offline":
+          return `${base} border-l-status-negative!`;
+        case "prepare":
+          return `${base} border-l-status-warning-text!`;
+        default:
+          return "";
+      }
+    };
+
     // Extreme-left health rail — inset box-shadow so it paints regardless of
     // border-collapse; rem width + token colour keep it theme-aware.
     const nodeRowStyle = (row: any): Record<string, string> => {
@@ -1054,7 +1070,7 @@ export default defineComponent({
           : h === "prepare"
             ? "var(--color-warning-500)"
             : "var(--color-success-500)";
-      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     // Utilisation tiers shared by the CPU and memory bars: amber from 70%, red
@@ -1194,6 +1210,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       router,
       loading,
@@ -1202,6 +1219,7 @@ export default defineComponent({
       nodeHealth,
       nodeRowClass,
       nodeRowStyle,
+      statusIndicatorClass,
       usageVariant,
       statusFilter,
       displayedRows,
@@ -1281,16 +1299,5 @@ export default defineComponent({
 }
 :deep(tr.status-prepare) > td:first-child::before {
   background: var(--color-status-warning-text);
-}
-
-/* Legacy span-based status indicator (slotted status filter list — parent-scoped) */
-span.status-online {
-  border-left: var(--color-status-positive) 0.3125rem solid !important;
-}
-span.status-offline {
-  border-left: 0.3125rem solid var(--color-status-negative) !important;
-}
-span.status-prepare {
-  border-left: 0.3125rem solid var(--color-status-warning-text) !important;
 }
 </style>

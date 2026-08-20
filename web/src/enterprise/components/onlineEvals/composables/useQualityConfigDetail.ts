@@ -3,6 +3,7 @@
 // score_config_id, plus a uniqueness/total query so KPI cards can render.
 
 import { computed, ref, watch, type Ref } from "vue";
+import { type TranslateFn } from "@/types/i18n";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
@@ -112,6 +113,7 @@ export function useQualityConfigDetail(
   dateWindow: Ref<DateWindow>,
   agentFilter: Ref<AgentFilterSelection | null | undefined>,
   qualityScope: Ref<QualityScope>,
+  t: TranslateFn,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
@@ -228,7 +230,7 @@ export function useQualityConfigDetail(
       id: "targetsScored",
       titleKey: "targetsScored",
       value: targetsScored,
-      context: `of ${scoreResults} score results`,
+      context: t("onlineEvals.quality.detail.ofScoreResults", { count: scoreResults }),
       format: "count",
     };
 
@@ -238,7 +240,9 @@ export function useQualityConfigDetail(
       const unhealthy = toNumber(agg?.unhealthy);
       const range = valueOf<any>(cfg, "numericRange", "numeric_range");
       const rangeText =
-        range && range.min != null && range.max != null ? `Range ${range.min}–${range.max}` : "";
+        range && range.min != null && range.max != null
+          ? t("onlineEvals.quality.detail.range", { min: range.min, max: range.max })
+          : "";
       const cards: DetailKpi[] = [
         {
           id: "avg",
@@ -267,7 +271,11 @@ export function useQualityConfigDetail(
           id: "unhealthy",
           titleKey: "unhealthy",
           value: total > 0 && unhealthy != null ? (unhealthy / total) * 100 : null,
-          context: threshold.label ? `Healthy ${threshold.label}` : "",
+          context: threshold.label
+            ? t("onlineEvals.quality.detail.healthyThreshold", {
+                threshold: threshold.label,
+              })
+            : "",
           format: "percent",
         });
       }

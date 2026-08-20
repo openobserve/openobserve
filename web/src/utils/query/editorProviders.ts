@@ -23,6 +23,7 @@
  * same question for a query you did not write, where completion never fires.
  */
 
+import type { TranslateFn } from "@/types/i18n";
 import type { SqlCompletionEntry } from "./sqlCompletion";
 
 /** An entry as it may arrive from either list. Org VRL functions come through
@@ -180,7 +181,10 @@ export const findFunctionEntry = (
 };
 
 /** Render an entry as monaco hover contents (IMarkdownString[]). */
-export const buildHoverContents = (entry: LooseEntry | null): { value: string }[] | null => {
+export const buildHoverContents = (
+  t: TranslateFn,
+  entry: LooseEntry | null,
+): { value: string }[] | null => {
   if (!entry) return null;
   const name = entryName(entry);
   const contents: { value: string }[] = [];
@@ -196,7 +200,7 @@ export const buildHoverContents = (entry: LooseEntry | null): { value: string }[
   }
 
   if (entry.deprecated) {
-    contents.push({ value: "**Deprecated** — prefer the canonical function." });
+    contents.push({ value: t("sqlEditor.hover.deprecated") });
   }
   if (entry.documentation) contents.push({ value: entry.documentation });
 

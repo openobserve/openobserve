@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { gt } from "@/types/i18n";
 
 // Mock store
 const mockStore = {
@@ -107,7 +108,7 @@ describe("useLogsHighlighter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    logsHighlighter = useLogsHighlighter();
+    logsHighlighter = useLogsHighlighter(gt);
   });
 
   describe("processHitsInChunks", () => {

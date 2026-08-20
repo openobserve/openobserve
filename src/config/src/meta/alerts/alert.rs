@@ -281,6 +281,8 @@ pub enum AlertTypeFilter {
     /// column, not the JSON payload, which is why it can be a SQL predicate
     /// rather than an app-side scan (D60).
     Slo,
+    /// Composite definitions are stored outside the ordinary `alerts` table.
+    Composite,
 }
 
 /// Parameters for listing alerts.
@@ -682,6 +684,16 @@ mod tests {
         assert_eq!(params.enabled, None);
         assert_eq!(params.owner, None);
         assert_eq!(params.page_size_and_idx, None);
+    }
+
+    #[test]
+    fn alert_type_filter_composite_has_a_stable_wire_discriminator() {
+        let encoded = serde_json::to_string(&AlertTypeFilter::Composite).unwrap();
+        assert_eq!(encoded, r#""composite""#);
+        assert_eq!(
+            serde_json::from_str::<AlertTypeFilter>(&encoded).unwrap(),
+            AlertTypeFilter::Composite
+        );
     }
 
     #[test]

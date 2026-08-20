@@ -130,6 +130,8 @@ const mockTranslations = {
   "correlation.noMetricStreamsFor": "No metric streams found for this {kind}",
   "correlation.filters": "Filters",
   "correlation.all": "All",
+  "correlation.currentValueOption": "{value} (current)",
+  "correlation.timeRangeWithDuration": "{start} - {end} ({minutes} min)",
   "correlation.loadingLogs": "Loading logs...",
   "correlation.loadingMetrics": "Loading metrics...",
   "correlation.loadingTraces": "Loading traces...",

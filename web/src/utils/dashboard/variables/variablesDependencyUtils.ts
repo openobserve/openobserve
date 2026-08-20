@@ -1,3 +1,5 @@
+import { gt } from "@/types/i18n";
+
 /**
  * Extract variable names from a string
  * @param {string} str - string to search for variable names
@@ -385,7 +387,12 @@ export const buildScopedDependencyGraph = (
               graph[parentKey].children.push(childKey);
             }
           } else {
-            throw new Error(`Invalid dependency: ${childKey} cannot depend on ${parentKey}`);
+            throw new Error(
+              gt("dashboard.utils.invalidVariableDependency", {
+                child: childKey,
+                parent: parentKey,
+              }),
+            );
           }
         }
       });

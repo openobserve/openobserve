@@ -32,6 +32,7 @@ use prost::Message;
 use proto::cluster_rpc;
 
 use super::super::empty_exec::NewEmptyExec;
+use crate::datafusion::sort_order::FileSortOrder;
 
 pub fn try_decode(
     node: cluster_rpc::NewEmptyExecNode,
@@ -56,7 +57,9 @@ pub fn try_decode(
         projection.as_ref(),
         &filters,
         node.limit.map(|v| v as usize),
-        node.sorted_by_time,
+        // only the classic `_timestamp DESC` order travels with distributed
+        // plans; the hash order is a compactor-merge concern
+        FileSortOrder::from_sorted_by_time(node.sorted_by_time),
         full_schema,
     )))
 }
@@ -75,7 +78,7 @@ pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()>
         }),
         filters,
         limit: node.limit().map(|v| v as u64),
-        sorted_by_time: node.sorted_by_time(),
+        sorted_by_time: node.sort_order().is_timestamp_desc(),
         full_schema: Some(node.full_schema().as_ref().try_into()?),
     };
     let proto = cluster_rpc::PhysicalPlanNode {
@@ -107,7 +110,7 @@ mod tests {
             Some(&vec![0]),
             &[],
             Some(10),
-            false,
+            FileSortOrder::None,
             Arc::clone(&schema),
         ));
 
@@ -129,7 +132,36 @@ mod tests {
         assert_eq!(plan.filters(), plan2.filters());
         assert_eq!(plan.limit(), plan2.limit());
         assert_eq!(plan.full_schema(), plan2.full_schema());
+        assert_eq!(plan.sort_order(), plan2.sort_order());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_datafusion_codec_sort_order_roundtrip() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            config::TIMESTAMP_COL_NAME,
+            DataType::Int64,
+            false,
+        )]));
+        let proto = super::super::get_physical_extension_codec();
+        let ctx = datafusion::prelude::SessionContext::new();
+        for order in [FileSortOrder::None, FileSortOrder::TimestampDesc] {
+            let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
+                "test",
+                Arc::clone(&schema),
+                None,
+                &[],
+                None,
+                order,
+                Arc::clone(&schema),
+            ));
+            let bytes = physical_plan_to_bytes_with_extension_codec(plan, &proto)?;
+            let decoded =
+                physical_plan_from_bytes_with_extension_codec(&bytes, &ctx.task_ctx(), &proto)?;
+            let decoded = decoded.downcast_ref::<NewEmptyExec>().unwrap();
+            assert_eq!(decoded.sort_order(), order);
+        }
         Ok(())
     }
 }

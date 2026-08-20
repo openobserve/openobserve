@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -51,6 +51,22 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
+// Copyable JSON samples, kept out of the catalogue: the field names are the
+// backend's template variables, so a translated sample does not work when pasted.
+const SAMPLE = {
+  whyWithout: raw('"text": "Severity: high — owned by payments"'),
+  whyWith: raw('"text": "Severity: {severity} — owned by {team}"'),
+  variablesCode: raw(
+    '{\n  "text": "[{severity}] {alert_name} — {alert_count} events\\nOwned by {team}"\n}',
+  ),
+  variablesResult: raw('{ "text": "[high] High CPU — 42 events\\nOwned by payments" }'),
+  rowTemplateRow: raw("{pod}: {level} at {_timestamp}"),
+  rowTemplateMain: raw('{ "text": "{alert_count} matches:\\n{rows}" }'),
+  rowTemplateResult: raw(
+    '{ "text": "2 matches:\\nweb-1: ERROR at 14:02\\nweb-3: ERROR at 14:05" }',
+  ),
+};
+
 const title = computed(() => {
   switch (props.topic) {
     case "variables":
@@ -77,12 +93,12 @@ function segmentsFor(name: string): PreviewSegment[] {
 // segClass maps a segment kind to its visual style class.
 function segClass(kind: string) {
   return kind === "live"
-    ? "seg-live"
+    ? "text-text-heading font-semibold"
     : kind === "sample"
-      ? "seg-sample"
+      ? "text-text-secondary italic underline decoration-dashed"
       : kind === "opaque"
-        ? "seg-opaque"
-        : "seg-text";
+        ? "rounded-default bg-surface-subtle-hover text-text-body px-1"
+        : "text-text-body";
 }
 
 // ── CURRENT snapshot, frozen when the drawer opens ──────────────────
@@ -199,29 +215,49 @@ const displayedVariables = computed(() => {
 // Built-in variables the server actually substitutes (source of truth:
 // process_dest_template in src/core/src/alerts/alert.rs). Each has a one-line
 // description shown on hover so the list teaches, not just lists.
-const builtInVars: { name: string; desc: string }[] = [
-  { name: "org_name", desc: "Your organization name" },
-  { name: "stream_type", desc: "Stream type (logs, metrics, traces)" },
-  { name: "stream_name", desc: "Name of the stream the alert watches" },
-  { name: "alert_name", desc: "The alert's name" },
-  { name: "alert_type", desc: "Alert type (e.g. scheduled, real-time)" },
-  { name: "alert_period", desc: "Evaluation window, in minutes" },
-  { name: "alert_operator", desc: "Threshold comparison operator (>, <, =)" },
-  { name: "alert_threshold", desc: "The configured threshold value" },
-  { name: "alert_count", desc: "Number of matching records" },
+// `name` is the server-side token pasted verbatim into a template — it stays
+// English. `desc` is the prose shown on hover, so it is translated.
+const builtInVars: { name: string; desc: I18nText }[] = [
+  { name: "org_name", desc: t("alerts.alertSettings.builtInVars.orgName") },
+  { name: "stream_type", desc: t("alerts.alertSettings.builtInVars.streamType") },
+  { name: "stream_name", desc: t("alerts.alertSettings.builtInVars.streamName") },
+  { name: "alert_name", desc: t("alerts.alertSettings.builtInVars.alertName") },
+  { name: "alert_type", desc: t("alerts.alertSettings.builtInVars.alertType") },
+  { name: "alert_period", desc: t("alerts.alertSettings.builtInVars.alertPeriod") },
+  { name: "alert_operator", desc: t("alerts.alertSettings.builtInVars.alertOperator") },
+  { name: "alert_threshold", desc: t("alerts.alertSettings.builtInVars.alertThreshold") },
+  { name: "alert_count", desc: t("alerts.alertSettings.builtInVars.alertCount") },
   {
     name: "alert_agg_value",
-    desc: "The evaluated aggregation value for the triggering group (empty when the alert has no aggregation value)",
+    desc: t("alerts.alertSettings.builtInVars.alertAggValue"),
   },
-  { name: "alert_description", desc: "The alert's description text" },
-  { name: "alert_start_time", desc: "Window start time (ISO 8601)" },
-  { name: "alert_end_time", desc: "Window end time (ISO 8601)" },
-  { name: "alert_url", desc: "Link back to OpenObserve to investigate" },
-  { name: "alert_trigger_time", desc: "When the alert fired (ISO 8601)" },
-  { name: "alert_trigger_time_millis", desc: "Trigger time in epoch millis" },
-  { name: "alert_trigger_time_seconds", desc: "Trigger time in epoch seconds" },
-  { name: "alert_trigger_time_str", desc: "Trigger time, human-readable" },
-  { name: "rows", desc: "All matching rows, formatted by the row template" },
+  {
+    name: "alert_description",
+    desc: t("alerts.alertSettings.builtInVars.alertDescription"),
+  },
+  {
+    name: "alert_start_time",
+    desc: t("alerts.alertSettings.builtInVars.alertStartTime"),
+  },
+  { name: "alert_end_time", desc: t("alerts.alertSettings.builtInVars.alertEndTime") },
+  { name: "alert_url", desc: t("alerts.alertSettings.builtInVars.alertUrl") },
+  {
+    name: "alert_trigger_time",
+    desc: t("alerts.alertSettings.builtInVars.alertTriggerTime"),
+  },
+  {
+    name: "alert_trigger_time_millis",
+    desc: t("alerts.alertSettings.builtInVars.alertTriggerTimeMillis"),
+  },
+  {
+    name: "alert_trigger_time_seconds",
+    desc: t("alerts.alertSettings.builtInVars.alertTriggerTimeSeconds"),
+  },
+  {
+    name: "alert_trigger_time_str",
+    desc: t("alerts.alertSettings.builtInVars.alertTriggerTimeStr"),
+  },
+  { name: "rows", desc: t("alerts.alertSettings.builtInVars.rows") },
 ];
 
 // Built-in reference is collapsed by default — a beginner shouldn't be hit
@@ -229,7 +265,9 @@ const builtInVars: { name: string; desc: string }[] = [
 const showBuiltIns = ref(false);
 
 function copyVar(name: string) {
-  copyToClipboard(`{${name}}`, t, { successMessage: `Copied {${name}}` });
+  copyToClipboard(`{${name}}`, t, {
+    successMessage: t("common.copiedVariable", { name: `{${name}}` }),
+  });
 }
 
 defineExpose({ applyTemplate, previewTemplate });
@@ -243,44 +281,55 @@ defineExpose({ applyTemplate, previewTemplate });
     :title="title"
     @update:open="emit('update:open', $event)"
   >
-    <div class="help-body">
+    <div class="text-text-body flex flex-col gap-6 p-5 text-sm">
       <!-- Legend (shown only when a non-empty preview is actually on screen, so
            the colored swatches always have something to explain). Readable in
            both themes. -->
-      <div v-if="showLegend" data-test="help-legend" class="help-legend">
-        <span class="help-legend__title">{{ t("alerts.alertSettings.helpLegendTitle") }}</span>
-        <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--live">{{
-            t("alerts.alertSettings.helpLegendLiveExample")
-          }}</span>
-          <span class="help-legend__sep">=</span>
+      <div
+        v-if="showLegend"
+        data-test="help-legend"
+        class="rounded-default bg-surface-subtle text-text-secondary flex flex-col gap-2 p-3 text-xs"
+      >
+        <span class="text-text-heading font-semibold">{{
+          t("alerts.alertSettings.helpLegendTitle")
+        }}</span>
+        <span class="flex items-baseline gap-2 leading-[1.4]">
+          <span
+            class="rounded-default text-2xs border-border-subtle bg-surface-base text-text-heading min-w-14 shrink-0 border px-1.5 py-px text-center font-mono leading-[1.4] font-semibold"
+            >{{ t("alerts.alertSettings.helpLegendLiveExample") }}</span
+          >
+          <span class="text-text-muted">=</span>
           {{ t("alerts.alertSettings.helpLegendLive") }}
         </span>
-        <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--sample">{{
-            t("alerts.alertSettings.helpLegendSampleExample")
-          }}</span>
-          <span class="help-legend__sep">=</span>
+        <span class="flex items-baseline gap-2 leading-[1.4]">
+          <span
+            class="rounded-default text-2xs border-border-subtle bg-surface-base text-text-secondary min-w-14 shrink-0 border px-1.5 py-px text-center font-mono leading-[1.4] italic underline decoration-dashed"
+            >{{ t("alerts.alertSettings.helpLegendSampleExample") }}</span
+          >
+          <span class="text-text-muted">=</span>
           {{ t("alerts.alertSettings.helpLegendSample") }}
         </span>
-        <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--opaque">{{ raw("{rows}") }}</span>
-          <span class="help-legend__sep">=</span>
+        <span class="flex items-baseline gap-2 leading-[1.4]">
+          <span
+            class="rounded-default text-2xs bg-surface-subtle-hover text-text-body min-w-14 shrink-0 px-1.5 py-px text-center font-mono leading-[1.4]"
+            >{{ raw("{rows}") }}</span
+          >
+          <span class="text-text-muted">=</span>
           {{ t("alerts.alertSettings.helpLegendOpaque") }}
         </span>
       </div>
 
       <!-- ══ TEMPLATE OVERRIDE ══ -->
       <template v-if="topic === 'template'">
-        <section class="help-section">
-          <h3 class="help-section__title">
+        <section class="flex flex-col">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpWhatThisDoes") }}
           </h3>
-          <p class="help-section__text help-section__text--mb">
+          <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
             {{ t("alerts.alertSettings.helpTemplateExplain") }}
           </p>
-          <p class="help-section__text" data-test="help-template-when">
-            <span class="help-inline-label">{{
+          <p class="text-text-secondary m-0 leading-[1.5]" data-test="help-template-when">
+            <span class="text-text-heading font-semibold">{{
               t("alerts.alertSettings.helpTemplateWhenHeading")
             }}</span>
             {{ t("alerts.alertSettings.helpTemplateWhenDesc") }}
@@ -289,54 +338,55 @@ defineExpose({ applyTemplate, previewTemplate });
 
         <OSeparator />
 
-        <section class="help-section" data-test="help-current-section">
-          <h3 class="help-section__title">
+        <section class="flex flex-col" data-test="help-current-section">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpCurrentHeading") }}
           </h3>
 
           <!-- Override set: one rendered body -->
           <template v-if="snapshotTemplate">
-            <p class="help-section__text help-section__text--mb">
+            <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
               {{ t("alerts.alertSettings.helpCurrentOverrideHeading") }}
             </p>
             <pre
               v-if="currentSegments.length"
-              class="preview-box"
+              data-test="help-preview-box"
+              class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             ><template v-for="(s, i) in currentSegments" :key="i"
                 ><span :class="segClass(s.kind)">{{ s.text }}</span></template
               ></pre>
-            <p v-else class="help-empty">
+            <p v-else class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
             </p>
           </template>
 
           <!-- No override: each destination's current message, side by side -->
           <template v-else>
-            <p class="help-section__text help-section__text--mb">
+            <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
               {{ t("alerts.alertSettings.helpCurrentNoOverride") }}
             </p>
-            <p v-if="!snapshotDestinations.length" class="help-empty">
+            <p v-if="!snapshotDestinations.length" class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentNoDestinations") }}
             </p>
-            <ul v-else class="help-dest-list">
+            <ul v-else class="m-0 flex list-none flex-col gap-3 p-0">
               <li
                 v-for="d in snapshotDestinations"
                 :key="d.name"
                 data-test="help-destination-row"
-                class="help-dest-card"
+                class="rounded-surface border-border-default bg-surface-base flex flex-col gap-2 border p-3"
               >
-                <div class="help-dest-card__head">
-                  <span class="help-dest-card__name">{{ d.name }}</span>
-                  <span class="help-dest-card__tpl">{{ d.template || "—" }}</span>
+                <div class="flex items-baseline justify-between gap-3">
+                  <span class="text-text-heading font-semibold">{{ d.name }}</span>
+                  <span class="text-text-muted text-xs">{{ d.template || "—" }}</span>
                 </div>
                 <pre
                   v-if="d.segments.length"
                   data-test="help-destination-preview"
-                  class="preview-box preview-box--nested"
+                  class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
                 ><template v-for="(s, i) in d.segments" :key="i"
                     ><span :class="segClass(s.kind)">{{ s.text }}</span></template
                   ></pre>
-                <p v-else class="help-empty help-empty--sm">
+                <p v-else class="text-text-secondary m-0 text-xs italic">
                   {{ t("alerts.alertSettings.helpDestinationNoTemplate") }}
                 </p>
               </li>
@@ -346,8 +396,8 @@ defineExpose({ applyTemplate, previewTemplate });
 
         <OSeparator />
 
-        <section class="help-section">
-          <h3 class="help-section__title">
+        <section class="flex flex-col">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpPreviewHeading") }}
           </h3>
           <OSelect
@@ -356,28 +406,29 @@ defineExpose({ applyTemplate, previewTemplate });
             clearable
             data-test="help-preview-template-select"
             :placeholder="t('alerts.alertSettings.helpPreviewSelectPlaceholder')"
-            class="help-preview-select"
+            class="mb-3 max-w-80"
           />
           <template v-if="previewTemplate">
             <pre
               v-if="previewSegments.length"
-              class="preview-box"
+              data-test="help-preview-box"
+              class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             ><template v-for="(s, i) in previewSegments" :key="i"
                 ><span :class="segClass(s.kind)">{{ s.text }}</span></template
               ></pre>
-            <p v-else class="help-empty">
+            <p v-else class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
             </p>
             <OButton
               data-test="help-apply-template-btn"
               :disabled="applyDisabled"
-              class="help-apply-btn"
+              class="mt-3"
               @click="applyTemplate"
             >
               {{ t("alerts.alertSettings.helpApplyToAlert") }}
             </OButton>
           </template>
-          <p v-else class="help-empty" data-test="help-preview-select-empty">
+          <p v-else class="text-text-secondary m-0 italic" data-test="help-preview-select-empty">
             {{ t("alerts.alertSettings.helpPreviewSelectEmpty") }}
           </p>
         </section>
@@ -385,11 +436,11 @@ defineExpose({ applyTemplate, previewTemplate });
 
       <!-- ══ ADDITIONAL VARIABLES ══ -->
       <template v-else-if="topic === 'variables'">
-        <section class="help-section">
-          <h3 class="help-section__title">
+        <section class="flex flex-col">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpWhatThisDoes") }}
           </h3>
-          <p class="help-section__text">
+          <p class="text-text-secondary m-0 leading-[1.5]">
             {{ t("alerts.alertSettings.helpVariablesExplain") }}
           </p>
         </section>
@@ -397,35 +448,43 @@ defineExpose({ applyTemplate, previewTemplate });
         <OSeparator />
 
         <!-- WHY: teach the payoff with a concrete before/after -->
-        <section class="help-section" data-test="help-why">
-          <h3 class="help-section__title">
+        <section class="flex flex-col" data-test="help-why">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpWhyHeading") }}
           </h3>
-          <p class="help-section__text help-section__text--mb">
+          <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
             {{ t("alerts.alertSettings.helpWhyIntro") }}
           </p>
-          <div class="help-compare">
-            <div class="help-compare__col help-compare__col--bad">
-              <span class="help-compare__label">{{
-                t("alerts.alertSettings.helpWhyWithoutLabel")
-              }}</span>
-              <p class="help-compare__desc">
+          <div class="flex flex-col gap-3">
+            <div
+              class="rounded-surface border-border-default border-l-warning-500 flex flex-col gap-1.5 border border-l-2 p-3"
+            >
+              <span
+                class="text-text-secondary text-2xs font-semibold tracking-[0.03em] uppercase"
+                >{{ t("alerts.alertSettings.helpWhyWithoutLabel") }}</span
+              >
+              <p class="text-text-secondary text-compact m-0 leading-[1.45]">
                 {{ t("alerts.alertSettings.helpWhyWithoutDesc") }}
               </p>
-              <pre class="preview-box preview-box--nested">{{
-                t("alerts.alertSettings.helpWhyWithoutCode")
-              }}</pre>
+              <pre
+                data-test="help-preview-box"
+                class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
+                >{{ SAMPLE.whyWithout }}</pre>
             </div>
-            <div class="help-compare__col help-compare__col--good">
-              <span class="help-compare__label">{{
-                t("alerts.alertSettings.helpWhyWithLabel")
-              }}</span>
-              <p class="help-compare__desc">
+            <div
+              class="rounded-surface border-border-default border-l-primary-500 flex flex-col gap-1.5 border border-l-2 p-3"
+            >
+              <span
+                class="text-text-secondary text-2xs font-semibold tracking-[0.03em] uppercase"
+                >{{ t("alerts.alertSettings.helpWhyWithLabel") }}</span
+              >
+              <p class="text-text-secondary text-compact m-0 leading-[1.45]">
                 {{ t("alerts.alertSettings.helpWhyWithDesc") }}
               </p>
-              <pre class="preview-box preview-box--nested">{{
-                t("alerts.alertSettings.helpWhyWithCode")
-              }}</pre>
+              <pre
+                data-test="help-preview-box"
+                class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
+                >{{ SAMPLE.whyWith }}</pre>
             </div>
           </div>
         </section>
@@ -433,30 +492,35 @@ defineExpose({ applyTemplate, previewTemplate });
         <OSeparator />
 
         <!-- A concrete, doc-accurate worked example with rendered result -->
-        <section class="help-section" data-test="help-example">
-          <h3 class="help-section__title">
+        <section class="flex flex-col" data-test="help-example">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpExampleHeading") }}
           </h3>
-          <p class="help-section__text help-section__text--mb">
+          <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
             {{ t("alerts.alertSettings.helpVariablesExampleCaption") }}
           </p>
-          <pre class="preview-box">{{ t("alerts.alertSettings.helpVariablesExampleCode") }}</pre>
-          <span class="help-result-label">{{
-            t("alerts.alertSettings.helpExampleResultLabel")
-          }}</span>
-          <pre class="preview-box preview-box--result">{{
-            t("alerts.alertSettings.helpVariablesExampleResult")
-          }}</pre>
+          <pre
+            data-test="help-preview-box"
+            class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
+            >{{ SAMPLE.variablesCode }}</pre>
+          <span
+            class="text-text-secondary text-2xs mx-0 mt-2.5 mb-1 block font-semibold tracking-[0.03em] uppercase"
+            >{{ t("alerts.alertSettings.helpExampleResultLabel") }}</span
+          >
+          <pre
+            data-test="help-preview-box"
+            class="rounded-surface border-border-default bg-surface-subtle text-text-body border-l-primary-500 m-0 border border-l-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
+            >{{ SAMPLE.variablesResult }}</pre>
         </section>
 
         <OSeparator />
 
         <!-- Built-in reference: collapsed by default so a beginner isn't hit
              with 18 cryptic tokens. Opt in to browse. -->
-        <section class="help-section">
+        <section class="flex flex-col">
           <button
             type="button"
-            class="help-disclosure"
+            class="text-text-heading hover:text-text-link flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-sm font-semibold"
             data-test="help-builtin-toggle"
             :aria-expanded="showBuiltIns"
             @click="showBuiltIns = !showBuiltIns"
@@ -465,23 +529,23 @@ defineExpose({ applyTemplate, previewTemplate });
             <span>{{ t("alerts.alertSettings.helpBuiltInHeading") }}</span>
           </button>
           <template v-if="showBuiltIns">
-            <p class="help-section__hint help-section__hint--top">
-              {{ t("alerts.alertSettings.helpBuiltInIntro") }}
+            <p class="text-text-secondary mx-0 mt-0 mb-2 text-xs">
+              {{ t("alerts.alertSettings.helpBuiltInIntro", { product: raw("OpenObserve") }) }}
             </p>
-            <div class="help-chips" data-test="help-builtin-list">
+            <div class="flex flex-wrap gap-2" data-test="help-builtin-list">
               <button
                 v-for="v in builtInVars"
                 :key="v.name"
                 type="button"
                 data-test="help-builtin-var"
-                class="help-chip"
+                class="rounded-default border-border-default text-text-code hover:bg-surface-subtle-hover cursor-pointer border bg-transparent px-2 py-1 font-mono text-xs transition-[background] duration-200"
                 :title="v.desc"
                 @click="copyVar(v.name)"
               >
                 {{ "{" + v.name + "}" }}
               </button>
             </div>
-            <p class="help-section__hint">
+            <p class="text-text-secondary mx-0 mt-2 mb-0 text-xs">
               {{ t("alerts.alertSettings.helpBuiltInFooter") }}
             </p>
           </template>
@@ -489,19 +553,23 @@ defineExpose({ applyTemplate, previewTemplate });
 
         <OSeparator />
 
-        <section class="help-section" data-test="help-your-variables">
-          <h3 class="help-section__title">
+        <section class="flex flex-col" data-test="help-your-variables">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpYourVariablesHeading") }}
           </h3>
           <template v-if="!displayedVariables.length">
-            <p class="help-empty">
+            <p class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpYourVariablesEmpty") }}
             </p>
           </template>
-          <ul v-else class="help-var-list">
-            <li v-for="cv in displayedVariables" :key="cv.id" class="help-var-row">
-              <span class="help-var-row__key">{{ "{" + cv.key + "}" }}</span>
-              <span class="help-var-row__val">{{ cv.value }}</span>
+          <ul v-else class="m-0 flex list-none flex-col gap-1.5 p-0">
+            <li
+              v-for="cv in displayedVariables"
+              :key="cv.id"
+              class="rounded-default border-border-default flex justify-between gap-3 border px-2 py-1.5"
+            >
+              <span class="text-text-code font-mono text-xs">{{ "{" + cv.key + "}" }}</span>
+              <span class="text-text-secondary">{{ cv.value }}</span>
             </li>
           </ul>
         </section>
@@ -509,11 +577,11 @@ defineExpose({ applyTemplate, previewTemplate });
 
       <!-- ══ ROW TEMPLATE ══ -->
       <template v-else>
-        <section class="help-section">
-          <h3 class="help-section__title">
+        <section class="flex flex-col">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpWhatThisDoes") }}
           </h3>
-          <p class="help-section__text">
+          <p class="text-text-secondary m-0 leading-[1.5]">
             {{ t("alerts.alertSettings.helpRowTemplateExplain") }}
           </p>
         </section>
@@ -522,11 +590,11 @@ defineExpose({ applyTemplate, previewTemplate });
 
         <!-- WHY: the compose story (row template formats one record; {rows}
              expands them all into the main template) -->
-        <section class="help-section" data-test="help-row-why">
-          <h3 class="help-section__title">
+        <section class="flex flex-col" data-test="help-row-why">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpRowTemplateWhyHeading") }}
           </h3>
-          <p class="help-section__text help-section__text--mb">
+          <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
             {{ t("alerts.alertSettings.helpRowTemplateWhyDesc") }}
           </p>
         </section>
@@ -534,45 +602,52 @@ defineExpose({ applyTemplate, previewTemplate });
         <OSeparator />
 
         <!-- Worked example: row template + main template composing via {rows} -->
-        <section class="help-section" data-test="help-row-example">
-          <h3 class="help-section__title">
+        <section class="flex flex-col" data-test="help-row-example">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpExampleHeading") }}
           </h3>
-          <p class="help-section__text help-section__text--mb">
+          <p class="text-text-secondary m-0 mb-3 leading-[1.5]">
             {{ t("alerts.alertSettings.helpRowTemplateExampleCaption") }}
           </p>
-          <div class="help-compose">
-            <span class="help-compose__label">{{
+          <div class="flex flex-col gap-1.5">
+            <span class="text-text-secondary text-2xs font-semibold tracking-[0.03em] uppercase">{{
               t("alerts.alertSettings.helpRowTemplateExampleRowLabel")
             }}</span>
-            <pre class="preview-box preview-box--nested">{{
-              t("alerts.alertSettings.helpRowTemplateExampleRowCode")
-            }}</pre>
-            <span class="help-compose__label">{{
+            <pre
+              data-test="help-preview-box"
+              class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
+              >{{ SAMPLE.rowTemplateRow }}</pre>
+            <span class="text-text-secondary text-2xs font-semibold tracking-[0.03em] uppercase">{{
               t("alerts.alertSettings.helpRowTemplateExampleMainLabel")
             }}</span>
-            <pre class="preview-box preview-box--nested">{{
-              t("alerts.alertSettings.helpRowTemplateExampleMainCode")
-            }}</pre>
-            <span class="help-compose__label help-result-label">{{
-              t("alerts.alertSettings.helpExampleResultLabel")
-            }}</span>
-            <pre class="preview-box preview-box--result">{{
-              t("alerts.alertSettings.helpRowTemplateExampleResult")
-            }}</pre>
+            <pre
+              data-test="help-preview-box"
+              class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
+              >{{ SAMPLE.rowTemplateMain }}</pre>
+            <span
+              class="text-text-secondary text-2xs mx-0 mt-2.5 mb-1 block font-semibold tracking-[0.03em] uppercase"
+              >{{ t("alerts.alertSettings.helpExampleResultLabel") }}</span
+            >
+            <pre
+              data-test="help-preview-box"
+              class="rounded-surface border-border-default bg-surface-subtle text-text-body border-l-primary-500 m-0 border border-l-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
+              >{{ SAMPLE.rowTemplateResult }}</pre>
           </div>
         </section>
 
         <OSeparator />
 
-        <section class="help-section">
-          <h3 class="help-section__title">
+        <section class="flex flex-col">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpRowTemplateTypeHeading") }}
           </h3>
-          <p class="help-section__text">
+          <p class="text-text-secondary m-0 leading-[1.5]">
             {{ t("alerts.alertSettings.helpRowTemplateTypeExplain") }}
           </p>
-          <p class="help-current-type" data-test="help-row-template-type">
+          <p
+            class="text-text-secondary text-compact mx-0 mt-2 mb-0 flex items-center gap-2"
+            data-test="help-row-template-type"
+          >
             {{ t("alerts.alertSettings.helpRowTemplateTypeCurrent") }}
             <OBadge variant="primary-soft" size="sm">{{ rowTemplateType }}</OBadge>
           </p>
@@ -580,17 +655,18 @@ defineExpose({ applyTemplate, previewTemplate });
 
         <OSeparator />
 
-        <section class="help-section">
-          <h3 class="help-section__title">
+        <section class="flex flex-col">
+          <h3 class="text-text-heading m-0 mb-2 text-sm font-semibold">
             {{ t("alerts.alertSettings.helpPreviewHeadingShort") }}
           </h3>
           <pre
             v-if="rowSegments.length"
-            class="preview-box"
+            data-test="help-preview-box"
+            class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
           ><template v-for="(s, i) in rowSegments" :key="i"
               ><span :class="segClass(s.kind)">{{ s.text }}</span></template
             ></pre>
-          <p v-else class="help-empty" data-test="help-row-preview-empty">
+          <p v-else class="text-text-secondary m-0 italic" data-test="help-row-preview-empty">
             {{ t("alerts.alertSettings.helpRowTemplatePreviewEmpty") }}
           </p>
         </section>
@@ -598,381 +674,3 @@ defineExpose({ applyTemplate, previewTemplate });
     </div>
   </ODrawer>
 </template>
-
-<style scoped>
-/* keep(complex-state): the .seg-live/-sample/-opaque/-text segment styles are
-   applied by the computed segClass() mapper to the v-for'd preview segments —
-   a dynamic, per-kind class name the utility layer cannot inline — and the
-   legend / preview-box / destination-card BEM blocks cascade hover and kind
-   variants around them. All values already resolve to design tokens. */
-/* Colors use the design-token layer defined in src/lib/styles/tokens/*.css
-   (--color-*, --radius-*) — the same theme-aware tokens the O* component
-   library consumes, with dark-mode overrides in tokens/dark.css. */
-
-/* ── Layout ─────────────────────────────────────────────────────────── */
-.help-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.25rem;
-  font-size: var(--text-sm);
-  color: var(--color-text-body);
-}
-
-/* ── Legend: a compact, readable key (not a banner) ───────────────────
-   A small key that reads top-to-bottom: each row is a concrete example of how
-   that kind of value appears in the preview, then "= plain explanation".
-   Stacked (not wrapped inline) so labels never get cramped or cut off. */
-.help-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  border-radius: var(--radius-default);
-  background: var(--color-surface-subtle);
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-}
-
-.help-legend__title {
-  font-weight: 600;
-  color: var(--color-text-heading);
-}
-
-.help-legend__item {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  line-height: 1.4;
-}
-
-.help-legend__sep {
-  color: var(--color-text-muted);
-}
-
-/* Each swatch is a real example rendered in that style, so the row is
-   self-explanatory: the swatch IS what it describes. */
-.help-legend__swatch {
-  flex-shrink: 0;
-  min-width: 3.5rem;
-  padding: 0.0625rem 0.375rem;
-  border-radius: var(--radius-default);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  line-height: 1.4;
-  text-align: center;
-}
-.help-legend__swatch--live {
-  font-weight: 600;
-  color: var(--color-text-heading);
-  background: var(--color-surface-base);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-subtle);
-}
-.help-legend__swatch--sample {
-  font-style: italic;
-  color: var(--color-text-secondary);
-  text-decoration: underline dashed;
-  background: var(--color-surface-base);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-subtle);
-}
-.help-legend__swatch--opaque {
-  background: var(--color-surface-subtle-hover);
-  color: var(--color-text-body);
-}
-
-/* ── Sections ───────────────────────────────────────────────────────── */
-.help-section {
-  display: flex;
-  flex-direction: column;
-}
-
-.help-section__title {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text-heading);
-  margin: 0 0 0.5rem;
-}
-
-.help-section__text {
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-  margin: 0;
-}
-
-.help-section__text--mb {
-  margin-bottom: 0.75rem;
-}
-
-.help-section__hint {
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  margin: 0.5rem 0 0;
-}
-
-.help-section__hint--top {
-  margin: 0 0 0.5rem;
-}
-
-/* Collapsible section header ("Browse built-in variables") — looks like a
-   clickable disclosure row, matching .help-section__title weight. */
-.help-disclosure {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text-heading);
-
-  &:hover {
-    color: var(--color-text-link);
-  }
-}
-
-/* "What gets sent" rendered-result label + box — shows the concrete output so
-   a beginner sees input → result, not just a template full of placeholders. */
-.help-result-label {
-  display: block;
-  margin: 0.625rem 0 0.25rem;
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-secondary);
-}
-
-.preview-box--result {
-  border-left: 0.125rem solid var(--color-primary-500);
-}
-
-.help-empty {
-  /* Empty-state guidance is meant to be READ — use secondary text, not the
-     muted/placeholder token which is too faint (esp. in light mode). */
-  color: var(--color-text-secondary);
-  font-style: italic;
-  margin: 0;
-}
-
-.help-empty--sm {
-  font-size: var(--text-xs);
-}
-
-/* Inline lead-in label for a sentence (e.g. "When should I override?"). */
-.help-inline-label {
-  font-weight: 600;
-  color: var(--color-text-heading);
-}
-
-/* "Currently selected: [String]" — readable label next to an OBadge showing
-   the active row-template type (badge styling comes from OBadge, reused). */
-.help-current-type {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0.5rem 0 0;
-  font-size: var(--text-compact);
-  color: var(--color-text-secondary);
-}
-
-/* Row-template compose example: stacked labeled code blocks. */
-.help-compose {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.help-compose__label {
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-secondary);
-}
-
-/* ── Why-use-a-variable before/after comparison ─────────────────────── */
-.help-compare {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.help-compare__col {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  padding: 0.75rem;
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-surface);
-  border-left-width: 0.125rem;
-}
-
-.help-compare__col--bad {
-  border-left-color: var(--color-warning-500);
-}
-.help-compare__col--good {
-  border-left-color: var(--color-primary-500);
-}
-
-.help-compare__label {
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-secondary);
-}
-.help-compare__desc {
-  margin: 0;
-  font-size: var(--text-compact);
-  color: var(--color-text-secondary);
-  line-height: 1.45;
-}
-
-.help-preview-select {
-  max-width: 20rem;
-  margin-bottom: 0.75rem;
-}
-
-.help-apply-btn {
-  margin-top: 0.75rem;
-}
-
-/* ── Destination cards (current message per destination) ────────────── */
-.help-dest-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.help-dest-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-surface);
-  background: var(--color-surface-base);
-}
-
-.help-dest-card__head {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  align-items: baseline;
-}
-.help-dest-card__name {
-  font-weight: 600;
-  color: var(--color-text-heading);
-}
-.help-dest-card__tpl {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
-/* ── Built-in variable chips ────────────────────────────────────────── */
-.help-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.help-chip {
-  padding: 0.25rem 0.5rem;
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-default);
-  background: transparent;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-text-code);
-  cursor: pointer;
-  transition: background 0.2s ease;
-
-  &:hover {
-    background: var(--color-surface-subtle-hover);
-  }
-}
-
-/* ── User's context variables list ──────────────────────────────────── */
-.help-var-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.help-var-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.375rem 0.5rem;
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-default);
-}
-
-.help-var-row__key {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-text-code);
-}
-.help-var-row__val {
-  color: var(--color-text-secondary);
-}
-
-/* ── Preview box + segment styles ───────────────────────────────────── */
-.preview-box {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.6;
-  margin: 0;
-  padding: 0.75rem;
-  border-radius: var(--radius-surface);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-default);
-  background: var(--color-surface-subtle);
-  color: var(--color-text-body);
-}
-
-/* Nested inside a destination card — lighter so it doesn't double-frame. */
-.preview-box--nested {
-  border-color: var(--color-border-subtle);
-  background: var(--color-surface-panel);
-}
-
-/* live = the user's real data, shown plainly but with a touch of weight. */
-.seg-live {
-  font-weight: 600;
-  color: var(--color-text-heading);
-}
-/* sample = a mock runtime value: clearly "example", never mistaken for real. */
-.seg-sample {
-  font-style: italic;
-  text-decoration: underline dashed;
-  color: var(--color-text-secondary);
-}
-/* opaque = filled at notification time. Readable chip in BOTH themes — the
-   previous version put faint text on a near-same gray and was unreadable. */
-.seg-opaque {
-  padding: 0 0.25rem;
-  border-radius: var(--radius-default);
-  background: var(--color-surface-subtle-hover);
-  color: var(--color-text-body);
-}
-.seg-text {
-  color: var(--color-text-body);
-}
-</style>

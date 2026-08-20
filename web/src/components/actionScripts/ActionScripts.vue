@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTimeCell :value="row.created_at_raw" unit="us" :timezone="store.state.timezone" />
           </template>
           <template #cell-execution_details_type="{ row }">
-            <OTag :value="row.execution_details_type" />
+            <OTag :value="row.execution_details_type" :label="row.execution_details_label" />
           </template>
           <template #cell-last_run_at="{ row }">
             <OTimeCell
@@ -248,7 +248,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
@@ -292,6 +292,15 @@ interface ActionScriptList {
   last_successful_at: string;
   status: any;
 }
+
+// Keys, not translations: this is module scope, so calling t() here would bake
+// the label into whichever locale was loaded at import. The server's execution
+// token maps to the copy that describes it; the token itself never changes.
+const EXECUTION_TYPE_KEYS: Record<string, I18nKey> = {
+  repeat: "actions.cronJob",
+  service: "actions.realTime",
+  once: "actions.once",
+};
 
 export default defineComponent({
   name: "AlertList",
@@ -393,7 +402,9 @@ export default defineComponent({
       {
         id: "execution_details_type",
         header: t("actions.type"),
-        accessorKey: "execution_details_type",
+        // Sort on the label, not the token: the column sorts by what the reader
+        // sees, and that ordering should follow the active locale.
+        accessorKey: "execution_details_label",
         sortable: true,
         hideable: true,
         size: COL.type,
@@ -467,10 +478,6 @@ export default defineComponent({
             };
           });
           actionsScriptRows.value = alerts.value.map((data: any) => {
-            if (data.execution_details_type === "repeat") data.execution_details_type = "Cron Job";
-            if (data.execution_details_type === "service")
-              data.execution_details_type = "Real Time";
-            if (data.execution_details_type === "once") data.execution_details_type = "Once";
             return {
               id: data.id,
               name: data.name,
@@ -485,7 +492,17 @@ export default defineComponent({
                 ? convertUnixToDateFormat(data.last_successful_at)
                 : "-",
               status: data.status,
+              // The server's token, kept intact — OTag resolves its colour from
+              // this, and anything that filters or persists needs the wire value.
               execution_details_type: data.execution_details_type,
+              // Display copy lives in its own field. Overwriting the token with
+              // translated text used to send it through OTag's generic path,
+              // which humanises what it is given ([_-] → space, Title Case) —
+              // fine for "Cron Job", but it rendered "Cron-Job" as "Cron Job"
+              // and "Tarea cron" as "Tarea Cron".
+              execution_details_label: EXECUTION_TYPE_KEYS[data.execution_details_type]
+                ? t(EXECUTION_TYPE_KEYS[data.execution_details_type])
+                : raw(data.execution_details_type ?? ""),
             };
           });
           actionsScriptRows.value.forEach((alert: ActionScriptList) => {
@@ -612,7 +629,7 @@ export default defineComponent({
           }
           toast({
             variant: "error",
-            message: err?.data?.message || "Error while deleting alert.",
+            message: err?.data?.message || t("actionScripts.deleteActionError"),
           });
         });
       if (config.enableAnalytics == "true") {
@@ -691,7 +708,7 @@ export default defineComponent({
             message:
               error.response?.data?.message ||
               error?.message ||
-              "Error while deleting action scripts",
+              t("actionScripts.deleteActionScriptsError"),
           });
         }
         confirmBulkDelete.value = false;

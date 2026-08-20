@@ -40,7 +40,12 @@ use config::{
             StreamType, TimeRange, UpdateStreamSettings,
         },
     },
-    utils::{flatten::format_label_name, json, time::now_micros, util::get_distinct_stream_name},
+    utils::{
+        flatten::format_label_name,
+        json,
+        time::now_micros,
+        util::{get_distinct_stream_name, get_trace_time_index_stream_name},
+    },
 };
 #[cfg(feature = "vectorscan")]
 use db::re_pattern::process_association_changes;
@@ -400,56 +405,75 @@ pub async fn save_stream_settings(
     };
     let settings = saved.settings;
 
-    // skip metadata, as we should never do distinct values stream for
-    // metadata streams
-    if matches!(stream_type, StreamType::Logs | StreamType::Traces)
-        && let Some(original_settings) = saved.previous_settings
-    {
-        let existing = original_settings.data_retention;
-        let new = settings.data_retention;
-        if existing != new {
-            let distinct_stream = get_distinct_stream_name(stream_type, stream_name);
-
-            match infra::schema::get(org_id, &distinct_stream, StreamType::Metadata).await {
-                Ok(distinct_schema) => {
-                    let mut distinct_settings =
-                        unwrap_stream_settings(&distinct_schema).unwrap_or_default();
-                    distinct_settings.data_retention = new;
-
-                    let mut metadata = distinct_schema.metadata.clone();
-                    metadata.insert(
-                        "settings".to_string(),
-                        json::to_string(&distinct_settings).unwrap(),
-                    );
-                    if !metadata.contains_key("created_at") {
-                        metadata.insert("created_at".to_string(), now_micros().to_string());
-                    }
-
-                    if let Err(e) = db::schema::update_setting(
-                        org_id,
-                        &distinct_stream,
-                        StreamType::Metadata,
-                        metadata,
-                    )
-                    .await
-                    {
-                        log::warn!(
-                            "error in updating retention setting for distinct stream : {org_id}/{distinct_stream} : {e}"
-                        );
-                    }
-                }
-                Err(e) => {
-                    // We have already updated the main stream settings, and this is just for
-                    // retention, so no point in failing the api call if this fails.
-                    log::warn!(
-                        "error getting schema for distinct stream {org_id}/{distinct_stream} : {e}"
-                    );
-                }
-            }
-        }
-    }
+    sync_associated_metadata_stream_retention(org_id, stream_name, stream_type, &settings).await;
 
     Ok(MetaHttpResponse::ok(""))
+}
+
+async fn sync_associated_metadata_stream_retention(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    settings: &StreamSettings,
+) {
+    for metadata_stream in associated_metadata_streams(stream_type, stream_name) {
+        if !infra::schema::exists(org_id, StreamType::Metadata, &metadata_stream).await {
+            continue;
+        }
+
+        let metadata_schema =
+            match infra::schema::get(org_id, &metadata_stream, StreamType::Metadata).await {
+                Ok(schema) => schema,
+                Err(e) => {
+                    log::warn!(
+                        "error getting associated metadata stream {org_id}/{metadata_stream}: {e}"
+                    );
+                    continue;
+                }
+            };
+        let mut metadata_settings = unwrap_stream_settings(&metadata_schema).unwrap_or_default();
+        if metadata_settings.data_retention == settings.data_retention
+            && metadata_settings.extended_retention_days == settings.extended_retention_days
+        {
+            continue;
+        }
+
+        metadata_settings.data_retention = settings.data_retention;
+        metadata_settings.extended_retention_days = settings.extended_retention_days.clone();
+        let mut metadata = metadata_schema.metadata.clone();
+        metadata.insert(
+            "settings".to_string(),
+            json::to_string(&metadata_settings).unwrap(),
+        );
+        if !metadata.contains_key("created_at") {
+            metadata.insert("created_at".to_string(), now_micros().to_string());
+        }
+        if let Err(e) =
+            db::schema::update_setting(org_id, &metadata_stream, StreamType::Metadata, metadata)
+                .await
+        {
+            // The source stream settings have already been saved. A failure to update an
+            // associated metadata stream must not fail the original request.
+            log::warn!(
+                "error updating retention for associated metadata stream {org_id}/{metadata_stream}: {e}"
+            );
+        }
+    }
+}
+
+fn associated_metadata_streams(stream_type: StreamType, stream_name: &str) -> Vec<String> {
+    if !matches!(
+        stream_type,
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces
+    ) {
+        return Vec::new();
+    }
+
+    let mut streams = vec![get_distinct_stream_name(stream_type, stream_name)];
+    if stream_type == StreamType::Traces {
+        streams.push(get_trace_time_index_stream_name(stream_name));
+    }
+    streams
 }
 
 #[tracing::instrument(skip(new_settings))]
@@ -826,6 +850,17 @@ where
         return Ok(MetaHttpResponse::not_found("stream not found"));
     }
 
+    // Related-resource cleanup includes a graph-locked preflight of every
+    // alert owned by this stream. It must run before the schema mutation so a
+    // referenced alert rejects the cascade without deleting any member.
+    if del_related_feature_resources
+        && let Err(response) =
+            cleanup_related_resources(org_id.to_string(), stream_name.to_string(), stream_type)
+                .await
+    {
+        return Ok(response);
+    }
+
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
         return Ok((
@@ -837,14 +872,6 @@ where
             )),
         )
             .into_response());
-    }
-
-    if del_related_feature_resources
-        && let Err(response) =
-            cleanup_related_resources(org_id.to_string(), stream_name.to_string(), stream_type)
-                .await
-    {
-        return Ok(response);
     }
 
     // create delete for compactor
@@ -864,6 +891,8 @@ where
         )
             .into_response());
     }
+
+    delete_associated_metadata_streams(org_id, stream_name, stream_type).await;
 
     // delete related resource
     if let Err(e) = stream_delete_inner(org_id, stream_type, stream_name).await {
@@ -891,6 +920,43 @@ where
     db::authz::remove_ownership(org_id, stream_type.as_str(), Authz::new(stream_name)).await;
 
     Ok(MetaHttpResponse::ok("stream deleted"))
+}
+
+async fn delete_associated_metadata_streams(
+    org_id: &str,
+    source_stream: &str,
+    stream_type: StreamType,
+) {
+    for metadata_stream in associated_metadata_streams(stream_type, source_stream) {
+        if !infra::schema::exists(org_id, StreamType::Metadata, &metadata_stream).await {
+            continue;
+        }
+
+        if let Err(e) =
+            db::schema::delete(org_id, &metadata_stream, Some(StreamType::Metadata)).await
+        {
+            log::warn!(
+                "failed to delete associated metadata stream schema {org_id}/{metadata_stream}: {e}"
+            );
+        }
+        if let Err(e) = db::compact::retention::delete_stream(
+            org_id,
+            StreamType::Metadata,
+            &metadata_stream,
+            None,
+        )
+        .await
+        {
+            log::warn!(
+                "failed to schedule associated metadata stream deletion {org_id}/{metadata_stream}: {e}"
+            );
+        }
+        if let Err(e) = stream_delete_inner(org_id, StreamType::Metadata, &metadata_stream).await {
+            log::warn!(
+                "failed to clean associated metadata stream caches {org_id}/{metadata_stream}: {e}"
+            );
+        }
+    }
 }
 
 pub async fn stream_delete_inner(
@@ -1124,6 +1190,23 @@ mod tests {
     use arrow_schema::{DataType, Field};
 
     use super::*;
+
+    #[test]
+    fn test_associated_metadata_streams() {
+        assert_eq!(
+            associated_metadata_streams(StreamType::Logs, "app"),
+            vec!["distinct_values_logs_app"]
+        );
+        assert_eq!(
+            associated_metadata_streams(StreamType::Metrics, "cpu"),
+            vec!["distinct_values_metrics_cpu"]
+        );
+        assert_eq!(
+            associated_metadata_streams(StreamType::Traces, "default"),
+            vec!["distinct_values_traces_default", "trace_time_index_default"]
+        );
+        assert!(associated_metadata_streams(StreamType::Metadata, "internal").is_empty());
+    }
 
     #[test]
     fn test_stream_res() {

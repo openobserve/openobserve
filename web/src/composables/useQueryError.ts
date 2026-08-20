@@ -34,7 +34,7 @@
 
 import DOMPurify from "dompurify";
 import { computed, ref, type ComputedRef, type Ref, type MaybeRefOrGetter, toValue } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import type { I18nKey } from "@/types/i18n";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -223,7 +223,9 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
     const parts: string[] = [];
     if (cleanMessage.value) parts.push(cleanMessage.value);
     if (rawDetail.value) parts.push(rawDetail.value);
-    if (traceId.value) parts.push(`TraceID: ${traceId.value}`);
+    // Not translated: this is the same "TraceID: <id>" marker the regexes above
+    // parse out of the backend message, and support pastes it back verbatim.
+    if (traceId.value) parts.push(raw(`TraceID: ${traceId.value}`));
     navigator.clipboard?.writeText(parts.join("\n"));
   };
 

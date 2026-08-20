@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OTag from "@/lib/core/Badge/OTag.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 interface Props {
   frustrationTypes: string[];
@@ -36,13 +37,15 @@ interface Props {
 
 defineProps<Props>();
 
+const { t } = useI18nTyped();
+
 const tooltips: Record<string, string> = {
-  rage_click: "User clicked rapidly multiple times (3+) - indicating frustration",
-  dead_click: "Click produced no response - element may be broken or misleading",
-  error_click: "Click triggered a JavaScript error",
-  rage_tap: "User tapped rapidly multiple times (3+) - indicating frustration",
-  error_tap: "Tap triggered a JavaScript error",
+  rage_click: t("rum.frustrationRageClick"),
+  dead_click: t("rum.frustrationDeadClick"),
+  error_click: t("rum.frustrationErrorClick"),
+  rage_tap: t("rum.frustrationRageTap"),
+  error_tap: t("rum.frustrationErrorTap"),
 };
 
-const getTooltipText = (type: string) => tooltips[type] || `Frustration signal: ${type}`;
+const getTooltipText = (type: string) => tooltips[type] || t("rum.frustrationSignalType", { type });
 </script>

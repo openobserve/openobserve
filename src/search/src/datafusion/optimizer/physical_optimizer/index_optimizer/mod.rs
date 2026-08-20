@@ -359,6 +359,7 @@ mod tests {
             aggregate_topk::AggregateTopkRule, index_optimizer::utils::tests::get_remote_scan,
             remote_scan::RemoteScanRule,
         },
+        sort_order::FileSortOrder,
         table_provider::empty_table::NewEmptyTable,
     };
 
@@ -371,7 +372,7 @@ mod tests {
             None,
             &[],
             None,
-            false,
+            FileSortOrder::None,
             schema.clone(),
         ));
 
@@ -394,7 +395,7 @@ mod tests {
             None,
             &[],
             None,
-            false,
+            FileSortOrder::None,
             schema.clone(),
         ));
 

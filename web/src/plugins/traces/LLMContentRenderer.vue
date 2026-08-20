@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
@@ -475,16 +475,20 @@ const isPlainText = computed(() => {
 // Helper function to format content (handles string, array of parts, or object)
 const formatContent = (content: any): string => {
   // Handle array content (OpenAI multimodal format: [{type: 'text', text: '...'}, {type: 'image_url', image_url: {...}}])
+  //
+  // The "[Image: …]" markers below stay English: renderMarkdown() matches them
+  // with /\[Image: (https?:\/\/[^\]]+)\]/ to turn them into real markdown image
+  // syntax, so a translated marker would never be rendered as an image.
   if (Array.isArray(content)) {
     const parts: string[] = [];
     for (const part of content) {
       if (part.type === "text" && part.text) {
         parts.push(part.text);
       } else if (part.type === "image_url" && part.image_url?.url) {
-        parts.push(`[Image: ${part.image_url.url}]`);
+        parts.push(raw(`[Image: ${part.image_url.url}]`));
       } else if (part.type === "image" && part.source) {
         // Handle Anthropic-style image content
-        parts.push(`[Image: ${part.source.type || "base64"}]`);
+        parts.push(raw(`[Image: ${part.source.type || "base64"}]`));
       } else {
         // Fallback for unknown part types
         parts.push(JSON.stringify(part));

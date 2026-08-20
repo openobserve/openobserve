@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-if="statusCounts.critical > 0">
             <div
-              class="rounded-default text-service-health-critical inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-service-health-critical)_12%,transparent)] px-2.5 py-1 text-xs font-medium"
+              class="rounded-default text-service-health-critical bg-service-health-critical/12 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
               data-test="services-catalog-pill-critical"
             >
               <span>{{ statusCounts.critical }}</span>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-if="statusCounts.warning > 0">
             <div
-              class="rounded-default text-service-health-warning inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-service-health-warning)_12%,transparent)] px-2.5 py-1 text-xs font-medium"
+              class="rounded-default text-service-health-warning bg-service-health-warning/12 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
               data-test="services-catalog-pill-warning"
             >
               <span>{{ statusCounts.warning }}</span>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-if="statusCounts.degraded > 0">
             <div
-              class="rounded-default text-service-health-degraded inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-service-health-degraded)_12%,transparent)] px-2.5 py-1 text-xs font-medium"
+              class="rounded-default text-service-health-degraded bg-service-health-degraded/12 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
               data-test="services-catalog-pill-degraded"
             >
               <span>{{ statusCounts.degraded }}</span>
@@ -652,7 +652,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "p50_latency_ns",
     hideable: true,
-    header: t("traces.servicesCatalog.columns.p50Latency"),
+    header: raw("P50"),
     accessorKey: "p50_latency_ns",
     sortable: true,
     resizable: true,
@@ -662,7 +662,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "p95_latency_ns",
     hideable: true,
-    header: t("traces.servicesCatalog.columns.p95Latency"),
+    header: raw("P95"),
     accessorKey: "p95_latency_ns",
     sortable: true,
     resizable: true,
@@ -672,7 +672,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "p99_latency_ns",
     hideable: true,
-    header: t("traces.servicesCatalog.columns.p99Latency"),
+    header: raw("P99"),
     accessorKey: "p99_latency_ns",
     sortable: true,
     resizable: true,

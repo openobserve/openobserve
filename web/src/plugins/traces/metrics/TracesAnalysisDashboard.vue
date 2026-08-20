@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #separator>
             <div
-              class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+              class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
             ></div>
           </template>
 
@@ -389,8 +389,8 @@ const { isDark } = useTheme();
 const chipColors = computed(() =>
   isDark.value ? COMPARISON_COLORS.dark : COMPARISON_COLORS.light,
 );
-const { loading, error } = useLatencyInsightsAnalysis();
-const { generateDashboard } = useLatencyInsightsDashboard();
+const { loading, error } = useLatencyInsightsAnalysis(t);
+const { generateDashboard } = useLatencyInsightsDashboard(t);
 
 // Variables manager will be initialized by RenderDashboardCharts
 // and we'll receive a reference to it via the @variablesManagerReady event

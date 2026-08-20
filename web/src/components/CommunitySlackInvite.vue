@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { addCommasToNumber } from "@/utils/zincutils";
@@ -172,7 +172,12 @@ const joinSlack = () => {
         </div>
 
         <h2 data-test="community-slack-invite-title" class="flex-1 self-center">
-          {{ t("communitySlackInvite.title") }}
+          {{
+            t("communitySlackInvite.title", {
+              product: raw("OpenObserve"),
+              platform: raw("Slack"),
+            })
+          }}
         </h2>
 
         <OButton

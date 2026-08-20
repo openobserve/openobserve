@@ -201,7 +201,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     parentLink: "/rum",
     absorbs: ["rum", "synthetics"],
     children: [
-      { titleKey: "menu.rum", icon: "devices", name: "RUM", requires: "rum" },
+      { titleKey: "menu.rum", title: "RUM", icon: "devices", name: "RUM", requires: "rum" },
       { titleKey: "menu.synthetic", icon: "radar", name: "synthetics", requires: "synthetics" },
     ],
   },
@@ -215,30 +215,37 @@ export const NAV_GROUPS: NavGroupDef[] = [
  * in-page SectionRail is the place to switch sections. Re-add an entry here
  * (mirroring the page's SectionRail) to restore a hover flyout.
  *
- * Traces: each flyout child is its own standalone route. The Traces page also
- * offers Service Graph / Services Catalog as toolbar tabs (SearchBar.vue) that
- * switch views in-page (`?tab=`) — dual access paths with different semantics.
- * Spans is deliberately absent — it is
- * a view-granularity toggle inside the Traces search page (it shares the
- * query/stream/time context), not a destination. Service Graph carries the
- * `enterprise` gate its route guard applies, so the rail never offers a link
- * that would redirect straight back to Traces.
+ * Traces: every flyout child targets the Traces page's existing `?tab=` views,
+ * keeping one URL and one shared query/stream/time context for all four modes.
+ * Service Graph carries the same enterprise gate as its in-page tab.
  */
 export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
   traces: [
-    { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
+    {
+      titleKey: "traces.spansTab",
+      icon: "layers",
+      name: "traces",
+      tab: "spans",
+      defaultForRoute: true,
+    },
+    {
+      titleKey: "menu.traces",
+      icon: "account-tree",
+      name: "traces",
+      tab: "traces",
+    },
     {
       titleKey: "menu.serviceGraph",
       icon: "share",
-      name: "serviceGraph",
+      name: "traces",
+      tab: "service-graph",
       gate: "enterprise",
-      activeOnTab: { name: "traces", tab: "service-graph" },
     },
     {
       titleKey: "menu.services",
       icon: "menu-book",
-      name: "servicesCatalog",
-      activeOnTab: { name: "traces", tab: "services-catalog" },
+      name: "traces",
+      tab: "services-catalog",
     },
   ],
 };

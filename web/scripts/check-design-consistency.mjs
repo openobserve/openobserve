@@ -1,28 +1,26 @@
 #!/usr/bin/env node
-// CI ratchet: count per-file occurrences of every design-token bypass category
-// from O2_TOKEN_MIGRATION_PLAN.md §3 (A–R). Debt can only shrink.
+// CI guard: ZERO occurrences of any design-token bypass category from
+// O2_TOKEN_MIGRATION_PLAN.md §3 (A–R). One violation fails the build.
 //
-//   node scripts/check-design-consistency.mjs            # fail if any file/category exceeds baseline
-//   node scripts/check-design-consistency.mjs --strict   # ALSO fail if the baseline is stale (has slack) — CI mode
-//   node scripts/check-design-consistency.mjs --baseline # (re)write design-debt-baseline.json
+//   node scripts/check-design-consistency.mjs           # fail on any violation
+//   node scripts/check-design-consistency.mjs --list    # show every violation
 //
-// --strict is what CI runs (lint:design:strict). Plain mode lets a file sit
-// below its baseline (leaving headroom a future raw token could refill without
-// tripping the guard); --strict forbids that slack, so every bypass category is
-// strictly monotonic-down and NO new raw token can land anywhere — including in a
-// file that still carries pre-existing debt. Improve → re-baseline → commit.
+// Replaced a ratchet against design-debt-baseline.json, which allowed debt to
+// persist as long as it never grew — every non-zero entry was headroom a future
+// bypass could refill silently. `--strict` is accepted and ignored; zero
+// tolerance subsumes it. px is owned by eslint's local/no-hardcoded-px.
 //
-// Phase B: ratchet mode (this file). Phase G: delete the baseline → zero tolerance.
-//
-// px is not checked here — `local/no-hardcoded-px` (eslint) owns it for every file type.
-import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
+// If this failed: do not add an exemption. Reach the token through its
+// registered utility (register one in tokens/semantic.css or component.css if
+// none exists), or move the rule to base-elements.css / utilities.css. The
+// allowlists below are only for cases a utility physically CANNOT express.
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = join(__dirname, "..", "src");
-const BASELINE = join(__dirname, "design-debt-baseline.json");
 
 // Declared homes for literal hex in .ts (§12.3). Excluded from the `tsHex`
 // category because their CONSUMER cannot resolve a CSS custom property, so a
@@ -99,9 +97,7 @@ const DARK_SEAM_ALLOWLIST = [
 //   • ViewDashboard.vue: its @media print / fullscreen rules target external ancestors
 //     (.o2-app-root, main, .o2-content-scroll, .scroll) outside the SFC — unscoped on
 //     purpose (carries a keep(complex-state) note).
-const UNSCOPED_STYLE_ALLOWLIST = [
-  "views/Dashboards/ViewDashboard.vue",
-];
+const UNSCOPED_STYLE_ALLOWLIST = ["views/Dashboards/ViewDashboard.vue"];
 
 // Files allowed to carry a literal font stack. Email markup renders inside a mail
 // client, which can load neither our webfont nor our custom properties, so a
@@ -111,18 +107,25 @@ const FONT_ALLOWLIST = [
   "utils/fonts.ts", // defines the fallback stacks the tokens mirror
 ];
 
-const PALETTE = "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
+const PALETTE =
+  "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
 const PROPS = "text|bg|border|ring|fill|stroke|divide|outline|decoration|placeholder|from|via|to";
 
 // Categories evaluated over the WHOLE file text.
 const WHOLE = {
-  rawPalette: new RegExp(`\\b(?:dark:|hover:|focus:|group-hover:|active:)*(?:${PROPS})-(?:${PALETTE})-\\d{2,3}\\b`, "g"),
+  rawPalette: new RegExp(
+    `\\b(?:dark:|hover:|focus:|group-hover:|active:)*(?:${PROPS})-(?:${PALETTE})-\\d{2,3}\\b`,
+    "g",
+  ),
   // PROJECT raw-ramp utilities (Part B, Ring 3): feature code reaching for our own
   // primitives (grey-*/primary-*) instead of semantic tokens. The ramps stay
   // REGISTERED while these consumers exist (un-registering would break them, and
   // migrating is not value-preserving — e.g. accent flips 600→400 in dark), so
   // this ratchet freezes the count: it can only shrink toward the Part-B ideal.
-  rawProjectRamp: new RegExp(`\\b(?:dark:|hover:|focus:|group-hover:|active:|focus-visible:)*(?:${PROPS}|ring)-(?:grey|primary)-\\d{2,3}\\b`, "g"),
+  rawProjectRamp: new RegExp(
+    `\\b(?:dark:|hover:|focus:|group-hover:|active:|focus-visible:)*(?:${PROPS}|ring)-(?:grey|primary)-\\d{2,3}\\b`,
+    "g",
+  ),
   hexClass: /-\[#[0-9a-fA-F]{3,8}\]/g,
   inlineHexStyle: /style="[^"]*#[0-9a-fA-F]{3,8}/g,
   inlineHexBind: /:style="[^"]*#[0-9a-fA-F]{3,8}/g,
@@ -172,7 +175,8 @@ const WHOLE = {
     "g",
   ),
   // Dark-mode mechanism fragmentation (§3.R.2 mechanisms 1,2,5,6,7)
-  darkMechanism: /theme\s*[=!]==?\s*['"]dark['"]|const\s+(?:isDark|isDarkMode|darkMode)\s*=|\.body--(?:dark|light)|classList\.contains\(['"]body--|\.(?:light|dark)-mode\b/g,
+  darkMechanism:
+    /theme\s*[=!]==?\s*['"]dark['"]|const\s+(?:isDark|isDarkMode|darkMode)\s*=|\.body--(?:dark|light)|classList\.contains\(['"]body--|\.(?:light|dark)-mode\b/g,
 };
 
 // Categories evaluated ONLY inside <style>…</style> blocks (scoped AND unscoped —
@@ -203,29 +207,53 @@ function styleBlocks(text) {
 }
 
 // ── rawVarInComponent (F.6), CONTEXT-AWARE ─────────────────────────────────
-// A raw `var(--color-*)` in a component <style> block is debt ONLY where a
-// registered utility (bg-x / text-x / border-x) could replace it. In a few CSS
-// positions a utility physically cannot, so the raw var() is correct — like the
-// TS_HEX / DARK_SEAM allowlists above. We skip an occurrence when it is:
-//   • inside :deep(…)             — a child's internal DOM; no parent class reaches it
-//   • inside color-mix()/gradient — a utility can't be a mix input / colour stop
-//   • a pseudo-element rule (::before/::after/::-webkit-scrollbar/::placeholder…)
-//   • inside @keyframes           — animated colour steps have no utility form
-//   • a CSS custom-property def (--x: var(…)) — a utility can't DEFINE a var
-// Judged PER-OCCURRENCE, not by the block's keep() comment: keep() is mandatory on
-// every surviving block (see countUnjustifiedBlocks), so a block-level exemption
-// would zero the category. A block kept for one keyframe can still carry an
-// avoidable raw var() in a plain rule — this counts that, not the block.
+// A raw var(--color-*) in a <style> block is debt ONLY where a utility could
+// replace it. Skipped where one physically cannot: inside :deep(), inside
+// color-mix()/gradient, a pseudo-element rule, inside @keyframes, or a custom-
+// property definition. Judged PER-OCCURRENCE — keep() is mandatory on every
+// surviving block, so a block-level exemption would zero the category.
 
-// selector-nesting stack (raw selector texts, incl. leading comments) at `target`
+// Blank comment BODIES, preserving byte offsets so every index stays valid.
+// Must run BEFORE the scan: a comment sits between the previous `}` and the next
+// `{`, so its punctuation is read as selector structure. A keep() comment naming
+// ::after / :deep( / @keyframes exempted the rule after it, and a stray `;` or
+// `{` in prose reset the stack mid-sentence. Ten occurrences across seven files
+// were invisible before this.
+function blankComments(css) {
+  let out = "";
+  for (let i = 0; i < css.length; ) {
+    if (css[i] === "/" && css[i + 1] === "*") {
+      const end = css.indexOf("*/", i + 2);
+      const stop = end === -1 ? css.length : end + 2;
+      out += css.slice(i, stop).replace(/[^\n]/g, " ");
+      i = stop;
+    } else if (css[i] === "/" && css[i + 1] === "/" && css[i - 1] !== ":") {
+      // SCSS line comment (`:` guard keeps `https://…` intact)
+      const end = css.indexOf("\n", i);
+      const stop = end === -1 ? css.length : end;
+      out += " ".repeat(stop - i);
+      i = stop;
+    } else {
+      out += css[i];
+      i++;
+    }
+  }
+  return out;
+}
+
+// selector-nesting stack (comment-free — see blankComments) at `target`
 function selectorStackAt(css, target) {
   const stack = [];
   let pending = 0;
   for (let i = 0; i < target && i < css.length; i++) {
     const ch = css[i];
-    if (ch === "{") { stack.push(css.slice(pending, i)); pending = i + 1; }
-    else if (ch === "}") { stack.pop(); pending = i + 1; }
-    else if (ch === ";") pending = i + 1;
+    if (ch === "{") {
+      stack.push(css.slice(pending, i));
+      pending = i + 1;
+    } else if (ch === "}") {
+      stack.pop();
+      pending = i + 1;
+    } else if (ch === ";") pending = i + 1;
   }
   return stack.join(" ");
 }
@@ -245,7 +273,82 @@ function insideColourFn(css, idx) {
   return bal > 0;
 }
 
-function countRawVarInComponent(styleText) {
+// ── rawVarInTemplate ───────────────────────────────────────────────────────
+// rawVarInComponent's twin on the template side. Only three shapes count,
+// because only these are PROVABLY replaceable:
+//   bg-[var(--color-x)]                          -> bg-x
+//   bg-[color-mix(… var(--color-x) 12%, transparent)]  -> bg-x/12  (same bytes)
+//   bg-[color-mix(… var(--color-x) 12%, var(--color-y))] -> a derived token
+// Everything else is exempt — a gradient/mask stop or drop-shadow colour has no
+// utility form. Comments are blanked first (a doc comment showing the bad
+// pattern is not a violation — KpiCard.vue had one).
+// The `(?:\s*,[^)\]]*)?` tails catch the FALLBACK form `bg-[var(--color-x,#fff)]`:
+// the token is defined so the fallback never fires, it only hides the read.
+// Shipped without that and two occurrences slipped past.
+const BARE_READ =
+  /[a-zA-Z][a-zA-Z0-9-]*-(?:\[\s*(?:[a-z]+:)?\s*var\(\s*--color-[a-z0-9-]+\s*(?:,[^)\]]*)?\)\s*\]|\(\s*(?:[a-z]+:)?\s*--color-[a-z0-9-]+\s*(?:,[^)\]]*)?\))/g;
+const ALPHA_MIX =
+  /[a-zA-Z][a-zA-Z0-9-]*-\[color-mix\(in[_ ]srgb,[_ ]?var\(\s*--color-[a-z0-9-]+\s*\)[_ ]+[0-9.]+%[_ ]?,[_ ]?transparent\)\]/g;
+const BLEND_MIX =
+  /[a-zA-Z][a-zA-Z0-9-]*-\[color-mix\(in[_ ]srgb,[_ ]?var\(\s*--color-[a-z0-9-]+\s*\)[_ ]+[0-9.]+%[_ ]?,[_ ]?var\(\s*--color-[a-z0-9-]+\s*\)\)\]/g;
+
+function countRawVarInTemplate(text) {
+  // template + script only; <style> is rawVarInComponent's job
+  const cut = text.indexOf("<style");
+  const head = blankComments(cut === -1 ? text : text.slice(0, cut)).replace(
+    /<!--[\s\S]*?-->/g,
+    (m) => m.replace(/[^\n]/g, " "),
+  );
+  return (
+    (head.match(BARE_READ) || []).length +
+    (head.match(ALPHA_MIX) || []).length +
+    (head.match(BLEND_MIX) || []).length
+  );
+}
+
+// ── arbShadow ──────────────────────────────────────────────────────────────
+// A hand-written shadow in any of the three syntaxes it hides in. The app ships
+// one scale (--shadow-xs/sm/md/lg + the sticky/rail/glow/scroll roles) and
+// colour is a separate axis, so spelling out offsets/blur is never needed. A
+// ring is ring-*. Mirrors arbRadius.
+// Template-only scanning was not enough: a pass that fixed the template left 40
+// literals in <style> blocks and JS boxShadow: objects, reporting zero throughout.
+const ARB_SHADOW =
+  /\b(?:inset-)?(?:drop-)?shadow-\[(?!(?:inherit|initial|unset|none)\])[^\]]+\]|\[box-shadow:[^\]]+\]/g;
+// Accepted forms: var(--shadow-*), none/inherit/initial/unset, and an
+// interpolated ${…} (already a token by then). The (?<![-\w]) lookbehind stops
+// a vendor-prefixed -webkit-box-shadow being counted alongside its twin.
+const CSS_SHADOW = /(?<![-\w])box-shadow:\s*(?!\s*(?:var\(|none|inherit|initial|unset|\$\{))[^;]+;/g;
+// Three JS spellings occur here: `boxShadow:` literal, `x.boxShadow =`, and
+// `"box-shadow":` as a quoted key. The first version had only the literal form,
+// and the other two sat in OTableBodyCell/useStickyColumns reporting clean.
+const JS_SHADOW =
+  /(?:boxShadow\s*[:=]|["']box-shadow["']\s*:)\s*(["'`])(?!\s*(?:var\(|none|\$\{))[^"'`]+\1/g;
+
+// Chart libraries and the email template serialise their own style strings —
+// ECharts options and mail markup cannot resolve a CSS custom property, so a
+// literal is the only option there. Same rationale as TS_HEX_ALLOWLIST.
+const SHADOW_LITERAL_ALLOWLIST = [
+  "utils/prebuilt-templates/email.ts",
+  "utils/dashboard/",
+  "components/dashboards/PanelSchemaRenderer.vue",
+  "plugins/traces/ServiceGraph.vue",
+];
+
+function countArbShadow(text, rel = "") {
+  if (SHADOW_LITERAL_ALLOWLIST.some((p) => (p.endsWith("/") ? rel.includes(p) : rel.endsWith(p)))) {
+    return 0;
+  }
+  const blanked = blankComments(text).replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, " "));
+  return (
+    (blanked.match(ARB_SHADOW) || []).length +
+    (blanked.match(CSS_SHADOW) || []).length +
+    (blanked.match(JS_SHADOW) || []).length
+  );
+}
+
+function countRawVarInComponent(rawStyleText) {
+  const styleText = blankComments(rawStyleText);
   let n = 0;
   const reVar = /var\(\s*--color-[a-z0-9-]+/g;
   let m;
@@ -257,8 +360,8 @@ function countRawVarInComponent(styleText) {
     if (/^\s*--[\w-]+\s*:/.test(styleText.slice(s, idx))) continue;
     if (insideColourFn(styleText, idx)) continue;
     const sel = selectorStackAt(styleText, idx);
-    if (/:deep\(/.test(sel)) continue;   // child component internals
-    if (/::[a-z-]/.test(sel)) continue;  // pseudo-element
+    if (/:deep\(/.test(sel)) continue; // child component internals
+    if (/::[a-z-]/.test(sel)) continue; // pseudo-element
     if (/@keyframes/.test(sel)) continue; // keyframe step
     n++;
   }
@@ -272,7 +375,9 @@ function countRawVarInComponent(styleText) {
 // step 5. `lib-override:<lib>` takes a free-form library suffix, matched by prefix.
 const KEEP_TAG_NAMES =
   "lib-override(?::[\\w.-]+)?|generated-content|keyframes|print|scrollbar|complex-state|brand|third-party";
-const KEEP_TAGS = new RegExp(`keep\\s*(?:\\(\\s*(?:${KEEP_TAG_NAMES})\\s*\\)|:\\s*(?:${KEEP_TAG_NAMES}))`);
+const KEEP_TAGS = new RegExp(
+  `keep\\s*(?:\\(\\s*(?:${KEEP_TAG_NAMES})\\s*\\)|:\\s*(?:${KEEP_TAG_NAMES}))`,
+);
 
 // Counts style blocks that carry no keep-comment. A block with no justification
 // is debt by definition — either it should have been migrated to utilities, or
@@ -320,6 +425,10 @@ function countFile(file, rel) {
     }
     const rawVar = countRawVarInComponent(sb);
     if (rawVar) counts.rawVarInComponent = rawVar;
+    const rawTpl = countRawVarInTemplate(text);
+    if (rawTpl) counts.rawVarInTemplate = rawTpl;
+    const arbShadow = countArbShadow(text, rel);
+    if (arbShadow) counts.arbShadow = arbShadow;
     const unjustified = countUnjustifiedBlocks(text);
     if (unjustified) counts.styleKeepComment = unjustified;
   } else {
@@ -331,11 +440,13 @@ function countFile(file, rel) {
     if (!isSpec && !allowed) {
       // Strip comments first so a hex mentioned in prose ("e.g. #FF0000")
       // doesn't count as a real colour literal.
-      const code = text
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+      const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
       const n = (code.match(/['"]#[0-9a-fA-F]{3,8}['"]/g) || []).length;
       if (n) counts.tsHex = n;
+    }
+    if (!isSpec) {
+      const n = countArbShadow(text, rel);
+      if (n) counts.arbShadow = n;
     }
     if (!isSpec && !DARK_SEAM_ALLOWLIST.some((p) => rel.endsWith(p))) {
       const n = (text.match(WHOLE.darkMechanism) || []).length;
@@ -359,80 +470,34 @@ for (const f of files) {
   if (Object.keys(c).length) current[rel] = c;
 }
 
-if (process.argv.includes("--baseline")) {
-  const totals = {};
-  for (const c of Object.values(current))
-    for (const [k, n] of Object.entries(c)) totals[k] = (totals[k] || 0) + n;
-  writeFileSync(BASELINE, JSON.stringify({ totals, files: current }, null, 2) + "\n");
-  console.log(`Wrote baseline: ${Object.keys(current).length} files with debt.`);
-  console.log("Totals:", JSON.stringify(totals));
+// Flatten to (file, category, count). Zero tolerance — any entry fails the build.
+const violations = [];
+for (const [rel, c] of Object.entries(current))
+  for (const [k, n] of Object.entries(c)) violations.push({ rel, k, n });
+violations.sort((a, b) => b.n - a.n || a.rel.localeCompare(b.rel));
+const total = violations.reduce((sum, v) => sum + v.n, 0);
+const fileCount = Object.keys(current).length;
+
+if (process.argv.includes("--list")) {
+  for (const { rel, k, n } of violations) console.log(`  ${rel}  [${k}]  ${n}`);
+  console.log(`\n${total} violation(s) across ${fileCount} file(s).`);
   process.exit(0);
 }
 
-if (!existsSync(BASELINE)) {
-  console.error("No baseline found. Run: node scripts/check-design-consistency.mjs --baseline");
-  process.exit(2);
-}
-const baseline = JSON.parse(readFileSync(BASELINE, "utf8"));
-const base = baseline.files || {};
-
-const regressions = [];
-let improved = 0;
-for (const [rel, c] of Object.entries(current)) {
-  for (const [k, n] of Object.entries(c)) {
-    const b = (base[rel] && base[rel][k]) || 0;
-    if (n > b) regressions.push({ rel, k, n, b });
-  }
-}
-// count improvements (any file/category strictly below baseline, or dropped to 0)
-// and record them: in --strict mode a below-baseline count is a STALE baseline,
-// i.e. slack the ratchet is leaving open. That slack is exactly where a future
-// raw token would land WITHOUT tripping the guard (a file at baseline 5 that has
-// since dropped to 2 would silently accept 3 new raw var()s). Closing it makes
-// every category monotonically shrink and forbids ANY new raw-token bypass —
-// even inside a file that still carries pre-existing debt.
-const stale = [];
-for (const [rel, bc] of Object.entries(base)) {
-  for (const [k, b] of Object.entries(bc)) {
-    const n = (current[rel] && current[rel][k]) || 0;
-    if (n < b) {
-      improved += b - n;
-      stale.push({ rel, k, n, b });
-    }
-  }
-}
-
-// --strict (used by CI): the baseline must equal reality — no headroom. Passed
-// by `lint:design:strict` in build-pr-image.yml / playwright.yml.
-const STRICT = process.argv.includes("--strict");
-
-if (regressions.length) {
-  console.error(`\ncheck-design-consistency: ${regressions.length} regression(s) above baseline:\n`);
-  for (const { rel, k, n, b } of regressions.slice(0, 60))
-    console.error(`  ${rel}  [${k}]  ${b} → ${n}  (+${n - b})`);
-  if (regressions.length > 60) console.error(`  …and ${regressions.length - 60} more`);
-  console.error(`\nUse the sanctioned utilities/tokens (§4) instead. See DESIGN_TOKEN_STANDARD.md.\n`);
-  process.exit(1);
-}
-
-if (STRICT && stale.length) {
+if (violations.length) {
   console.error(
-    `\ncheck-design-consistency (--strict): baseline is STALE — ${stale.length} file/category ` +
-      `pair(s) are below their recorded debt, i.e. ${improved} occurrence(s) of slack the\n` +
-      `ratchet would let a future raw token silently refill. Lock the win in:\n`,
+    `\ncheck-design-consistency: ${total} design-token bypass(es) in ${fileCount} file(s):\n`,
   );
-  for (const { rel, k, n, b } of stale.slice(0, 60))
-    console.error(`  ${rel}  [${k}]  ${b} → ${n}  (−${b - n})`);
-  if (stale.length > 60) console.error(`  …and ${stale.length - 60} more`);
+  for (const { rel, k, n } of violations.slice(0, 60)) console.error(`  ${rel}  [${k}]  ${n}`);
+  if (violations.length > 60) {
+    console.error(`  …and ${violations.length - 60} more (--list to see all)`);
+  }
   console.error(
-    `\nRun:  node scripts/check-design-consistency.mjs --baseline   and commit the tightened baseline.\n`,
+    "\nReach the token through its registered utility (bg-x / text-x / border-x), or" +
+      "\nmove the rule to src/styles/base-elements.css or src/styles/utilities.css." +
+      "\nDo not add an exemption. See DESIGN_TOKEN_STANDARD.md §4.\n",
   );
   process.exit(1);
 }
 
-console.log(`OK — no design-consistency regressions (${Object.keys(current).length} files scanned).`);
-if (improved)
-  console.log(
-    `Improved by ${improved} occurrence(s) below baseline — re-run with --baseline and commit the update` +
-      (STRICT ? "" : " (required in --strict / CI)") + ".",
-  );
+console.log(`OK — no design-token bypasses (${files.length} files scanned).`);

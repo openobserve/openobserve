@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { gt } from "@/types/i18n";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -47,7 +48,7 @@ import useMetricsExplorer from "./useMetricsExplorer";
 
 /** Always get a fresh instance with reset state. */
 function getInstance() {
-  const inst = useMetricsExplorer();
+  const inst = useMetricsExplorer(gt);
   inst.resetDashboardPanelData();
   return inst;
 }
@@ -58,7 +59,7 @@ describe("useMetricsExplorer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset shared singleton state
-    useMetricsExplorer().resetDashboardPanelData();
+    useMetricsExplorer(gt).resetDashboardPanelData();
   });
 
   // -------------------------------------------------------------------------

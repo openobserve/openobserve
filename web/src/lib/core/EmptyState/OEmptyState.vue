@@ -181,7 +181,7 @@ const props = withDefaults(
     actionLabel?: I18nText;
     actionIcon?: IconName;
     /** Secondary action; emits `secondaryAction` on click. */
-    secondaryActionLabel?: string;
+    secondaryActionLabel?: I18nText;
     /** Suppress the preset's actions (e.g. table empties with no CTA). */
     hideAction?: boolean;
     /**

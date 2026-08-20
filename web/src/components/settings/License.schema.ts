@@ -11,10 +11,7 @@ import { z } from "zod";
 
 export const makeLicenseSchema = (t: (_key: string) => string) =>
   z.object({
-    licenseKey: z
-      .string()
-      .trim()
-      .min(1, t("about.license_key_required") || "License key is required"),
+    licenseKey: z.string().trim().min(1, t("about.license_key_required")),
   });
 
 export type LicenseForm = z.infer<ReturnType<typeof makeLicenseSchema>>;

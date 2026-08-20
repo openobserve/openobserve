@@ -129,9 +129,12 @@ function markerTooltip(event: any): string {
   const name = String(event?.name ?? event?.type ?? "");
   const label = name.length > 100 ? `${name.slice(0, 100)}…` : name;
   if (event?.frustration_types?.length) {
-    return `⚠️ FRUSTRATION: ${event.frustration_types.join(", ")}\n${label}`;
+    return t("rum.frustrationEventTooltip", {
+      types: event.frustration_types.join(", "),
+      name: label,
+    });
   }
-  return event?.type === "error" ? `⛔ ERROR: ${label}` : label;
+  return event?.type === "error" ? t("rum.errorEventTooltip", { name: label }) : label;
 }
 
 // ---- playback loop -------------------------------------------------------
@@ -297,7 +300,7 @@ onBeforeUnmount(() => {
             class="absolute -bottom-1.25 -ml-px cursor-pointer"
             :class="
               event.frustration_types?.length
-                ? 'h-4.5 w-[0.1875rem] shadow-[0_0_0.25rem_var(--color-badge-orange-solid-bg)]'
+                ? 'ring-badge-orange-solid-bg h-4.5 w-[0.1875rem] ring-2'
                 : 'h-3.75 w-0.5'
             "
             :style="{ left: `${markerLeftPct(event)}%`, background: markerColor(event) }"

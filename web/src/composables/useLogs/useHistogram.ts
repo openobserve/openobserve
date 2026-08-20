@@ -347,7 +347,7 @@ export const useHistogram = () => {
       }
     } catch (e: any) {
       console.error("Error while generating histogram data", e);
-      notificationMsg.value = "Error while generating histogram data.";
+      notificationMsg.value = t("search.errorWhileGeneratingHistogramData");
     }
   };
 

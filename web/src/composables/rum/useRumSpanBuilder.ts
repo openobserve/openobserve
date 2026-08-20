@@ -262,13 +262,17 @@ export default function useRumSpanBuilder(
       event.resource_duration / 1000000 || event[`${event.type}_duration`] / 1000000 || 0;
     const isTraced = hasRumField(event, "trace_id");
 
-    let operationName = "Unknown RUM Event";
+    let operationName: string = t("rum.unknownRumEvent");
     if (event.type === "resource") {
-      operationName = `${event.resource_method || "GET"} ${event.resource_url || "Unknown URL"}`;
+      operationName = `${event.resource_method || "GET"} ${event.resource_url || t("rum.unknownUrl")}`;
     } else if (event.type === "error") {
-      operationName = `Error: ${event.error_message || event.error_type || "Unknown Error"}`;
+      operationName = t("common.errorPrefix", {
+        message: event.error_message || event.error_type || t("rum.unknownErrorTitle"),
+      });
     } else if (event.type === "long_task") {
-      operationName = `Long Task: ${event.long_task_duration / 1000 || duration}ms`;
+      operationName = t("rum.longTaskOperation", {
+        duration: event.long_task_duration / 1000 || duration,
+      });
     }
 
     return {
@@ -340,7 +344,9 @@ export default function useRumSpanBuilder(
         span_id: `rum_view_${view.view_id}`,
         reference_parent_span_id: "",
         trace_id: traceId || undefined,
-        operation_name: `View: ${view.view_url || view.view_name || "Unknown Page"}`,
+        operation_name: t("rum.viewOperation", {
+          page: view.view_url || view.view_name || t("rum.unknownPage"),
+        }),
         service_name: view.service || "Frontend",
         span_status: "OK",
         span_kind: SPAN_KIND_UNSPECIFIED,
@@ -387,7 +393,10 @@ export default function useRumSpanBuilder(
         span_id: `rum_action_${action.action_id}`,
         reference_parent_span_id: action.view_id ? `rum_view_${action.view_id}` : "",
         trace_id: traceId || undefined,
-        operation_name: `Action: ${action.action_type || "Unknown"} on ${action.action_target_name || "Unknown"}`,
+        operation_name: t("rum.actionOperation", {
+          type: action.action_type || t("rum.unknown"),
+          target: action.action_target_name || t("rum.unknown"),
+        }),
         service_name: action.service || "Frontend",
         span_status: "OK",
         span_kind: SPAN_KIND_UNSPECIFIED,
@@ -399,7 +408,7 @@ export default function useRumSpanBuilder(
     if (actionsToCollapse.length > 0) {
       spans.push(
         makeCollapsedSpan(
-          `[${actionsToCollapse.length} other actions]`,
+          t("rum.collapsedOtherActions", { count: actionsToCollapse.length }),
           actionsToCollapse,
           firstTracedResource?.view_id,
           firstTracedResource?.session_id,
@@ -460,7 +469,7 @@ export default function useRumSpanBuilder(
     if (errors.length > 3) {
       spans.push(
         makeCollapsedSpan(
-          `[${errors.length - 3} more errors]`,
+          t("rum.collapsedMoreErrors", { count: errors.length - 3 }),
           errors.slice(3),
           firstTracedResource?.view_id,
           firstTracedResource?.session_id,
@@ -494,7 +503,7 @@ export default function useRumSpanBuilder(
     const remaining = staticAssets.length - 3;
     spans.push(
       makeCollapsedSpan(
-        `[${remaining} static assets]`,
+        t("rum.collapsedStaticAssets", { count: remaining }),
         staticAssets.slice(3),
         firstTracedResource?.view_id,
         firstTracedResource?.session_id,
@@ -520,7 +529,7 @@ export default function useRumSpanBuilder(
 
     return [
       makeCollapsedSpan(
-        `[${longTasks.length} long tasks]`,
+        t("rum.collapsedLongTasks", { count: longTasks.length }),
         longTasks,
         firstTracedResource?.view_id,
         firstTracedResource?.session_id,

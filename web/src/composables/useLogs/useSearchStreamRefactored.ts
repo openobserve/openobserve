@@ -40,11 +40,11 @@ export const useSearchStreamRefactored = (t: TranslateFn) => {
   const { addTraceId } = logsUtils();
 
   // Initialize all the split composables
-  const queryBuilder = useSearchQuery();
+  const queryBuilder = useSearchQuery(t);
   const connectionManager = useSearchConnection(t);
   const responseProcessor = useSearchResponseHandler();
-  const histogramHandler = useSearchHistogramManager();
-  const paginationManager = useSearchPagination();
+  const histogramHandler = useSearchHistogramManager(t);
+  const paginationManager = useSearchPagination(t);
 
   const { searchObj, resetQueryData } = searchState();
 

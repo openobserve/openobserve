@@ -163,9 +163,12 @@ describe("ScheduledDashboards", () => {
             props: ["tabs", "activeTab"],
             emits: ["update:activeTab"],
           },
-          NoData: {
-            name: "NoData",
-            template: '<div data-test="no-data-mock" class="no-data-mock">No data available</div>',
+          OEmptyState: {
+            name: "OEmptyState",
+            template:
+              '<div data-test="o2-empty-state" class="o2-empty-state-mock">No reports yet</div>',
+            props: ["size", "preset", "filtered"],
+            emits: ["action"],
           },
           OInput: {
             name: "OInput",
@@ -236,7 +239,7 @@ describe("ScheduledDashboards", () => {
         "scheduled-dashboards",
       );
       expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain(
-        "h-fit",
+        "h-full",
       );
     });
 
@@ -247,7 +250,7 @@ describe("ScheduledDashboards", () => {
         "scheduled-dashboards",
       );
       expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain(
-        "h-fit",
+        "h-full",
       );
     });
   });
@@ -563,9 +566,9 @@ describe("ScheduledDashboards", () => {
       expect(table.props("loading")).toBe(true);
     });
 
-    it("should show no data message when not loading and no reports", () => {
+    it("should show empty state when not loading and no reports", () => {
       const wrapper = createWrapper({ loading: false, reports: [] });
-      expect(wrapper.find('[data-test="no-data-mock"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-empty-state"]').exists()).toBe(true);
     });
   });
 

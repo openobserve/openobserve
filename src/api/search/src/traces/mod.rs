@@ -52,9 +52,35 @@ use crate::{
 };
 
 pub mod dag;
+pub mod details;
 pub(crate) mod schema_compat;
 pub mod session;
+pub mod time_index;
 pub mod user;
+
+pub(crate) async fn check_stream_permissions(
+    org_id: &str,
+    stream_name: &str,
+    user_id: &str,
+) -> Option<Response> {
+    #[cfg(feature = "enterprise")]
+    {
+        return openobserve_core::authz::check_stream_permissions(
+            stream_name,
+            org_id,
+            user_id,
+            &StreamType::Traces,
+            openobserve_core::authz::StreamPermissionResourceType::Search,
+        )
+        .await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, stream_name, user_id);
+        None
+    }
+}
 
 /// TracesIngest
 #[utoipa::path(
@@ -210,44 +236,8 @@ pub async fn get_latest_traces(
     };
     let user_id = &user_email.user_id;
 
-    // Check permissions on stream
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_openfga::meta::mapping::OFGA_MODELS;
-
-        use crate::service::{auth::AuthExtractor, users::get_user};
-        if !db::user::is_root_user(user_id) {
-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
-            let stream_type_str = StreamType::Traces.as_str();
-
-            if !openobserve_core::authz::check_permissions(
-                user_id,
-                AuthExtractor {
-                    auth: "".to_string(),
-                    method: "GET".to_string(),
-                    o2_type: format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(stream_type_str)
-                            .map_or(stream_type_str, |model| model.key),
-                        openobserve_core::auth::into_ofga_supported_format(&stream_name)
-                    ),
-                    org_id: org_id.clone(),
-                    bypass_check: false,
-                    parent_id: "".to_string(),
-                    use_all_org: false,
-                    use_self_context: false,
-                    use_self_parent: true,
-                },
-                user.role,
-                user.is_external,
-            )
-            .await
-            {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
-        // Check permissions on stream ends
+    if let Some(response) = check_stream_permissions(&org_id, &stream_name, user_id).await {
+        return response;
     }
 
     let filter = match query.get("filter") {
@@ -944,43 +934,8 @@ pub async fn get_latest_traces_stream(
     };
     let user_id = &user_email.user_id;
 
-    // Check permissions on stream
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_openfga::meta::mapping::OFGA_MODELS;
-
-        use crate::service::{auth::AuthExtractor, users::get_user};
-        if !db::user::is_root_user(user_id) {
-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
-            let stream_type_str = StreamType::Traces.as_str();
-
-            if !openobserve_core::authz::check_permissions(
-                user_id,
-                AuthExtractor {
-                    auth: "".to_string(),
-                    method: "GET".to_string(),
-                    o2_type: format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(stream_type_str)
-                            .map_or(stream_type_str, |model| model.key),
-                        openobserve_core::auth::into_ofga_supported_format(&stream_name)
-                    ),
-                    org_id: org_id.clone(),
-                    bypass_check: false,
-                    parent_id: "".to_string(),
-                    use_all_org: false,
-                    use_self_context: false,
-                    use_self_parent: true,
-                },
-                user.role,
-                user.is_external,
-            )
-            .await
-            {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
+    if let Some(response) = check_stream_permissions(&org_id, &stream_name, user_id).await {
+        return response;
     }
 
     let filter = match query.get("filter") {

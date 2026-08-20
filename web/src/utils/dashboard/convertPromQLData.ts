@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { applySeriesColorMappings, getContrastColor } from "./chartColorUtils";
 import { formatDate } from "./dateTimeUtils";
@@ -186,13 +188,11 @@ export const convertPromQLData = async (
     // Only show warning if we actually hit the limit (metricsStored >= maxSeries)
     // AND we had to drop some metrics (totalMetricsReceived > metricsStored)
     if (totalMetricsReceived > metricsStored && metricsStored >= maxSeries) {
-      extras.limitNumberOfSeriesWarningMessage =
-        "Limiting the displayed series to ensure optimal performance";
+      extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
     }
   } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
     // Fallback: Series limiting happens here (for non-streaming queries)
-    extras.limitNumberOfSeriesWarningMessage =
-      "Limiting the displayed series to ensure optimal performance";
+    extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
   }
 
   // flag to check if the data is time seriesc

@@ -11,7 +11,7 @@ const useManagementRoutes = () => {
       component: Settings,
       meta: {
         keepAlive: true,
-        title: "Settings",
+        titleKey: "menu.settings",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -21,7 +21,7 @@ const useManagementRoutes = () => {
           path: "general",
           name: "general",
           meta: {
-            title: "General",
+            titleKey: "settings.groupGeneral",
           },
           component: () => import("@/components/settings/General.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -32,7 +32,7 @@ const useManagementRoutes = () => {
           path: "organization",
           name: "organizationSettings",
           meta: {
-            title: "Organization Parameters",
+            titleKey: "settings.orgLabel",
           },
           component: () => import("@/components/settings/OrganizationSettings.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -65,6 +65,23 @@ const useManagementRoutes = () => {
       ],
     },
   ];
+
+  // Public synthetics locations are the registry the Lambda venue dispatches
+  // against, and synthetics ships in OSS — so this registers in every build. The
+  // page itself lists public rows only; private locations stay enterprise.
+  routes[0].children.push({
+    path: "synthetics_locations",
+    name: "syntheticsLocations",
+    component: () => import("@/components/settings/SyntheticsLocationsList.vue"),
+    meta: {
+      keepAlive: true,
+      titleKey: "routeTitles.syntheticsLocations",
+    },
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, next);
+    },
+  });
+
   // LLM Model Pricing, LLM Providers and GenAI Agent Mapping (used by the AI
   // Observability / Online Evals flows) are enterprise/cloud-only features — the
   // backend routes only exist behind the enterprise feature flag, so they must
@@ -75,7 +92,7 @@ const useManagementRoutes = () => {
       name: "modelPricing",
       meta: {
         keepAlive: true,
-        title: "LLM Model Pricing",
+        titleKey: "settings.llmModelPricing",
       },
       component: () => import("@/components/settings/ModelPricingList.vue"),
       beforeEnter(to: any, from: any, next: any) {
@@ -86,7 +103,7 @@ const useManagementRoutes = () => {
       path: "model_pricing/edit",
       name: "modelPricingEditor",
       meta: {
-        title: "Model Pricing Editor",
+        titleKey: "routeTitles.modelPricingEditor",
       },
       component: () => import("@/components/settings/ModelPricingEditor.vue"),
       beforeEnter(to: any, from: any, next: any) {
@@ -98,7 +115,7 @@ const useManagementRoutes = () => {
       name: "llmProviders",
       component: () => import("@/components/settings/LlmProvidersSettings.vue"),
       meta: {
-        title: "LLM Providers",
+        titleKey: "llmProviders.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -110,7 +127,7 @@ const useManagementRoutes = () => {
       component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
       meta: {
         keepAlive: true,
-        title: "GenAI Agent Mapping",
+        titleKey: "settings.genAiAgentMapping.title",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -130,7 +147,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/queries/RunningQueries.vue"),
           meta: {
             keepAlive: true,
-            title: "Query Management",
+            titleKey: "settings.queryManagement",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -142,7 +159,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/CipherKeys.vue"),
           meta: {
             keepAlive: true,
-            title: "Cipher Keys",
+            titleKey: "settings.cipherKeys",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -154,7 +171,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/AiToolsets.vue"),
           meta: {
             keepAlive: true,
-            title: "AI Toolsets",
+            titleKey: "aiToolset.header",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -164,7 +181,7 @@ const useManagementRoutes = () => {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
           meta: {
-            title: "Pipeline Destinations",
+            titleKey: "pipeline_destinations.header",
           },
           component: () => import("@/components/alerts/PipelinesDestinationList.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -176,7 +193,7 @@ const useManagementRoutes = () => {
           name: "storageSettings",
           component: () => import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
-            title: "Storage Settings",
+            titleKey: "routeTitles.storageSettings",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -188,7 +205,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/Nodes.vue"),
           meta: {
             keepAlive: true,
-            title: "Nodes",
+            titleKey: "settings.nodes",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -200,7 +217,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/DomainManagement.vue"),
           meta: {
             keepAlive: true,
-            title: "Domain Management",
+            titleKey: "routeTitles.domainManagement",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -212,19 +229,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/RegexPatternList.vue"),
           meta: {
             keepAlive: true,
-            title: "Regex Patterns",
-          },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "synthetics_locations",
-          name: "syntheticsLocations",
-          component: () => import("@/components/settings/SyntheticsLocationsList.vue"),
-          meta: {
-            keepAlive: true,
-            title: "Synthetics Locations",
+            titleKey: "routeTitles.regexPatterns",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -236,7 +241,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/CorrelationSettings.vue"),
           meta: {
             keepAlive: true,
-            title: "Correlation Settings",
+            titleKey: "settings.correlationSettings",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -262,7 +267,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/OrganizationManagement.vue"),
           meta: {
             keepAlive: true,
-            title: "Organization Management",
+            titleKey: "settings.organizationManagement",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
