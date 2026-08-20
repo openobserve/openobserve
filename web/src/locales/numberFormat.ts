@@ -32,6 +32,7 @@ export const APP_LOCALE_TO_BCP47: Record<string, string> = {
   ru: "ru-RU",
   pl: "pl-PL",
   vi: "vi-VN",
+  id: "id-ID",
 };
 
 // Resolve the active app language without importing the i18n instance, so
