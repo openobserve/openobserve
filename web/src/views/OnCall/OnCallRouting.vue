@@ -29,11 +29,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   default team sits above the queue it exists to drain.
 -->
 <template>
+  <!-- Configuration reached from the On-Call header; the rail has no second
+       entry to return through, so the header carries the way back. -->
   <OPageLayout
     data-test="oncall-routing-page"
     :title="t('oncall.routingTitle')"
     :subtitle="t('oncall.routingSubtitle')"
     icon="account-tree"
+    :back="{
+      label: t('oncall.backToResponses'),
+      to: { name: 'onCallResponses', query: { org_identifier: orgId } },
+      dataTest: 'oncall-routing-back-btn',
+    }"
     scroll
   >
     <!-- All on demand: the page's own answer is the rule list, so the tester

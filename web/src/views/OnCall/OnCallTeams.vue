@@ -15,12 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- The rail names On-Call once and the module owns its own navigation, so a
+       sub-page reached from the On-Call header is a dead end without `back`:
+       there is no second menu item to return through. -->
   <OPageLayout
     bleed
     data-test="oncall-teams-page"
     :title="t('oncall.teamsTitle')"
     :subtitle="t('oncall.teamsSubtitle')"
     icon="group-work"
+    :back="{
+      label: t('oncall.backToResponses'),
+      to: { name: 'onCallResponses', query: { org_identifier: orgId } },
+      dataTest: 'oncall-teams-back-btn',
+    }"
   >
     <template #actions>
       <!-- Every team's ladder side by side. The page existed, was registered,

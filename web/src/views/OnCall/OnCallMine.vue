@@ -30,12 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   narrowed rather than rendering a second copy of it.
 -->
 <template>
+  <!-- Reached from the On-Call header, same as Teams and Routing, and with the
+       same single rail entry behind it. -->
   <OPageLayout
     bleed
     data-test="oncall-mine-page"
     :title="t('oncall.mineTitle')"
     :subtitle="t('oncall.mineSubtitle')"
     icon="person"
+    :back="{
+      label: t('oncall.backToResponses'),
+      to: { name: 'onCallResponses', query: { org_identifier: orgId } },
+      dataTest: 'oncall-mine-back-btn',
+    }"
     scroll
   >
     <template #actions>

@@ -24,12 +24,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   now — rather than a rendering of the configuration.
 -->
 <template>
+  <!-- Opened from the teams list, so back goes there rather than all the way
+       out to Pages. -->
   <OPageLayout
     bleed
     data-test="oncall-policies-page"
     :title="t('oncall.policiesTitle')"
     :subtitle="t('oncall.policiesSubtitle')"
     icon="arrow-upward"
+    :back="{
+      label: t('oncall.backToTeams'),
+      to: { name: 'onCallTeams', query: { org_identifier: orgId } },
+      dataTest: 'oncall-policies-back-btn',
+    }"
   >
     <OTable
       :frame="false"

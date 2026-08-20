@@ -143,6 +143,23 @@ describe("OnCallPolicies", () => {
     expect(rowsOf(wrapper)[0].onCall).toBe("");
   });
 
+  /// On-Call owns one rail entry, so a sub-page with no Back is a dead end.
+  /// Mounted through the REAL page layout: the button lives in OPageHeader, and
+  /// a stubbed layout would report success while nothing rendered.
+  it("offers a way back to the teams list it was opened from", async () => {
+    const { OPageLayout: _stubbedLayout, ...realLayout } = stubs;
+    const wrapper = mount(OnCallPolicies, {
+      global: { plugins: [i18n, store], stubs: realLayout },
+    });
+    await flushPromises();
+
+    const back = wrapper.find('[data-test="oncall-policies-back-btn"]');
+    expect(back.exists()).toBe(true);
+    await back.trigger("click");
+
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallTeams" }));
+  });
+
   /// I13: the tab is called Escalation, so that is what the link says. The old
   /// `policy` spelling still resolves for links already saved, but nothing we
   /// generate should keep minting the word the screen does not use.

@@ -40,8 +40,11 @@ vi.mock("@/services/oncall", () => ({
     setRoutingConfig: vi.fn(),
   },
 }));
+// Hoisted so every useRouter() call shares ONE spy — a fresh vi.fn() per call
+// records the navigation onto an object the test can no longer see.
+const push = vi.hoisted(() => vi.fn());
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }));
 
 import alertsService from "@/services/alerts";
@@ -416,5 +419,22 @@ describe("OnCallRouting", () => {
 
     expect(wrapper.find('[data-test="oncall-routing-test-signal"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(true);
+  });
+
+  /// On-Call owns one rail entry, so routing — reached only from the On-Call
+  /// header — had no way out but the browser's own Back. Real layout again:
+  /// the button lives in OPageHeader, which a stubbed layout never renders.
+  it("offers a way back to the On-Call pages it was opened from", async () => {
+    const { OPageLayout: _stubbedLayout, ...realLayout } = stubs;
+    const wrapper = mount(OnCallRouting, {
+      global: { plugins: [i18n, store], stubs: realLayout },
+    });
+    await flushPromises();
+
+    const back = wrapper.find('[data-test="oncall-routing-back-btn"]');
+    expect(back.exists()).toBe(true);
+    await back.trigger("click");
+
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallResponses" }));
   });
 });
