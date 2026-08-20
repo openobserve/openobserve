@@ -78,6 +78,7 @@ pub(super) async fn write_files(
             buf,
             meta,
             layout: MetricsFileLayout::Legacy,
+            series_index: None,
         })
         .collect())
 }

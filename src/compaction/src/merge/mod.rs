@@ -974,6 +974,7 @@ pub async fn merge_files(
         buf,
         meta: mut new_file_meta,
         layout,
+        series_index,
     } in merged_files
     {
         new_file_meta.compressed_size = buf.len() as i64;
@@ -998,10 +999,31 @@ pub async fn merge_files(
 
         // TODO: check how compliance will interact with org storage
         let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
-        if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
+        let compliance = cfg.s3.feature_force_infrequent_access && storage_type.is_compliance();
+        if compliance {
             storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
         } else {
             storage::put(&account, &new_file_key, buf.clone()).await?;
+        }
+
+        // TSID-major files own a `.sidx` series index; it is not tracked in
+        // file_list and is deleted together with the data file
+        if let Some(series_index) = series_index {
+            let series_index_key =
+                MetricsFileLayout::series_index_path(&new_file_key).ok_or_else(|| {
+                    anyhow::anyhow!("TSID series index for a non TSID-major file: {new_file_key}")
+                })?;
+            let series_index = Bytes::from(series_index);
+            if compliance {
+                storage::put_with_compliance(&account, &series_index_key, series_index.clone())
+                    .await?;
+            } else {
+                storage::put(&account, &series_index_key, series_index.clone()).await?;
+            }
+            log::debug!(
+                "[COMPACTOR:WORKER:{thread_id}] wrote TSID series index {series_index_key}, size: {}",
+                series_index.len()
+            );
         }
 
         if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {

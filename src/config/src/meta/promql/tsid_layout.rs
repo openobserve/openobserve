@@ -14,13 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! The TSID-major metrics layout (`ZO_METRICS_TSID_MAJOR_ENABLED`): when it
-//! applies to a stream and how the physical layout of a metrics file is
-//! encoded in its name.
+//! applies to a stream, how the physical layout of a metrics file is encoded
+//! in its name, and the names of the `.sidx` series-index sidecar columns.
 
 use arrow_schema::{DataType, Schema};
 
 use super::HASH_LABEL;
 use crate::{FileFormat, meta::stream::StreamType};
+
+pub const TSID_SERIES_INDEX_ROW_START: &str = "__oo_sidx_row_start";
+pub const TSID_SERIES_INDEX_ROW_COUNT: &str = "__oo_sidx_row_count";
 
 /// True when `stream_type` uses the TSID-major layout
 /// (`ZO_METRICS_TSID_MAJOR_ENABLED`): Parquet metrics files ordered by
@@ -53,14 +56,16 @@ pub enum MetricsFileLayout {
     /// written by the ingester and by incremental compactor merges of the
     /// still-open hour (`tsid-sorted-{id}.parquet`).
     HashSorted,
-    /// Size-bounded Parquet ordered by `(__hash__ ASC, _timestamp ASC)`,
-    /// written by the compactor's hour-end merge (`tsid-major-v3-{id}.parquet`).
+    /// Size-bounded Parquet ordered by `(__hash__ ASC, _timestamp ASC)` with a
+    /// sibling `.sidx` series index; written by the compactor's hour-end merge
+    /// (`tsid-major-v3-{id}.parquet`).
     TsidMajor,
 }
 
 impl MetricsFileLayout {
     const HASH_SORTED_PREFIX: &'static str = "tsid-sorted-";
     const TSID_MAJOR_PREFIX: &'static str = "tsid-major-v3-";
+    const SERIES_INDEX_EXT: &'static str = ".sidx";
 
     /// Layout of the file at `path` (a full object key or a bare file name).
     pub fn of(path: &str) -> Self {
@@ -108,6 +113,15 @@ impl MetricsFileLayout {
             Some(pos) => format!("{}/{}{}", &key[..pos], self.prefix(), &key[pos + 1..]),
             None => format!("{}{key}", self.prefix()),
         }
+    }
+
+    /// The sibling `.sidx` series-index object of a TSID-major file.
+    pub fn series_index_path(path: &str) -> Option<String> {
+        if Self::of(path) != Self::TsidMajor {
+            return None;
+        }
+        path.strip_suffix(".parquet")
+            .map(|path| format!("{path}{}", Self::SERIES_INDEX_EXT))
     }
 }
 
@@ -188,6 +202,22 @@ mod metrics_file_layout_tests {
         assert_eq!(
             MetricsFileLayout::HashSorted.mark_file_key("1.parquet"),
             "tsid-sorted-1.parquet"
+        );
+    }
+
+    #[test]
+    fn series_index_path_only_for_tsid_major() {
+        assert_eq!(
+            MetricsFileLayout::series_index_path("files/default/tsid-major-v3-456.parquet"),
+            Some("files/default/tsid-major-v3-456.sidx".to_string())
+        );
+        assert_eq!(
+            MetricsFileLayout::series_index_path("files/default/tsid-sorted-456.parquet"),
+            None
+        );
+        assert_eq!(
+            MetricsFileLayout::series_index_path("files/default/456.parquet"),
+            None
         );
     }
 }

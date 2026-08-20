@@ -62,6 +62,8 @@ pub struct MergedFile {
     pub meta: FileMeta,
     /// Physical layout the file was written in; decides its file name.
     pub layout: MetricsFileLayout,
+    /// `.sidx` series index of a [`MetricsFileLayout::TsidMajor`] file.
+    pub series_index: Option<Vec<u8>>,
 }
 
 pub struct MergeParquetResult {
@@ -147,6 +149,7 @@ pub async fn merge_parquet_files(
                 buf,
                 meta: metadata,
                 layout: mode.file_layout(),
+                series_index: None,
             }]
         }
     };
