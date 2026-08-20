@@ -354,13 +354,24 @@ describe("SettingsIndex", () => {
       const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
-      const syntheticsItem = items.find((i: any) => i.key === "synthetics_locations");
 
       expect(cipherItem?.visible).toBe(false);
       expect(nodesItem?.visible).toBe(false);
       expect(pipelineItem?.visible).toBe(false);
       expect(regexItem?.visible).toBe(false);
-      expect(syntheticsItem?.visible).toBe(false);
+    });
+
+    // Synthetics ships in OSS: the locations hub card stays visible on an OSS
+    // build (meta org + the backend flag are the only gates).
+    it("should keep synthetics_locations visible when not enterprise", async () => {
+      const config = await import("@/aws-exports");
+      vi.mocked(config.default).isEnterprise = "false";
+
+      const wrapper = createWrapper();
+      const items = getAllItems(wrapper);
+      const syntheticsItem = items.find((i: any) => i.key === "synthetics_locations");
+
+      expect(syntheticsItem?.visible).toBe(true);
     });
 
     it("should mark cloud-only items as not visible when not cloud", async () => {
@@ -403,36 +414,63 @@ describe("SettingsIndex", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should redirect syntheticsLocations to general when meta-org guard applies", async () => {
-      // Set up meta_org guard condition: store has a meta_org configured,
-      // but isEnterprise is false so the notMeta guard triggers.
-      mockStore.state.zoConfig = {
-        meta_org: "some-meta-org",
-        service_streams_enabled: true,
-      };
-
-      const awsConfig = await import("@/aws-exports");
-      vi.mocked(awsConfig.default).isEnterprise = "false";
-
-      // Set the route name to syntheticsLocations so the guard branch activates.
+    // The guard is meta-org + the backend flag, NOT the build type: synthetics
+    // ships in OSS, and its public location registry is the only venue an OSS
+    // deployment has.
+    const onSyntheticsLocationsRoute = (run: () => void) => {
       const originalRoute = router.currentRoute.value;
       router.currentRoute.value = {
         ...router.currentRoute.value,
         name: "syntheticsLocations",
         path: "/synthetics-locations",
       } as any;
+      try {
+        run();
+      } finally {
+        // Restore the original route to avoid cross-test contamination
+        router.currentRoute.value = originalRoute;
+      }
+    };
 
-      createWrapper();
+    it("should redirect syntheticsLocations to general when synthetics is disabled", async () => {
+      mockStore.state.zoConfig = {
+        meta_org: "some-meta-org",
+        service_streams_enabled: true,
+        synthetics_enabled: false,
+      };
 
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "/settings/general",
-          query: { org_identifier: "test-org" },
-        }),
-      );
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "false";
 
-      // Restore the original route to avoid cross-test contamination
-      router.currentRoute.value = originalRoute;
+      onSyntheticsLocationsRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            path: "/settings/general",
+            query: { org_identifier: "test-org" },
+          }),
+        );
+      });
+    });
+
+    it("should NOT redirect syntheticsLocations on an OSS build with synthetics on", async () => {
+      mockStore.state.zoConfig = {
+        meta_org: "some-meta-org",
+        service_streams_enabled: true,
+        synthetics_enabled: true,
+      };
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "false";
+
+      onSyntheticsLocationsRoute(() => {
+        createWrapper();
+
+        expect(mockRouterPush).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: "/settings/general" }),
+        );
+      });
     });
   });
 });

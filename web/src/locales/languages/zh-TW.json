@@ -625,6 +625,12 @@
     "delete": "刪除",
     "remove": "移除",
     "export": "匯出",
+    "download": "下載",
+    "openProviderOnRegistry": "在 {registry} 上的 OpenObserve provider",
+    "exportTerraformTabTooltip": "相同的配置適用於 Terraform 或 OpenTofu。",
+    "exportTerraformEmpty": "此選項沒有對應的 Terraform 資源。請改為以 JSON 匯出。",
+    "exportTerraformSkipped": "未包含：{names}。OpenObserve Terraform provider 沒有這些項目的資源。",
+    "exportTerraformDropped": "已省略 — provider schema 無法承載這些欄位：{fields}。",
     "actions": "操作",
     "version": "版本",
     "updated_at": "更新於",
@@ -820,13 +826,7 @@
     "backTo": "返回 {label}",
     "boolTrue": "是",
     "boolFalse": "否",
-    "browserTimeWithZone": "瀏覽器時間（{zone}）",
-    "download": "下載",
-    "openProviderOnRegistry": "在 {registry} 上的 OpenObserve provider",
-    "exportTerraformTabTooltip": "相同的配置適用於 Terraform 或 OpenTofu。",
-    "exportTerraformEmpty": "此選項沒有對應的 Terraform 資源。請改為以 JSON 匯出。",
-    "exportTerraformSkipped": "未包含：{names}。OpenObserve Terraform provider 沒有這些項目的資源。",
-    "exportTerraformDropped": "已省略 — provider schema 無法承載這些欄位：{fields}。"
+    "browserTimeWithZone": "瀏覽器時間（{zone}）"
   },
   "flow": {
     "stepPicker": {
@@ -6157,6 +6157,8 @@
       "legendNoData": "無資料"
     },
     "importAlertTitle": "匯入警示",
+    "exportDialogTitle": "匯出警示 | 匯出 {count} 個警示",
+    "exportDialogSubtitle": "檢閱定義，然後將其下載為 JSON 或適用於 OpenObserve provider 的 Terraform。",
     "jsonFilesOnlyHint": "僅限 .json 檔案",
     "outputMessages": "輸出訊息",
     "destinationsRequiredLabel": "目的地 *",
@@ -7365,9 +7367,7 @@
     "sloKind": "條件類型",
     "sloLongWindow": "長視窗",
     "sloShortWindow": "短視窗",
-    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。",
-    "exportDialogTitle": "匯出警示 | 匯出 {count} 個警示",
-    "exportDialogSubtitle": "檢閱定義，然後將其下載為 JSON 或適用於 OpenObserve provider 的 Terraform。"
+    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。"
   },
   "alert_dependencies": {
     "actionOpen": "開啟",
@@ -12451,9 +12451,12 @@
       "statusConnecting": "連線中",
       "statusOffline": "離線",
       "statusDown": "故障",
+      "statusUnknown": "未知",
       "connectingMessage": "等待第一個代理程式上線 — 安裝後不久就會到達。",
       "offlineMessage": "代理程式最近中斷連線 — 在重新連線之前，檢查不會從此處執行。",
       "downMessage": "超過一天沒有代理程式 — 在有代理程式重新連線之前，此位置不會執行檢查。",
+      "unknownMessage": "代理程式只會向它們註冊的叢集回報健康狀態，因此此處無法確認其狀態。該位置可能仍在運行。",
+      "unknownAgents": "此處無法取得代理程式狀態",
       "noSearchResults": "沒有符合搜尋條件的位置",
       "noPublicMatches": "沒有符合搜尋條件的公開位置",
       "noPrivateMatches": "沒有符合搜尋條件的私人位置",
@@ -12652,6 +12655,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "未歸屬於任何步驟 ({count})",
+      "allSteps": "所有步驟 ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12666,9 +12672,17 @@
       "reload": "重新載入頁面",
       "retry": "Retry",
       "unattributedCount": "{count} 個事件未歸屬於任何步驟",
-      "stepFilterBanner": "顯示步驟 {step} 的事件",
-      "clearStepFilter": "清除",
-      "rowTitleWithTimestamps": "{label}\n發起於 {initiated} · 觀測於 {observed}"
+      "rowTitleWithTimestamps": "{label}\n發起於 {initiated} · 觀測於 {observed}",
+      "detailEvent": "事件",
+      "detailOccurred": "發生",
+      "detailInitiated": "發起",
+      "detailResourceType": "資源類型",
+      "detailLevel": "級別",
+      "detailOrigin": "來源",
+      "detailFirstParty": "第一方",
+      "detailThirdParty": "第三方",
+      "detailStackTrace": "堆疊追蹤",
+      "footerEvents": "事件"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12716,8 +12730,7 @@
       "evidenceCounts": "{consoleErrors} 個主控台錯誤 · {pageErrors} 個頁面錯誤 · {failed} 個失敗請求 · {nonOk} 個非 2xx 回應",
       "evidenceTruncated": "由於達到擷取限制，本次執行中丟棄了一些事件。套件會說明遺漏的內容。",
       "pageActivity": "頁面活動",
-      "pageActivityCount": "{shown} / {total}",
-      "pageActivityCountTruncated": "{shown} / {total}+",
+      "pageActivityEvents": "{count} 個事件 | {count} 個事件",
       "pageActivityViewAllShort": "在「證據」中檢視全部",
       "expandScreenshot": "展開"
     },
@@ -12967,7 +12980,9 @@
       "status": {
         "online": "線上",
         "offline": "離線",
-        "pending": "待處理"
+        "pending": "待處理",
+        "unknown": "未知",
+        "unknownHint": "代理程式只會向它們註冊的叢集回報健康狀態，因此此處無法確認其狀態。該位置可能仍在運行。"
       },
       "table": {
         "name": "名稱",
@@ -13023,6 +13038,7 @@
         "agentName": "代理程式",
         "restartConfig": "重新啟動設定 — 複製此代理程式的設定命令，以重新執行安裝 / docker restart（例如在 Token 輪替之後）",
         "noAgents": "此位置尚未有代理程式註冊。",
+        "agentsUnavailable": "此位置的代理程式已向另一個叢集註冊，因此在此處看不到它們。",
         "checksTitle": "從此位置執行的檢查",
         "checkName": "名稱",
         "noChecks": "此位置尚未分配任何檢查。",
@@ -13689,6 +13705,7 @@
       "resumingAlerts": "正在恢復警示...",
       "pausingAlerts": "正在暫停警示...",
       "errorExportingAlertsPleaseTryAgain": "匯出警示時發生錯誤。請再試一次。",
+      "someAlertsCouldNotBeExported": "無法讀取 {names}。其餘項目已可匯出。",
       "successfullyExportedAlert": "成功匯出 {count} 個警示 | 成功匯出 {count} 個警示",
       "exportingAlerts": "正在匯出警示...",
       "pleaseWaitWhileSearchingForDashboards": "正在搜尋儀表板，請稍候...",
@@ -13743,8 +13760,7 @@
       "alertSavedSuccessfully": "警示已成功儲存。",
       "alertUpdatedSuccessfully": "警示已成功更新。",
       "openingDedupConfig": "正在開啟 {name} 的重複資料排除設定",
-      "editingAlert": "正在編輯警示：{name}",
-      "someAlertsCouldNotBeExported": "無法讀取 {names}。其餘項目已可匯出。"
+      "editingAlert": "正在編輯警示：{name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "加密金鑰更新成功",
@@ -14259,6 +14275,11 @@
     "move": "移動",
     "moveTitle": "將 {count} 個 SLO 移動到另一個資料夾",
     "moveSelected": "移動 {count} 個已選項目",
+    "exportTitle": "匯出 SLO | 匯出 {count} 個 SLO",
+    "exportSubtitle": "檢閱定義，然後以 JSON 或 Terraform 格式下載，用於 OpenObserve provider。",
+    "exportFailed": "無法讀取 SLO 定義。請再試一次。",
+    "exportPartial": "無法讀取 {names}。其餘的已準備好匯出。",
+    "exportSucceeded": "已匯出 {count} 個 SLO | 已匯出 {count} 個 SLO",
     "moved": "已將 {count} 個 SLO 移動到 {folder}",
     "moveFailed": "移動失敗",
     "preview": {
@@ -14313,12 +14334,7 @@
       "editTargetMissing": "該警示已不在這個 SLO 上。",
       "describeBurn": "燃燒率 > {critical} 在 {long} 和 {short} 期間",
       "describeBudget": "錯誤預算消耗 > {critical}%"
-    },
-    "exportTitle": "匯出 SLO | 匯出 {count} 個 SLO",
-    "exportSubtitle": "檢閱定義，然後以 JSON 或 Terraform 格式下載，用於 OpenObserve provider。",
-    "exportFailed": "無法讀取 SLO 定義。請再試一次。",
-    "exportPartial": "無法讀取 {names}。其餘的已準備好匯出。",
-    "exportSucceeded": "已匯出 {count} 個 SLO | 已匯出 {count} 個 SLO"
+    }
   },
   "promql": {
     "operations": {

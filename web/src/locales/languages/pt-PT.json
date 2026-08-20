@@ -625,6 +625,12 @@
     "delete": "Excluir",
     "remove": "Remover",
     "export": "Exportar",
+    "download": "Baixar",
+    "openProviderOnRegistry": "Provedor do OpenObserve no {registry}",
+    "exportTerraformTabTooltip": "A mesma configuração se aplica ao Terraform ou ao OpenTofu.",
+    "exportTerraformEmpty": "Não existe recurso Terraform para esta seleção. Exporte-o como JSON em vez disso.",
+    "exportTerraformSkipped": "Não incluídos: {names}. O provedor Terraform do OpenObserve não tem recurso para estes.",
+    "exportTerraformDropped": "Omitidos — o esquema do provedor não suporta estes campos: {fields}.",
     "actions": "Ações",
     "version": "Versão",
     "updated_at": "Atualizado em",
@@ -820,13 +826,7 @@
     "backTo": "Voltar para {label}",
     "boolTrue": "Verdadeiro",
     "boolFalse": "Falso",
-    "browserTimeWithZone": "Horário do navegador ({zone})",
-    "download": "Baixar",
-    "openProviderOnRegistry": "Provedor do OpenObserve no {registry}",
-    "exportTerraformTabTooltip": "A mesma configuração se aplica ao Terraform ou ao OpenTofu.",
-    "exportTerraformEmpty": "Não existe recurso Terraform para esta seleção. Exporte-o como JSON em vez disso.",
-    "exportTerraformSkipped": "Não incluídos: {names}. O provedor Terraform do OpenObserve não tem recurso para estes.",
-    "exportTerraformDropped": "Omitidos — o esquema do provedor não suporta estes campos: {fields}."
+    "browserTimeWithZone": "Horário do navegador ({zone})"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "Sem dados"
     },
     "importAlertTitle": "Importar alerta",
+    "exportDialogTitle": "Exportar alerta | Exportar {count} alertas",
+    "exportDialogSubtitle": "Revise a definição e baixe-a como JSON ou como Terraform para o provedor OpenObserve.",
     "jsonFilesOnlyHint": "Somente arquivos .json",
     "outputMessages": "Mensagens de saída",
     "destinationsRequiredLabel": "Destinos *",
@@ -7370,9 +7372,7 @@
     "sloKind": "Tipo de condição",
     "sloLongWindow": "Janela longa",
     "sloShortWindow": "Janela curta",
-    "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui.",
-    "exportDialogTitle": "Exportar alerta | Exportar {count} alertas",
-    "exportDialogSubtitle": "Revise a definição e baixe-a como JSON ou como Terraform para o provedor OpenObserve."
+    "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui."
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -12456,9 +12456,12 @@
       "statusConnecting": "Conectando",
       "statusOffline": "Offline",
       "statusDown": "Fora do ar",
+      "statusUnknown": "Desconhecido",
       "connectingMessage": "Aguardando o primeiro agente se conectar — ele chegará logo após a instalação.",
       "offlineMessage": "O agente caiu recentemente — a verificação não será executada daqui até ele se reconectar.",
       "downMessage": "Nenhum agente há mais de um dia — este local não executará a verificação até um agente se reconectar.",
+      "unknownMessage": "Os agentes reportam sua saúde apenas para o cluster com o qual se registraram, então este não pode confirmar. O local pode muito bem estar em execução.",
+      "unknownAgents": "Status do agente indisponível aqui",
       "noSearchResults": "Nenhum local corresponde à sua pesquisa",
       "noPublicMatches": "Nenhum local público corresponde à sua pesquisa",
       "noPrivateMatches": "Nenhum local privado corresponde à sua pesquisa",
@@ -12657,6 +12660,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "Não atribuído a uma etapa ({count})",
+      "allSteps": "Todas as etapas ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12671,9 +12677,17 @@
       "reload": "Recarregar página",
       "retry": "Retry",
       "unattributedCount": "{count} eventos não foram atribuídos a nenhuma etapa",
-      "stepFilterBanner": "Mostrando eventos da etapa {step}",
-      "clearStepFilter": "Limpar",
-      "rowTitleWithTimestamps": "{label}\niniciado {initiated} · observado {observed}"
+      "rowTitleWithTimestamps": "{label}\niniciado {initiated} · observado {observed}",
+      "detailEvent": "Evento",
+      "detailOccurred": "Ocorreu",
+      "detailInitiated": "Iniciado",
+      "detailResourceType": "Tipo de recurso",
+      "detailLevel": "Nível",
+      "detailOrigin": "Origem",
+      "detailFirstParty": "Primeira parte",
+      "detailThirdParty": "Terceira parte",
+      "detailStackTrace": "Rastreamento de pilha",
+      "footerEvents": "Eventos"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12721,8 +12735,7 @@
       "evidenceCounts": "{consoleErrors} erros de console · {pageErrors} erros de página · {failed} requisições com falha · {nonOk} respostas não-2xx",
       "evidenceTruncated": "Alguns eventos foram descartados durante esta execução porque o limite de captura foi atingido. O pacote informa o que ocorreu.",
       "pageActivity": "Atividade da página",
-      "pageActivityCount": "{shown} de {total}",
-      "pageActivityCountTruncated": "{shown} de {total}+",
+      "pageActivityEvents": "{count} evento | {count} eventos",
       "pageActivityViewAllShort": "Ver tudo em Evidências",
       "expandScreenshot": "Expandir"
     },
@@ -12972,7 +12985,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "Pendente"
+        "pending": "Pendente",
+        "unknown": "Desconhecido",
+        "unknownHint": "Os agentes reportam sua saúde apenas para o cluster com o qual se registraram, então este não pode confirmar. O local pode muito bem estar em execução."
       },
       "table": {
         "name": "Nome",
@@ -13028,6 +13043,7 @@
         "agentName": "Agente",
         "restartConfig": "Configuração de reinício — copie o comando de configuração deste agente para reexecutar a instalação / reinício do docker (por exemplo, após uma rotação de token)",
         "noAgents": "Nenhum agente se registrou para este local ainda.",
+        "agentsUnavailable": "Os agentes deste local se registraram em outro cluster e não estão visíveis aqui.",
         "checksTitle": "Verificações em execução a partir deste local",
         "checkName": "Nome",
         "noChecks": "Nenhuma verificação está atribuída a este local ainda.",
@@ -13694,6 +13710,7 @@
       "resumingAlerts": "Retomando alertas...",
       "pausingAlerts": "Pausando alertas...",
       "errorExportingAlertsPleaseTryAgain": "Erro ao exportar alertas. Tente novamente.",
+      "someAlertsCouldNotBeExported": "Não foi possível ler {names}. O restante está pronto para exportar.",
       "successfullyExportedAlert": "Exportado com sucesso {count} alerta | Exportados com sucesso {count} alertas",
       "exportingAlerts": "Exportando alertas...",
       "pleaseWaitWhileSearchingForDashboards": "Aguarde enquanto procuramos por painéis...",
@@ -13748,8 +13765,7 @@
       "alertSavedSuccessfully": "Alerta salvo com sucesso.",
       "alertUpdatedSuccessfully": "Alerta atualizado com sucesso.",
       "openingDedupConfig": "Abrindo configuração de deduplicação para: {name}",
-      "editingAlert": "Editando alerta: {name}",
-      "someAlertsCouldNotBeExported": "Não foi possível ler {names}. O restante está pronto para exportar."
+      "editingAlert": "Editando alerta: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Chave de criptografia atualizada com sucesso",
@@ -14264,6 +14280,11 @@
     "move": "Mover",
     "moveTitle": "Mover {count} SLO(s) para outra pasta",
     "moveSelected": "Mover {count} selecionado(s)",
+    "exportTitle": "Exportar SLO | Exportar {count} SLOs",
+    "exportSubtitle": "Revise a definição e baixe-a como JSON ou como Terraform para o provedor do OpenObserve.",
+    "exportFailed": "Não foi possível ler a definição do SLO. Tente novamente.",
+    "exportPartial": "Não foi possível ler {names}. O restante está pronto para exportar.",
+    "exportSucceeded": "Exportado {count} SLO | Exportados {count} SLOs",
     "moved": "Movidos {count} SLO(s) para {folder}",
     "moveFailed": "Falha ao mover",
     "preview": {
@@ -14318,12 +14339,7 @@
       "editTargetMissing": "Esse alerta não está mais neste SLO.",
       "describeBurn": "Taxa de consumo > {critical} em {long} e {short}",
       "describeBudget": "Orçamento de erros consumido > {critical}%"
-    },
-    "exportTitle": "Exportar SLO | Exportar {count} SLOs",
-    "exportSubtitle": "Revise a definição e baixe-a como JSON ou como Terraform para o provedor do OpenObserve.",
-    "exportFailed": "Não foi possível ler a definição do SLO. Tente novamente.",
-    "exportPartial": "Não foi possível ler {names}. O restante está pronto para exportar.",
-    "exportSucceeded": "Exportado {count} SLO | Exportados {count} SLOs"
+    }
   },
   "promql": {
     "operations": {

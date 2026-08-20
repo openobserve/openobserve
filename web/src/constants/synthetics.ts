@@ -377,10 +377,3 @@ export const CHROME_UI_LABELS = {
  * all, and every step silently degraded to role/text/css.
  */
 export const DEFAULT_TEST_ID_ATTR = "data-test";
-
-/**
- * How many evidence events a step expansion shows before deferring to the
- * Evidence tab. A live bundle held 158 events across two steps — uncapped, one
- * expansion would run to 136 rows and break the step timeline's scroll.
- */
-export const INLINE_EVIDENCE_LIMIT = 5;

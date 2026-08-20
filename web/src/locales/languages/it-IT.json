@@ -625,6 +625,12 @@
     "delete": "Elimina",
     "remove": "Rimuovi",
     "export": "Esporta",
+    "download": "Scarica",
+    "openProviderOnRegistry": "Provider OpenObserve su {registry}",
+    "exportTerraformTabTooltip": "La stessa configurazione si applica con Terraform o OpenTofu.",
+    "exportTerraformEmpty": "Non esiste alcuna risorsa Terraform per questa selezione. Esportala come JSON.",
+    "exportTerraformSkipped": "Non inclusi: {names}. Il provider Terraform di OpenObserve non ha risorse per questi.",
+    "exportTerraformDropped": "Esclusi — lo schema del provider non può contenere questi campi: {fields}.",
     "actions": "Azioni",
     "version": "Versione",
     "updated_at": "Aggiornato a",
@@ -820,13 +826,7 @@
     "backTo": "Torna a {label}",
     "boolTrue": "Vero",
     "boolFalse": "Falso",
-    "browserTimeWithZone": "Ora del browser ({zone})",
-    "download": "Scarica",
-    "openProviderOnRegistry": "Provider OpenObserve su {registry}",
-    "exportTerraformTabTooltip": "La stessa configurazione si applica con Terraform o OpenTofu.",
-    "exportTerraformEmpty": "Non esiste alcuna risorsa Terraform per questa selezione. Esportala come JSON.",
-    "exportTerraformSkipped": "Non inclusi: {names}. Il provider Terraform di OpenObserve non ha risorse per questi.",
-    "exportTerraformDropped": "Esclusi — lo schema del provider non può contenere questi campi: {fields}."
+    "browserTimeWithZone": "Ora del browser ({zone})"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "Nessun dato"
     },
     "importAlertTitle": "Importa alert",
+    "exportDialogTitle": "Esporta avviso | Esporta {count} avvisi",
+    "exportDialogSubtitle": "Rivedi la definizione, poi scaricala come JSON o come Terraform per il provider OpenObserve.",
     "jsonFilesOnlyHint": "Solo file .json",
     "outputMessages": "Messaggi di output",
     "destinationsRequiredLabel": "Destinazioni *",
@@ -7370,9 +7372,7 @@
     "sloKind": "Tipo di condizione",
     "sloLongWindow": "Finestra lunga",
     "sloShortWindow": "Finestra breve",
-    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui.",
-    "exportDialogTitle": "Esporta avviso | Esporta {count} avvisi",
-    "exportDialogSubtitle": "Rivedi la definizione, poi scaricala come JSON o come Terraform per il provider OpenObserve."
+    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui."
   },
   "alert_dependencies": {
     "actionOpen": "Apri",
@@ -12456,9 +12456,12 @@
       "statusConnecting": "Connessione",
       "statusOffline": "Offline",
       "statusDown": "Non disponibile",
+      "statusUnknown": "Sconosciuto",
       "connectingMessage": "In attesa che il primo agente si connetta — arriverà subito dopo l'installazione.",
       "offlineMessage": "L'agente si è disconnesso di recente — il controllo non verrà eseguito da qui finché non si riconnette.",
       "downMessage": "Nessun agente per oltre un giorno — questa posizione non eseguirà il controllo finché un agente non si riconnette.",
+      "unknownMessage": "Gli agenti riportano il loro stato di salute solo al cluster con cui si sono registrati, quindi questo non può confermarlo. La posizione potrebbe benissimo essere operativa.",
+      "unknownAgents": "Stato agente non disponibile qui",
       "noSearchResults": "Nessuna posizione corrisponde alla tua ricerca",
       "noPublicMatches": "Nessuna posizione pubblica corrisponde alla tua ricerca",
       "noPrivateMatches": "Nessuna posizione privata corrisponde alla tua ricerca",
@@ -12657,6 +12660,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "Non attribuito a un passaggio ({count})",
+      "allSteps": "Tutti i passaggi ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12671,9 +12677,17 @@
       "reload": "Ricarica pagina",
       "retry": "Retry",
       "unattributedCount": "{count} eventi non sono stati attribuiti a nessun passaggio",
-      "stepFilterBanner": "Mostrando gli eventi per il passo {step}",
-      "clearStepFilter": "Cancella",
-      "rowTitleWithTimestamps": "{label}\navviato {initiated} · osservato {observed}"
+      "rowTitleWithTimestamps": "{label}\navviato {initiated} · osservato {observed}",
+      "detailEvent": "Evento",
+      "detailOccurred": "Verificato",
+      "detailInitiated": "Avviato",
+      "detailResourceType": "Tipo di risorsa",
+      "detailLevel": "Livello",
+      "detailOrigin": "Origine",
+      "detailFirstParty": "Prima parte",
+      "detailThirdParty": "Terza parte",
+      "detailStackTrace": "Traccia dello stack",
+      "footerEvents": "Eventi"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12721,8 +12735,7 @@
       "evidenceCounts": "{consoleErrors} errori console · {pageErrors} errori di pagina · {failed} richieste fallite · {nonOk} risposte non-2xx",
       "evidenceTruncated": "Alcuni eventi sono stati eliminati durante questa esecuzione perché è stato raggiunto il limite di acquisizione. Il bundle indica ciò che è stato scartato.",
       "pageActivity": "Attività della pagina",
-      "pageActivityCount": "{shown} di {total}",
-      "pageActivityCountTruncated": "{shown} di {total}+",
+      "pageActivityEvents": "{count} evento | {count} eventi",
       "pageActivityViewAllShort": "Visualizza tutto in Prova",
       "expandScreenshot": "Espandi"
     },
@@ -12972,7 +12985,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "In attesa"
+        "pending": "In attesa",
+        "unknown": "Sconosciuto",
+        "unknownHint": "Gli agenti riportano il loro stato di salute solo al cluster con cui si sono registrati, quindi questo non può confermarlo. La posizione potrebbe benissimo essere operativa."
       },
       "table": {
         "name": "Nome",
@@ -13028,6 +13043,7 @@
         "agentName": "Agente",
         "restartConfig": "Riavvio configurazione — copia il comando di configurazione di questo agente per rieseguire l'installazione / il riavvio di docker (ad es. dopo una rotazione del token)",
         "noAgents": "Nessun agente si è ancora registrato per questa posizione.",
+        "agentsUnavailable": "Gli agenti di questa posizione sono registrati con un altro cluster e non sono visibili qui.",
         "checksTitle": "Controlli in esecuzione da questa posizione",
         "checkName": "Nome",
         "noChecks": "Nessun controllo è ancora assegnato a questa posizione.",
@@ -13694,6 +13710,7 @@
       "resumingAlerts": "Ripresa degli avvisi...",
       "pausingAlerts": "Pausa degli avvisi...",
       "errorExportingAlertsPleaseTryAgain": "Errore durante l'esportazione degli avvisi. Riprova.",
+      "someAlertsCouldNotBeExported": "Impossibile leggere {names}. I restanti sono pronti per l'esportazione.",
       "successfullyExportedAlert": "{count} avviso esportato con successo | {count} avvisi esportati con successo",
       "exportingAlerts": "Esportazione degli avvisi...",
       "pleaseWaitWhileSearchingForDashboards": "Attendere mentre si cercano le dashboard...",
@@ -13748,8 +13765,7 @@
       "alertSavedSuccessfully": "Avviso salvato con successo.",
       "alertUpdatedSuccessfully": "Avviso aggiornato con successo.",
       "openingDedupConfig": "Apertura configurazione di deduplicazione per: {name}",
-      "editingAlert": "Modifica avviso: {name}",
-      "someAlertsCouldNotBeExported": "Impossibile leggere {names}. I restanti sono pronti per l'esportazione."
+      "editingAlert": "Modifica avviso: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Chiave di cifratura aggiornata con successo",
@@ -14264,6 +14280,11 @@
     "move": "Sposta",
     "moveTitle": "Sposta {count} SLO in un'altra cartella",
     "moveSelected": "Sposta {count} selezionati",
+    "exportTitle": "Esporta SLO | Esporta {count} SLO",
+    "exportSubtitle": "Rivedi la definizione, quindi scaricala come JSON o come Terraform per il provider OpenObserve.",
+    "exportFailed": "Impossibile leggere la definizione SLO. Riprova.",
+    "exportPartial": "Impossibile leggere {names}. Gli altri sono pronti per l'esportazione.",
+    "exportSucceeded": "Esportato {count} SLO | Esportati {count} SLO",
     "moved": "Spostati {count} SLO in {folder}",
     "moveFailed": "Spostamento non riuscito",
     "preview": {
@@ -14318,12 +14339,7 @@
       "editTargetMissing": "Questo avviso non è più su questo SLO.",
       "describeBurn": "Tasso di consumo > {critical} su {long} e {short}",
       "describeBudget": "Budget errori consumato > {critical}%"
-    },
-    "exportTitle": "Esporta SLO | Esporta {count} SLO",
-    "exportSubtitle": "Rivedi la definizione, quindi scaricala come JSON o come Terraform per il provider OpenObserve.",
-    "exportFailed": "Impossibile leggere la definizione SLO. Riprova.",
-    "exportPartial": "Impossibile leggere {names}. Gli altri sono pronti per l'esportazione.",
-    "exportSucceeded": "Esportato {count} SLO | Esportati {count} SLO"
+    }
   },
   "promql": {
     "operations": {
