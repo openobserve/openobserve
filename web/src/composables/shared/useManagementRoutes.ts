@@ -65,6 +65,23 @@ const useManagementRoutes = () => {
       ],
     },
   ];
+
+  // Public synthetics locations are the registry the Lambda venue dispatches
+  // against, and synthetics ships in OSS — so this registers in every build. The
+  // page itself lists public rows only; private locations stay enterprise.
+  routes[0].children.push({
+    path: "synthetics_locations",
+    name: "syntheticsLocations",
+    component: () => import("@/components/settings/SyntheticsLocationsList.vue"),
+    meta: {
+      keepAlive: true,
+      titleKey: "routeTitles.syntheticsLocations",
+    },
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, next);
+    },
+  });
+
   // LLM Model Pricing, LLM Providers and GenAI Agent Mapping (used by the AI
   // Observability / Online Evals flows) are enterprise/cloud-only features — the
   // backend routes only exist behind the enterprise feature flag, so they must
@@ -213,18 +230,6 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             titleKey: "routeTitles.regexPatterns",
-          },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "synthetics_locations",
-          name: "syntheticsLocations",
-          component: () => import("@/components/settings/SyntheticsLocationsList.vue"),
-          meta: {
-            keepAlive: true,
-            titleKey: "routeTitles.syntheticsLocations",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

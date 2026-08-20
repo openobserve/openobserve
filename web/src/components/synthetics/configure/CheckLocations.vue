@@ -30,6 +30,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
+import { locationLiveStatus as liveStatus } from "@/utils/synthetics/locationLiveStatus";
 
 const props = defineProps<{
   check: BrowserCheck;
@@ -87,12 +88,15 @@ function locationDisplayName(location: SyntheticsLocation): string {
 
 // ── Status tiers ─────────────────────────────────────────────────────────────
 
-type StatusTier = "ready" | "connecting" | "offline" | "down";
+type StatusTier = "ready" | "unknown" | "connecting" | "offline" | "down";
 
 /** Resolve the display tier — "down" is offline with no agent for ≥24h, a
  *  distinction raw `status` can't express. Sorting and display both key off
  *  this so a dead location never outranks a recently-dropped one. */
 function statusTier(location: SyntheticsLocation): StatusTier {
+  // Checked first: without it this region's missing agent rows read as
+  // "connecting", i.e. install an agent you already installed elsewhere.
+  if (liveStatus(location) === "unknown") return "unknown";
   if (location.status === "online") return "ready";
   if (location.status === "pending") return "connecting";
   const nowUs = Date.now() * 1000;
@@ -109,7 +113,8 @@ interface StatusInfo {
   message: string;
   /** Color of the always-visible message line under the row. */
   messageClass: string;
-  badgeVariant: "success-outline" | "info-outline" | "warning-outline" | "error-outline";
+  badgeVariant:
+    "success-outline" | "info-outline" | "warning-outline" | "error-outline" | "default-outline";
   actionLabel: string;
   actionVariant: "outline";
 }
@@ -126,6 +131,22 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
       message: "",
       messageClass: "",
       badgeVariant: "success-outline",
+      actionLabel: t("synthetics.locations.addAgent"),
+      actionVariant: "outline",
+    };
+  }
+
+  // Neutral on purpose: nothing is wrong here and nothing is confirmed either,
+  // so it must not colour like a fault and must not offer a fix.
+  if (tier === "unknown") {
+    return {
+      tier: "unknown",
+      icon: "help-outline",
+      label: t("synthetics.locations.statusUnknown"),
+      iconClass: "text-text-muted",
+      message: t("synthetics.locations.unknownMessage"),
+      messageClass: "text-text-secondary",
+      badgeVariant: "default-outline",
       actionLabel: t("synthetics.locations.addAgent"),
       actionVariant: "outline",
     };
@@ -191,6 +212,18 @@ function agentDisplay(location: SyntheticsLocation): AgentDisplay {
   const names = location.agent_names ?? [];
   const count = location.live_agents ?? names.length;
 
+  // "Waiting for the first agent" is wrong here — this region has no agent
+  // list to report, which is not the same as there being none.
+  if (liveStatus(location) === "unknown") {
+    return {
+      firstAgent: "",
+      extra: 0,
+      allNames: [],
+      count: 0,
+      statusText: t("synthetics.locations.unknownAgents"),
+    };
+  }
+
   if (location.status === "online") {
     return {
       firstAgent: names[0] ?? "",
@@ -226,7 +259,15 @@ function agentDisplay(location: SyntheticsLocation): AgentDisplay {
 
 // ── Location lists ───────────────────────────────────────────────────────────
 
-const TIER_SORT: Record<StatusTier, number> = { ready: 0, connecting: 1, offline: 2, down: 3 };
+// "unknown" ranks just below "ready": it is selectable and probably fine, so it
+// must not sink beneath the locations that genuinely need attention.
+const TIER_SORT: Record<StatusTier, number> = {
+  ready: 0,
+  unknown: 1,
+  connecting: 2,
+  offline: 3,
+  down: 4,
+};
 
 const publicLocations = computed(() => props.locations.filter((l) => l.kind !== "private"));
 

@@ -1,0 +1,7 @@
+appId: com.o2native
+---
+# After foregrounding, navigate to Details so a NEW view (DetailsActivity, viewB) is recorded in the
+# SAME session — proving the lifecycle cycle did not reset the session.
+- assertVisible: "Trigger handled error"
+- tapOn: "Go to Details"
+- assertVisible: "Details screen"

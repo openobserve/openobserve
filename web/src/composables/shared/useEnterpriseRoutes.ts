@@ -19,13 +19,27 @@ import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
-// (enterprise O2_SYNTHETICS_ENABLED). Direct URL access redirects home when off.
+// (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
+// access redirects home when off.
 const syntheticsRouteGuard = (to: any, from: any, next: any) => {
   if (store.state.zoConfig?.synthetics_enabled === false) {
     next("/");
     return;
   }
   routeGuard(to, from, next);
+};
+
+// Private locations are served by agents deployed inside the customer's network,
+// which is the one enterprise part of synthetics — so the detail page needs the
+// narrower flag as well. Same `=== false` stance as above: /config is fetched
+// without await, so redirecting on "not yet known" would bounce a bookmarked
+// link on a cold load.
+const privateLocationRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.synthetics_private_locations_enabled === false) {
+    next("/");
+    return;
+  }
+  syntheticsRouteGuard(to, from, next);
 };
 
 // Workflows routes are gated on the backend /config flag `workflows_enabled`
@@ -168,68 +182,74 @@ const useEnterpriseRoutes = () => {
       ],
     },
   ];
+
+  // Synthetics ships in OSS; only the private-VPC-agent half stays enterprise, so
+  // these routes register in every build. Visibility is the backend `/config` flag
+  // `synthetics_enabled` (ZO_SYNTHETICS_ENABLED) via syntheticsRouteGuard, and the
+  // private-location detail page carries the narrower
+  // `synthetics_private_locations_enabled` gate on top of it.
+  routes.push({
+    path: "synthetics",
+    name: "synthetics",
+    component: () => import("@/views/SyntheticMonitoring.vue"),
+    meta: { titleKey: "menu.synthetic" },
+    beforeEnter(to: any, from: any, next: any) {
+      syntheticsRouteGuard(to, from, next);
+    },
+  });
+
+  routes.push(
+    {
+      path: "synthetics/add",
+      name: "synthetics-add",
+      component: () => import("@/views/synthetics/CreateCheck.vue"),
+      meta: { titleKey: "routeTitles.addCheck" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "synthetics/edit/:id",
+      name: "synthetics-edit",
+      component: () => import("@/views/synthetics/CreateCheck.vue"),
+      meta: { titleKey: "synthetics.results.editCheck" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "synthetic/private-locations/:id",
+      name: "synthetic-private-location",
+      component: () => import("@/views/synthetics/PrivateLocationDetail.vue"),
+      meta: { titleKey: "synthetics.privateLocations.detail.title" },
+      beforeEnter(to: any, from: any, next: any) {
+        privateLocationRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "synthetics/:id/results",
+      name: "synthetic-monitor-results",
+      component: () => import("@/views/synthetics/MonitorResults.vue"),
+      meta: { titleKey: "synthetics.results.title" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "synthetics/:id/results/run/:runId/:executionId",
+      name: "synthetics-run-detail",
+      component: () => import("@/views/synthetics/RunDetail.vue"),
+      meta: { titleKey: "synthetics.runDetail.title" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    },
+  );
+
   //the below are the routes that we support for enterprise and cloud
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
-    routes.push({
-      path: "synthetics",
-      name: "synthetics",
-      component: () => import("@/views/SyntheticMonitoring.vue"),
-      meta: { titleKey: "menu.synthetic" },
-      beforeEnter(to: any, from: any, next: any) {
-        syntheticsRouteGuard(to, from, next);
-      },
-    });
-
-    routes.push(
-      {
-        path: "synthetics/add",
-        name: "synthetics-add",
-        component: () => import("@/views/synthetics/CreateCheck.vue"),
-        meta: { titleKey: "routeTitles.addCheck" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-      {
-        path: "synthetics/edit/:id",
-        name: "synthetics-edit",
-        component: () => import("@/views/synthetics/CreateCheck.vue"),
-        meta: { titleKey: "synthetics.results.editCheck" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-      {
-        path: "synthetic/private-locations/:id",
-        name: "synthetic-private-location",
-        component: () => import("@/views/synthetics/PrivateLocationDetail.vue"),
-        meta: { titleKey: "synthetics.privateLocations.detail.title" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-      {
-        path: "synthetics/:id/results",
-        name: "synthetic-monitor-results",
-        component: () => import("@/views/synthetics/MonitorResults.vue"),
-        meta: { titleKey: "synthetics.results.title" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-      {
-        path: "synthetics/:id/results/run/:runId/:executionId",
-        name: "synthetics-run-detail",
-        component: () => import("@/views/synthetics/RunDetail.vue"),
-        meta: { titleKey: "synthetics.runDetail.title" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-    );
-
     routes.push(
       {
         path: "incidents",

@@ -45,6 +45,36 @@ pub fn decode_encryption_key(key_b64: &str) -> Result<Vec<u8>, String> {
     Ok(key)
 }
 
+/// Marks a value as AES-encrypted at rest. Values without it are plaintext.
+pub const SECRET_PREFIX: &str = "AESenc:";
+
+/// Encrypts a secret for storage, prefixing it with [`SECRET_PREFIX`].
+///
+/// Already-prefixed input is returned unchanged, so an update that does not
+/// touch a credential cannot double-wrap it.
+///
+/// Lives here rather than in the synthetics crate because three places need the
+/// same pair and none of them may depend on each other: the synthetics service,
+/// the enterprise super-cluster producer, and the OSS applier — which must not
+/// reach the synthetics crate at all, or the applier could re-publish what it
+/// just applied.
+pub fn encrypt_secret_value(dek: &[u8], value: &str) -> Result<String, EncryptError> {
+    if value.starts_with(SECRET_PREFIX) {
+        return Ok(value.to_string());
+    }
+    let ciphertext = Algorithm::Aes256Siv.encrypt(dek, value)?;
+    Ok(format!("{SECRET_PREFIX}{ciphertext}"))
+}
+
+/// Decrypts a value written by [`encrypt_secret_value`].
+///
+/// Input without the prefix is passed to the cipher as-is, which keeps rows
+/// written before the prefix existed readable.
+pub fn decrypt_secret_value(dek: &[u8], stored: &str) -> Result<String, EncryptError> {
+    let b64 = stored.strip_prefix(SECRET_PREFIX).unwrap_or(stored);
+    Algorithm::Aes256Siv.decrypt(dek, b64)
+}
+
 #[derive(ThisError, Debug)]
 pub enum EncryptError {
     #[error("Algorithm Error: {0}")]
@@ -123,6 +153,49 @@ impl Algorithm {
             }
             Self::None => Ok(String::from_utf8_lossy(&decoded).to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod secret_value_tests {
+    use super::*;
+
+    fn key(b: u8) -> Vec<u8> {
+        vec![b; AES_256_SIV_KEY_LEN]
+    }
+
+    #[test]
+    fn a_secret_round_trips() {
+        let k = key(1);
+        let stored = encrypt_secret_value(&k, "hunter2").unwrap();
+        assert!(stored.starts_with(SECRET_PREFIX));
+        assert_eq!(decrypt_secret_value(&k, &stored).unwrap(), "hunter2");
+    }
+
+    /// An update that does not touch a credential re-saves the stored value, so
+    /// encrypting twice must not wrap it twice.
+    #[test]
+    fn encrypting_an_already_encrypted_value_is_a_no_op() {
+        let k = key(1);
+        let once = encrypt_secret_value(&k, "hunter2").unwrap();
+        assert_eq!(encrypt_secret_value(&k, &once).unwrap(), once);
+    }
+
+    /// The property option B rests on: a secret encrypted under one region's
+    /// DEK is unreadable under another's, which is why it crosses the queue in
+    /// clear and is re-encrypted on arrival.
+    #[test]
+    fn another_regions_key_cannot_read_it() {
+        let stored = encrypt_secret_value(&key(1), "hunter2").unwrap();
+        assert!(decrypt_secret_value(&key(2), &stored).is_err());
+    }
+
+    /// Rows written before the prefix existed are still readable.
+    #[test]
+    fn an_unprefixed_ciphertext_still_decrypts() {
+        let k = key(3);
+        let raw = Algorithm::Aes256Siv.encrypt(&k, "legacy").unwrap();
+        assert_eq!(decrypt_secret_value(&k, &raw).unwrap(), "legacy");
     }
 }
 

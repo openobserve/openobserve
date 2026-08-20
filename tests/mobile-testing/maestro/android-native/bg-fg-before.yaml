@@ -1,0 +1,6 @@
+appId: com.o2native
+---
+# Records the MainActivity view BEFORE the background/foreground cycle (viewA).
+- launchApp:
+    clearState: false
+- assertVisible: "Trigger handled error"

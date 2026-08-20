@@ -80,6 +80,7 @@ import { SanityPage } from "./generalPages/sanityPage.js";
 import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
 import { ThemePage } from "./generalPages/themePage.js";
+import { DateTimePickerPage } from "./generalPages/dateTimePickerPage.js";
 import { LanguagePage } from "./generalPages/languagePage.js";
 import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.js";
 import { CorrelationDrawerPage } from "./generalPages/correlationDrawerPage.js";
@@ -210,6 +211,7 @@ class PageManager {
     this.changeOrgPage = new ChangeOrgPage(page);
     this.enrichmentPage = new EnrichmentPage(page);
     this.themePage = new ThemePage(page);
+    this.dateTimePickerPage = new DateTimePickerPage(page);
     this.languagePage = new LanguagePage(page);
     this.correlationSettingsPage = new CorrelationSettingsPage(page);
     this.correlationDrawerPage = new CorrelationDrawerPage(page);
