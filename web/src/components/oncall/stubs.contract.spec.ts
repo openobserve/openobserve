@@ -98,22 +98,40 @@ const componentIndex = (() => {
  */
 function declaredProps(file: string): Set<string> | null {
   const source = readFileSync(file, "utf8");
+  const models = modelProps(source);
+  const withModels = (props: Set<string> | null) => {
+    if (!props) return models.size ? models : null;
+    models.forEach((p) => props.add(p));
+    return props;
+  };
 
   const typed = /defineProps<\s*/.exec(source);
   if (typed) {
     const after = source.slice(typed.index + typed[0].length);
-    if (after.startsWith("{")) return propsFromTypeBody(braceBody(after, 0));
+    if (after.startsWith("{")) return withModels(propsFromTypeBody(braceBody(after, 0)));
     // A named interface — sibling `.types.ts` first, then this file.
     const named = after.match(/^([A-Za-z_$][\w$]*)/);
-    return named ? propsFromNamedType(named[1], file, source) : null;
+    return withModels(named ? propsFromNamedType(named[1], file, source) : null);
   }
 
   const runtime = /defineProps\(\s*\{/.exec(source);
   if (runtime) {
-    return propsFromTypeBody(braceBody(source, runtime.index + runtime[0].length - 1));
+    return withModels(propsFromTypeBody(braceBody(source, runtime.index + runtime[0].length - 1)));
   }
 
-  return null;
+  return withModels(null);
+}
+
+/**
+ * `defineModel` declares a prop too — `modelValue`, or the name it was given.
+ * Reading only `defineProps` reported an honest `v-model` stub as a liar.
+ */
+function modelProps(source: string): Set<string> {
+  const names = new Set<string>();
+  const re = /defineModel\s*(?:<[^>]*>)?\s*\(\s*(?:"([^"]+)"|'([^']+)')?/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(source)) !== null) names.add(match[1] ?? match[2] ?? "modelValue");
+  return names;
 }
 
 /** Comments carry colons and braces of their own, and would parse as members. */
