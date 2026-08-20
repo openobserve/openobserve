@@ -1,0 +1,10 @@
+appId: com.o2native.ios
+---
+# Fire a 200 and a 404 through the URLSession instrumented via O2SessionDelegate so both land as RUM
+# `resource` events (the 404 carries a >=400 status for the negative test).
+- launchApp:
+    clearState: false
+- tapOn: "Fetch resource 200"
+- tapOn: "Fetch resource 404"
+- waitForAnimationToEnd:
+    timeout: 3000
