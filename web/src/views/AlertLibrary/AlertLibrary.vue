@@ -159,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="entry.id"
                       :entry="entry"
                       :ready="entryReady(entry)"
+                      @open="openEntry(entry)"
                     />
                   </div>
                 </section>
@@ -168,6 +169,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPageLayout>
+
+    <LibraryDrawer
+      v-model:open="drawerOpen"
+      :entry="selectedEntry"
+      :ready="selectedEntry ? entryReady(selectedEntry) : false"
+      @install="onInstall"
+    />
   </div>
 </template>
 
@@ -178,6 +186,7 @@ import { useRouter } from "vue-router";
 
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import LibraryCard from "@/components/alertLibrary/LibraryCard.vue";
+import LibraryDrawer from "@/components/alertLibrary/LibraryDrawer.vue";
 import LibraryEmptyState from "@/components/alertLibrary/LibraryEmptyState.vue";
 import LibraryRail from "@/components/alertLibrary/LibraryRail.vue";
 import {
@@ -196,6 +205,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -218,6 +228,10 @@ const severity = ref("all");
 /** Stat-strip facet. `null` = no availability filter; "all" never sticks. */
 const facet = ref<"ready" | "missing" | null>(null);
 const search = ref("");
+
+/** Kept after close so the drawer can animate out with its content intact. */
+const selectedEntry = ref<AlertLibraryEntry | null>(null);
+const drawerOpen = ref(false);
 
 const streamsByType = ref<StreamsByType>({});
 const streamsPending = ref(true);
@@ -407,6 +421,19 @@ const clearFilters = () => {
   severity.value = "all";
   facet.value = null;
   search.value = "";
+};
+
+const openEntry = (entry: AlertLibraryEntry) => {
+  selectedEntry.value = entry;
+  drawerOpen.value = true;
+};
+
+/**
+ * Phase 4 owns the wizard. Saying so is better than a dead button: the drawer
+ * has already tuned the file, and this is the only thing left to answer.
+ */
+const onInstall = () => {
+  toast({ variant: "info", message: t("alert_library.drawer.installHint") });
 };
 
 const openContribute = () => {

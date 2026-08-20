@@ -26,9 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <article
-    class="rounded-surface border-border-default bg-surface-base flex h-full flex-col gap-2 border p-3"
+    class="rounded-surface border-border-default bg-surface-base hover:border-border-strong focus-visible:ring-accent/40 flex h-full cursor-pointer flex-col gap-2 border p-3 outline-none focus-visible:ring-2"
     :class="ready ? '' : 'border-dashed opacity-65'"
+    role="button"
+    tabindex="0"
+    :aria-label="t('alert_library.openDetails', { title: entry.title })"
     :data-test="`alert-library-card-${entry.id}`"
+    @click="emit('open')"
+    @keydown.enter.prevent="emit('open')"
+    @keydown.space.prevent="emit('open')"
   >
     <div class="flex items-start gap-2">
       <h3 class="text-text-heading min-w-0 flex-1 text-sm leading-snug font-medium">
@@ -88,6 +94,8 @@ const props = defineProps<{
   /** Whether every stream this alert queries exists in the org. */
   ready: boolean;
 }>();
+
+const emit = defineEmits<{ (e: "open"): void }>();
 
 const { t } = useI18nTyped();
 
