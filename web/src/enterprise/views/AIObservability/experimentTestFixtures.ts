@@ -8,6 +8,7 @@ export function makeExperiment(overrides: Partial<LlmExperiment> = {}): LlmExper
     orgId: "acme",
     name: "Experiment",
     datasetId: "dataset-a",
+    datasetName: "Dataset A",
     datasetVersion: 1,
     task: { type: "remote", config: {} },
     scorers: [],

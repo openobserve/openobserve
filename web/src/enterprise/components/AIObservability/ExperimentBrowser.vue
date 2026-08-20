@@ -2,29 +2,22 @@
 
 <template>
   <section class="space-y-4" data-test="ai-experiment-browser">
-    <div v-if="!compact" class="flex flex-wrap items-end gap-3">
+    <div v-if="!compact" class="grid grid-cols-[30%_1fr_auto] items-end gap-3">
       <OSelect
         v-model="datasetFilter"
-        class="min-w-56"
         :label="t('aiObservability.experiments.datasetFilter')"
+        :placeholder="t('aiObservability.experiments.datasetFilterPlaceholder')"
         :options="datasetOptions"
         clearable
         data-test="ai-experiment-dataset-filter"
       />
       <OInput
         v-model="nameSearch"
-        class="min-w-56 flex-1"
+        class="min-w-0"
         :label="t('aiObservability.experiments.nameSearch')"
+        :placeholder="t('aiObservability.experiments.nameSearchPlaceholder')"
         data-test="ai-experiment-name-search"
       />
-      <OButton
-        size="sm"
-        variant="primary"
-        data-test="ai-experiment-filtered-new"
-        @click="$emit('new', selectedDatasetId)"
-      >
-        {{ t("aiObservability.experiments.newButton") }}
-      </OButton>
       <OButton
         size="sm"
         variant="outline"
@@ -52,87 +45,133 @@
     </div>
 
     <section
-      v-for="group in groups"
-      :key="group.datasetId"
+      v-for="group in datasetRows"
+      :key="group.id"
       class="border-border-default rounded-default overflow-hidden border"
       :data-test="`ai-experiment-group-${group.datasetId}`"
     >
-      <header class="bg-code-bg flex items-center justify-between gap-3 px-4 py-3">
-        <div>
-          <h3 class="text-text-primary text-sm font-medium">{{ group.datasetName }}</h3>
-          <p class="text-text-secondary text-xs">
-            {{ t("aiObservability.experiments.groupCount", { count: group.experiments.length }) }}
-          </p>
-        </div>
+      <header class="px-table-edge flex items-center gap-2 py-2">
         <OButton
-          v-if="compact"
-          size="sm"
-          variant="outline"
-          @click="$emit('open-filtered', group.datasetId)"
-        >
-          {{ t("aiObservability.experiments.viewAll") }}
-        </OButton>
+          size="icon"
+          variant="ghost"
+          :icon-left="isGroupExpanded(group.id) ? 'expand-more' : 'chevron-right'"
+          :aria-label="t('aiObservability.experiments.toggleGroup')"
+          :data-test="`ai-experiment-group-toggle-${group.datasetId}`"
+          @click="toggleGroup(group.id)"
+        />
+        <span class="text-text-heading text-sm font-medium">{{ raw(group.name) }}</span>
+        <span class="text-text-secondary text-xs">
+          {{ t("aiObservability.experiments.groupCount", { count: group.experimentCount }) }}
+        </span>
+        <div class="ms-auto flex items-center gap-2">
+          <OButton
+            v-if="!compact"
+            size="sm"
+            variant="outline"
+            :data-test="`ai-experiment-group-add-${group.datasetId}`"
+            @click="$emit('new', group.datasetId)"
+          >
+            {{ t("aiObservability.experiments.addToDataset") }}
+          </OButton>
+          <OButton
+            v-if="compact"
+            size="sm"
+            variant="outline"
+            @click="$emit('open-filtered', group.datasetId)"
+          >
+            {{ t("aiObservability.experiments.viewAll") }}
+          </OButton>
+        </div>
       </header>
 
-      <div
-        v-for="experiment in group.experiments"
-        :key="experiment.id"
-        class="border-border-default border-t px-4 py-3"
-        :data-test="`ai-experiment-row-${experiment.id}`"
+      <OTable
+        v-if="isGroupExpanded(group.id)"
+        :data="group.children"
+        :columns="columns"
+        row-key="id"
+        show-index
+        :show-global-filter="false"
+        :fill-height="false"
+        :frame="false"
+        pagination="none"
+        sorting="client"
+        :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="ai-experiments-rows"
+        :selection="compact ? 'none' : 'multiple'"
+        :selected-ids="selectedIds"
+        :is-row-selectable="canSelectRow"
+        width="100%"
+        class="w-full"
+        :data-test="`ai-experiment-table-${group.datasetId}`"
+        @update:selected-ids="(ids: string[]) => onSelectionChange(ids, group.children)"
+        @row-click="(experiment: any) => $emit('select', experiment.id)"
       >
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-text-primary font-medium">{{ experiment.name }}</span>
-              <OTag v-if="isBaseline(experiment)" size="sm" variant="blue-soft">
-                {{ t("aiObservability.experiments.baseline") }}
-              </OTag>
-              <OTag size="sm">{{ experiment.status }}</OTag>
-            </div>
-            <div class="text-text-secondary mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-              <span>{{ progressLabel(experiment) }}</span>
-              <span>{{ scoreLabel(experiment) }}</span>
-              <span>{{ costLabel(experiment) }}</span>
-              <OTimeCell :value="experiment.createdAt" unit="ms" mode="relative" />
-            </div>
+        <template #cell-name="{ row: experiment }">
+          <div
+            class="flex min-w-0 items-center gap-2"
+            :data-test="`ai-experiment-row-${experiment.id}`"
+          >
+            <span class="text-text-heading truncate font-medium">{{ experiment.name }}</span>
+            <OTag v-if="isBaseline(experiment)" size="sm" variant="blue-soft">
+              {{ t("aiObservability.experiments.baseline") }}
+            </OTag>
           </div>
-          <div class="flex shrink-0 items-center gap-2">
-            <OCheckbox
-              v-if="!compact"
-              :model-value="selectedIds.includes(experiment.id)"
-              :disabled="comparisonDisabled(experiment)"
-              :title="
-                comparisonDisabled(experiment)
-                  ? t('aiObservability.experiments.comparisonReasons.different_dataset')
-                  : undefined
-              "
-              :aria-label="t('aiObservability.experiments.selectForComparison')"
-              @click.stop
-              @update:model-value="toggleComparison(experiment)"
+        </template>
+
+        <template #cell-status="{ row }">
+          <div
+            class="flex min-w-0 items-center gap-2"
+            :data-test="`ai-experiment-status-${row.id}`"
+          >
+            <ODataBarCell
+              v-if="row.status === 'running'"
+              :value="evidence(row).completedSlots"
+              :max="evidence(row).totalSlots || 1"
+              :display="progressLabel(row)"
             />
-            <OButton
-              size="sm"
-              :variant="isBaseline(experiment) ? 'outline' : 'ghost'"
-              :data-test="`ai-experiment-baseline-${experiment.id}`"
-              @click.stop="setBaseline(experiment)"
-            >
-              {{
-                isBaseline(experiment)
-                  ? t("aiObservability.experiments.baseline")
-                  : t("aiObservability.experiments.setBaseline")
-              }}
-            </OButton>
-            <OButton
-              size="sm"
-              variant="outline"
-              :data-test="`ai-experiment-detail-${experiment.id}`"
-              @click="emit('select', experiment.id)"
-            >
-              {{ t("aiObservability.experiments.viewDetails") }}
-            </OButton>
+            <template v-else>
+              <OTag size="sm" :variant="statusVariant(row.status, 'eval').variant">
+                {{ statusVariant(row.status, "eval").label }}
+              </OTag>
+              <span v-if="row.statusReason" class="text-text-secondary truncate text-xs">
+                {{ raw(row.statusReason) }}
+              </span>
+            </template>
           </div>
-        </div>
-      </div>
+        </template>
+
+        <template #cell-cost="{ row }">
+          <span class="text-text-secondary">{{ costLabel(row) }}</span>
+        </template>
+
+        <template #cell-createdAt="{ row }">
+          <OTimeCell :value="row.createdAt" unit="ms" mode="relative" />
+        </template>
+
+        <template #cell-actions="{ row }">
+          <div class="flex items-center gap-2">
+            <OButton
+              size="sm"
+              variant="ghost"
+              :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
+              :title="
+                isBaseline(row)
+                  ? t('aiObservability.experiments.baseline')
+                  : t('aiObservability.experiments.setBaseline')
+              "
+              :aria-label="
+                isBaseline(row)
+                  ? t('aiObservability.experiments.baseline')
+                  : t('aiObservability.experiments.setBaseline')
+              "
+              :data-test="`ai-experiment-baseline-${row.id}`"
+              @click.stop="setBaseline(row)"
+            />
+          </div>
+        </template>
+      </OTable>
     </section>
   </section>
 </template>
@@ -145,8 +184,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
+import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LlmDataset } from "@/services/llm-datasets.service";
 import type { ExperimentDetail, LlmExperiment } from "@/services/llm-experiments.service";
 import {
@@ -155,7 +197,6 @@ import {
   groupExperiments,
   readExperimentBaselines,
   type ComparisonIneligibilityReason,
-  type ExperimentScoreSummary,
   writeExperimentBaselines,
 } from "@/enterprise/views/AIObservability/experimentDiscovery";
 import { aiExperimentsRoute } from "@/enterprise/views/AIObservability/experimentRoutes";
@@ -173,7 +214,7 @@ const props = withDefaults(
   { details: () => ({}), fixedDatasetId: "", compact: false, syncUrl: false },
 );
 
-const emit = defineEmits<{
+defineEmits<{
   select: [experimentId: string];
   new: [datasetId: string];
   "open-filtered": [datasetId: string];
@@ -188,7 +229,69 @@ const datasetFilter = ref(initialDataset);
 const nameSearch = ref(props.syncUrl ? String(route.query.experiment ?? "") : "");
 const baselineByDataset = ref(readExperimentBaselines(props.orgId));
 const selectedIds = ref<string[]>([]);
+const collapsedGroups = ref<string[]>([]);
 const rejectedComparisonReason = ref("");
+
+function isGroupRow(row: TreeRow): row is DatasetRow {
+  return (row as DatasetRow).isGroup === true;
+}
+
+function buildColumns(experiments: LlmExperiment[]): OTableColumnDef[] {
+  const scoreColumns: OTableColumnDef[] = groupScorerNames(experiments).map((name) => ({
+    id: `score:${name}`,
+    header: raw(name),
+    accessorFn: (row: TreeRow) => (isGroupRow(row) ? "" : scoreCell(row, name)),
+    sortable: true,
+    hideable: true,
+    size: 140,
+    meta: { align: "left" as const },
+  }));
+
+  return [
+    {
+      id: "name",
+      header: t("aiObservability.experiments.columns.name"),
+      accessorKey: "name",
+      sortable: true,
+      size: COL.name,
+      minSize: 160,
+      meta: { align: "left" as const, flex: true, isName: true },
+    },
+    {
+      id: "status",
+      header: t("aiObservability.experiments.columns.status"),
+      accessorKey: "status",
+      sortable: true,
+      size: 200,
+      meta: { align: "left" as const },
+    },
+    ...scoreColumns,
+    {
+      id: "cost",
+      header: t("aiObservability.experiments.columns.cost"),
+      hideable: true,
+      sortable: false,
+      size: 110,
+      meta: { align: "left" as const },
+    },
+    {
+      id: "createdAt",
+      header: t("aiObservability.experiments.columns.created"),
+      accessorKey: "createdAt",
+      sortable: true,
+      size: 140,
+      meta: { align: "left" as const },
+    },
+    {
+      id: "actions",
+      header: t("aiObservability.experiments.columns.actions"),
+      sortable: false,
+      isAction: true,
+      size: 72,
+      meta: { align: "left" as const },
+    },
+  ];
+}
 
 const datasetOptions = computed(() =>
   props.datasets.map((dataset) => ({ label: raw(dataset.name), value: dataset.id })),
@@ -196,6 +299,45 @@ const datasetOptions = computed(() =>
 const datasetNames = computed(
   () => new Map(props.datasets.map((dataset) => [dataset.id, raw(dataset.name)])),
 );
+// Datasets are parent rows and their experiments are children, so one table
+// gives the whole list shared sorting, column sizing and persistence.
+type DatasetRow = {
+  id: string;
+  isGroup: true;
+  name: string;
+  datasetId: string;
+  experimentCount: number;
+  children: LlmExperiment[];
+};
+// The optional false discriminant lets the template narrow a row to an
+// experiment with `v-if="!row.isGroup"`.
+type ExperimentRow = LlmExperiment & { isGroup?: false };
+type TreeRow = DatasetRow | ExperimentRow;
+
+// Groups are open unless explicitly collapsed, so a new dataset never hides.
+function isGroupExpanded(groupId: string) {
+  return !collapsedGroups.value.includes(groupId);
+}
+
+function toggleGroup(groupId: string) {
+  collapsedGroups.value = isGroupExpanded(groupId)
+    ? [...collapsedGroups.value, groupId]
+    : collapsedGroups.value.filter((id) => id !== groupId);
+}
+
+const datasetRows = computed<DatasetRow[]>(() =>
+  groups.value.map((group) => ({
+    id: `dataset:${group.datasetId}`,
+    isGroup: true as const,
+    name: group.datasetName,
+    datasetId: group.datasetId,
+    experimentCount: group.experiments.length,
+    children: group.experiments,
+  })),
+);
+// One table means one column set, so the scorer columns are the union across
+// every visible dataset; a scorer that does not apply to a row shows "—".
+const columns = computed(() => buildColumns(groups.value.flatMap((g) => g.experiments)));
 const groups = computed(() =>
   groupExperiments(
     props.experiments,
@@ -205,10 +347,6 @@ const groups = computed(() =>
     nameSearch.value,
   ),
 );
-const selectedDatasetId = computed(() => {
-  const visible = props.fixedDatasetId || datasetFilter.value;
-  return visible && groups.value.length <= 1 ? visible : "";
-});
 const selectedExperiments = computed(() =>
   props.experiments.filter(({ id }) => selectedIds.value.includes(id)),
 );
@@ -272,34 +410,28 @@ function progressLabel(experiment: LlmExperiment) {
     : raw(experiment.status);
 }
 
-function scoreLabel(experiment: LlmExperiment) {
-  const scores = evidence(experiment).scores;
-  return scores.length
-    ? raw(scores.map(formatScoreSummary).join(" · "))
-    : t("aiObservability.experiments.noScores");
+// One column per scorer in the group: the scores array already carries each
+// scorer separately, so nothing here needs the API to change.
+function groupScorerNames(experiments: LlmExperiment[]): string[] {
+  const names: string[] = [];
+  for (const experiment of experiments) {
+    for (const score of evidence(experiment).scores) {
+      if (!names.includes(score.name)) names.push(score.name);
+    }
+  }
+  return names;
 }
 
-function formatScoreSummary(score: ExperimentScoreSummary): string {
-  if (score.kind === "numeric") {
-    return t("aiObservability.experiments.numericScoreSummary", {
-      name: score.name,
-      value: score.value.toFixed(3),
-      count: score.sampleCount,
-    });
-  }
+function scoreCell(experiment: LlmExperiment, scorerName: string): string {
+  const score = evidence(experiment).scores.find((entry) => entry.name === scorerName);
+  if (!score) return "—";
+  if (score.kind === "numeric") return score.value.toFixed(3);
   if (score.kind === "boolean") {
-    return t("aiObservability.experiments.booleanScoreSummary", {
-      name: score.name,
-      trueCount: score.trueCount,
-      falseCount: score.falseCount,
-      count: score.sampleCount,
-    });
+    const pct = score.sampleCount ? Math.round((score.trueCount / score.sampleCount) * 100) : 0;
+    return `${pct}% true`;
   }
-  return t("aiObservability.experiments.categoricalScoreSummary", {
-    name: score.name,
-    values: score.values.map(({ value, count }) => `${value} × ${count}`).join(", "),
-    count: score.sampleCount,
-  });
+  const top = [...score.values].sort((a, b) => b.count - a.count)[0];
+  return top ? `${top.value} × ${top.count}` : "—";
 }
 
 function translateComparisonReason(reason: ComparisonIneligibilityReason | null) {
@@ -309,7 +441,7 @@ function translateComparisonReason(reason: ComparisonIneligibilityReason | null)
 
 function costLabel(experiment: LlmExperiment) {
   const cost = evidence(experiment).cost;
-  return cost === null ? t("aiObservability.experiments.noCost") : raw(`$${cost.toFixed(4)}`);
+  return cost === null ? raw("—") : raw(`$${cost.toFixed(4)}`);
 }
 
 function isBaseline(experiment: LlmExperiment) {
@@ -330,6 +462,23 @@ function comparisonDisabled(experiment: LlmExperiment) {
     !selectedIds.value.includes(experiment.id) &&
     selected[0].datasetId !== experiment.datasetId,
   );
+}
+
+function canSelectRow(row: LlmExperiment) {
+  return !comparisonDisabled(row);
+}
+
+// OTable hands back the whole next selection; route the one row that changed
+// through toggleComparison so the two-item cap and baseline seeding still apply.
+function onSelectionChange(next: string[], rows: LlmExperiment[]) {
+  // Each dataset renders its own table, so only diff within that table's rows —
+  // otherwise one group's emit would look like it deselected another's.
+  const scope = rows.map((row) => row.id);
+  const inScope = selectedIds.value.filter((id) => scope.includes(id));
+  const changedId =
+    next.find((id) => !inScope.includes(id)) ?? inScope.find((id) => !next.includes(id));
+  const experiment = props.experiments.find(({ id }) => id === changedId);
+  if (experiment) toggleComparison(experiment);
 }
 
 function toggleComparison(experiment: LlmExperiment) {

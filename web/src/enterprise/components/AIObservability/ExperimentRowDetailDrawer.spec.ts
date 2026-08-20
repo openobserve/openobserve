@@ -90,15 +90,12 @@ function mountDrawer() {
 }
 
 describe("ExperimentRowDetailDrawer", () => {
-  it("renders frozen evidence, execution facts, score reasoning, and provenance", () => {
+  it("renders frozen evidence, execution facts, and scores", () => {
     const wrapper = mountDrawer();
 
     expect(wrapper.text()).toContain("When?");
     expect(wrapper.text()).toContain("Tomorrow");
     expect(wrapper.text()).toContain("provider timeout");
-    expect(wrapper.text()).toContain("attempt-1");
-    expect(wrapper.text()).toContain("Partially correct");
-    expect(wrapper.text()).toContain("Client reported");
     expect(wrapper.text()).toContain("Row 2 of 3");
   });
 
@@ -106,30 +103,12 @@ describe("ExperimentRowDetailDrawer", () => {
     const wrapper = mountDrawer();
 
     const buttons = wrapper.findAll("button");
-    await buttons.find((button) => button.text().includes("Previous row"))?.trigger("click");
-    await buttons.find((button) => button.text().includes("Retry failed slot"))?.trigger("click");
-    await buttons.find((button) => button.text().includes("View trace"))?.trigger("click");
+    await buttons.find((button) => button.text().includes("Previous Row"))?.trigger("click");
+    await buttons.find((button) => button.text().includes("Retry Failed Slot"))?.trigger("click");
+    await buttons.find((button) => button.text().includes("View Trace"))?.trigger("click");
 
     expect(wrapper.emitted("navigate")?.[0]).toEqual(["row-0"]);
     expect(wrapper.emitted("retry")?.[0]).toEqual([detail.trials[0]]);
     expect(wrapper.emitted("trace")?.[0]).toEqual([detail.trials[0].execution]);
-  });
-
-  it("does not infer client provenance from an Experiment wrapper", () => {
-    const serverDetail = structuredClone(detail);
-    delete serverDetail.trials[0].scores[0].score?.origin_source_type;
-
-    const wrapper = mount(ExperimentRowDetailDrawer, {
-      props: { open: true, detail: serverDetail },
-      global: {
-        stubs: {
-          ODrawer: { props: ["open"], template: '<section v-if="open"><slot /></section>' },
-          OButton: { template: "<button><slot /></button>" },
-          OTag: { template: "<span><slot /></span>" },
-        },
-      },
-    });
-
-    expect(wrapper.text()).not.toContain("Client reported");
   });
 });

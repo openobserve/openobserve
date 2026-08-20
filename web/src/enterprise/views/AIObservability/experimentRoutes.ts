@@ -26,3 +26,30 @@ export function aiExperimentsRoute(
     },
   };
 }
+
+/** A single experiment's results page. */
+export function aiExperimentDetailRoute(
+  orgIdentifier: string,
+  experimentId: string,
+): RouteLocationRaw {
+  return {
+    name: "aiExperimentDetail",
+    params: { id: experimentId },
+    query: { org_identifier: orgIdentifier },
+  };
+}
+
+/** The create form. `datasetId` preselects the dataset the user came from. */
+export function aiExperimentCreateRoute(
+  orgIdentifier: string,
+  options: Pick<AiExperimentsRouteOptions, "datasetId" | "query"> = {},
+): RouteLocationRaw {
+  return {
+    name: "aiExperimentCreate",
+    query: {
+      ...options.query,
+      org_identifier: orgIdentifier,
+      ...(options.datasetId ? { dataset: options.datasetId } : {}),
+    },
+  };
+}

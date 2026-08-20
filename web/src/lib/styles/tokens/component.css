@@ -1254,6 +1254,7 @@
   --color-dialog-close-active-bg: var(--color-dialog-close-active-bg);
   --color-dialog-focus-ring: var(--color-dialog-focus-ring);
   --spacing-page-edge: var(--spacing-page-edge);
+  --spacing-table-edge: var(--spacing-table-edge);
   --spacing-rail: var(--spacing-rail);
   --spacing-dialog-header-px: var(--spacing-dialog-header-px);
   --spacing-dialog-header-py: var(--spacing-dialog-header-py);

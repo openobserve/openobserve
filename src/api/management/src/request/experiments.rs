@@ -16,6 +16,7 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
     llm_evaluations::{
+        datasets,
         experiment_dispersion::{self, NormalizationSpans},
         experiment_ingest::{self, IngestError},
         experiment_results,
@@ -226,6 +227,15 @@ pub async fn list_experiments(
         Ok(list) => list,
         Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
     };
+    // One Dataset query for the whole list — a lookup per experiment would be N+1.
+    let dataset_names: std::collections::HashMap<String, String> = datasets::list(&org_id)
+        .await
+        .map(|list| {
+            list.into_iter()
+                .map(|dataset| (dataset.id, dataset.name))
+                .collect()
+        })
+        .unwrap_or_default();
     match experiments::list(&org_id).await {
         Ok(experiments) => MetaHttpResponse::json(ListExperimentsResponseBody {
             list: experiments
@@ -238,7 +248,10 @@ pub async fn list_experiments(
                         permitted_objects.as_deref(),
                     )
                 })
-                .map(ExperimentResponseBody::from)
+                .map(|experiment| {
+                    let dataset_name = dataset_names.get(&experiment.dataset_id).cloned();
+                    ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name)
+                })
                 .collect(),
         }),
         Err(error) => experiment_error_response(error),
@@ -393,8 +406,12 @@ pub async fn get_experiment(
             return MetaHttpResponse::internal_error("Failed to load Experiment results");
         }
     };
+    let dataset_name = datasets::get(&org_id, &experiment.dataset_id)
+        .await
+        .ok()
+        .map(|dataset| dataset.name);
     MetaHttpResponse::json(ExperimentDetailResponseBody {
-        experiment: experiment.into(),
+        experiment: ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name),
         preview: preview.into(),
         results,
     })

@@ -20,6 +20,9 @@ const props = defineProps<{
   table: Table<any>;
   columnOrder: string[];
   selectionMultiple?: boolean;
+  /** Render the header select-all checkbox. The `th` is kept either way so the
+   *  body's selection gutter stays aligned. */
+  showSelectAll?: boolean;
   isAllSelected?: boolean;
   isIndeterminate?: boolean;
   expansionEnabled?: boolean;
@@ -451,6 +454,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
+          v-if="showSelectAll !== false"
           :model-value="isAllSelected ?? false"
           :indeterminate="isIndeterminate ?? false"
           row-id="all"

@@ -77,7 +77,9 @@ const activeSection = computed<string>(() => {
   )
     return "queues";
   if (route.name === "aiDatasets") return "datasets";
-  if (route.name === "aiExperiments") return "experiments";
+  // The create form is a route of its own, so the rail must stay lit while it
+  // is open — same shape as the queue sub-routes above.
+  if (route.name === "aiExperiments" || route.name === "aiExperimentCreate") return "experiments";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
     return tab;
