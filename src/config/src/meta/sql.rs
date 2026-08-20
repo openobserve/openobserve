@@ -119,20 +119,78 @@ pub fn resolve_stream_names_with_type(sql: &str) -> Result<Vec<TableReference>, 
     Ok(tables)
 }
 
-/// Top-level (outer, for CTEs) WHERE of a query as a string; "" if none/unparseable.
+/// Just the full outer WHERE of a query, verbatim; "" if none/unparseable. Use this
+/// when you only need the whole WHERE and not the per-stream split (`extract_where`).
 pub fn extract_where_clause(sql: &str) -> String {
     let dialect = PostgreSqlDialect {};
     let Ok(statements) = Parser::parse_sql(&dialect, sql) else {
         return String::new();
     };
     for statement in statements {
-        if let Statement::Query(query) = statement {
-            if let Some(where_clause) = where_from_set_expr(query.body.as_ref()) {
-                return where_clause;
-            }
+        if let Statement::Query(query) = statement
+            && let Some(w) = where_from_set_expr(query.body.as_ref())
+        {
+            return w;
         }
     }
     String::new()
+}
+
+/// Both forms of a query's WHERE, produced from a single parse.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct WhereInfo {
+    /// Top-level (outer, for CTEs) WHERE as a string, verbatim; "" if none.
+    pub where_clause: String,
+    /// Per-stream WHERE for a JOIN (`{stream -> scoped WHERE}`, alias-stripped);
+    /// empty for non-joins.
+    pub where_by_stream: HashMap<String, String>,
+}
+
+/// Parse `sql` once and return both the full outer WHERE (single-stream base filter)
+/// and the per-stream join WHERE. "" / empty for no-WHERE / unparseable.
+pub fn extract_where(sql: &str) -> WhereInfo {
+    let mut info = WhereInfo::default();
+    let dialect = PostgreSqlDialect {};
+    let Ok(statements) = Parser::parse_sql(&dialect, sql) else {
+        return info;
+    };
+    for statement in statements {
+        if let Statement::Query(query) = statement {
+            // Full outer WHERE, verbatim (single-stream panels use this directly).
+            if let Some(w) = where_from_set_expr(query.body.as_ref()) {
+                info.where_clause = w;
+            }
+            // Per-stream WHERE — only for joins (2+ streams).
+            if let Some(select) = outer_select(query.body.as_ref())
+                && let Some(selection) = &select.selection
+            {
+                let (alias_to_stream, streams) = from_streams(&select.from);
+                if streams.len() >= 2 {
+                    let conjuncts = split_and(selection);
+                    for stream in &streams {
+                        // Keep conjuncts whose referenced streams ⊆ {stream} (empty set =
+                        // unqualified columns, kept for every stream), then strip qualifiers.
+                        let kept: Vec<String> = conjuncts
+                            .iter()
+                            .filter(|c| {
+                                conjunct_streams(c, &alias_to_stream).iter().all(|s| s == stream)
+                            })
+                            .map(|c| {
+                                let mut e = (*c).clone();
+                                let _ = VisitMut::visit(&mut e, &mut QualifierStripper);
+                                e.to_string()
+                            })
+                            .collect();
+                        if !kept.is_empty() {
+                            info.where_by_stream.insert(stream.clone(), kept.join(" AND "));
+                        }
+                    }
+                }
+            }
+            return info;
+        }
+    }
+    info
 }
 
 /// WHERE of a query body, unwrapping parenthesized SELECT; None for UNION/set-ops.
@@ -142,46 +200,6 @@ fn where_from_set_expr(body: &SetExpr) -> Option<String> {
         SetExpr::Query(query) => where_from_set_expr(query.body.as_ref()),
         _ => None,
     }
-}
-
-/// Per-stream WHERE for a JOIN query: `{ stream -> WHERE scoped to that stream }`,
-/// alias-stripped. Empty for non-joins / no-WHERE / unparseable.
-pub fn extract_where_by_stream(sql: &str) -> HashMap<String, String> {
-    let mut out = HashMap::new();
-    let dialect = PostgreSqlDialect {};
-    let Ok(statements) = Parser::parse_sql(&dialect, sql) else {
-        return out;
-    };
-    for statement in statements {
-        if let Statement::Query(query) = statement
-            && let Some(select) = outer_select(query.body.as_ref())
-            && let Some(selection) = &select.selection
-        {
-            let (alias_to_stream, streams) = from_streams(&select.from);
-            if streams.len() < 2 {
-                return out; // only joins need per-stream scoping
-            }
-            let conjuncts = split_and(selection);
-            for stream in &streams {
-                // Keep conjuncts whose referenced streams ⊆ {stream} (empty set =
-                // unqualified columns, kept for every stream), then strip qualifiers.
-                let kept: Vec<String> = conjuncts
-                    .iter()
-                    .filter(|c| conjunct_streams(c, &alias_to_stream).iter().all(|s| s == stream))
-                    .map(|c| {
-                        let mut e = (*c).clone();
-                        let _ = VisitMut::visit(&mut e, &mut QualifierStripper);
-                        e.to_string()
-                    })
-                    .collect();
-                if !kept.is_empty() {
-                    out.insert(stream.clone(), kept.join(" AND "));
-                }
-            }
-            return out;
-        }
-    }
-    out
 }
 
 /// Innermost SELECT of a body, unwrapping parenthesized queries.
@@ -352,61 +370,56 @@ mod tests {
 
     #[test]
     fn test_extract_where_clause() {
+        let wc = |sql: &str| extract_where(sql).where_clause;
+
         // Basic WHERE is returned without the leading keyword.
         assert_eq!(
-            extract_where_clause("SELECT a FROM t WHERE level = 'error' AND status = 500"),
+            wc("SELECT a FROM t WHERE level = 'error' AND status = 500"),
             "level = 'error' AND status = 500",
         );
 
         // No WHERE → empty string.
-        assert_eq!(extract_where_clause("SELECT a FROM t GROUP BY a"), "");
+        assert_eq!(wc("SELECT a FROM t GROUP BY a"), "");
 
         // Unparseable input → empty string, never a panic.
-        assert_eq!(extract_where_clause("not a query"), "");
+        assert_eq!(wc("not a query"), "");
 
         // The OUTER WHERE of a CTE query is returned (not the CTE's inner WHERE).
         assert_eq!(
-            extract_where_clause(
-                "WITH c AS (SELECT id FROM t WHERE inner_flag = 1) \
-                 SELECT id FROM c WHERE outer_flag = 2",
-            ),
+            wc("WITH c AS (SELECT id FROM t WHERE inner_flag = 1) \
+                SELECT id FROM c WHERE outer_flag = 2"),
             "outer_flag = 2",
         );
 
         // JOIN: the JOIN is in FROM, so the full WHERE (both stream aliases) is returned.
         assert_eq!(
-            extract_where_clause(
-                "SELECT a.svc, b.region FROM stream_a a \
-                 JOIN stream_b b ON a.id = b.id WHERE a.env = 'prod' AND b.tier = 'gold'",
-            ),
+            wc("SELECT a.svc, b.region FROM stream_a a \
+                JOIN stream_b b ON a.id = b.id WHERE a.env = 'prod' AND b.tier = 'gold'"),
             "a.env = 'prod' AND b.tier = 'gold'",
         );
 
         // Subquery in WHERE is rendered verbatim, subquery included.
         assert_eq!(
-            extract_where_clause("SELECT a FROM t WHERE id IN (SELECT id FROM u WHERE x = 1)"),
+            wc("SELECT a FROM t WHERE id IN (SELECT id FROM u WHERE x = 1)"),
             "id IN (SELECT id FROM u WHERE x = 1)",
         );
 
         // Parenthesized top-level SELECT is unwrapped to its WHERE.
-        assert_eq!(
-            extract_where_clause("(SELECT a FROM t WHERE flag = 1)"),
-            "flag = 1",
-        );
+        assert_eq!(wc("(SELECT a FROM t WHERE flag = 1)"), "flag = 1");
 
         // UNION has one WHERE per branch → no single clause, empty string.
         assert_eq!(
-            extract_where_clause(
-                "SELECT a FROM t WHERE x = 1 UNION SELECT a FROM u WHERE y = 2",
-            ),
+            wc("SELECT a FROM t WHERE x = 1 UNION SELECT a FROM u WHERE y = 2"),
             "",
         );
     }
 
     #[test]
     fn test_extract_where_by_stream() {
+        let wbs = |sql: &str| extract_where(sql).where_by_stream;
+
         // Each stream keeps its own conjuncts, alias-stripped.
-        let m = extract_where_by_stream(
+        let m = wbs(
             "SELECT a.svc, b.region FROM stream_a a JOIN stream_b b ON a.id = b.id \
              WHERE a.env = 'prod' AND b.tier = 'gold'",
         );
@@ -414,7 +427,7 @@ mod tests {
         assert_eq!(m.get("stream_b").map(String::as_str), Some("tier = 'gold'"));
 
         // A cross-stream conjunct (a.x = b.y) is dropped from both streams.
-        let m2 = extract_where_by_stream(
+        let m2 = wbs(
             "SELECT a.x FROM stream_a a JOIN stream_b b ON a.id = b.id \
              WHERE a.x = b.y AND a.env = 'prod'",
         );
@@ -422,10 +435,10 @@ mod tests {
         assert!(!m2.contains_key("stream_b"));
 
         // Single-stream query → empty (the caller uses where_clause instead).
-        assert!(extract_where_by_stream("SELECT a FROM logs WHERE x = 1").is_empty());
+        assert!(wbs("SELECT a FROM logs WHERE x = 1").is_empty());
 
         // Unparseable → empty, never a panic.
-        assert!(extract_where_by_stream("not a query").is_empty());
+        assert!(wbs("not a query").is_empty());
     }
 
     #[test]
