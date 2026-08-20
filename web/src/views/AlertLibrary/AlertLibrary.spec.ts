@@ -276,6 +276,24 @@ describe("AlertLibrary", () => {
     );
   });
 
+  it("opens the drawer on the card that was clicked, and only then", async () => {
+    const wrapper = await mountView();
+    const drawer = wrapper.findComponent({ name: "LibraryDrawer" });
+    // Mounted from the start but closed: the drawer is what performs the second
+    // GET, and it must not fire for a gallery nobody has clicked into.
+    expect(drawer.props("open")).toBe(false);
+
+    await wrapper.find('[data-test="alert-library-card-k8s/node-disk-pressure"]').trigger("click");
+    expect(drawer.props("open")).toBe(true);
+    expect((drawer.props("entry") as AlertLibraryEntry).id).toBe("k8s/node-disk-pressure");
+  });
+
+  it("tells the drawer whether the alert can run, so it can say so before install", async () => {
+    const wrapper = await mountView();
+    await wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').trigger("click");
+    expect(wrapper.findComponent({ name: "LibraryDrawer" }).props("ready")).toBe(false);
+  });
+
   it("explains a load failure by its error code and offers a retry", async () => {
     manifestRef.value = null;
     errorRef.value = { code: "unsupported_version" };

@@ -88,6 +88,25 @@ describe("LibraryCard", () => {
     );
   });
 
+  it("opens the drawer on click — the card IS the affordance, there is no button", () => {
+    const wrapper = mountCard();
+    wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').trigger("click");
+    expect(wrapper.emitted("open")).toHaveLength(1);
+  });
+
+  it.each(["enter", "space"])("opens on %s, so the grid is reachable without a mouse", (key) => {
+    const wrapper = mountCard();
+    wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').trigger(`keydown.${key}`);
+    expect(wrapper.emitted("open")).toHaveLength(1);
+  });
+
+  it("names what it opens, since the card is a control with no visible label", () => {
+    const root = mountCard().find('[data-test="alert-library-card-k8s/pod-oom-killed"]');
+    expect(root.attributes("role")).toBe("button");
+    expect(root.attributes("tabindex")).toBe("0");
+    expect(root.attributes("aria-label")).toContain("Pod OOM Killed");
+  });
+
   it("survives an entry with no description", () => {
     const wrapper = mountCard({ entry: { ...entry, description: "" } });
     expect(wrapper.text()).toContain("Pod OOM Killed");
