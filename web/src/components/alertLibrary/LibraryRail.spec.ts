@@ -53,6 +53,10 @@ const mountRail = (props: Record<string, unknown> = {}) =>
     global: { plugins: [i18n] },
   });
 
+/** Open the categories tab — the rail lists one axis at a time. */
+const showCategories = (wrapper: ReturnType<typeof mountRail>) =>
+  wrapper.find('[data-test="alert-library-rail-axis-categories"]').trigger("click");
+
 describe("LibraryRail", () => {
   it("renders the three navigation groups", () => {
     const text = mountRail().text();
@@ -75,7 +79,10 @@ describe("LibraryRail", () => {
   });
 
   it("emits the category the user picked", async () => {
+    // Packs and categories share one list behind a segmented control, so the
+    // categories tab has to be opened before its rows exist.
     const wrapper = mountRail();
+    await showCategories(wrapper);
     await wrapper.find('[data-test="alert-library-rail-category-pod"]').trigger("click");
     expect(wrapper.emitted("update:category")).toEqual([["pod"]]);
   });
@@ -94,17 +101,49 @@ describe("LibraryRail", () => {
     expect(wrapper.emitted("update:severity")).toBeUndefined();
   });
 
-  it("marks the active pack and category", () => {
+  it("marks the active pack and category", async () => {
     const wrapper = mountRail({ pack: "openobserve", category: "pod" });
     expect(
       wrapper.find('[data-test="alert-library-rail-pack-openobserve"]').attributes("data-active"),
     ).toBe("true");
+
+    await showCategories(wrapper);
     expect(
       wrapper.find('[data-test="alert-library-rail-category-pod"]').attributes("data-active"),
     ).toBe("true");
     expect(
       wrapper.find('[data-test="alert-library-rail-category-all"]').attributes("data-active"),
     ).toBe("false");
+  });
+
+  it("shows one axis at a time, and remembers the other's selection", async () => {
+    // The tabs switch what is LISTED, not what is selected — a pack chosen on
+    // one tab must still be chosen after browsing categories on the other,
+    // otherwise switching tabs silently resets navigation.
+    const wrapper = mountRail({ pack: "openobserve", category: "pod" });
+    expect(wrapper.find('[data-test="alert-library-rail-pack-openobserve"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-library-rail-category-pod"]').exists()).toBe(false);
+
+    await showCategories(wrapper);
+    expect(wrapper.find('[data-test="alert-library-rail-pack-openobserve"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-library-rail-category-pod"]').exists()).toBe(true);
+
+    await wrapper.find('[data-test="alert-library-rail-axis-packs"]').trigger("click");
+    expect(
+      wrapper.find('[data-test="alert-library-rail-pack-openobserve"]').attributes("data-active"),
+    ).toBe("true");
+    // Switching axes is a view change, not a navigation change.
+    expect(wrapper.emitted("update:pack")).toBeUndefined();
+    expect(wrapper.emitted("update:category")).toBeUndefined();
+  });
+
+  it("counts the choices behind each tab, discounting the 'all' pseudo-facet", () => {
+    // The count answers "how many options are in here", which is what makes a
+    // tab worth opening; counting `all` would advertise a choice that is the
+    // absence of one.
+    const wrapper = mountRail();
+    expect(wrapper.find('[data-test="alert-library-rail-axis-count-packs"]').text()).toBe("2");
+    expect(wrapper.find('[data-test="alert-library-rail-axis-count-categories"]').text()).toBe("2");
   });
 
   it("carries no install-status facet — the rail navigates, the strip filters", () => {

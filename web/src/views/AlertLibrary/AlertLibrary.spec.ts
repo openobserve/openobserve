@@ -220,13 +220,21 @@ describe("AlertLibrary", () => {
 
   it("switches packs from the rail and resets the category with it", async () => {
     const wrapper = await mountView();
+    // The rail lists one axis at a time behind a segmented control, so the
+    // categories tab has to be opened before a category row exists.
+    await wrapper.find('[data-test="alert-library-rail-axis-categories"]').trigger("click");
     await wrapper.find('[data-test="alert-library-rail-category-node"]').trigger("click");
     await flushPromises();
+    await wrapper.find('[data-test="alert-library-rail-axis-packs"]').trigger("click");
     await wrapper.find('[data-test="alert-library-rail-pack-openobserve"]').trigger("click");
     await flushPromises();
     expect(
       wrapper.find('[data-test="alert-library-card-openobserve/ingest-errors"]').exists(),
     ).toBe(true);
+
+    // Reopen the categories tab to see the reset: the new pack's categories are
+    // a different set, so carrying "node" across would filter to nothing.
+    await wrapper.find('[data-test="alert-library-rail-axis-categories"]').trigger("click");
     expect(
       wrapper.find('[data-test="alert-library-rail-category-all"]').attributes("data-active"),
     ).toBe("true");
