@@ -1247,6 +1247,7 @@ async fn get_or_compute_tail(org_id: &str, stream: &str, offset: i64) -> Option<
 /// Returns empty when the stream does not exist yet.
 async fn run_stats_search(
     org_id: &str,
+    user_id: Option<&str>,
     sql: String,
     start_time: i64,
     end_time: i64,
@@ -1266,12 +1267,21 @@ async fn run_stats_search(
     // chokepoint every stats read passes through, so no call site can forget.
     let (lo, hi) = stats_read_range(start_time, end_time);
     let req = rollup::dbm_search_request(sql, lo, hi, STATS_READ_SIZE as i64, 30);
-    // `user_id: None` is deliberate HERE: stream scoping happens up-front in
-    // `involved_streams`, which filters to what the caller may read and drives
-    // both the rollup rows and the tail. Passing a user here as well would
-    // double-authorize the same request.
+    // The caller's identity is carried into the search, not dropped. It does NOT
+    // authorize the read — `search_service` performs no permission check; that is
+    // the handler's job (see `can_read_stream`). What it does carry is the
+    // role-derived query-range limit (`get_settings_max_query_range`) and the
+    // attribution every search task, cancellation and audit record is keyed on.
+    // `None` is reserved for the background rollup writer, which has no user.
     let trace_id = config::ider::generate();
-    let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
+    let resp = crate::search::search(
+        &trace_id,
+        org_id,
+        StreamType::Logs,
+        user_id.map(str::to_string),
+        &req,
+    )
+    .await?;
     // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
     super::hits_or_partial_error(resp, O2_DB_STATS_STREAM)
 }
@@ -1763,8 +1773,8 @@ async fn read_databases_window(
     // Concurrent, where they were awaited one after the other: two independent
     // record families over the same summary stream have no ordering to honour.
     let (totals_rows, qs_rows) = match tokio::join!(
-        run_stats_search(org_id, totals_sql, start_time, end_time),
-        run_stats_search(org_id, qs_sql, start_time, end_time),
+        run_stats_search(org_id, Some(user_id), totals_sql, start_time, end_time),
+        run_stats_search(org_id, Some(user_id), qs_sql, start_time, end_time),
     ) {
         (Ok(t), Ok(q)) => (t, q),
         (t, q) => {
@@ -2170,7 +2180,8 @@ async fn read_queries_window(
     // applied at merge time in Rust (it must filter the cached unfiltered tail
     // anyway), so user search text never reaches the SQL string at all.
     let qs_sql = build_stats_sql(org_id, "query_stats", &filters.sql_preds());
-    let qs_rows = match run_stats_search(org_id, qs_sql, start_time, end_time).await {
+    let qs_rows = match run_stats_search(org_id, Some(user_id), qs_sql, start_time, end_time).await
+    {
         Ok(rows) => rows,
         Err(e) => {
             log::error!("[DbMonitoring] queries rollup read failed for {org_id}: {e}");
@@ -2335,6 +2346,8 @@ pub async fn get_dbm_query_history(
     {
         return unauthorized_response();
     }
+    // Carried into every search this handler runs — see `run_stats_search`.
+    let user_id = Some(user_email.user_id.as_str());
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
         return MetaHttpResponse::bad_request("start_time must be before end_time");
@@ -2415,7 +2428,7 @@ pub async fn get_dbm_query_history(
                 fingerprint_pred(fingerprint)
             ),
         );
-        match run_stats_search(&org_id, ec_sql, start_time, end_time).await {
+        match run_stats_search(&org_id, user_id, ec_sql, start_time, end_time).await {
             Ok(rows) => {
                 let rows: Vec<Value> = rows.into_iter().filter(|r| ec_filters.matches(r)).collect();
                 fold_error_code_counts(&rows)
@@ -2431,8 +2444,8 @@ pub async fn get_dbm_query_history(
     // this chain (plus the backfill and tails below) used to be a serial
     // sequence of up to ~10 awaited searches.
     let (fp_res, totals_res, error_classes) = tokio::join!(
-        run_stats_search(&org_id, fp_sql, start_time, end_time),
-        run_stats_search(&org_id, totals_sql, start_time, end_time),
+        run_stats_search(&org_id, user_id, fp_sql, start_time, end_time),
+        run_stats_search(&org_id, user_id, totals_sql, start_time, end_time),
         error_classes_fut,
     );
     let (fp_rows, totals_rows) = match (fp_res, totals_res) {
@@ -2903,13 +2916,14 @@ async fn read_samples_body(
         ..Default::default()
     };
     let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds());
-    let totals_rows = match run_stats_search(org_id, totals_sql, start_time, end_time).await {
-        Ok(rows) => rows,
-        Err(e) => {
-            log::warn!("[DbMonitoring] samples stream discovery failed for {org_id}: {e}");
-            Vec::new()
-        }
-    };
+    let totals_rows =
+        match run_stats_search(org_id, Some(user_id), totals_sql, start_time, end_time).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                log::warn!("[DbMonitoring] samples stream discovery failed for {org_id}: {e}");
+                Vec::new()
+            }
+        };
     let Some(streams) =
         involved_streams(org_id, user_id, q.stream.as_ref(), &[&totals_rows[..]]).await
     else {
@@ -3773,6 +3787,7 @@ pub(crate) fn build_raw_deadlock_presence_sql(
 #[cfg(feature = "enterprise")]
 async fn deadlock_window_needs_fallback(
     org_id: &str,
+    user_id: Option<&str>,
     stream: &str,
     start_time: i64,
     end_time: i64,
@@ -3787,8 +3802,8 @@ async fn deadlock_window_needs_fallback(
     // Two independent bounded reads — the same `tokio::join!` shape
     // `probe_collection` already uses for its pair.
     let (canonical_rows, raw_rows) = tokio::join!(
-        run_events_search(org_id, stream, canonical_sql, start_time, end_time),
-        run_events_search(org_id, stream, raw_sql, start_time, end_time),
+        run_events_search(org_id, user_id, stream, canonical_sql, start_time, end_time),
+        run_events_search(org_id, user_id, stream, raw_sql, start_time, end_time),
     );
     let (canonical_rows, raw_rows) = match (canonical_rows, raw_rows) {
         (Ok(c), Ok(r)) => (c, r),
@@ -3873,6 +3888,7 @@ pub(crate) fn build_raw_blocking_presence_sql(
 #[cfg(feature = "enterprise")]
 async fn blocking_window_needs_fallback(
     org_id: &str,
+    user_id: Option<&str>,
     stream: &str,
     start_time: i64,
     end_time: i64,
@@ -3882,7 +3898,7 @@ async fn blocking_window_needs_fallback(
         // No marker column on this stream, so no raw row can exist.
         return false;
     };
-    match run_events_search(org_id, stream, raw_sql, start_time, end_time).await {
+    match run_events_search(org_id, user_id, stream, raw_sql, start_time, end_time).await {
         Ok(rows) => {
             let needed = !rows.is_empty();
             if needed {
@@ -4054,6 +4070,7 @@ pub(crate) fn build_dbm_events_sql(
 /// collector recipes must render an empty state, not a 500.
 async fn run_events_search(
     org_id: &str,
+    user_id: Option<&str>,
     stream: &str,
     sql: String,
     start_time: i64,
@@ -4063,13 +4080,19 @@ async fn run_events_search(
         return Ok(Vec::new());
     }
     let req = rollup::dbm_search_request(sql, start_time, end_time, STATS_READ_SIZE as i64, 30);
-    // `user_id: None` is deliberate HERE: the caller's read permission on
-    // `stream` is verified by every handler that reaches this function (see
-    // `can_read_stream`), so re-resolving it per search would re-query OFGA on
-    // a path that is already authorized. Any NEW caller of this function must
-    // check first — it does not authorize itself.
+    // The caller's identity is carried into the search — see `run_stats_search`
+    // for why (query-range limits and attribution, NOT authorization). This
+    // function still does not authorize itself: every handler that reaches it
+    // must check the caller's read permission on `stream` first.
     let trace_id = config::ider::generate();
-    let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
+    let resp = crate::search::search(
+        &trace_id,
+        org_id,
+        StreamType::Logs,
+        user_id.map(str::to_string),
+        &req,
+    )
+    .await?;
     // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
     super::hits_or_partial_error(resp, stream)
 }
@@ -4729,6 +4752,7 @@ const PROBE_SCAN_LIMIT: usize = 2000;
 /// one server-vantage record.
 async fn probe_collection(
     org_id: &str,
+    user_id: Option<&str>,
     stream: &str,
     kind: &str,
     start_time: i64,
@@ -4752,9 +4776,10 @@ async fn probe_collection(
     // Collapsing them onto one shared range would break both.
     let last_seen_sql = build_last_seen_sql(stream, kind, preds);
     let (rows, last_seen_rows) = tokio::join!(
-        run_events_search(org_id, stream, sql, probe_start, probe_end),
+        run_events_search(org_id, user_id, stream, sql, probe_start, probe_end),
         run_events_search(
             org_id,
+            user_id,
             stream,
             last_seen_sql,
             start_time - LAST_SEEN_LOOKBACK_MICROS,
@@ -5122,8 +5147,15 @@ async fn read_deadlocks_body(
     let raw_fallback = match present_raw_deadlock_columns(org_id, stream).await {
         Ok(present) => {
             let candidate = RawDeadlockFallback { present };
-            if deadlock_window_needs_fallback(org_id, stream, start_time, end_time, &candidate)
-                .await
+            if deadlock_window_needs_fallback(
+                org_id,
+                Some(user_id),
+                stream,
+                start_time,
+                end_time,
+                &candidate,
+            )
+            .await
             {
                 Some(candidate)
             } else {
@@ -5165,13 +5197,14 @@ async fn read_deadlocks_body(
             raw: raw_fallback.as_ref().map(RawProjection::Deadlock),
         },
     );
-    let rows = match run_events_search(org_id, stream, sql, start_time, end_time).await {
-        Ok(rows) => rows,
-        Err(e) => {
-            log::error!("[DbMonitoring] deadlocks read failed for {org_id}/{stream}: {e}");
-            return Err(MetaHttpResponse::internal_error(e));
-        }
-    };
+    let rows =
+        match run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                log::error!("[DbMonitoring] deadlocks read failed for {org_id}/{stream}: {e}");
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        };
     let row_count = rows.len();
 
     // Per-ROW branch: canonical rows keep the canonical reader, raw rows go to
@@ -5226,6 +5259,7 @@ async fn read_deadlocks_body(
     let probe = if hits.is_empty() {
         probe_collection(
             org_id,
+            Some(user_id),
             stream,
             server_vantage::KIND_DEADLOCK,
             start_time,
@@ -5564,8 +5598,15 @@ async fn read_blocking_body(
     let raw_fallback = match present_raw_blocking_columns(org_id, stream).await {
         Ok(present) => {
             let candidate = RawBlockingFallback { present };
-            if blocking_window_needs_fallback(org_id, stream, start_time, end_time, &candidate)
-                .await
+            if blocking_window_needs_fallback(
+                org_id,
+                Some(user_id),
+                stream,
+                start_time,
+                end_time,
+                &candidate,
+            )
+            .await
             {
                 Some(candidate)
             } else {
@@ -5596,13 +5637,14 @@ async fn read_blocking_body(
             raw: raw_fallback.as_ref().map(RawProjection::Blocking),
         },
     );
-    let rows = match run_events_search(org_id, stream, sql, start_time, end_time).await {
-        Ok(rows) => rows,
-        Err(e) => {
-            log::error!("[DbMonitoring] blocking read failed for {org_id}/{stream}: {e}");
-            return Err(MetaHttpResponse::internal_error(e));
-        }
-    };
+    let rows =
+        match run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                log::error!("[DbMonitoring] blocking read failed for {org_id}/{stream}: {e}");
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        };
 
     // The min-wait and search filters are applied in Rust, deliberately: they
     // must filter the SAME rows that feed chain assembly, and a float predicate
@@ -5639,6 +5681,7 @@ async fn read_blocking_body(
     let probe = if hits.is_empty() {
         probe_collection(
             org_id,
+            Some(user_id),
             stream,
             server_vantage::KIND_BLOCKING,
             start_time,
@@ -5863,7 +5906,7 @@ async fn read_activity_body(
     // their latencies added: measured live at a 12h window this handler took
     // 5.4s, by far the slowest read in DBM. Only the ROW query is fatal on
     // failure; the aggregates keep their degrade-to-empty behaviour.
-    let rows_fut = run_events_search(org_id, stream, sql, start_time, end_time);
+    let rows_fut = run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time);
     let by_wait_fut = async {
         match build_dbm_activity_breakdown_sql(
             stream,
@@ -5873,7 +5916,7 @@ async fn read_activity_body(
             &present,
         ) {
             Some(sql) => wait_event_breakdown(
-                &run_events_search(org_id, stream, sql, start_time, end_time)
+                &run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time)
                     .await
                     .unwrap_or_default(),
             ),
@@ -5889,7 +5932,7 @@ async fn read_activity_body(
             &present,
         ) {
             Some(sql) => state_breakdown(
-                &run_events_search(org_id, stream, sql, start_time, end_time)
+                &run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time)
                     .await
                     .unwrap_or_default(),
             ),
@@ -5932,6 +5975,7 @@ async fn read_activity_body(
     // it is read for the interval whether or not the tab is empty.
     let probe_fut = probe_collection(
         org_id,
+        Some(user_id),
         stream,
         server_vantage::KIND_ACTIVITY,
         start_time,
@@ -5944,6 +5988,7 @@ async fn read_activity_body(
     // would read null exactly where the disclosure matters most.
     let times_fut = run_events_search(
         org_id,
+        Some(user_id),
         stream,
         build_dbm_sample_times_sql(stream, server_vantage::KIND_ACTIVITY, &preds),
         start_time,
@@ -6690,13 +6735,18 @@ async fn read_server_metrics_body(
     };
 
     let rows = match build_dbm_server_metrics_sql(stream, engine, database, fingerprint, &present) {
-        Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
-            Ok(rows) => rows,
-            Err(e) => {
-                log::error!("[DbMonitoring] server metrics read failed for {org_id}/{stream}: {e}");
-                return Err(MetaHttpResponse::internal_error(e));
+        Some(sql) => {
+            match run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time).await
+            {
+                Ok(rows) => rows,
+                Err(e) => {
+                    log::error!(
+                        "[DbMonitoring] server metrics read failed for {org_id}/{stream}: {e}"
+                    );
+                    return Err(MetaHttpResponse::internal_error(e));
+                }
             }
-        },
+        }
         // The stream has never carried server counters — an empty section, not
         // an error.
         None => Vec::new(),
@@ -7114,13 +7164,18 @@ async fn read_server_queries_body(
     }
 
     let rows = match build_dbm_server_queries_sql(stream, &preds, limit, &present) {
-        Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
-            Ok(rows) => rows,
-            Err(e) => {
-                log::error!("[DbMonitoring] server queries read failed for {org_id}/{stream}: {e}");
-                return Err(MetaHttpResponse::internal_error(e));
+        Some(sql) => {
+            match run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time).await
+            {
+                Ok(rows) => rows,
+                Err(e) => {
+                    log::error!(
+                        "[DbMonitoring] server queries read failed for {org_id}/{stream}: {e}"
+                    );
+                    return Err(MetaHttpResponse::internal_error(e));
+                }
             }
-        },
+        }
         // The stream has never carried server counters — an empty section, not
         // an error.
         None => Vec::new(),
@@ -7502,15 +7557,19 @@ async fn read_server_samples_body(
         let capture_on = server_samples_capture_state(&present) == "on";
         // A stream that never captured contributes nothing — not an error.
         let stream_rows = match build_dbm_server_samples_sql(stream, &preds, limit, &present) {
-            Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
-                Ok(stream_rows) => stream_rows,
-                Err(e) => {
-                    log::error!(
-                        "[DbMonitoring] server samples read failed for {org_id}/{stream}: {e}"
-                    );
-                    return Err(MetaHttpResponse::internal_error(e));
+            Some(sql) => {
+                match run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time)
+                    .await
+                {
+                    Ok(stream_rows) => stream_rows,
+                    Err(e) => {
+                        log::error!(
+                            "[DbMonitoring] server samples read failed for {org_id}/{stream}: {e}"
+                        );
+                        return Err(MetaHttpResponse::internal_error(e));
+                    }
                 }
-            },
+            }
             None => Vec::new(),
         };
         Ok((capture_on, stream_rows))
@@ -7661,13 +7720,16 @@ async fn read_plans_body(
     };
 
     let rows = match build_dbm_plans_sql(stream, fingerprint, "", &present) {
-        Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
-            Ok(rows) => rows,
-            Err(e) => {
-                log::error!("[DbMonitoring] plans read failed for {org_id}/{stream}: {e}");
-                return Err(MetaHttpResponse::internal_error(e));
+        Some(sql) => {
+            match run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time).await
+            {
+                Ok(rows) => rows,
+                Err(e) => {
+                    log::error!("[DbMonitoring] plans read failed for {org_id}/{stream}: {e}");
+                    return Err(MetaHttpResponse::internal_error(e));
+                }
             }
-        },
+        }
         // The stream has never carried plans — an empty section, not an error.
         None => Vec::new(),
     };
@@ -8355,7 +8417,7 @@ async fn read_dbm_instances_body(
     }
 
     let hits = match build_dbm_instances_sql(stream, q.system.as_deref(), &present) {
-        Some(sql) => run_events_search(org_id, stream, sql, start_time, end_time)
+        Some(sql) => run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time)
             .await
             .map_err(|e| {
                 log::error!("[DbMonitoring] instances search failed for {org_id}/{stream}: {e}");
@@ -8566,9 +8628,11 @@ async fn read_table_health_body(
     // section — the rules that need no index data must keep rendering.
     let table_search = async {
         match build_dbm_table_health_sql(stream, &preds, limit, &present) {
-            Some(sql) => run_events_search(org_id, stream, sql, start_time, end_time)
-                .await
-                .map(Some),
+            Some(sql) => {
+                run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time)
+                    .await
+                    .map(Some)
+            }
             // The stream has never carried table stats — an empty section, not
             // an error.
             None => Ok(None),
@@ -8580,9 +8644,11 @@ async fn read_table_health_body(
             return Ok(None);
         }
         match build_dbm_index_health_sql(stream, &preds, limit, &present) {
-            Some(sql) => run_events_search(org_id, stream, sql, start_time, end_time)
-                .await
-                .map(Some),
+            Some(sql) => {
+                run_events_search(org_id, Some(user_id), stream, sql, start_time, end_time)
+                    .await
+                    .map(Some)
+            }
             None => Ok(None),
         }
     };
@@ -17104,12 +17170,25 @@ mod tests {
             let body = &body[..body.find("\n}\n").map_or(body.len(), |e| e + 3)];
 
             // The row read: the one bound to `rows`, fatal by construction.
-            let read = body
+            //
+            // Matched on a WHITESPACE-COLLAPSED copy of the body, because the
+            // shape of this statement is rustfmt's to decide, not ours: adding
+            // one argument to `run_events_search` pushed it over the width and
+            // rustfmt split it into `let rows =` / `match run_events_search(…`,
+            // which a single-line literal stopped finding. The test then failed
+            // claiming the handler "has no fatal row read" — a false alarm about
+            // the very invariant it exists to protect. Collapsing runs of
+            // whitespace to one space makes the scrape immune to re-wrapping
+            // while keeping the assertion below exactly as strict.
+            let flat = body.split_whitespace().collect::<Vec<_>>().join(" ");
+            let read = flat
                 .find("let rows = match run_events_search(")
-                .or_else(|| body.find("let rows_fut = run_events_search("))
+                .or_else(|| flat.find("let rows_fut = run_events_search("))
                 .unwrap_or_else(|| panic!("{handler} has no fatal row read"));
-            let stmt = &body[read..];
-            let stmt = &stmt[..stmt.find(";\n").map_or(stmt.len(), |e| e + 1)];
+            let stmt = &flat[read..];
+            // `"; "` rather than `";\n"`: the newline is gone from the flattened
+            // copy, and the statement still ends at the first semicolon.
+            let stmt = &stmt[..stmt.find("; ").map_or(stmt.len(), |e| e + 1)];
             assert!(
                 !stmt.contains("unwrap_or_default()") && !stmt.contains("unwrap_or_else"),
                 "{handler}: the read feeding a `not_collecting` verdict must \
