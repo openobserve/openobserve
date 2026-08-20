@@ -21,9 +21,9 @@ unless a query overrides with `persist: "none"`.
 
 ## Cached today
 
-63 cached reads are declared with `defineQuery`, each in the service file that
-owns its URL,
-plus the two pre-existing IndexedDB caches now folded into the same purge path.
+63 cached reads are declared with `queryOptions()` in `<domain>.queries.ts`,
+beside the transport module that owns their URLs, plus the two pre-existing
+IndexedDB caches now folded into the same purge path.
 
 ### App shell
 
@@ -285,7 +285,7 @@ lists behind one service.
 | 57  | Score config versions | `GET /api/{org}/score_configs/{id}/versions` | T3       | memory  |
 
 Writes (`create` / `update` / `delete` / `activate` / `pause` / `manual_eval`)
-become `useOrgMutation` with a prefix invalidate. `scorers/test` and
+are `mutationOptions()` declaring `meta.invalidates` with a prefix key. `scorers/test` and
 `llm_judge/output_schema` are POST previews — never cache.
 
 **AI Observability** — `src/enterprise/{views,components}/AIObservability`
@@ -335,7 +335,7 @@ Per audit §5.9. These are not "to be migrated"; they must stay uncached.
 | Stream Explorer table                                            | `search.search` (SQL)                      | Same — it is a search, not a list.                                                                                                       |
 | RUM error tracking / performance                                 | dashboard-backed `search.search`           | Same.                                                                                                                                    |
 | SSE / AI chat streams                                            | `ai_chat.*`                                | Streaming.                                                                                                                               |
-| Ingestion, login, file upload                                    | `POST`/`PUT`/`DELETE`                      | One-shot, side-effecting. Use `useOrgMutation` — invalidate, never cache.                                                                |
+| Ingestion, login, file upload                                    | `POST`/`PUT`/`DELETE`                      | One-shot, side-effecting. Use `mutationOptions` — invalidate, never cache.                                                                |
 | Short URL resolve, `verify_identifier`, billing hosted-page URLs | one-shot                                   | Single-use tokens/URLs.                                                                                                                  |
 
 ---

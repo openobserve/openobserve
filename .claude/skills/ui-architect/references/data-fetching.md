@@ -1,11 +1,32 @@
 # Data Fetching & Caching
 
-Every cached read is a `defineQuery` declared in the service file that owns the
-URL. `web/src/composables/query/` holds the client, the durations and the storage
-adapters — not a per-endpoint module per domain.
+Every cached read is a plain **`queryOptions()`** object declared in
+`services/<domain>.queries.ts`, beside the transport module that owns the URL.
+There is no wrapper type and no house vocabulary: `useQuery`, `useMutation`,
+`queryClient.fetchQuery`, `invalidateQueries` are TanStack's own API, called
+directly.
 
 What is cached where, and what is deliberately not, is in
-[data-fetching-inventory.md](data-fetching-inventory.md).
+[data-fetching-inventory.md](data-fetching-inventory.md). The full call flow,
+purge paths and the reasoning behind the layout live in `web/docs/` —
+[api-cache-architecture.md](../../../../web/docs/api-cache-architecture.md) and
+[query-authoring-guide.md](../../../../web/docs/query-authoring-guide.md).
+
+---
+
+## The three files per domain
+
+```
+services/<domain>.ts            transport only — axios, URLs, nothing else
+services/<domain>.querykeys.ts  keys; imports nothing but `orgKey`
+services/<domain>.queries.ts    queryOptions / mutationOptions
+```
+
+Never collapse these. The transport is separate so a normal
+`vi.mock("@/services/<domain>")` reaches a `queryFn` — when they shared a file
+the reference was intra-module and no module mock could intercept it. The keys
+are separate again so a write in one domain can drop another's scope without
+dragging that domain's transport along and forming an import cycle.
 
 ---
 
@@ -18,20 +39,19 @@ What is cached where, and what is deliberately not, is in
 want the client default and say nothing at all, and the few that differ name a
 constant.
 
----
-
 ### Where each decision lives
 
-| Decision                               | File                                                    |
-| -------------------------------------- | ------------------------------------------------------- |
-| "How long is this fresh?"              | `query/cachePolicy.ts` — the only file with numbers     |
-| "Where is it stored?"                  | the `persister` option; omit it for memory only         |
-| "What identifies this read?"           | the `key` of its `defineQuery` — never an inline array  |
-| "Which endpoint, what response shape?" | the same `defineQuery`, in `services/<domain>.ts`       |
-| "When does this page read it?"         | the page — `enabled`, `force`, `refetchInterval`        |
-| "What is the URL?"                     | `services/*.ts` — the builders are untouched by caching |
+| Decision                               | File                                                     |
+| -------------------------------------- | -------------------------------------------------------- |
+| "How long is this fresh?"              | `query/cachePolicy.ts` — the only file with numbers      |
+| "Where is it stored?"                  | the `persister` option; omit it for memory only          |
+| "What identifies this read?"           | the key factory in `services/<domain>.querykeys.ts`      |
+| "Which endpoint, what response shape?" | the `queryOptions()` in `services/<domain>.queries.ts`   |
+| "What does a write invalidate?"        | that write's `meta.invalidates` — never the component    |
+| "When does this page read it?"         | the page — `enabled`, `refetchInterval`                  |
+| "What is the URL?"                     | `services/<domain>.ts` — untouched by caching            |
 
-### Tiers and their storage
+### Policy by shape of read
 
 | Read                            | `staleTime`                 | `persister`             |
 | ------------------------------- | --------------------------- | ----------------------- |
@@ -41,118 +61,184 @@ constant.
 | operational state you poll      | `0`                         | —                       |
 | heavy result payloads           | `0`                         | `indexedDbPersister`    |
 
----
-
 ### Adding a new endpoint
 
 ```
-├─ Not a GET, or streaming, or a single-use URL? ──► no cache. useOrgMutation for writes.
+├─ Not a GET, or streaming, or a single-use URL? ──► no cache. mutationOptions for writes.
 └─ GET, reused across surfaces or visits?
-   ├─ Immutable for the session?        ──► SESSION_STATIC   localStorage
-   ├─ Org configuration?                ──► ORG_CONFIG       localStorage
-   ├─ A list of entities?               ──► ENTITY_LIST      memory
-   ├─ One entity?                       ──► ENTITY_DETAIL    memory
-   ├─ Operational state you poll?       ──► VOLATILE         memory + refetchInterval
-   └─ Large result payload?             ──► HEAVY_RESULT     IndexedDB
+   ├─ Immutable for the session?        ──► SESSION_STALE_TIME  localStorage
+   ├─ Org configuration?                ──► CONFIG_STALE_TIME   localStorage
+   ├─ A list of entities / one entity?  ──► client default      memory
+   ├─ Operational state you poll?       ──► staleTime 0         memory + refetchInterval
+   └─ Large result payload?             ──► staleTime 0         IndexedDB
         │
         └─ then, whatever the duration:
-           carries a token, key or passcode? ──yes──► persist: "none"
+           carries a token, key or passcode? ──yes──► no persister
 ```
 
-**Verify the duration against the payload, not the endpoint name.** Two proposals in
-the inventory were wrong for exactly this reason: `/api/license` sounds static
-but carries live usage counters, and the node list sounds like config but is
-cluster state that must not be served from disk.
-
-### The template
-
-```ts
-// services/<domain>.ts — below the URL builders it calls
-import { defineQuery } from "@/composables/query/queryClient";
-
-export const thingQuery = defineQuery<[], Thing[]>({
-  key: ["things", "list"], // → ["org", <org>, "things", "list"]
-  fetch: async (org) => (await thingService.list(org)).data?.list ?? [],
-  persist: "none", // only if it carries a secret
-});
-```
-
-A parameterised key is a function of the same arguments `fetch` takes after the
-org, and states its `scope` so siblings in the domain invalidate together:
-
-```ts
-export const thingDetailQuery = defineQuery<[id: string], Thing>({
-  key: (id) => ["things", "detail", id],
-  fetch: async (org, id) => (await thingService.get(org, id)).data ?? null,
-  scope: ["things"],
-});
-```
-
-Use `defineGlobalQuery` for a read that is **not** org-scoped (`/config`, the
-license): same declaration, no `org` argument at the call site.
+**Verify the duration against the payload, not the endpoint name.** `/api/license`
+sounds static but carries live usage counters; the node list sounds like config
+but is cluster state that must not be served from disk.
 
 ---
 
-### Rules that are easy to get wrong
+## The template
 
-1. **`fetchQuery`, not `ensureQueryData`.** The latter returns cached data even
-   after `invalidateQueries` — it only fetches when there is _no_ data.
-2. **Invalidate by prefix, never re-call the page loader.** `invalidate(org)`
-   drops the declaration's whole `scope`, not the exact key: a precise
-   invalidate is a bug waiting for the next key variant.
-3. **The `force` convention.** Loaders are `getX(force = false)`. Mount and
-   route-change reads stay cached; a **Refresh** button, a **post-write reload**
-   and an **explicit user search** pass `true`.
-4. **Never bind a loader straight to a template event.**
-   ```vue
-   <!-- WRONG: the DOM event object lands in `force` -->
-   <OButton @click="getData" />
-   <!-- RIGHT -->
-   <OButton @click="refreshData" />
-   <!-- const refreshData = () => getData(true) -->
-   ```
-5. **Return the promise from a loader.** `await getData()` must actually wait —
-   several loaders silently did not, which only worked while the fetch resolved
-   in a single microtask.
-6. **A query result may not be `undefined`.** Use `?? null` in the queryFn.
-7. **Match the service's export shape** — some are default exports, some named
-   (`annotationService`). A wrong import is `undefined` at runtime, not a
-   compile error.
-8. **A spec cannot replace a query-carrying service module wholesale.** Overlay
-   the stubs onto the real module — see "Testing" at the end.
+```ts
+// services/things.querykeys.ts
+import { orgKey } from "@/composables/query/keys";
 
-### Before you put a list on `load()`
+export const thingKeys = {
+  all: (org: string) => orgKey(org, "things"), // ← the invalidation scope
+  list: (org: string) => orgKey(org, "things", "list"),
+  detail: (org: string, id: string) => orgKey(org, "things", "detail", id),
+};
+```
 
-Two things make a second paint unsafe. Check both:
+```ts
+// services/things.queries.ts
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
+import thingService from "./things";
+import { thingKeys } from "./things.querykeys";
 
-1. **Side effects in the response handler** — opening a dialog, firing a second
-   request, minting a row id. Split the pure row mapping out and leave the
-   effects on the fresh pass. If it cannot be split, use `peek()` to skip the
-   spinner instead and accept that a cold surface waits.
-2. **Unstable row identity** — a row keyed by `getUUID()` cannot be painted
-   twice; the second paint renames every row. Derive the identity from the
-   entity first.
+export const thingsQuery = (org: string) =>
+  queryOptions({
+    queryKey: thingKeys.list(org),
+    queryFn: async (): Promise<Thing[]> => (await thingService.list(org)).data?.list ?? [],
+  });
+
+export const deleteThingMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (id: string) => thingService.delete(org, id),
+    meta: { invalidates: [thingKeys.all(org)], removes: [thingKeys.all(org)] },
+  });
+```
+
+`orgKey` roots every key at `["org", <id>, …]`. The org-switch purge, the logout
+purge and the persister's storage prefix all scan that shape — build a key by
+hand and it silently opts out of all three. A read that is **not** org-scoped
+(`/config`, the license) uses `globalKey`.
+
+---
+
+## Consuming
+
+### In a component — subscribe
+
+```ts
+const org = useOrgId();
+const q = useQuery(() => Object.assign(thingsQuery(org.value), { enabled: !!org.value }));
+
+const rows = computed(() => q.data.value ?? []);
+const loading = q.isLoading; // cold read in flight → OTable skeleton
+const fetching = q.isFetching; // any request → refresh-button spinner
+```
+
+The rows **are** the query. Anything that invalidates the scope repaints them
+with no wiring at the call site.
+
+### Writing
+
+```ts
+const del = useMutation(() => deleteThingMutation(org.value));
+await del.mutateAsync(id);
+```
+
+The component never names a cache. `meta` is applied centrally by a
+`MutationCache` in `query/queryClient.ts`:
+
+| field            | effect                                                                |
+| ---------------- | --------------------------------------------------------------------- |
+| `invalidates`    | `invalidateQueries` per scope — prefer a domain's `all`                |
+| `removes`        | `removeQueries({ type: "inactive" })` — use after a delete             |
+| `successMessage` | success toast via the notifier injected in `main.ts`                   |
+| `silentError`    | suppress the default error toast when the call site renders its own    |
+
+### Outside a component
+
+Route guards, Vuex actions, plain utils — same object, read imperatively:
+
+```ts
+await queryClient.fetchQuery(thingsQuery(org));
+await queryClient.fetchQuery({ ...thingsQuery(org), staleTime: 0 }); // force
+queryClient.getQueryData(thingKeys.list(org)); // peek, no request
+```
+
+`fetchInto(options, { apply, loading, fetching })` drives refs a component
+already owns. It writes a **snapshot** — an invalidation elsewhere will not
+repaint it — so prefer `useQuery` wherever the component can host it. Only four
+modules should be using it.
+
+---
+
+## Rules that are easy to get wrong
+
+1. **`Object.assign`, not a spread.** `queryOptions()` brands its `queryKey`
+   with the result type; spreading into a fresh literal drops the brand and
+   `data` silently degrades to `unknown`. It still compiles.
+2. **`isLoading`, not `isPending`, for a gated query.** A query with
+   `enabled: false` is pending forever. `isLoading` is pending **and** fetching.
+3. **`enabled: false` does not stop the options factory running.** A key built
+   from a nullable parameter needs a placeholder or it throws.
+4. **`refetch()` resolves, it does not reject.** Read failures from
+   `query.error`. It also resolves *before* vue-query propagates into its
+   reactive refs — a caller reading `q.data` straight after needs `nextTick()`.
+5. **`mutateAsync` settles a tick later than a bare service promise.** A handler
+   that does not `return` its chain stops being awaitable. If synchronous work
+   follows the chain (analytics), hold the promise, run the tail, then return it.
+6. **Invalidate on success, never before the write.** Declaring `meta` does this
+   for you; a hand-written `invalidateQueries` before an `await` races the
+   refetch against the request.
+7. **`fetchQuery`, not `ensureQueryData`.** The latter returns cached data even
+   after `invalidateQueries` — it only fetches when there is *no* data.
+8. **Nothing reachable from `queryClient.ts` may import UI or i18n at runtime.**
+   The test setup imports it eagerly; a runtime edge to `@/types/i18n` defeats
+   `vi.mock("vue-i18n")` in every spec that uses it. Toasts are injected via
+   `setMutationNotifier` from `main.ts`.
+9. **A query result may not be `undefined`.** Use `?? null` in the queryFn.
+10. **Match the service's export shape** — some are default exports, some named
+    (`annotationService`). A wrong import is `undefined` at runtime, not a
+    compile error.
+
+---
+
+## When a component resists conversion
+
+Four shapes block deriving rows from the cache. Fix the shape, don't work
+around it:
+
+| Shape                                                    | Fix                                                                                        | Example              |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------- |
+| Shaping function **mutates** its argument                | Make it pure — deriving would rewrite the cached entry in place                             | `PipelinesList`      |
+| Page owns state **seeded** from the response              | Gate the query behind `enabled` so it cannot fire before init; `await q.suspense()` first   | `Nodes`              |
+| Rows carry **user state** (a `selected` flag)             | Keep the list local, drive it from a `watch` on `q.data` that preserves that state          | `BuiltInPatternsTab` |
+| Read is **parameterised per call** (folder, page, filter) | Hold the parameters in a `ref` so the key forks per shape — this also deletes any stale-response guard | `ReportList`, `SloList` |
+
+Also check: **unstable row identity.** A row keyed by `getUUID()` cannot be
+painted twice. Derive the identity from the entity first.
 
 A page that already looks instant is not evidence it is cached — rows often
 survive a remount in shared component state while the request still fires every
 time. Check the network, not the flicker.
 
-### Never cache
+---
+
+## Never cache
 
 Ad-hoc search (`search.search`, `_around`, partitions, WS), AI chat streams,
 single-use URLs and page tokens, and **any GET that mutates** (billing's
 `unsubscribe` / `resume_subscription`).
 
-Also uncached on purpose, with reasons in inventory §3i:
-`dashboards.get_Dashboard` (its `hash` drives optimistic-concurrency saves) and
-read-modify-write reads such as `WorkflowLinkAlertsDialog`.
+Also uncached on purpose: `dashboards.get_Dashboard` (its `hash` drives
+optimistic-concurrency saves) and read-modify-write reads such as
+`WorkflowLinkAlertsDialog`.
 
-### Never persist
+## Never persist
 
 Ingestion tokens, org passcode, cipher key material, RUM tokens,
-service-account tokens, synthetics agent tokens. Pin `persist: "none"` **on the
-query**, not by relying on its policy — the override has to survive someone
-changing the file's durations later.
+service-account tokens, synthetics agent tokens. Omit the `persister` **on the
+query** rather than relying on its duration — the override has to survive
+someone changing the file's policy later.
 
 ---
 
@@ -160,379 +246,47 @@ changing the file's durations later.
 
 Every key is rooted at `["org", id]`, which is what makes both events safe.
 
-| Event          | Memory   | localStorage / IndexedDB                |
-| -------------- | -------- | --------------------------------------- |
-| **Org switch** | **kept** | **purged** for the org being left       |
-| **Logout**     | cleared  | purged entirely (incl. `o2FieldValues`) |
+| Event          | Memory   | localStorage / IndexedDB          |
+| -------------- | -------- | --------------------------------- |
+| **Org switch** | **kept** | **purged** for the org being left |
+| **Logout**     | cleared  | purged entirely                   |
 
 Memory is kept across an org switch on purpose: one org's data can never be
-served to another, and `gcTime` collects it anyway, so switching back to a
-recent org inside its `staleTime` costs no requests at all. Disk is purged
-because it is a different budget — localStorage is ~5 MB shared with the whole
-app, and the previous tenant's stream, folder and function names should not sit
-on a possibly shared machine.
-
-Consequence: switching back is free **in-session only**. The disk copy was
-purged on the way out and a cache hit fetches nothing, so nothing re-persists
-until that org next fetches for real.
+served to another, and `gcTime` collects it anyway. Disk is purged because it is
+a ~5 MB budget shared with the whole app, and the previous tenant's names should
+not sit on a possibly shared machine.
 
 Implemented in `purgeOrgQueries` / `purgeAllQueries` (`query/queryClient.ts`).
 
 ---
 
-## Architecture — the call flow
-
-### The layers, and what each one owns
-
-Layered by rate of change. Each decision has exactly one home.
-
-| #   | Layer             | File(s)                                                          | Owns                                                                             |
-| --- | ----------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| 6   | Page / component  | `views/…`, `components/…`                                        | _when_ to read: `enabled`, the folder id, the `force` flag, `refetchInterval`    |
-| 5   | Consumption shape | `<x>Query.get/refresh/use` · `useServerTable` · `useOrgMutation` | _how_ a page consumes — reactive or imperative                                   |
-| 4   | Per-API binding   | `defineQuery` in `services/<domain>.ts`                          | key + fetch + any TanStack option it needs; the key derives identity             |
-| 3   | Storage adapters  | `query/persisters.ts` · `query/idbStorage.ts`                    | localStorage / IndexedDB mechanics                                               |
-| 2   | **Policy**        | `query/cachePolicy.ts`                                           | `staleTime`, `gcTime`, `persist`, focus-refetch — **the only file with numbers** |
-| 1   | Transport         | `services/*.ts` → `services/http.ts`                             | URLs, auth, 401 refresh, 403 grouping                                            |
-
-Layers 1 and 4 share a file on purpose: a cached read is declared directly
-beside the endpoint it calls, so adding one means editing one file.
-
-**The rule that follows from this: durations live in `cachePolicy.ts`.**
-`staleTime: 60000` at a call site is a review rejection — if none of the constants fit,
-add one to `cachePolicy.ts`.
-
-The URL builders themselves were **not modified** by the caching work — they are
-still thin wrappers returning axios promises. What the caching work added to a
-service file is a `defineQuery` declaration per cached read, below the builders.
-
----
-
-### Read path — worked example
-
-The sidebar folder list, traced through every file it touches.
-
-```
-  src/components/common/sidebar/FolderList.vue
-        │  await getFoldersListByType(store, props.type)
-        ▼
-  src/utils/commons.ts                                     ← legacy entry point,
-        │  fetchFoldersByType(org, type)                      kept so ~10 call
-        │  …then dispatches setFoldersByType (Vuex bridge)    sites need no edit
-        ▼
-  src/services/common.ts                                   ← LAYER 4: the binding
-        │  foldersQuery = defineQuery({
-        │    key:   (type) => ["folders", type],           ← identity, rooted at
-        │                                                     ["org", org, …]
-        │    fetch: (org, type) => common.list_Folders(…),
-        │    staleTime: CONFIG_STALE_TIME,                 ← LAYER 2: policy
-        │  })
-        ▼
-  @tanstack/query-core  (via src/composables/query/queryClient.ts)
-        │
-        ├── data in memory and fresh (< 5 min)? ──────────► return it. 0 requests.
-        │
-        ├── nothing in memory, but persisted?
-        │     └─ persisters.ts reads
-        │        localStorage["o2q-[\"org\",\"acme\",\"folders\",\"dashboards\"]"]
-        │        └─► hydrate, return; refetch in the background only if stale
-        │
-        └── miss, or stale ──► run queryFn
-              │
-              ▼
-        src/services/common.ts     list_Folders(org, type)  ← LAYER 1, same file
-              │
-              ▼
-        src/services/http.ts       axios + 401 refresh + 403 grouping
-              │
-              ▼
-        GET /api/v2/{org}/folders/{type}
-              │
-              ▼
-        result stored in memory, and — because ORG_CONFIG persists —
-        written to localStorage by the persister
-```
-
-Two consequences worth internalising:
-
-- **Concurrency is free.** Three components mounting at once produce one
-  request; `fetchQuery` shares the in-flight promise by key.
-- **The Vuex dispatch is a bridge, not a cache.** It exists so components that
-  still read `organizationData.foldersByType` keep working. It is deleted along
-  with the last such consumer.
-
----
-
-### Write path
-
-A write never re-calls the page loader. It invalidates a **prefix**, and the
-next read goes to the server.
-
-```
-  AddFunction.vue
-        │  jsTransformService.create(org, payload)      ← LAYER 1, unchanged
-        │
-        │  functionsQuery.invalidate(org)
-        ▼
-  services/jstransform.ts
-        │  invalidateQueries({ queryKey: ["org", org, ...scope] })
-        ▼
-  every key under ["org", org, "functions", …] is now stale
-        │
-        ▼
-  the next functionsQuery.get(org) — from anywhere — hits the server
-```
-
-Prefix, not exact key, on purpose: the declaration's `scope` (defaulting to the
-first key segment) also covers the enrichment-tables list and any future
-variant. A precise-key invalidate is a bug waiting for the next key to be added.
-
-For deletes, `useOrgMutation`'s `removes` additionally calls `removeQueries({
-type: "inactive" })` — invalidation alone leaves the deleted entity's detail
-query cached and ready to serve the next reader.
-
----
-
-### Purge path
-
-```
-  ORG SWITCH  ── MainLayout.vue  changeOrganizationIdentifier(next, previous)
-        │
-        └─ purgeOrgQueries(previous)          ← query/queryClient.ts
-              └─ purgePersistedOrg(previous)  ← query/persisters.ts
-                    ├─ localStorage keys starting  o2q-["org","<prev>"
-                    ├─ IndexedDB o2Cache keys      o2q-heavy-["org","<prev>"
-                    ├─ IndexedDB o2Cache keys      panel|<prev>|…
-                    └─ fieldValueDB.clearOrg(prev) → o2FieldValues  <prev>|…
-
-        In-memory entries are deliberately KEPT — see "Lifecycle" above.
-        So switching back is free in-session, but the disk copy is gone: a
-        cache hit fetches nothing, so nothing re-persists until the next real
-        fetch for that org.
-
-  LOGOUT  ── stores/index.ts  logout action  (the single choke point for
-        │                                     all 12 dispatch sites)
-        └─ purgeAllQueries()
-              ├─ queryClient.clear()
-              └─ purgeAllPersisted()  → localStorage o2q-*  +  o2Cache  +
-                                        fieldValueDB.clearAll()
-```
-
----
-
-### The two consumption shapes
-
-Both are legitimate; they differ in whether the caller is inside a `setup()`.
-
-**(a) Reactive** — the target shape. The component renders from the query.
-
-```ts
-const { data: rows, isPending, isFetching } = pipelinesQuery.use(() => []);
-// isPending → skeleton (no cached data at all)
-// isFetching → subtle background-refresh indicator
-```
-
-**(b) Imperative** — for loaders that are not in a `setup()`, or whose page owns
-its own `loading` ref.
-
-```ts
-const getData = (force = false) =>
-  pipelinesQuery.load({
-    org,
-    apply: (list) => (rows.value = list),
-    loading,
-    force, // refresh button, post-write reload
-  });
-```
-
-**`get()` waits; `load()` does not.** `get()` on a _stale_ entry blocks on the
-network — the cached value is still in the cache, but a loader that flips
-`loading` around it blanks the list and spins until the response lands. `load()`
-applies the cached value first and the server's when it lands, and only sets
-`loading` when there is nothing to show. Use `get()` when the caller genuinely
-needs one settled value (a route guard, a write path); use `load()` for anything
-that paints a list.
-
-`load()` does the fetching; `peek()` is the read-only companion for deciding
-whether there is anything to show before it runs.
-When a loader's response handler has side effects and so cannot be run twice —
-it opens a dialog, fires a second request — do not hand it to `load`'s `apply`.
-Use `peek()` to decide whether to spin, and read once with `get()`.
-
-**Current state is a deliberate hybrid.** Most migrated pages use (b), because
-converting each page's data flow to (a) carried more regression risk than the
-caching itself. Policy is fully centralised in `cachePolicy.ts`; consumption is not yet
-uniform. Converting the imperative pages to (a) is a follow-up that changes no
-policy and no keys.
-
-#### The `force` convention
-
-Only three things pass `force = true`: an explicit **Refresh** button, a
-**post-write reload**, and an explicit **user-initiated search**. Mount and
-route-change reads stay cached.
-
-```ts
-// WRONG — the DOM event object lands in `force`, so this always refetches
-<OButton @click="getData" />
-
-// RIGHT — a named handler makes the intent explicit
-const refreshData = () => getData(true);
-<OButton @click="refreshData" />
-```
-
----
-
-### Where a decision goes — quick reference
-
-| Decision                                          | File                                                      |
-| ------------------------------------------------- | --------------------------------------------------------- |
-| "How long is this fresh?"                         | `query/cachePolicy.ts` — pick or add a constant           |
-| "Where is it stored?"                             | the `persister` option; omit it for memory only           |
-| "What identifies this read?"                      | the `key` of its `defineQuery`, in `services/<domain>.ts` |
-| "Which endpoint, and how is the response shaped?" | the same `defineQuery`'s `fetch`                          |
-| "When does this page read it?"                    | the page — `enabled`, `force`, `refetchInterval`          |
-| "What does this URL look like?"                   | `services/*.ts` — unchanged by caching                    |
-
-New endpoint? The decision tree is in the "Adding a new endpoint" section
-above.
-
----
-
-### Declaring a query — the layout as implemented
-
-Every cached read is one `defineQuery` in the service file that owns the URL.
-There is no `queries/` folder and no central key registry: the key is derived
-from the declaration, and `scope` **is** the invalidation prefix.
-
-```ts
-// services/saved_views.ts
-import http from "./http";
-import { defineQuery } from "@/composables/query/queryClient";
-
-const savedViews = {
-  get: (org: string) => http().get(`/api/${org}/savedviews`),
-  post: (org: string, body: unknown) =>
-    http().post(`/api/${org}/savedviews`, body),
-};
-export default savedViews;
-
-export const savedViewsQuery = defineQuery({
-  key: ["search", "savedViews"], // → ["org", <org>, "search", "savedViews"]
-  fetch: async (org) => (await savedViews.get(org)).data?.views ?? [],
-});
-```
-
-Call sites read the same everywhere:
-
-```ts
-await savedViewsQuery.get(org); // cached
-await savedViewsQuery.refresh(org); // bypasses staleTime — refresh button, post-write
-savedViewsQuery.invalidate(org); // after a write
-```
-
-Parameterised keys are a function of the same arguments `fetch` takes after the
-org:
-
-```ts
-export const foldersQuery = defineQuery({
-  key: (type: string) => ["folders", type],
-  fetch: async (org, type: string) =>
-    normalize((await common.list_Folders(org, type)).data.list),
-  staleTime: CONFIG_STALE_TIME,
-  scope: ["folders"], // what invalidate() drops — defaults to key[0]
-});
-```
-
-#### What a query exposes
-
-| Member                                 | Use                                                                                |
-| -------------------------------------- | ---------------------------------------------------------------------------------- |
-| `get(org, …)`                          | cached read — no request while fresh                                               |
-| `refresh(org, …)`                      | bypasses `staleTime`: refresh button, post-write reload, explicit search           |
-| `load({ org, apply, loading, force })` | paint a list: the cached value, then the server's                                  |
-| `peek(org, …)`                         | the cached value or undefined — **no request**; for handlers that cannot run twice |
-| `invalidate(org)`                      | after a write; drops the whole `scope`                                             |
-| `remove(org)`                          | after a delete; drops inactive entries outright                                    |
-| `prime(org, data, …)`                  | seed a value the caller already applied optimistically                             |
-| `use(argsFn, opts)`                    | reactive form for a `setup()` that wants `isPending` / `isFetching`                |
-| `prefetch(org, …)`                     | warm an entry without rendering it                                                 |
-| `options` / `key`                      | the raw pieces, for one-off client calls                                           |
-
-`defineGlobalQuery` is the same declaration for a read that is **not**
-org-scoped — `/config`, the license. Its members drop the `org` argument; the key
-is rooted at `["org", GLOBAL_SCOPE, …]` so the logout purge still reaches it
-while the org-switch purge deliberately does not.
-
-#### The final file layout
-
-```
-composables/query/
-  queryClient.ts   client, purges, defineQuery/defineGlobalQuery, key helpers
-  cachePolicy.ts   the only file with staleTime/gcTime numbers
-  persisters.ts    localStorage + IndexedDB adapters
-  idbStorage.ts    shared IndexedDB primitive
-  panelKey.ts      panel-result digest (a genuine special case)
-  useOrgId.ts · useServerTable.ts · useOrgMutation.ts
-```
-
-`stableFilters`, `quantizeRange` and `GLOBAL_SCOPE` live in `queryClient.ts`;
-`ServerTableParams` lives in `useServerTable.ts`.
-
-#### What this costs
-
-- **Services are no longer dependency-free.** They import `queryClient`.
-  `setupTests.ts` already imports the query layer for every spec, so no test
-  pays a new import.
-- **A spec can no longer replace a service module wholesale** — that would take
-  the query exports with it, and stubbing around the service object would leave
-  the query calling the real endpoint. Specs overlay their stubs onto the real
-  module instead; see §8.
-- **Cross-domain invalidation is explicit.** Three declarations in one domain
-  each state `scope: ["alerts"]` — same behaviour as one central handle, the
-  prefix written three times instead of once.
-
----
-
-### Testing implications
-
-- The app's `queryClient` is a **module singleton**. `setupTests.ts` calls
-  `queryClient.clear()` **and** `purgeAllPersisted()` in `afterEach` — `clear()`
-  alone leaves localStorage entries that the next test restores from, silently
-  skipping its service mock.
-- The composables pass that client **explicitly** rather than relying on plugin
-  injection, so component specs need no per-file setup.
-- A spec that mounts a component and then wants a _different_ service response
-  must force the reload (`getData(true)`) or invalidate first — otherwise the
-  mount already warmed the cache and the new mock is never called.
-
-#### Mocking a service that declares queries
-
-A query holds a direct reference to the service object, so replacing the module
-wholesale takes the query exports with it and stubbing around the object leaves
-the query calling the real endpoint. Overlay the stubs onto the real module
-instead — `src/test/unit/helpers/mockService.ts`:
-
-```ts
-vi.mock("@/services/reports", async (importOriginal) => {
-  const { overlayServiceMock } =
-    await import("@/test/unit/helpers/mockService");
-  return overlayServiceMock(await importOriginal(), {
+## Testing
+
+- `setupTests.ts` installs `VueQueryPlugin` with the app's client and, in
+  `afterEach`, calls `queryClient.clear()` **and** `purgeAllPersisted()`.
+  `clear()` alone leaves localStorage entries the next test restores from,
+  silently skipping its service mock. Do not duplicate any of this per file.
+- **Mock the transport with a plain `vi.mock`.** Declarations reach it through a
+  normal import, so this is all that is needed:
+  ```ts
+  vi.mock("@/services/reports", () => ({
     default: { listByFolderId: vi.fn() },
-  });
-});
-```
-
-Everything on an overlaid object is stubbed, not just what the factory names —
-a method left real would reach the network. Three helpers cover the cases:
-
-| Helper                              | For                                                                                                                                                                                  |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `overlayServiceMock(actual, stubs)` | the normal `vi.mock` factory                                                                                                                                                         |
-| `automockService(actual)`           | the bare `vi.mock("@/services/x")` automock, queries left real                                                                                                                       |
-| `queryStub(fetch, map?)`            | services whose endpoints are **bare function exports** (`@/services/iam`) — those cannot be intercepted from outside the module, so the query is pointed back at the spec's own stub |
-
-- The query layer defers its fetch a microtask. A spec that captures a resolver
-  from inside a mock must flush a tick before asserting on what follows.
+  }));
+  ```
+  The old `overlayServiceMock` / `automockService` / `queryStub` helpers existed
+  because queries used to live *inside* the transport module. `queryStub` and
+  the `__isQuery` marker are gone; the two overlay helpers remain only for specs
+  that stub part of a service and want the rest of the real module.
+- A spec that mounts a component and then wants a **different** service response
+  must clear the cache or force the reload — the mount already warmed it:
+  ```ts
+  vi.mocked(service.list).mockResolvedValue({ data: [] });
+  queryClient.clear(); // ← without this the override is ignored
+  await wrapper.vm.getData();
+  ```
+- The query layer defers its `queryFn` to a microtask, and `mutateAsync` settles
+  a tick later still. A spec that captures a resolver from inside a mock, or
+  awaits a handler, must flush a tick before asserting.
 
 ---
 
@@ -541,37 +295,3 @@ a method left real would reach the network. Three helpers cover the cases:
 `npm run lint` and `npm run format:check` are **different gates**. ESLint's
 prettier rule does not cover everything CI checks, so a scripted or bulk edit
 can pass lint and still fail `format:check`. Run both, plus `type-check`.
-
-## Testing
-
-- `setupTests.ts` already clears the query client **and** purges persisted
-  storage between tests. Do not duplicate it.
-- A spec that mounts a component and then wants a **different** service response
-  must clear the cache or force the reload — the mount already warmed it, so the
-  new mock never runs.
-  ```ts
-  vi.mocked(service.list).mockResolvedValue({ data: [] });
-  queryClient.clear(); // ← without this the override is ignored
-  await wrapper.vm.getData();
-  ```
-- The query layer defers the queryFn to a microtask. A spec that captures a
-  resolver from inside a mock must flush a tick before resolving it.
-- Component specs need no per-file plugin setup: the composables pass the app's
-  `queryClient` explicitly.
-- **Never replace a query-carrying service module wholesale** — that takes the
-  query exports with it, and stubbing around the service object leaves the query
-  calling the real endpoint. Overlay onto the real module instead:
-  ```ts
-  vi.mock("@/services/reports", async (importOriginal) => {
-    const { overlayServiceMock } =
-      await import("@/test/unit/helpers/mockService");
-    return overlayServiceMock(await importOriginal(), {
-      default: { listByFolderId: vi.fn() },
-    });
-  });
-  ```
-  Everything on an overlaid object is stubbed, not just what the factory names.
-  `automockService(actual)` is the bare-automock equivalent, and `queryStub` is
-  for services whose endpoints are **bare function exports** (`@/services/iam`)
-  — those cannot be intercepted from outside the module, so the query is pointed
-  back at the spec's own stub.
