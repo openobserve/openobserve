@@ -36,7 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="onClick"
     @mouseenter="handleNodeHover"
     @mouseleave="handleNodeLeave"
-    @output-click="onOutputClick"
   >
     <!-- Two-line body: the custom NAME (bold) on top when renamed, then a single
          muted line combining the TYPE and config DETAIL as "Type · detail". Without
@@ -245,7 +244,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
-const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas(t);
+const { editNode, requestDeleteNode } = useWorkflowCanvas(t);
 
 // This node's live record in the shared graph — the source for meta-backed
 // display (custom name, comment, disabled). Reactive: mutating meta re-renders.
@@ -382,14 +381,10 @@ const handleActionsLeave = () => {
   }, 200);
 };
 
-// Clicking the source handle is the "add next step" affordance (it replaced the
-// hover-`+` that used to sit under the card). Terminal action nodes render no
-// source handle at all, so this can only fire where a next step is legal — and
-// it stays inert on the read-only Runs canvas.
-const onOutputClick = (event: MouseEvent) => {
-  if (workflowObj.readOnly) return;
-  openStepPicker(props.id, "out", event);
-};
+// Adding the next step / a fan-out branch is now the canvas-level append `+` under
+// (or beside) each node — see WorkflowCanvas.appendPoints — so the source handle is
+// just a connection point again (no click-to-add). The source dot still drags to
+// wire edges manually.
 
 // On the read-only Runs canvas the node body isn't editable — the error badge
 // (openResult) is the only affordance. In the editor, click opens the config.

@@ -509,4 +509,38 @@ describe("WorkflowCanvas", () => {
       expect(vf.setViewport).not.toHaveBeenCalled();
     });
   });
+
+  // Append `+`: previously only leaves got one; now every non-terminal node does,
+  // so a fan-out branch can be added from a node that already has a child.
+  describe("append + (fan-out from any node)", () => {
+    beforeEach(() => vf.findNode.mockReturnValue({ dimensions: { width: 200 } }));
+
+    it("offers an append + on a node that ALREADY has a child (not just the leaf)", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          { id: "c1", position: { x: 100, y: 240 }, data: { node_type: "condition" } },
+        ],
+        edges: [{ id: "e1", source: "t1", target: "c1" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      // BOTH the trigger (has a child → fan-out +) and the leaf condition get a +.
+      expect(wrapper.findAll('[data-test="workflow-flow-append-add"]').length).toBe(2);
+    });
+
+    it("never offers an append + on a terminal (output) node", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          { id: "d1", position: { x: 100, y: 240 }, data: { node_type: "destination" } },
+        ],
+        edges: [{ id: "e1", source: "t1", target: "d1" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      // Only the trigger (has a child) — the destination is terminal, so no +.
+      expect(wrapper.findAll('[data-test="workflow-flow-append-add"]').length).toBe(1);
+    });
+  });
 });

@@ -232,10 +232,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
   </div>
 
-  <!-- Leaf-append `+` — every leaf step (that can still chain onward) gets a `+`
-       just below it, so extending the workflow is the SAME gesture as inserting
-       between (the mid-edge `+`), instead of the old click-the-source-dot. Flow-
-       anchored like the Action slot so it tracks the node. -->
+  <!-- Append `+` — every step that can still chain onward gets a `+` to add the next
+       step. A leaf shows it straight below (with a connector stub); a node that
+       already has children shows it on the free side to fan out another branch,
+       instead of the old click-the-source-dot. Flow-anchored so it tracks the node. -->
   <div
     v-for="pt in appendPoints"
     :key="pt.id"
@@ -243,7 +243,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="absolute top-[var(--wf-oy)] left-[var(--wf-ox)] z-10 flex origin-top -translate-x-1/2 scale-[var(--wf-oz)] flex-col items-center"
     :style="{ '--wf-ox': pt.left + 'px', '--wf-oy': pt.top + 'px', '--wf-oz': pt.zoom }"
   >
-    <span class="border-border-strong h-5 border-l-2"></span>
+    <!-- Straight stub for a leaf / centred `+`; a curved connector edge from the
+         node to a fan-out `+` that sits off to the side. -->
+    <span v-if="pt.line" class="border-border-strong h-5 border-l-2"></span>
+    <svg
+      v-else
+      :width="pt.svgW"
+      height="20"
+      :viewBox="`${-pt.svgW / 2} 0 ${pt.svgW} 20`"
+      aria-hidden="true"
+    >
+      <path
+        :d="`M ${pt.cx} 0 Q ${pt.cx} 13 0 20`"
+        fill="none"
+        stroke="var(--color-border-strong)"
+        stroke-width="2"
+      />
+    </svg>
     <FlowAddButton @click="openStepPicker(pt.id, 'out', $event)" />
   </div>
 
@@ -499,23 +515,72 @@ const actionSlot = computed(() => {
   return screenBelow(triggerNode.value);
 });
 
-// Leaf-append `+` points: one under every leaf step that can still chain onward
-// (not a terminal/output node). Excludes the trigger while the Action slot covers
-// it, so there's never a bare `+` and a labelled Action card on the same node.
+// The append `+` for ONE node. A leaf (no children) gets the plain straight-down
+// `+` below its centre. A node that ALREADY has children gets a `+` on the FREE
+// side, so it never lands on the existing downward edge — and clicking it fans out
+// another branch: children lean right → `+` on the LEFT, lean left → RIGHT, sit on
+// both sides → CENTRED below (that gap is free). `line` = draw the little connector
+// stub (only when the `+` is straight below).
+const appendPointFor = (node: any) => {
+  const base = screenBelow(node); // { left, top, zoom } — below centre
+  const wf = workflowObj.currentSelectedWorkflow;
+  const childIds = (wf.edges || [])
+    .filter((e: any) => e.source === node.id)
+    .map((e: any) => e.target);
+  if (!childIds.length) return { ...base, line: true, cx: 0 }; // leaf → straight stub `+`
+
+  const nodeW = findNode(node.id)?.dimensions?.width ?? 240;
+  const nodeCx = (node.position?.x ?? 0) + nodeW / 2;
+  const byId = new Map((wf.nodes || []).map((n: any) => [n.id, n]));
+  const TH = 40; // flow-px: within this of the node centre counts as "centred"
+  let left = 0;
+  let right = 0;
+  let center = 0;
+  for (const cid of childIds) {
+    const c: any = byId.get(cid);
+    if (!c) continue;
+    const cw = findNode(cid)?.dimensions?.width ?? 240;
+    const ccx = (c.position?.x ?? 0) + cw / 2;
+    if (ccx > nodeCx + TH) right++;
+    else if (ccx < nodeCx - TH) left++;
+    else center++;
+  }
+  // Pick the free side; a lone centred child (or a crowded node) defaults to right.
+  let side: "left" | "right" | "center" = "right";
+  if (right > 0 && left === 0) side = "left";
+  else if (left > 0 && right === 0) side = "right";
+  else if (left > 0 && right > 0 && center === 0) side = "center";
+  if (side === "center") return { ...base, line: true, cx: 0 };
+  const sign = side === "right" ? 1 : -1;
+  const off = nodeW / 2 + 28;
+  // `cx` is the node's LOCAL x relative to the `+` (the div is scaled by zoom, so
+  // it's the unscaled offset) — the connector curve starts there. `svgW` sizes the
+  // (centred) connector SVG so the curve isn't clipped.
+  return {
+    ...base,
+    left: base.left + off * base.zoom * sign,
+    line: false,
+    cx: -off * sign,
+    svgW: 2 * off,
+  };
+};
+
+// Append `+` points: one under (or beside) EVERY step that can still chain onward
+// (not a terminal/output node), so a fan-out branch can be added from any node, not
+// just leaves. Excludes the trigger while the Action slot covers it, so there's
+// never a bare `+` and a labelled Action card on the same node.
 const appendPoints = computed(() => {
   if (readOnly.value) return [];
   const wf = workflowObj.currentSelectedWorkflow;
   const nodes = wf.nodes || [];
-  const sources = new Set((wf.edges || []).map((e: any) => e.source));
   return nodes
     .filter((n: any) => {
-      if (sources.has(n.id)) return false; // has a child → not a leaf
       if (nodeMeta(n.data?.node_type)?.ioType === "output") return false; // terminal
       // The trigger's first step is offered via the labelled Action slot instead.
       if (hasTrigger.value && stepCount.value === 0) return false;
       return true;
     })
-    .map((n: any) => ({ id: n.id, ...screenBelow(n) }));
+    .map((n: any) => ({ id: n.id, ...appendPointFor(n) }));
 });
 
 // Mid-edge `+` clicked → splice a step onto that edge (A→new→B). Reuses the same

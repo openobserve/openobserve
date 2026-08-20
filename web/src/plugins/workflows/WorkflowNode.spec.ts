@@ -489,37 +489,10 @@ describe("WorkflowNode", () => {
   // The hover-`+` under the card is gone: clicking the node's SOURCE HANDLE
   // opens the step picker. Terminal (output) nodes render no source handle, so
   // there is nothing to click on them.
-  describe("source handle -> step picker", () => {
-    const outputClick = (w: any, x = 120, y = 240) =>
-      w.findComponent({ name: "FlowNodeCard" }).vm.$emit("outputClick", {
-        clientX: x,
-        clientY: y,
-      } as MouseEvent);
-
-    it("opens the step picker anchored at the click for a logic node", async () => {
-      wrapper = mountNode("c1", CONDITION.data);
-      outputClick(wrapper, 120, 240);
-      await nextTick();
-      expect(workflowObj.stepPicker).toEqual({
-        show: true,
-        source: "c1",
-        handle: "out",
-        mode: "next",
-        // edgeId is only set in insert-on-edge mode (T7); empty here.
-        edgeId: "",
-        position: null,
-        anchor: { x: 120, y: 240 },
-      });
-    });
-
-    it("opens the step picker for the trigger too", async () => {
-      wrapper = mountNode("t1", TRIGGER.data);
-      outputClick(wrapper);
-      await nextTick();
-      expect(workflowObj.stepPicker.show).toBe(true);
-      expect(workflowObj.stepPicker.source).toBe("t1");
-    });
-
+  // The source dot is a connection point only now (adding a next step / fan-out
+  // branch moved to the canvas-level append `+`); it renders where a next step is
+  // legal and is absent on terminal nodes.
+  describe("source handle (connection point)", () => {
     it("renders a source handle on a logic node", () => {
       wrapper = mountNode("c1", CONDITION.data);
       expect(wrapper.findComponent({ name: "FlowNodeCard" }).props("hasOutput")).toBe(true);
@@ -528,15 +501,6 @@ describe("WorkflowNode", () => {
     it("renders NO source handle on a terminal (output) destination node", () => {
       wrapper = mountNode("d1", DESTINATION.data);
       expect(wrapper.findComponent({ name: "FlowNodeCard" }).props("hasOutput")).toBe(false);
-    });
-
-    it("does nothing on the read-only Runs canvas", async () => {
-      workflowObj.readOnly = true;
-      wrapper = mountNode("c1", CONDITION.data);
-      outputClick(wrapper);
-      await nextTick();
-      expect(workflowObj.stepPicker.show).toBe(false);
-      workflowObj.readOnly = false;
     });
   });
 
