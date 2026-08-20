@@ -168,6 +168,21 @@ pub struct FromPresetRequest {
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetPolicyRequest {
     pub rungs: Vec<PriorityRung>,
+    /// How many times the ladder runs before `final_action`. 1..=5.
+    ///
+    /// **Absent leaves it unchanged**, which is why it can be added without
+    /// breaking a client that never sent it. It was missing entirely: the
+    /// engine stored, validated and honoured both this and `final_action`,
+    /// while the write path silently dropped them — so a policy could never
+    /// leave the defaults, `PolicyError::RepeatOutOfRange` could never fire
+    /// from the API, and the editor showing them read-only was correct rather
+    /// than lazy.
+    #[serde(default)]
+    pub repeat_count: Option<i32>,
+    /// What happens once the last pass ends with nobody having answered.
+    /// Absent leaves it unchanged.
+    #[serde(default)]
+    pub final_action: Option<config::meta::oncall::FinalAction>,
     /// Alert Destination names to page through. Absent leaves them unchanged.
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
@@ -420,12 +435,15 @@ pub struct OwnershipQuery {
 /// "Cover for me" — `architecture/02` §5, as one request.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateOverrideRequest {
-    /// Which rotation slot is being covered. Omitted means the default one,
-    /// which is what every cover meant before slots existed. A slot the team
-    /// does not staff is refused: a cover over a position no rotation fills
-    /// would page somebody nobody expected.
+    /// Which rotation is being covered. Omitted means the team's primary, which
+    /// is what "cover for me" means on a team that has never thought about
+    /// positions. A rotation the team does not have is refused: a cover over a
+    /// position nothing staffs would page somebody nobody expected.
+    ///
+    /// Accepts an id or a name — a client with the calendar in front of it sends
+    /// the id, a human writing the call by hand sends "Secondary".
     #[serde(default)]
-    pub slot: Option<String>,
+    pub rotation_id: Option<String>,
     /// Who is covering. Must be a user of this org: an override outranks every
     /// layer, so an address that goes nowhere is a team with no pager for the
     /// length of the window.
@@ -457,11 +475,11 @@ pub struct OverrideWindowQuery {
 pub struct ResolvedScheduleQuery {
     pub from: i64,
     pub to: i64,
-    /// Which slot's row of the grid to draw. Omitted means the default one.
-    /// One slot per call rather than all of them interleaved: a row with two
-    /// answers in it is not a row.
+    /// Which rotation's row of the grid to draw. Omitted means the primary.
+    /// One rotation per call rather than all of them interleaved: a row with
+    /// two answers in it is not a row.
     #[serde(default)]
-    pub slot: Option<String>,
+    pub rotation_id: Option<String>,
 }
 
 /// A person, a window, or both. Listing every absence an org has ever recorded
@@ -1171,7 +1189,7 @@ pub async fn create_override(
         match o2_enterprise::enterprise::oncall::service::create_override(
             &org_id,
             &team_id,
-            body.slot,
+            body.rotation_id,
             &body.user_email,
             body.start_at,
             body.end_at,
@@ -1318,7 +1336,7 @@ pub async fn get_resolved_schedule(
         match o2_enterprise::enterprise::oncall::service::resolved_schedule(
             &org_id,
             &team_id,
-            q.slot.as_deref(),
+            q.rotation_id.clone(),
             q.from,
             q.to,
         )
@@ -1401,6 +1419,8 @@ pub async fn set_policy(
             body.rungs,
             body.destinations,
             body.l0,
+            body.repeat_count,
+            body.final_action,
         )
         .await
         {
@@ -5477,30 +5497,51 @@ mod tests {
     /// the default slot. The UI sends the field only when a team runs more
     /// than one pool.
     #[test]
-    fn test_a_cover_body_without_a_slot_still_parses() {
+    fn test_a_cover_body_without_a_rotation_still_parses() {
         let body: CreateOverrideRequest = serde_json::from_str(
             r#"{"user_email":"sam@o2.ai","start_at":1,"end_at":2}"#,
         )
         .unwrap();
-        assert_eq!(body.slot, None);
+        assert_eq!(body.rotation_id, None, "absent means the team's primary");
         assert_eq!(body.covering_for, None);
 
         let named: CreateOverrideRequest = serde_json::from_str(
-            r#"{"slot":"secondary","user_email":"sam@o2.ai","start_at":1,"end_at":2}"#,
+            r#"{"rotation_id":"Secondary","user_email":"sam@o2.ai","start_at":1,"end_at":2}"#,
         )
         .unwrap();
-        assert_eq!(named.slot.as_deref(), Some("secondary"));
+        assert_eq!(named.rotation_id.as_deref(), Some("Secondary"));
     }
 
-    /// The grid is drawn one slot at a time; omitting the parameter is the
-    /// single-pool team's whole experience of slots.
+    /// The grid is drawn one rotation at a time; omitting the parameter draws
+    /// the primary, which is the row a calendar opens on.
     #[test]
-    fn test_the_resolved_schedule_slot_is_optional() {
+    fn test_the_resolved_schedule_rotation_is_optional() {
         let q: ResolvedScheduleQuery = serde_json::from_str(r#"{"from":1,"to":2}"#).unwrap();
-        assert_eq!(q.slot, None);
+        assert_eq!(q.rotation_id, None);
         let q: ResolvedScheduleQuery =
-            serde_json::from_str(r#"{"from":1,"to":2,"slot":"secondary"}"#).unwrap();
-        assert_eq!(q.slot.as_deref(), Some("secondary"));
+            serde_json::from_str(r#"{"from":1,"to":2,"rotation_id":"rot_2"}"#).unwrap();
+        assert_eq!(q.rotation_id.as_deref(), Some("rot_2"));
+    }
+
+    /// Both were stored, validated and honoured by the engine while the write
+    /// path had no field for them — so a policy could never leave the defaults.
+    /// Absent still means "leave unchanged", so a client that never sent them
+    /// keeps working.
+    #[test]
+    fn test_a_policy_body_can_now_set_repeat_count_and_final_action() {
+        let bare: SetPolicyRequest = serde_json::from_str(r#"{"rungs":[]}"#).unwrap();
+        assert_eq!(bare.repeat_count, None);
+        assert_eq!(bare.final_action, None);
+
+        let full: SetPolicyRequest = serde_json::from_str(
+            r#"{"rungs":[],"repeat_count":3,"final_action":"notify_default_team"}"#,
+        )
+        .unwrap();
+        assert_eq!(full.repeat_count, Some(3));
+        assert_eq!(
+            full.final_action,
+            Some(config::meta::oncall::FinalAction::NotifyDefaultTeam)
+        );
     }
 
     /// "I am away" is the common case, and it must not require the caller to

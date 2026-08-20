@@ -126,7 +126,7 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
             EscalationPolicy {
                 repeat_count,
                 final_action,
-                ..EscalationPolicy::default_for_team(m.id, m.org_id, m.team_id)
+                ..EscalationPolicy::whole_team_fallback(m.id, m.org_id, m.team_id)
             }
         }
     }
@@ -141,7 +141,27 @@ pub async fn get_or_create(org_id: &str, team_id: &str) -> Result<EscalationPoli
     if let Some(found) = get_by_team(org_id, team_id).await? {
         return Ok(found);
     }
-    let defaults = EscalationPolicy::default_for_team(ider::uuid(), org_id, team_id);
+    // The default ladder names the team's own rotations, so it has to read
+    // them. A policy that pointed at ids nobody staffed would look configured
+    // and page nobody — the exact failure the rotation rework removed from the
+    // schedule, and it must not reappear here.
+    let schedule = super::oncall_schedules::get_by_team(org_id, team_id).await?;
+    let rotations: Vec<&config::meta::oncall::Rotation> = schedule
+        .as_ref()
+        .map(|s| s.rotations.iter().filter(|r| r.validate().is_ok()).collect())
+        .unwrap_or_default();
+    let defaults = match rotations.first() {
+        Some(primary) => EscalationPolicy::default_for_team(
+            ider::uuid(),
+            org_id,
+            team_id,
+            primary.id.clone(),
+            rotations.get(1).map(|r| r.id.clone()),
+        ),
+        // A team with no rotations yet still needs a policy, and the whole team
+        // is the only target that resolves without one.
+        None => EscalationPolicy::whole_team_fallback(ider::uuid(), org_id, team_id),
+    };
     match insert(&defaults).await {
         Ok(created) => Ok(created),
         // Another node created it between our read and our write; the unique
@@ -392,9 +412,14 @@ mod tests {
                 p.pages_anyone(AlertPriority::P1),
                 "`{bad}` must leave the team pageable"
             );
+            // The **whole-team** fallback, not the shipped default ladder.
+            // The default names the team's rotations by id, and this path has
+            // just failed to read the row those ids would have come from —
+            // guessing one would produce a level pointing at a position that
+            // may not exist, which pages nobody while looking configured.
             assert_eq!(
                 p,
-                EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()))
+                EscalationPolicy::whole_team_fallback("pol_1", "default", "team_1")
             );
         }
     }

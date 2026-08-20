@@ -43,7 +43,7 @@ pub use agent::{
     severity_pages, update_channels, verdict_lines,
 };
 pub use contact::{Contact, ContactError, normalize_phone};
-pub use target::{EscalationTarget, TargetError};
+pub use target::{EscalationTarget, RotationMode, TargetError};
 pub use policy::{
     AfterRung, BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, Channel, ChannelBreaker,
     DEFAULT_PAGING_PRIORITY, DEFAULT_REPEAT_COUNT, EscalationPolicy, FALLBACK_ORDER, FinalAction,

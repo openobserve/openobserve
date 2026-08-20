@@ -700,6 +700,67 @@ impl EscalationPolicy {
         }
     }
 
+    /// A ladder that pages the whole team, on the shipped timings.
+    ///
+    /// For the one caller that needs a policy and cannot know the team's
+    /// rotations: the stored rungs would not parse. Guessing a rotation id
+    /// there would be worse than useless — it would name a position that may
+    /// not exist and page nobody — so this falls back to the one target that
+    /// is always resolvable.
+    ///
+    /// Loud on purpose: a team whose policy failed to read pages *everybody*,
+    /// which somebody will notice and fix, rather than pages nobody, which
+    /// nobody notices until an outage.
+    pub fn whole_team_fallback(
+        id: impl Into<String>,
+        org_id: impl Into<String>,
+        team_id: impl Into<String>,
+    ) -> Self {
+        use AlertPriority::*;
+        let m = MICROS_PER_MINUTE;
+        let everybody = |delays: &[i64]| PriorityRung {
+            priority: P1,
+            steps: delays
+                .iter()
+                .map(|d| LadderStep::new(*d, vec![EscalationTarget::WholeTeam]))
+                .collect(),
+            channels: vec![Channel::Email],
+        };
+        Self {
+            id: id.into(),
+            org_id: org_id.into(),
+            team_id: team_id.into(),
+            destinations: vec![],
+            l0: super::agent::L0Policy::defaults(),
+            repeat_count: DEFAULT_REPEAT_COUNT,
+            final_action: FinalAction::Stop,
+            rungs: vec![
+                PriorityRung {
+                    priority: P1,
+                    ..everybody(&[0, 5 * m, 15 * m, 30 * m])
+                },
+                PriorityRung {
+                    priority: P2,
+                    ..everybody(&[0, 15 * m, 30 * m])
+                },
+                PriorityRung {
+                    priority: P3,
+                    ..everybody(&[0, 30 * m])
+                },
+                PriorityRung {
+                    priority: P4,
+                    steps: vec![],
+                    channels: vec![],
+                },
+                PriorityRung {
+                    priority: P5,
+                    steps: vec![],
+                    channels: vec![],
+                },
+            ],
+        }
+    }
+
     pub fn rung(&self, priority: AlertPriority) -> Option<&PriorityRung> {
         self.rungs.iter().find(|r| r.priority == priority)
     }

@@ -190,10 +190,10 @@ pub async fn put_override(record: &ScheduleOverride) -> Result<(), errors::Error
         id: record.id.clone(),
         org_id: record.org_id.clone(),
         team_id: record.team_id.clone(),
-        // Carried, not defaulted: the slot IS which position the cover stands
+        // Carried, not defaulted: this IS which position the cover stands
         // over, and a replica that guessed at it would cover a different
         // rotation from the region that wrote it.
-        slot: record.slot.clone(),
+        rotation_id: record.rotation_id.clone(),
         user_email: record.user_email.clone(),
         covering_for: record.covering_for.clone(),
         start_at: record.start_at,
