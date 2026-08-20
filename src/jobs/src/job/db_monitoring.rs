@@ -17,9 +17,11 @@
 //!
 //! A dedicated windowed job — structurally the service-graph job
 //! (scheduler-role-only, `spawn_pausable_job!`) but with NO enterprise cfg and
-//! paced on the rollup's fixed cadence
-//! (`openobserve_core::traces::db_monitoring::rollup::ROLLUP_INTERVAL_SECS`,
-//! 900 s — a const, not config: DBM's only knob is `ZO_DB_MONITORING_ENABLED`).
+//! paced on the rollup's configured cadence
+//! (`openobserve_core::traces::db_monitoring::rollup::rollup_interval_secs`,
+//! `ZO_DB_MONITORING_ROLLUP_INTERVAL_SECS`, default 900 s, clamped to
+//! [60, 3600]). The cadence is read once when the job is spawned, so a changed
+//! interval takes effect on restart.
 //!
 //! The cfg-free shape is not an oversight. Parts of DBM's READ surface are
 //! enterprise-only (deadlocks, blocked queries, table health), but this job
@@ -45,7 +47,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     spawn_pausable_job!(
         "db_monitoring_rollup",
-        openobserve_core::traces::db_monitoring::rollup::ROLLUP_INTERVAL_SECS,
+        openobserve_core::traces::db_monitoring::rollup::rollup_interval_secs(),
         {
             log::debug!("[DB_MONITORING::JOB] Running db stats rollup");
             if let Err(e) =

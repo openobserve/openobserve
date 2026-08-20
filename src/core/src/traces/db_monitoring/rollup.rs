@@ -57,15 +57,86 @@ pub const O2_DB_STATS_STREAM: &str = "_o2_db_stats";
 /// exactly-the-cap rule to set `tail_truncated`.
 pub(crate) const SEARCH_SIZE: usize = 100000;
 
-/// Rollup window / job cadence in seconds. A fixed operational constant, not
-/// config: it was an env knob (same default) until the DBM config collapsed to
-/// the single `ZO_DB_MONITORING_ENABLED` switch. The read side sizes its
-/// live-tail cap and history backfill windows from this same value.
-pub const ROLLUP_INTERVAL_SECS: u64 = 900;
+/// Rollup window / job cadence in seconds, from
+/// `ZO_DB_MONITORING_ROLLUP_INTERVAL_SECS` (default 900).
+///
+/// This is the FRESHNESS FLOOR of every rollup-backed page: rolled-up data is
+/// up to one interval stale, and the read path covers the remainder with a live
+/// delta query over the un-rolled-up spans. Lowering it shrinks that delta —
+/// the delta is a full aggregation over its window, so its cost scales with the
+/// interval — at the cost of a more frequent job and more `_o2_db_stats` rows.
+///
+/// Read through this accessor, never cached in a `static`: the job cadence, the
+/// delta cap and the history backfill windows must all agree within a process,
+/// and a value captured once at startup would disagree with a reloaded config.
+///
+/// Clamped to [60, 3600]. Below 60 s the job would spend more time starting
+/// windows than aggregating them; above an hour the delta grows unbounded and
+/// the read path degrades to a full-window scan on every miss.
+pub fn rollup_interval_secs() -> u64 {
+    config::get_config()
+        .db_monitoring
+        .rollup_interval_secs
+        .clamp(60, 3600)
+}
+
+/// How many rollup intervals of raw spans one delta read may span.
+///
+/// The delta aggregates RAW SPANS; its cost scales with the window it covers.
+/// When the rollup job is healthy the window is under one interval and this
+/// bound never binds. When the job STALLS, `offset` falls arbitrarily far
+/// behind and an unbounded delta would try to aggregate every span since the
+/// stall — on a busy stream that is hours of raw data on a user's page load,
+/// growing without limit for as long as the job stays down. That is the one
+/// shape a read path must never take: the harder the system is struggling, the
+/// more expensive every page becomes.
+///
+/// So a stalled job degrades into STALENESS instead, which the response already
+/// knows how to say: `tail_covers_from` later than `data_through` is precisely
+/// "the gap between these two is covered by neither source", and the UI draws
+/// its staleness banner from it. Bounded wrong-but-labelled beats unbounded
+/// right.
+///
+/// Four intervals (1 h at the 900 s default) is the same catch-up budget the
+/// WRITER gives itself per tick (`MAX_CATCHUP_WINDOWS`), so a reader never asks
+/// for a wider span of raw spans than the rollup would process in one go.
+pub(crate) const MAX_DELTA_INTERVALS: i64 = 4;
+
+/// The earliest instant a delta may read from, given the caller's window.
+///
+/// `[max(offset, q_start, q_end − MAX_DELTA_INTERVALS × interval), q_end]`.
+/// The first two terms are the honest answer — start where the rollup stopped,
+/// but never before what was asked for. The third is the guard rail: whatever
+/// the rollup's state, one read never spans more than the catch-up budget.
+pub(crate) fn delta_start(offset: i64, q_start: i64, q_end: i64) -> i64 {
+    let budget = MAX_DELTA_INTERVALS.saturating_mul(rollup_interval_secs() as i64 * 1_000_000);
+    offset
+        .max(q_start)
+        .max(q_end.saturating_sub(budget))
+        .min(q_end)
+}
+
+/// Floor `t` (µs) to the rollup interval grid.
+///
+/// The grid is what makes a DELTA row and a ROLLUP row the same kind of thing:
+/// both are a per-fingerprint aggregate stamped at a window boundary, so the
+/// result cache can slice them on aligned boundaries (`calculate_deltas` takes
+/// its no-`+1` branch only for grid-aligned aggregates) and a delta row for a
+/// window is later SUPERSEDED by the rollup's own row for that window rather
+/// than double-counted beside it.
+///
+/// Stamping raw `now` instead would put every execution on its own boundary:
+/// the cache could never match two entries, and two overlapping deltas for the
+/// same window would both survive the merge — the +33% shape
+/// `stats_read_range` already documents.
+pub(crate) fn floor_to_grid(t: i64) -> i64 {
+    let w = rollup_interval_secs() as i64 * 1_000_000;
+    if w <= 0 { t } else { t - t.rem_euclid(w) }
+}
 
 /// Query fingerprints kept per (db system, instance) per rollup window; the
-/// rest folds into an 'other' bucket. Fixed for the same reason as
-/// [`ROLLUP_INTERVAL_SECS`], carrying the old knob's default.
+/// rest folds into an 'other' bucket. Fixed (unlike the interval), carrying
+/// the old knob's default.
 pub const ROLLUP_TOP_N: usize = 200;
 
 /// Catch-up cap: never scan more than this many windows per (stream, tick).
@@ -131,13 +202,19 @@ fn metric_block(has_rows_col: bool) -> String {
 /// `SUM(total_time_ns)` per (system, instance, fingerprint) → `DENSE_RANK` per
 /// (system, instance) ordered by that fingerprint total → keep `rnk <= top_n`,
 /// retaining ALL constituent rows of each winning fingerprint.
-pub(crate) fn build_rank_sql(stream_name: &str, top_n: usize, has_rows_col: bool) -> String {
+pub(crate) fn build_rank_sql(
+    stream_name: &str,
+    top_n: usize,
+    has_rows_col: bool,
+    window_end: i64,
+) -> String {
     let metrics = metric_block(has_rows_col);
     format!(
         r#"SELECT * FROM (
   SELECT *, DENSE_RANK() OVER (PARTITION BY db_system, db_instance ORDER BY fp_total DESC) AS rnk FROM (
     SELECT *, SUM(total_time_ns) OVER (PARTITION BY db_system, db_instance, fingerprint) AS fp_total FROM (
 SELECT
+    {window_end} AS _timestamp,
     o2_db_fingerprint AS fingerprint,
     max(o2_db_query_norm) AS query_norm,
     o2_db_system AS db_system,
@@ -168,10 +245,11 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
 /// SETS on a live cluster (the UNION ALL shape is the live-verified one), and
 /// (b) without `GROUPING()` discriminator columns a genuinely-NULL group value
 /// would be ambiguous with the other grain's NULL marker.
-pub(crate) fn build_totals_sql(stream_name: &str, has_rows_col: bool) -> String {
+pub(crate) fn build_totals_sql(stream_name: &str, has_rows_col: bool, window_end: i64) -> String {
     let metrics = metric_block(has_rows_col);
     format!(
         r#"SELECT
+    {window_end} AS _timestamp,
     o2_db_system AS db_system,
     o2_db_instance AS db_instance,
     o2_db_namespace AS db_namespace,
@@ -182,6 +260,7 @@ WHERE o2_db_fingerprint IS NOT NULL
 GROUP BY o2_db_system, o2_db_instance, o2_db_namespace
 UNION ALL
 SELECT
+    {window_end} AS _timestamp,
     o2_db_system AS db_system,
     o2_db_instance AS db_instance,
     CAST(NULL AS STRING) AS db_namespace,
@@ -515,7 +594,7 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
         return Ok(());
     }
     let now = now_micros();
-    let window_micros = ROLLUP_INTERVAL_SECS as i64 * 1_000_000;
+    let window_micros = rollup_interval_secs() as i64 * 1_000_000;
 
     // Query the usage stream for recently-ingesting trace streams.
     let sql = r#"SELECT org_id, stream_name
@@ -764,8 +843,11 @@ async fn process_window(
     has_rows_col: bool,
 ) -> Result<(), anyhow::Error> {
     // (1) stage-1 rank query: top-N fingerprints per (system, instance).
-    let rank_sql = build_rank_sql(stream_name, ROLLUP_TOP_N, has_rows_col);
-    let stage1_rows = run_dbm_search(org_id, rank_sql, start_time, end_time).await?;
+    // `end_time` IS this window's grid boundary (the job walks the grid), and
+    // `to_record` re-stamps the same value — passing it keeps the row
+    // self-consistent between the two.
+    let rank_sql = build_rank_sql(stream_name, ROLLUP_TOP_N, has_rows_col, end_time);
+    let stage1_rows = run_dbm_search(org_id, None, rank_sql, start_time, end_time, false).await?;
     if stage1_rows.is_empty() {
         // Idle window — nothing to roll up, nothing to write.
         return Ok(());
@@ -774,11 +856,11 @@ async fn process_window(
     // (2) db_totals + class totals (one UNION ALL query) and (3) error_class:
     // independent of each other — only the empty-window early exit above
     // depends on stage 1 — so they run concurrently.
-    let totals_sql = build_totals_sql(stream_name, has_rows_col);
+    let totals_sql = build_totals_sql(stream_name, has_rows_col, end_time);
     let error_sql = build_error_class_sql(stream_name);
     let (totals_rows, error_rows) = tokio::join!(
-        run_dbm_search(org_id, totals_sql, start_time, end_time),
-        run_dbm_search(org_id, error_sql, start_time, end_time)
+        run_dbm_search(org_id, None, totals_sql, start_time, end_time, false),
+        run_dbm_search(org_id, None, error_sql, start_time, end_time, false)
     );
     let (totals_rows, error_rows) = (totals_rows?, error_rows?);
 
@@ -820,6 +902,7 @@ pub(crate) fn dbm_search_request(
     end_time: i64,
     size: i64,
     timeout: i64,
+    use_cache: bool,
 ) -> config::meta::search::Request {
     config::meta::search::Request {
         query: config::meta::search::Query {
@@ -848,7 +931,7 @@ pub(crate) fn dbm_search_request(
         timeout,
         search_type: None,
         search_event_context: None,
-        use_cache: false,
+        use_cache,
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,
@@ -861,14 +944,45 @@ pub(crate) fn dbm_search_request(
 /// un-rolled-up span tail (design D4).
 pub(crate) async fn run_dbm_search(
     org_id: &str,
+    user_id: Option<&str>,
     sql: String,
     start_time: i64,
     end_time: i64,
+    use_cache: bool,
 ) -> Result<Vec<Value>, anyhow::Error> {
-    let req = dbm_search_request(sql, start_time, end_time, SEARCH_SIZE as i64, 300);
+    // `user_id` does NOT authorize the read — the search layer performs no
+    // permission check; that is the handler's job. It carries the role-derived
+    // query-range limit and the attribution every search task, cancellation and
+    // audit record is keyed on. `None` is for the two callers with no user to
+    // name: the background rollup WRITER, and the shared/cached delta, whose
+    // one computation answers every viewer of that window.
+
+    let req = dbm_search_request(sql, start_time, end_time, SEARCH_SIZE as i64, 300, use_cache);
 
     let trace_id = config::ider::generate();
-    let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
+    let resp = if use_cache {
+        search_service::cache::search(
+            &trace_id,
+            org_id,
+            StreamType::Traces,
+            user_id.map(str::to_string),
+            &req,
+            String::new(),
+            false,
+            None,
+            false,
+        )
+        .await?
+    } else {
+        crate::search::search(
+            &trace_id,
+            org_id,
+            StreamType::Traces,
+            user_id.map(str::to_string),
+            &req,
+        )
+        .await?
+    };
     // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
     // This harness feeds the rollup WRITER as well as the read APIs, so a torn
     // read absorbed here would not merely render a wrong page: it would persist
@@ -924,15 +1038,126 @@ mod tests {
 
     use super::*;
 
+    // ── Delta window bound ──────────────────────────────────────────────────
+
+    /// The healthy case: the rollup is current, so the delta starts at the
+    /// offset and the bound never binds.
+    #[test]
+    fn delta_start_follows_the_offset_when_the_rollup_is_healthy() {
+        let w = rollup_interval_secs() as i64 * 1_000_000;
+        let q_end = 100 * w;
+        let q_start = q_end - 10 * w;
+        // Offset within one interval of the request end — the normal state.
+        let offset = q_end - w / 2;
+        assert_eq!(delta_start(offset, q_start, q_end), offset);
+    }
+
+    /// THE REGRESSION THIS EXISTS FOR. A rollup stalled for days must not make
+    /// the delta read days of raw spans; it reads at most the catch-up budget,
+    /// and the uncovered span becomes staleness the response reports.
+    #[test]
+    fn delta_start_refuses_to_read_past_the_catch_up_budget() {
+        let w = rollup_interval_secs() as i64 * 1_000_000;
+        let q_end = 1_000 * w;
+        let q_start = 0;
+        let stalled_offset = q_end - 500 * w; // ~5 days behind at 900 s
+        let start = delta_start(stalled_offset, q_start, q_end);
+        assert_eq!(start, q_end - MAX_DELTA_INTERVALS * w);
+        assert!(
+            start > stalled_offset,
+            "a bound that does not bind is not a bound; the gap \
+             (offset, start) is the staleness the response must report"
+        );
+        assert!((q_end - start) <= MAX_DELTA_INTERVALS * w);
+    }
+
+    /// The caller's own window still wins when it is NARROWER than the budget:
+    /// a request for the last 5 minutes never reads an hour.
+    #[test]
+    fn delta_start_never_reads_before_the_request() {
+        let w = rollup_interval_secs() as i64 * 1_000_000;
+        let q_end = 100 * w;
+        let q_start = q_end - w / 10; // a narrow, recent window
+        // Offset far behind AND budget wider than the request: q_start wins.
+        assert_eq!(delta_start(q_end - 900 * w, q_start, q_end), q_start);
+    }
+
+    /// A window already fully rolled up leaves nothing to do, and the window
+    /// can never invert.
+    #[test]
+    fn delta_start_never_inverts_the_window() {
+        let w = rollup_interval_secs() as i64 * 1_000_000;
+        let q_end = 100 * w;
+        let q_start = q_end - 10 * w;
+        // Rollup is AHEAD of the requested end — historical, fully covered.
+        assert_eq!(delta_start(q_end + 50 * w, q_start, q_end), q_end);
+        // Degenerate bounds must not panic or wrap.
+        assert!(delta_start(i64::MIN, i64::MIN, q_end) <= q_end);
+        assert!(delta_start(0, 0, 0) == 0);
+    }
+
+    // ── Grid alignment (delta caching) ──────────────────────────────────────
+
+    /// The delta and the rollup must stamp the SAME lattice. If they drift, a
+    /// cached delta row and the rollup row for the same window stop being the
+    /// same window: the merge (`merge_rows` sums additive metrics) would count
+    /// both — the +33% shape `stats_read_range` already documents live.
+    #[test]
+    fn floor_to_grid_lands_on_window_boundaries() {
+        let w = rollup_interval_secs() as i64 * 1_000_000;
+        assert!(w > 0);
+        // Any instant inside a window floors to that window's start.
+        for probe in [0_i64, 1, w - 1, w, w + 1, 5 * w + 7] {
+            let f = floor_to_grid(probe);
+            assert_eq!(f % w, 0, "{probe} floored to {f}, not on the grid");
+            assert!(f <= probe && probe - f < w, "{probe} floored outside its own window");
+        }
+    }
+
+    /// Idempotence is what lets two requests in the same window share a cache
+    /// entry: stamping raw `now` would give every execution its own boundary
+    /// and the cache could never match two entries.
+    #[test]
+    fn floor_to_grid_is_idempotent_within_one_window() {
+        let w = rollup_interval_secs() as i64 * 1_000_000;
+        let base = 1_700_000_000_000_000_i64;
+        let a = floor_to_grid(base);
+        assert_eq!(a, floor_to_grid(a));
+        // Two instants in the SAME window agree; the next window does not.
+        assert_eq!(floor_to_grid(a + 1), floor_to_grid(a + w - 1));
+        assert_ne!(floor_to_grid(a), floor_to_grid(a + w));
+    }
+
+    /// Negative/zero inputs must not panic or wrap: `rem_euclid` keeps the
+    /// floor below the input on both sides of the epoch.
+    #[test]
+    fn floor_to_grid_handles_non_positive_inputs() {
+        let w = rollup_interval_secs() as i64 * 1_000_000;
+        assert_eq!(floor_to_grid(0), 0);
+        let f = floor_to_grid(-1);
+        assert!(f <= -1 && f % w == 0, "negative input floored to {f}");
+    }
+
+    /// The writer stamps `end_time` and `to_record` re-stamps the same value,
+    /// so the row is self-consistent. Asserted on the builder because that is
+    /// where a future edit would silently diverge.
+    #[test]
+    fn rank_sql_stamp_is_the_window_end_the_writer_passes() {
+        let end = 1_700_000_900_000_000_i64;
+        let sql = build_rank_sql("s", 10, false, end);
+        assert!(sql.contains(&format!("{end} AS _timestamp")));
+    }
+
     // ── SQL builders: exact strings ─────────────────────────────────────────
 
     #[test]
     fn test_rank_sql_exact_with_rows_columns() {
-        let sql = build_rank_sql("otel_demo", 200, true);
+        let sql = build_rank_sql("otel_demo", 200, true, 1_700_000_900_000_000);
         let expected = r#"SELECT * FROM (
   SELECT *, DENSE_RANK() OVER (PARTITION BY db_system, db_instance ORDER BY fp_total DESC) AS rnk FROM (
     SELECT *, SUM(total_time_ns) OVER (PARTITION BY db_system, db_instance, fingerprint) AS fp_total FROM (
 SELECT
+    1700000900000000 AS _timestamp,
     o2_db_fingerprint AS fingerprint,
     max(o2_db_query_norm) AS query_norm,
     o2_db_system AS db_system,
@@ -966,7 +1191,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
     // must never reference it (a missing column is a hard error, not NULL).
     #[test]
     fn test_rank_sql_omits_rows_columns_when_absent() {
-        let sql = build_rank_sql("s", 50, false);
+        let sql = build_rank_sql("s", 50, false, 0);
         assert!(!sql.contains("db_response_returned_rows"));
         assert!(!sql.contains("rows_returned"));
         assert!(sql.contains("COUNT(DISTINCT trace_id) AS traces\nFROM \"s\""));
@@ -980,9 +1205,14 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
     // filter. (No time bound to assert: the window is the request payload's.)
     #[test]
     fn test_totals_sql_shape() {
-        let sql = build_totals_sql("s", false);
+        let sql = build_totals_sql("s", false, 1_700_000_900_000_000);
         assert_eq!(sql.matches("UNION ALL").count(), 1);
         let (ns_arm, class_arm) = sql.split_once("UNION ALL").unwrap();
+        // BOTH arms must carry the grid stamp: a UNION arm without it would
+        // emit NULL `_timestamp` rows the result cache cannot place, and the
+        // cache would silently decline the whole query.
+        assert!(ns_arm.contains("1700000900000000 AS _timestamp"));
+        assert!(class_arm.contains("1700000900000000 AS _timestamp"));
         // Namespace grain: stmt_class = NULL marker.
         assert!(ns_arm.contains("o2_db_namespace AS db_namespace"));
         assert!(ns_arm.contains("CAST(NULL AS STRING) AS stmt_class"));
