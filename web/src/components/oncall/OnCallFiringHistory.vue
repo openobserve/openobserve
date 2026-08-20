@@ -21,10 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   that needs its threshold tuned.
 -->
 <template>
-  <OCard variant="outlined" data-test="oncall-firing-history">
-    <OCardSection role="body">
-      <h2 class="text-text-heading text-lg">{{ t("oncall.firingHistory") }}</h2>
-      <p class="text-text-muted mb-3 text-xs">{{ t("oncall.firingHistoryHint") }}</p>
+  <OCard variant="glass" data-test="oncall-firing-history">
+    <OCardSection role="header" dense>
+      <OText variant="card-title">{{ t("oncall.firingHistory") }}</OText>
+    </OCardSection>
+
+    <OCardSection role="body" dense>
+      <p class="text-text-secondary mb-3 text-xs">{{ t("oncall.firingHistoryHint") }}</p>
 
       <OTable
         :data="firings"
@@ -47,14 +50,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-acked_by="{ row }">
           <OUserCell v-if="row.acked_by" :value="row.acked_by" />
-          <span v-else class="text-text-muted text-sm">{{ t("oncall.neverAcknowledged") }}</span>
+          <span v-else class="text-text-secondary text-sm">{{
+            t("oncall.neverAcknowledged")
+          }}</span>
         </template>
 
         <template #cell-cause="{ row }">
           <OTag v-if="row.cause" variant="amber-soft" size="sm">
             {{ t(`oncall.cause_${row.cause}`) }}
           </OTag>
-          <span v-else class="text-text-muted text-sm">{{ ABSENT }}</span>
+          <span v-else class="text-text-secondary text-sm">{{ ABSENT }}</span>
         </template>
 
         <!-- A subject firing for the first time is the normal case, not an
@@ -83,6 +88,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 

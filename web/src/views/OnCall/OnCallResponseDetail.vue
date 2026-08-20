@@ -219,8 +219,14 @@
                  analysis panel that sits empty forever. -->
             <OnCallVerdictCard :events="events" />
 
-            <OCard variant="outlined" data-test="oncall-response-activity">
-              <OCardSection role="body">
+            <OCard variant="glass" data-test="oncall-response-activity">
+              <!-- Every other pane on this page names itself; this one did not,
+                   so the thread began mid-air under a bare border. -->
+              <OCardSection role="header" dense>
+                <OText variant="card-title">{{ t("oncall.tabActivity") }}</OText>
+              </OCardSection>
+
+              <OCardSection role="body" dense>
                 <OnCallTimeline :events="events" :opened-at="response.opened_at" />
 
                 <!-- Pinned under the thread it appends to. A note is a comment. -->
@@ -277,6 +283,7 @@
               :deliveries="deliveries"
               :handover-at="handoverAt"
               :handover-to="handoverTo"
+              :closed-at="response.closed_at"
             />
 
             <OnCallEscalation
@@ -332,7 +339,7 @@
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <p class="text-text-muted text-sm" data-test="oncall-handoff-hint">
+        <p class="text-text-secondary text-sm" data-test="oncall-handoff-hint">
           {{ handoffMode === "team" ? t("oncall.handoffTeamHint") : t("oncall.handoffPersonHint") }}
         </p>
 
@@ -386,7 +393,7 @@
       data-test="oncall-confirm-recovery-dialog"
     >
       <div class="flex flex-col gap-3">
-        <p class="text-text-muted text-sm">{{ t("oncall.confirmRecoveryMessage") }}</p>
+        <p class="text-text-secondary text-sm">{{ t("oncall.confirmRecoveryMessage") }}</p>
         <OInput
           v-model="recoveryNote"
           :label="t('oncall.confirmRecoveryNote')"
@@ -419,7 +426,7 @@
       data-test="oncall-promote-dialog"
     >
       <div class="flex flex-col gap-3">
-        <p class="text-text-muted text-sm">{{ t("oncall.promoteMessage") }}</p>
+        <p class="text-text-secondary text-sm">{{ t("oncall.promoteMessage") }}</p>
 
         <OInput
           v-model="promoteTitle"
@@ -434,8 +441,8 @@
              — it takes whatever string it is sent — so the picker is where it
              holds. -->
         <div class="flex flex-col gap-1">
-          <span class="text-text-label text-xs">{{ t("oncall.promoteSeverity") }}</span>
-          <span class="text-text-muted text-xs">{{ t("oncall.promoteSeverityHint") }}</span>
+          <span class="text-text-secondary text-xs">{{ t("oncall.promoteSeverity") }}</span>
+          <span class="text-text-secondary text-xs">{{ t("oncall.promoteSeverityHint") }}</span>
           <OSelect
             v-model="promoteSeverity"
             :options="severityOptions"
@@ -469,14 +476,14 @@
       data-test="oncall-resolve-dialog"
     >
       <div class="flex flex-col gap-3">
-        <p class="text-text-muted text-sm">{{ t("oncall.resolveMessage") }}</p>
+        <p class="text-text-secondary text-sm">{{ t("oncall.resolveMessage") }}</p>
 
         <!-- Asked HERE and nowhere else. A cause collected later is a cause
              never collected, and it is the only input the prior-causes panel
              has. -->
         <div class="flex flex-col gap-1">
-          <span class="text-text-label text-xs">{{ t("oncall.resolveCause") }}</span>
-          <span class="text-text-muted text-xs">{{ t("oncall.resolveCauseHint") }}</span>
+          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCause") }}</span>
+          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCauseHint") }}</span>
           <OSelect
             v-model="resolveCause"
             :options="causeOptions"
@@ -534,6 +541,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem, StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -793,40 +801,44 @@ const elapsedLabel = computed(() => {
 /// next rung. A dash is not the answer to "when does this escalate" — the
 /// answer is that it never will again, and each tile now says its own version
 /// of that instead of going blank.
-const escalatesIn = computed<{ value: I18nText | string; tone: StatTone }>(() => {
-  const r = response.value;
-  const progress = escalation.value;
-  if (r?.state === "resolved")
-    return { value: t("oncall.escalationResolvedShort"), tone: "neutral" };
-  if (r && isSnoozed(r)) return { value: t("oncall.escalationSnoozedShort"), tone: "warning" };
-  if (r?.state === "acknowledged") return { value: t("oncall.escalationAcked"), tone: "success" };
-  const remaining = progress?.next_at ? progress.next_at - nowMicros.value : null;
-  if (remaining && remaining > 0) {
-    return {
-      value: formatMicrosDuration(remaining),
-      tone: remaining < 5 * 60 * 1_000_000 ? "error" : "neutral",
-    };
-  }
-  // Nothing is coming: either the ladder ran out with nobody answering, or it
-  // has not started. The first is the loudest fact on the page.
-  if (progress?.exhausted) return { value: t("oncall.statNobodyLeft"), tone: "error" };
-  return { value: t("oncall.escalationNotStarted"), tone: "neutral" };
-});
+/// `echoesState` marks the readings where this tile says nothing the title bar
+/// has not already said: "Acknowledged", "Resolved" and "Snoozed" are all tags
+/// beside the page title, and a tile repeating one of them is a fifth of the
+/// strip spent on a word already on screen. The countdown, "nobody left" and
+/// "not started" are readings that exist nowhere else, so those still get a
+/// tile.
+const escalatesIn = computed<{ value: I18nText | string; tone: StatTone; echoesState: boolean }>(
+  () => {
+    const r = response.value;
+    const progress = escalation.value;
+    if (r?.state === "resolved")
+      return { value: t("oncall.escalationResolvedShort"), tone: "neutral", echoesState: true };
+    if (r && isSnoozed(r))
+      return { value: t("oncall.escalationSnoozedShort"), tone: "warning", echoesState: true };
+    if (r?.state === "acknowledged")
+      return { value: t("oncall.escalationAcked"), tone: "success", echoesState: true };
+    const remaining = progress?.next_at ? progress.next_at - nowMicros.value : null;
+    if (remaining && remaining > 0) {
+      return {
+        value: formatMicrosDuration(remaining),
+        tone: remaining < 5 * 60 * 1_000_000 ? "error" : "neutral",
+        echoesState: false,
+      };
+    }
+    // Nothing is coming: either the ladder ran out with nobody answering, or it
+    // has not started. The first is the loudest fact on the page.
+    if (progress?.exhausted)
+      return { value: t("oncall.statNobodyLeft"), tone: "error", echoesState: false };
+    return { value: t("oncall.escalationNotStarted"), tone: "neutral", echoesState: false };
+  },
+);
 
 const summaryStats = computed<StatItem[]>(() => {
   const r = response.value;
   const openMicros = r ? nowMicros.value - r.opened_at : null;
   const acked = Boolean(r?.acked_at);
   const closed = Boolean(r?.closed_at);
-  return [
-    {
-      key: "escalatesIn",
-      label: t("oncall.statEscalatesIn"),
-      value: escalatesIn.value.value,
-      icon: "notifications-active",
-      tone: escalatesIn.value.tone,
-      dataTest: "oncall-stat-escalates-in",
-    },
+  const stats: StatItem[] = [
     {
       // Until somebody acks, "time to ack" is a clock still running, and
       // freezing it at a dash hid the number the SLA is measured on.
@@ -866,6 +878,19 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "oncall-stat-firing",
     },
   ];
+
+  if (!escalatesIn.value.echoesState) {
+    stats.unshift({
+      key: "escalatesIn",
+      label: t("oncall.statEscalatesIn"),
+      value: escalatesIn.value.value,
+      icon: "notifications-active",
+      tone: escalatesIn.value.tone,
+      dataTest: "oncall-stat-escalates-in",
+    });
+  }
+
+  return stats;
 });
 
 /// How far up the ladder a page got, said as the rung rather than as a delay.
@@ -1182,7 +1207,15 @@ async function fetchTeamContext() {
   const r = response.value;
   if (!r) return;
   const [slots, policyRes, reach] = await Promise.allSettled([
-    oncallService.whoIsOnCall({ org_identifier: orgId.value, team_id: r.team_id }),
+    // A closed record is history, and the live rotation is not its history:
+    // hours later the pager has moved on, and the rail named whoever holds it
+    // now as though they had been the one paged. The schedule endpoint answers
+    // as of any instant, so a closed record asks it about its own last moment.
+    oncallService.whoIsOnCall({
+      org_identifier: orgId.value,
+      team_id: r.team_id,
+      at: r.closed_at ?? undefined,
+    }),
     oncallService.getPolicy({ org_identifier: orgId.value, team_id: r.team_id }),
     oncallService.teamReachability({ org_identifier: orgId.value, team_id: r.team_id }),
   ]);
@@ -1201,6 +1234,10 @@ async function fetchHandover() {
   handoverTo.value = null;
   const r = response.value;
   if (!r) return;
+  // Who inherits the pager next is advice for a page somebody still has to
+  // carry. On a closed one it is a fact about next week's rota that nobody
+  // opened this record to read.
+  if (r.closed_at) return;
   const from = nowMicros.value;
   const to = from + 7 * 24 * 60 * 60 * 1_000_000;
   try {

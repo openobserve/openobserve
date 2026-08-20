@@ -116,9 +116,7 @@ describe("OnCallWhoIsOn", () => {
   /// walked further down, and without the number the choice looks arbitrary.
   it("says how far down the rotation the derived secondary sits", () => {
     const wrapper = render({
-      slots: [
-        { slot: "primary", rotation: "weekly", user_email: "ana@o2.ai", next_offset: 3 },
-      ],
+      slots: [{ slot: "primary", rotation: "weekly", user_email: "ana@o2.ai", next_offset: 3 }],
     });
     expect(wrapper.text()).toContain("3 further down the rotation");
   });
@@ -131,5 +129,44 @@ describe("OnCallWhoIsOn", () => {
     });
     expect(wrapper.text()).toContain("1700000000000000");
     expect(wrapper.text()).toContain("yuki@o2.ai");
+  });
+
+  /// A closed record is history. The roster it is given was resolved as of the
+  /// moment it closed, so the card has to read as a record of who carried it —
+  /// "on call right now" over a name from last Tuesday is a lie the card tells
+  /// about a person.
+  describe("once the page is closed", () => {
+    const closedProps = {
+      slots: [{ slot: "primary", rotation: "weekly", user_email: "ana@o2.ai", next_offset: 3 }],
+      closedAt: 1_700_000_000_000_000,
+    };
+
+    it("speaks about the shift in the past tense", () => {
+      const wrapper = render(closedProps);
+      expect(wrapper.text()).toContain("Who was on this");
+      expect(wrapper.text()).toContain("On call at the time");
+      expect(wrapper.text()).not.toContain("On call right now");
+      expect(wrapper.text()).toContain("ana@o2.ai");
+    });
+
+    /// Both rows are advice about a pager somebody still has to carry.
+    it("drops the handover and the rotation's next seat", () => {
+      const wrapper = render({
+        ...closedProps,
+        handoverAt: 1_700_000_000_000_000,
+        handoverTo: "yuki@o2.ai",
+      });
+      expect(wrapper.text()).not.toContain("yuki@o2.ai");
+      expect(wrapper.text()).not.toContain("further down the rotation");
+    });
+
+    /// An unstaffed rotation is an emergency while a page is open and a plain
+    /// fact after it closed.
+    it("states an empty roster without alarming about it", () => {
+      const wrapper = render({ slots: [], closedAt: 1_700_000_000_000_000 });
+      const nobody = wrapper.find('[data-test="oncall-who-is-on-nobody"]');
+      expect(nobody.text()).toContain("when this page closed");
+      expect(nobody.classes()).not.toContain("text-status-error-text");
+    });
   });
 });

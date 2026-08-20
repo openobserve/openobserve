@@ -113,6 +113,15 @@ describe("OnCallAboutPage", () => {
     expect(render().find('[data-test="oncall-about-routing-reason"]').exists()).toBe(false);
   });
 
+  /// An alert that names its own team was never routed: no rule was consulted
+  /// and none could have changed the outcome. The row would be a label, a
+  /// sentence saying nothing happened, and a link to rules that had no say.
+  it("omits the routing row when the alert named the team itself", () => {
+    const wrapper = render({ routingReason: "routed to tm_9 by the alert's own setting" });
+    expect(wrapper.find('[data-test="oncall-about-routing-reason"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-open-routing"]').exists()).toBe(false);
+  });
+
   /// The id here IS the rule that woke somebody, and the trip to change it was
   /// a copy-paste into the alert list's search box. The editor lives on the
   /// list route behind `action=update` — `AlertDetail` navigates the same way.

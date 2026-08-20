@@ -75,11 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("oncall.rungReachedNobodyRetrying") }}
             </OTag>
-            <span class="text-text-muted text-xs">{{ formatAt(event.at) }}</span>
-            <span class="text-text-muted text-xs">{{ relativeTo(event.at) }}</span>
+            <span class="text-text-secondary text-xs">{{ formatAt(event.at) }}</span>
+            <span class="text-text-secondary text-xs">{{ relativeTo(event.at) }}</span>
           </div>
           <p class="text-text-body text-sm break-words">{{ raw(event.body) }}</p>
-          <p class="text-text-muted text-xs">{{ raw(event.actor) }}</p>
+          <p class="text-text-secondary text-xs">{{ raw(event.actor) }}</p>
         </div>
       </li>
     </ol>

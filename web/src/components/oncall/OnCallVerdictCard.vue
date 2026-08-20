@@ -34,15 +34,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   (asked-for beside applied, including the clamped and refused cases).
 -->
 <template>
-  <OCard v-if="verdict" variant="outlined" data-test="oncall-verdict-card">
-    <OCardSection role="body" class="flex flex-col gap-2">
-      <span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <OText variant="panel-title">{{ t("oncall.verdictTitle") }}</OText>
-        <span class="text-text-secondary text-xs">
-          {{ raw(verdict.actor) }} · <OTimeCell :value="verdict.at" unit="us" />
-        </span>
+  <OCard v-if="verdict" variant="glass" data-test="oncall-verdict-card">
+    <OCardSection role="header" dense class="flex-wrap">
+      <OText variant="card-title">{{ t("oncall.verdictTitle") }}</OText>
+      <span class="text-text-secondary text-xs">
+        {{ raw(verdict.actor) }} · <OTimeCell :value="verdict.at" unit="us" />
       </span>
+    </OCardSection>
 
+    <OCardSection role="body" dense class="flex flex-col gap-2">
       <p class="text-text-body text-sm" data-test="oncall-verdict-body">
         {{ raw(verdict.body) }}
       </p>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- The verdict never edits the page that already went out — it rides as
          one follow-up. Saying so heads off "why didn't my page update". -->
-      <span class="text-text-muted text-xs">{{ t("oncall.verdictFollowUpNote") }}</span>
+      <span class="text-text-secondary text-xs">{{ t("oncall.verdictFollowUpNote") }}</span>
     </OCardSection>
   </OCard>
 </template>

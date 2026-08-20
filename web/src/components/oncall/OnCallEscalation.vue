@@ -23,21 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   row with a count, which is also how a human describes it out loud.
 -->
 <template>
-  <OCard variant="outlined" data-test="oncall-escalation">
-    <OCardSection role="body">
-      <span class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <OText variant="panel-title">{{ t("oncall.escalation") }}</OText>
-        <OButton
-          v-if="teamId"
-          variant="ghost"
-          size="xs"
-          data-test="oncall-escalation-edit"
-          @click="emit('edit')"
-        >
-          {{ t("oncall.edit") }}
-        </OButton>
-      </span>
+  <OCard variant="glass" data-test="oncall-escalation">
+    <OCardSection role="header" dense class="justify-between">
+      <OText variant="card-title">{{ t("oncall.escalation") }}</OText>
+      <OButton
+        v-if="teamId"
+        variant="ghost"
+        size="xs"
+        data-test="oncall-escalation-edit"
+        @click="emit('edit')"
+      >
+        {{ t("oncall.edit") }}
+      </OButton>
+    </OCardSection>
 
+    <OCardSection role="body" dense>
       <!-- D-21: an impacted record is a liaison seat, and its ladder is
            deliberately two rungs — the opening page and one chase — with no
            repeat and no handoff. Unexplained, that reads as a ladder somebody
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <p
         v-if="!groups.length"
-        class="text-text-muted mb-3 text-sm"
+        class="text-text-secondary mb-3 text-sm"
         data-test="oncall-escalation-none"
       >
         {{ t("oncall.ladderNothingSent") }}
@@ -76,7 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="text-text-body min-w-0 flex-1 text-sm">
               {{ group.said }}
-              <span v-if="group.everyLabel" class="text-text-muted">{{ group.everyLabel }}</span>
+              <span v-if="group.everyLabel" class="text-text-secondary">{{
+                group.everyLabel
+              }}</span>
             </span>
 
             <!-- `/escalation` cannot say this (§G.9 #6): a fired rung that
@@ -109,7 +111,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("oncall.rungMatchedNobody") }}
             </OTag>
-            <OTimeCell v-else class="text-text-muted shrink-0" :value="group.lastAt" unit="us" />
+            <OTimeCell
+              v-else
+              class="text-text-secondary shrink-0"
+              :value="group.lastAt"
+              unit="us"
+            />
           </div>
         </OTimelineItem>
 
@@ -121,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span class="min-w-0 flex-1 text-sm" :class="endTone">{{ endLabel }}</span>
-            <OTimeCell v-if="endAt" class="text-text-muted shrink-0" :value="endAt" unit="us" />
+            <OTimeCell v-if="endAt" class="text-text-secondary shrink-0" :value="endAt" unit="us" />
           </div>
         </OTimelineItem>
       </OTimeline>

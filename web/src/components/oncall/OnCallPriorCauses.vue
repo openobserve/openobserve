@@ -15,16 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard variant="outlined" data-test="oncall-prior-causes">
-    <OCardSection role="body">
-      <h2 class="text-text-heading text-lg">{{ t("oncall.priorCauses") }}</h2>
-      <p class="text-text-muted mb-3 text-xs">{{ t("oncall.priorCausesHint") }}</p>
+  <OCard variant="glass" data-test="oncall-prior-causes">
+    <OCardSection role="header" dense>
+      <OText variant="card-title">{{ t("oncall.priorCauses") }}</OText>
+    </OCardSection>
+
+    <OCardSection role="body" dense>
+      <p class="text-text-secondary mb-3 text-xs">{{ t("oncall.priorCausesHint") }}</p>
 
       <!-- An org with no history yet is told how the history gets made, rather
            than being shown an empty box it cannot act on. -->
       <p
         v-if="!groups.length"
-        class="text-text-muted text-sm"
+        class="text-text-secondary text-sm"
         data-test="oncall-prior-causes-empty"
       >
         {{ t("oncall.priorCausesEmpty") }}
@@ -42,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTag>
           <div class="flex-1">
             <div class="text-text-body text-sm">{{ t(`oncall.cause_${group.cause}`) }}</div>
-            <div v-if="group.note" class="text-text-muted text-xs">
+            <div v-if="group.note" class="text-text-secondary text-xs">
               {{ raw(group.note) }}
             </div>
           </div>
@@ -65,6 +68,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import type { CauseGroup, ResolutionCause } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 

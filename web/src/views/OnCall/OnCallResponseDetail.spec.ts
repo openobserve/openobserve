@@ -125,7 +125,7 @@ const stubs = {
   },
   OnCallWhoIsOn: {
     name: "OnCallWhoIsOn",
-    props: ["slots", "deliveries", "handoverAt", "handoverTo"],
+    props: ["slots", "deliveries", "handoverAt", "handoverTo", "closedAt"],
     template: "<div />",
   },
   OnCallAboutPage: {
@@ -884,6 +884,37 @@ describe("OnCallResponseDetail", () => {
 
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("handoverTo")).toBe(null);
     });
+
+    /// Hours after a page closes the pager has moved on, and the rail named
+    /// whoever holds it now as though they had been the one woken. The
+    /// schedule answers as of any instant, so a closed record asks about its
+    /// own last moment instead of about this one.
+    it("resolves the roster as of the moment a closed record closed", async () => {
+      const closedAt = 1_700_000_000_000_000 + HOUR_MICROS;
+      const wrapper = await renderWith({ state: "resolved", closed_at: closedAt });
+
+      expect(service.whoIsOnCall).toHaveBeenCalledWith(
+        expect.objectContaining({ at: closedAt }),
+      );
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("closedAt")).toBe(closedAt);
+    });
+
+    /// Who inherits the pager next is advice for a page somebody still has to
+    /// carry; on a closed one it is a fact about next week's rota.
+    it("asks for no handover once the record is closed", async () => {
+      await renderWith({ state: "resolved", closed_at: 1_700_000_000_000_000 + HOUR_MICROS });
+
+      expect(service.resolvedSchedule).not.toHaveBeenCalled();
+    });
+
+    /// An open record keeps asking about now — `at` unset is the live rotation.
+    it("keeps asking about now while the page is open", async () => {
+      await renderWith();
+
+      expect(service.whoIsOnCall).toHaveBeenCalledWith(
+        expect.objectContaining({ at: undefined }),
+      );
+    });
   });
 
   /// `runbook_url` is hoisted onto the record by the API precisely so this
@@ -972,6 +1003,23 @@ describe("OnCallResponseDetail", () => {
     const ack = items.find((i) => i.key === "ack")!;
     expect(ack.label).toBe("Time to ack");
     expect(ack.value).toContain("1h");
+  });
+
+  /// The state tag sits beside the page title. A tile whose whole reading is
+  /// that same word spends a fifth of the strip repeating what is already on
+  /// screen, so it stands down and leaves the four measurements.
+  it("drops the escalation tile once its reading is the state tag over again", async () => {
+    const wrapper = await renderWith({
+      state: "acknowledged",
+      acked_by: "engineer@example.com",
+      acked_at: 1_700_000_000_000_000 + HOUR_MICROS,
+    });
+    const items = wrapper.findComponent({ name: "OStatStrip" }).props("items") as {
+      key: string;
+    }[];
+
+    expect(items.find((i) => i.key === "escalatesIn")).toBeUndefined();
+    expect(items.map((i) => i.key)).toEqual(["ack", "resolve", "reachedRung", "firing"]);
   });
 });
 

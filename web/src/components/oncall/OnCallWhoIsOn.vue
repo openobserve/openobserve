@@ -26,16 +26,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   name — otherwise "why that person" has no answer on any screen.
 -->
 <template>
-  <OCard variant="outlined" data-test="oncall-who-is-on">
-    <OCardSection role="body">
-      <OText variant="panel-title" class="mb-3 block">{{ t("oncall.whoIsOnThis") }}</OText>
+  <OCard variant="glass" data-test="oncall-who-is-on">
+    <OCardSection role="header" dense>
+      <OText variant="card-title">{{
+        closed ? t("oncall.whoWasOnThis") : t("oncall.whoIsOnThis")
+      }}</OText>
+    </OCardSection>
 
+    <OCardSection role="body" dense>
+      <!-- An unstaffed rotation is an emergency while a page is open and a
+           plain fact once it is closed, so the colour follows the state. -->
       <p
         v-if="!slots.length"
-        class="text-status-error-text text-sm"
+        class="text-sm"
+        :class="closed ? 'text-text-secondary' : 'text-status-error-text'"
         data-test="oncall-who-is-on-nobody"
       >
-        {{ t("oncall.nobodyOnCall") }}
+        {{ closed ? t("oncall.nobodyWasOnCall") : t("oncall.nobodyOnCall") }}
       </p>
 
       <template v-else>
@@ -43,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              right edge gives every person the same two columns to read, which
              a tag trailing the address never does. -->
         <ODescriptionList dense>
-          <ODescriptionItem :label="t('oncall.onCallNow')">
+          <ODescriptionItem :label="closed ? t('oncall.onCallThen') : t('oncall.onCallNow')">
             <span class="flex w-full items-center gap-2">
               <OUserCell class="min-w-0 truncate font-medium" :value="primary.user_email" />
               <OTag
@@ -84,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Below the rule is the schedule around those people, not more
              people — the two were one run of rows, and the handover read as
              another seat somebody is sitting in. -->
-        <template v-if="handoverAt || nextOffset">
+        <template v-if="!closed && (handoverAt || nextOffset)">
           <OSeparator class="my-3" />
 
           <ODescriptionList dense>
@@ -95,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
                 <OTimeCell :value="handoverAt" unit="us" />
                 <template v-if="handoverTo">
-                  <span class="text-text-muted text-xs">{{ raw("→") }}</span>
+                  <span class="text-text-secondary text-xs">{{ raw("→") }}</span>
                   <OUserCell class="min-w-0 truncate" :value="handoverTo" />
                 </template>
               </span>
@@ -106,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  rather than adding one. Absent for a rotation that hands over to
                  nobody. -->
             <ODescriptionItem v-if="nextOffset" :label="t('oncall.secondaryOffset')">
-              <span class="text-text-muted text-xs">
+              <span class="text-text-secondary text-xs">
                 {{ t("oncall.secondaryOffsetValue", { offset: nextOffset }) }}
               </span>
             </ODescriptionItem>
@@ -143,11 +150,27 @@ const props = withDefaults(
     handoverAt?: number | null;
     /** Who holds it after that. */
     handoverTo?: string | null;
+    /**
+     * Micros — when this record closed, or null while it is still open.
+     *
+     * A closed record is read as history: the roster it carries was resolved
+     * as of this instant rather than as of now, so the card says so in its
+     * tense and drops the rows that are advice about a pager still being held.
+     */
+    closedAt?: number | null;
   }>(),
-  { slots: () => [], deliveries: () => [], handoverAt: null, handoverTo: null },
+  {
+    slots: () => [],
+    deliveries: () => [],
+    handoverAt: null,
+    handoverTo: null,
+    closedAt: null,
+  },
 );
 
 const { t } = useI18nTyped();
+
+const closed = computed(() => Boolean(props.closedAt));
 
 /// The default slot is the primary — every stored policy's unsuffixed target
 /// means it, so it is what "on call now" refers to.

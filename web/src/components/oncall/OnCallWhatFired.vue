@@ -24,20 +24,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   was read by nothing in `web/src`.
 -->
 <template>
-  <OCard variant="outlined" data-test="oncall-what-fired">
-    <OCardSection role="body">
-      <span class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <OText variant="panel-title">{{ t("oncall.whatFired") }}</OText>
-        <router-link
-          v-if="alertRoute"
-          class="text-accent text-sm"
-          :to="alertRoute"
-          data-test="oncall-what-fired-open-alert"
-        >
-          {{ t("oncall.openAlertRule") }}
-        </router-link>
-      </span>
+  <OCard variant="glass" data-test="oncall-what-fired">
+    <OCardSection role="header" dense class="justify-between">
+      <OText variant="card-title">{{ t("oncall.whatFired") }}</OText>
+      <router-link
+        v-if="alertRoute"
+        class="text-accent text-xs"
+        :to="alertRoute"
+        data-test="oncall-what-fired-open-alert"
+      >
+        {{ t("oncall.openAlertRule") }}
+      </router-link>
+    </OCardSection>
 
+    <OCardSection role="body" dense>
       <OCode block data-test="oncall-what-fired-condition">{{ conditionLine }}</OCode>
 
       <!-- The number that crossed the line, beside the line it crossed. The
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-what-fired-observed"
       >
         {{ t("oncall.whatFiredObserved", { value: observedLine }) }}
-        <span v-if="observedAgo" class="text-text-muted">{{ observedAgo }}</span>
+        <span v-if="observedAgo" class="text-text-secondary">{{ observedAgo }}</span>
       </p>
 
       <span class="mt-3 flex flex-wrap items-center gap-2">
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="menu-book" size="xs" />
           {{ t("oncall.whatFiredRunbook") }}
         </a>
-        <span v-else class="text-text-muted text-xs" data-test="oncall-what-fired-no-runbook">
+        <span v-else class="text-text-secondary text-xs" data-test="oncall-what-fired-no-runbook">
           {{ t("oncall.whatFiredNoRunbook") }}
         </span>
       </span>

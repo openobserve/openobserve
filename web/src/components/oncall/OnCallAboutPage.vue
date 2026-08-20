@@ -24,17 +24,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   an incident grows its own detail page.
 -->
 <template>
-  <OCard variant="outlined" data-test="oncall-about-page">
-    <OCardSection role="body">
-      <OText variant="panel-title" class="mb-3 block">{{ t("oncall.aboutThisPage") }}</OText>
+  <OCard variant="glass" data-test="oncall-about-page">
+    <OCardSection role="header" dense>
+      <OText variant="card-title">{{ t("oncall.aboutThisPage") }}</OText>
+    </OCardSection>
 
+    <OCardSection role="body" dense>
       <ODescriptionList dense>
         <!-- The engine records why it picked this team. It was only ever
              readable by scrolling the timeline, which is not where somebody
              asks "why me". Stacked: it is a sentence with a ksuid in it, and a
              sentence rationed to two thirds of a rail column wraps to four
              lines beside a label that needed one. -->
-        <ODescriptionItem v-if="routingReason" :label="t('oncall.routedBecause')" stacked>
+        <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBecause')" stacked>
           <span class="flex flex-col items-start gap-1">
             <!-- The mechanism in the UI's own words, then the rule as the same
                  key|value chips the routing tab draws it with. The server's
@@ -79,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-for="(note, index) in routingNotes"
               :key="index"
-              class="text-text-muted text-xs"
+              class="text-text-secondary text-xs"
               :data-test="`oncall-about-routing-note-${index}`"
             >
               {{ raw(note) }}
@@ -128,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODescriptionItem v-if="cause" :label="t('oncall.resolveCause')">
           <span data-test="oncall-about-cause">
             {{ t(`oncall.cause_${cause}`) }}
-            <span v-if="causeNote" class="text-text-muted">{{ raw(causeNote) }}</span>
+            <span v-if="causeNote" class="text-text-secondary">{{ raw(causeNote) }}</span>
           </span>
         </ODescriptionItem>
       </ODescriptionList>
@@ -285,6 +287,20 @@ const routingDimensions = computed(() =>
 );
 
 const routingNotes = computed(() => routing.value?.notes ?? []);
+
+/// A page routed `explicit` was not routed at all — the alert names its team,
+/// no rule was consulted and none could have changed the outcome. With no
+/// dimensions and no notes to show, the row is a label, a sentence that says
+/// "nothing happened here", and a link to rules that had no say, so the whole
+/// row goes. Every other mechanism is the engine's own account of a decision —
+/// which rule matched, or why none did — and that is the answer to "why me".
+const showRoutingReason = computed(
+  () =>
+    Boolean(props.routingReason) &&
+    (routing.value?.mechanism !== "explicit" ||
+      routingDimensions.value.length > 0 ||
+      routingNotes.value.length > 0),
+);
 
 const subjectLabel = computed(() =>
   props.subjectType === "alert" ? t("oncall.alertId") : t("oncall.subject"),
