@@ -9452,7 +9452,20 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% of trace)",
       "requestCount": "{count} req"
-    }
+    },
+    "spanEventTimeline": "Span event timeline",
+    "eventClusterTooltip": "{count} events",
+    "spanEventCount": "{count} event",
+    "spanEventCountPlural": "{count} events",
+    "spanEventCountWithErrors": "{count} · {errors} error",
+    "spanEventCountWithErrorsPlural": "{count} · {errors} errors",
+    "spanEventErrorCount": "{errors} error",
+    "spanEventErrorCountPlural": "{errors} errors",
+    "eventClusterAriaLabel": "{count} events, {errors} error",
+    "eventClusterAriaLabelPlural": "{count} events, {errors} errors",
+    "eventMarkerTooltip": "Event: {name}",
+    "exceptionMarkerTooltip": "Exception: {type}",
+    "spanEventFallback": "span event"
   },
   "actions": {
     "realTime": "Real Time",

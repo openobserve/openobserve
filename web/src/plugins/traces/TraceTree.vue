@@ -111,22 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseenter="onHoverSpan((spans as any[])[virtualRow.index].spanId)"
               >
                 <div
-                  class="view-logs-container invisible absolute top-1 right-0"
-                  :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
-                >
-                  <div class="view-span-logs mx-1">
-                    <OButton
-                      variant="ghost"
-                      size="icon"
-                      :title="t('traces.viewLogs')"
-                      @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"
-                      :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
-                    >
-                      <OIcon name="search" size="xs" />
-                    </OButton>
-                  </div>
-                </div>
-                <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
                   class="span-count-box text-2xs border-card-glass-border! hover:bg-interactive-hover-bg relative mr-1 flex h-5 min-w-5 cursor-pointer items-center justify-center rounded-full border px-1 py-0 font-semibold transition-colors duration-200"
                   :style="{
@@ -234,7 +218,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <div class="sticky right-0 flex items-center">
+                  <div class="sticky right-0 flex items-center gap-1">
+                    <!-- Hidden at rest, not merely invisible: `invisible` would keep
+                         the box in layout and reserve a permanent gutter to the left
+                         of the badges, which is the thing this arrangement exists to
+                         avoid. `hidden` gives the operation name the full width until
+                         the row is hovered, and the button then takes its 1.5rem from
+                         the already-truncating name — never from the badges, which
+                         stay pinned to the right edge. The cost is that the text's
+                         truncation point shifts on hover; the reflow is one row wide.
+
+                         It sits before the status badge because it used to sit *on
+                         top of* it: the old `.view-logs-container` was an absolute
+                         overlay pinned to `right-0`, so hovering a row covered both
+                         the HTTP status and the event count — and the event count is
+                         the honest fallback for spans whose markers cannot be drawn,
+                         so hover hid the one channel that is always true. -->
+                    <div
+                      class="view-span-logs hidden"
+                      :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
+                    >
+                      <OButton
+                        variant="outline"
+                        size="icon"
+                        :title="t('traces.viewLogs')"
+                        @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"
+                        :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                      >
+                        <OIcon name="search" size="xs" />
+                      </OButton>
+                    </div>
                     <span
                       v-if="getHttpStatusVars((spans as any[])[virtualRow.index])"
                       class="rounded-default mr-1 px-1 py-[0.4rem] text-xs leading-none font-semibold whitespace-nowrap"
@@ -251,26 +264,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ getHttpStatus((spans as any[])[virtualRow.index]) }}
                     </span>
-                    <span
-                      v-if="getEventCount((spans as any[])[virtualRow.index]) > 0 && false"
-                      class="flex items-center"
-                      :style="{
-                        fontSize: '0.625rem',
-                        lineHeight: 1,
-                        gap: '0.125rem',
-                        color: 'var(--color-text-secondary)',
-                        whiteSpace: 'nowrap',
-                      }"
-                      :title="
-                        t('traces.traceTree.spanEvent', {
-                          count: getEventCount((spans as any[])[virtualRow.index]),
-                        })
+                    <!-- Honest fallback for the event markers: a marker can only
+                         be drawn for an event that positions inside the trace
+                         window, and a sub-pixel span has nowhere to draw one at
+                         all. This count is always true.
+
+                         Two tallies, each with its own glyph: the badge's icon
+                         counts every event, the trailing segment counts the
+                         subset that failed. Severity therefore still travels on
+                         a non-colour channel — the glyph, and the icon's own
+                         `label`, which is what a screen reader reads — rather
+                         than on the error variant's red alone. -->
+                    <OBadge
+                      v-if="getEventSummary((spans as any[])[virtualRow.index]).total > 0"
+                      size="xs"
+                      shape="square"
+                      :variant="
+                        getEventSummary((spans as any[])[virtualRow.index]).errors > 0
+                          ? 'error-outline'
+                          : 'default-outline'
                       "
-                      :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
+                      icon="event-note"
+                      class="mr-1 rounded!"
+                      :title="getEventCountLabel((spans as any[])[virtualRow.index])"
+                      data-test="span-event-count-badge"
+                      :data-test-span="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >
-                      <OIcon name="event-note" size="xs" />
-                      {{ getEventCount((spans as any[])[virtualRow.index]) }}
-                    </span>
+                      {{ getEventSummary((spans as any[])[virtualRow.index]).total }}
+                      <template
+                        v-if="getEventSummary((spans as any[])[virtualRow.index]).errors > 0"
+                        #trailing
+                      >
+                        <span class="flex items-center gap-0.5" data-test="span-event-error-count">
+                          <OIcon
+                            name="error"
+                            size="xs"
+                            :label="getEventErrorLabel((spans as any[])[virtualRow.index])"
+                          />
+                          {{ getEventSummary((spans as any[])[virtualRow.index]).errors }}
+                        </span>
+                      </template>
+                    </OBadge>
                   </div>
                 </div>
               </div>
@@ -302,6 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :spanData="spanMap[(spans as any[])[virtualRow.index].spanId]"
               @toggle-collapse="toggleSpanCollapse"
               @select-span="selectSpan"
+              @select-span-event="selectSpanEvent"
               @view-logs="viewSpanLogs((spans as any[])[virtualRow.index])"
             />
           </div>
@@ -326,14 +361,16 @@ import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import SpanBlock from "./SpanBlock.vue";
+import { summarizeSpanEvents } from "@/composables/traces/useSpanEvents";
 import SpanKindBadge from "./components/SpanKindBadge.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
 import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/convertTraceData";
 import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer, type VirtualItem } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import config from "@/aws-exports";
@@ -406,6 +443,7 @@ export default defineComponent({
   emits: [
     "toggleCollapse",
     "selectSpan",
+    "selectSpanEvent",
     "hoverSpan",
     "unhoverSpan",
     "update-current-index",
@@ -511,6 +549,10 @@ export default defineComponent({
     }
     const selectSpan = (spanId: string) => {
       emit("selectSpan", spanId);
+    };
+
+    const selectSpanEvent = (payload: { spanId: string; eventIndex: number }) => {
+      emit("selectSpanEvent", payload);
     };
     const onHoverSpan = (spanId: string) => {
       if (enableHoverSelection) emit("hoverSpan", spanId);
@@ -747,13 +789,71 @@ export default defineComponent({
       };
     };
 
-    const getEventCount = (span: any): number => {
-      return props.spanMap[span.spanId]?.events?.length ?? 0;
+    interface SpanEventSummary {
+      total: number;
+      errors: number;
+    }
+
+    /** Shared result for a span the trace carries no event payload for. */
+    const NO_SPAN_EVENTS: SpanEventSummary = Object.freeze({ total: 0, errors: 0 });
+
+    /**
+     * Every span's event tally, computed once per `spanMap`.
+     *
+     * The badge reads this five or six times per row — `v-if`, `:class`,
+     * `:title`, the text, and the label helper — and the row list is virtualized,
+     * so it re-renders on every scroll tick. Summarizing on demand meant
+     * re-running `JSON.parse` over the raw events payload 150+ times per frame
+     * for a screenful of rows. Keying the whole map off `spanMap` collapses that
+     * to one parse per span per trace.
+     */
+    const eventSummaryMap = computed<Record<string, SpanEventSummary>>(() => {
+      const timestampField = store.state.zoConfig?.timestamp_column;
+      const summaries: Record<string, SpanEventSummary> = {};
+
+      for (const [spanId, spanData] of Object.entries(props.spanMap ?? {})) {
+        summaries[spanId] = summarizeSpanEvents((spanData as any)?.events, timestampField);
+      }
+
+      return summaries;
+    });
+
+    const getEventSummary = (span: any): SpanEventSummary =>
+      eventSummaryMap.value[span.spanId] ?? NO_SPAN_EVENTS;
+
+    /**
+     * The badge is the honest fallback: markers can only show events that
+     * position inside the trace window, and 10.3% of spans in the `default`
+     * stream render narrower than one pixel. The badge shows the two tallies
+     * as icon-and-number pairs, so this full sentence is what its tooltip says.
+     */
+    const getEventCountLabel = (span: any): string => {
+      const { total, errors } = getEventSummary(span);
+      if (!errors)
+        return total === 1
+          ? t("traces.spanEventCount", { count: total })
+          : t("traces.spanEventCountPlural", { count: total });
+      return errors === 1
+        ? t("traces.spanEventCountWithErrors", { count: total, errors })
+        : t("traces.spanEventCountWithErrorsPlural", { count: total, errors });
+    };
+
+    /**
+     * The error icon's accessible name. Without it the error tally reaches a
+     * screen reader as a bare number beside a red glyph — severity by colour
+     * alone, which is the defect the badge exists to fix.
+     */
+    const getEventErrorLabel = (span: any): I18nText => {
+      const { errors } = getEventSummary(span);
+      return errors === 1
+        ? t("traces.spanEventErrorCount", { errors })
+        : t("traces.spanEventErrorCountPlural", { errors });
     };
 
     return {
       toggleSpanCollapse,
       selectSpan,
+      selectSpanEvent,
       onHoverSpan,
       onUnhoverSpan,
       highlightedSpanId,
@@ -773,6 +873,9 @@ export default defineComponent({
       scrollToMatch,
       findMatches,
       getChildCount,
+      getEventSummary,
+      getEventCountLabel,
+      getEventErrorLabel,
       formatTokens,
       formatCost,
       isLLMTrace,
@@ -783,7 +886,6 @@ export default defineComponent({
       getKindIcon,
       getHttpStatus,
       getHttpStatusVars,
-      getEventCount,
       // virtualizer
       virtualRows,
       totalSize,
@@ -791,7 +893,7 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge, OButton, OIcon },
+  components: { SpanBlock, SpanKindBadge, OBadge, OButton, OIcon },
 });
 </script>
 
@@ -822,8 +924,8 @@ export default defineComponent({
   background-color: transparent !important;
 }
 
-.span-row:hover .view-logs-container {
-  visibility: visible;
+.span-row:hover .view-span-logs {
+  display: flex;
 }
 
 .span-row.span-row-selected::before {
