@@ -153,8 +153,9 @@ export const purgePersistedOrg = async (org: string): Promise<void> => {
   if (!org) return;
   removeLocalByPrefix(orgStoragePrefix(LS_PREFIX, org));
   await cacheRemoveByPrefix(orgStoragePrefix(IDB_PREFIX, org));
-  // Non-query consumers of the same store (panel results) key themselves
-  // `<namespace>|<org>|…`.
+  // Legacy only. Panel results moved onto the query prefix above, so nothing
+  // writes `<namespace>|<org>|…` any more — this drains the entries an older
+  // build left in a user's IndexedDB. Removable once those have aged out.
   for (const ns of CACHE_NAMESPACES) {
     await cacheRemoveByPrefix(`${ns}|${org}|`);
   }

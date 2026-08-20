@@ -14,40 +14,50 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Per-panel result cache. The public API (`getPanelCache` / `savePanelCache`)
- * is unchanged; the storage underneath is now the shared IndexedDB primitive,
- * which brings three things this cache never had:
+ * Per-panel result cache, on the app's query layer.
  *
- *  - the org in the key, so two orgs cannot collide on a dashboard id and the
- *    org-switch purge can find these records;
- *  - a TTL and an LRU cap, so panel payloads — the largest objects the app
- *    stores — no longer grow without bound;
- *  - structured-clone writes instead of `JSON.parse(JSON.stringify(...))` on
- *    the main thread for multi-MB result sets.
+ * The public API (`getPanelCache` / `savePanelCache`) is unchanged and so is the
+ * behaviour: a panel restores its last result and fires no query. What moved is
+ * where the result lives — from a private IndexedDB namespace with its own TTL
+ * and LRU to a normal TanStack entry under `["org", <org>, "panels", …]`, held
+ * in memory by the query cache and on disk by the same `indexedDbPersister`
+ * every other heavy read uses.
+ *
+ * Three things follow from being on the query layer rather than beside it:
+ *
+ *  - the org-switch and logout purges already scan that key prefix, so panel
+ *    results are dropped by the code that drops everything else instead of by
+ *    the namespace sweep only this file knew about;
+ *  - `gcTime` and the persister's `maxAge` replace the hand-rolled record cap
+ *    and 24 h TTL;
+ *  - a panel result is visible in the devtools next to the query that fetched
+ *    the dashboard it belongs to.
+ *
+ * What deliberately did NOT move is the read path: `usePanelDataLoader` still
+ * decides when to restore, and a restored panel still issues no request. Making
+ * panels revalidate is a behaviour change, not a storage one.
  */
 
-import {
-  PANEL_CACHE_NAMESPACE,
-  cacheAllRecords,
-  cacheClear,
-  cacheGetRecord,
-  cacheMaintain,
-  cacheSetOrThrow,
-  orgScopedKey,
-} from "@/composables/query/idbStorage";
-import { panelKeyDigest } from "@/composables/query/panelKey";
 import { toRaw } from "vue";
+import { hashKey } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import { idbPersister } from "@/composables/query/persisters";
+import { LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { panelKeyDigest } from "@/composables/query/panelKey";
+import { panelKeys } from "./panel.querykeys";
 
 /**
  * Strip Vue's reactive proxies so structured clone can take the value.
  *
- * `toRaw` only unwraps the level it is handed, and a panel's result reaches
- * this file as a proxy several containers deep — every write threw
- * `DataCloneError: [object Array] could not be cloned` and the cache stayed
- * empty. Recursion is limited to arrays and plain objects: a raw target holds
- * its children raw, so the walk stops as soon as `toRaw` returns the same
- * object it was given, and anything exotic (Date, TypedArray) is already
- * cloneable and passed through untouched.
+ * `toRaw` only unwraps the level it is handed, and a panel's result arrives
+ * several containers deep — every write used to throw `DataCloneError: [object
+ * Array] could not be cloned` and the cache stayed empty. Recursion covers
+ * arrays and plain objects only: a raw target holds its children raw, and
+ * anything exotic (Date, TypedArray) already clones and would be rebuilt as a
+ * bag of properties if walked.
+ *
+ * Still required on the query layer: the persister serializes with identity and
+ * hands the value straight to IndexedDB.
  */
 const toStorable = <T>(value: T, seen = new WeakMap<object, any>()): T => {
   if (value === null || typeof value !== "object") return value;
@@ -66,8 +76,6 @@ const toStorable = <T>(value: T, seen = new WeakMap<object, any>()): T => {
     return out as T;
   }
 
-  // Only plain objects: a Date or a TypedArray clones as-is, and walking one
-  // would rebuild it as a bag of properties.
   const proto = Object.getPrototypeOf(raw);
   if (proto !== Object.prototype && proto !== null) return raw as T;
 
@@ -89,10 +97,6 @@ declare global {
   }
 }
 
-/** Panel results are large; keep far fewer of them than of small config values. */
-const MAX_PANEL_RECORDS = 200;
-const PANEL_TTL_MS = 24 * 60 * 60_000;
-
 export interface PanelCacheEntry {
   key: any;
   value: any;
@@ -100,19 +104,34 @@ export interface PanelCacheEntry {
   timestamp: number;
 }
 
-// The digest of the normalized schema + variables is part of the key, so a
-// panel's different variable combinations no longer overwrite each other.
-const panelKey = (
-  org: string,
-  folderId: string,
-  dashboardId: string,
-  panelId: string,
-  digest: string,
-): string => orgScopedKey(PANEL_CACHE_NAMESPACE, org, folderId, dashboardId, panelId, digest);
+/**
+ * Panel entries are written per partition by the SQL executor, so they are read
+ * back far more often than they are fetched. `staleTime: Infinity` states what
+ * the read path already does — a restored panel does not revalidate — rather
+ * than leaving it to the client default that never applies here.
+ */
+const panelEntryOptions = {
+  gcTime: LONG_GC_TIME,
+  staleTime: Infinity,
+  persister: idbPersister.persisterFn,
+} as const;
+
+const isPanelKey = (key: readonly unknown[]) => key[0] === "org" && key[2] === "panels";
 
 window._o2_removeDashboardCache = async (): Promise<void> => {
   try {
-    await cacheClear();
+    const cache = queryClient.getQueryCache();
+    await Promise.all(
+      cache
+        .getAll()
+        .filter((query) => isPanelKey(query.queryKey))
+        .map(async (query) => {
+          await idbPersister.removeQueries?.({ queryKey: query.queryKey, exact: true });
+          cache.remove(query);
+        }),
+    );
+    // Entries that were only ever on disk have no in-memory query to walk.
+    await idbPersister.persisterGc?.();
   } catch (error) {
     console.error("Error clearing dashboard cache:", error);
   }
@@ -120,24 +139,25 @@ window._o2_removeDashboardCache = async (): Promise<void> => {
 
 window._o2_getDashboardCache = async (): Promise<any> => {
   try {
-    const records = await cacheAllRecords<PanelCacheEntry>();
     const cache: any = {};
+    queryClient
+      .getQueryCache()
+      .getAll()
+      .forEach((query) => {
+        if (!isPanelKey(query.queryKey)) return;
+        const [, , , folderId, dashboardId, panelId] = query.queryKey as any[];
+        const entry = query.state.data as PanelCacheEntry | undefined;
+        if (!entry) return;
 
-    records.forEach((record) => {
-      if (!record.key.startsWith(`${PANEL_CACHE_NAMESPACE}|`)) return;
-      const [, , folderId, dashboardId, panelId] = record.key.split("|");
-
-      if (!cache[folderId]) cache[folderId] = {};
-      if (!cache[folderId][dashboardId]) cache[folderId][dashboardId] = {};
-
-      cache[folderId][dashboardId][panelId] = {
-        key: record.value.key,
-        value: record.value.value,
-        cacheTimeRange: record.value.cacheTimeRange,
-        timestamp: record.value.timestamp,
-      };
-    });
-
+        if (!cache[folderId]) cache[folderId] = {};
+        if (!cache[folderId][dashboardId]) cache[folderId][dashboardId] = {};
+        cache[folderId][dashboardId][panelId] = {
+          key: entry.key,
+          value: entry.value,
+          cacheTimeRange: entry.cacheTimeRange,
+          timestamp: entry.timestamp,
+        };
+      });
     return cache;
   } catch (error) {
     console.error("Error getting dashboard cache:", error);
@@ -170,21 +190,25 @@ export const usePanelCache = (
     };
   }
 
-  let writesSinceSweep = 0;
+  const keyFor = (cacheKey: any) =>
+    panelKeys.result(org, folderId, dashboardId, panelId, panelKeyDigest(cacheKey));
 
   const savePanelCache = async (key: any, data: any, cacheTimeRange: any): Promise<void> => {
     try {
-      await cacheSetOrThrow<PanelCacheEntry>(
-        panelKey(org, folderId, dashboardId, panelId, panelKeyDigest(key)),
-        toStorable({ key, value: data, cacheTimeRange, timestamp: Date.now() }),
-        PANEL_TTL_MS,
-      );
-      // The SQL executor saves per partition, so sweep occasionally rather than
-      // paying the scan on every write.
-      if (++writesSinceSweep >= 20) {
-        writesSinceSweep = 0;
-        void cacheMaintain(MAX_PANEL_RECORDS);
-      }
+      const queryKey = keyFor(key);
+      const entry = toStorable<PanelCacheEntry>({
+        key,
+        value: data,
+        cacheTimeRange,
+        timestamp: Date.now(),
+      });
+
+      // The entry has to exist as a real query before it can carry the persister
+      // and a gcTime: `setQueryData` alone builds one with the client defaults,
+      // which would collect a panel result on the app's ordinary schedule.
+      queryClient.setQueryDefaults(queryKey, panelEntryOptions as any);
+      queryClient.setQueryData(queryKey, entry);
+      await idbPersister.persistQueryByKey?.(queryKey as any, queryClient);
     } catch (error) {
       console.error("Error saving panel cache:", error);
     }
@@ -197,16 +221,32 @@ export const usePanelCache = (
    */
   const getPanelCache = async (currentKey?: any): Promise<PanelCacheEntry | null> => {
     try {
-      const record = await cacheGetRecord<PanelCacheEntry>(
-        panelKey(org, folderId, dashboardId, panelId, panelKeyDigest(currentKey)),
-      );
-      if (!record) return null;
+      const queryKey = keyFor(currentKey);
+
+      // Memory first: a panel remounting inside one session never touches disk.
+      let entry = queryClient.getQueryData<PanelCacheEntry>(queryKey);
+
+      if (!entry) {
+        // Two things this call does not do what its name suggests: it keys
+        // storage by the query HASH rather than the key array, and it returns
+        // the stored `state.data` already unwrapped — not the PersistedQuery.
+        entry = (await idbPersister.retrieveQuery?.(hashKey(queryKey))) as
+          PanelCacheEntry | undefined;
+        if (entry) {
+          // Hydrate, so the next remount is a memory hit and the org purge can
+          // see this entry without reading IndexedDB.
+          queryClient.setQueryDefaults(queryKey, panelEntryOptions as any);
+          queryClient.setQueryData(queryKey, entry);
+        }
+      }
+
+      if (!entry) return null;
 
       return {
-        key: record.value.key,
-        value: record.value.value,
-        cacheTimeRange: record.value.cacheTimeRange,
-        timestamp: record.value.timestamp,
+        key: entry.key,
+        value: entry.value,
+        cacheTimeRange: entry.cacheTimeRange,
+        timestamp: entry.timestamp,
       };
     } catch (error) {
       console.error("Error getting panel cache:", error);
