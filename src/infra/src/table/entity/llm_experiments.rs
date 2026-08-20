@@ -33,6 +33,11 @@ pub struct Model {
     /// resolved terminal. `NULL` keeps it in the recovery sweep.
     pub scores_settled_at: Option<i64>,
     pub idempotency_key: Option<String>,
+    /// At most one row per organization and Dataset carries the Baseline flag.
+    pub is_baseline: bool,
+    /// When early deletion started. A marked row is unavailable to every read
+    /// while asynchronous cleanup finishes.
+    pub deleted_at: Option<i64>,
     pub created_by: String,
     pub created_at: i64,
 }

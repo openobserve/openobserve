@@ -3,7 +3,9 @@
 //! HTTP boundary models for Experiment comparisons.
 
 pub use domain::DEFAULT_COMPARISON_THRESHOLD;
-use openobserve_core::llm_evaluations::experiment_comparison as domain;
+use openobserve_core::llm_evaluations::{
+    experiment_comparison as domain, experiment_results::ScoringStatus,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
@@ -123,6 +125,14 @@ pub struct ExperimentComparisonResponseBody {
     pub dataset_id: String,
     pub threshold: f64,
     pub assignment_rule: String,
+    /// One or both sides are still being scored. The comparison is readable,
+    /// but it is provisional: it cannot serve as a CI result, and its
+    /// Experiments cannot be made a Baseline until scoring is terminal.
+    pub partial: bool,
+    #[schema(value_type = String)]
+    pub baseline_scoring_status: ScoringStatus,
+    #[schema(value_type = String)]
+    pub candidate_scoring_status: ScoringStatus,
     pub counts: ExperimentComparisonCountsBody,
     pub dimensions: Vec<ExperimentComparisonSummaryDimensionBody>,
     pub rows: Vec<ExperimentComparisonRowBody>,
@@ -205,6 +215,9 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
             dataset_id: value.dataset_id,
             threshold: value.threshold,
             assignment_rule: value.assignment_rule,
+            partial: value.partial,
+            baseline_scoring_status: value.baseline_scoring_status,
+            candidate_scoring_status: value.candidate_scoring_status,
             counts,
             dimensions: value
                 .dimensions

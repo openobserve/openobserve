@@ -22,9 +22,14 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
+default = ["enterprise", "vectorscan"]
 enterprise = [
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "dep:o2_dex",
+    "dep:o2_ratelimit",
     "audit/enterprise",
+    "config/enterprise",
     "openobserve-api-http/enterprise",
     "openobserve-api-grpc/enterprise",
     "openobserve-core/enterprise",
@@ -35,6 +40,7 @@ enterprise = [
     "usage_reporting/enterprise",
 ]
 vectorscan = [
+    "o2_enterprise/vectorscan",
     "openobserve-api-http/vectorscan",
     "openobserve-api-grpc/vectorscan",
     "openobserve-core/vectorscan",
@@ -43,6 +49,9 @@ vectorscan = [
     "search_service/vectorscan",
 ]
 cloud = [
+    "infra/cloud",
+    "enterprise",
+    "o2_enterprise/cloud",
     "openobserve-api-http/cloud",
     "openobserve-api-grpc/cloud",
     "openobserve-core/cloud",
@@ -105,6 +114,8 @@ argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
 aws-sdk-sns.workspace = true
+aws-sdk-marketplacemetering.workspace = true
+aws-sdk-sqs.workspace = true
 base64.workspace = true
 bitflags.workspace = true
 bytes.workspace = true
@@ -144,6 +155,10 @@ maxminddb.workspace = true
 md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.48", features = ["v3"], optional = true }
+o2_dex = { workspace = true, optional = true }
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+o2_ratelimit = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
@@ -161,6 +176,7 @@ regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
+rustls-pemfile.workspace = true
 rustls-native-certs.workspace = true
 webpki-roots.workspace = true
 sea-orm.workspace = true
@@ -220,6 +236,8 @@ pin-project-lite.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap.workspace = true
+aws-config.workspace = true
+aws-credential-types.workspace = true
 audit.workspace = true
 openobserve-api-http.workspace = true
 openobserve-api-grpc.workspace = true
@@ -307,9 +325,6 @@ edition = "2024"
 license = "AGPL-3.0"
 
 [workspace.dependencies]
-pulldown-cmark = { version = "0.13", default-features = false, features = [
-    "html",
-] }
 config = { path = "src/config" }
 infra = { path = "src/infra" }
 ingester = { path = "src/ingester" }
@@ -350,10 +365,10 @@ openobserve-api-pipelines = { path = "src/api/pipelines" }
 openobserve-api-search = { path = "src/api/search" }
 openobserve-jobs = { path = "src/jobs" }
 openobserve-mcp = { path = "src/mcp" }
-o2_dex = { path = "src/enterprise/o2_dex" }
-o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
-o2_openfga = { path = "src/enterprise/o2_openfga" }
-o2_ratelimit = { path = "src/enterprise/o2_ratelimit" }
+o2_dex = { path = "../o2-enterprise/o2_dex" }
+o2_enterprise = { path = "../o2-enterprise/o2_enterprise", default-features = false }
+o2_openfga = { path = "../o2-enterprise/o2_openfga" }
+o2_ratelimit = { path = "../o2-enterprise/o2_ratelimit" }
 vortex = { git = "https://github.com/openobserve/vortex", rev = "1cb48912c14d9c7bd29832d9aff5666d730e1f0e", features = [
     "tokio",
 ] }
@@ -402,7 +417,6 @@ tower-http = { version = "0.6", features = [
     "decompression-gzip",
     "decompression-br",
     "decompression-deflate",
-    "decompression-zstd",
     "trace",
     "timeout",
     "request-id",
@@ -427,7 +441,17 @@ async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "1.8"
 aws-credential-types = "1.2.14"
-aws-sdk-sns = { version = "1.97", default-features = false, features = [
+aws-sdk-sns = { version = "1.98", default-features = false, features = [
+    "behavior-version-latest",
+    "default-https-client",
+    "rt-tokio",
+] }
+aws-sdk-marketplacemetering = { version = "1.101", default-features = false, features = [
+    "behavior-version-latest",
+    "default-https-client",
+    "rt-tokio",
+] }
+aws-sdk-sqs = { version = "1.97", default-features = false, features = [
     "behavior-version-latest",
     "default-https-client",
     "rt-tokio",
@@ -472,6 +496,7 @@ hmac = "0.12"
 image = { version = "0.24", default-features = false, features = ["png"] }
 indexmap = { version = "2.8", features = ["serde"] }
 itertools = "0.14"
+jsonschema = "0.29"
 lettre = { version = "0.11", default-features = false, features = [
     "builder",
     "hostname",
@@ -521,6 +546,9 @@ plotters = { version = "0.3.7", default-features = false, features = [
 prometheus = { version = "0.14", features = ["process"] }
 prost = "0.14"
 prost-wkt-types = "0.7"
+pulldown-cmark = { version = "0.13", default-features = false, features = [
+    "html",
+] }
 rand = "0.10"
 rayon = "1.10"
 regex = "1.11"
@@ -537,6 +565,7 @@ reqwest = { version = "0.13", default-features = false, features = [
     "multipart",
 ] }
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
+rustls-pemfile = "2"
 rustls = { version = "0.23", default-features = false, features = [
     "std",
     "tls12",
@@ -606,7 +635,7 @@ url = "2.5"
 urlencoding = "2.1"
 utoipa = { version = "5.4", features = ["axum_extras", "openapi_extensions"] }
 utoipa-axum = "0.2"
-utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 uuid = { version = "1.20", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "branch-v0.54" }
 vrl = { version = "0.31", features = [

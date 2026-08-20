@@ -24,9 +24,10 @@
 
 use openobserve_core::llm_evaluations::datasets::{
     CreateDataset, CreateDatasetItem, Dataset, DatasetItem, DatasetItemPage, DatasetItemSource,
-    DatasetSourceCounts, ListDatasetItems, PushDatasetItemResult, PushQueueItemToDataset,
-    TelemetryDatasetItemRefType as ServiceRefType, UpdateDataset, UpdateDatasetItem,
-    UpsertDatasetItem, UpsertDatasetItemsResult, UpsertOutcome, UpsertedDatasetItem,
+    DatasetSnapshotPage, DatasetSourceCounts, ListDatasetItems, PushDatasetItemResult,
+    PushQueueItemToDataset, ReadSnapshotRows, TelemetryDatasetItemRefType as ServiceRefType,
+    UpdateDataset, UpdateDatasetItem, UpsertDatasetItem, UpsertDatasetItemsResult, UpsertOutcome,
+    UpsertedDatasetItem,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -105,6 +106,60 @@ impl From<ListDatasetItemsQuery> for ListDatasetItems {
             include_deleted: value.include_deleted.unwrap_or(defaults.include_deleted),
             from: value.from.unwrap_or(defaults.from),
             size: value.size.unwrap_or(defaults.size),
+        }
+    }
+}
+
+/// Query for a pinned historical Snapshot read.
+#[derive(Clone, Copy, Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(deny_unknown_fields)]
+pub struct DatasetSnapshotRowsQuery {
+    /// Snapshot version to resolve. Defaults to the Dataset's current version.
+    pub version: Option<i64>,
+    /// Zero-based result offset. Defaults to 0.
+    pub from: Option<usize>,
+    /// Page size from 1 through 100. Defaults to 20.
+    pub size: Option<usize>,
+}
+
+impl From<DatasetSnapshotRowsQuery> for ReadSnapshotRows {
+    fn from(value: DatasetSnapshotRowsQuery) -> Self {
+        let defaults = ReadSnapshotRows::default();
+        Self {
+            snapshot_version: value.version,
+            from: value.from.unwrap_or(defaults.from),
+            size: value.size.unwrap_or(defaults.size),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetSnapshotRowsResponseBody {
+    pub rows: Vec<DatasetItemResponseBody>,
+    /// The version actually resolved, which a caller that omitted `version`
+    /// needs in order to pin the same Snapshot again.
+    pub snapshot_version: i64,
+    pub total: u64,
+    pub from: usize,
+    pub size: usize,
+    pub has_more: bool,
+}
+
+impl From<DatasetSnapshotPage> for DatasetSnapshotRowsResponseBody {
+    fn from(value: DatasetSnapshotPage) -> Self {
+        Self {
+            rows: value
+                .rows
+                .into_iter()
+                .map(DatasetItemResponseBody::from)
+                .collect(),
+            snapshot_version: value.snapshot_version,
+            total: value.total,
+            from: value.from,
+            size: value.size,
+            has_more: value.has_more,
         }
     }
 }
