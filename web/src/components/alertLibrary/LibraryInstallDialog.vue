@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('alert_library.install.title')"
     :sub-title="t('alert_library.install.subtitle')"
     :persistent="isInstalling"
+    :show-close="!isInstalling"
     data-test="alert-library-install-dialog"
     @update:open="onOpenChange"
   >
@@ -373,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm-action"
-          :disabled="isInstalling"
+          :disabled="isInstalling || isCreatingDestination"
           data-test="alert-library-install-cancel"
           @click="onOpenChange(false)"
         >
@@ -467,7 +468,7 @@ import { getPrebuiltConfig } from "@/utils/prebuilt-templates";
 import type { CredentialField } from "@/utils/prebuilt-templates/types";
 
 import { severityBadgeValue, severityLabel } from "./libraryFacets";
-import { buildInstallPayload, type InstallOverrides } from "./libraryInstall";
+import { buildInstallPayload, InstallPayloadError, type InstallOverrides } from "./libraryInstall";
 import { coerceTunable, readTunables, DEFAULT_TUNABLES } from "./libraryTunables";
 
 const props = defineProps<{
@@ -533,6 +534,14 @@ const tuneFrequency = ref(DEFAULT_TUNABLES.frequency);
 const tuneSilence = ref(DEFAULT_TUNABLES.silence);
 
 // ── run ────────────────────────────────────────────────────────────────────
+/**
+ * The alert set this run reports on, frozen when it starts.
+ *
+ * `candidates` derives from `props.entries`, which the gallery recomputes as
+ * its async stream load settles. Rebuilding the result rows from it mid-run
+ * would drop rows the user has not read yet.
+ */
+const roster = ref<AlertLibraryEntry[]>([]);
 const results = ref<InstallResult[]>([]);
 const isInstalling = ref(false);
 const hasRun = ref(false);
@@ -549,10 +558,19 @@ const minutesSuffix = computed(() => t("alert_library.install.minutes"));
  */
 const candidates = computed<AlertLibraryEntry[]>(() => {
   const seedEntry = props.seed?.entry;
-  if (!seedEntry) return props.entries;
-  return props.entries.some((entry) => entry.id === seedEntry.id)
-    ? props.entries
-    : [seedEntry, ...props.entries];
+  const offered =
+    seedEntry && !props.entries.some((entry) => entry.id === seedEntry.id)
+      ? [seedEntry, ...props.entries]
+      : props.entries;
+
+  // Deduped by id: the install walks this list, so a manifest that repeats an
+  // entry would create that alert twice.
+  const seen = new Set<string>();
+  return offered.filter((entry) => {
+    if (seen.has(entry.id)) return false;
+    seen.add(entry.id);
+    return true;
+  });
 });
 
 const destinationOptions = computed(() =>
@@ -609,7 +627,10 @@ const canAdvance = computed(() => {
 
 // ── lifecycle ──────────────────────────────────────────────────────────────
 const reset = () => {
+  sessionToken += 1;
   step.value = 1;
+  isCreatingDestination.value = false;
+  isTesting.value = false;
   existingDestinations.value = [];
   destinationsFailed.value = false;
   destinationMode.value = "existing";
@@ -624,6 +645,7 @@ const reset = () => {
   folderName.value = "";
   tuneEnabled.value = false;
   results.value = [];
+  roster.value = [];
   hasRun.value = false;
   isInstalling.value = false;
 
@@ -643,6 +665,13 @@ const reset = () => {
  * it into create mode — behind the current one. Same guard the drawer uses.
  */
 let destinationsToken = 0;
+
+/**
+ * Bumped by every `reset()`. Anything that awaits must re-check it afterwards:
+ * a create started before a close-and-reopen would otherwise finish against the
+ * NEW session, writing a destination name the user never chose.
+ */
+let sessionToken = 0;
 
 const loadDestinations = async () => {
   const token = ++destinationsToken;
@@ -717,6 +746,12 @@ const setCredential = (key: string, value: unknown) => {
 };
 
 const errorText = (error: unknown): I18nText => {
+  // The builder refuses a file it cannot read by CODE, because it has no `t`.
+  // Resolving it here is what keeps that refusal translatable instead of
+  // showing the user the literal string "unreadable_conditions".
+  if (error instanceof InstallPayloadError) {
+    return t("alert_library.install.unreadableConditions");
+  }
   const response = (error as { response?: { data?: { message?: string } } })?.response;
   return (
     raw(response?.data?.message) ||
@@ -726,26 +761,36 @@ const errorText = (error: unknown): I18nText => {
 };
 
 const runTest = async () => {
+  const token = sessionToken;
   isTesting.value = true;
   testMessage.value = "";
   try {
     const result = await testDestination(createType.value, credentials.value);
+    if (token !== sessionToken) return;
     testPassed.value = result.success;
     testMessage.value = result.success
       ? t("alert_library.install.destinationTestPassed")
       : t("alert_library.install.destinationTestFailed", { error: result.error ?? "" });
   } catch (error) {
+    if (token !== sessionToken) return;
     testPassed.value = false;
     testMessage.value = t("alert_library.install.destinationTestFailed", {
       error: String(errorText(error)),
     });
   } finally {
-    isTesting.value = false;
+    if (token === sessionToken) isTesting.value = false;
   }
 };
 
 /** Creates the destination, and only advances once it exists. */
 const createAndUse = async (): Promise<boolean> => {
+  // The longest await in the wizard, and the most destructive to finish late:
+  // a create that resolves after a close-and-reopen would adopt the CURRENT
+  // (reset, empty) name as the destination and self-advance the step, so every
+  // alert POSTs `destinations: [""]` behind a summary claiming all is well.
+  const token = sessionToken;
+  const name = createName.value.trim();
+
   isCreatingDestination.value = true;
   try {
     // Inside the try: an unknown type makes validateCredentials throw, and out
@@ -758,12 +803,15 @@ const createAndUse = async (): Promise<boolean> => {
       return false;
     }
 
-    await createDestination(createType.value, createName.value.trim(), credentials.value);
-    chosenDestination.value = createName.value.trim();
+    await createDestination(createType.value, name, credentials.value);
+    if (token !== sessionToken) return false;
+
+    chosenDestination.value = name;
     destinationMode.value = "existing";
     await loadDestinations();
-    return true;
+    return token === sessionToken;
   } catch (error) {
+    if (token !== sessionToken) return false;
     toast({
       variant: "error",
       message: t("alert_library.install.destinationCreateFailed", {
@@ -772,7 +820,8 @@ const createAndUse = async (): Promise<boolean> => {
     });
     return false;
   } finally {
-    isCreatingDestination.value = false;
+    // A stale session already had this cleared by `reset()`.
+    if (token === sessionToken) isCreatingDestination.value = false;
   }
 };
 
@@ -791,8 +840,12 @@ const goNext = async () => {
   // OButton already blocks a click while `loading`, but the guard belongs here
   // too: a second create means a second destination, silently.
   if (isCreatingDestination.value) return;
+  const token = sessionToken;
+
   if (step.value === 1 && destinationMode.value === "create") {
     if (!(await createAndUse())) return;
+    // Never advance a session the user has already left.
+    if (token !== sessionToken) return;
   }
   step.value += 1;
 };
@@ -843,26 +896,29 @@ const setResult = (id: string, patch: Partial<InstallResult>) => {
 
 const install = async (ids: string[]) => {
   if (isInstalling.value) return;
+  // Defensive: every path to step 5 sets this, but installing against an empty
+  // destination is a guaranteed 400 for the whole batch, so never start one.
+  if (!chosenDestination.value) return;
 
-  const batch = candidates.value.filter((entry) => ids.includes(entry.id));
+  // Freeze the roster on the FIRST run; a retry reports on the same set.
+  if (!hasRun.value) {
+    roster.value = candidates.value.filter((entry) => selectedIds.value.includes(entry.id));
+  }
+
+  const batch = roster.value.filter((entry) => ids.includes(entry.id));
   // `batch`, not `ids`: an id with no entry behind it would otherwise flip
   // `hasRun` and toast a result for a run that never happened.
   if (batch.length === 0) return;
+
   const existing = new Map(results.value.map((result) => [result.id, result]));
-  results.value = candidates.value
-    .filter((entry) => selectedIds.value.includes(entry.id))
-    .map((entry) => {
-      if (ids.includes(entry.id)) {
-        return { id: entry.id, title: raw(entry.title), status: "pending" as const };
-      }
-      return (
-        existing.get(entry.id) ?? {
-          id: entry.id,
-          title: raw(entry.title),
-          status: "pending" as const,
-        }
-      );
-    });
+  results.value = roster.value.map(
+    (entry) =>
+      (ids.includes(entry.id) ? undefined : existing.get(entry.id)) ?? {
+        id: entry.id,
+        title: raw(entry.title),
+        status: "pending" as const,
+      },
+  );
 
   isInstalling.value = true;
   hasRun.value = true;
@@ -871,40 +927,46 @@ const install = async (ids: string[]) => {
     ? { frequency: tuneFrequency.value, silence: tuneSilence.value }
     : undefined;
 
+  // Only what this pass created. Re-announcing everything in `results` would
+  // make a retry repeat ids the parent already counted.
+  const installedNow: string[] = [];
+
   // Sequential on purpose: one rejected create must not take the rest of the
   // batch with it, and a burst of parallel POSTs is what rate limits.
-  for (const entry of batch) {
-    setResult(entry.id, { status: "running", message: undefined });
-    try {
-      const file =
-        props.seed && props.seed.entry.id === entry.id
-          ? props.seed.file
-          : await loadAlertFile(entry);
+  try {
+    for (const entry of batch) {
+      setResult(entry.id, { status: "running", message: undefined });
+      try {
+        const file =
+          props.seed && props.seed.entry.id === entry.id
+            ? props.seed.file
+            : await loadAlertFile(entry);
 
-      const payload = buildInstallPayload({
-        entry,
-        file,
-        folderId: folderId.value,
-        destination: chosenDestination.value,
-        owner: store.state.userInfo?.email ?? "",
-        timezone: store.state.timezone,
-        overrides: batchOverrides,
-      });
+        const payload = buildInstallPayload({
+          entry,
+          file,
+          folderId: folderId.value,
+          destination: chosenDestination.value,
+          owner: store.state.userInfo?.email ?? "",
+          timezone: store.state.timezone,
+          overrides: batchOverrides,
+        });
 
-      await alertsService.create_by_alert_id(orgIdentifier(), payload, folderId.value);
-      setResult(entry.id, { status: "installed" });
-    } catch (error) {
-      setResult(entry.id, { status: "failed", message: errorText(error) });
+        await alertsService.create_by_alert_id(orgIdentifier(), payload, folderId.value);
+        setResult(entry.id, { status: "installed" });
+        installedNow.push(entry.id);
+      } catch (error) {
+        setResult(entry.id, { status: "failed", message: errorText(error) });
+      }
     }
+  } finally {
+    // Nothing escapes the per-alert catch today, but if anything ever did the
+    // dialog would become uncloseable by every path at once.
+    isInstalling.value = false;
   }
 
-  isInstalling.value = false;
-
-  const installedIds = results.value
-    .filter((result) => result.status === "installed")
-    .map((result) => result.id);
-  if (installedIds.length > 0) {
-    emit("installed", { folderId: folderId.value, ids: installedIds });
+  if (installedNow.length > 0) {
+    emit("installed", { folderId: folderId.value, ids: installedNow });
   }
 
   const failed = failedIds.value.length;

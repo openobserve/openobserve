@@ -1079,6 +1079,158 @@ describe("LibraryInstallDialog", () => {
     });
   });
 
+  describe("a session that was left behind", () => {
+    it("does not let a stale destination create poison the next batch", async () => {
+      // Close mid-create, reopen, pick a real destination, THEN let the old
+      // create land. Without a session guard it adopts the post-reset (empty)
+      // name and self-advances, so every alert POSTs destinations: [""] behind
+      // a summary screen claiming the destination was fine.
+      mocks.listDestinations.mockResolvedValue({ data: [] });
+      let releaseCreate: () => void = () => {};
+      mocks.createDestination.mockReturnValue(
+        new Promise<void>((resolve) => {
+          releaseCreate = resolve;
+        }),
+      );
+
+      const wrapper = await mountDialog();
+      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
+      await flushPromises();
+      await wrapper
+        .find('[data-test="alert-library-install-destination-name"]')
+        .setValue("library-slack");
+      await wrapper
+        .find('[data-test="alert-library-install-credential-webhookUrl"]')
+        .setValue("https://hooks.slack.com/services/T/B/X");
+      await click(wrapper, "alert-library-install-next");
+
+      // Abandon this session while the create is still in flight.
+      await wrapper.setProps({ open: false });
+      mocks.listDestinations.mockResolvedValue({ data: [{ name: "ops-slack" }] });
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await flushPromises();
+
+      releaseCreate();
+      await flushPromises();
+
+      // Still on step 1, still holding the destination the user just picked.
+      expect(wrapper.find('[data-test="alert-library-install-destination-step"]').exists()).toBe(
+        true,
+      );
+
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-run");
+      expect(mocks.createAlert.mock.calls[0][1].destinations).toEqual(["ops-slack"]);
+    });
+
+    it("does not show a test verdict for a destination the new session never tested", async () => {
+      mocks.listDestinations.mockResolvedValue({ data: [] });
+      let releaseTest: (value: unknown) => void = () => {};
+      mocks.testDestination.mockReturnValue(
+        new Promise((resolve) => {
+          releaseTest = resolve;
+        }),
+      );
+
+      const wrapper = await mountDialog();
+      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
+      await flushPromises();
+      await click(wrapper, "alert-library-install-destination-test");
+
+      await wrapper.setProps({ open: false });
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+
+      releaseTest({ success: true });
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="alert-library-install-destination-test-result"]').exists(),
+      ).toBe(false);
+    });
+  });
+
+  it("installs a repeated manifest id exactly once", async () => {
+    // The manifest is fetched content; a duplicated entry would otherwise be
+    // walked twice and create the alert twice.
+    const wrapper = await mountDialog({ entries: [seedEntry(), seedEntry(), secondEntry()] });
+    await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+    await click(wrapper, "alert-library-install-next");
+    await click(wrapper, "alert-library-install-select-all");
+
+    expect(wrapper.find('[data-test="alert-library-install-count"]').attributes("data-total")).toBe(
+      "2",
+    );
+
+    await click(wrapper, "alert-library-install-next");
+    await click(wrapper, "alert-library-install-next");
+    await click(wrapper, "alert-library-install-next");
+    await click(wrapper, "alert-library-install-run");
+
+    expect(mocks.createAlert).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.createAlert.mock.calls.filter((call) => call[1].name === "pod-oom-killed"),
+    ).toHaveLength(1);
+  });
+
+  it("fails the one alert whose conditions cannot be read, and says why", async () => {
+    // The builder refuses rather than installing an empty filter group. The
+    // loop must surface that as a normal per-alert failure.
+    mocks.loadAlertFile.mockImplementation((entry: AlertLibraryEntry) => {
+      const file = libraryFile(entry.name);
+      if (entry.name === "node-disk-pressure") {
+        file.query_condition = { type: "sql", sql: "select 1", conditions: { version: 1 } };
+      }
+      return Promise.resolve(file);
+    });
+
+    const wrapper = await mountDialog();
+    await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+    await click(wrapper, "alert-library-install-next");
+    await click(wrapper, "alert-library-install-select-all");
+    await click(wrapper, "alert-library-install-next");
+    await click(wrapper, "alert-library-install-next");
+    await click(wrapper, "alert-library-install-next");
+    await click(wrapper, "alert-library-install-run");
+
+    expect(statusOf(wrapper, "k8s/node-disk-pressure")).toBe("failed");
+    expect(statusOf(wrapper, "k8s/pod-oom-killed")).toBe("installed");
+    expect(statusOf(wrapper, "k8s/cert-expiring")).toBe("installed");
+    // Translated copy — not a raw TypeError from inside a converter, and not
+    // the bare error CODE the builder throws with.
+    const message = wrapper
+      .find('[data-test="alert-library-install-error-k8s/node-disk-pressure"]')
+      .text();
+    expect(message).not.toContain("is not a function");
+    expect(message).not.toContain("unreadable_conditions");
+    expect(message).toContain("cannot read");
+  });
+
+  it("announces only what the retry created, not what it announced before", async () => {
+    mocks.createAlert
+      .mockResolvedValueOnce({ data: {} })
+      .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
+      .mockResolvedValueOnce({ data: {} });
+
+    const wrapper = await mountDialog();
+    await advanceAllToInstall(wrapper);
+    await click(wrapper, "alert-library-install-run");
+
+    mocks.createAlert.mockResolvedValue({ data: {} });
+    await click(wrapper, "alert-library-install-retry");
+
+    const installed = wrapper.emitted("installed");
+    expect(installed).toHaveLength(2);
+    // A consumer adding these up must not count the first pass twice.
+    expect(installed?.[1]?.[0]).toMatchObject({ ids: ["k8s/node-disk-pressure"] });
+  });
+
   it("starts from the first step again when reopened", async () => {
     const wrapper = await mountDialog();
     await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
@@ -1128,6 +1280,74 @@ describe("LibraryInstallDialog", () => {
           .element as HTMLInputElement
       ).checked,
     ).toBe(false);
+  });
+
+  // The stub above renders the panel inline and has no close button, which makes
+  // this whole class of bug invisible. ODialog's own X is NOT gated by
+  // `persistent` (only Escape and interact-outside are) and it self-closes via
+  // its internal open state, so refusing its `update:open` would leave the panel
+  // gone, the parent still holding `open`, and the run unreachable.
+  describe("against the real ODialog", () => {
+    const realStubs = { ...stubs } as Record<string, unknown>;
+    delete realStubs.ODialog;
+
+    const inBody = (test: string) =>
+      document.body.querySelector(`[data-test="${test}"]`) as HTMLElement | null;
+
+    const clickInBody = async (test: string) => {
+      inBody(test)?.click();
+      await flushPromises();
+    };
+
+    let wrapper: ReturnType<typeof mount> | null = null;
+
+    afterEach(() => {
+      wrapper?.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+    });
+
+    it("takes the close button away while creates are in flight", async () => {
+      let release: (value: unknown) => void = () => {};
+      mocks.createAlert.mockReturnValue(
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+      );
+
+      wrapper = mount(LibraryInstallDialog, {
+        props: {
+          open: true,
+          entries: entries(),
+          seed: { entry: seedEntry(), file: libraryFile("pod-oom-killed") },
+        },
+        global: { plugins: [i18n, store], stubs: realStubs },
+        attachTo: document.body,
+      });
+      await flushPromises();
+
+      expect(inBody("o-dialog-close-btn")).not.toBeNull();
+
+      const select = inBody("alert-library-install-destination") as HTMLSelectElement;
+      select.value = "ops-slack";
+      select.dispatchEvent(new Event("change"));
+      await flushPromises();
+
+      await clickInBody("alert-library-install-next");
+      await clickInBody("alert-library-install-next");
+      await clickInBody("alert-library-install-next");
+      await clickInBody("alert-library-install-next");
+      await clickInBody("alert-library-install-run");
+
+      // Mid-run: no way to dismiss the panel and strand the batch.
+      expect(inBody("o-dialog-close-btn")).toBeNull();
+
+      release({ data: {} });
+      await flushPromises();
+
+      // Back once the run is over, so the results are dismissable.
+      expect(inBody("o-dialog-close-btn")).not.toBeNull();
+    });
   });
 
   it("loads no destinations while closed", async () => {

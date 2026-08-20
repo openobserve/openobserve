@@ -7528,6 +7528,7 @@
       "allInstalled": "{count} alert installed | {count} alerts installed",
       "someFailed": "{installed} installed, {failed} failed",
       "unknownError": "The alert could not be created.",
+      "unreadableConditions": "This alert's filter conditions are in a format this version cannot read. Installing it would create an alert with no filter, so it was skipped.",
       "back": "Back",
       "next": "Next",
       "cancel": "Cancel",

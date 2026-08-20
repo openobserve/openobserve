@@ -66,28 +66,82 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
+/** Why a file could not be turned into a payload. Resolved to copy by the caller. */
+export type InstallPayloadErrorCode = "unreadable_conditions";
+
+/**
+ * A file this builder refuses to install.
+ *
+ * Carries a CODE rather than a message: this module is Vue-less and has no `t`,
+ * so the wizard resolves it — the same split `AlertLibraryError` already uses.
+ */
+export class InstallPayloadError extends Error {
+  readonly code: InstallPayloadErrorCode;
+
+  constructor(code: InstallPayloadErrorCode) {
+    super(code);
+    this.name = "InstallPayloadError";
+    this.code = code;
+  }
+}
+
 /**
  * The conditions tree, in the `{version: 2, conditions}` envelope the backend
  * requires. Lifted from ImportAlert's `createAlert` — the library ships files
  * exported from any product version, so all three legacy shapes are reachable.
+ *
+ * Unlike ImportAlert, this REFUSES a shape it cannot read instead of falling
+ * back. `detectConditionsVersion` answers 0 for anything unrecognised and
+ * `convertV0ToV2` answers an empty group for a non-array, so a plausible
+ * legacy envelope like `{version: 1, conditions: …}` would otherwise install
+ * an alert whose filter matches EVERY row, reported as a success. ImportAlert
+ * can live with that because a human picked the document; here it arrives from
+ * a public bucket. A visible per-alert failure beats a silent always-firing
+ * alert at 3am.
  */
-const toV2Conditions = (raw: unknown): { version: number; conditions: unknown } => {
+const toV2Conditions = (input: unknown): { version: number; conditions: unknown } => {
   // An already-wrapped tree is unwrapped first so detection sees the tree
   // itself rather than the envelope, which detects as v0.
-  const wrapper = asRecord(raw);
-  let conditions =
-    wrapper.version === 2 || wrapper.version === "2" ? wrapper.conditions : (raw as unknown);
+  const wrapper = asRecord(input);
+  const unwrapped =
+    wrapper.version === 2 || wrapper.version === "2" ? wrapper.conditions : (input as unknown);
 
-  const version = detectConditionsVersion(conditions);
-  if (version === 0) {
-    conditions = convertV0ToV2(conditions as unknown[]);
-  } else if (version === 1) {
-    const tree = asRecord(conditions);
-    if (tree.and || tree.or) conditions = convertV1BEToV2(conditions);
-    else if (tree.label && tree.items) conditions = convertV1ToV2(conditions);
+  const version = detectConditionsVersion(unwrapped);
+
+  if (version === 2) return { version: 2, conditions: unwrapped };
+
+  if (version === 1) {
+    const tree = asRecord(unwrapped);
+    const branch = tree.and ?? tree.or;
+    if (branch !== undefined) {
+      // Detection only checked that the key is truthy; `{and: "x"}` would reach
+      // `.map` and surface a raw TypeError as the install's failure reason.
+      if (!Array.isArray(branch)) throw new InstallPayloadError("unreadable_conditions");
+      return { version: 2, conditions: convertV1BEToV2(unwrapped) };
+    }
+    if (!Array.isArray(tree.items)) throw new InstallPayloadError("unreadable_conditions");
+    return { version: 2, conditions: convertV1ToV2(unwrapped) };
   }
 
-  return { version: 2, conditions };
+  // v0 is a FLAT ARRAY. Anything else detecting as 0 is a shape this build does
+  // not know, and converting it would silently drop the predicate.
+  if (!Array.isArray(unwrapped)) throw new InstallPayloadError("unreadable_conditions");
+  return { version: 2, conditions: convertV0ToV2(unwrapped) };
+};
+
+/**
+ * `context_attributes` is free-form KV shipped into notification payloads and
+ * typed `HashMap<String, String>` on the wire, so a non-string value 400s the
+ * whole alert. Values are dropped rather than the field being whitelisted: a
+ * library alert may legitimately carry attributes its row template reads, and
+ * discarding those would change what the notification says.
+ */
+const stringValuedOnly = (record: Record<string, unknown>): Record<string, string> => {
+  const kept: Record<string, string> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (typeof value === "string") kept[key] = value;
+  }
+  return kept;
 };
 
 export function buildInstallPayload(input: InstallPayloadInput): Record<string, unknown> {
@@ -125,7 +179,7 @@ export function buildInstallPayload(input: InstallPayloadInput): Record<string, 
   payload.destinations = [destination];
 
   payload.context_attributes = {
-    ...asRecord(payload.context_attributes),
+    ...stringValuedOnly(asRecord(payload.context_attributes)),
     library_id: entry.id,
     library_hash: entry.content_hash,
   };

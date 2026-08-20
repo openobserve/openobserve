@@ -181,10 +181,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @install="onInstall"
     />
 
+    <!-- `installed` is deliberately unlistened here: Phase 5 consumes it to
+         mark entries as installed. Do not delete it as dead code. -->
     <LibraryInstallDialog
-      v-model:open="installOpen"
+      :open="installOpen"
       :entries="visibleEntries"
       :seed="installSeed"
+      @update:open="onInstallOpenChange"
     />
   </div>
 </template>
@@ -450,6 +453,12 @@ const onInstall = (payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }
   installSeed.value = payload;
   drawerOpen.value = false;
   installOpen.value = true;
+};
+
+const onInstallOpenChange = (open: boolean) => {
+  installOpen.value = open;
+  // Drop the tuned file on close so a later open cannot reuse a stale one.
+  if (!open) installSeed.value = null;
 };
 
 const openContribute = () => {

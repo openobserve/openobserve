@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 
-import { buildInstallPayload } from "./libraryInstall";
+import { buildInstallPayload, InstallPayloadError } from "./libraryInstall";
 
 const entry = (over: Partial<AlertLibraryEntry> = {}): AlertLibraryEntry => ({
   id: "k8s/pod-oom-killed",
@@ -320,6 +320,37 @@ describe("buildInstallPayload", () => {
       expect(conditionsOf(absent)).toBeNull();
     });
 
+    // An unreadable shape must FAIL, not fall back. `detectConditionsVersion`
+    // answers 0 for anything it does not recognise and `convertV0ToV2` answers
+    // an empty group for a non-array, so falling back installs an alert whose
+    // filter matches every row — reported as a success.
+    const buildWithConditions = (conditions: unknown) =>
+      build({
+        file: file({ query_condition: { type: "sql", sql: "select 1", conditions } }),
+      });
+
+    it.each([
+      ["a legacy envelope the v2 unwrap does not recognise", { version: 1, conditions: {} }],
+      ["an object of an unknown shape", { filters: [{ column: "code" }] }],
+      ["a bare string", "code = 500"],
+      ["a v1 backend branch that is not a list", { and: "not-an-array" }],
+      ["a v1 frontend branch that is not a list", { label: "and", items: "not-an-array" }],
+    ])("refuses %s rather than installing an alert with no predicate", (_label, conditions) => {
+      expect(() => buildWithConditions(conditions)).toThrow(InstallPayloadError);
+    });
+
+    it("refuses with a code, not a raw TypeError from inside a converter", () => {
+      // `{and: "x"}` detects as v1 and used to reach `.map` on a string, showing
+      // the user "input.and.map is not a function" as the reason install failed.
+      try {
+        buildWithConditions({ and: "not-an-array" });
+        throw new Error("expected a refusal");
+      } catch (error) {
+        expect(error).toBeInstanceOf(InstallPayloadError);
+        expect((error as InstallPayloadError).code).toBe("unreadable_conditions");
+      }
+    });
+
     it("adds no conditions key to an alert that has none — most of the library", () => {
       const queryCondition = build().query_condition as Record<string, unknown>;
       expect("conditions" in queryCondition).toBe(false);
@@ -380,6 +411,22 @@ describe("buildInstallPayload", () => {
       });
       expect(payload.tags).toEqual(["pack:k8s"]);
       expect(payload.context_attributes).toEqual({
+        library_id: "k8s/pod-oom-killed",
+        library_hash: "1c09e8f6ac33",
+      });
+    });
+
+    it("drops context_attributes values that are not strings, keeping the rest", () => {
+      // Free-form KV shipped into notification payloads and typed
+      // HashMap<String,String> on the wire, so a non-string 400s the whole
+      // alert. Dropped rather than whitelisted — a row template may read these.
+      const payload = build({
+        file: file({
+          context_attributes: { team: "platform", retries: 3, tags: ["a"], nested: { x: 1 } },
+        }),
+      });
+      expect(payload.context_attributes).toEqual({
+        team: "platform",
         library_id: "k8s/pod-oom-killed",
         library_hash: "1c09e8f6ac33",
       });
