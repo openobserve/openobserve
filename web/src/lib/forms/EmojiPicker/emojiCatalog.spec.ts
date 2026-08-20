@@ -12,6 +12,7 @@ import {
   GLYPH_TOKEN_PREFIX,
   AI_GLYPH_SLUGS,
   AI_GLYPH_PREFIX,
+  isAiGlyphToken,
   resolveGlyph,
 } from "./glyphRegistry";
 
@@ -88,10 +89,23 @@ describe("emojiCatalog", () => {
     expect(resolveGlyph("o2:ai-not-a-real-brand")).toBeNull();
   });
 
-  it("should resolve every glyph token the catalog offers", () => {
+  it("should resolve every curated glyph token the catalog offers", () => {
     const broken = ALL_EMOJIS.map((option) => option.token)
-      .filter((token) => token.startsWith(GLYPH_TOKEN_PREFIX))
+      .filter((token) => token.startsWith(GLYPH_TOKEN_PREFIX) && !isAiGlyphToken(token))
       .filter((token) => resolveGlyph(token) === null);
+    expect(broken).toEqual([]);
+  });
+
+  // AI logos come from the gitignored generated/ dir, absent until
+  // fetch-datasource-content.mjs has run — so a fresh checkout or CI without the
+  // fetch would fail this through no fault of the catalog. Same stance
+  // modelVendorLogo.spec.ts takes over that directory.
+  it("should resolve every AI glyph token when the assets are bundled", () => {
+    const aiTokens = ALL_EMOJIS.map((option) => option.token).filter(isAiGlyphToken);
+    const resolved = aiTokens.filter((token) => resolveGlyph(token) !== null);
+    if (resolved.length === 0) return; // assets not fetched in this environment
+
+    const broken = aiTokens.filter((token) => resolveGlyph(token) === null);
     expect(broken).toEqual([]);
   });
 
