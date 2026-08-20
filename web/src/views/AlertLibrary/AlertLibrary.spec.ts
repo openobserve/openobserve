@@ -159,6 +159,39 @@ describe("AlertLibrary", () => {
     expect(getStreams).toHaveBeenCalledWith("all", false, false);
   });
 
+  it("waits for readiness before drawing cards, so none flips from ready to dimmed", async () => {
+    // The manifest is a small cached S3 object; the org's streams are a backend
+    // query, so the manifest lands first. Drawing on the manifest alone painted
+    // every card solid — `entryReady` optimistically answers true while
+    // readiness is unknown — and they then dimmed to `border-dashed opacity-65`
+    // when the streams arrived. Visible as the borders lightening on their own.
+    let releaseStreams: () => void = () => {};
+    getStreams.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releaseStreams = () => resolve({ name: "all", list: STREAM_LIST });
+      }),
+    );
+
+    const wrapper = await mountView();
+    // Manifest has resolved, streams have not: skeleton, no cards to flip.
+    expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(false);
+
+    releaseStreams();
+    await flushPromises();
+    // Cards appear once, already carrying the correct verdict.
+    expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(true);
+  });
+
+  it("still renders the grid when the stream check fails", async () => {
+    // The skeleton must not latch on: a failed stream load leaves readiness
+    // unknown deliberately, and cards render undimmed rather than claiming the
+    // org has no telemetry.
+    getStreams.mockRejectedValueOnce(new Error("streams unavailable"));
+    const wrapper = await mountView();
+
+    expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(true);
+  });
+
   it("shows the first pack's alerts only", async () => {
     const wrapper = await mountView();
     expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(true);

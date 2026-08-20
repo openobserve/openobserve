@@ -262,7 +262,26 @@ const readinessKnown = ref(false);
 const entries = computed<AlertLibraryEntry[]>(() => manifest.value?.alerts ?? []);
 const lastFetched = computed<number | null>(() => store.state.alertLibrary?.lastFetched ?? null);
 const loadFailed = computed(() => !!error.value && !manifest.value);
-const isBusy = computed(() => (isLoading.value || streamsPending.value) && !manifest.value);
+/**
+ * Skeleton until there is something honest to draw.
+ *
+ * The manifest and the org's streams load in parallel, and the manifest wins —
+ * it is a small cached S3 object, the streams are a backend query. Gating only
+ * on `!manifest` therefore painted the grid the instant the manifest landed,
+ * while readiness was still unknown; `entryReady` optimistically answers `true`
+ * then, so every card rendered solid and full-opacity and then dimmed to
+ * `border-dashed opacity-65` a moment later when the streams arrived. That read
+ * as the borders getting lighter on their own.
+ *
+ * Also requiring `readinessKnown` holds the skeleton until the verdict is real.
+ * It cannot stick: a failed stream load clears `streamsPending` in its `finally`,
+ * so the grid renders with readiness deliberately unknown (cards undimmed). And
+ * a background refresh keeps `readinessKnown` true, so the grid is never blanked
+ * under the user.
+ */
+const isBusy = computed(
+  () => (isLoading.value || streamsPending.value) && (!manifest.value || !readinessKnown.value),
+);
 
 const errorDescription = computed(() => {
   const code = (error.value?.code ?? "malformed") as AlertLibraryErrorCode;
