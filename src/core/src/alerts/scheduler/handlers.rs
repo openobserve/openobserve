@@ -6303,6 +6303,7 @@ mod tests {
                 name: "my_func".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
             0.0,
             0.0,

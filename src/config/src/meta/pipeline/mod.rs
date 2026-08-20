@@ -1020,6 +1020,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     200.0,
                     100.0,
@@ -1031,6 +1032,7 @@ mod tests {
                         name: "test_function2".to_string(),
                         after_flatten: true,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1065,6 +1067,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     100.0,
                     100.0,
@@ -1325,6 +1328,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1435,6 +1439,7 @@ mod tests {
                         name: "test_function1".to_string(),
                         after_flatten: true, // Checked
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     200.0,
                     100.0,
@@ -1446,6 +1451,7 @@ mod tests {
                         name: "test_function2".to_string(),
                         after_flatten: false, // Unchecked after checked
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1523,6 +1529,7 @@ mod tests {
                 name: "fn1".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
         );
         node_map.insert(
@@ -1587,6 +1594,7 @@ mod tests {
                 name: "fn1".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
             0.0,
             0.0,
