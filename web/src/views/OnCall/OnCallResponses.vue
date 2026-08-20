@@ -50,23 +50,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("oncall.myOnCallNav") }}
       </OButton>
+      <!-- The row holds two kinds of control that look alike: one narrows this
+           list, the rest leave it. The rule follows the filter, so the buttons
+           after it are read as somewhere to go rather than something else to
+           switch on. It goes with the filter — with nobody signed in there is
+           no filter, and a rule with nothing on one side of it divides
+           nothing. -->
+      <OSeparator v-if="viewerEmail" vertical class="mx-1 self-stretch" />
       <!-- The module's own navigation. The rail names On-Call once; who is on
            call (Teams) and which team a page reaches (Routing) are configuration
            for this screen, so they are reached from it rather than from three
            sibling rail entries. -->
-      <!-- Named for what it uniquely answers — "did my phone actually ring" —
-           rather than "My on-call", which is already the filter beside it. Two
-           controls with one name is the vocabulary problem this module keeps
-           being reported for. -->
-      <OButton
-        variant="outline"
-        size="sm"
-        icon-left="inbox"
-        data-test="oncall-responses-mine-page-btn"
-        @click="goTo('onCallMine')"
-      >
-        {{ t("oncall.mineSentToMe") }}
-      </OButton>
       <OButton
         variant="outline"
         size="sm"
@@ -118,27 +112,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @create-team="createTeam"
     />
 
-    <!-- The standing question, above the list that answers it per row: would a
-         page reach anyone. Hidden only while setup owns the screen — on an org
-         that has never paged it has no answer yet.
-
-         "Is anything waiting on a person" used to be a banner here as well. The
-         ringing run is the first section of the list directly below, with the
-         same count and the same acknowledge-all on its heading, so the banner
-         was that heading said twice — and its count was taken before the stat
-         filter, so a filtered list could disagree with it. -->
-    <OContent v-if="setupLoaded && !setupOnly && !unavailable" class="pt-2">
-      <OnCallNowStrip
-        :teams="teams"
-        :slots-by-team="slotsByTeam"
-        :handover-by-team="handoverByTeam"
-        :viewer-email="viewerEmail"
-        :analytics="causeAnalytics"
-        @view-schedules="goTo('onCallTeams')"
-        @view-team="openTeam"
-      />
-    </OContent>
-
+    <!-- `table-id` carries a version suffix because column widths and
+         visibility are persisted per column id: the previous entry hid Team,
+         hid a column that no longer exists, and sized a time column that has
+         since been renamed — three settings no reader chose. -->
     <OTable
       v-if="!unavailable && !setupOnly"
       :frame="false"
@@ -149,16 +126,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :error="loadError"
       pagination="client"
       :page-size="20"
-      sort-by="opened_at"
+      sort-by="last_alert_at"
       sort-order="desc"
       :column-visibility="{
         firings: false,
         state: false,
-        team: false,
-        opened_at: false,
         channels: false,
       }"
-      table-id="oncall-responses-list"
+      table-id="oncall-responses-list-v2"
       :persist-columns="true"
       :show-global-filter="false"
       :enable-column-resize="true"
@@ -230,6 +205,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div v-else class="flex w-full flex-wrap items-center gap-2">
+          <!-- The standing question, on the same row as the filters that narrow
+               the list which answers it per row: would a page reach anyone.
+               It had a strip of its own above the toolbar, which spent a whole
+               line of the first screen on a button and a count.
+
+               "Is anything waiting on a person" used to be a banner here as
+               well. The ringing run is the first section of the list directly
+               below, with the same count and the same acknowledge-all on its
+               heading, so the banner was that heading said twice — and its
+               count was taken before the stat filter, so a filtered list could
+               disagree with it. -->
+          <OnCallNowStrip
+            v-if="setupLoaded"
+            :teams="teams"
+            :slots-by-team="slotsByTeam"
+            :handover-by-team="handoverByTeam"
+            :viewer-email="viewerEmail"
+            @view-schedules="goTo('onCallTeams')"
+            @view-team="openTeam"
+          />
+          <!-- Same rule as the header row: what follows narrows this list, what
+               precedes it does not. Who is on call right now is a standing fact
+               with a menu behind it, and sitting flush against the team filter
+               it read as the first of the filters. -->
+          <OSeparator v-if="setupLoaded" vertical class="mx-1 self-stretch" />
           <!-- `width` is a PROP, not a class: OSelect merges an incoming class
                with its own width class, so a `w-56` here lost to the default
                `w-full` and stacked the whole toolbar into three rows. -->
@@ -373,9 +373,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag v-if="!row.latest.team_id" variant="error-soft" size="sm">
           {{ t("oncall.statUnrouted") }}
         </OTag>
-        <span v-else class="text-text-body truncate text-sm">
-          {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
-        </span>
+        <!-- The team is a destination, not a label: "who else is on this
+             rotation" is the question after "who owns this page", and it lives
+             one click away on the team. `.stop` because the row itself opens
+             the page — a cell that navigates somewhere else must not do both. -->
+        <OButton
+          v-else
+          variant="ghost-primary"
+          size="xs"
+          class="max-w-full"
+          :data-test="`oncall-row-team-${row.rowKey}`"
+          @click.stop="openTeam(row.latest.team_id)"
+        >
+          <span class="truncate">
+            {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
+          </span>
+        </OButton>
       </template>
 
       <!-- The name plus what the page is about: how often it has fired, and the
@@ -390,11 +403,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ raw(`×${row.firings.length}`) }}
             </OTag>
           </span>
-          <span class="flex flex-wrap items-center gap-1">
-            <OTag v-if="row.latest.team_id" variant="default-soft" size="sm">
-              {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
-            </OTag>
-            <OTag v-else variant="error-soft" size="sm">{{ t("oncall.statUnrouted") }}</OTag>
+          <!-- Only when there is something to say: with the team moved out to
+               its own column most rows carry no chips at all, and an empty row
+               of them still took vertical space in every one. -->
+          <span
+            v-if="isImpactedRow(row.latest) || row.latest.incident_id"
+            class="flex flex-wrap items-center gap-1"
+          >
             <!-- This row is somebody else's outage reaching this team's
                  service, and the difference decides what the reader does with
                  it: a page you fix, or a blast radius you contain and confirm
@@ -442,23 +457,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
       </template>
 
-      <!-- How long this has been ringing, and when the ladder actually started.
-           A page opened an hour ago whose ladder waited thirty minutes has been
+      <!-- The same cell as the Incident list's "Last Alert", down to the hover
+           tooltip and the em dash, so the two lists read alike.
+
+           The second line survives the change because it is not a time format:
+           a page opened an hour ago whose ladder waited thirty minutes has been
            ringing for half as long as its age suggests, and that gap is the
            difference between a slow responder and a slow policy. -->
-      <template #cell-notified="{ row }">
+      <template #cell-last_alert_at="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5">
-          <template v-if="isRinging(row)">
-            <OText variant="body-strong" as="span" :data-test="`oncall-ringing-for-${row.rowKey}`">
-              {{ ringingFor(row.latest) }}
-            </OText>
-            <OText variant="meta"
-              v-if="ladderStarted(row.latest)"
-              :data-test="`oncall-ladder-started-${row.rowKey}`">
-              {{ ladderStarted(row.latest) }}
-            </OText>
-          </template>
-          <OTimeCell v-else :value="row.latest.opened_at" unit="us" />
+          <OTimeCell
+            :value="row.latest.opened_at"
+            unit="us"
+            mode="relative"
+            :timezone="store.state.timezone"
+            :empty-label="raw('—')"
+          />
+          <OText
+            v-if="isRinging(row) && ladderStarted(row.latest)"
+            variant="meta"
+            :data-test="`oncall-ladder-started-${row.rowKey}`"
+          >
+            {{ ladderStarted(row.latest) }}
+          </OText>
         </span>
       </template>
 
@@ -482,10 +503,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OTag>
         </span>
-      </template>
-
-      <template #cell-opened_at="{ row }">
-        <OTimeCell :value="row.latest.opened_at" unit="us" />
       </template>
 
       <!-- What already happened, without leaving the triage list. The detail
@@ -692,11 +709,10 @@ import OnCallPageContext from "@/components/oncall/OnCallPageContext.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
-import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
@@ -714,6 +730,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -727,7 +744,6 @@ import type {
   OnCallResponse,
   OnCallResponseEvent,
   OnCallResponseGroup,
-  CauseAnalytics,
   OnCallSchedule,
   OnCallSlot,
   OnCallTeam,
@@ -754,7 +770,6 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { canConfigure } = useOnCallPermissions();
-const nowMicros = useOnCallClock();
 
 /// A table row. Grouped or not, every row carries the same shape so the
 /// columns and the actions never have to branch on the mode.
@@ -799,7 +814,6 @@ const expandedEvents = ref<OnCallResponseEvent[]>([]);
 const expandedHistory = ref<OnCallResponse[]>([]);
 const expandedCauses = ref<CauseGroup[]>([]);
 const expandedLoading = ref(false);
-const causeAnalytics = ref<CauseAnalytics | null>(null);
 const teamsAvailable = ref(true);
 const truncated = ref(false);
 const loading = ref(false);
@@ -918,6 +932,19 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     meta: { isName: true, flex: true },
   },
   {
+    // Who owns this page. It used to be a chip inside the alert cell and a
+    // column hidden by default — so the one fact that decides who answers was
+    // unsortable, unfilterable by column, and said twice on the rows where it
+    // was on at all.
+    id: "team",
+    header: t("oncall.team"),
+    size: 160,
+    accessorFn: (row: PageRow) =>
+      teamNameById.value[row.latest.team_id] ?? row.latest.team_id ?? "",
+    sortable: true,
+    hideable: true,
+  },
+  {
     // Sorts on rungs fired, so "furthest up the ladder" is one click away —
     // that is the ordering a responder wants, not alphabetical state.
     id: "escalation",
@@ -934,11 +961,17 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     sortable: true,
   },
   {
-    // Age, not the absolute instant: "1h 44m" is what a responder is deciding
-    // against, and on a ringing row it is the whole point of the column.
-    id: "notified",
-    header: t("oncall.ringingAge"),
-    size: 144,
+    // The Incident list's "Last Alert" cell, said the same way here: relative
+    // time with the absolute instant on hover. Two sibling tables answering
+    // "when did this last fire" in two different formats made a reader carry
+    // the conversion between them.
+    //
+    // The bespoke duration this used to render is the same number: a page that
+    // opened forty minutes ago and is still ringing has been ringing for forty
+    // minutes, which is what the relative time already says.
+    id: "last_alert_at",
+    header: t("oncall.lastAlertAt"),
+    size: COL.dateAbsolute,
     accessorFn: (row: PageRow) => row.latest.opened_at,
     sortable: true,
   },
@@ -960,23 +993,6 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     header: t("oncall.state"),
     size: 128,
     accessorFn: (row: PageRow) => row.latest.state,
-    sortable: true,
-    hideable: true,
-  },
-  {
-    id: "team",
-    header: t("oncall.team"),
-    size: 160,
-    accessorFn: (row: PageRow) =>
-      teamNameById.value[row.latest.team_id] ?? row.latest.team_id ?? "",
-    sortable: true,
-    hideable: true,
-  },
-  {
-    id: "opened_at",
-    header: t("oncall.openedAt"),
-    size: 128,
-    accessorFn: (row: PageRow) => row.latest.opened_at,
     sortable: true,
     hideable: true,
   },
@@ -1385,14 +1401,6 @@ function isRinging(row: PageRow): boolean {
   return rowSection(row) === "ringing";
 }
 
-/// How long the page has gone unanswered. Relative, because that is the number
-/// being decided against.
-function ringingFor(record: OnCallResponse): I18nText {
-  return t("oncall.ringingFor", {
-    duration: formatMicrosDuration(nowMicros.value - record.opened_at),
-  });
-}
-
 /// When the ladder's first rung fired, as its delay from the page opening. A
 /// policy that waits before ringing anybody is a common and invisible cause of
 /// "nobody answered", and `after_micros` is the only place it is recorded.
@@ -1608,20 +1616,6 @@ async function fetchExpandedEvents(responseId: string) {
   }
 }
 
-/// What keeps breaking the org, counted in the database over a window. Costs
-/// one request and, unlike anything derived from the fetched page, describes
-/// the whole org.
-async function fetchCauseAnalytics() {
-  try {
-    const res = await oncallService.analyticsCauses({ org_identifier: orgId.value });
-    causeAnalytics.value = res.data ?? null;
-  } catch {
-    // Older servers have no analytics route; the card says "no cause recorded"
-    // rather than taking the screen down.
-    causeAnalytics.value = null;
-  }
-}
-
 async function refreshAll() {
   await fetchResponses();
   // The probe answered "not here" — every further call would 404/403 the
@@ -1629,7 +1623,7 @@ async function refreshAll() {
   if (unavailable.value) return;
   await fetchContext();
   await fetchTeamContext();
-  await Promise.allSettled([fetchEscalationProgress(), fetchCauseAnalytics()]);
+  await fetchEscalationProgress();
 }
 
 // Expansion is single-mode, so there is at most one id to resolve. The table

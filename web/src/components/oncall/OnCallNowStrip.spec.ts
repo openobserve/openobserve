@@ -18,8 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import OnCallNowStrip from "@/components/oncall/OnCallNowStrip.vue";
 import i18n from "@/locales";
-import type { CauseAnalytics, OnCallTeam } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import type { OnCallTeam } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OTag: { name: "OTag", template: "<span><slot /></span>" },
@@ -44,7 +43,6 @@ const stubs = {
     template: "<button @click=\"$emit('select')\"><slot /></button>",
   },
   ODropdownSeparator: { name: "ODropdownSeparator", template: "<hr />" },
-  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
 };
 
 function team(id: string, name: string, timezone = "UTC"): OnCallTeam {
@@ -64,7 +62,7 @@ describe("OnCallNowStrip", () => {
 
     expect(wrapper.find("[data-test='oncall-now-strip-empty']").exists()).toBe(true);
     expect(wrapper.find("[data-test='oncall-now-strip-trigger']").text()).toContain(
-      "On call now · nobody",
+      "On-call teams (0)",
     );
   });
 
@@ -74,7 +72,7 @@ describe("OnCallNowStrip", () => {
     const wrapper = render({ teams: [team("t1", "A"), team("t2", "B")] });
 
     expect(wrapper.find("[data-test='oncall-now-strip-trigger']").text()).toContain(
-      "On call now · 2 teams",
+      "On-call teams (2)",
     );
   });
 
@@ -180,32 +178,5 @@ describe("OnCallNowStrip", () => {
     await wrapper.find("[data-test='oncall-now-strip-schedules']").trigger("click");
 
     expect(wrapper.emitted("view-schedules")).toHaveLength(1);
-  });
-
-  /// Sorted here rather than trusted from the wire: the endpoint makes no
-  /// ordering promise, and naming the wrong cause is worse than naming none.
-  it("names the two biggest causes, largest first", () => {
-    const analytics: CauseAnalytics = {
-      from: 0,
-      to: 30 * MICROS_PER_DAY,
-      total: 10,
-      causes: [
-        { cause: "dependency_failure", count: 2, last_title: null },
-        { cause: "capacity_or_load", count: 3, last_title: "search_index_lag" },
-      ],
-    } as CauseAnalytics;
-    const wrapper = render({ analytics });
-
-    const text = wrapper.find("[data-test='oncall-now-strip-causes']").text();
-    expect(text).toContain("Last 30 days:");
-    expect(text.indexOf("30%")).toBeLessThan(text.indexOf("20%"));
-  });
-
-  /// A cause is recorded at resolve, so an org that never fills it in has
-  /// nothing here — which is a different fact from "nothing broke".
-  it("says nothing about causes when none was recorded", () => {
-    const wrapper = render({ analytics: null });
-
-    expect(wrapper.find("[data-test='oncall-now-strip-causes']").exists()).toBe(false);
   });
 });
