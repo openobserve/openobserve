@@ -1393,6 +1393,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
+              <div class="flex items-start gap-2">
+                  <AlertMultiToggle
+                      v-if="!showVrl && localTab === 'sql'"
+                      :enabled="isMultiAlert"
+                      @change="onMultiAlertChange"
+                  />
+              </div>
 
               <!-- PromQL: Alert if the value is + Having series -->
               <template v-if="localTab === 'promql' && promqlCondition">
