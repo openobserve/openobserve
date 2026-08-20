@@ -957,7 +957,13 @@ mod tests {
     const MIN: i64 = MICROS_PER_MINUTE;
 
     fn policy() -> EscalationPolicy {
-        EscalationPolicy::default_for_team("pol_1", "default", "team_1")
+        EscalationPolicy::default_for_team(
+            "pol_1",
+            "default",
+            "team_1",
+            "rot_primary",
+            Some("rot_secondary".into()),
+        )
     }
 
     fn steps(priority: AlertPriority) -> Vec<LadderStep> {
@@ -1029,13 +1035,16 @@ mod tests {
     #[test]
     fn test_the_default_ladder_needs_only_one_rotation() {
         let action = plan(&steps(AlertPriority::P2), 0, &[]);
-        assert_eq!(targets_of(&action), vec![EscalationTarget::OnCallNow]);
+        assert_eq!(targets_of(&action), vec![EscalationTarget::rotation("rot_primary")]);
 
         let later = plan(&steps(AlertPriority::P2), 5 * MIN, &[0]);
-        assert_eq!(targets_of(&later), vec![EscalationTarget::NextOnCall]);
+        assert_eq!(targets_of(&later), vec![EscalationTarget::rotation("rot_secondary")]);
 
+        // Third and fourth are the whole team. There is no "everyone on the
+        // schedule" rung any more: it unioned every slot, which is not a thing
+        // a level can name now that a level names one rotation.
         let l1 = plan(&steps(AlertPriority::P2), 15 * MIN, &[0, 5 * MIN]);
-        assert_eq!(targets_of(&l1), vec![EscalationTarget::EveryoneOnSchedule]);
+        assert_eq!(targets_of(&l1), vec![EscalationTarget::WholeTeam]);
 
         let last = plan(&steps(AlertPriority::P2), 30 * MIN, &[0, 5 * MIN, 15 * MIN]);
         assert_eq!(targets_of(&last), vec![EscalationTarget::WholeTeam]);
@@ -1050,37 +1059,33 @@ mod tests {
     /// away from the doc fails here rather than at 3am.
     #[test]
     fn test_default_ladders_match_the_published_timing_table() {
-        use EscalationTarget::{EveryoneOnSchedule, NextOnCall, OnCallNow, WholeTeam};
-
         let expected: &[(AlertPriority, &[(i64, &[EscalationTarget])])] = &[
             (
                 AlertPriority::P1,
                 &[
                     // §2: primary + secondary + L1, in parallel, at t=0.
-                    (0, &[OnCallNow, NextOnCall, EveryoneOnSchedule]),
-                    (5 * MIN, &[WholeTeam]),
-                    (15 * MIN, &[WholeTeam]),
-                    (30 * MIN, &[WholeTeam]),
-                    (60 * MIN, &[WholeTeam]),
+                    (0, &[EscalationTarget::rotation("rot_primary"), EscalationTarget::rotation("rot_secondary")]),
+                    (5 * MIN, &[EscalationTarget::WholeTeam]),
+                    (15 * MIN, &[EscalationTarget::WholeTeam]),
+                    (30 * MIN, &[EscalationTarget::WholeTeam]),
+                    (60 * MIN, &[EscalationTarget::WholeTeam]),
                 ],
             ),
             (
                 AlertPriority::P2,
                 &[
-                    (0, &[OnCallNow]),
-                    (5 * MIN, &[NextOnCall]),
-                    (15 * MIN, &[EveryoneOnSchedule]),
-                    (30 * MIN, &[WholeTeam]),
-                    (60 * MIN, &[WholeTeam]),
+                    (0, &[EscalationTarget::rotation("rot_primary")]),
+                    (5 * MIN, &[EscalationTarget::rotation("rot_secondary")]),
+                    (15 * MIN, &[EscalationTarget::WholeTeam]),
+                    (30 * MIN, &[EscalationTarget::WholeTeam]),
                 ],
             ),
             (
                 AlertPriority::P3,
                 &[
-                    (0, &[OnCallNow]),
-                    (15 * MIN, &[NextOnCall]),
-                    (30 * MIN, &[EveryoneOnSchedule]),
-                    (60 * MIN, &[WholeTeam]),
+                    (0, &[EscalationTarget::rotation("rot_primary")]),
+                    (15 * MIN, &[EscalationTarget::rotation("rot_secondary")]),
+                    (30 * MIN, &[EscalationTarget::WholeTeam]),
                 ],
             ),
             (AlertPriority::P4, &[]),
@@ -1124,9 +1129,8 @@ mod tests {
         assert_eq!(
             targets_of(&action),
             vec![
-                EscalationTarget::OnCallNow,
-                EscalationTarget::NextOnCall,
-                EscalationTarget::EveryoneOnSchedule,
+                EscalationTarget::rotation("rot_primary"),
+                EscalationTarget::rotation("rot_secondary"),
             ]
         );
     }
@@ -1227,10 +1231,9 @@ mod tests {
         assert_eq!(
             fired,
             vec![
-                (0, EscalationTarget::OnCallNow),
-                (15 * MIN, EscalationTarget::NextOnCall),
-                (30 * MIN, EscalationTarget::EveryoneOnSchedule),
-                (60 * MIN, EscalationTarget::WholeTeam),
+                (0, EscalationTarget::rotation("rot_primary")),
+                (15 * MIN, EscalationTarget::rotation("rot_secondary")),
+                (30 * MIN, EscalationTarget::WholeTeam),
             ]
         );
         assert_eq!(
@@ -1305,7 +1308,7 @@ mod tests {
     fn test_two_rungs_cannot_share_a_delay() {
         let mut p = policy();
         p.rungs[0].steps = vec![
-            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
+            LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")]),
             LadderStep::new(0, vec![EscalationTarget::WholeTeam]),
         ];
         assert_eq!(p.validate(), Err(PolicyError::DuplicateDelay(0)));
@@ -1327,8 +1330,8 @@ mod tests {
     fn test_due_rungs_come_back_in_delay_order() {
         let unordered = vec![
             LadderStep::new(30 * MIN, vec![EscalationTarget::WholeTeam]),
-            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
-            LadderStep::new(5 * MIN, vec![EscalationTarget::NextOnCall]),
+            LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")]),
+            LadderStep::new(5 * MIN, vec![EscalationTarget::rotation("rot_secondary")]),
         ];
         assert_eq!(
             delays(&plan(&unordered, MICROS_PER_HOUR, &[])),
@@ -1342,8 +1345,8 @@ mod tests {
     fn test_next_wakeup_is_the_soonest_pending_step() {
         let unordered = vec![
             LadderStep::new(30 * MIN, vec![EscalationTarget::WholeTeam]),
-            LadderStep::new(5 * MIN, vec![EscalationTarget::NextOnCall]),
-            LadderStep::new(15 * MIN, vec![EscalationTarget::EveryoneOnSchedule]),
+            LadderStep::new(5 * MIN, vec![EscalationTarget::rotation("rot_secondary")]),
+            LadderStep::new(15 * MIN, vec![EscalationTarget::everyone_in("rot_primary")]),
         ];
         assert_eq!(
             plan(&unordered, 0, &[]),
@@ -2000,9 +2003,9 @@ mod tests {
     fn test_an_impacted_record_climbs_its_first_rung_and_exactly_one_more() {
         let m = MICROS_PER_MINUTE;
         let full = vec![
-            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
-            LadderStep::new(5 * m, vec![EscalationTarget::NextOnCall]),
-            LadderStep::new(15 * m, vec![EscalationTarget::EveryoneOnSchedule]),
+            LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")]),
+            LadderStep::new(5 * m, vec![EscalationTarget::rotation("rot_secondary")]),
+            LadderStep::new(15 * m, vec![EscalationTarget::everyone_in("rot_primary")]),
             LadderStep::new(30 * m, vec![EscalationTarget::WholeTeam]),
         ];
         let cut = impacted_ladder(&full);
@@ -2023,8 +2026,8 @@ mod tests {
         let m = MICROS_PER_MINUTE;
         let jumbled = vec![
             LadderStep::new(30 * m, vec![EscalationTarget::WholeTeam]),
-            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
-            LadderStep::new(5 * m, vec![EscalationTarget::NextOnCall]),
+            LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")]),
+            LadderStep::new(5 * m, vec![EscalationTarget::rotation("rot_secondary")]),
         ];
         let cut = impacted_ladder(&jumbled);
         assert_eq!(
@@ -2037,7 +2040,7 @@ mod tests {
     /// would page somebody their own policy never names.
     #[test]
     fn test_a_one_rung_policy_gives_an_impacted_team_one_rung() {
-        let one = vec![LadderStep::new(0, vec![EscalationTarget::OnCallNow])];
+        let one = vec![LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")])];
         assert_eq!(impacted_ladder(&one).len(), 1);
         assert!(impacted_ladder(&[]).is_empty());
     }

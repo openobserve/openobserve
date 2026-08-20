@@ -298,7 +298,7 @@ mod tests {
     /// engine has always run.
     #[test]
     fn test_the_default_columns_read_back_as_todays_ladder() {
-        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1");
+        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()));
         let encoded = serde_json::to_string(&defaults.rungs).unwrap();
         let p = to_policy(model(&encoded));
         assert_eq!(p.repeat_count, config::meta::oncall::DEFAULT_REPEAT_COUNT);
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_rungs_round_trip_through_the_json_column() {
-        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1");
+        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()));
         let encoded = serde_json::to_string(&defaults.rungs).unwrap();
         let p = to_policy(model(&encoded));
         assert_eq!(p, defaults);
@@ -350,7 +350,7 @@ mod tests {
     /// tell.
     #[test]
     fn test_the_l0_block_round_trips_through_its_own_column() {
-        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1");
+        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()));
         let encoded = serde_json::to_string(&defaults.rungs).unwrap();
 
         let mut stored = model(&encoded);
@@ -394,7 +394,7 @@ mod tests {
             );
             assert_eq!(
                 p,
-                EscalationPolicy::default_for_team("pol_1", "default", "team_1")
+                EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()))
             );
         }
     }
@@ -410,7 +410,7 @@ mod tests {
 
     #[test]
     fn test_edited_rungs_survive_the_round_trip() {
-        let mut edited = EscalationPolicy::default_for_team("pol_1", "default", "team_1");
+        let mut edited = EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()));
         let idx = edited
             .rungs
             .iter()

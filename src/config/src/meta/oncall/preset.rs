@@ -1189,6 +1189,18 @@ fn minute_input(field: &str, label: &str) -> PresetInput {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A preset builds the rules of ONE rotation, so the tests wrap them in one
+    /// to ask who is on call. Which rule won is what they assert on — that is
+    /// the question a preset answers.
+    fn of(rules: &[ShiftRule]) -> crate::meta::oncall::Rotation {
+        crate::meta::oncall::Rotation {
+            id: "rot_1".to_string(),
+            name: "Primary".to_string(),
+            shift_rules: rules.to_vec(),
+            source: None,
+        }
+    }
     use crate::meta::oncall::rotation::{MICROS_PER_HOUR, resolve_on_call};
 
     /// Monday 2026-01-05 00:00:00 UTC — a Monday, so a week of hours walked
@@ -1272,7 +1284,7 @@ mod tests {
                 let rotations = build(&spec, tz, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
                 for hour in 0..(7 * 24) {
                     let at = MONDAY + hour * MICROS_PER_HOUR;
-                    let slots = resolve_on_call(&rotations, &[], &[], at, tz);
+                    let slots = resolve_on_call(&[of(&rotations)], &[], &[], at, tz);
                     assert!(
                         !slots.is_empty(),
                         "{id} in {tz} left hour {hour} of the week uncovered"
@@ -1301,7 +1313,7 @@ mod tests {
                 for step in 0..(7 * 24 * 4) {
                     let at = monday + step * (MICROS_PER_HOUR / 4);
                     assert!(
-                        !resolve_on_call(&rotations, &[], &[], at, tz).is_empty(),
+                        !resolve_on_call(&[of(&rotations)], &[], &[], at, tz).is_empty(),
                         "{id} left a gap at step {step} of a DST week"
                     );
                 }
@@ -1325,9 +1337,9 @@ mod tests {
                     .timestamp_micros()
             };
             let who = |t| {
-                resolve_on_call(&rotations, &[], &[], t, tz)
+                resolve_on_call(&[of(&rotations)], &[], &[], t, tz)
                     .first()
-                    .map(|s| s.rotation.clone())
+                    .map(|s| s.rule.clone())
                     .unwrap()
             };
             assert_eq!(who(at(8, 59)), "Nights and weekends", "{y}-{m}-{d} 08:59");
@@ -1390,9 +1402,9 @@ mod tests {
             let id = spec.id();
             let rotations = build(&spec, tz, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
             for (hour, expected) in samples {
-                let slots = resolve_on_call(&rotations, &[], &[], MONDAY + hour * MICROS_PER_HOUR, tz);
+                let slots = resolve_on_call(&[of(&rotations)], &[], &[], MONDAY + hour * MICROS_PER_HOUR, tz);
                 assert_eq!(
-                    slots.first().map(|s| s.rotation.as_str()),
+                    slots.first().map(|s| s.rule.as_str()),
                     Some(*expected),
                     "{id} at hour {hour}"
                 );
@@ -1437,7 +1449,7 @@ mod tests {
         let at = |h: i64| MONDAY + h * MICROS_PER_HOUR;
         for (hour, expected) in [(2, "naoto@o2.ai"), (12, "dee@o2.ai"), (20, "kelly@o2.ai")] {
             assert_eq!(
-                resolve_on_call(&rotations, &[], &[], at(hour), chrono_tz::UTC)
+                resolve_on_call(&[of(&rotations)], &[], &[], at(hour), chrono_tz::UTC)
                     .first()
                     .map(|s| s.user_email.as_str()),
                 Some(expected),
@@ -1495,7 +1507,7 @@ mod tests {
                     ],
                     "{id} rotation carries a field the schedule API does not know"
                 );
-                let back: Rotation = serde_json::from_value(json).unwrap();
+                let back: ShiftRule = serde_json::from_value(json).unwrap();
                 assert_eq!(&back, r, "{id}");
             }
         }
@@ -1835,14 +1847,14 @@ mod tests {
         for (hour, expected) in [(0, "Night"), (7, "Day"), (23, "Night")] {
             assert_eq!(
                 resolve_on_call(
-                    &rotations,
+                    &[of(&rotations)],
                     &[],
                     &[],
                     MONDAY + hour * MICROS_PER_HOUR,
                     chrono_tz::UTC
                 )
                 .first()
-                .map(|s| s.rotation.as_str()),
+                .map(|s| s.rule.as_str()),
                 Some(expected),
                 "hour {hour}"
             );

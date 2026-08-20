@@ -1518,9 +1518,8 @@ mod tests {
 
     #[test]
     fn test_arbitrary_shift_lengths_resolve() {
-        let r = Rotation {
+        let r = ShiftRule {
             name: "Primary".into(),
-            slot: DEFAULT_SLOT.to_string(),
             members: vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             shift_micros: 8 * MICROS_PER_HOUR,
             anchor_micros: ANCHOR,
@@ -1528,9 +1527,6 @@ mod tests {
             restrictions: vec![],
             starts_at: None,
             ends_at: None,
-            secondary_offset: None,
-            secondary_slot: None,
-            source: None,
         };
         assert_eq!(r.member_at(ANCHOR, TZ), Some("ana@o2.ai"));
         assert_eq!(r.member_at(ANCHOR + 8 * MICROS_PER_HOUR, TZ), Some("bob@o2.ai"));
@@ -1543,24 +1539,24 @@ mod tests {
     #[test]
     fn test_validate_rejects_unusable_rotations() {
         let mut r = weekly(&[]);
-        assert_eq!(r.validate(), Err(RotationError::NoMembers));
+        assert_eq!(r.validate(), Err(ShiftRuleError::NoMembers));
 
         r = weekly(&["ana@o2.ai"]);
         r.shift_micros = 0;
-        assert_eq!(r.validate(), Err(RotationError::NonPositiveShift(0)));
+        assert_eq!(r.validate(), Err(ShiftRuleError::NonPositiveShift(0)));
         r.shift_micros = -1;
-        assert_eq!(r.validate(), Err(RotationError::NonPositiveShift(-1)));
+        assert_eq!(r.validate(), Err(ShiftRuleError::NonPositiveShift(-1)));
 
         r = weekly(&["ana@o2.ai", "ANA@o2.ai"]);
         assert_eq!(
             r.validate(),
-            Err(RotationError::DuplicateMember("ANA@o2.ai".into())),
+            Err(ShiftRuleError::DuplicateMember("ANA@o2.ai".into())),
             "duplicates must be caught case-insensitively"
         );
 
         r = weekly(&["ana@o2.ai"]);
         r.name = "  ".into();
-        assert_eq!(r.validate(), Err(RotationError::NoName));
+        assert_eq!(r.validate(), Err(ShiftRuleError::NoName));
     }
 
     /// An unusable rotation must resolve to nobody. Falling back to
@@ -1577,96 +1573,22 @@ mod tests {
         assert_eq!(zero.member_at(ANCHOR, TZ), None, "must not divide by zero");
     }
 
-    /// One rotation is all a team needs. "Secondary" is this rotation's next
-    /// handover, not a second schedule somebody has to staff.
-    #[test]
-    fn test_the_ladder_walks_one_rotation() {
-        let rotations = vec![Rotation::weekly(
-            "Primary",
-            vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()],
-            ANCHOR,
-        )];
-
-        assert_eq!(
-            on_call_now(&rotations, &[], &[], ANCHOR, chrono_tz::UTC).as_deref(),
-            Some("ana@o2.ai")
-        );
-        assert_eq!(
-            next_on_call(&rotations, &[], &[], ANCHOR, chrono_tz::UTC).as_deref(),
-            Some("bob@o2.ai")
-        );
-        // A week later everyone has moved along by one.
-        let later = ANCHOR + MICROS_PER_WEEK;
-        assert_eq!(
-            on_call_now(&rotations, &[], &[], later, chrono_tz::UTC).as_deref(),
-            Some("bob@o2.ai")
-        );
-        assert_eq!(
-            next_on_call(&rotations, &[], &[], later, chrono_tz::UTC).as_deref(),
-            Some("cara@o2.ai")
-        );
-    }
-
-    /// The next handover wraps, so the last member hands back to the first.
-    #[test]
-    fn test_next_on_call_wraps_around_the_rotation() {
-        let rotations = vec![Rotation::weekly(
-            "Primary",
-            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
-            ANCHOR,
-        )];
-        assert_eq!(
-            next_on_call(&rotations, &[], &[], ANCHOR + MICROS_PER_WEEK, chrono_tz::UTC).as_deref(),
-            Some("ana@o2.ai")
-        );
-    }
-
-    /// A one-person rotation has no next. Returning the same person would
-    /// page them twice and call the second one an escalation.
-    #[test]
-    fn test_a_single_member_rotation_has_no_next() {
-        let rotations = vec![Rotation::weekly("Primary", vec!["ana@o2.ai".into()], ANCHOR)];
-
-        assert_eq!(
-            on_call_now(&rotations, &[], &[], ANCHOR, chrono_tz::UTC).as_deref(),
-            Some("ana@o2.ai")
-        );
-        assert_eq!(next_on_call(&rotations, &[], &[], ANCHOR, chrono_tz::UTC), None);
-        assert_eq!(
-            resolve_on_call(&rotations, &[], &[], ANCHOR, chrono_tz::UTC)[0].next_user_email,
-            None
-        );
-    }
-
-    #[test]
-    fn test_everyone_on_schedule_is_the_whole_rotation() {
-        let rotations = vec![Rotation::weekly(
-            "Primary",
-            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
-            ANCHOR,
-        )];
-        assert_eq!(
-            everyone_on_schedule(&rotations, &[], &[], ANCHOR, chrono_tz::UTC),
-            vec!["ana@o2.ai".to_string(), "bob@o2.ai".to_string()]
-        );
-    }
-
     /// An unusable rotation resolves to nobody, which is visible, rather than
     /// to `members[0]`, which would page someone the schedule never selected.
     #[test]
     fn test_a_broken_rotation_staffs_nobody() {
-        let rotations = vec![Rotation::weekly("Primary", vec![], ANCHOR)];
-        assert!(resolve_on_call(&rotations, &[], &[], ANCHOR, chrono_tz::UTC).is_empty());
+        let rotations = vec![ShiftRule::weekly("Primary", vec![], ANCHOR)];
+        assert!(resolve_on_call(&[of(&rotations)], &[], &[], ANCHOR, chrono_tz::UTC).is_empty());
         assert_eq!(on_call_now(&rotations, &[], &[], ANCHOR, chrono_tz::UTC), None);
-        assert_eq!(next_on_call(&rotations, &[], &[], ANCHOR, chrono_tz::UTC), None);
-        assert!(everyone_on_schedule(&rotations, &[], &[], ANCHOR, chrono_tz::UTC).is_empty());
+        assert_eq!(of(&rotations).next_holder(&[], ANCHOR, chrono_tz::UTC), None);
+        assert!(of(&rotations).everyone(&[], &[], ANCHOR, chrono_tz::UTC).is_empty());
     }
 
     #[test]
     fn test_round_trips_through_json() {
         let r = weekly(&["ana@o2.ai", "bob@o2.ai"]);
         let json = serde_json::to_string(&r).unwrap();
-        let back: Rotation = serde_json::from_str(&json).unwrap();
+        let back: ShiftRule = serde_json::from_str(&json).unwrap();
         assert_eq!(back, r);
     }
 
@@ -1695,10 +1617,9 @@ mod tests {
         members: &[&str],
         priority: i32,
         restrictions: Vec<TimeWindow>,
-    ) -> Rotation {
-        Rotation {
+    ) -> ShiftRule {
+        ShiftRule {
             name: name.to_string(),
-            slot: DEFAULT_SLOT.to_string(),
             members: members.iter().map(|s| s.to_string()).collect(),
             shift_micros: MICROS_PER_WEEK,
             anchor_micros: ANCHOR,
@@ -1706,10 +1627,47 @@ mod tests {
             restrictions,
             starts_at: None,
             ends_at: None,
-            secondary_offset: None,
-            secondary_slot: None,
+        }
+    }
+
+    /// The id every single-rotation test uses, so a cover and the rotation it
+    /// covers agree without each test saying so.
+    const R1: &str = "rot_1";
+
+    /// Wrap a stack of rules into one rotation.
+    ///
+    /// Most of this suite predates rotations-as-objects and is about how
+    /// *rules* combine — priority, restrictions, validity, DST. Those questions
+    /// did not change, so the tests did not either; they just need a position
+    /// to be asked about.
+    fn of(rules: &[ShiftRule]) -> Rotation {
+        Rotation {
+            id: R1.to_string(),
+            name: "Primary".to_string(),
+            shift_rules: rules.to_vec(),
             source: None,
         }
+    }
+
+    fn on_call_now(
+        rules: &[ShiftRule],
+        overrides: &[ScheduleOverride],
+        unavailability: &[Unavailability],
+        at: i64,
+        tz: chrono_tz::Tz,
+    ) -> Option<String> {
+        of(rules).on_call(overrides, unavailability, at, tz)
+    }
+
+    fn resolve_grid(
+        rules: &[ShiftRule],
+        overrides: &[ScheduleOverride],
+        unavailability: &[Unavailability],
+        from: i64,
+        to: i64,
+        tz: chrono_tz::Tz,
+    ) -> Result<Vec<CoverageSegment>, GridError> {
+        resolve_window(&of(rules), overrides, unavailability, from, to, tz)
     }
 
     /// 2026-08-10 is a Monday; 2026-08-15 a Saturday.
@@ -1923,7 +1881,7 @@ mod tests {
         )];
         let saturday = local(IST, 2026, 8, 15, 12, 0);
         assert!(on_call_now(&rotations, &[], &[], saturday, IST).is_none());
-        assert!(resolve_on_call(&rotations, &[], &[], saturday, IST).is_empty());
+        assert!(resolve_on_call(&[of(&rotations)], &[], &[], saturday, IST).is_empty());
     }
 
     /// DST: New York moves its clock, and a 09:00-local window must still be
@@ -1953,7 +1911,7 @@ mod tests {
             7,
             vec![window(&[0, 4], 540, 1020)],
         );
-        let back: Rotation = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        let back: ShiftRule = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
         assert_eq!(back, r);
     }
 
@@ -1970,10 +1928,9 @@ mod tests {
     /// US fall back: 2026-11-01, 02:00 → 01:00 local.
     const HOUR: i64 = MICROS_PER_HOUR;
 
-    fn daily(members: &[&str], anchor: i64) -> Rotation {
-        Rotation {
+    fn daily(members: &[&str], anchor: i64) -> ShiftRule {
+        ShiftRule {
             name: "On-call rotation".into(),
-            slot: DEFAULT_SLOT.to_string(),
             members: members.iter().map(|s| s.to_string()).collect(),
             shift_micros: MICROS_PER_DAY,
             anchor_micros: anchor,
@@ -1981,9 +1938,6 @@ mod tests {
             restrictions: vec![],
             starts_at: None,
             ends_at: None,
-            secondary_offset: None,
-            secondary_slot: None,
-            source: None,
         }
     }
 
@@ -1992,7 +1946,7 @@ mod tests {
     #[test]
     fn test_a_weekly_handover_keeps_its_local_hour_across_spring_forward() {
         let anchor = local(NY, 2026, 3, 2, 9, 0);
-        let r = Rotation::weekly("On-call rotation", vec!["ana@o2.ai".into(), "bob@o2.ai".into()], anchor);
+        let r = ShiftRule::weekly("On-call rotation", vec!["ana@o2.ai".into(), "bob@o2.ai".into()], anchor);
 
         let handover = r.next_handover(anchor + HOUR, NY).unwrap();
         assert_eq!(
@@ -2014,7 +1968,7 @@ mod tests {
     #[test]
     fn test_a_weekly_handover_keeps_its_local_hour_across_fall_back() {
         let anchor = local(NY, 2026, 10, 26, 9, 0);
-        let r = Rotation::weekly("On-call rotation", vec!["ana@o2.ai".into(), "bob@o2.ai".into()], anchor);
+        let r = ShiftRule::weekly("On-call rotation", vec!["ana@o2.ai".into(), "bob@o2.ai".into()], anchor);
 
         let handover = r.next_handover(anchor + HOUR, NY).unwrap();
         assert_eq!(
@@ -2118,8 +2072,8 @@ mod tests {
     /// rather than failing to parse.
     #[test]
     fn test_a_rotation_without_layer_fields_still_parses() {
-        let json = r#"{"level":"primary","members":["ana@o2.ai"],"shift_micros":604800000000,"anchor_micros":0}"#;
-        let r: Rotation = serde_json::from_str(json).unwrap();
+        let json = r#"{"members":["ana@o2.ai"],"shift_micros":604800000000,"anchor_micros":0}"#;
+        let r: ShiftRule = serde_json::from_str(json).unwrap();
         assert_eq!(r.priority, 0);
         assert!(r.restrictions.is_empty());
         assert!(r.starts_at.is_none() && r.ends_at.is_none());
@@ -2133,10 +2087,9 @@ mod tests {
     // wind a layer down had to delete the record of who had been covering
     // those hours.
 
-    fn retirable(name: &str, member: &str, priority: i32) -> Rotation {
-        Rotation {
+    fn retirable(name: &str, member: &str, priority: i32) -> ShiftRule {
+        ShiftRule {
             name: name.into(),
-            slot: DEFAULT_SLOT.to_string(),
             members: vec![member.into()],
             shift_micros: MICROS_PER_WEEK,
             anchor_micros: ANCHOR,
@@ -2144,9 +2097,6 @@ mod tests {
             restrictions: vec![],
             starts_at: None,
             ends_at: None,
-            secondary_offset: None,
-            secondary_slot: None,
-            source: None,
         }
     }
 
@@ -2231,7 +2181,7 @@ mod tests {
         r.ends_at = Some(ANCHOR);
         assert_eq!(
             r.validate(),
-            Err(RotationError::EmptyValidityWindow {
+            Err(ShiftRuleError::EmptyValidityWindow {
                 starts_at: ANCHOR,
                 ends_at: ANCHOR
             }),
@@ -2252,12 +2202,12 @@ mod tests {
         let plain = retirable("Base", "ana@o2.ai", 0);
         let json = serde_json::to_string(&plain).unwrap();
         assert!(!json.contains("starts_at"), "absent bounds add no noise: {json}");
-        assert_eq!(serde_json::from_str::<Rotation>(&json).unwrap(), plain);
+        assert_eq!(serde_json::from_str::<ShiftRule>(&json).unwrap(), plain);
 
         let mut bounded = plain.clone();
         bounded.starts_at = Some(1);
         bounded.ends_at = Some(2);
-        let back: Rotation =
+        let back: ShiftRule =
             serde_json::from_str(&serde_json::to_string(&bounded).unwrap()).unwrap();
         assert_eq!(back, bounded);
     }
@@ -2267,7 +2217,7 @@ mod tests {
     fn cover(id: &str, user: &str, start: i64, end: i64, created_at: i64) -> ScheduleOverride {
         ScheduleOverride {
             id: id.into(),
-            slot: None,
+            rotation_id: R1.into(),
             org_id: "default".into(),
             team_id: "team_1".into(),
             user_email: user.into(),
@@ -2328,11 +2278,11 @@ mod tests {
             on_call_now(&rotations, &overrides, &[], saturday, IST).as_deref(),
             Some("sam@o2.ai")
         );
-        let slots = resolve_on_call(&rotations, &overrides, &[], saturday, IST);
+        let slots = resolve_on_call(&[of(&rotations)], &overrides, &[], saturday, IST);
         assert_eq!(slots.len(), 1);
         assert_eq!(slots[0].override_id.as_deref(), Some("ov_1"));
         assert_eq!(
-            slots[0].rotation, OVERRIDE_ROTATION_NAME,
+            slots[0].rule, OVERRIDE_ROTATION_NAME,
             "no layer was displaced, so the slot says so"
         );
     }
@@ -2347,7 +2297,7 @@ mod tests {
 
         // Before the second one starts, the first still holds.
         assert_eq!(
-            covering_override(&[first.clone(), second.clone()], 400)
+            covering_override(&[first.clone(), second.clone()], R1, 400)
                 .unwrap()
                 .user_email,
             "first@o2.ai"
@@ -2358,14 +2308,14 @@ mod tests {
             vec![second.clone(), first.clone()],
         ] {
             assert_eq!(
-                covering_override(&order, 700).unwrap().user_email,
+                covering_override(&order, R1, 700).unwrap().user_email,
                 "second@o2.ai",
                 "list order must not decide the winner"
             );
         }
         // After the first ends, only the second is left.
         assert_eq!(
-            covering_override(&[first, second], 1200).unwrap().user_email,
+            covering_override(&[first, second], R1, 1200).unwrap().user_email,
             "second@o2.ai"
         );
     }
@@ -2376,15 +2326,15 @@ mod tests {
     fn test_overrides_created_in_the_same_microsecond_still_resolve_deterministically() {
         let a = cover("ov_a", "a@o2.ai", 0, 1000, 50);
         let b = cover("ov_b", "b@o2.ai", 0, 1000, 50);
-        assert_eq!(covering_override(&[a.clone(), b.clone()], 10).unwrap().id, "ov_b");
-        assert_eq!(covering_override(&[b, a], 10).unwrap().id, "ov_b");
+        assert_eq!(covering_override(&[a.clone(), b.clone()], R1, 10).unwrap().id, "ov_b");
+        assert_eq!(covering_override(&[b, a], R1, 10).unwrap().id, "ov_b");
     }
 
     /// Deleting the override restores the computed result — §5. Nothing about
     /// the rotation was changed while it stood.
     #[test]
     fn test_removing_an_override_restores_the_rotation() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
@@ -2400,81 +2350,6 @@ mod tests {
         );
     }
 
-    /// A rung that pages the same engineer twice is not an escalation. With a
-    /// two-person rotation and a cover taken by the other member, the roster's
-    /// "next" IS the coverer, so the next-but-one is used.
-    #[test]
-    fn test_the_next_on_call_is_never_the_person_already_covering() {
-        let rotations = vec![Rotation::weekly(
-            "On-call rotation",
-            vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()],
-            ANCHOR,
-        )];
-        // ana is rostered at ANCHOR, bob is next. bob takes the cover.
-        let overrides = vec![cover("ov_1", "bob@o2.ai", ANCHOR, ANCHOR + MICROS_PER_DAY, 1)];
-
-        assert_eq!(
-            on_call_now(&rotations, &overrides, &[], ANCHOR, TZ).as_deref(),
-            Some("bob@o2.ai")
-        );
-        assert_eq!(
-            next_on_call(&rotations, &overrides, &[], ANCHOR, TZ).as_deref(),
-            Some("cara@o2.ai"),
-            "rung two must reach somebody else"
-        );
-        // Matching is case-insensitive; membership is stored lowercased but a
-        // hand-written override may not be.
-        let shouty = vec![cover("ov_1", "BOB@o2.ai", ANCHOR, ANCHOR + MICROS_PER_DAY, 1)];
-        assert_eq!(
-            next_on_call(&rotations, &shouty, &[], ANCHOR, TZ).as_deref(),
-            Some("cara@o2.ai")
-        );
-    }
-
-    /// Somebody from outside the rotation covering does not reorder it: rung
-    /// two is still the roster's next.
-    #[test]
-    fn test_an_outside_coverer_leaves_the_handover_order_alone() {
-        let rotations = vec![Rotation::weekly(
-            "On-call rotation",
-            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
-            ANCHOR,
-        )];
-        let overrides = vec![cover("ov_1", "dev@o2.ai", ANCHOR, ANCHOR + MICROS_PER_DAY, 1)];
-        assert_eq!(
-            next_on_call(&rotations, &overrides, &[], ANCHOR, TZ).as_deref(),
-            Some("bob@o2.ai")
-        );
-    }
-
-    /// §7's level 3 is the broadcast of last resort. One that leaves out the
-    /// person actually holding the pager is not one — and nobody is removed,
-    /// because shrinking the final rung to arrange a night off is how a page
-    /// reaches an empty room.
-    #[test]
-    fn test_everyone_on_schedule_includes_the_coverer_and_drops_nobody() {
-        let rotations = vec![Rotation::weekly(
-            "On-call rotation",
-            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
-            ANCHOR,
-        )];
-        let outside = vec![cover("ov_1", "dev@o2.ai", ANCHOR, ANCHOR + 10, 1)];
-        assert_eq!(
-            everyone_on_schedule(&rotations, &outside, &[], ANCHOR, TZ),
-            vec![
-                "ana@o2.ai".to_string(),
-                "bob@o2.ai".to_string(),
-                "dev@o2.ai".to_string()
-            ]
-        );
-        // A coverer already on the roster is not listed twice.
-        let inside = vec![cover("ov_1", "BOB@o2.ai", ANCHOR, ANCHOR + 10, 1)];
-        assert_eq!(
-            everyone_on_schedule(&rotations, &inside, &[], ANCHOR, TZ),
-            vec!["ana@o2.ai".to_string(), "bob@o2.ai".to_string()]
-        );
-    }
-
     /// A cover from 18:00 to 09:00 the next morning is the commonest one there
     /// is, and it has to mean the same wall-clock hours in the two zones a
     /// distributed team reads it in. Stored in absolute micros, so it does.
@@ -2483,7 +2358,7 @@ mod tests {
         let ny = chrono_tz::America::New_York;
         let start = local(IST, 2026, 8, 10, 18, 0);
         let end = local(IST, 2026, 8, 11, 9, 0);
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into()],
             ANCHOR,
@@ -2514,7 +2389,7 @@ mod tests {
     /// shift. "Take my afternoon" is the whole point of §5's one interaction.
     #[test]
     fn test_a_partial_day_cover_takes_exactly_its_hours() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into()],
             ANCHOR,
@@ -2548,7 +2423,7 @@ mod tests {
     /// looks — which is what an absolute range means.
     #[test]
     fn test_a_cover_spanning_the_spring_forward_is_continuous() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             local(NY, 2026, 3, 2, 9, 0),
@@ -2584,7 +2459,7 @@ mod tests {
     /// backwards and the holder must not go with it.
     #[test]
     fn test_a_cover_spanning_the_fall_back_holds_through_the_repeated_hour() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             local(NY, 2026, 10, 26, 9, 0),
@@ -2614,7 +2489,7 @@ mod tests {
     /// calendar is not a hole in the timeline.
     #[test]
     fn test_a_cover_ending_inside_the_skipped_hour_still_ends() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into()],
             local(NY, 2026, 3, 2, 9, 0),
@@ -2701,13 +2576,13 @@ mod tests {
 
     #[test]
     fn test_a_quiet_week_resolves_to_one_segment() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
         )];
         let (from, to) = (ANCHOR, ANCHOR + MICROS_PER_WEEK);
-        let segments = resolve_window(&rotations, &[], &[], from, to, TZ).unwrap();
+        let segments = resolve_grid(&rotations, &[], &[], from, to, TZ).unwrap();
 
         assert_tiles(&segments, from, to);
         assert_eq!(segments.len(), 1, "one shift, one row — not 168 identical ones");
@@ -2717,13 +2592,13 @@ mod tests {
 
     #[test]
     fn test_the_grid_breaks_at_every_handover() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
         )];
         let (from, to) = (ANCHOR, ANCHOR + 3 * MICROS_PER_WEEK);
-        let segments = resolve_window(&rotations, &[], &[], from, to, TZ).unwrap();
+        let segments = resolve_grid(&rotations, &[], &[], from, to, TZ).unwrap();
 
         assert_tiles(&segments, from, to);
         assert_eq!(
@@ -2748,7 +2623,7 @@ mod tests {
         )];
         let from = local(IST, 2026, 8, 10, 0, 0); // Monday 00:00
         let to = from + MICROS_PER_DAY;
-        let segments = resolve_window(&rotations, &[], &[], from, to, IST).unwrap();
+        let segments = resolve_grid(&rotations, &[], &[], from, to, IST).unwrap();
 
         assert_tiles(&segments, from, to);
         assert_eq!(segments.len(), 3, "gap, office hours, gap");
@@ -2763,7 +2638,7 @@ mod tests {
     /// — marked, and splitting the shift it took a slice out of.
     #[test]
     fn test_an_override_splits_the_segment_it_covers() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into()],
             ANCHOR,
@@ -2776,7 +2651,7 @@ mod tests {
             ANCHOR + 9 * MICROS_PER_HOUR,
             1,
         )];
-        let segments = resolve_window(&rotations, &overrides, &[], from, to, TZ).unwrap();
+        let segments = resolve_grid(&rotations, &overrides, &[], from, to, TZ).unwrap();
 
         assert_tiles(&segments, from, to);
         assert_eq!(segments.len(), 3);
@@ -2801,7 +2676,7 @@ mod tests {
         let rotations = vec![retirable("Base", "ana@o2.ai", 0), weekend];
         let (from, to) = (ANCHOR, ANCHOR + 4 * MICROS_PER_DAY);
 
-        let segments = resolve_window(&rotations, &[], &[], from, to, TZ).unwrap();
+        let segments = resolve_grid(&rotations, &[], &[], from, to, TZ).unwrap();
         assert_tiles(&segments, from, to);
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].rotation.as_deref(), Some("Weekends"));
@@ -2820,7 +2695,7 @@ mod tests {
         ];
         let from = local(IST, 2026, 8, 10, 0, 0);
         let to = from + MICROS_PER_DAY;
-        let segments = resolve_window(&rotations, &[], &[], from, to, IST).unwrap();
+        let segments = resolve_grid(&rotations, &[], &[], from, to, IST).unwrap();
 
         assert_tiles(&segments, from, to);
         assert_eq!(
@@ -2847,7 +2722,7 @@ mod tests {
         )];
         let from = local(NY, 2026, 3, 7, 0, 0);
         let to = local(NY, 2026, 3, 10, 0, 0);
-        let segments = resolve_window(&rotations, &[], &[], from, to, NY).unwrap();
+        let segments = resolve_grid(&rotations, &[], &[], from, to, NY).unwrap();
 
         assert_tiles(&segments, from, to);
         let opens: Vec<i64> = segments
@@ -2869,12 +2744,12 @@ mod tests {
     /// A caller asking for a year gets an error, not a million rows.
     #[test]
     fn test_the_window_is_bounded() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into()],
             ANCHOR,
         )];
-        let err = resolve_window(&rotations, &[], &[], ANCHOR, ANCHOR + 365 * MICROS_PER_DAY, TZ)
+        let err = resolve_grid(&rotations, &[], &[], ANCHOR, ANCHOR + 365 * MICROS_PER_DAY, TZ)
             .unwrap_err();
         assert!(
             matches!(err, GridError::WindowTooLong { .. }),
@@ -2883,10 +2758,10 @@ mod tests {
         assert!(err.to_string().contains(&MAX_GRID_MICROS.to_string()));
 
         // The bound itself is usable.
-        resolve_window(&rotations, &[], &[], ANCHOR, ANCHOR + MAX_GRID_MICROS, TZ).unwrap();
+        resolve_grid(&rotations, &[], &[], ANCHOR, ANCHOR + MAX_GRID_MICROS, TZ).unwrap();
         // And an inverted window is a caller mistake, not an empty answer.
         assert!(matches!(
-            resolve_window(&rotations, &[], &[], ANCHOR, ANCHOR, TZ).unwrap_err(),
+            resolve_grid(&rotations, &[], &[], ANCHOR, ANCHOR, TZ).unwrap_err(),
             GridError::InvertedWindow { .. }
         ));
     }
@@ -2895,14 +2770,14 @@ mod tests {
     /// truncated grid that looks like a schedule which ends.
     #[test]
     fn test_a_schedule_that_shreds_the_window_is_refused_rather_than_truncated() {
-        let mut r = Rotation::weekly(
+        let mut r = ShiftRule::weekly(
             "Flapping",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
         );
         // A one-minute shift over a month is far past any honest schedule.
         r.shift_micros = MICROS_PER_MINUTE;
-        let err = resolve_window(&[r], &[], &[], ANCHOR, ANCHOR + MAX_GRID_MICROS, TZ).unwrap_err();
+        let err = resolve_grid(&[r], &[], &[], ANCHOR, ANCHOR + MAX_GRID_MICROS, TZ).unwrap_err();
         assert!(
             matches!(err, GridError::TooManySegments { .. }),
             "expected a segment-budget refusal, got {err}"
@@ -2914,9 +2789,9 @@ mod tests {
     /// what keeps the honest cases small.
     #[test]
     fn test_a_one_person_rotation_is_one_segment_however_often_it_hands_over() {
-        let mut r = Rotation::weekly("Solo", vec!["ana@o2.ai".into()], ANCHOR);
+        let mut r = ShiftRule::weekly("Solo", vec!["ana@o2.ai".into()], ANCHOR);
         r.shift_micros = MICROS_PER_MINUTE;
-        let segments = resolve_window(&[r], &[], &[], ANCHOR, ANCHOR + MICROS_PER_DAY, TZ).unwrap();
+        let segments = resolve_grid(&[r], &[], &[], ANCHOR, ANCHOR + MICROS_PER_DAY, TZ).unwrap();
         assert_eq!(segments.len(), 1);
     }
 
@@ -2924,7 +2799,7 @@ mod tests {
     /// latest created wins, and the grid shows the handover between them.
     #[test]
     fn test_the_grid_applies_the_overlap_rule() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into()],
             ANCHOR,
@@ -2934,7 +2809,7 @@ mod tests {
             cover("ov_b", "second@o2.ai", ANCHOR + 3000, ANCHOR + 7000, 20),
         ];
         let (from, to) = (ANCHOR, ANCHOR + 10_000);
-        let segments = resolve_window(&rotations, &overrides, &[], from, to, TZ).unwrap();
+        let segments = resolve_grid(&rotations, &overrides, &[], from, to, TZ).unwrap();
 
         assert_tiles(&segments, from, to);
         assert_eq!(
@@ -2956,14 +2831,14 @@ mod tests {
     /// whole of it, without contributing boundaries outside it.
     #[test]
     fn test_an_override_enclosing_the_whole_window_is_one_segment() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
         )];
         let (from, to) = (ANCHOR, ANCHOR + 2 * MICROS_PER_WEEK);
         let overrides = vec![cover("ov_1", "sam@o2.ai", from - MICROS_PER_DAY, to + MICROS_PER_DAY, 1)];
-        let segments = resolve_window(&rotations, &overrides, &[], from, to, TZ).unwrap();
+        let segments = resolve_grid(&rotations, &overrides, &[], from, to, TZ).unwrap();
 
         assert_tiles(&segments, from, to);
         assert_eq!(
@@ -2981,634 +2856,130 @@ mod tests {
     // interfering, and a schedule that predates slots keeps meaning exactly
     // what it meant.
 
-    /// The gap in one test. A junior pool and a senior pool, different people,
-    /// different handover days, both resolving at the same instant — and the
-    /// secondary is emphatically NOT next week's primary.
+    // ── Unavailability (GAP 2) ──────────────────────────────────────────────
+
+    // ── Rotations as positions (02 §0) ──────────────────────────────────────
+
+    /// The mechanism the derived secondary was replaced by, in one test.
+    ///
+    /// Same roster, same cadence, anchor one shift back. No field links them and
+    /// nothing at resolution time knows they are related — which is exactly why
+    /// this is allowed to be a default.
     #[test]
-    fn test_two_slots_resolve_simultaneously_and_independently() {
-        let rotations = vec![
-            Rotation::weekly(
-                "Juniors",
-                vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
-                ANCHOR,
-            ),
-            // Handing over three days later: separate slots do not have to
-            // share a handover day, which one flat cycle forced on them.
-            Rotation::weekly(
-                "Seniors",
-                vec!["eve@o2.ai".into(), "fay@o2.ai".into()],
-                ANCHOR - 4 * MICROS_PER_DAY,
-            )
-            .in_slot("secondary"),
-        ];
+    fn test_an_offset_rotation_is_never_the_person_already_on_call() {
+        let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
 
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, ANCHOR, TZ).as_deref(),
-            Some("ana@o2.ai")
-        );
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ).as_deref(),
-            Some("eve@o2.ai"),
-            "the secondary is a different person from a different pool"
-        );
-
-        // Four days on, the senior rotation has handed over and the junior one
-        // has not. Neither move disturbed the other.
-        let later = ANCHOR + 4 * MICROS_PER_DAY;
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, later, TZ).as_deref(),
-            Some("ana@o2.ai")
-        );
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], "secondary", later, TZ).as_deref(),
-            Some("fay@o2.ai")
-        );
-
-        // And this week's secondary never becomes next week's primary.
-        let next_week = ANCHOR + MICROS_PER_WEEK;
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, next_week, TZ).as_deref(),
-            Some("bob@o2.ai")
-        );
-        assert!(
-            !["eve@o2.ai", "fay@o2.ai"]
-                .contains(&on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, next_week, TZ).unwrap().as_str()),
-            "a senior must never be promoted into the junior rotation by the calendar"
-        );
-    }
-
-    /// `resolve_on_call` answers for every slot at once, which is what the
-    /// team header reads. One entry per slot, default first.
-    #[test]
-    fn test_on_call_lists_one_entry_per_slot_default_first() {
-        let rotations = vec![
-            Rotation::weekly("Seniors", vec!["eve@o2.ai".into()], ANCHOR).in_slot("secondary"),
-            Rotation::weekly("Juniors", vec!["ana@o2.ai".into()], ANCHOR),
-        ];
-        let slots = resolve_on_call(&rotations, &[], &[], ANCHOR, TZ);
-        assert_eq!(slots.len(), 2);
-        assert_eq!(slots[0].slot, DEFAULT_SLOT, "the primary reads first");
-        assert_eq!(slots[0].user_email, "ana@o2.ai");
-        assert_eq!(slots[1].slot, "secondary");
-        assert_eq!(slots[1].user_email, "eve@o2.ai");
-    }
-
-    /// Layering is a within-slot contest, so follow-the-sun must be untouched
-    /// by the arrival of a second slot beside it. Three restricted layers over
-    /// a catch-all, checked hour by hour, with a secondary running alongside.
-    #[test]
-    fn test_follow_the_sun_still_resolves_inside_one_slot() {
-        let window = |start_hour: u32, end_hour: u32| TimeWindow {
-            days: vec![],
-            start_minute: start_hour * 60,
-            end_minute: end_hour * 60,
-        };
-        let layer = |name: &str, member: &str, priority: i32, w: Option<TimeWindow>| Rotation {
-            name: name.into(),
-            slot: DEFAULT_SLOT.to_string(),
-            members: vec![member.into()],
-            shift_micros: MICROS_PER_WEEK,
-            anchor_micros: ANCHOR,
-            priority,
-            restrictions: w.into_iter().collect(),
-            starts_at: None,
-            ends_at: None,
-            secondary_offset: None,
-            secondary_slot: None,
-            source: None,
-        };
-        let rotations = vec![
-            layer("APAC", "apac@o2.ai", 30, Some(window(0, 8))),
-            layer("EMEA", "emea@o2.ai", 30, Some(window(8, 16))),
-            layer("AMER", "amer@o2.ai", 30, Some(window(16, 24))),
-            layer("Catch-all", "cat@o2.ai", 10, None),
-            // A senior slot beside them, unrestricted and higher priority than
-            // any of the layers — it must not steal a single hour, because it
-            // is not in the contest at all.
-            Rotation::weekly("Seniors", vec!["eve@o2.ai".into()], ANCHOR)
-                .in_slot("secondary"),
-        ];
-
-        // Counted from a local midnight, because the layers are described in
-        // wall-clock hours and `ANCHOR` is an arbitrary instant.
-        let midnight = local(TZ, 2026, 3, 2, 0, 0);
-        for hour in 0..24i64 {
-            let at = midnight + hour * MICROS_PER_HOUR;
-            let expected = match hour {
-                0..=7 => "apac@o2.ai",
-                8..=15 => "emea@o2.ai",
-                _ => "amer@o2.ai",
-            };
-            assert_eq!(
-                on_call_now(&rotations, &[], &[], at, TZ).as_deref(),
-                Some(expected),
-                "hour {hour}"
-            );
-            assert_eq!(
-                on_call_in_slot(&rotations, &[], &[], "secondary", at, TZ).as_deref(),
-                Some("eve@o2.ai"),
-                "hour {hour}: the senior slot resolves regardless of the layer in force"
-            );
+        for week in 0..9i64 {
+            let at = ANCHOR + week * MICROS_PER_WEEK;
+            let p = primary.on_call(&[], &[], at, TZ).unwrap();
+            let s = secondary.on_call(&[], &[], at, TZ).unwrap();
+            assert_ne!(p, s, "week {week}: one pager, two positions");
         }
+
+        // And the pairing is the one the calendar already shows.
+        assert_eq!(primary.on_call(&[], &[], ANCHOR, TZ).as_deref(), Some("ana@o2.ai"));
+        assert_eq!(secondary.on_call(&[], &[], ANCHOR, TZ).as_deref(), Some("bob@o2.ai"));
     }
 
-    /// The upgrade path, which is the whole compatibility argument: JSON
-    /// stored before slots existed parses as the default slot, resolves
-    /// identically, and serialises back with no `slot` key — so a stored row is
-    /// not rewritten by being read.
+    /// A one-person roster cannot have a distinct secondary, and offsetting it
+    /// must not pretend otherwise.
     #[test]
-    fn test_a_stored_rotation_with_no_slot_is_the_default_slot() {
-        let stored = r#"{
-            "name": "On-call rotation",
-            "members": ["ana@o2.ai", "bob@o2.ai"],
-            "shift_micros": 604800000000,
-            "anchor_micros": 1700000000000000,
-            "priority": 0,
-            "restrictions": []
-        }"#;
-        let r: Rotation = serde_json::from_str(stored).unwrap();
-        assert_eq!(r.slot, DEFAULT_SLOT);
-        r.validate().unwrap();
+    fn test_a_one_person_roster_collides_with_its_own_offset() {
+        let primary = rota("rot_p", &["ana@o2.ai"]);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let rotations = [primary, secondary];
+        let found = colliding_rotations(&rotations, &[], &[], ANCHOR, TZ);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(found[0].0, "ana@o2.ai");
+        assert_eq!(found[0].1.len(), 2, "both positions name the same person");
+    }
 
-        let rotations = vec![r.clone()];
-        assert_eq!(
-            on_call_now(&rotations, &[], &[], ANCHOR, TZ).as_deref(),
-            Some("ana@o2.ai")
-        );
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, ANCHOR, TZ).as_deref(),
-            Some("ana@o2.ai"),
-            "naming the default slot explicitly is the same question"
-        );
-        assert_eq!(
-            slots(&rotations),
-            vec![DEFAULT_SLOT.to_string(), SECONDARY_SLOT.to_string()],
-            "the secondary is derived implicitly — nothing is stored for it"
-        );
+    /// Drift is *reported*, not prevented — the whole argument for having no
+    /// stored link between the two rotations.
+    #[test]
+    fn test_a_roster_edited_on_one_side_only_is_reported_as_a_collision() {
+        let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
+        let mut secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        // Somebody adds cara to the secondary and forgets the primary.
+        secondary.shift_rules[0].members = vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()];
 
-        let json = serde_json::to_string(&r).unwrap();
+        let rotations = [primary, secondary];
+        let collided: Vec<i64> = (0..6i64)
+            .map(|w| ANCHOR + w * MICROS_PER_WEEK)
+            .filter(|at| !colliding_rotations(&rotations, &[], &[], *at, TZ).is_empty())
+            .collect();
         assert!(
-            !json.contains("slot"),
-            "a default-slot rotation must go back on the wire as it came off it: {json}"
+            !collided.is_empty(),
+            "a one-sided roster edit must surface, not silently double-page"
         );
-        assert_eq!(serde_json::from_str::<Rotation>(&json).unwrap(), r);
-
-        // A named slot does appear, or the field would be unusable.
-        let named = r.in_slot("secondary");
-        let json = serde_json::to_string(&named).unwrap();
-        assert!(json.contains(r#""slot":"secondary""#), "{json}");
-        assert_eq!(serde_json::from_str::<Rotation>(&json).unwrap(), named);
     }
 
-    /// Two slots are two answers, so an override has to say which one it
-    /// stands over. Otherwise arranging cover for the primary would silently
-    /// take the secondary too, and the ladder would page one person twice.
+    /// Two ordinary rotations, resolved at the same instant, to two people.
+    /// This is what "a second position" now means.
     #[test]
-    fn test_a_cover_only_takes_the_slot_it_names() {
-        let rotations = vec![
-            Rotation::weekly("Juniors", vec!["ana@o2.ai".into()], ANCHOR),
-            Rotation::weekly("Seniors", vec!["eve@o2.ai".into()], ANCHOR).in_slot("secondary"),
-        ];
-        let mut ov = cover("ov_1", "sam@o2.ai", ANCHOR, ANCHOR + MICROS_PER_DAY, 1);
-        ov.slot = Some("secondary".into());
-        let overrides = vec![ov];
-
-        assert_eq!(
-            on_call_now(&rotations, &overrides, &[], ANCHOR, TZ).as_deref(),
-            Some("ana@o2.ai"),
-            "the primary is untouched by a cover on another slot"
+    fn test_two_rotations_resolve_independently() {
+        let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
+        let dba = Rotation::weekly(
+            "rot_dba",
+            "Database",
+            vec!["eve@o2.ai".into(), "fay@o2.ai".into()],
+            ANCHOR,
         );
+        let positions = resolve_on_call(&[primary, dba], &[], &[], ANCHOR, TZ);
+        assert_eq!(positions.len(), 2);
+        assert_eq!(positions[0].rotation_id, "rot_p");
+        assert_eq!(positions[0].user_email, "ana@o2.ai");
+        assert_eq!(positions[1].rotation_id, "rot_dba");
+        assert_eq!(positions[1].user_email, "eve@o2.ai");
+    }
+
+    /// A cover stands over **one** position. It used to be able to claim a slot
+    /// nothing staffed, which is the same shape of mistake as the derived
+    /// secondary: a position existing because something other than a rotation
+    /// asked for it.
+    #[test]
+    fn test_a_cover_only_stands_over_the_rotation_it_names() {
+        let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let ov = ScheduleOverride {
+            rotation_id: "rot_p".into(),
+            ..cover("ov_1", "sam@o2.ai", ANCHOR, ANCHOR + 1_000, 1)
+        };
         assert_eq!(
-            on_call_in_slot(&rotations, &overrides, &[], "secondary", ANCHOR, TZ).as_deref(),
+            primary.on_call(&[ov.clone()], &[], ANCHOR, TZ).as_deref(),
             Some("sam@o2.ai")
         );
-    }
-
-    /// A stored cover with no slot means the default one, for the same reason
-    /// a stored rotation does.
-    #[test]
-    fn test_a_cover_with_no_slot_is_the_default_slot() {
-        let stored = cover("ov_1", "sam@o2.ai", ANCHOR, ANCHOR + MICROS_PER_DAY, 1);
-        assert_eq!(stored.slot(), DEFAULT_SLOT);
-        assert!(!serde_json::to_string(&stored).unwrap().contains("slot"));
         assert_eq!(
-            covering_override(&[stored.clone()], ANCHOR).map(|o| o.id.as_str()),
-            Some("ov_1")
-        );
-        assert!(covering_override_in_slot(&[stored], "secondary", ANCHOR).is_none());
-    }
-
-    /// The broadcast of last resort is the union across slots: a senior pool
-    /// left out of the final rung is half the room not woken. A one-slot team
-    /// gets exactly what it got before.
-    #[test]
-    fn test_everyone_on_schedule_unions_the_slots() {
-        let juniors = Rotation::weekly(
-            "Juniors",
-            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
-            ANCHOR,
-        );
-        assert_eq!(
-            everyone_on_schedule(&[juniors.clone()], &[], &[], ANCHOR, TZ),
-            vec!["ana@o2.ai".to_string(), "bob@o2.ai".to_string()],
-            "one slot resolves exactly as it did before slots existed"
-        );
-
-        let rotations = vec![
-            juniors,
-            Rotation::weekly("Seniors", vec!["eve@o2.ai".into(), "bob@o2.ai".into()], ANCHOR)
-                .in_slot("secondary"),
-        ];
-        assert_eq!(
-            everyone_on_schedule(&rotations, &[], &[], ANCHOR, TZ),
-            vec![
-                "ana@o2.ai".to_string(),
-                "bob@o2.ai".to_string(),
-                "eve@o2.ai".to_string()
-            ],
-            "deduplicated: somebody on both pools is one person to a page"
-        );
-        assert_eq!(
-            everyone_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ),
-            vec!["eve@o2.ai".to_string(), "bob@o2.ai".to_string()],
-            "and one slot can still be named on its own"
-        );
-    }
-
-    /// **The read `/on-call` is built from**, which is the one that was wrong.
-    ///
-    /// `slots()` reported the derived name and `on_call_in_slot` resolved it,
-    /// so every test passed — but `resolve_on_call` asked
-    /// `winning_rotation_in_slot`, which only matches a rotation's own slot,
-    /// and dropped the entry. The slot existed everywhere except the place a
-    /// person looks, and the team screen said "nobody backs this rotation up".
-    ///
-    /// Found by someone driving the product as a user rather than reading it.
-    /// Pinned here, at the level the endpoint uses, because the level below was
-    /// already green and stayed green throughout.
-    #[test]
-    fn test_the_derived_slot_appears_in_the_read_the_endpoint_uses() {
-        let rotations = vec![
-            Rotation::weekly(
-                "Platform",
-                vec![
-                    "ana@o2.ai".into(),
-                    "bob@o2.ai".into(),
-                    "cy@o2.ai".into(),
-                    "dee@o2.ai".into(),
-                ],
-                ANCHOR,
-            )
-            .deriving("secondary"),
-        ];
-        let on_call = resolve_on_call(&rotations, &[], &[], ANCHOR, TZ);
-        assert_eq!(
-            on_call.len(),
-            2,
-            "one roster, two staffed positions — got {on_call:?}"
-        );
-        assert_eq!(on_call[0].slot, "primary");
-        assert_eq!(on_call[0].user_email, "ana@o2.ai");
-        assert_eq!(on_call[1].slot, "secondary");
-        assert_eq!(on_call[1].user_email, "bob@o2.ai");
-        assert_eq!(
-            on_call[1].rotation, "Platform",
-            "the derived slot names the rotation it is derived from, not a placeholder"
-        );
-        assert_ne!(on_call[0].user_email, on_call[1].user_email);
-    }
-
-    /// And the read the **calendar** is built from, which had the same hole.
-    /// A row of empty cells says "nobody has this", which is a strong claim to
-    /// make wrongly.
-    #[test]
-    fn test_the_derived_slot_is_drawn_on_the_grid_too() {
-        let rotations = vec![
-            Rotation::weekly(
-                "Platform",
-                vec![
-                    "ana@o2.ai".into(),
-                    "bob@o2.ai".into(),
-                    "cy@o2.ai".into(),
-                    "dee@o2.ai".into(),
-                ],
-                ANCHOR,
-            )
-            .deriving("secondary"),
-        ];
-        let segments = resolve_window_in_slot(
-            &rotations,
-            &[],
-            &[],
-            "secondary",
-            ANCHOR,
-            ANCHOR + MICROS_PER_WEEK,
-            TZ,
-        )
-        .expect("a week of the secondary slot");
-        assert!(!segments.is_empty());
-        assert!(
-            segments.iter().all(|s| s.user_email.is_some()),
-            "every segment of a staffed derived slot has a holder — got {segments:?}"
-        );
-        assert_eq!(segments[0].user_email.as_deref(), Some("bob@o2.ai"));
-        assert_eq!(segments[0].rotation.as_deref(), Some("Platform"));
-    }
-
-    /// A cover written into the derived slot already worked — the override arm
-    /// returns before the branch that was broken — which is exactly why the
-    /// bug was survivable: writing a cover made the slot appear, so the slot
-    /// looked real from the outside.
-    #[test]
-    fn test_a_cover_on_the_derived_slot_still_reads_as_that_slot() {
-        let rotations = vec![
-            Rotation::weekly(
-                "Platform",
-                vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cy@o2.ai".into()],
-                ANCHOR,
-            )
-            .deriving("secondary"),
-        ];
-        let overrides = vec![ScheduleOverride {
-            id: "ov1".into(),
-            org_id: "default".into(),
-            team_id: "t1".into(),
-            slot: Some("secondary".into()),
-            user_email: "zoe@o2.ai".into(),
-            covering_for: None,
-            start_at: ANCHOR - MICROS_PER_HOUR,
-            end_at: ANCHOR + MICROS_PER_HOUR,
-            reason: None,
-            created_by: "root@o2.ai".into(),
-            created_at: ANCHOR,
-        }];
-        let on_call = resolve_on_call(&rotations, &overrides, &[], ANCHOR, TZ);
-        let secondary = on_call
-            .iter()
-            .find(|s| s.slot == "secondary")
-            .expect("the covered slot");
-        assert_eq!(secondary.user_email, "zoe@o2.ai");
-        assert_eq!(secondary.override_id.as_deref(), Some("ov1"));
-    }
-
-    /// The whole point of the field: an ordinary team — one pool, anybody can
-    /// be primary, somebody else is secondary — gets a secondary that is a
-    /// real slot, without maintaining the same people in two lists.
-    #[test]
-    fn test_a_declared_derived_slot_is_staffed_from_the_same_roster() {
-        let rotations = vec![
-            Rotation::weekly(
-                "Platform",
-                vec![
-                    "ana@o2.ai".into(),
-                    "bob@o2.ai".into(),
-                    "cy@o2.ai".into(),
-                    "dee@o2.ai".into(),
-                ],
-                ANCHOR,
-            )
-            .deriving("secondary"),
-        ];
-        // Default offset 1: the secondary is whoever takes over next, which is
-        // the same person the calendar shows in the next cell.
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, ANCHOR, TZ).as_deref(),
-            Some("ana@o2.ai")
-        );
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ).as_deref(),
+            secondary.on_call(&[ov], &[], ANCHOR, TZ).as_deref(),
             Some("bob@o2.ai"),
-            "the derived position is now addressable by slot name"
-        );
-        assert_eq!(
-            slots(&rotations),
-            vec!["primary".to_string(), "secondary".to_string()],
-            "and it is reported, which is what lets a cover name it"
+            "the other position is untouched"
         );
     }
 
-    /// Distinct **by construction**, which is the guarantee two independent
-    /// rotations in two slots cannot make — nothing cross-checks those, so the
-    /// same person can hold both and the ladder pages them twice.
+    /// A rotation with no rules is refused rather than stored as a position
+    /// that pages nobody — the one state that looks configured and is not.
     #[test]
-    fn test_a_derived_slot_can_never_be_the_person_already_on_call() {
-        for len in 2..12usize {
-            let members: Vec<String> = (0..len).map(|i| format!("m{i}@o2.ai")).collect();
-            let rotations =
-                vec![Rotation::weekly("Team", members, ANCHOR).deriving("secondary")];
-            for shift in 0..len as i64 {
-                let at = ANCHOR + shift * MICROS_PER_WEEK;
-                let primary = on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, at, TZ);
-                let secondary = on_call_in_slot(&rotations, &[], &[], "secondary", at, TZ);
-                assert!(primary.is_some() && secondary.is_some(), "len={len}");
-                assert_ne!(primary, secondary, "len={len} shift={shift}");
-            }
-        }
+    fn test_a_rotation_with_no_shift_rules_is_refused() {
+        let empty = Rotation {
+            id: "rot_p".into(),
+            name: "Primary".into(),
+            shift_rules: vec![],
+            source: None,
+        };
+        assert_eq!(empty.validate(), Err(RotationError::NoShiftRules));
+        assert!(resolve_on_call(&[empty], &[], &[], ANCHOR, TZ).is_empty());
     }
 
-    /// A cover on the derived slot behaves like a cover anywhere else — which
-    /// is the complaint this whole field answers, since it used to be refused.
+    /// Levels page by id, so a rename cannot move who is woken.
     #[test]
-    fn test_the_derived_slot_can_be_covered() {
-        let rotations = vec![
-            Rotation::weekly(
-                "Platform",
-                vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cy@o2.ai".into()],
-                ANCHOR,
-            )
-            .deriving("secondary"),
-        ];
-        let overrides = vec![ScheduleOverride {
-            id: "ov1".into(),
-            org_id: "default".into(),
-            team_id: "t1".into(),
-            slot: Some("secondary".into()),
-            user_email: "zoe@o2.ai".into(),
-            covering_for: None,
-            start_at: ANCHOR - MICROS_PER_HOUR,
-            end_at: ANCHOR + MICROS_PER_HOUR,
-            reason: None,
-            created_by: "root@o2.ai".into(),
-            created_at: ANCHOR,
-        }];
-        assert_eq!(
-            on_call_in_slot(&rotations, &overrides, &[], "secondary", ANCHOR, TZ).as_deref(),
-            Some("zoe@o2.ai"),
-            "a cover beats the derived holder, exactly as it beats a rostered one"
-        );
-        assert_eq!(
-            on_call_in_slot(&rotations, &overrides, &[], DEFAULT_SLOT, ANCHOR, TZ).as_deref(),
-            Some("ana@o2.ai"),
-            "and covering one slot does not disturb the other"
-        );
+    fn test_renaming_a_rotation_does_not_move_who_it_resolves() {
+        let mut r = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
+        let before = r.on_call(&[], &[], ANCHOR, TZ);
+        r.name = "Front line".into();
+        assert_eq!(r.id, "rot_p");
+        assert_eq!(r.on_call(&[], &[], ANCHOR, TZ), before);
     }
-
-    /// A rotation that staffs a slot directly outranks one that derives it, so
-    /// declaring a derived slot can never quietly displace a real pool.
-    #[test]
-    fn test_a_real_rotation_beats_a_derived_one_for_the_same_slot() {
-        let rotations = vec![
-            Rotation::weekly(
-                "Platform",
-                vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
-                ANCHOR,
-            )
-            .deriving("secondary"),
-            Rotation::weekly("Seniors", vec!["eve@o2.ai".into()], ANCHOR).in_slot("secondary"),
-        ];
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ).as_deref(),
-            Some("eve@o2.ai")
-        );
-    }
-
-    /// A one-person rotation has no next, so declaring the slot would invent a
-    /// permanent coverage gap out of a team that is fine.
-    #[test]
-    fn test_a_one_person_rotation_declares_no_derived_slot() {
-        let rotations =
-            vec![Rotation::weekly("Solo", vec!["ana@o2.ai".into()], ANCHOR).deriving("secondary")];
-        assert_eq!(slots(&rotations), vec!["primary".to_string()]);
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ),
-            None
-        );
-    }
-
-    /// Two people, one place. There is no reading of it the author meant.
-    #[test]
-    fn test_a_rotation_cannot_derive_its_own_slot() {
-        let r = Rotation::weekly("Team", vec!["a@o2.ai".into(), "b@o2.ai".into()], ANCHOR)
-            .deriving("Primary");
-        assert!(matches!(
-            r.validate(),
-            Err(RotationError::SecondarySlotIsItsOwn(_))
-        ));
-        assert!(r.validate().unwrap_err().to_string().contains("two people at once"));
-    }
-
-    /// **An ordinary two-person rotation has a coverable secondary without
-    /// anybody writing a field**, and still stores nothing new.
-    ///
-    /// This test asserted the opposite until 2026-08-18 — that an undeclared
-    /// derived slot "changes nothing". That was the defect: a team created
-    /// before the field existed, or by any client that does not set it, could
-    /// *see* its secondary on the calendar and could not write a cover against
-    /// it, because `slots()` never reported the name and override creation
-    /// validates against `slots()`.
-    ///
-    /// The wire form is unchanged, which is the part worth keeping: nothing is
-    /// written, so every stored schedule round-trips byte-for-byte.
-    #[test]
-    fn test_an_ordinary_rotation_has_a_coverable_secondary_with_nothing_written() {
-        let r = Rotation::weekly("Team", vec!["a@o2.ai".into(), "b@o2.ai".into()], ANCHOR);
-        let json = serde_json::to_string(&r).unwrap();
-        assert!(!json.contains("secondary_slot"), "still nothing on the wire: {json}");
-        assert!(!json.contains("source"), "{json}");
-
-        assert_eq!(
-            slots(std::slice::from_ref(&r)),
-            vec!["primary".to_string(), "secondary".to_string()],
-            "the position exists, so a cover can name it"
-        );
-        assert_eq!(
-            on_call_in_slot(std::slice::from_ref(&r), &[], &[], "secondary", ANCHOR, TZ).as_deref(),
-            Some("b@o2.ai"),
-            "and it resolves to the person the calendar shows taking over next"
-        );
-    }
-
-    /// The cases that must **not** grow a secondary out of nowhere.
-    #[test]
-    fn test_the_implicit_secondary_is_withheld_where_it_would_be_wrong() {
-        // One person has nobody after them; a slot here would be a permanent
-        // coverage gap invented out of a team that is fine.
-        let alone = Rotation::weekly("Solo", vec!["a@o2.ai".into()], ANCHOR);
-        assert_eq!(slots(std::slice::from_ref(&alone)), vec!["primary".to_string()]);
-
-        // A rotation that already staffs a named position is somebody's design.
-        let seniors = Rotation::weekly("Seniors", vec!["e@o2.ai".into(), "f@o2.ai".into()], ANCHOR)
-            .in_slot("escalation");
-        assert_eq!(
-            slots(std::slice::from_ref(&seniors)),
-            vec!["escalation".to_string()],
-            "no phantom secondary off a non-default slot"
-        );
-
-        // And a real secondary rotation wins the name outright — it is not
-        // listed twice, and it is what resolves.
-        let primary = Rotation::weekly("Core", vec!["a@o2.ai".into(), "b@o2.ai".into()], ANCHOR);
-        let real = Rotation::weekly("Backup", vec!["x@o2.ai".into(), "y@o2.ai".into()], ANCHOR)
-            .in_slot("secondary");
-        let both = vec![primary, real];
-        assert_eq!(slots(&both), vec!["primary".to_string(), "secondary".to_string()]);
-        assert_eq!(
-            on_call_in_slot(&both, &[], &[], "secondary", ANCHOR, TZ).as_deref(),
-            Some("x@o2.ai"),
-            "staffed directly beats derived"
-        );
-    }
-
-    /// Slot names are operator text, so two spellings of one slot must be one
-    /// slot — a rung that says `Secondary` has to reach the rotation that says
-    /// `secondary`, or it reaches nobody with no visible cause.
-    #[test]
-    fn test_slot_names_are_matched_case_insensitively() {
-        let rotations =
-            vec![Rotation::weekly("Seniors", vec!["eve@o2.ai".into()], ANCHOR).in_slot("Secondary")];
-        assert_eq!(
-            on_call_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ).as_deref(),
-            Some("eve@o2.ai")
-        );
-        assert_eq!(slots(&rotations), vec!["Secondary".to_string()]);
-    }
-
-    /// A rotation nothing can name is a rotation no rung can page.
-    #[test]
-    fn test_a_blank_or_overlong_slot_is_refused() {
-        let mut r = Rotation::weekly("Primary", vec!["ana@o2.ai".into()], ANCHOR);
-        r.slot = "   ".into();
-        assert_eq!(r.validate(), Err(RotationError::BadSlot("   ".into())));
-        r.slot = "x".repeat(MAX_SLOT_CHARS + 1);
-        assert!(matches!(r.validate(), Err(RotationError::BadSlot(_))));
-        r.slot = "x".repeat(MAX_SLOT_CHARS);
-        r.validate().unwrap();
-    }
-
-    /// The grid is drawn one slot at a time, and each row carries the slot it
-    /// answers for.
-    #[test]
-    fn test_the_grid_resolves_one_slot_at_a_time() {
-        let rotations = vec![
-            Rotation::weekly(
-                "Juniors",
-                vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
-                ANCHOR,
-            ),
-            Rotation::weekly("Seniors", vec!["eve@o2.ai".into()], ANCHOR).in_slot("secondary"),
-        ];
-        let (from, to) = (ANCHOR, ANCHOR + 2 * MICROS_PER_WEEK);
-
-        let primary = resolve_window(&rotations, &[], &[], from, to, TZ).unwrap();
-        assert_tiles(&primary, from, to);
-        assert_eq!(primary.len(), 2, "one handover in the window");
-        assert!(primary.iter().all(|s| s.slot == DEFAULT_SLOT));
-        assert_eq!(primary[0].user_email.as_deref(), Some("ana@o2.ai"));
-        assert_eq!(primary[1].user_email.as_deref(), Some("bob@o2.ai"));
-
-        let secondary =
-            resolve_window_in_slot(&rotations, &[], &[], "secondary", from, to, TZ).unwrap();
-        assert_tiles(&secondary, from, to);
-        assert_eq!(
-            secondary.len(),
-            1,
-            "a one-person rotation is one stretch, whatever the other slot does"
-        );
-        assert_eq!(secondary[0].slot, "secondary");
-        assert_eq!(secondary[0].user_email.as_deref(), Some("eve@o2.ai"));
-    }
-
-    // ── Unavailability (GAP 2) ──────────────────────────────────────────────
 
     fn away(user: &str, start: i64, end: i64) -> Unavailability {
         Unavailability {
@@ -3627,7 +2998,7 @@ mod tests {
     /// it passes to the next person and nobody is woken on a beach.
     #[test]
     fn test_an_away_member_is_skipped_and_the_shift_passes_along() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()],
             ANCHOR,
@@ -3639,10 +3010,17 @@ mod tests {
             Some("bob@o2.ai"),
             "the shift passes to the next eligible member"
         );
+        // Bob again, and that is right: he is standing in for ana's week and
+        // the next week is his own. The old assertion was cara, because the old
+        // `next_on_call` walked one position along the *ladder* from whoever
+        // was on call. This is the calendar's question — who holds the next
+        // shift — and nothing pages it, so two consecutive weeks for bob is a
+        // fact to display rather than a double-page to avoid.
         assert_eq!(
-            next_on_call(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
-            Some("cara@o2.ai"),
-            "and rung two moves along with it rather than doubling up on bob"
+            of(&rotations)
+                .next_holder(&unavailability, ANCHOR, TZ)
+                .as_deref(),
+            Some("bob@o2.ai"),
         );
 
         // Nobody else's turn moved. Bob's own week is still Bob's, and Cara's
@@ -3670,7 +3048,7 @@ mod tests {
     /// first one.
     #[test]
     fn test_the_skip_wraps_round_the_cycle() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()],
             ANCHOR,
@@ -3686,10 +3064,17 @@ mod tests {
             on_call_now(&rotations, &[], &unavailability, at, TZ).as_deref(),
             Some("bob@o2.ai")
         );
+        // Ana, because "up next" is answered **at the next handover**, and both
+        // absences have ended by then. The old assertion here was `None`: the
+        // old `next_on_call` meant "the next available person *right now*",
+        // which is a ladder question, and the ladder no longer asks it. This is
+        // the calendar's question, and the calendar is right that ana holds the
+        // next shift.
         assert_eq!(
-            next_on_call(&rotations, &[], &unavailability, at, TZ),
-            None,
-            "there is nobody else left, and saying otherwise would be a lie"
+            of(&rotations)
+                .next_holder(&unavailability, at, TZ)
+                .as_deref(),
+            Some("ana@o2.ai"),
         );
     }
 
@@ -3698,7 +3083,7 @@ mod tests {
     /// never the away person.
     #[test]
     fn test_everybody_away_degrades_to_a_coverage_gap() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
@@ -3709,12 +3094,20 @@ mod tests {
         ];
 
         assert_eq!(on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ), None);
-        assert_eq!(next_on_call(&rotations, &[], &unavailability, ANCHOR, TZ), None);
-        assert!(resolve_on_call(&rotations, &[], &unavailability, ANCHOR, TZ).is_empty());
-        assert!(everyone_on_schedule(&rotations, &[], &unavailability, ANCHOR, TZ).is_empty());
+        // "Up next" is asked at the next handover, by which point the absences
+        // have ended — so the calendar correctly shows bob taking over. The gap
+        // is *now*, and that is what the grid below reports.
+        assert_eq!(
+            of(&rotations)
+                .next_holder(&unavailability, ANCHOR, TZ)
+                .as_deref(),
+            Some("bob@o2.ai")
+        );
+        assert!(resolve_on_call(&[of(&rotations)], &[], &unavailability, ANCHOR, TZ).is_empty());
+        assert!(of(&rotations).everyone(&[], &unavailability, ANCHOR, TZ).is_empty());
 
         // And the grid says so out loud rather than leaving a hole in the list.
-        let segments = resolve_window(
+        let segments = resolve_grid(
             &rotations,
             &[],
             &unavailability,
@@ -3732,7 +3125,7 @@ mod tests {
     /// somebody's own leave is that they cut it short to take the shift.
     #[test]
     fn test_an_override_outranks_an_absence() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
@@ -3746,7 +3139,7 @@ mod tests {
             Some("sam@o2.ai")
         );
         assert_eq!(
-            resolve_on_call(&rotations, &overrides, &unavailability, ANCHOR, TZ)[0].user_email,
+            resolve_on_call(&[of(&rotations)], &overrides, &unavailability, ANCHOR, TZ)[0].user_email,
             "sam@o2.ai"
         );
         // The layer underneath is still skipped normally once the cover ends.
@@ -3770,7 +3163,7 @@ mod tests {
     /// under somebody who was only marking a Tuesday off.
     #[test]
     fn test_the_skip_is_deterministic_and_does_not_reshuffle_the_grid() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec![
                 "ana@o2.ai".into(),
@@ -3781,7 +3174,7 @@ mod tests {
             ANCHOR,
         )];
         let (from, to) = (ANCHOR, ANCHOR + 4 * MICROS_PER_WEEK);
-        let before = resolve_window(&rotations, &[], &[], from, to, TZ).unwrap();
+        let before = resolve_grid(&rotations, &[], &[], from, to, TZ).unwrap();
 
         // Cara is away for her own week — the third one — and for nothing else.
         let cara_week = ANCHOR + 2 * MICROS_PER_WEEK;
@@ -3792,16 +3185,16 @@ mod tests {
         ];
 
         // Repeatable: ten reads, and a reversed row order, all agree.
-        let first = resolve_window(&rotations, &[], &unavailability, from, to, TZ).unwrap();
+        let first = resolve_grid(&rotations, &[], &unavailability, from, to, TZ).unwrap();
         for _ in 0..10 {
             assert_eq!(
-                resolve_window(&rotations, &[], &unavailability, from, to, TZ).unwrap(),
+                resolve_grid(&rotations, &[], &unavailability, from, to, TZ).unwrap(),
                 first
             );
         }
         let reversed: Vec<_> = unavailability.iter().rev().cloned().collect();
         assert_eq!(
-            resolve_window(&rotations, &[], &reversed, from, to, TZ).unwrap(),
+            resolve_grid(&rotations, &[], &reversed, from, to, TZ).unwrap(),
             first,
             "the answer must not depend on the order the rows came back in"
         );
@@ -3830,14 +3223,14 @@ mod tests {
     /// so both edges are boundaries the grid has to show.
     #[test]
     fn test_an_absence_inside_a_shift_splits_the_segment() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
         )];
         let (start, end) = (ANCHOR + 2 * MICROS_PER_DAY, ANCHOR + 4 * MICROS_PER_DAY);
         let unavailability = vec![away("ana@o2.ai", start, end)];
-        let segments = resolve_window(
+        let segments = resolve_grid(
             &rotations,
             &[],
             &unavailability,
@@ -3862,7 +3255,7 @@ mod tests {
     fn test_a_skip_across_a_dst_week_keeps_the_wall_clock_handover() {
         // US spring forward is 2026-03-08. Hand over Sundays at 09:00 local.
         let anchor = local(NY, 2026, 3, 1, 9, 0);
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()],
             anchor,
@@ -3918,7 +3311,7 @@ mod tests {
     /// on the calendar.
     #[test]
     fn test_away_assignments_name_the_shift_the_rota_would_hand_over() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()],
             ANCHOR,
@@ -3932,7 +3325,7 @@ mod tests {
         )];
 
         let found = away_assignments(
-            &rotations,
+            &[of(&rotations)],
             &unavailability,
             ANCHOR,
             ANCHOR + 4 * MICROS_PER_WEEK,
@@ -3941,8 +3334,9 @@ mod tests {
         );
         assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(found[0].user_email, "ana@o2.ai");
-        assert_eq!(found[0].rotation, "On-call rotation");
-        assert_eq!(found[0].slot, DEFAULT_SLOT);
+        assert_eq!(found[0].rotation, "Primary", "the position");
+        assert_eq!(found[0].rule, "On-call rotation", "the rule inside it");
+        assert_eq!(found[0].rotation_id, R1);
         assert_eq!(
             (found[0].from, found[0].to),
             (ana_week, ana_week + 2 * MICROS_PER_DAY),
@@ -3956,10 +3350,10 @@ mod tests {
 
         // Nothing to say when nobody is away, and nothing to say about a week
         // outside the horizon.
-        assert!(away_assignments(&rotations, &[], ANCHOR, ANCHOR + MICROS_PER_WEEK, TZ, 50).is_empty());
+        assert!(away_assignments(&[of(&rotations)], &[], ANCHOR, ANCHOR + MICROS_PER_WEEK, TZ, 50).is_empty());
         assert!(
             away_assignments(
-                &rotations,
+                &[of(&rotations)],
                 &unavailability,
                 ANCHOR,
                 ANCHOR + MICROS_PER_WEEK,
@@ -3974,7 +3368,7 @@ mod tests {
     /// nobody picks it up — which is the coverage gap, named at edit time.
     #[test]
     fn test_an_away_assignment_with_no_taker_says_so() {
-        let rotations = vec![Rotation::weekly(
+        let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
@@ -3984,7 +3378,7 @@ mod tests {
             away("bob@o2.ai", ANCHOR, ANCHOR + MICROS_PER_WEEK),
         ];
         let found = away_assignments(
-            &rotations,
+            &[of(&rotations)],
             &unavailability,
             ANCHOR,
             ANCHOR + MICROS_PER_WEEK,
@@ -4011,393 +3405,13 @@ mod tests {
     // ── The derived secondary's offset (§E.9) ───────────────────────────────
 
     /// A roster of `n` people, `p0..p{n-1}`, weekly from the anchor.
-    fn roster(n: usize) -> Rotation {
-        Rotation::weekly(
+    fn roster(n: usize) -> ShiftRule {
+        ShiftRule::weekly(
             "On-call rotation",
             (0..n).map(|i| format!("p{i}@o2.ai")).collect(),
             ANCHOR,
         )
     }
 
-    /// The rule itself, over every roster size a real team has: **one**,
-    /// whatever the size.
-    ///
-    /// The size-dependent version is what made the product unreadable — the
-    /// calendar named one successor and the ladder named another, and both
-    /// were right. A rule a responder can hold in their head beats a rule that
-    /// spaces the pairing out.
-    #[test]
-    fn test_the_default_offset_is_one_for_every_roster() {
-        let table = [
-            (1usize, 1u32),
-            (2, 1),
-            (3, 1),
-            (4, 1),
-            (5, 1),
-            (6, 1),
-            (7, 1),
-            (8, 1),
-            (9, 1),
-            (10, 1),
-        ];
-        for (len, want) in table {
-            assert_eq!(default_secondary_offset(len), want, "roster of {len}");
-            assert_eq!(
-                roster(len).resolved_secondary_offset(),
-                want,
-                "roster of {len} resolves what it defaults to"
-            );
-        }
-    }
-
-    /// Who the secondary actually is, for every roster size, with the default.
-    ///
-    /// One person has no secondary at all — the case that was already right,
-    /// and the one a fallback would quietly break by paging the primary twice
-    /// and calling it an escalation.
-    #[test]
-    fn test_the_derived_secondary_across_roster_sizes() {
-        let table = [
-            (1usize, None),
-            (2, Some("p1@o2.ai")),
-            (3, Some("p1@o2.ai")),
-            (4, Some("p1@o2.ai")),
-            (5, Some("p1@o2.ai")),
-            (6, Some("p1@o2.ai")),
-            (7, Some("p1@o2.ai")),
-            (8, Some("p1@o2.ai")),
-            (9, Some("p1@o2.ai")),
-            (10, Some("p1@o2.ai")),
-        ];
-        for (len, want) in table {
-            let rotations = vec![roster(len)];
-            assert_eq!(
-                next_on_call(&rotations, &[], &[], ANCHOR, TZ).as_deref(),
-                want,
-                "roster of {len}"
-            );
-        }
-    }
-
-    /// The whole point, stated as the thing the screen shows: **the secondary
-    /// is the person the calendar already says takes over next.**
-    ///
-    /// This test used to assert the exact opposite — that the secondary must
-    /// *not* be next week's primary — which is how the product ended up naming
-    /// two different people "next" on two different tabs. Keeping the inverted
-    /// version here as history would be worse than useless, so it is inverted
-    /// with its reason.
-    #[test]
-    fn test_the_secondary_is_the_person_who_takes_over_next() {
-        let rotations = vec![roster(10)];
-        for week in 0..10i64 {
-            let at = ANCHOR + week * MICROS_PER_WEEK;
-            let primary = on_call_now(&rotations, &[], &[], at, TZ).unwrap();
-            let secondary = next_on_call(&rotations, &[], &[], at, TZ).unwrap();
-            let next_weeks_primary =
-                on_call_now(&rotations, &[], &[], at + MICROS_PER_WEEK, TZ).unwrap();
-            assert_eq!(
-                secondary, next_weeks_primary,
-                "week {week}: one 'next', not two — the ladder and the calendar \
-                 must name the same person"
-            );
-            assert_eq!(
-                secondary,
-                format!("p{}@o2.ai", (week as usize + 1) % 10),
-                "week {week}"
-            );
-            assert_ne!(secondary, primary, "and never the same person twice");
-        }
-    }
-
-    /// Shadow-then-lead has to stay reachable — it is a real onboarding
-    /// pattern, it just stopped being the only one. Explicit `1` is it, at
-    /// every roster size.
-    #[test]
-    fn test_an_explicit_offset_of_one_restores_shadow_then_lead() {
-        for len in 2..=10usize {
-            let rotations = vec![roster(len).with_secondary_offset(1)];
-            let secondary = next_on_call(&rotations, &[], &[], ANCHOR, TZ);
-            assert_eq!(secondary.as_deref(), Some("p1@o2.ai"), "roster of {len}");
-            assert_eq!(
-                secondary,
-                on_call_now(&rotations, &[], &[], ANCHOR + MICROS_PER_WEEK, TZ),
-                "roster of {len}: this week's secondary leads next week"
-            );
-        }
-    }
-
-    /// Every explicit offset a roster of ten can hold, and the person it
-    /// picks. Offsets past the roster are clamped rather than refused.
-    #[test]
-    fn test_explicit_offsets_over_a_roster_of_ten() {
-        let table = [
-            (1u32, "p1@o2.ai"),
-            (2, "p2@o2.ai"),
-            (5, "p5@o2.ai"),
-            (9, "p9@o2.ai"),
-            // 10 would wrap onto the primary, so it clamps to the furthest
-            // usable position instead of paging the same person twice.
-            (10, "p9@o2.ai"),
-            (99, "p9@o2.ai"),
-        ];
-        for (offset, want) in table {
-            let rotations = vec![roster(10).with_secondary_offset(offset)];
-            assert_eq!(
-                next_on_call(&rotations, &[], &[], ANCHOR, TZ).as_deref(),
-                Some(want),
-                "offset {offset}"
-            );
-        }
-    }
-
-    /// A roster that shrinks under a stored offset must keep paging somebody.
-    /// Clamping is what makes a stale number a smaller separation rather than
-    /// a coverage gap.
-    #[test]
-    fn test_a_shrunken_roster_clamps_rather_than_going_dark() {
-        let mut r = roster(10).with_secondary_offset(7);
-        r.members.truncate(3);
-        assert!(r.validate().is_ok(), "a stale offset is not a broken rotation");
-        assert_eq!(r.resolved_secondary_offset(), 2);
-        assert_eq!(
-            next_on_call(&[r], &[], &[], ANCHOR, TZ).as_deref(),
-            Some("p2@o2.ai")
-        );
-    }
-
-    /// Zero is the one value that can only be typed, never arrived at by
-    /// editing a roster — so it is refused where it is written.
-    #[test]
-    fn test_a_zero_offset_is_refused() {
-        let r = roster(4).with_secondary_offset(0);
-        assert_eq!(r.validate(), Err(RotationError::ZeroSecondaryOffset));
-    }
-
-    /// The refusal has to name the default it is steering somebody towards, and
-    /// name it *correctly*.
-    ///
-    /// It did not. The message advised "leave it unset for half the roster" —
-    /// true under `max(1, len/2)`, wrong from the moment the default became 1,
-    /// and the only place a user ever reads it is the moment they got the field
-    /// wrong. The previous version of this test asserted on the phrase
-    /// "shadow-then-lead", so it pinned the sentence's *shape* while the claim
-    /// inside it went stale.
-    ///
-    /// So this asserts against [`default_secondary_offset`] itself: the text
-    /// cannot contradict the constant without failing here.
-    #[test]
-    fn test_the_zero_offset_refusal_names_the_real_default() {
-        let message = RotationError::ZeroSecondaryOffset.to_string();
-        assert!(
-            message.contains(&format!("default of {}", default_secondary_offset(4))),
-            "the refusal does not name the default it advises: {message}"
-        );
-        assert!(
-            !message.contains("half the roster"),
-            "the refusal still advises the offset rule that was replaced: {message}"
-        );
-    }
-
-    /// Absent from the wire when it is derived, so a rotation stored before
-    /// the field existed serialises back byte-for-byte as it was stored.
-    #[test]
-    fn test_the_offset_is_absent_from_the_wire_unless_set() {
-        let derived = serde_json::to_string(&roster(10)).unwrap();
-        assert!(
-            !derived.contains("secondary_offset"),
-            "derived offsets are not written: {derived}"
-        );
-        let explicit = serde_json::to_string(&roster(10).with_secondary_offset(1)).unwrap();
-        assert!(explicit.contains(r#""secondary_offset":1"#));
-    }
-
-    /// And a rotation stored without the field derives the new default rather
-    /// than the old hard-coded 1 — which is the change, and the reason the
-    /// field is absent-means-derived instead of defaulted to 1 on read.
-    #[test]
-    fn test_a_stored_rotation_without_the_field_derives_the_default() {
-        let stored = serde_json::json!({
-            "name": "On-call rotation",
-            "members": (0..10).map(|i| format!("p{i}@o2.ai")).collect::<Vec<_>>(),
-            "shift_micros": MICROS_PER_WEEK,
-            "anchor_micros": ANCHOR,
-        });
-        let r: Rotation = serde_json::from_value(stored).unwrap();
-        assert_eq!(r.secondary_offset, None);
-        assert_eq!(r.resolved_secondary_offset(), 1);
-        assert_eq!(
-            next_on_call(&[r], &[], &[], ANCHOR, TZ).as_deref(),
-            Some("p1@o2.ai")
-        );
-    }
-
-    /// **A roster change no longer moves the pairing at all**, which is the
-    /// second thing the offset change bought.
-    ///
-    /// Under `max(1, len/2)` the secondary depended on the roster's *size*, so
-    /// adding a tenth person silently repaired who backed up whom for everyone
-    /// — accepted at the time as "deliberate and visible", and visible to
-    /// nobody. At an offset of one the answer depends only on position, so the
-    /// pairing survives the team growing.
-    #[test]
-    fn test_a_roster_change_does_not_move_the_pairing() {
-        let nine = roster(9);
-        assert_eq!(
-            next_on_call(&[nine.clone()], &[], &[], ANCHOR, TZ).as_deref(),
-            Some("p1@o2.ai")
-        );
-        let mut ten = nine;
-        ten.members.push("p9@o2.ai".into());
-        for _ in 0..5 {
-            assert_eq!(
-                next_on_call(&[ten.clone()], &[], &[], ANCHOR, TZ).as_deref(),
-                Some("p1@o2.ai"),
-                "the tenth person joined and nobody's backup changed"
-            );
-        }
-    }
-
     // ── The offset composed with an absence ─────────────────────────────────
-
-    /// The double-skip test. An absent member at the front advances the
-    /// PRIMARY and nobody else: the secondary stays exactly where it was.
-    ///
-    /// Getting this wrong is subtle and expensive — the offset would be
-    /// measured from the person who inherited the shift rather than from the
-    /// roster, so one holiday would move two people and the team's pairing
-    /// would change every week somebody was away.
-    #[test]
-    fn test_an_absence_moves_the_primary_and_not_the_secondary() {
-        // Offset pinned at 3: the default is 1, which puts the secondary on
-        // exactly the person the primary's skip advances to, so the two rules
-        // could not be told apart and this test would pass while asserting
-        // nothing.
-        let rotations = vec![roster(6).with_secondary_offset(3)];
-        let week = ANCHOR + MICROS_PER_WEEK;
-
-        assert_eq!(
-            on_call_now(&rotations, &[], &[], ANCHOR, TZ).as_deref(),
-            Some("p0@o2.ai")
-        );
-        assert_eq!(
-            next_on_call(&rotations, &[], &[], ANCHOR, TZ).as_deref(),
-            Some("p3@o2.ai")
-        );
-
-        let unavailability = vec![away("p0@o2.ai", ANCHOR, week)];
-        assert_eq!(
-            on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
-            Some("p1@o2.ai"),
-            "the away person's own turn passes along"
-        );
-        assert_eq!(
-            next_on_call(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
-            Some("p3@o2.ai"),
-            "and nobody else's row moves: the secondary is unchanged"
-        );
-    }
-
-    /// The absence landing ON the secondary passes that shift along, and only
-    /// that one.
-    #[test]
-    fn test_an_absent_secondary_passes_to_the_next_person_along() {
-        // Offset pinned: this is a test about the *secondary's* own skip, and
-        // the default offset of 1 puts the secondary on the person the
-        // primary's skip already moved to, which would test both rules at once.
-        let rotations = vec![roster(6).with_secondary_offset(3)];
-        let unavailability = vec![away("p3@o2.ai", ANCHOR, ANCHOR + MICROS_PER_WEEK)];
-        assert_eq!(
-            on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
-            Some("p0@o2.ai"),
-            "the primary is untouched"
-        );
-        assert_eq!(
-            next_on_call(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
-            Some("p4@o2.ai")
-        );
-    }
-
-    /// Both away, at the two ends: the primary advances one and the secondary
-    /// advances one, independently, and the gap between them is not doubled.
-    #[test]
-    fn test_the_offset_and_the_skip_do_not_compound() {
-        // Pinned for the same reason: at the default offset of 1 there is no
-        // gap left to double, so the compounding this test exists to rule out
-        // could not show up either way.
-        let rotations = vec![roster(8).with_secondary_offset(4)];
-        let end = ANCHOR + MICROS_PER_WEEK;
-        let unavailability = vec![away("p0@o2.ai", ANCHOR, end), away("p4@o2.ai", ANCHOR, end)];
-        assert_eq!(
-            on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
-            Some("p1@o2.ai")
-        );
-        assert_eq!(
-            next_on_call(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
-            Some("p5@o2.ai"),
-            "p5, not p6: the primary's skip is not added to the offset"
-        );
-    }
-
-    /// At offset 1 the two rules collide — the offset's position IS the
-    /// person who just inherited the shift — and the secondary must still
-    /// never be the primary.
-    #[test]
-    fn test_the_secondary_is_never_the_primary_when_the_offset_collides() {
-        let rotations = vec![roster(4).with_secondary_offset(1)];
-        let unavailability = vec![away("p0@o2.ai", ANCHOR, ANCHOR + MICROS_PER_WEEK)];
-        let primary = on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ);
-        let secondary = next_on_call(&rotations, &[], &unavailability, ANCHOR, TZ);
-        assert_eq!(primary.as_deref(), Some("p1@o2.ai"));
-        assert_eq!(secondary.as_deref(), Some("p2@o2.ai"));
-        assert_ne!(primary, secondary);
-    }
-
-    /// Separation is a preference; reaching a human is not. When everybody
-    /// from the offset onwards is away, the second rung falls back to the
-    /// nearest available person rather than reporting no secondary at all.
-    #[test]
-    fn test_the_secondary_falls_back_rather_than_paging_nobody() {
-        let rotations = vec![roster(4)]; // offset 2
-        let end = ANCHOR + MICROS_PER_WEEK;
-        let unavailability = vec![away("p2@o2.ai", ANCHOR, end), away("p3@o2.ai", ANCHOR, end)];
-        assert_eq!(
-            next_on_call(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
-            Some("p1@o2.ai"),
-            "the far half is away, so the near half takes it"
-        );
-    }
-
-    /// Everybody but the primary away is still no secondary, because there is
-    /// genuinely nobody — the fallback must not invent one by wrapping onto
-    /// the person already holding the pager.
-    #[test]
-    fn test_no_secondary_when_everybody_else_is_away() {
-        let rotations = vec![roster(3)];
-        let end = ANCHOR + MICROS_PER_WEEK;
-        let unavailability = vec![away("p1@o2.ai", ANCHOR, end), away("p2@o2.ai", ANCHOR, end)];
-        assert_eq!(
-            on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ).as_deref(),
-            Some("p0@o2.ai")
-        );
-        assert_eq!(
-            next_on_call(&rotations, &[], &unavailability, ANCHOR, TZ),
-            None
-        );
-    }
-
-    /// The resolved slot carries the offset, so the screen can say where the
-    /// secondary came from instead of naming somebody and leaving the reader
-    /// to guess.
-    #[test]
-    fn test_the_resolved_slot_reports_the_offset_it_used() {
-        let resolved = resolve_on_call(&[roster(10)], &[], &[], ANCHOR, TZ);
-        assert_eq!(resolved[0].next_user_email.as_deref(), Some("p1@o2.ai"));
-        assert_eq!(resolved[0].next_offset, Some(1));
-
-        // One person: no next, so no offset to report about it.
-        let alone = resolve_on_call(&[roster(1)], &[], &[], ANCHOR, TZ);
-        assert_eq!(alone[0].next_user_email, None);
-        assert_eq!(alone[0].next_offset, None);
-    }
 }

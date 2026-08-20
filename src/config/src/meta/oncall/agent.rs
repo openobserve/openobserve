@@ -2827,7 +2827,7 @@ mod tests {
     fn test_the_triage_budget_stays_well_inside_the_rung_it_sits_in() {
         use super::super::policy::EscalationPolicy;
         let budget = shipped().triage_budget_micros();
-        let policy = EscalationPolicy::default_for_team("p", "default", "t");
+        let policy = EscalationPolicy::default_for_team("p", "default", "t", "rot_primary", Some("rot_secondary".into()));
         for (priority, factor) in [(P2, 3), (P3, 10)] {
             let first_escalation = policy
                 .rung(priority)
