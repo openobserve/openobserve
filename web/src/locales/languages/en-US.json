@@ -2756,7 +2756,12 @@
       "disable": "Disable Step",
       "enable": "Enable Step",
       "disabledBadge": "Disabled",
-      "incompleteBadge": "Set up later"
+      "incompleteBadge": "Set up later",
+      "unsavedFnTitle": "Unsaved Function Changes",
+      "unsavedFnMessage": "This step has function code that isn't saved to your library. Save it, discard the changes, or keep editing.",
+      "unsavedFnSave": "Save Function",
+      "unsavedFnDiscard": "Discard Changes",
+      "unsavedFnKeep": "Keep Editing"
     },
     "commonFieldsAbove": "common fields above",
     "canvas": {

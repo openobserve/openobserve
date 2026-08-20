@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <FunctionPicker
         ref="picker"
         :initial-name="savedData.name || ''"
+        :initial-raw-fn="savedData.raw_fn || ''"
         :initial-after-flatten="savedData.after_flatten ?? false"
         :sample-events="sampleEvents"
         language="javascript"
@@ -118,8 +119,10 @@ onBeforeUnmount(() => {
 
 // Drawer "Save": the picker is optional, so submit() resolves a payload even with
 // no function selected (empty name = placeholder). It only returns null while the
-// inline "Create New Function" editor is open. Flag the node incomplete when no
-// function was picked — that drives the node's warning badge and blocks Publish.
+// inline "Create New Function" editor is open. Flag the node incomplete when no saved
+// function is referenced — inline `raw_fn` has an empty name, so it's treated the same
+// as an unconfigured dummy ("Set up later"): runs in Test, but blocks Publish until
+// the function is saved (the backend rejects raw_fn / empty name on publish too).
 const submit = async () => {
   const node = workflowObj.currentSelectedNodeData;
   const payload = (await picker.value?.submit()) ?? null;
@@ -128,5 +131,11 @@ const submit = async () => {
   return payload;
 };
 
-defineExpose({ submit });
+// Exposed for WorkflowNodeDrawer's save-or-discard exit prompt (unsaved inline/edited
+// function code must be resolved before leaving the node — never auto-saved).
+const isDirty = () => !!picker.value?.isDirty?.();
+const discardChanges = () => picker.value?.discardChanges?.();
+const saveChanges = () => picker.value?.saveChanges?.();
+
+defineExpose({ submit, isDirty, discardChanges, saveChanges });
 </script>

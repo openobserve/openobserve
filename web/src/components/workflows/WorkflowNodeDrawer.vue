@@ -36,7 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="raw(title)"
     :size="containerSize"
     :width="containerWidth"
-    :show-close="true"
+    :show-close="!isFunctionNode"
+    :persistent="isFunctionNode"
     data-test="workflow-node-drawer"
   >
     <!-- Footer — Previous / Next step navigation on the left (walks the same tree
@@ -118,50 +119,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The header TITLE is the editable step name (T2), with the node type as the
          subtitle so the kind stays clear. -->
     <template #header>
-      <div class="min-w-0">
-        <OInlineEdit
-          :model-value="nodeName"
-          data-test="workflows-node-rename-input"
-          :placeholder="t('workflow.node.namePlaceholder')"
-          :aria-label="t('workflow.node.namePlaceholder')"
-          :readonly="canvasReadOnly"
-          @update:model-value="onNameLive"
-          @commit="onNameCommit"
-        />
-        <div class="mt-0.5 flex items-center gap-2">
-          <span class="text-text-secondary truncate text-xs">{{ typeBreadcrumb }}</span>
+      <div class="flex min-w-0 items-start gap-2">
+        <!-- Function nodes hide reka's close X + block outside/escape (persistent) so
+             a dirty editor can't be dismissed without the guard — this custom X routes
+             the close through requestClose(). Other node types keep the built-in X. -->
+        <OButton
+          v-if="isFunctionNode"
+          variant="ghost"
+          size="icon-sm"
+          class="order-last shrink-0"
+          data-test="workflow-ndv-close"
+          :aria-label="t('common.close')"
+          @click="requestClose"
+        >
+          <OIcon name="close" size="sm" />
+        </OButton>
+        <div class="min-w-0 flex-1">
+          <OInlineEdit
+            :model-value="nodeName"
+            data-test="workflows-node-rename-input"
+            :placeholder="t('workflow.node.namePlaceholder')"
+            :aria-label="t('workflow.node.namePlaceholder')"
+            :readonly="canvasReadOnly"
+            @update:model-value="onNameLive"
+            @commit="onNameCommit"
+          />
+          <div class="mt-0.5 flex items-center gap-2">
+            <span class="text-text-secondary truncate text-xs">{{ typeBreadcrumb }}</span>
 
-          <!-- Run label + switcher — read-only history only. The chip shows the run id
+            <!-- Run label + switcher — read-only history only. The chip shows the run id
                (already on the result — no fetch); the history button opens a menu of
                runs to load onto THIS node. -->
-          <template v-if="historyRunId">
-            <span
-              data-test="workflow-ndv-run-label"
-              class="border-border-default text-text-secondary rounded-default inline-flex max-w-[20rem] shrink-0 items-center border px-1.5 py-0.5 text-xs"
-              :title="raw(historyRunId)"
-            >
-              <span class="truncate">{{ t("workflow.ndv.runLabel") }} · {{ historyRunId }}</span>
-            </span>
+            <template v-if="historyRunId">
+              <span
+                data-test="workflow-ndv-run-label"
+                class="border-border-default text-text-secondary rounded-default inline-flex max-w-[20rem] shrink-0 items-center border px-1.5 py-0.5 text-xs"
+                :title="raw(historyRunId)"
+              >
+                <span class="truncate">{{ t("workflow.ndv.runLabel") }} · {{ historyRunId }}</span>
+              </span>
 
-            <WorkflowRunSwitcher
-              :current-run-id="historyRunId"
-              :org-id="store.state.selectedOrganization.identifier"
-              :workflow-id="workflowObj.currentSelectedWorkflow?.id || ''"
-              @select="switchRun"
-            >
-              <template #trigger>
-                <OButton
-                  variant="outline"
-                  size="icon-xs-sq"
-                  class="shrink-0"
-                  data-test="workflow-ndv-run-switcher"
-                >
-                  <OIcon name="history" size="xs" />
-                  <OTooltip :content="t('workflow.ndv.switchRun')" side="bottom" />
-                </OButton>
-              </template>
-            </WorkflowRunSwitcher>
-          </template>
+              <WorkflowRunSwitcher
+                :current-run-id="historyRunId"
+                :org-id="store.state.selectedOrganization.identifier"
+                :workflow-id="workflowObj.currentSelectedWorkflow?.id || ''"
+                @select="switchRun"
+              >
+                <template #trigger>
+                  <OButton
+                    variant="outline"
+                    size="icon-xs-sq"
+                    class="shrink-0"
+                    data-test="workflow-ndv-run-switcher"
+                  >
+                    <OIcon name="history" size="xs" />
+                    <OTooltip :content="t('workflow.ndv.switchRun')" side="bottom" />
+                  </OButton>
+                </template>
+              </WorkflowRunSwitcher>
+            </template>
+          </div>
         </div>
       </div>
     </template>
@@ -539,6 +556,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :ok-label="t('common.delete')"
       @update:ok="onConfirmDelete"
     />
+
+    <!-- Unsaved-function prompt (Function nodes only) — nested so it stacks above the
+         NDV. Forces a choice (persistent, no dismiss): never auto-save the library
+         function, never silently drop edits. Save opens the picker's save dialog and
+         keeps you here; Discard leaves without committing; Keep editing stays. -->
+    <ODialog
+      :open="exitPromptOpen"
+      persistent
+      :show-close="false"
+      size="sm"
+      data-test="workflow-ndv-unsaved-fn"
+      :title="t('workflow.node.unsavedFnTitle')"
+      :neutral-button-label="t('workflow.node.unsavedFnKeep')"
+      :secondary-button-label="t('workflow.node.unsavedFnDiscard')"
+      :primary-button-label="t('workflow.node.unsavedFnSave')"
+      neutral-button-variant="outline"
+      secondary-button-variant="outline-destructive"
+      @click:neutral="onExitKeepEditing"
+      @click:secondary="onExitDiscard"
+      @click:primary="onExitSave"
+    >
+      <p class="text-text-secondary text-sm">{{ t("workflow.node.unsavedFnMessage") }}</p>
+    </ODialog>
   </ODialog>
 </template>
 
@@ -985,6 +1025,7 @@ const toggleStepsCollapsed = () => {
 };
 const navigateTo = (targetId: string) => {
   if (!targetId || targetId === nodeId.value) return;
+  if (guardFnExit(() => editNode(targetId))) return;
   editNode(targetId);
 };
 
@@ -1069,8 +1110,9 @@ const executeStep = async () => {
 // its payload and apply it to the (already-committed) node. Awaited because
 // schema-validated bodies (the pickers) resolve asynchronously. A read-only trigger
 // or a form-less placeholder type has nothing to submit — just close. A body that
-// returns null (its inline "Create New …" editor is still open) is left untouched.
-const applyAndClose = async () => {
+// returns null (its inline "Create New …" editor is still open) is left untouched
+// but the panel still closes.
+const commitAndClose = async () => {
   // Read-only Runs view: never commit — just close (no historical-run mutation).
   if (bodyComponent.value && !readonlyBody.value && !canvasReadOnly.value) {
     const payload = await bodyRef.value?.submit?.();
@@ -1080,6 +1122,51 @@ const applyAndClose = async () => {
     }
   }
   closeNodeDrawer();
+};
+
+// Function nodes get special close handling: their editor can hold unsaved inline
+// code, and reka closes optimistically (can't be cleanly reopened → visible flicker).
+// So for a function node the dialog is `persistent` (outside-click / Escape can't
+// dismiss it) and reka's close X is hidden; a custom header X routes through
+// requestClose() instead, which shows the guard prompt WITHOUT any reka close.
+const isFunctionNode = computed(() => workflowObj.dialog.name === "function");
+const requestClose = () => {
+  // Dirty → prompt (Save/Discard/Keep); otherwise commit + close.
+  if (guardFnExit(() => closeNodeDrawer())) return;
+  commitAndClose();
+};
+
+// ── Unsaved-function exit guard ───────────────────────────────────────────────
+// A Function node's editor can hold inline/edited JS not yet saved to the library
+// (serialized as `raw_fn`). Leaving the node — Prev/Next or closing — must not
+// silently auto-save (a library update is irreversible) nor silently drop edits, so
+// prompt first. Save opens the picker's save dialog and KEEPS the user on the node;
+// Discard proceeds without committing; Keep editing stays put.
+const exitPromptOpen = ref(false);
+let pendingProceed: (() => void) | null = null;
+const functionDirty = () =>
+  workflowObj.dialog.name === "function" && !canvasReadOnly.value && !!bodyRef.value?.isDirty?.();
+const guardFnExit = (proceed: () => void): boolean => {
+  if (!functionDirty()) return false;
+  pendingProceed = proceed;
+  exitPromptOpen.value = true;
+  return true;
+};
+const onExitKeepEditing = () => {
+  exitPromptOpen.value = false;
+  pendingProceed = null;
+};
+const onExitDiscard = () => {
+  const proceed = pendingProceed;
+  exitPromptOpen.value = false;
+  pendingProceed = null;
+  bodyRef.value?.discardChanges?.();
+  proceed?.();
+};
+const onExitSave = () => {
+  exitPromptOpen.value = false;
+  pendingProceed = null; // stay on the node; the user completes the save dialog
+  bodyRef.value?.saveChanges?.();
 };
 // Delete confirmation lives INSIDE this dialog (not the shared one in WorkflowEditor)
 // so it stacks ON TOP of the NDV: nested in the ODialog it inherits a higher z-index
@@ -1094,7 +1181,10 @@ const onConfirmDelete = () => {
   const id = workflowObj.currentSelectedNodeData?.id;
   if (id) deleteNode(id);
 };
-const onOpenChange = (open: boolean) => {
-  if (!open) applyAndClose();
+// reka's close (X / outside / Escape) — only reachable for NON-function nodes now
+// (function nodes are persistent with no reka X, closing via requestClose instead),
+// so no dirty guard is needed here.
+const onOpenChange = async (open: boolean) => {
+  if (!open) await commitAndClose();
 };
 </script>

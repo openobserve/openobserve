@@ -43,21 +43,32 @@ vi.mock("vue-router", () => ({
   onBeforeRouteLeave: () => {},
 }));
 
-const { triggerSubmit, conditionSubmit, functionSubmit, destinationSubmit, makeBodyStub } =
-  vi.hoisted(() => ({
-    triggerSubmit: vi.fn(),
-    conditionSubmit: vi.fn(),
-    functionSubmit: vi.fn(),
-    destinationSubmit: vi.fn(),
-    makeBodyStub: (name: string, submit: any, extraData: any = {}) => ({
-      default: {
-        name,
-        template: `<div class="body-stub" data-test="${name}" />`,
-        data: () => ({ ...extraData }),
-        methods: { submit },
-      },
-    }),
-  }));
+const {
+  triggerSubmit,
+  conditionSubmit,
+  functionSubmit,
+  destinationSubmit,
+  functionIsDirty,
+  functionDiscard,
+  functionSave,
+  makeBodyStub,
+} = vi.hoisted(() => ({
+  triggerSubmit: vi.fn(),
+  conditionSubmit: vi.fn(),
+  functionSubmit: vi.fn(),
+  destinationSubmit: vi.fn(),
+  functionIsDirty: vi.fn(() => false),
+  functionDiscard: vi.fn(),
+  functionSave: vi.fn(),
+  makeBodyStub: (name: string, submit: any, extraData: any = {}, extraMethods: any = {}) => ({
+    default: {
+      name,
+      template: `<div class="body-stub" data-test="${name}" />`,
+      data: () => ({ ...extraData }),
+      methods: { submit, ...extraMethods },
+    },
+  }),
+}));
 
 vi.mock("@/plugins/workflows/nodes/WorkflowTrigger.vue", () =>
   makeBodyStub("WorkflowTrigger", () => triggerSubmit()),
@@ -66,7 +77,16 @@ vi.mock("@/plugins/workflows/nodes/WorkflowCondition.vue", () =>
   makeBodyStub("WorkflowCondition", () => conditionSubmit()),
 );
 vi.mock("@/plugins/workflows/nodes/WorkflowFunction.vue", () =>
-  makeBodyStub("WorkflowFunction", () => functionSubmit()),
+  makeBodyStub(
+    "WorkflowFunction",
+    () => functionSubmit(),
+    {},
+    {
+      isDirty: () => functionIsDirty(),
+      discardChanges: () => functionDiscard(),
+      saveChanges: () => functionSave(),
+    },
+  ),
 );
 vi.mock("@/plugins/workflows/nodes/WorkflowDestination.vue", () =>
   makeBodyStub("WorkflowDestination", () => destinationSubmit(), {
@@ -113,6 +133,7 @@ const makeContainerStub = (name: string, cls: string) => ({
   template: `
     <div class="${cls}" v-bind="$attrs">
       <div class="drawer-title">{{ title }}</div>
+      <div class="header-slot"><slot name="header" /></div>
       <button class="btn-primary" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
       <button class="btn-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
       <button class="btn-neutral" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
@@ -490,6 +511,144 @@ describe("WorkflowNodeDrawer", () => {
       expect(workflowObj.currentSelectedNodeID).toBe("dest");
       expect(wrapper.find('[data-test="workflow-ndv-input"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="workflow-ndv-output"]').exists()).toBe(true);
+    });
+  });
+
+  // A Function node's editor can hold inline/edited JS not yet saved to the library
+  // (raw_fn). Leaving — Prev/Next or close — must prompt Save / Discard / Keep editing
+  // (never auto-save, never silently drop edits).
+  describe("unsaved-function exit guard (raw_fn)", () => {
+    const seedFnGraph = () => {
+      workflowObj.currentSelectedWorkflow.nodes = [
+        {
+          id: "trig",
+          type: "input",
+          position: { x: 0, y: 0 },
+          data: { node_type: "workflow_trigger", trigger_kind: "alert_fired" },
+        },
+        { id: "fn", type: "default", position: { x: 0, y: 0 }, data: { node_type: "function" } },
+        {
+          id: "dest",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination" },
+        },
+      ] as any;
+      workflowObj.currentSelectedWorkflow.edges = [
+        { id: "e1", source: "trig", target: "fn" },
+        { id: "e2", source: "fn", target: "dest" },
+      ] as any;
+    };
+    const unsaved = (w: any) =>
+      w
+        .findAllComponents(ODialogStub)
+        .find((d: any) => d.props("title") === t("workflow.node.unsavedFnTitle"));
+    const promptOpen = (w: any) => !!unsaved(w)?.props("open");
+    const next = (w: any) => w.find('[data-test="workflow-ndv-next-step"]');
+
+    beforeEach(() => functionIsDirty.mockReturnValue(false));
+
+    it("prompts instead of navigating when the editor is dirty", async () => {
+      seedFnGraph();
+      openNode("fn");
+      functionIsDirty.mockReturnValue(true);
+      wrapper = mountDrawer();
+      await next(wrapper).trigger("click");
+      await flushPromises();
+      expect(promptOpen(wrapper)).toBe(true);
+      expect(workflowObj.currentSelectedNodeID).toBe("fn"); // did NOT navigate
+    });
+
+    it("navigates directly when the editor is not dirty (no prompt)", async () => {
+      seedFnGraph();
+      openNode("fn");
+      wrapper = mountDrawer();
+      await next(wrapper).trigger("click");
+      await flushPromises();
+      expect(promptOpen(wrapper)).toBe(false);
+      expect(workflowObj.currentSelectedNodeID).toBe("dest");
+    });
+
+    it("Discard proceeds with the navigation (and reverts the editor)", async () => {
+      seedFnGraph();
+      openNode("fn");
+      functionIsDirty.mockReturnValue(true);
+      wrapper = mountDrawer();
+      await next(wrapper).trigger("click");
+      await unsaved(wrapper).find(".btn-secondary").trigger("click"); // Discard
+      await flushPromises();
+      expect(functionDiscard).toHaveBeenCalled();
+      expect(workflowObj.currentSelectedNodeID).toBe("dest");
+      expect(promptOpen(wrapper)).toBe(false);
+    });
+
+    it("Save opens the save flow and stays on the node", async () => {
+      seedFnGraph();
+      openNode("fn");
+      functionIsDirty.mockReturnValue(true);
+      wrapper = mountDrawer();
+      await next(wrapper).trigger("click");
+      await unsaved(wrapper).find(".btn-primary").trigger("click"); // Save
+      await flushPromises();
+      expect(functionSave).toHaveBeenCalled();
+      expect(workflowObj.currentSelectedNodeID).toBe("fn"); // stayed
+      expect(promptOpen(wrapper)).toBe(false);
+    });
+
+    it("Keep editing closes the prompt and stays", async () => {
+      seedFnGraph();
+      openNode("fn");
+      functionIsDirty.mockReturnValue(true);
+      wrapper = mountDrawer();
+      await next(wrapper).trigger("click");
+      await unsaved(wrapper).find(".btn-neutral").trigger("click"); // Keep editing
+      await flushPromises();
+      expect(workflowObj.currentSelectedNodeID).toBe("fn");
+      expect(promptOpen(wrapper)).toBe(false);
+      expect(functionDiscard).not.toHaveBeenCalled();
+      expect(functionSave).not.toHaveBeenCalled();
+    });
+
+    // Function nodes hide reka's X + block outside/escape (persistent); the custom
+    // header X routes through the guard so there's no optimistic close (no flicker).
+    it("uses a custom close X + persistent dialog for function nodes", () => {
+      seedFnGraph();
+      openNode("fn");
+      wrapper = mountDrawer();
+      expect(wrapper.find('[data-test="workflow-ndv-close"]').exists()).toBe(true);
+      expect(drawerProps(wrapper).showClose).toBe(false); // reka X hidden
+    });
+
+    it("guards the custom close X when dirty (panel stays open)", async () => {
+      seedFnGraph();
+      openNode("fn");
+      functionIsDirty.mockReturnValue(true);
+      wrapper = mountDrawer();
+      await wrapper.find('[data-test="workflow-ndv-close"]').trigger("click");
+      await flushPromises();
+      expect(promptOpen(wrapper)).toBe(true);
+      expect(workflowObj.dialog.show).toBe(true); // not closed
+    });
+
+    it("Discard from a guarded close actually closes the panel", async () => {
+      seedFnGraph();
+      openNode("fn");
+      functionIsDirty.mockReturnValue(true);
+      wrapper = mountDrawer();
+      await wrapper.find('[data-test="workflow-ndv-close"]').trigger("click");
+      await unsaved(wrapper).find(".btn-secondary").trigger("click"); // Discard
+      await flushPromises();
+      expect(workflowObj.dialog.show).toBe(false); // now closed
+    });
+
+    it("closes directly via the custom X when NOT dirty (no prompt)", async () => {
+      seedFnGraph();
+      openNode("fn");
+      wrapper = mountDrawer();
+      await wrapper.find('[data-test="workflow-ndv-close"]').trigger("click");
+      await flushPromises();
+      expect(promptOpen(wrapper)).toBe(false);
+      expect(workflowObj.dialog.show).toBe(false);
     });
   });
 

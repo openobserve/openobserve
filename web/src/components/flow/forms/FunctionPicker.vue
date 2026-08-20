@@ -227,14 +227,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              seeds the fresh-function default. -->
         <AddFunction
           ref="addFunctionRef"
-          :key="createButton ? selectedFunction : undefined"
+          :key="createButton ? `${selectedFunction}:${resetNonce}` : undefined"
           :is-updated="false"
           :height-offset="75"
           :sample-events="sampleEvents"
           :forced-language="language"
           :hide-test-panel="createButton"
           :hide-ai-assist="createButton"
-          :default-code="createButton && selectedFunction ? selectedDefinition : defaultCode"
+          :default-code="editorSeed"
           @update:list="onFunctionCreation"
           @cancel:hideform="cancelFunctionCreation"
         />
@@ -371,6 +371,10 @@ const props = withDefaults(
     // full-height page (no mode switch, no definition preview, no RBF/RAF guidelines) —
     // an editor-first surface. Pipelines keep the switch + preview + guidelines (default).
     createButton?: boolean;
+    // Workflow inline JS: the node's saved raw_fn (unsaved/edited code not backed by a
+    // library function). When set with no `initialName`, it seeds the editor so reopening
+    // a draft keeps the inline code. submit() sends it back as `raw_fn` while dirty.
+    initialRawFn?: string;
     duplicateNames?: string[];
     // Sample events to seed the inline function editor's "Events" panel (e.g. the
     // workflow alert payload). Omitted → the generic log sample.
@@ -390,6 +394,7 @@ const props = withDefaults(
     isUpdating: false,
     optional: false,
     createButton: false,
+    initialRawFn: "",
     duplicateNames: () => [],
     sampleEvents: undefined,
     language: "",
@@ -440,6 +445,35 @@ const form = useOForm<AssociateFunctionForm>({
 const selectedFunction = form.useStore((s: any) => s.values?.selectedFunction ?? "");
 
 const selectedDefinition = computed(() => functionDefs.value[selectedFunction.value] || "");
+
+// ── Inline JS (raw_fn) + dirty tracking (workflow single-screen) ──────────────
+// The editor seeds from the selected fn's saved code, else the node's persisted
+// raw_fn, else the fresh-function default. Bumping resetNonce re-keys AddFunction
+// to force a remount at that seed — used by discard to revert the editor.
+const resetNonce = ref(0);
+const editorSeed = computed(() =>
+  props.createButton && selectedFunction.value
+    ? selectedDefinition.value
+    : props.initialRawFn || props.defaultCode,
+);
+// Live editor code (imperative — AddFunction exposes getCode only). Read on demand;
+// NOT reactive to typing, so isDirty()/submit() call it at the moment they run.
+const editorCode = (): string => (addFunctionRef.value?.getCode?.() as string) ?? "";
+// Would this node serialize as inline `raw_fn`? True when the live code diverges from
+// the selected fn's saved code, or there's real inline code with no fn selected.
+const isDirty = (): boolean => {
+  if (!props.createButton) return false; // raw_fn is a workflow-only concept
+  const code = editorCode().trim();
+  if (selectedFunction.value) return code !== (selectedDefinition.value || "").trim();
+  // No saved fn selected: dirty only when there's real code beyond the seed default.
+  const seed = (props.defaultCode || "").trim();
+  return code.length > 0 && code !== seed;
+};
+// Discard: revert the editor to its seed by remounting — the selected fn's saved code
+// (name kept), or the fresh default when nothing was selected (node → unconfigured).
+const discardChanges = () => {
+  resetNonce.value++;
+};
 
 // After Flattening lives in the bottom bar (single-screen). Plain switch bound to the
 // same form field submit() reads, so no second OForm context is needed at the bottom.
@@ -615,10 +649,19 @@ const submit = async () => {
   // WITHOUT running the required schema, so no inline error and empty resolves to
   // an empty name rather than null (mirrors DestinationPicker's optional branch).
   if (props.optional) {
+    const flat = props.showFlatten ? { after_flatten: !!form.state.values.afterFlattening } : {};
+    // Workflow single-screen: when the editor holds inline/edited code (diverges from
+    // the selected saved fn, or there's code with none selected), send it as `raw_fn`
+    // with an empty name — the backend runs it as inline JS. Otherwise reference the
+    // saved fn by name. (Never both; a clean selection or an empty node clears raw_fn.)
+    if (props.createButton && isDirty()) {
+      return { name: "", raw_fn: editorCode(), ...flat };
+    }
     const name = (form.state.values.selectedFunction as string) || "";
-    return props.showFlatten
-      ? { name, after_flatten: !!form.state.values.afterFlattening }
-      : { name };
+    // Clean/empty: clear any stale raw_fn. `undefined` (not "") so it drops from JSON
+    // → backend `None`; an empty string would be `Some("")` and read as "has raw_fn",
+    // which would wrongly flag a saved-fn node as unsaved and block Publish.
+    return { name, raw_fn: undefined, ...flat };
   }
   validated.value = null;
   await form.handleSubmit();
@@ -629,5 +672,8 @@ const submit = async () => {
     : { name: values.selectedFunction };
 };
 
-defineExpose({ submit, createNewFunction, form });
+// `isDirty` / `discardChanges` drive the workflow NDV's save-or-discard exit prompt;
+// `saveChanges` opens the Save (Update|Create) flow with the live editor code.
+const saveChanges = () => onBottomSave();
+defineExpose({ submit, createNewFunction, form, isDirty, discardChanges, saveChanges });
 </script>

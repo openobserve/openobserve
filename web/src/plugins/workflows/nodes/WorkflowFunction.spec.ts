@@ -40,6 +40,7 @@ vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
     // attribute coerces to `true` instead of surfacing as `""`.
     props: {
       initialName: {},
+      initialRawFn: {},
       initialAfterFlatten: {},
       sampleEvents: {},
       language: {},
@@ -119,6 +120,16 @@ describe("WorkflowFunction", () => {
       const wrapper = createWrapper();
       expect(picker(wrapper).props("initialName")).toBe("redact");
       expect(picker(wrapper).props("initialAfterFlatten")).toBe(false);
+    });
+
+    it("seeds initial-raw-fn from a saved inline (nameless) node", () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "n1",
+        data: { node_type: "function", name: "", raw_fn: "() => 1", after_flatten: true },
+      } as any;
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("initialName")).toBe("");
+      expect(picker(wrapper).props("initialRawFn")).toBe("() => 1");
     });
 
     it("defaults after-flatten to false when only a name is saved", () => {
@@ -214,6 +225,19 @@ describe("WorkflowFunction", () => {
       pickerSubmit.mockResolvedValue(undefined);
       const wrapper = createWrapper();
       await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+    });
+
+    it("proxies an inline raw_fn payload and flags incomplete (empty name)", async () => {
+      workflowObj.currentSelectedNodeData = { id: "f1", data: { node_type: "function" } } as any;
+      pickerSubmit.mockResolvedValue({ name: "", raw_fn: "() => 2", after_flatten: true });
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        name: "",
+        raw_fn: "() => 2",
+        after_flatten: true,
+      });
+      // raw_fn has an empty name → treated the same as a dummy (blocks Publish).
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
     });
   });
 

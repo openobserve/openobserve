@@ -26,6 +26,10 @@ vi.mock("@/services/jstransform", () => ({
   default: { list: (...args: any[]) => mockList(...args) },
 }));
 
+// The live editor code AddFunction.getCode() returns — tests set it to simulate the
+// user typing / editing (the real editor is imperative; the picker reads it on demand).
+let mockEditorCode = "";
+
 // Minimal, controllable stubs for the lib inputs so we can drive v-model.
 const OSelectStub = {
   name: "OSelect",
@@ -65,6 +69,12 @@ function createWrapper(props: Record<string, any> = {}) {
           template: '<div class="add-function-stub">{{ defaultCode }}</div>',
           props: ["isUpdated", "heightOffset", "defaultCode", "forcedLanguage", "sampleEvents"],
           emits: ["update:list", "cancel:hideform"],
+          // Mirrors the real AddFunction's only exposed method; returns the mock code
+          // unless a test left it empty, in which case it echoes the seed (matches the
+          // real editor, which starts at default-code).
+          setup(props: any, { expose }: any) {
+            expose({ getCode: () => (mockEditorCode !== "" ? mockEditorCode : props.defaultCode) });
+          },
         },
       },
     },
@@ -88,6 +98,7 @@ const listResponse = {
 describe("FunctionPicker", () => {
   beforeEach(() => {
     mockList.mockResolvedValue(listResponse);
+    mockEditorCode = "";
   });
   afterEach(() => vi.clearAllMocks());
 
@@ -244,5 +255,76 @@ describe("FunctionPicker", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="create-function-toggle"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="create-function-open"]').exists()).toBe(false);
+  });
+
+  // ── Workflow inline JS (raw_fn) + dirty tracking ─────────────────────────────
+  // Single-screen workflow: the editor can hold inline/edited code that isn't backed
+  // by a saved function. submit() then sends `raw_fn` (empty name) instead of a name;
+  // a clean saved-fn selection sends `{ name, raw_fn: undefined }` so any stale raw_fn
+  // is cleared. isDirty() drives the NDV's save/discard exit prompt.
+  const wf = (props: Record<string, any> = {}) =>
+    createWrapper({ createButton: true, optional: true, language: "javascript", ...props });
+
+  it("clean selection (no edits) → submit sends the name and clears raw_fn", async () => {
+    const wrapper = wf({ initialName: "js_fn", initialAfterFlatten: false });
+    await flushPromises();
+    // editor equals the saved code → not dirty
+    mockEditorCode = "() => {}";
+    expect((wrapper.vm as any).isDirty()).toBe(false);
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "js_fn",
+      raw_fn: undefined,
+      after_flatten: false,
+    });
+  });
+
+  it("edited saved fn (unsaved) → submit sends raw_fn with an empty name", async () => {
+    const wrapper = wf({ initialName: "js_fn", initialAfterFlatten: true });
+    await flushPromises();
+    mockEditorCode = "() => { return 1 }"; // diverges from saved "() => {}"
+    expect((wrapper.vm as any).isDirty()).toBe(true);
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "",
+      raw_fn: "() => { return 1 }",
+      after_flatten: true,
+    });
+  });
+
+  it("pure inline code (no fn selected) → submit sends raw_fn", async () => {
+    const wrapper = wf({ initialAfterFlatten: false, defaultCode: "// seed" });
+    await flushPromises();
+    mockEditorCode = "() => 42"; // real code, none selected, differs from the seed
+    expect((wrapper.vm as any).isDirty()).toBe(true);
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "",
+      raw_fn: "() => 42",
+      after_flatten: false,
+    });
+  });
+
+  it("untouched seed (no fn, only default code) → not dirty, empty-name dummy", async () => {
+    const wrapper = wf({ defaultCode: "// seed" });
+    await flushPromises();
+    mockEditorCode = "// seed"; // still the seed → nothing to save
+    expect((wrapper.vm as any).isDirty()).toBe(false);
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "",
+      raw_fn: undefined,
+      after_flatten: true,
+    });
+  });
+
+  it("initialRawFn seeds the editor when reopening an inline (nameless) node", async () => {
+    const wrapper = wf({ initialRawFn: "() => 'persisted'" });
+    await flushPromises();
+    const addFn = wrapper.findComponent({ name: "AddFunction" });
+    expect(addFn.props("defaultCode")).toBe("() => 'persisted'");
+  });
+
+  it("isDirty() is false outside single-screen mode (raw_fn is workflow-only)", async () => {
+    const wrapper = createWrapper({ language: "javascript", initialName: "js_fn" });
+    await flushPromises();
+    mockEditorCode = "() => { changed }";
+    expect((wrapper.vm as any).isDirty()).toBe(false);
   });
 });
