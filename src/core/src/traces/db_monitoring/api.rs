@@ -6841,7 +6841,11 @@ pub(crate) fn build_dbm_server_queries_sql(
     // Ranking needs a figure to rank BY. With no call count the newest
     // statements are the useful ones, which is also what the reader gets on
     // every other feed that has no ranking metric.
-    let order_by = if has_calls { "calls DESC" } else { "last_seen DESC" };
+    let order_by = if has_calls {
+        "calls DESC"
+    } else {
+        "last_seen DESC"
+    };
     Some(format!(
         "SELECT {proj}, {query_text}, {calls_col}, {exec_time}, \
          MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
@@ -6890,7 +6894,10 @@ mod server_queries_without_calls_tests {
     fn server_queries_sql_builds_without_a_calls_column() {
         let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(false))
             .expect("statements without call counts are still statements");
-        assert!(sql.contains("NULL AS calls"), "the wire field must survive as null: {sql}");
+        assert!(
+            sql.contains("NULL AS calls"),
+            "the wire field must survive as null: {sql}"
+        );
         assert!(
             sql.contains("ORDER BY last_seen DESC"),
             "with no figure to rank by, newest-first is the honest order: {sql}"
@@ -6901,7 +6908,10 @@ mod server_queries_without_calls_tests {
     fn server_queries_sql_still_ranks_by_calls_where_it_can() {
         let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(true)).expect("sql");
         assert!(sql.contains("ORDER BY calls DESC"), "{sql}");
-        assert!(sql.contains(&format!("SUM({})", server_vantage::O2_DBM_CALLS)), "{sql}");
+        assert!(
+            sql.contains(&format!("SUM({})", server_vantage::O2_DBM_CALLS)),
+            "{sql}"
+        );
     }
 
     #[test]
@@ -8221,13 +8231,13 @@ fn table_health_row_to_dto(row: &Value) -> Value {
 // be on screen. Each page used to derive its options from its own loaded rows,
 // which fails in three separate ways that all look like "the filter is broken":
 //
-//   * a feed that names no instance leaves the picker EMPTY (deadlocks return
-//     no identity of their own),
-//   * a feed no engine populates DROPS that engine (SQL Server has no session
-//     sampler, so Activity could never offer `mssql-prod-1` — while a chip set
-//     from another tab still displayed it, unselectable and unclearable),
-//   * a CAPPED read (activity stops at 100 sampled sessions) makes the list
-//     first-page-local rather than window-local.
+//   * a feed that names no instance leaves the picker EMPTY (deadlocks return no identity of their
+//     own),
+//   * a feed no engine populates DROPS that engine (SQL Server has no session sampler, so Activity
+//     could never offer `mssql-prod-1` — while a chip set from another tab still displayed it,
+//     unselectable and unclearable),
+//   * a CAPPED read (activity stops at 100 sampled sessions) makes the list first-page-local rather
+//     than window-local.
 //
 // `/databases` cannot stand in: it is the CLIENT vantage (spans), so on a
 // zero-trace org it returns nothing at all while server-vantage data sits one
@@ -8238,7 +8248,6 @@ fn table_health_row_to_dto(row: &Value) -> Value {
 // every server-vantage record carries `(engine, instance)` whatever feed wrote
 // it, which makes the union complete BY CONSTRUCTION instead of by remembering
 // to add each new feed to a client-side merge.
-#[cfg(feature = "enterprise")]
 #[derive(Debug, Deserialize)]
 pub struct DbmInstancesQuery {
     pub stream: Option<String>,
@@ -8271,7 +8280,16 @@ pub struct DbmInstancesQuery {
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
-#[cfg(feature = "enterprise")]
+// NOT enterprise-gated, deliberately. This is the scope filter's instance
+// picker, and the filter rides on tabs OSS can see (Activity, Top queries) —
+// gating it would leave those tabs with an empty picker on an OSS build. It
+// also reads nothing enterprise: a `SELECT DISTINCT` over the `o2_dbm_engine` /
+// `o2_dbm_instance` columns, whose vocabulary lives in `config`. It carried a
+// `#[cfg(feature = "enterprise")]` from the commit that introduced it, while
+// `src/api/search/src/traces/mod.rs` re-exported it unconditionally — so an OSS
+// build failed to compile `openobserve-api-search` with E0432. The bug survived
+// because the OSS build was only ever checked against `openobserve-core`, which
+// re-exports nothing and so compiled clean.
 pub async fn get_dbm_instances(
     Path(org_id): Path<String>,
     user_email: UserEmail,
@@ -8292,7 +8310,6 @@ pub async fn get_dbm_instances(
 /// An instance whose rows carry an engine but no instance name degrades to a
 /// `null` instance rather than being dropped: it is the only evidence that
 /// engine exists, and the picker renders it as an engine-level choice.
-#[cfg(feature = "enterprise")]
 async fn read_dbm_instances_body(
     org_id: &str,
     user_id: &str,
@@ -8373,7 +8390,6 @@ async fn read_dbm_instances_body(
 /// Deliberately NO `o2_dbm_kind` predicate. Every feed's records carry the
 /// identity columns, so filtering to one kind is exactly the per-feed
 /// incompleteness this endpoint exists to remove.
-#[cfg(feature = "enterprise")]
 pub(crate) fn build_dbm_instances_sql(
     stream_name: &str,
     system: Option<&str>,
@@ -8388,7 +8404,10 @@ pub(crate) fn build_dbm_instances_sql(
     let instance_col = if present.contains(server_vantage::O2_DBM_INSTANCE) {
         server_vantage::O2_DBM_INSTANCE.to_string()
     } else {
-        format!("CAST(NULL AS VARCHAR) AS {}", server_vantage::O2_DBM_INSTANCE)
+        format!(
+            "CAST(NULL AS VARCHAR) AS {}",
+            server_vantage::O2_DBM_INSTANCE
+        )
     };
     // `escape_ident`, not raw interpolation: a stream name carrying a double
     // quote would otherwise terminate the identifier. Same helper every
@@ -8400,10 +8419,7 @@ pub(crate) fn build_dbm_instances_sql(
     if let Some(system) = system.map(str::trim).filter(|s| !s.is_empty()) {
         // Same escaping rule the sibling builders use for a user-supplied
         // literal: double any quote so it cannot terminate the string.
-        sql.push_str(&format!(
-            " AND {engine} = '{}'",
-            system.replace('\'', "''")
-        ));
+        sql.push_str(&format!(" AND {engine} = '{}'", system.replace('\'', "''")));
     }
     sql.push_str(&format!(" ORDER BY {engine}"));
     Some(sql)
@@ -12423,11 +12439,11 @@ mod tests {
     /// Three things have to hold together, and each broke the other two when it
     /// was got wrong:
     ///   * the lock record must be EMITTED (not dropped for having no side),
-    ///   * it must GROUP with its side (so the group key cannot include the
-    ///     database — only one of the two records has one), and
-    ///   * it must not count toward the repeated-transaction-id guard (it
-    ///     deliberately shares its side's trx id, which otherwise reads as a
-    ///     second deadlock and splits every side into its own fragment).
+    ///   * it must GROUP with its side (so the group key cannot include the database — only one of
+    ///     the two records has one), and
+    ///   * it must not count toward the repeated-transaction-id guard (it deliberately shares its
+    ///     side's trx id, which otherwise reads as a second deadlock and splits every side into its
+    ///     own fragment).
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_innodb_lock_records_fold_into_the_side_they_describe() {
@@ -14992,7 +15008,10 @@ mod tests {
         without.remove(server_vantage::O2_DBM_PLAN_HASH);
         let sql = build_dbm_plans_sql("dbm_server", "fp", "", &without)
             .expect("plans without a hash are still plans worth showing");
-        assert!(sql.contains(server_vantage::O2_DBM_PLAN), "the plan must be projected: {sql}");
+        assert!(
+            sql.contains(server_vantage::O2_DBM_PLAN),
+            "the plan must be projected: {sql}"
+        );
     }
 
     #[test]
@@ -15835,8 +15854,7 @@ mod tests {
     /// deadlocks — so a tab could not offer an instance it had no rows for.
     #[test]
     fn test_instances_sql_unions_every_feed() {
-        let sql = build_dbm_instances_sql("dbm_server", None, &all_cols())
-            .expect("instances sql");
+        let sql = build_dbm_instances_sql("dbm_server", None, &all_cols()).expect("instances sql");
         assert!(
             sql.contains("SELECT DISTINCT"),
             "the identity list must be a distinct scan, not a row read"
