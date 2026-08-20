@@ -142,6 +142,10 @@
   /* --- Borders (mapped — solid, clearly visible) --- */
   --color-border-default: var(--d-border);
   --color-border-strong: var(--d-border-strong);
+  /* Control edges. `--d-border-strong` (#6b6b6b) already clears ~3:1 against
+     the dark surfaces, so dark mode reuses it rather than inventing a value —
+     the light theme needs its own only because grey-400 falls short there. */
+  --color-border-control: var(--d-border-strong);
   /* Soft divider — one step quieter than border-default so row/section
        splits don't read as hard structural lines (but still visible). */
   --color-border-subtle: var(--d-divider);
