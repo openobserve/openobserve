@@ -593,10 +593,13 @@ const downstreamOfErrorNodes = (errorIds: string[]): string[] => {
 };
 
 // A v2 condition group the backend reads as "pass everything through": one rule
-// with an empty column, `=`, "true". Backend treats an empty column as
-// match-all, so records flow to the next node unfiltered. Used to give a
-// never-configured (dummy) Condition node a valid, non-filtering `NodeData` at
-// send time. Mirrors ConditionBuilder's emptyGroup() shape (value → "true").
+// with an EMPTY column. The backend short-circuits an empty column to always-true
+// (Condition::evaluate: `if self.column.is_empty() { return true }`) BEFORE it ever
+// reads `operator`/`value`, so both are irrelevant — we send an empty value (not a
+// misleading literal like "true") so it matches an unconfigured rule and round-trips
+// cleanly if the draft is reopened. Used to give a never-configured (dummy) Condition
+// node a valid, non-filtering `NodeData` at send time; mirrors ConditionBuilder's
+// emptyGroup() shape.
 const passthroughConditionGroup = () => ({
   filterType: "group",
   logicalOperator: "AND",
@@ -606,7 +609,7 @@ const passthroughConditionGroup = () => ({
       filterType: "condition",
       column: "",
       operator: "=",
-      value: "true",
+      value: "",
       values: [],
       logicalOperator: "AND",
       id: getUUID(),

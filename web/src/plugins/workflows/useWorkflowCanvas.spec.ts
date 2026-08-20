@@ -830,7 +830,7 @@ describe("placeholder / incomplete node (Configure Later)", () => {
     expect(data.template_override).toBeNull();
   });
 
-  it("dummy CONDITION node serializes as a pass-through v2 rule (column '', '=', 'true')", () => {
+  it("dummy CONDITION node serializes as a pass-through v2 rule (empty column, empty value)", () => {
     workflowObj.currentSelectedWorkflow = {
       nodes: [
         {
@@ -847,10 +847,12 @@ describe("placeholder / incomplete node (Configure Later)", () => {
     expect(data.version).toBe(2);
     expect(data.conditions.filterType).toBe("group");
     expect(data.conditions.conditions).toHaveLength(1);
+    // Empty column → backend short-circuits to always-true; value is irrelevant, so
+    // it's empty (not a misleading "true" literal).
     expect(data.conditions.conditions[0]).toMatchObject({
       column: "",
       operator: "=",
-      value: "true",
+      value: "",
     });
   });
 
