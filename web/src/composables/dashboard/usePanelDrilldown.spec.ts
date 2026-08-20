@@ -260,25 +260,21 @@ describe("usePanelDrilldown", () => {
     expect(svc.isJoin).toBe(true);
   });
 
-  it("scopes a join's WHERE to the drilled stream, dropping other-stream conditions", async () => {
-    const deps = makeTableDeps(
-      "select a.svc as svc, b.region as region, count(*) as cnt " +
-        "from stream_a a join stream_b b on a.id = b.id " +
-        "where a.env = 'prod' and b.tier = 'gold' group by svc, region",
-    );
+  it("captures the backend per-stream WHERE from result_schema into panelWhereByStream", async () => {
+    resultSchemaMock.mockResolvedValue({
+      data: {
+        where_by_stream: { stream_a: "env = 'prod'", stream_b: "tier = 'gold'" },
+        cross_links: { stream_links: [], org_links: [] },
+      },
+    });
+    const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);
     await flush();
 
-    // Drilling stream_a keeps a.env (alias stripped) and drops b.tier.
-    const svc = api.getCellDrilldownField(0, "svc");
-    expect(svc.baseWhere).toContain("env");
-    expect(svc.baseWhere).toContain("'prod'");
-    expect(svc.baseWhere).not.toContain("tier");
-
-    // Drilling stream_b keeps b.tier and drops a.env.
-    const region = api.getCellDrilldownField(0, "region");
-    expect(region.baseWhere).toContain("tier");
-    expect(region.baseWhere).not.toContain("env");
+    expect(api.panelWhereByStream.value).toEqual({
+      stream_a: "env = 'prod'",
+      stream_b: "tier = 'gold'",
+    });
   });
 
   it("captures the backend-parsed WHERE from result_schema into panelBaseWhere", async () => {

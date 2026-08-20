@@ -13,12 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::LazyLock;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::ControlFlow,
+    sync::LazyLock,
+};
 
 use datafusion::sql::{TableReference, parser::DFParser, resolve::resolve_table_references};
 use serde::{Deserialize, Serialize};
 use sqlparser::{
-    ast::{Expr, SelectItem, SetExpr, Statement},
+    ast::{
+        BinaryOperator, Expr, ObjectName, ObjectNamePart, Select, SelectItem, SetExpr, Statement,
+        TableFactor, TableWithJoins, Visit, VisitMut, Visitor, VisitorMut,
+    },
     dialect::PostgreSqlDialect,
     keywords::ALL_KEYWORDS,
     parser::Parser,
@@ -137,6 +144,157 @@ fn where_from_set_expr(body: &SetExpr) -> Option<String> {
     }
 }
 
+/// Per-stream WHERE for a JOIN query: `{ stream -> WHERE scoped to that stream }`,
+/// alias-stripped. Empty for non-joins / no-WHERE / unparseable.
+pub fn extract_where_by_stream(sql: &str) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    let dialect = PostgreSqlDialect {};
+    let Ok(statements) = Parser::parse_sql(&dialect, sql) else {
+        return out;
+    };
+    for statement in statements {
+        if let Statement::Query(query) = statement
+            && let Some(select) = outer_select(query.body.as_ref())
+            && let Some(selection) = &select.selection
+        {
+            let (alias_to_stream, streams) = from_streams(&select.from);
+            if streams.len() < 2 {
+                return out; // only joins need per-stream scoping
+            }
+            let conjuncts = split_and(selection);
+            for stream in &streams {
+                // Keep conjuncts whose referenced streams ⊆ {stream} (empty set =
+                // unqualified columns, kept for every stream), then strip qualifiers.
+                let kept: Vec<String> = conjuncts
+                    .iter()
+                    .filter(|c| conjunct_streams(c, &alias_to_stream).iter().all(|s| s == stream))
+                    .map(|c| {
+                        let mut e = (*c).clone();
+                        let _ = VisitMut::visit(&mut e, &mut QualifierStripper);
+                        e.to_string()
+                    })
+                    .collect();
+                if !kept.is_empty() {
+                    out.insert(stream.clone(), kept.join(" AND "));
+                }
+            }
+            return out;
+        }
+    }
+    out
+}
+
+/// Innermost SELECT of a body, unwrapping parenthesized queries.
+fn outer_select(body: &SetExpr) -> Option<&Select> {
+    match body {
+        SetExpr::Select(select) => Some(select),
+        SetExpr::Query(query) => outer_select(query.body.as_ref()),
+        _ => None,
+    }
+}
+
+/// Last identifier of an object name (the stream/table name).
+fn object_name_last(name: &ObjectName) -> String {
+    match name.0.last() {
+        Some(ObjectNamePart::Identifier(id)) => id.value.clone(),
+        _ => String::new(),
+    }
+}
+
+/// (alias/table -> stream, distinct stream names) from the FROM + JOIN clauses.
+fn from_streams(from: &[TableWithJoins]) -> (HashMap<String, String>, Vec<String>) {
+    let mut map = HashMap::new();
+    let mut streams = Vec::new();
+    for twj in from {
+        let factors = std::iter::once(&twj.relation).chain(twj.joins.iter().map(|j| &j.relation));
+        for factor in factors {
+            if let TableFactor::Table { name, alias, .. } = factor {
+                let stream = object_name_last(name);
+                if stream.is_empty() {
+                    continue;
+                }
+                if !streams.contains(&stream) {
+                    streams.push(stream.clone());
+                }
+                if let Some(a) = alias {
+                    map.insert(a.name.value.clone(), stream.clone());
+                }
+                map.insert(stream.clone(), stream.clone());
+            }
+        }
+    }
+    (map, streams)
+}
+
+/// Flatten a WHERE's top-level AND chain (through `Nested`) into conjuncts.
+fn split_and(expr: &Expr) -> Vec<&Expr> {
+    fn walk<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
+        match e {
+            Expr::BinaryOp {
+                left,
+                op: BinaryOperator::And,
+                right,
+            } => {
+                walk(left, out);
+                walk(right, out);
+            }
+            Expr::Nested(inner) => walk(inner, out),
+            other => out.push(other),
+        }
+    }
+    let mut out = Vec::new();
+    walk(expr, &mut out);
+    out
+}
+
+/// The set of streams a conjunct's qualified columns reference (via `alias_to_stream`).
+fn conjunct_streams(expr: &Expr, alias_to_stream: &HashMap<String, String>) -> HashSet<String> {
+    let mut v = StreamRefs {
+        alias_to_stream,
+        streams: HashSet::new(),
+    };
+    let _ = expr.visit(&mut v);
+    v.streams
+}
+
+struct StreamRefs<'a> {
+    alias_to_stream: &'a HashMap<String, String>,
+    streams: HashSet<String>,
+}
+
+impl Visitor for StreamRefs<'_> {
+    type Break = ();
+    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        if let Expr::CompoundIdentifier(ids) = expr
+            && ids.len() >= 2
+        {
+            let qualifier = &ids[ids.len() - 2].value;
+            let stream = self
+                .alias_to_stream
+                .get(qualifier)
+                .cloned()
+                .unwrap_or_else(|| qualifier.clone());
+            self.streams.insert(stream);
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+/// Strips the table qualifier off every column ref (`a.col` -> `col`).
+struct QualifierStripper;
+
+impl VisitorMut for QualifierStripper {
+    type Break = ();
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::CompoundIdentifier(ids) = expr
+            && let Some(last) = ids.last()
+        {
+            *expr = Expr::Identifier(last.clone());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 pub trait TableReferenceExt {
     fn stream_type(&self) -> String;
     fn stream_name(&self) -> String;
@@ -243,6 +401,31 @@ mod tests {
             ),
             "",
         );
+    }
+
+    #[test]
+    fn test_extract_where_by_stream() {
+        // Each stream keeps its own conjuncts, alias-stripped.
+        let m = extract_where_by_stream(
+            "SELECT a.svc, b.region FROM stream_a a JOIN stream_b b ON a.id = b.id \
+             WHERE a.env = 'prod' AND b.tier = 'gold'",
+        );
+        assert_eq!(m.get("stream_a").map(String::as_str), Some("env = 'prod'"));
+        assert_eq!(m.get("stream_b").map(String::as_str), Some("tier = 'gold'"));
+
+        // A cross-stream conjunct (a.x = b.y) is dropped from both streams.
+        let m2 = extract_where_by_stream(
+            "SELECT a.x FROM stream_a a JOIN stream_b b ON a.id = b.id \
+             WHERE a.x = b.y AND a.env = 'prod'",
+        );
+        assert_eq!(m2.get("stream_a").map(String::as_str), Some("env = 'prod'"));
+        assert!(!m2.contains_key("stream_b"));
+
+        // Single-stream query → empty (the caller uses where_clause instead).
+        assert!(extract_where_by_stream("SELECT a FROM logs WHERE x = 1").is_empty());
+
+        // Unparseable → empty, never a panic.
+        assert!(extract_where_by_stream("not a query").is_empty());
     }
 
     #[test]

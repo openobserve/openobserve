@@ -32,7 +32,7 @@ use config::{
             default_use_cache,
         },
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
-        sql::{extract_where_clause, resolve_stream_names},
+        sql::{extract_where_by_stream, extract_where_clause, resolve_stream_names},
         stream::StreamType,
     },
     utils::{base64, json, time::now_micros},
@@ -1978,6 +1978,7 @@ pub async fn result_schema(
         having: res_schema.having,
         timeseries_field: res_schema.timeseries,
         where_clause: extract_where_clause(&req.query.sql),
+        where_by_stream: extract_where_by_stream(&req.query.sql),
         cross_links,
     })
     .into_response()
