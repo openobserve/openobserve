@@ -135,6 +135,10 @@ const stubs = {
   ODropdownGroup: { name: "ODropdownGroup", props: ["label"], template: "<div><slot /></div>" },
   ODropdownSeparator: { name: "ODropdownSeparator", template: "<hr />" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
+  // Stubbed for the same reason as the dropdown family: unstubbed it pulls
+  // reka-ui into every mount in this file, and the mounts here are already the
+  // slowest part of the suite.
+  OSeparator: { name: "OSeparator", template: "<hr />" },
   OEmptyState: {
     name: "OEmptyState",
     props: ["preset", "filtered"],
@@ -284,29 +288,44 @@ describe("OnCallResponses", () => {
     expect(rowTone(asRow(page({ snoozed_until: Date.now() * 1000 + 60_000_000 })))).toBe("muted");
   });
 
-  /// A triage list read at 3am is newest-first. `state`, `team` and `opened_at`
-  /// are all now said by another cell — the escalation cell, the alert chips and
-  /// the age — so they stay available for sorting but off by default.
+  /// A triage list read at 3am is newest-first. `state` and `firings` are said
+  /// by another cell — the escalation cell and the alert chips — so they stay
+  /// available for sorting but off by default. Team is NOT one of them: it is
+  /// the fact that decides who answers, so it is a column you can see and sort.
   it("sorts newest first and hides the columns another cell already says", async () => {
     const wrapper = await withPages([page()]);
     const table = wrapper.findComponent({ name: "OTable" });
 
-    expect(table.props("sortBy")).toBe("opened_at");
+    expect(table.props("sortBy")).toBe("last_alert_at");
     expect(table.props("sortOrder")).toBe("desc");
     expect(table.props("columnVisibility")).toEqual({
       firings: false,
       state: false,
-      team: false,
-      opened_at: false,
       channels: false,
     });
     const ids = (table.props("columns") as any[]).map((c) => c.id);
     expect(ids).toContain("escalation");
     expect(ids).toContain("responder");
-    expect(ids).toContain("notified");
+    expect(ids).toContain("team");
+    expect(ids).toContain("last_alert_at");
+    // One instant, one column. `opened_at` rendered the same timestamp as the
+    // time column beside it, in the same format.
+    expect(ids).not.toContain("opened_at");
     expect(ids).not.toContain("acked_by");
     // Actions last: the column you act from should not sit between two you read.
     expect(ids[ids.length - 1]).toBe("actions");
+  });
+
+  /// The Pages list and the Incident list both answer "when did this last
+  /// fire". They used to answer it in two formats — a bespoke duration here, a
+  /// relative time there — so a reader carried the conversion between them.
+  it("renders the time column the way the incident list renders Last Alert", async () => {
+    const wrapper = await withPages([page()]);
+    const time = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+    const col = time.find((c) => c.id === "last_alert_at");
+
+    expect(col.header).toBe("Last Alert");
+    expect(col.sortable).toBe(true);
   });
 
   /// The list refreshes only when somebody asks it to. A background poll was
@@ -797,6 +816,25 @@ describe("OnCallResponses", () => {
       expect(line).toContain("600");
       expect(line).not.toContain(" of ");
     }, 20_000);
+  });
+
+  /// The team column is the answer to "who owns this page", and the question
+  /// straight after it is "who is on that rotation" — which is a screen, not a
+  /// string. The cell navigates there rather than making the reader find the
+  /// team by name on another list.
+  it("opens the team from the team column", async () => {
+    const wrapper = await withPages([page()]);
+
+    const cell = wrapper.find('[data-test^="oncall-row-team-"]');
+    expect(cell.exists()).toBe(true);
+
+    await cell.trigger("click");
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "onCallTeamDetail",
+        params: { teamId: "team_1" },
+      }),
+    );
   });
 
   it("always offers a route to Teams", async () => {
