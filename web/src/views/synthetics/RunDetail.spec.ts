@@ -454,6 +454,20 @@ describe("RunDetail — per-step page activity", () => {
     w.unmount();
   });
 
+  /**
+   * A flex item defaults to `min-width: auto`, so it refuses to shrink below its
+   * content. Without the clamp, one long URL or the evidence table's own
+   * content width pushes this column past the expansion and every card in it
+   * overflows — and `truncate` and `overflow-x-auto` both go inert, because each
+   * needs a bounded parent to act on.
+   */
+  it("clamps the expansion's content column so wide content scrolls instead of overflowing", async () => {
+    const w = await mountWithRun({ ...mockFailedWithEvidence });
+    const column = w.find('[data-test="synthetics-step-page-activity"]').element.parentElement;
+    expect(column?.className).toContain("min-w-0");
+    w.unmount();
+  });
+
   it("sends view-all to the Evidence tab filtered to that step", async () => {
     const w = await mountWithRun({ ...mockFailedWithEvidence });
     w.findComponent(StepPageActivity).vm.$emit("view-all", "s19");
@@ -461,6 +475,33 @@ describe("RunDetail — per-step page activity", () => {
     const panel = w.findComponent(EvidencePanel);
     expect(panel.exists()).toBe(true);
     expect(panel.props("stepFilter")).toBe("s19");
+    w.unmount();
+  });
+
+  it("numbers evidence step options from the executed steps list, not recordedSteps position", async () => {
+    // recordedSteps carries a step (s1) that never actually ran this attempt —
+    // a journey typically has ~13 recorded steps and only a few execute. If the
+    // select's numbering came from recordedSteps position, s19 here would read
+    // "Step 2" (its position in recordedSteps) instead of "Step 1" (its
+    // position among the steps that actually ran, which is what the Steps tab
+    // and "Failed at Step N" both show).
+    const w = await mountWithRun({
+      ...mockFailedWithEvidence,
+      recordedSteps: [
+        { id: "s1", action: "click", name: "Go home", selector: null, url: "" },
+        ...mockFailedWithEvidence.recordedSteps,
+      ],
+    });
+    // EvidencePanel only mounts on the Evidence tab (v-if, not v-show).
+    w.findComponent(StepPageActivity).vm.$emit("view-all", "s19");
+    await flushPromises();
+    const panel = w.findComponent(EvidencePanel);
+    const stepOptions = panel.props("stepOptions") as {
+      stepId: string;
+      number: number;
+      name: string;
+    }[];
+    expect(stepOptions).toEqual([{ stepId: "s19", number: 1, name: "Click Sign In" }]);
     w.unmount();
   });
 

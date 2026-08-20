@@ -26,13 +26,17 @@ Environment:
     TRANSLATION_CONCURRENCY Batches in flight per locale (default 4; 1 = serial).
 """
 
+import os
 import sys
 
 from translator import (
+    SOURCE_LOCALE,
     build_locale,
     build_state,
     collect_pending_leaves,
+    find_duplicate_keys,
     get_language_file_path,
+    get_state_file_path,
     get_supported_languages,
     load_json,
     load_source,
@@ -55,6 +59,23 @@ def run_check(locales):
     source = load_source()
     if not source:
         print("ERROR: en-US.json source is empty or missing.")
+        sys.exit(1)
+
+    # Before comparing anything: a duplicated key makes every comparison below
+    # read the last block and ignore the first, so a file looks up to date while
+    # half of it is dead. Structural, so it fails like a bad source.
+    duplicated = False
+    for path in [get_language_file_path(SOURCE_LOCALE), get_state_file_path()] + [
+        get_language_file_path(locale) for locale in locales
+    ]:
+        if not os.path.exists(path):
+            continue
+        dupes = find_duplicate_keys(path)
+        if dupes:
+            duplicated = True
+            print(f"ERROR: duplicate keys in {path}: {', '.join(dupes)}")
+    if duplicated:
+        print("\nA duplicated key hides the earlier block from every reader. Merge them.")
         sys.exit(1)
 
     state = load_state()

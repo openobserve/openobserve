@@ -28,21 +28,20 @@
  * and retries at `attempt-N-`. Showing one under another's label is a real
  * error, not a cosmetic one.
  */
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 
 import {
   evidenceOriginTs,
   foldEvidenceBundle,
   type EvidenceEvent,
-  type EvidenceGroup,
 } from "@/composables/synthetics/syntheticResultsSchema";
+import { useEvidenceFilters } from "@/composables/synthetics/useEvidenceFilters";
 import EvidenceEvents from "./EvidenceEvents.vue";
+import EvidenceFilters from "./EvidenceFilters.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import {
@@ -68,10 +67,18 @@ const props = withDefaults(
     errorKind?: EvidenceErrorKind | null;
     /** `evidence_truncated` from the record, or a truncation event in the stream. */
     truncated?: boolean;
-    /** Scope every row and every count to one step. Null shows the whole run. */
+    /**
+     * Scope every row and every count to one step. Null shows the whole run;
+     * the `__unattributed__` sentinel shows only the events the bundle could
+     * not attribute to any step.
+     */
     stepFilter?: string | null;
-    /** Display name for the filtered step, for the banner. */
-    stepFilterName?: string;
+    /**
+     * Steps to offer in the scope select, in journey order. The panel resolves
+     * numbers, names and per-step counts from this plus `events` — it does not
+     * take a resolved name for the current filter.
+     */
+    stepOptions?: { stepId: string; number: number; name: string }[];
     /** Whether capture is switched off for this check, vs merely not kept. */
     captureOff?: boolean;
     /** Whether the run passed — evidence is retained for failures by default. */
@@ -80,39 +87,22 @@ const props = withDefaults(
   {
     truncated: false,
     stepFilter: null,
-    stepFilterName: "",
+    stepOptions: () => [],
     captureOff: false,
     runPassed: false,
     errorKind: null,
   },
 );
 
-const emit = defineEmits<{ (e: "clear-step-filter"): void; (e: "retry"): void }>();
+const emit = defineEmits<{
+  (e: "update:stepFilter", value: string | null): void;
+  (e: "retry"): void;
+}>();
+
+/** Sentinel for "events with no step_id" — a real value, not a magic null. */
+const UNATTRIBUTED_STEP = "__unattributed__";
 
 const { t } = useI18nTyped();
-
-/**
- * Three views, not five kind chips.
- *
- * The chips were one per anomaly kind — console errors, page errors, non-2xx,
- * failed requests — which asked the reader to pick a severity before they knew
- * what happened, and left the two that matter most (a page error, a failed
- * request) sitting in separate filters from the surfaces they belong to. The
- * split here is DevTools': what the page SAID (console, uncaught exceptions and
- * dialogs included) versus what it ASKED FOR (every request, the ones that never
- * completed included). Severity survives inside each view as the group sections,
- * which are already ordered worst-first.
- */
-type EvidenceView = "all" | "network" | "console";
-
-const VIEW_GROUPS: Record<EvidenceView, EvidenceGroup["kind"][]> = {
-  all: ["pageErrors", "requestsFailed", "console", "network"],
-  network: ["requestsFailed", "network"],
-  console: ["pageErrors", "console"],
-};
-
-const view = ref<EvidenceView>("all");
-const firstPartyOnly = ref(false);
 
 const loading = computed(() => props.status === "loading" || props.status === "idle");
 const loadError = computed(() => (props.status === "error" ? props.error : null));
@@ -137,9 +127,14 @@ function reloadPage() {
  * The badges are folded from this, not from the whole run: a badge that counts
  * the run while the list shows one step is a lie, not a shortcut.
  */
-const scopedEvents = computed(() =>
-  props.stepFilter ? props.events.filter((e) => e.stepId === props.stepFilter) : props.events,
-);
+const scopedEvents = computed(() => {
+  if (props.stepFilter === UNATTRIBUTED_STEP) {
+    return props.events.filter((e) => e.stepId === null);
+  }
+  return props.stepFilter
+    ? props.events.filter((e) => e.stepId === props.stepFilter)
+    : props.events;
+});
 
 const bundle = computed(() =>
   foldEvidenceBundle(scopedEvents.value, props.stepDefs, props.truncated),
@@ -155,60 +150,63 @@ const bundle = computed(() =>
  */
 const originTs = computed(() => evidenceOriginTs(props.events));
 
-/** The one axis the tabs do not cover: whose code it was. */
-function matches(e: EvidenceEvent): boolean {
-  return !firstPartyOnly.value || e.firstParty;
-}
-
-/**
- * One list for the view, in time order.
- *
- * Was one table PER GROUP KIND, which bought four pagination bars, four column
- * grids and four restarting timelines to say something the view toggle above
- * already says. Kind moved onto the row as a badge — the same conclusion step
- * attribution reached earlier, applied to the other axis.
- *
- * Chronological, not worst-first: one table means one timeline, and a timeline
- * that does not run in time order is not one. Severity survives per row (the
- * rail, the coloured status) and is one header click away.
- */
-const visibleEvents = computed(() =>
-  bundle.value.groups
-    .filter((g) => VIEW_GROUPS[view.value].includes(g.kind))
-    .flatMap((g) => g.events)
-    .filter(matches)
-    .sort((a, b) => (a.initiatedTs ?? a.ts) - (b.initiatedTs ?? b.ts)),
+// The step card is about to mount this same toolbar, so the view/first-party/
+// wrap state and the counts they drive live in one composable rather than two
+// copies that could drift apart.
+const { view, firstPartyOnly, wrap, views, visibleEvents } = useEvidenceFilters(
+  computed(() => bundle.value.events),
 );
 
-/**
- * Badge counts describe the ATTEMPT, not the current view: they are folded
- * before the first-party filter, so unchecking it never makes a number move
- * under the reader. Scoped to the step filter, though — a badge that counts the
- * run while the list shows one step is a lie, not a shortcut.
- */
-function countIn(kinds: EvidenceGroup["kind"][]): number {
-  return bundle.value.groups
-    .filter((g) => kinds.includes(g.kind))
-    .reduce((n, g) => n + g.events.length, 0);
-}
+/** OSelect emits its own model type; the panel's contract with its owner is `string | null`. */
+const stepFilterModel = computed({
+  get: () => props.stepFilter,
+  set: (value: string | null) => emit("update:stepFilter", value),
+});
 
-const views = computed(() => [
-  {
-    key: "all" as EvidenceView,
-    label: t("synthetics.evidence.filterAll"),
-    count: bundle.value.counts.all,
-  },
-  {
-    key: "network" as EvidenceView,
-    label: t("synthetics.evidence.groupNetwork"),
-    count: countIn(VIEW_GROUPS.network),
-  },
-  {
-    key: "console" as EvidenceView,
-    label: t("synthetics.evidence.groupConsole"),
-    count: countIn(VIEW_GROUPS.console),
-  },
-]);
+/**
+ * Options for the step-scope select: All steps, then one per step that owns
+ * at least one event (journey order, per `stepOptions`), then unattributed
+ * if any event has no step. A journey runs ~13 steps and typically only 2-3
+ * own events — listing the rest would be dead options selecting an empty
+ * table.
+ *
+ * Counts read `props.events`, not `scopedEvents` or the folded bundle: they
+ * describe the ATTEMPT so the option a reader is not currently on does not
+ * appear to change count as they filter — same principle as the view-toggle
+ * badges above.
+ */
+const stepSelectOptions = computed<SelectOptionInput[]>(() => {
+  // One pass for every count: filtering per step rescanned the whole bundle
+  // once per step, and both tallies come off the same walk.
+  const perStep = new Map<string, number>();
+  let unattributedCount = 0;
+  for (const e of props.events) {
+    if (e.stepId === null) unattributedCount += 1;
+    else perStep.set(e.stepId, (perStep.get(e.stepId) ?? 0) + 1);
+  }
+
+  const options: SelectOptionInput[] = [
+    {
+      value: null,
+      label: t("synthetics.evidence.allSteps", { count: props.events.length }),
+    },
+  ];
+  for (const step of props.stepOptions) {
+    const count = perStep.get(step.stepId) ?? 0;
+    if (count === 0) continue;
+    options.push({
+      value: step.stepId,
+      label: t("synthetics.evidence.stepOption", { number: step.number, name: step.name, count }),
+    });
+  }
+  if (unattributedCount > 0) {
+    options.push({
+      value: UNATTRIBUTED_STEP,
+      label: t("synthetics.evidence.unattributedOption", { count: unattributedCount }),
+    });
+  }
+  return options;
+});
 </script>
 
 <template>
@@ -274,28 +272,6 @@ const views = computed(() => [
       </OBanner>
 
       <template v-else>
-        <!-- Scoped to one step, arrived at from a step expansion. Dismissible,
-             because the run-level view is the other half of the question. -->
-        <OBanner
-          v-if="stepFilter"
-          variant="info"
-          dense
-          inline-actions
-          :content="t('synthetics.evidence.stepFilterBanner', { step: stepFilterName })"
-          data-test="synthetics-evidence-step-filter"
-        >
-          <template #actions>
-            <OButton
-              variant="ghost"
-              size="xs"
-              data-test="synthetics-evidence-clear-step-filter-btn"
-              @click="emit('clear-step-filter')"
-            >
-              {{ t("synthetics.evidence.clearStepFilter") }}
-            </OButton>
-          </template>
-        </OBanner>
-
         <!-- X-8.2: reduced fidelity is reported. A silently short list reads as a
              quiet run. -->
         <div
@@ -307,31 +283,17 @@ const views = computed(() => [
           {{ t("synthetics.evidence.truncated") }}
         </div>
 
-        <!-- Every option keeps its count and stays visible at zero: a hidden
-             zero is indistinguishable from an option that does not exist, and
-             "nothing on the console" is information. First-party sits beside
-             the group rather than in it — it narrows whichever option is
-             selected, so it is not a fourth one. -->
-        <div class="flex flex-wrap items-center gap-2">
-          <OToggleGroup v-model="view" type="single">
-            <OToggleGroupItem
-              v-for="v in views"
-              :key="v.key"
-              :value="v.key"
-              size="sm"
-              :data-test="`synthetics-evidence-filter-${v.key}`"
-            >
-              {{ v.label }} <span class="text-text-secondary">({{ v.count }})</span>
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <OCheckbox
-            v-model="firstPartyOnly"
-            size="sm"
-            :label="t('synthetics.evidence.firstPartyOnly')"
-            class="ml-2"
-            data-test="synthetics-evidence-first-party"
-          />
-        </div>
+        <!-- The step scope is a control you can change, not a caption you can
+             only dismiss; supplying options is what turns it on, which is how
+             the step card avoids it. -->
+        <EvidenceFilters
+          v-model:view="view"
+          v-model:first-party-only="firstPartyOnly"
+          v-model:wrap="wrap"
+          v-model:step-filter="stepFilterModel"
+          :views="views"
+          :step-options="stepSelectOptions"
+        />
 
         <!-- One table for the view. Rows come from the shared component, so the
              step expansion and this panel cannot drift apart; kind and step are
@@ -343,7 +305,8 @@ const views = computed(() => [
           mode="panel"
           :filtered="!!stepFilter"
           :origin-ts="originTs"
-          @clear-filters="emit('clear-step-filter')"
+          :wrap="wrap"
+          @clear-filters="emit('update:stepFilter', null)"
         />
       </template>
     </template>

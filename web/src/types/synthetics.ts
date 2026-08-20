@@ -580,6 +580,9 @@ export interface SyntheticsLocation {
   /** Check types runnable at this location (live agents' capabilities). */
   types?: string[];
   status?: "online" | "offline" | "pending";
+  /** Set only when this region cannot observe the location's agents, which
+   *  makes `status` a guess — see `utils/synthetics/locationLiveStatus`. */
+  live_status_unknown?: boolean;
   /** Live agents' names, most recently seen first (private rows). */
   agent_names?: string[];
   live_agents?: number;
@@ -679,6 +682,10 @@ export interface SyntheticLocation {
   agent_names: string[];
   agents_total: number;
   status: "online" | "offline" | "pending";
+  /** Set only when this region cannot observe the location's agents, which
+   *  makes `status`, `live_agents` and `agents_total` a guess rather than an
+   *  observation — see `utils/synthetics/locationLiveStatus`. */
+  live_status_unknown?: boolean;
   version?: string;
   /** Name of the most recently seen agent, live or stale. */
   last_agent_name?: string;

@@ -1,0 +1,38 @@
+[package]
+name = "openobserve-synthetics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+# `o2_enterprise` is a one-way edge: this crate publishes super-cluster messages
+# through it, and the private-agent code over there must therefore NOT depend on
+# this crate — cargo rejects the package cycle outright, `optional` and feature
+# gating included. Anything both sides need lives in `config` or `infra`.
+enterprise = ["dep:o2_enterprise", "dep:o2_openfga"]
+
+[dependencies]
+anyhow.workspace = true
+aws-config.workspace = true
+aws-sdk-lambda.workspace = true
+chrono.workspace = true
+config.workspace = true
+dashmap.workspace = true
+infra.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+reqwest.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+svix-ksuid.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+urlencoding.workspace = true
+

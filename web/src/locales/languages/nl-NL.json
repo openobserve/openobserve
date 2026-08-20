@@ -625,6 +625,12 @@
     "delete": "Verwijderen",
     "remove": "Verwijderen",
     "export": "Exporteren",
+    "download": "Downloaden",
+    "openProviderOnRegistry": "OpenObserve-provider op de {registry}",
+    "exportTerraformTabTooltip": "Dezelfde configuratie is van toepassing met Terraform of OpenTofu.",
+    "exportTerraformEmpty": "Er bestaat geen Terraform-resource voor deze selectie. Exporteer het in plaats daarvan als JSON.",
+    "exportTerraformSkipped": "Niet inbegrepen: {names}. De OpenObserve Terraform-provider heeft hier geen resource voor.",
+    "exportTerraformDropped": "Weggelaten — het provider-schema kan deze velden niet bevatten: {fields}.",
     "actions": "Acties",
     "version": "Versie",
     "updated_at": "Bijgewerkt op",
@@ -820,13 +826,7 @@
     "backTo": "Terug naar {label}",
     "boolTrue": "Waar",
     "boolFalse": "Onwaar",
-    "browserTimeWithZone": "Browsertijd ({zone})",
-    "download": "Downloaden",
-    "openProviderOnRegistry": "OpenObserve-provider op de {registry}",
-    "exportTerraformTabTooltip": "Dezelfde configuratie is van toepassing met Terraform of OpenTofu.",
-    "exportTerraformEmpty": "Er bestaat geen Terraform-resource voor deze selectie. Exporteer het in plaats daarvan als JSON.",
-    "exportTerraformSkipped": "Niet inbegrepen: {names}. De OpenObserve Terraform-provider heeft hier geen resource voor.",
-    "exportTerraformDropped": "Weggelaten — het provider-schema kan deze velden niet bevatten: {fields}."
+    "browserTimeWithZone": "Browsertijd ({zone})"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "Geen gegevens"
     },
     "importAlertTitle": "Waarschuwing importeren",
+    "exportDialogTitle": "Exporteer alert | Exporteer {count} alerts",
+    "exportDialogSubtitle": "Bekijk de definitie en download deze als JSON of als Terraform voor de OpenObserve-provider.",
     "jsonFilesOnlyHint": "Alleen .json-bestanden",
     "outputMessages": "Uitvoerberichten",
     "destinationsRequiredLabel": "Bestemmingen *",
@@ -7370,9 +7372,7 @@
     "sloKind": "Conditietype",
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
-    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
-    "exportDialogTitle": "Exporteer alert | Exporteer {count} alerts",
-    "exportDialogSubtitle": "Bekijk de definitie en download deze als JSON of als Terraform voor de OpenObserve-provider."
+    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond."
   },
   "alert_dependencies": {
     "actionOpen": "Openen",
@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Opname geannuleerd — het recorder-venster is gesloten",
       "restoreFailedHint": "de reis kan het gekozen punt niet bereiken totdat deze stap is voltooid",
       "recordBeforeFailedStep": "Opnemen vóór stap {step}",
-      "recordingHere": "Hier opnemen",
+      "newStepsLandHere": "Nieuwe stappen landen hier",
       "recordBeforeStep": "Opnemen vóór deze stap",
       "recordBeforeStepHint": "Speel de reis af tot dit punt en neem daarna nieuwe stappen op vóór dit punt.",
       "recordBeforeNeedsNewerExtension": "Werk de recorder-extensie bij om vanaf een specifieke stap op te nemen.",
@@ -12456,9 +12456,12 @@
       "statusConnecting": "Verbinden",
       "statusOffline": "Offline",
       "statusDown": "Niet beschikbaar",
+      "statusUnknown": "Onbekend",
       "connectingMessage": "Wachten op de eerste agent die incheckt — deze zal kort na installatie arriveren.",
       "offlineMessage": "Agent is recent weggevallen — de controle wordt vanaf hier niet uitgevoerd totdat deze opnieuw verbinding maakt.",
       "downMessage": "Al meer dan een dag geen agent — deze locatie zal de controle niet uitvoeren totdat een agent opnieuw verbinding maakt.",
+      "unknownMessage": "Agents rapporteren hun gezondheid alleen aan het cluster waarmee ze zijn geregistreerd, dus deze kan het niet bevestigen. De locatie draait mogelijk gewoon.",
+      "unknownAgents": "Agentstatus hier niet beschikbaar",
       "noSearchResults": "Geen locaties gevonden voor uw zoekopdracht",
       "noPublicMatches": "Geen openbare locaties gevonden voor uw zoekopdracht",
       "noPrivateMatches": "Geen privélocaties gevonden voor uw zoekopdracht",
@@ -12657,6 +12660,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "Niet toegewezen aan een stap ({count})",
+      "allSteps": "Alle stappen ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12671,9 +12677,17 @@
       "reload": "Pagina opnieuw laden",
       "retry": "Retry",
       "unattributedCount": "{count} events zijn niet aan een stap toegewezen",
-      "stepFilterBanner": "Gebeurtenissen voor stap {step}",
-      "clearStepFilter": "Wissen",
-      "rowTitleWithTimestamps": "{label}\ngeïnitieerd {initiated} · waargenomen {observed}"
+      "rowTitleWithTimestamps": "{label}\ngeïnitieerd {initiated} · waargenomen {observed}",
+      "detailEvent": "Gebeurtenis",
+      "detailOccurred": "Voorgevallen",
+      "detailInitiated": "Geïnitieerd",
+      "detailResourceType": "Resourcetype",
+      "detailLevel": "Niveau",
+      "detailOrigin": "Oorsprong",
+      "detailFirstParty": "Eerste partij",
+      "detailThirdParty": "Derde partij",
+      "detailStackTrace": "Stacktrace",
+      "footerEvents": "Gebeurtenissen"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12721,8 +12735,7 @@
       "evidenceCounts": "{consoleErrors} consolefouten · {pageErrors} paginafouten · {failed} mislukte verzoeken · {nonOk} niet-2xx-reacties",
       "evidenceTruncated": "Sommige gebeurtenissen werden tijdens deze run weggelaten omdat de opnamelimiet was bereikt. De bundel benoemt wat er misging.",
       "pageActivity": "Pagina-activiteit",
-      "pageActivityCount": "{shown} van {total}",
-      "pageActivityCountTruncated": "{shown} van {total}+",
+      "pageActivityEvents": "{count} gebeurtenis | {count} gebeurtenissen",
       "pageActivityViewAllShort": "Alles in Evidence weergeven",
       "expandScreenshot": "Uitvouwen"
     },
@@ -12972,7 +12985,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "In behandeling"
+        "pending": "In behandeling",
+        "unknown": "Onbekend",
+        "unknownHint": "Agents rapporteren hun gezondheid alleen aan het cluster waarmee ze zijn geregistreerd, dus deze kan het niet bevestigen. De locatie draait mogelijk gewoon."
       },
       "table": {
         "name": "Naam",
@@ -13028,6 +13043,7 @@
         "agentName": "Agent",
         "restartConfig": "Configuratie opnieuw starten — kopieer het installatiecommando van deze agent om de installatie opnieuw uit te voeren / docker opnieuw te starten (bijv. na een tokenrotatie)",
         "noAgents": "Er hebben zich nog geen agenten geregistreerd voor deze locatie.",
+        "agentsUnavailable": "De agents van deze locatie zijn geregistreerd bij een ander cluster en zijn hier niet zichtbaar.",
         "checksTitle": "Controles die vanaf deze locatie worden uitgevoerd",
         "checkName": "Naam",
         "noChecks": "Er zijn nog geen controles toegewezen aan deze locatie.",
@@ -13694,6 +13710,7 @@
       "resumingAlerts": "Alerts hervatten...",
       "pausingAlerts": "Alerts pauzeren...",
       "errorExportingAlertsPleaseTryAgain": "Fout bij het exporteren van alerts. Probeer het opnieuw.",
+      "someAlertsCouldNotBeExported": "Kon {names} niet lezen. De rest is klaar om te exporteren.",
       "successfullyExportedAlert": "{count} alert succesvol geëxporteerd | {count} alerts succesvol geëxporteerd",
       "exportingAlerts": "Alerts exporteren...",
       "pleaseWaitWhileSearchingForDashboards": "Een moment geduld terwijl er naar dashboards wordt gezocht...",
@@ -13748,8 +13765,7 @@
       "alertSavedSuccessfully": "Waarschuwing succesvol opgeslagen.",
       "alertUpdatedSuccessfully": "Waarschuwing succesvol bijgewerkt.",
       "openingDedupConfig": "Deduplicatieconfiguratie openen voor: {name}",
-      "editingAlert": "Waarschuwing bewerken: {name}",
-      "someAlertsCouldNotBeExported": "Kon {names} niet lezen. De rest is klaar om te exporteren."
+      "editingAlert": "Waarschuwing bewerken: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Coderingssleutel succesvol bijgewerkt",
@@ -14264,6 +14280,11 @@
     "move": "Verplaatsen",
     "moveTitle": "Verplaats {count} SLO(s) naar een andere map",
     "moveSelected": "Verplaats {count} geselecteerde",
+    "exportTitle": "Exporteer SLO | Exporteer {count} SLO's",
+    "exportSubtitle": "Bekijk de definitie en download deze vervolgens als JSON of als Terraform voor de OpenObserve-provider.",
+    "exportFailed": "De SLO-definitie kon niet worden gelezen. Probeer het opnieuw.",
+    "exportPartial": "Kon {names} niet lezen. De rest is klaar om te exporteren.",
+    "exportSucceeded": "{count} SLO geëxporteerd | {count} SLO's geëxporteerd",
     "moved": "Verplaatst {count} SLO(s) naar {folder}",
     "moveFailed": "Verplaatsen mislukt",
     "preview": {
@@ -14318,12 +14339,7 @@
       "editTargetMissing": "Die melding staat niet meer op deze SLO.",
       "describeBurn": "Verbrandingssnelheid > {critical} over {long} en {short}",
       "describeBudget": "Foutbudget verbruikt > {critical}%"
-    },
-    "exportTitle": "Exporteer SLO | Exporteer {count} SLO's",
-    "exportSubtitle": "Bekijk de definitie en download deze vervolgens als JSON of als Terraform voor de OpenObserve-provider.",
-    "exportFailed": "De SLO-definitie kon niet worden gelezen. Probeer het opnieuw.",
-    "exportPartial": "Kon {names} niet lezen. De rest is klaar om te exporteren.",
-    "exportSucceeded": "{count} SLO geëxporteerd | {count} SLO's geëxporteerd"
+    }
   },
   "promql": {
     "operations": {
