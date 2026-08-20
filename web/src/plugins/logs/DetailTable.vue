@@ -36,6 +36,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
         />
+        <!-- Lives in the header rather than inside the JSON tab so the action
+             stays reachable from every tab. JsonPreview is told to hide its own
+             copy via `hide-view-trace`. -->
+        <div
+          v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
+          class="flex shrink-0 items-center gap-2"
+        >
+          <OSelect
+            data-test="log-detail-view-trace-stream-select"
+            v-model="searchObj.meta.selectedTraceStream"
+            :options="tracesStreams"
+            class="w-40! shrink-0"
+            :loading="isTracesStreamsLoading"
+            :disabled="isTracesStreamsLoading"
+            size="sm"
+          />
+          <OButton
+            data-test="log-detail-view-trace-btn"
+            size="xs"
+            variant="outline"
+            icon-left="account-tree"
+            @click="viewTrace"
+            >{{ t("search.viewTrace") }}</OButton
+          >
+        </div>
         <OSwitch
           v-show="tab === 'table'"
           data-test="log-detail-wrap-values-toggle-btn"
@@ -69,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-copy-button
               mode="sidebar"
               hide-view-related
+              hide-view-trace
               :highlight-query="highlightQuery"
               :should-wrap-values="shouldWrapValues"
               @copy="copyContentToClipboard"
@@ -456,6 +482,7 @@ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -600,6 +627,25 @@ export default defineComponent({
     ]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
+
+    // The View Trace action is rendered in this component's header row (not
+    // inside JsonPreview) so it stays reachable from every tab. Gate on
+    // `modelValue`, which is a prop and therefore available during setup —
+    // `rowData` is only filled by the async created() hook below.
+    const {
+      tracesStreams,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
+      setViewTraceBtn: setViewTraceBtnFor,
+    } = useViewTraceAction(t, searchObj);
+
+    watch(
+      () => props.modelValue,
+      (record) => {
+        setViewTraceBtnFor(record);
+      },
+      { immediate: true },
+    );
     const { fnParsedSQL, hasAggregation } = logsUtils();
 
     // Watch for initialTab prop changes to update tab
@@ -1040,6 +1086,9 @@ export default defineComponent({
       searchObj,
       multiStreamFields,
       viewTrace,
+      tracesStreams,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
       hasAggregationQuery,
       sendToAiChat,
       addSearchTerm,
