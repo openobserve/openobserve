@@ -1,0 +1,587 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The store is the cache — not a module-level variable that happens to be
+// warm. Several tests below deliberately seed the STORE while leaving the
+// module cold (and vice versa) so that an implementation which memoises
+// privately and only writes to Vuex cannot pass.
+const CACHE_EXPIRY_MS = 10 * 60 * 1000;
+
+function freshLibraryState() {
+  return {
+    manifest: null as unknown,
+    lastFetched: null as number | null,
+    cacheExpiry: CACHE_EXPIRY_MS,
+    fileCache: {} as Record<string, unknown>,
+  };
+}
+
+// Mirrors the real root-store mutations. `clearAlertLibrary` mutates IN PLACE,
+// like the real one and its dashboardGallery neighbour — reassigning the object
+// here would also reset cacheExpiry and quietly diverge from production.
+const mockStore = {
+  state: { alertLibrary: freshLibraryState() },
+  commit: vi.fn((type: string, payload: unknown) => {
+    const lib = mockStore.state.alertLibrary;
+    if (type === "setAlertLibraryManifest") {
+      lib.manifest = payload;
+      lib.lastFetched = Date.now();
+    } else if (type === "setAlertLibraryFile") {
+      const { id, file } = payload as { id: string; file: unknown };
+      lib.fileCache[id] = file;
+    } else if (type === "clearAlertLibrary") {
+      lib.manifest = null;
+      lib.lastFetched = null;
+      lib.fileCache = {};
+    }
+  }),
+};
+
+vi.mock("vuex", () => ({ useStore: () => mockStore }));
+
+// Bound once at file evaluation, while the composable is re-imported per test.
+// Safe only because this module is pure (string constants + a pure function);
+// if it ever acquires state, import it inside beforeEach like the composable.
+import {
+  ALERT_LIBRARY_MANIFEST_URL,
+  SUPPORTED_MANIFEST_MAJOR,
+  alertFileUrl,
+} from "@/constants/alertLibrary";
+
+// The composable memoises its in-flight request at module scope (that is what
+// makes concurrent callers share one GET), so each test needs a fresh module
+// rather than a `resetForTests` hatch bolted onto the production API.
+let useAlertLibrary: typeof import("./useAlertLibrary").useAlertLibrary;
+
+/** One manifest entry, shaped exactly like the live generator emits. */
+function entry(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "k8s/pod_oom_killed",
+    name: "pod_oom_killed",
+    pack: "k8s",
+    category: "pod",
+    title: "Pod Oom Killed",
+    severity: "critical",
+    description: "Critical: Container was OOMKilled.",
+    stream: "kube_pod_container_status_terminated_reason",
+    stream_type: "metrics",
+    query_type: "promql",
+    required_streams: ["kube_pod_container_status_terminated_reason"],
+    path: "packs/k8s/alerts/pod/pod_oom_killed.json",
+    content_hash: "1c09e8f6ac33",
+    ...overrides,
+  };
+}
+
+function manifest(overrides: Record<string, unknown> = {}) {
+  return {
+    format_version: "1.0.0",
+    alert_count: 1,
+    packs: [{ id: "k8s", categories: [{ id: "pod", alert_count: 1 }], alert_count: 1 }],
+    alerts: [entry()],
+    ...overrides,
+  };
+}
+
+/** Stream names the org ingests, grouped by stream type. */
+function streams(byType: Record<string, string[]>): Record<string, Set<string>> {
+  return Object.fromEntries(Object.entries(byType).map(([type, names]) => [type, new Set(names)]));
+}
+
+const fetchMock = vi.fn();
+
+function respondOnceWith(body: unknown, init: { ok?: boolean; status?: number } = {}) {
+  fetchMock.mockResolvedValueOnce({
+    ok: init.ok ?? true,
+    status: init.status ?? 200,
+    json: async () => body,
+  });
+}
+
+/** A 200 whose body is not JSON at all — S3 error documents are XML. */
+function respondOnceWithUnparseableBody() {
+  fetchMock.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => {
+      throw new SyntaxError("Unexpected token < in JSON at position 0");
+    },
+  });
+}
+
+/** Names of the mutations committed so far, for "cached nothing" assertions. */
+const committedTypes = () => mockStore.commit.mock.calls.map((call) => call[0]);
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  // clearAllMocks does NOT drain a queued mockResolvedValueOnce; a test that
+  // under-consumes would leak a stale response into the next one and produce a
+  // misattributed failure. Reset the queue explicitly.
+  fetchMock.mockReset();
+  mockStore.state.alertLibrary = freshLibraryState();
+  vi.stubGlobal("fetch", fetchMock);
+  vi.resetModules();
+  ({ useAlertLibrary } = await import("./useAlertLibrary"));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("useAlertLibrary — loadManifest", () => {
+  it("fetches the manifest from the single shared URL", async () => {
+    respondOnceWith(manifest());
+    await useAlertLibrary().loadManifest();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(ALERT_LIBRARY_MANIFEST_URL);
+  });
+
+  it("returns the parsed manifest", async () => {
+    respondOnceWith(manifest());
+    const result = await useAlertLibrary().loadManifest();
+
+    expect(result.alert_count).toBe(1);
+    expect(result.alerts[0].id).toBe("k8s/pod_oom_killed");
+  });
+
+  it("commits the fetched manifest to the store", async () => {
+    respondOnceWith(manifest());
+    const result = await useAlertLibrary().loadManifest();
+
+    // Assert the PAYLOAD, not fields the mock's own commit sets — otherwise
+    // this passes for any non-nullish commit.
+    expect(mockStore.commit).toHaveBeenCalledWith("setAlertLibraryManifest", result);
+  });
+
+  it("serves a manifest cached in the STORE even with a cold module", async () => {
+    // The gallery, rail and strip mount on different ticks and a route re-entry
+    // re-imports nothing. If the read cache is a module-level variable rather
+    // than the store, this refetches — which is the whole reason the cache
+    // lives in Vuex.
+    mockStore.state.alertLibrary.manifest = manifest({ alert_count: 42 });
+    mockStore.state.alertLibrary.lastFetched = Date.now();
+
+    const result = await useAlertLibrary().loadManifest();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.alert_count).toBe(42);
+  });
+
+  it("serves a warm cache without a second network call", async () => {
+    respondOnceWith(manifest());
+    await useAlertLibrary().loadManifest();
+    await useAlertLibrary().loadManifest();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches after the store cache is cleared externally", async () => {
+    // clearAlertLibrary is the only invalidation hook. If the composable reads
+    // a private cache, clearing the store silently does nothing.
+    respondOnceWith(manifest());
+    await useAlertLibrary().loadManifest();
+
+    mockStore.commit("clearAlertLibrary");
+    respondOnceWith(manifest({ alert_count: 7 }));
+    const result = await useAlertLibrary().loadManifest();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.alert_count).toBe(7);
+  });
+
+  it("refetches once the cache has expired", async () => {
+    respondOnceWith(manifest());
+    await useAlertLibrary().loadManifest();
+
+    mockStore.state.alertLibrary.lastFetched = Date.now() - (CACHE_EXPIRY_MS + 1);
+    respondOnceWith(manifest({ alert_count: 2 }));
+    const result = await useAlertLibrary().loadManifest();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.alert_count).toBe(2);
+  });
+
+  it("honours the cache TTL configured on the store", async () => {
+    // A composable that hardcoded its own TTL would pass every other cache
+    // test here while ignoring the configured value.
+    respondOnceWith(manifest());
+    await useAlertLibrary().loadManifest();
+
+    mockStore.state.alertLibrary.cacheExpiry = 0;
+    respondOnceWith(manifest({ alert_count: 9 }));
+    const result = await useAlertLibrary().loadManifest();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.alert_count).toBe(9);
+  });
+
+  it("refetches on demand with force, ignoring a warm cache", async () => {
+    respondOnceWith(manifest());
+    await useAlertLibrary().loadManifest();
+    respondOnceWith(manifest({ alert_count: 3 }));
+    const result = await useAlertLibrary().loadManifest({ force: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.alert_count).toBe(3);
+  });
+
+  it("shares one in-flight request between concurrent callers", async () => {
+    // The page mounts the rail, the strip and the grid; all three ask for the
+    // manifest in the same tick. Three GETs of the same object is waste the
+    // dashboard gallery already pays — do not repeat it here.
+    let release: () => void = () => {};
+    fetchMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = () => resolve({ ok: true, status: 200, json: async () => manifest() });
+      }),
+    );
+
+    const lib = useAlertLibrary();
+    const first = lib.loadManifest();
+    const second = lib.loadManifest();
+    release();
+    const [a, b] = await Promise.all([first, second]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Identity AND substance: `toBe` alone is satisfied by undefined === undefined.
+    expect(a).toBe(b);
+    expect(a.alerts).toHaveLength(1);
+  });
+
+  it("rejects on an HTTP error and caches nothing", async () => {
+    respondOnceWith(null, { ok: false, status: 503 });
+
+    await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
+    // Assert on the mutation TYPES: `not.toHaveBeenCalledWith(type, anything())`
+    // does not match a `null` payload, so it passes for an implementation that
+    // commits null on failure.
+    expect(committedTypes()).not.toContain("setAlertLibraryManifest");
+    expect(mockStore.state.alertLibrary.manifest).toBeNull();
+  });
+
+  it("rejects when the network call itself fails", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("offline"));
+
+    await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
+    expect(committedTypes()).not.toContain("setAlertLibraryManifest");
+  });
+
+  it("rejects when the body is not JSON", async () => {
+    // S3 answers some misconfigurations with an XML error document under a 200,
+    // so `.json()` rejects rather than returning a wrong-shaped object.
+    respondOnceWithUnparseableBody();
+
+    await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
+    expect(committedTypes()).not.toContain("setAlertLibraryManifest");
+  });
+
+  it("retries after a failure instead of caching it", async () => {
+    // A failed load must not poison the cache — the user clicking Retry has to
+    // produce a real request.
+    fetchMock.mockRejectedValueOnce(new Error("offline"));
+    await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
+
+    respondOnceWith(manifest());
+    const result = await useAlertLibrary().loadManifest();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.alert_count).toBe(1);
+  });
+
+  it("rejects a manifest whose major format version it cannot read", async () => {
+    // Derived from the constant, not a hardcoded "2.0.0": otherwise the
+    // constant is dead and an inlined `major !== 1` passes.
+    respondOnceWith(manifest({ format_version: `${SUPPORTED_MANIFEST_MAJOR + 1}.0.0` }));
+
+    await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
+    expect(committedTypes()).not.toContain("setAlertLibraryManifest");
+  });
+
+  it("accepts a newer minor version of the same major", async () => {
+    // Minor bumps are additive (a new optional field), so an older client must
+    // keep working — otherwise every backfill breaks every deployed UI.
+    respondOnceWith(manifest({ format_version: `${SUPPORTED_MANIFEST_MAJOR}.7.0` }));
+
+    const result = await useAlertLibrary().loadManifest();
+    expect(result.format_version).toBe(`${SUPPORTED_MANIFEST_MAJOR}.7.0`);
+  });
+
+  it("accepts a bare-major and major.minor version string", async () => {
+    // The generator writes "1.0.0" today, but the parse must not be so strict
+    // that a future "1" or "1.2" is read as unsupported.
+    respondOnceWith(manifest({ format_version: "1" }));
+    await expect(useAlertLibrary().loadManifest()).resolves.toBeTruthy();
+
+    mockStore.commit("clearAlertLibrary");
+    respondOnceWith(manifest({ format_version: "1.2" }));
+    await expect(useAlertLibrary().loadManifest()).resolves.toBeTruthy();
+  });
+
+  it("rejects an unparseable or missing format version", async () => {
+    // Unset is not "assume compatible" — the field is the compatibility gate.
+    for (const bad of [undefined, "", "v1.0.0", "not-a-version"]) {
+      mockStore.commit("clearAlertLibrary");
+      fetchMock.mockReset();
+      respondOnceWith(manifest({ format_version: bad }));
+      await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
+    }
+  });
+
+  it("rejects a response that is not a manifest at all", async () => {
+    respondOnceWith({ nope: true });
+
+    await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
+  });
+
+  it("rejects a well-versioned document with no alerts array", async () => {
+    // Distinct from the case above: format_version alone must not be enough to
+    // pass validation, or a truncated upload renders as an empty gallery that
+    // looks like "you have no alerts" rather than an error.
+    respondOnceWith({ format_version: "1.0.0", packs: [] });
+
+    await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
+  });
+
+  it("rejects when alerts is present but not an array", async () => {
+    respondOnceWith({ format_version: "1.0.0", alerts: { nope: true } });
+
+    await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
+  });
+});
+
+describe("useAlertLibrary — loadAlertFile", () => {
+  it("fetches the file at the entry's path", async () => {
+    respondOnceWith({ name: "pod_oom_killed" });
+    await useAlertLibrary().loadAlertFile(entry());
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      alertFileUrl("packs/k8s/alerts/pod/pod_oom_killed.json"),
+    );
+  });
+
+  it("returns the parsed alert file", async () => {
+    respondOnceWith({ name: "pod_oom_killed", trigger_condition: { threshold: 1 } });
+    const file = await useAlertLibrary().loadAlertFile(entry());
+
+    expect(file.trigger_condition.threshold).toBe(1);
+  });
+
+  it("caches the file under the entry's stable id", async () => {
+    // `id` is <pack>/<name> — the same key install stamps as provenance. Keying
+    // the cache on bare `name` would collide across packs.
+    respondOnceWith({ name: "pod_oom_killed" });
+    await useAlertLibrary().loadAlertFile(entry());
+
+    expect(mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed"]).toBeDefined();
+  });
+
+  it("serves a file cached in the STORE even with a cold module", async () => {
+    // Same requirement as the manifest: the store is the cache. A module-scope
+    // Map that is written through to Vuex but never read back passes every
+    // other test in this block.
+    mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed"] = { name: "from-store" };
+
+    const file = await useAlertLibrary().loadAlertFile(entry());
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(file.name).toBe("from-store");
+  });
+
+  it("serves a cached file without a second network call", async () => {
+    respondOnceWith({ name: "pod_oom_killed" });
+    // Two separate composable calls, as two components would do.
+    await useAlertLibrary().loadAlertFile(entry());
+    await useAlertLibrary().loadAlertFile(entry());
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches a file after the store cache is cleared", async () => {
+    respondOnceWith({ name: "pod_oom_killed" });
+    await useAlertLibrary().loadAlertFile(entry());
+
+    mockStore.commit("clearAlertLibrary");
+    respondOnceWith({ name: "refetched" });
+    const file = await useAlertLibrary().loadAlertFile(entry());
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(file.name).toBe("refetched");
+  });
+
+  it("fetches each distinct alert separately", async () => {
+    respondOnceWith({ name: "pod_oom_killed" });
+    respondOnceWith({ name: "pod_evicted" });
+    const lib = useAlertLibrary();
+
+    await lib.loadAlertFile(entry());
+    await lib.loadAlertFile(
+      entry({
+        id: "k8s/pod_evicted",
+        name: "pod_evicted",
+        path: "packs/k8s/alerts/pod/pod_evicted.json",
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares one in-flight request for the same alert", async () => {
+    // Bulk install requests N files at once, and a drawer reopened quickly asks
+    // again before the first GET settles.
+    let release: () => void = () => {};
+    fetchMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = () => resolve({ ok: true, status: 200, json: async () => ({ name: "once" }) });
+      }),
+    );
+
+    const lib = useAlertLibrary();
+    const first = lib.loadAlertFile(entry());
+    const second = lib.loadAlertFile(entry());
+    release();
+    const [a, b] = await Promise.all([first, second]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(a).toBe(b);
+    expect(a.name).toBe("once");
+  });
+
+  it("rejects on an HTTP error and caches nothing", async () => {
+    respondOnceWith(null, { ok: false, status: 404 });
+
+    await expect(useAlertLibrary().loadAlertFile(entry())).rejects.toThrow();
+    expect(committedTypes()).not.toContain("setAlertLibraryFile");
+    expect(mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed"]).toBeUndefined();
+  });
+
+  it("rejects when the network call itself fails", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("offline"));
+
+    await expect(useAlertLibrary().loadAlertFile(entry())).rejects.toThrow();
+    expect(committedTypes()).not.toContain("setAlertLibraryFile");
+  });
+
+  it("retries a failed file instead of caching the failure", async () => {
+    // The drawer has a Retry button too.
+    fetchMock.mockRejectedValueOnce(new Error("offline"));
+    await expect(useAlertLibrary().loadAlertFile(entry())).rejects.toThrow();
+
+    respondOnceWith({ name: "pod_oom_killed" });
+    const file = await useAlertLibrary().loadAlertFile(entry());
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(file.name).toBe("pod_oom_killed");
+  });
+
+  it("rejects a file body that is not an alert object", async () => {
+    // This payload becomes an alert-create POST. A null, an array or a string
+    // must not reach that call.
+    for (const bad of [null, [], "nope", 42]) {
+      mockStore.commit("clearAlertLibrary");
+      fetchMock.mockReset();
+      respondOnceWith(bad);
+      await expect(useAlertLibrary().loadAlertFile(entry())).rejects.toThrow();
+    }
+  });
+});
+
+describe("useAlertLibrary — isReady", () => {
+  // Applicability detection: the differentiating feature. "Ready" means every
+  // stream the alert queries exists in this org, of the RIGHT type. It does NOT
+  // claim the signal itself is present (an alert on the `default` log stream
+  // reads Ready almost everywhere); tightening that needs required_fields,
+  // which the metadata backfill adds later.
+
+  it("is ready when the required stream exists under the entry's stream type", () => {
+    const available = streams({ metrics: ["kube_pod_container_status_terminated_reason"] });
+    expect(useAlertLibrary().isReady(entry(), available)).toBe(true);
+  });
+
+  it("is not ready when the required stream is absent", () => {
+    expect(useAlertLibrary().isReady(entry(), streams({ metrics: ["something_else"] }))).toBe(false);
+  });
+
+  it("does not match a stream of the wrong type", () => {
+    // Stream names are only unique within a type: a LOGS stream sharing the
+    // name of the metrics stream this alert queries must not read as Ready, or
+    // the install produces an alert that can never fire.
+    const wrongType = streams({ logs: ["kube_pod_container_status_terminated_reason"] });
+    expect(useAlertLibrary().isReady(entry(), wrongType)).toBe(false);
+  });
+
+  it("is not ready when the org has no streams of that type at all", () => {
+    expect(useAlertLibrary().isReady(entry(), streams({ logs: ["anything"] }))).toBe(false);
+    expect(useAlertLibrary().isReady(entry(), streams({}))).toBe(false);
+  });
+
+  it("reads required_streams, not the entry's display `stream` field", () => {
+    // Both fields exist on an entry and today they agree, so an implementation
+    // that checks `stream` passes almost every other case here. It is also the
+    // exact shortcut the HTML mock took (`streams.has(a.stream)`), which makes
+    // it the likeliest thing to get carried across during the port.
+    const divergent = entry({ stream: "present_stream", required_streams: ["absent_stream"] });
+    expect(useAlertLibrary().isReady(divergent, streams({ metrics: ["present_stream"] }))).toBe(
+      false,
+    );
+
+    const inverse = entry({ stream: "absent_stream", required_streams: ["present_stream"] });
+    expect(useAlertLibrary().isReady(inverse, streams({ metrics: ["present_stream"] }))).toBe(true);
+  });
+
+  it("requires every stream, not just one", () => {
+    const multi = entry({ required_streams: ["stream_a", "stream_b"] });
+    expect(useAlertLibrary().isReady(multi, streams({ metrics: ["stream_a"] }))).toBe(false);
+    expect(useAlertLibrary().isReady(multi, streams({ metrics: ["stream_a", "stream_b"] }))).toBe(
+      true,
+    );
+  });
+
+  it("treats an alert with no required streams as ready", () => {
+    // Vacuous truth, chosen deliberately: an alert that declares no data
+    // prerequisite has nothing to be blocked on.
+    expect(useAlertLibrary().isReady(entry({ required_streams: [] }), streams({}))).toBe(true);
+  });
+
+  it("returns false rather than throwing when required_streams is malformed", () => {
+    // The manifest is a fetched document and the format promises forward
+    // compatibility within a major, so a field can go missing or change shape.
+    // isReady runs once per card across 87 cards — a throw here blanks the
+    // whole gallery, so it must degrade to "not ready" instead.
+    const available = streams({ metrics: ["kube_pod_container_status_terminated_reason"] });
+    expect(() => useAlertLibrary().isReady(entry({ required_streams: undefined }), available)).not.toThrow();
+    expect(useAlertLibrary().isReady(entry({ required_streams: undefined }), available)).toBe(false);
+    expect(useAlertLibrary().isReady(entry({ required_streams: "a_string" }), available)).toBe(false);
+  });
+
+  it("matches stream names exactly, without case folding", () => {
+    // O2 stream names are case-sensitive; a near-miss must read as missing
+    // rather than quietly installing an alert that never fires.
+    const shouty = streams({ metrics: ["KUBE_POD_CONTAINER_STATUS_TERMINATED_REASON"] });
+    expect(useAlertLibrary().isReady(entry(), shouty)).toBe(false);
+  });
+
+  it("does not mutate the caller's stream sets", () => {
+    // Called once per card per render across 87 entries against shared sets;
+    // compare contents, since a size check cannot catch delete-then-add.
+    const available = streams({ metrics: ["kube_pod_container_status_terminated_reason"] });
+    useAlertLibrary().isReady(entry(), available);
+
+    expect(available.metrics).toEqual(new Set(["kube_pod_container_status_terminated_reason"]));
+  });
+});
