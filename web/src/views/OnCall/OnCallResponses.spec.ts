@@ -68,6 +68,7 @@ const stubs = {
       "selectedIds",
       "isRowSelectable",
       "error",
+      "loading",
       "sortBy",
       "sortOrder",
       "columnVisibility",
@@ -581,6 +582,40 @@ describe("OnCallResponses", () => {
     it("does not show before the first fetch resolves", () => {
       service.listResponses.mockReturnValue(new Promise(() => {}) as any);
       const wrapper = render();
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+    });
+
+    /// The reported bug: the list and the setup facts come from two different
+    /// fetches, and the setup defaults are all-false. The moment the LIST
+    /// landed, a configured org was told to create a team — and on an org with
+    /// no pages yet, setup took the whole screen before the table appeared.
+    it("does not show while the setup fetch is still outstanding", async () => {
+      service.listTeams.mockReturnValue(new Promise(() => {}) as any);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-setup-banner"]').exists()).toBe(false);
+    });
+
+    /// And the list must not flash its own empty state in that window either —
+    /// "no pages yet" is the wrong answer to show while we still cannot tell
+    /// whether setup owns the screen.
+    it("holds the list in its loading state until setup has answered", async () => {
+      service.listTeams.mockReturnValue(new Promise(() => {}) as any);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(true);
+    });
+
+    /// Teams did not answer, so "this org has no team" is the default we
+    /// started from, not a fact. Its first step would be a lie.
+    it("does not show when the teams call failed", async () => {
+      service.listTeams.mockRejectedValue(new Error("boom"));
+      const wrapper = render();
+      await flushPromises();
+
       expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
     });
 

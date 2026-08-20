@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          same count and the same acknowledge-all on its heading, so the banner
          was that heading said twice — and its count was taken before the stat
          filter, so a filtered list could disagree with it. -->
-    <OContent v-if="!setupOnly && !unavailable" class="pt-2">
+    <OContent v-if="setupLoaded && !setupOnly && !unavailable" class="pt-2">
       <OnCallNowStrip
         :teams="teams"
         :slots-by-team="slotsByTeam"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="rows"
       :columns="columns"
       row-key="rowKey"
-      :loading="loading"
+      :loading="loading || !setupLoaded"
       :error="loadError"
       pagination="client"
       :page-size="20"
@@ -828,6 +828,12 @@ const confirmBulkResolve = ref(false);
 // Only after the first fetch, so the checklist never flashes while loading.
 const loaded = ref(false);
 const setup = ref({ hasTeam: false, hasStaffedRotation: false, hasRouting: false });
+/// The list and the checklist are answered by two different fetches, and these
+/// defaults are all-false. Drawing the checklist off them the moment the LIST
+/// arrived told every configured org to create a team — and, with no pages yet,
+/// handed setup the whole screen — for as long as the context call took. The
+/// checklist waits for its own answer.
+const setupLoaded = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 /// Lowercased to compare with `acked_by`, which the server normalises on a
@@ -868,6 +874,10 @@ const isFiltered = computed(
 const showChecklist = computed(
   () =>
     loaded.value &&
+    setupLoaded.value &&
+    // Teams did not answer, so "this org has no team" is not a fact we hold —
+    // it is the default we started from, and the first step would be a lie.
+    teamsAvailable.value &&
     !loadError.value &&
     !(setup.value.hasTeam && setup.value.hasStaffedRotation && setup.value.hasRouting),
 );
@@ -1487,6 +1497,9 @@ async function fetchContext() {
     // An alert bound straight to a team counts: it is routing without a rule.
     hasRouting: rules.length > 0 || responses.value.some((r) => !!r.team_id),
   };
+  // Set even when a call failed: the screen has to stop waiting either way.
+  // Whether the answer is trustworthy is `teamsAvailable`, checked separately.
+  setupLoaded.value = true;
 }
 
 /// "Would any team page a person right now?" The coverage-gap endpoint answers
