@@ -1,0 +1,14 @@
+# Drives O2RumTester on iOS to the Checkout form (email/card/password) and dwells so Session
+# Replay records the PII screen — the UI spec then asserts it is masked.
+appId: org.reactjs.native.example.O2RumTester
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "O2 RUM Tester"
+    timeout: 40000
+- tapOn: "Go to Checkout form →"
+- assertVisible: "Checkout (masking test)"
+- tapOn: "Place order"
+- waitForAnimationToEnd:
+    timeout: 5000
