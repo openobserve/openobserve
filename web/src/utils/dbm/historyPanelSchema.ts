@@ -25,15 +25,15 @@
  * `query/history` endpoint returns classified rollup windows, not a table the
  * renderer could query, and the below-top-N / live classification has no SQL
  * equivalent. So there is no query for the renderer to fire.
- * DECISION: use the renderer's pre-fetched-results injection path
+ * So this uses the renderer's pre-fetched-results injection path
  * (`injectedPromqlData` on PanelSchemaRenderer / usePanelDataLoader). Despite
  * the prop's name that branch does not look at `queryType` — it only needs
  * `data` to hold one entry per query in the shape the query executor would have
- * written. We hand it a `queryType: "sql"` panel plus one synthetic row per
+ * written. It is handed a `queryType: "sql"` panel plus one synthetic row per
  * window, the same technique VersionOverlayChart.vue and MetricCardChart.vue
  * use. See `buildHistoryRows` for the row shape.
  *
- * Two traps encoded here rather than discovered at runtime:
+ * Two traps this encodes:
  *
  *  • The x column carries the raw MICROSECOND window timestamp. `isTimeStamp`
  *    in dateTimeUtils matches a 16-digit number, which is what promotes the

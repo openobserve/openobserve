@@ -16,13 +16,13 @@
 /**
  * "Alert me" reaches the lock surfaces.
  *
- * The action existed on Top queries and Databases only, so an operator looking
- * at a blocking chain or a deadlock — the two pages people arrive at DURING an
- * incident — had to leave and rebuild the query by hand.
+ * The blocking-chain and deadlock pages — the two people arrive at during an
+ * incident — must offer the action too, or an operator has to leave and rebuild
+ * the query by hand.
  *
- * WHAT THIS PINS IS WIRING, deliberately. Whether the row's action list offers
- * the item, whether the handler routes it, and whether the prefill is built
- * from the row rather than a constant. The VALUES the prefill contains — the
+ * What this pins is WIRING: whether the row's action list offers the item,
+ * whether the handler routes it, and whether the prefill is built from the row
+ * rather than a constant. The values the prefill contains — the
  * SQL, the threshold, the warnings, the provenance in the name — belong to
  * `utils/alerts/prefill/fromDbmLocks.ts` and are pinned by its own unit tests
  * against the real builder. Splitting it that way is the rule these sibling

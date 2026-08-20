@@ -37,10 +37,10 @@ export interface DbmNotCollectingSignals {
   /**
    * Databases the shared fan-out saw. `null` = unknown.
    *
-   * ZERO IS NOT A DATABASE COUNT HERE. The fan-out's `databaseCount` is the
+   * Zero is not a database count here. The fan-out's `databaseCount` is the
    * TRACE-vantage fleet row count, so a server-only org — collector recipes
    * wired, no APM anywhere — legitimately reports 0 while its databases are
-   * reporting statements normally. Interpolating that 0 produced "50 kinds of
+   * reporting statements normally. Interpolating that 0 gives "50 kinds of
    * query from 0 databases", a sentence that contradicts itself and blames the
    * absence of tracing for a healthy deployment. See `detailFor` below.
    */

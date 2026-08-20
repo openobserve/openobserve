@@ -274,9 +274,9 @@ export interface QueryHistoryResponse {
   breakdown?: QueryBreakdownRow[];
   /**
    * Present when `includeEndpoints` asked for it: the FR-5 calling-endpoints
-   * aggregation, run server-side against the trace stream THIS response
-   * resolved (`trace_stream_name`) — which is why the page no longer has to
-   * wait for that name before asking a second endpoint for it.
+   * aggregation, run server-side against the trace stream this response
+   * resolved (`trace_stream_name`), so the page never has to wait for that
+   * name before asking a second endpoint for it.
    *
    * `null` means there was no stream to aggregate (ambiguous or absent), which
    * is the reader's choice to make and must NOT be rendered as "no callers".
@@ -1014,6 +1014,54 @@ export interface InstancesResponse {
   hits: DbmInstanceHit[];
 }
 
+/**
+ * The instance-health sweep's window. There is deliberately NO stream or SQL
+ * parameter: the server owns the catalog and builds the query, so a
+ * `db_monitoring` grant buys database health columns rather than general
+ * metrics access. See `read_instance_metrics_body` in the Rust handler.
+ */
+export interface InstanceMetricsParams {
+  startTime?: number;
+  endTime?: number;
+}
+
+/**
+ * One metric reading, already unioned across streams and tagged with the role
+ * it plays. `series` is the label that splits one instance's rows — the
+ * database on a per-database metric, the replica on replication lag — and is
+ * null on a stream that carries no such label.
+ */
+export interface DbmInstanceMetricHit {
+  role: string;
+  /** The engine whose union arm produced this row. */
+  system: string;
+  instance: string;
+  series: string | null;
+  value: number;
+  _timestamp: number;
+}
+
+/**
+ * The spec for one stream the sweep actually read, travelling WITH the rows.
+ *
+ * The fold is still the client's (the rules are ~200 lines pinned by
+ * `instanceMetrics.spec.ts`), but which rule applies to a row is the SERVER's
+ * catalog — so the client folds by what the server swept rather than by a
+ * second copy of the list that could drift out of agreement with it.
+ */
+export interface DbmInstanceMetricStream {
+  stream: string;
+  role: string;
+  system: string;
+  cumulative: boolean;
+  aggregate: "sum" | "single" | "max";
+}
+
+export interface InstanceMetricsResponse {
+  hits: DbmInstanceMetricHit[];
+  streams: DbmInstanceMetricStream[];
+}
+
 export interface TableHealthParams {
   startTime?: number;
   endTime?: number;
@@ -1429,6 +1477,28 @@ const dbMonitoringService = {
     put(params, "stream", options.stream);
     put(params, "system", options.system);
     return http().get<InstancesResponse>(`/api/${orgId}/db_monitoring/instances`, {
+      params,
+    });
+  },
+
+  /**
+   * Instance health for the Databases page — connection saturation, cache hit
+   * ratio, replication lag and deadlock counts, swept from the collector's
+   * metric streams in ONE query.
+   *
+   * This replaces a browser-side sweep of `GET /streams?type=metrics`, a
+   * schema call per stream and a `POST /_search?type=metrics` per stream — 17
+   * requests and 8 concurrent DataFusion plans per page load. It moved server
+   * side because those are GENERIC endpoints that authorize against `metrics`
+   * and `stream` objects: a user holding the `db_monitoring` module grant and
+   * nothing else got a 403 from every one of them, and an "Access Required"
+   * dialog on a page they are entitled to read.
+   */
+  getInstanceMetrics: (orgId: string, options: InstanceMetricsParams = {}) => {
+    const params: QueryParams = {};
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    return http().get<InstanceMetricsResponse>(`/api/${orgId}/db_monitoring/instance_metrics`, {
       params,
     });
   },

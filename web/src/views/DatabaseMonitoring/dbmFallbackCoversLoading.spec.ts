@@ -23,18 +23,15 @@
  * tabs whose reads are slow enough to draw the skeleton, the jump reads as
  * broken — and the page repaints twice for one question.
  *
- * That used to be held by `await`ing a second request inside `load()`, which
- * kept `loading` true for its duration. The fallback rides the PRIMARY
- * response now (`include_server_fallback`): the server runs the same
- * conditional and returns the rows in the response that decides they are
- * needed. So the property is no longer maintained by an `await` that could be
- * dropped — there is no second read for the skeleton to race, which is the
- * stronger form of the same guarantee, and it also removes the round trip the
- * old shape spent on the deployment least able to spare it.
+ * The fallback rides the PRIMARY response (`include_server_fallback`): the
+ * server runs the same conditional and returns the rows in the response that
+ * decides they are needed. So the property rests on there being no second read
+ * for the skeleton to race, rather than on an `await` that could be dropped —
+ * and it costs no extra round trip on the deployment least able to spare one.
  *
  * What this pins is that structural property: the flag is asked for, the rows
- * are read off the response, and NO page fires a separate fallback request
- * — awaited or otherwise.
+ * are read off the response, and no page fires a separate fallback request —
+ * awaited or otherwise.
  *
  * Source-read like dbmRequestGuard.spec.ts, and for the same reason: these
  * views need a router, a store and a dozen O2 children to mount, and a

@@ -208,8 +208,8 @@ describe("buildDatabaseBreakdown — p95 across children", () => {
     expect(buildDatabaseBreakdown(rows).levels[0].p95Ns).toBeNull();
   });
 
-  // Regression: p50/p99 were once hardcoded null (see breakdown.ts — every
-  // `query_stats` row carries all three, worst-of alike).
+  // Every `query_stats` row carries all three percentiles, so p50 and p99 take
+  // the same worst-of rule as p95 (see breakdown.ts).
   it("carries p50 and p99 by the same worst-of rule, not just p95", () => {
     const rows = [
       row({ fingerprint: "a", services: ["cart"], p50_ns: 5, p95_ns: 10, p99_ns: 20 }),

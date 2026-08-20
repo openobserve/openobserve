@@ -173,8 +173,8 @@ export const buildHistorySeries = (
  * Values for one metric across the series, aligned 1:1 with `points`.
  *
  * `null` for any window that has no measurement — ECharts renders a null as a
- * break in the line, which is the honest rendering. A `0` here would be the bug
- * this whole module exists to prevent, so the extractor never coerces.
+ * break in the line, which is the honest rendering. A `0` would read as a real
+ * measurement of zero, so the extractor never coerces.
  */
 export const seriesValues = (
   points: DbmHistoryPoint[],

@@ -60,7 +60,7 @@ const PAGES = [
  *
  * The structural claims below are about MARKUP, and the script holds strings
  * (`"DbmScopeFilters"` in an import) that would otherwise satisfy a naive
- * `toContain` and let the real regression through.
+ * `toContain`.
  */
 const templateOf = (source: string): string => {
   const end = source.indexOf("<script setup");
@@ -232,9 +232,9 @@ describe("Deadlocks no longer writes a scope it cannot honour", () => {
   });
 
   /**
-   * The "widen the window" empty-state action used to hand-roll its own
-   * `router.replace` with only the range params, dropping the filters from the
-   * URL while leaving them applied. It goes through the page's `syncUrl` now.
+   * The "widen the window" empty-state action goes through the page's `syncUrl`.
+   * A hand-rolled `router.replace` with only the range params would drop the
+   * filters from the URL while leaving them applied.
    */
   it("widens the window through syncUrl, so the filters ride along", () => {
     const source = read("DeadlocksPage.vue");

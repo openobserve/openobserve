@@ -1122,8 +1122,8 @@ import dbMonitoringService, {
   type QueryStatsRow,
   type ServerQueryRow,
 } from "@/services/db_monitoring";
-// No `searchService` import: this page no longer runs a raw search of its own.
-// Its one hand-built query — the per-fingerprint slow samples — is served by
+// No `searchService` import: this page runs no raw search of its own. Its one
+// hand-built query — the per-fingerprint slow samples — is served by
 // `/samples?fingerprint=`, which builds the predicate server-side.
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -2304,19 +2304,19 @@ const load = async () => {
 
   // The stream list exists to RESOLVE an unknown stream (and to feed the
   // picker when the org has several). When the stream traveled in the URL or
-  // on the seeded row it is already resolved, so the fetch would answer a
-  // question nobody is asking — skipped. It no longer carries a security
-  // duty: the reads that take a stream now hand it to endpoints that
-  // authorize it, rather than interpolating it into SQL here.
+  // on the seeded row it is already resolved, so the fetch is skipped. It
+  // carries no security duty: the reads that take a stream hand it to
+  // endpoints that authorize it, rather than interpolating it into SQL here.
   const streamKnown = Boolean(streamParam.value || seed?.trace_stream_name);
   const streamsSettled = streamKnown ? Promise.resolve() : loadTraceStreams();
 
   try {
     if (seed) {
-      // Seeded entry: the row paints NOW, and everything the panel batch used
-      // to wait on — the trace stream, the server-metrics join key — is on the
-      // seed already. The row fetch refines (share, deltas, freshness) rather
-      // than gates, so the whole page loads in one concurrent wave.
+      // Seeded entry: the row paints immediately, and everything the panel
+      // batch would otherwise wait on — the trace stream, the server-metrics
+      // join key — is already on the seed. The row fetch refines (share,
+      // deltas, freshness) rather than gates, so the whole page loads in one
+      // concurrent wave.
       row.value = seed;
       await Promise.all([
         loadRow(token, seed),
@@ -2457,8 +2457,8 @@ const loadRow = async (token: number = requestSeq.current(), seed: QueryStatsRow
   // A miss in the ranked page above is a rank below `ROW_LOOKUP_LIMIT`, NOT
   // proof of absence — so it is re-asked by name rather than concluded. Only
   // the miss pays for it, and only for the row: the scope arithmetic below
-  // keeps using the ranked page, which is the whole scope this narrowed
-  // response no longer describes.
+  // keeps using the ranked page, since this narrowed response does not
+  // describe the whole scope.
   let fetched = hits.find((hit) => hit.fingerprint === fingerprint.value) ?? null;
   let targeted: TargetedRow = null;
   if (!fetched) {
@@ -2529,10 +2529,9 @@ const applyEndpointHits = (hits: EndpointRow[]) => {
  * or none named on the row. Both are a reader-fixable ambiguity, and the copy
  * says which.
  *
- * The zero-trace branch is gone with the copy it returned. It explained that no
- * traces reached this query, inside a section that no longer renders when no
- * traces reached this query — the section is hidden outright instead, which is
- * the same fact stated by absence rather than by a paragraph in an empty table.
+ * There is no zero-trace branch: the section does not render at all when no
+ * traces reached this query, which states the same fact by absence rather than
+ * by a paragraph in an empty table.
  */
 const noStreamMessage = () =>
   streamAmbiguous.value ? t("dbm.detail.ambiguousStream") : t("dbm.detail.noStream");
@@ -2540,11 +2539,11 @@ const noStreamMessage = () =>
 /**
  * The series — and, on the cold path, the calling endpoints with it.
  *
- * The two were separate requests fired together on every entry, with the same
- * fingerprint and window. Worse, `/query/endpoints` REQUIRES a trace stream,
- * and the stream this page uses is the one `/query/history` resolves and
- * returns (`trace_stream_name`) — so the second request was waiting on a fact
- * the first had already computed. `include_endpoints=true` runs the
+ * Fetching the two separately means two requests with the same fingerprint and
+ * window, and `/query/endpoints` requires a trace stream — the very one
+ * `/query/history` resolves and returns (`trace_stream_name`), so the second
+ * request would wait on a fact the first had already computed.
+ * `include_endpoints=true` runs the
  * aggregation server-side against that same resolved stream, concurrently with
  * the backfill it was already doing.
  *
@@ -2764,15 +2763,11 @@ const loadSamples = async (token: number = requestSeq.current()) => {
   }
 
   try {
-    // Through the DBM endpoint, which now takes a `fingerprint` scope.
-    //
-    // This page used to build the SQL itself — `SELECT … FROM "<stream>" WHERE
-    // o2_db_fingerprint = '…'` — against a stream name taken straight from
-    // `route.query`, and carried an `isSafeStreamName` validator and an
-    // `escapeSingleQuotes` helper to make that safe. Both are gone: the
-    // predicate is built server-side through the same escaping every other DBM
-    // predicate uses, and the stream is resolved through the endpoint's own
-    // `involved_streams` RBAC gate rather than interpolated from a URL.
+    // Through the DBM endpoint, which takes a `fingerprint` scope. The page
+    // builds no SQL of its own: the predicate is built server-side through the
+    // same escaping every other DBM predicate uses, and the stream is resolved
+    // through the endpoint's own `involved_streams` RBAC gate rather than
+    // interpolated from a URL.
     const response = await dbMonitoringService.getSamples(org.value, {
       fingerprint: fingerprint.value,
       stream: traceStream.value,

@@ -471,10 +471,8 @@ import {
   overlapTile,
 } from "@/utils/dbm/format";
 import { createDbmFilterEntry, optionsFrom } from "@/utils/dbm/filters";
-import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
-import streamService from "@/services/stream";
-import { collectInstanceMetrics, DBM_METRIC_STREAM_NAMES } from "@/utils/dbm/instanceMetricsRead";
+import { foldServerInstanceMetrics } from "@/utils/dbm/instanceMetricsRead";
 import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMetrics";
 import { unionFleetRows, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { healthScalar, healthSortValue } from "@/utils/dbm/healthScalar";
@@ -942,14 +940,11 @@ const statusLine = (row: DbmBreakdownRow): I18nText => {
  * The per-instance splits the LAST load brought down, keyed by `db_instance` —
  * exactly the shape `include_breakdown` returns.
  *
- * This used to be one `GET /queries?instance=<row>&stmt_class=all` PER EXPANDED
- * ROW, re-fired for every open row on every window change: opening six
- * databases and moving the range cost six requests, all answering a question
- * the overview's own read had already paid for. `include_breakdown=true` folds
- * them into the response that draws the table, so expanding a row is now a
- * lookup rather than a fetch. `null` means the section was not in the response
- * at all (an older server, or the read failing) — which is what the row's error
- * placeholder is for.
+ * `include_breakdown=true` folds the splits into the response that draws the
+ * table, so expanding a row is a lookup rather than a per-row
+ * `GET /queries?instance=<row>&stmt_class=all` re-fired on every window change.
+ * `null` means the section was not in the response at all (an older server, or
+ * the read failing) — which is what the row's error placeholder is for.
  */
 const instanceBreakdowns = shallowRef<Record<string, QueryStatsRow[]> | null>(null);
 const breakdownFailed = ref(false);
@@ -994,9 +989,9 @@ const fileBreakdown = (row: DatabaseRow) => {
  * reload. Open schema rows are in the same set and are skipped here: their
  * children came from their parent's entry, so there is nothing left to file.
  *
- * No longer async and no longer takes a request token: there is no request to
- * be stale against. The split and the table it describes came down together,
- * so the pair cannot disagree about which window it is.
+ * Synchronous and tokenless: there is no request to be stale against. The
+ * split and the table it describes come down together, so the pair cannot
+ * disagree about which window it is.
  */
 const fillOpenBreakdowns = () => {
   for (const id of expandedIds.value) {
@@ -1086,125 +1081,55 @@ const { getStreams } = useStreams(t);
 const { traceCount, probeTracePresence } = useDbmTracePresence(getStreams);
 
 /**
- * The metric streams that exist here, from the session-cached catalog. `null`
- * on failure or an empty catalog — both mean "we don't know", and the caller
- * falls back to sweeping the full spec list rather than trusting a blank.
- */
-const metricStreamNames = async (): Promise<ReadonlySet<string> | null> => {
-  try {
-    const response = (await getStreams("metrics", false, false)) as { list?: { name: string }[] };
-    const names = (response?.list ?? []).map((stream) => stream.name).filter(Boolean);
-    return names.length ? new Set(names) : null;
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Each existing metric stream's actual columns, so the sweep's SQL is built
- * from what the collector REALLY writes rather than from the spec's claim
- * about it — the claim has been wrong before (`db_namespace` vs the
- * receiver's `postgresql_database_name`), and a renamed column then fails as
- * a 400 on every load. Cached per (org, stream) for the session: schemas move
- * on collector upgrades, not between refreshes. A failed fetch caches as
- * `null` and that stream keeps the trust-then-retry path.
- */
-const metricSchemaCache = new Map<string, Promise<ReadonlySet<string> | null>>();
-
-const metricStreamFields = async (
-  existingStreams: ReadonlySet<string> | null,
-): Promise<ReadonlyMap<string, ReadonlySet<string>> | null> => {
-  if (!existingStreams?.size) return null;
-  const wanted = DBM_METRIC_STREAM_NAMES.filter((stream) => existingStreams.has(stream));
-  if (!wanted.length) return null;
-  const entries = await Promise.all(
-    wanted.map(async (stream) => {
-      const key = `${org.value}|${stream}`;
-      let pending = metricSchemaCache.get(key);
-      if (!pending) {
-        pending = streamService
-          .schema(org.value, stream, "metrics")
-          .then((response: { data?: { schema?: { name?: string }[] } }) => {
-            const fields = (response.data?.schema ?? [])
-              .map((field) => field.name)
-              .filter((name): name is string => Boolean(name));
-            return fields.length ? new Set(fields) : null;
-          })
-          .catch(() => null);
-        metricSchemaCache.set(key, pending);
-      }
-      return [stream, await pending] as const;
-    }),
-  );
-  const byStream = new Map<string, ReadonlySet<string>>();
-  for (const [stream, fields] of entries) {
-    if (fields) byStream.set(stream, fields);
-  }
-  return byStream.size ? byStream : null;
-};
-
-/**
- * The receiver's view of the instances, read from the metrics streams the
+ * The receiver's view of the instances, read from the metric streams the
  * user's collector already writes. Nothing is ingested for this.
  *
- * It is deliberately NOT awaited by `load()`: the query table is the page, and
+ * One request: the server resolves the streams, reads their schemas and sweeps
+ * them in a single UNION ALL, rather than a browser-side `/streams?type=metrics`
+ * catalog read plus a schema call and a `/_search?type=metrics` per stream.
+ *
+ * Authorization, not speed, is why it must stay server-side. Those generic
+ * endpoints authorize against `metrics` and `stream` objects, so a user holding
+ * only the `db_monitoring` module grant gets a 403 from every one of them and
+ * an "Access Required" dialog on a page they are entitled to read.
+ * `/db_monitoring/instance_metrics` authorizes against `db_monitoring`, which
+ * is what the module grant is for.
+ *
+ * Deliberately not awaited by `load()`: the query table is the page, and
  * a slow or broken metrics read must never delay or fail it. This resolves on
  * its own and re-renders the rows when it does — or never does, in which case
- * the page is exactly what it is today.
+ * the page is exactly what it was before the health column existed.
  */
 const loadInstanceMetrics = async (token: number) => {
   if (!org.value) return;
-  const window = { startTime: current.value.startTime, endTime: current.value.endTime };
-  // Ask the (session-cached) stream catalog which of the eight metric streams
-  // exist before sweeping, so a deployment carrying two of them fires two
-  // searches instead of two hits and six guaranteed 400s on every load. On any
-  // catalog failure the sweep runs unfiltered — see collectInstanceMetrics.
-  const existingStreams = await metricStreamNames();
-  // Then ask each existing stream's schema (also session-cached) which columns
-  // it really carries, so the SQL never names a field the collector renamed.
-  const fieldsByStream = await metricStreamFields(existingStreams);
   try {
-    const collected = await collectInstanceMetrics(
-      async (_stream, sql) => {
-        const response = await searchService.search({
-          org_identifier: org.value,
-          query: {
-            query: {
-              sql,
-              start_time: window.startTime,
-              end_time: window.endTime,
-              from: 0,
-              size: METRIC_SAMPLE_LIMIT,
-            },
-          },
-          page_type: "metrics",
-        });
-        return (response.data?.hits ?? []) as Record<string, unknown>[];
-      },
-      window,
-      { existingStreams, fieldsByStream },
-    );
+    const response = await dbMonitoringService.getInstanceMetrics(org.value, {
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+    });
     if (requestSeq.isStale(token)) return;
+    // The FOLD is still the client's — per-series grouping, counter
+    // differencing, the mariadb→mysql alias and host normalisation are the
+    // rules that decide what the column says, and they are pinned by
+    // `instanceMetrics.spec.ts`. Only the sweep moved.
+    const collected = foldServerInstanceMetrics(
+      response.data?.hits ?? [],
+      response.data?.streams ?? [],
+    );
     instanceMetrics.value = collected.metricsByKey;
     failedMetricStreams.value = collected.failedStreams;
     // The rows already rendered from the query read alone; re-run the union so
     // they pick up the health columns and the fleet gains its idle instances.
     applyInstanceMetrics();
   } catch {
-    // Unreachable by contract — collectInstanceMetrics never rejects — but a
-    // metrics failure may not take the query table with it under any
-    // circumstances, so the guard stays.
+    // A metrics failure may not take the query table with it under any
+    // circumstances. The column goes blank, the page keeps working — exactly
+    // what happened when any single stream read failed before.
     if (requestSeq.isStale(token)) return;
     instanceMetrics.value = new Map();
     failedMetricStreams.value = [];
   }
 };
-
-/**
- * Scrape enough of each metric stream to draw a window. A metric arrives once
- * per collection interval per instance, so this is generous for a fleet.
- */
-const METRIC_SAMPLE_LIMIT = 5000;
 
 /**
  * This page's OWN read. It takes no `force`: the table was always fetched live,
@@ -1227,9 +1152,7 @@ const load = () =>
         baselineEndTime: previous.value.endTime,
         // The per-instance split rides along, so expanding a row costs no
         // request. It is folded from the `query_stats` rows this response
-        // already reads to name each row's calling services — the same rows
-        // the per-row `GET /queries` used to re-fetch, once per open row, on
-        // every window change.
+        // already reads to name each row's calling services.
         includeBreakdown: true,
       });
 
@@ -1633,21 +1556,19 @@ const defaultColumnVisibility = {};
 const clearScope = () => {
   systemFilter.value = null;
   // Clear the SEARCH too, the way every sibling tab's clear does
-  // (TableHealthPage, SamplesPage, QueriesPage). Leaving it set made "clear"
-  // mean two different things inside one section: on this tab the list stayed
-  // narrowed by a search box whose text the reader could no longer see a
-  // reason for, and the only way back to the full list was to find and empty
-  // that box by hand.
+  // (TableHealthPage, SamplesPage, QueriesPage). Leaving it set makes "clear"
+  // mean two different things inside one section: the list stays narrowed by a
+  // search box whose text the reader has no visible reason for, and the only
+  // way back to the full list is to find and empty that box by hand.
   search.value = "";
   // Clear the WHOLE section's scope, not just the one dimension this tab
   // offers. The tabs do not share a store — each seeds its refs from
   // `route.query` on activation (useDbmScopeFilters' `onActivated` re-seed) —
-  // so the URL IS the shared scope. `syncUrl` spreads `...route.query`, which
-  // faithfully preserved `instance` / `namespace` / `env` / `service` that
-  // this page has no control for: pressing "Clear all" here emptied the chip
-  // row in front of the reader, then Slowest calls or Deadlocks came back
-  // still filtered by a dimension nothing on screen had mentioned. Dropping
-  // them here is what makes one "Clear all" mean the whole section.
+  // so the URL is the shared scope. `syncUrl` spreads `...route.query`, which
+  // would preserve `instance` / `namespace` / `env` / `service` that this page
+  // has no control for: "Clear all" would empty the chip row in front of the
+  // reader, then Slowest calls or Deadlocks would come back still filtered by a
+  // dimension nothing on screen had mentioned.
   syncUrl({ clearAllScope: true });
   load();
 };
@@ -1683,9 +1604,9 @@ const syncUrl = ({ clearAllScope = false }: { clearAllScope?: boolean } = {}) =>
 };
 
 /**
- * Every cause resolves to an action — `not-instrumented` is the default on a
- * fresh install, and it used to fall through here and do nothing, which made
- * the most prominent button on an empty page a dead click.
+ * Every cause resolves to an action, including `not-instrumented` — the default
+ * on a fresh install. A cause that falls through here makes the most prominent
+ * button on an empty page a dead click.
  */
 const onEmptyAction = (cause: DbmEmptyCauseId) => {
   switch (dbmEmptyAction(cause)) {
@@ -1748,11 +1669,11 @@ const openQueries = (
  */
 const onRowClick = (row: TableRow) => {
   if (!isBreakdownRow(row)) {
-    // A trafficless row navigates too: the query list is no longer empty by
+    // A trafficless row navigates too: the query list is not empty by
     // construction for it — Top queries falls back to the database-reported
     // list, and the system/instance scope this handoff carries filters that
-    // list to exactly this row. The earlier early-return here predates the
-    // fallback and had turned the whole fleet into dead rows on a no-APM org.
+    // list to exactly this row. Returning early here would turn the whole fleet
+    // into dead rows on a no-APM org.
     openQueries(row);
     return;
   }

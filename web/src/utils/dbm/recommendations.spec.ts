@@ -511,11 +511,9 @@ describe("collapseRecommendations", () => {
   });
 
   /**
-   * THE HONESTY CLAUSE. Hiding entries is only acceptable if the reader can
-   * SEE that entries are hidden. `hiddenCount` is how the strip says "and 2
-   * more" — a collapse that silently dropped them would present the list as
-   * more complete than it is, which is exactly what this feature's contract
-   * forbids.
+   * Hiding entries is only acceptable if the reader can see that entries are
+   * hidden. `hiddenCount` is how the strip says "and 2 more" — a collapse that
+   * silently dropped them would present the list as more complete than it is.
    */
   it("reports how many items each row stands for, so nothing is hidden silently", () => {
     const collapsed = collapseRecommendations(

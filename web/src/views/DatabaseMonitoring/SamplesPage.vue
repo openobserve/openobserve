@@ -721,10 +721,10 @@ const filterEntry = createDbmFilterEntry(() => {
 });
 
 const dimensionFilters = computed<DbmScopeFilter[]>(() => {
-  // In fallback mode the options must describe the list ON SCREEN. Every
-  // `options:` below used to derive from `allRows` alone — which is empty
-  // exactly when the fallback fires — so the hoisted control would otherwise
-  // offer five empty selects. The server rows are unioned in.
+  // In fallback mode the options must describe the list ON SCREEN. Deriving
+  // each `options:` below from `allRows` alone gives five empty selects,
+  // because `allRows` is empty exactly when the fallback fires. The server rows
+  // are unioned in.
   const serverList = serverListShown.value ? filteredServerRows.value : [];
 
   const instance = filterEntry({
@@ -920,9 +920,8 @@ const load = () =>
         env: envFilter.value ?? undefined,
         service: serviceFilter.value ?? undefined,
         // The database-reported fallback rides THIS response when the client
-        // answer is an exact zero — it used to be a second, sequential request
-        // fired once this one came back empty, which is two round trips on the
-        // deployment where it always fires.
+        // answer is an exact zero, rather than costing a second sequential
+        // request — two round trips on the deployment where it always fires.
         includeServerFallback: true,
       });
 

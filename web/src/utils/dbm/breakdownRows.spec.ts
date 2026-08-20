@@ -185,13 +185,13 @@ describe("isBreakdownRow", () => {
 });
 
 /**
- * DEFECT: the coverage caveat repeated verbatim under every open database.
+ * The coverage caveat must not repeat verbatim under every open database.
  *
  * The per-row percentage is genuinely per-row — 700/1000 and 550/1000 render
  * "30%" and "45%" — so the caveat is a disclosure, not a disclaimer, and it
- * stays attached to its own row. What made four rows read identically was the
- * ZERO-ATTRIBUTION case: with no per-query rows back, every row's shortfall is
- * exactly 1, so all four printed the same "100% less" sentence.
+ * stays attached to its own row. What makes rows read identically is the
+ * zero-attribution case: with no per-query rows back, every row's shortfall is
+ * exactly 1, so each prints the same "100% less" sentence.
  *
  * That case already has a better sentence of its own — the `empty` placeholder
  * child says "we have this database's totals but no per-query rows in this

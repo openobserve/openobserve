@@ -23,18 +23,15 @@
 //! [60, 3600]). The cadence is read once when the job is spawned, so a changed
 //! interval takes effect on restart.
 //!
-//! The cfg-free shape is not an oversight. Parts of DBM's READ surface are
+//! Deliberately not enterprise-gated: parts of DBM's read surface are
 //! enterprise-only (deadlocks, blocked queries, table health), but this job
-//! rolls up the `o2_db_*` columns on ordinary database SPANS — data every build
-//! ingests — into `_o2_db_stats`, which backs the endpoints that stay OSS. It
-//! is genuinely identical in both builds, so gating it would only starve the
-//! OSS tabs.
+//! rolls up the `o2_db_*` columns on ordinary database spans — data every build
+//! ingests — into `_o2_db_stats`, which backs the endpoints that stay OSS.
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // Only scheduler nodes run the DBM rollup job.
-    // (Ingester/querier/compactor/router nodes exit here.)
     if !LOCAL_NODE.is_scheduler() {
         log::info!(
             "[DB_MONITORING::JOB] rollup disabled on non-scheduler node (role: {:?})",

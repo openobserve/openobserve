@@ -190,20 +190,17 @@ fn degraded_classes_differ_from_text_classes() {
 // ─── Cross-vantage convergence: pg_stat_statements re-spacing (W3 plan join) ──
 //
 // The CLIENT vantage sees driver text (`count(*)`, `(a, b, c)`); the SERVER
-// vantage sees text Postgres's own jumbler already rewrote, which pads every
-// parenthesis and comma with spaces (`count ( * )`, `( a, b, c )`). Both texts
-// name ONE statement, so both MUST hash to one fingerprint — otherwise the
-// stored plan is invisible under the client's fingerprint and the UI says "No
-// plan for this query" while the plan sits in `dbm_server`.
+// vantage sees the text Postgres's own jumbler rewrote, padding every
+// parenthesis and comma with spaces (`count ( * )`, `( a, b, c )`). Both name
+// ONE statement, so both must hash to one fingerprint — the plan stored under
+// the server fingerprint has to be reachable from the client's.
 //
-// Every SERVER string below is verbatim `o2_dbm_activity_query` captured off the
-// live rig (`dbm_server`, `o2_dbm_kind='top_query'`), and every CLIENT string is
-// the paired `query_norm` from `/db_monitoring/queries` — producer output,
-// not hand-written approximations.
+// SERVER strings are verbatim `o2_dbm_activity_query` values; CLIENT strings are
+// the paired `query_norm` from `/db_monitoring/queries`.
 
-/// Pair a CLIENT statement text with the SERVER text of the SAME statement and
-/// assert one fingerprint. Both go through the public normalizer, so this is a
-/// real two-vantage assertion, not a canonicalizer reproducing its own output.
+/// Assert that a CLIENT text and the SERVER text of the SAME statement share one
+/// fingerprint. Both go through the public normalizer, so the assertion spans two
+/// real vantages rather than a canonicalizer reproducing its own output.
 fn assert_vantages_converge(label: &str, client: &str, server: &str) {
     use super::normalizer::{Dialect, normalize};
     let c = normalize(client, Dialect::Postgresql)
@@ -217,8 +214,8 @@ fn assert_vantages_converge(label: &str, client: &str, server: &str) {
     );
 }
 
-/// The reported defect: every INSERT missed its plan because pg pads the column
-/// list. 29k-calls-a-day statement, measured invisible in the UI.
+/// Pins that an INSERT converges across vantages despite Postgres padding the
+/// column list with spaces.
 #[test]
 fn insert_column_list_respacing_converges_across_vantages() {
     assert_vantages_converge(
@@ -239,8 +236,8 @@ fn insert_column_list_respacing_converges_across_vantages() {
     );
 }
 
-/// Function-call re-spacing (`count(*)` → `count ( * )`) — the other half of the
-/// measured misses, and the reason aggregate SELECTs missed too.
+/// Pins that function-call re-spacing (`count(*)` -> `count ( * )`) converges,
+/// which is what aggregate SELECTs join on.
 #[test]
 fn function_call_respacing_converges_across_vantages() {
     assert_vantages_converge(
@@ -260,8 +257,8 @@ fn function_call_respacing_converges_across_vantages() {
     );
 }
 
-/// Keyword case is already folded for hashing; re-spacing must not depend on it.
-/// (`SELECT COUNT(*)` client vs `SELECT count ( * )` server — both seen live.)
+/// Keyword case is folded for hashing; re-spacing tolerance must not depend on it
+/// (`SELECT COUNT(*)` client vs `SELECT count ( * )` server).
 #[test]
 fn respacing_converges_independently_of_keyword_case() {
     assert_vantages_converge(
@@ -271,9 +268,9 @@ fn respacing_converges_independently_of_keyword_case() {
     );
 }
 
-/// Whitespace-insensitivity must NOT dissolve real distinctions. Statements that
-/// differ in TOKENS stay apart — otherwise the fix trades a miss for a wrong plan,
-/// which is worse: a wrong plan looks authoritative.
+/// Whitespace-insensitivity must not dissolve real distinctions: statements that
+/// differ in TOKENS stay apart. Merging them would attach a wrong plan to a
+/// statement, which reads as authoritative and is worse than a missing one.
 #[test]
 fn respacing_tolerance_does_not_merge_distinct_statements() {
     use super::normalizer::{Dialect, normalize};
@@ -309,11 +306,10 @@ fn respacing_tolerance_does_not_merge_distinct_statements() {
         fp("SELECT ab FROM t"),
         "whitespace between two words was erased, merging an alias into one identifier"
     );
-    // Words following a placeholder keep their own separation. (Note: `? marker`
-    // and `?marker` DO hash alike, and correctly so — no word can begin with `?`,
-    // so the lexer yields the same two tokens either way. What must survive is the
-    // boundary between the WORDS that follow.) Shape taken from the live workload:
-    // `SELECT pg_sleep(?), ? AS marker`.
+    // Words following a placeholder keep their own separation. `? marker` and
+    // `?marker` DO hash alike, correctly so: no word can begin with `?`, so the
+    // lexer yields the same two tokens either way. What must survive is the
+    // boundary between the WORDS that follow.
     assert_ne!(
         fp("SELECT ? AS marker FROM t"),
         fp("SELECT ? marker FROM t"),
@@ -358,9 +354,9 @@ fn respacing_tolerance_does_not_rewrite_display_text() {
     );
 }
 
-/// Convergence must hold through the SERVER-VANTAGE entry point too, not just the
-/// bare normalizer: `fingerprint_statement` is what `canonicalize_top_query` calls,
-/// and it is the function whose output lands in `o2_dbm_fingerprint`.
+/// Convergence must hold through the server-vantage entry point, not just the bare
+/// normalizer: `canonicalize_top_query` calls `fingerprint_statement`, whose output
+/// lands in `o2_dbm_fingerprint`.
 #[test]
 fn server_vantage_entry_point_converges_with_client_span() {
     use super::{

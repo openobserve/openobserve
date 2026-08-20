@@ -16,14 +16,13 @@
 /**
  * Every DBM page has to carry the request-sequence guard.
  *
- * `useDbmRequestSeq` is unit-tested on its own, but the defect this closes was
- * never in the mechanism — it was that no page had one. So the regression worth
- * pinning is the WIRING. On the list pages the token claim and the
- * spinner-clearing now live ONCE, in `useDbmListPage`'s `run` envelope (its
- * spec proves both behaviourally), so what each page must still show in source
- * is: it routes its load through that envelope, and it checks the token before
- * writing anything a response produced. The detail page keeps its own guard
- * and is pinned in full.
+ * `useDbmRequestSeq` is unit-tested on its own, so what is pinned here is the
+ * WIRING — that every page actually carries it. On the list pages the token
+ * claim and the spinner-clearing live once, in `useDbmListPage`'s `run`
+ * envelope (its spec proves both behaviourally), so what each page must show in
+ * source is: it routes its load through that envelope, and it checks the token
+ * before writing anything a response produced. The detail page keeps its own
+ * guard and is pinned in full.
  *
  * Read off the source rather than by mounting: these views need a router, a
  * store and a dozen O2 children to mount, and a harness that heavy would fail
@@ -101,8 +100,8 @@ describe("DBM pages guard against out-of-order responses", () => {
     // The filing path is synchronous — a lookup into what already arrived.
     expect(source).toMatch(/const fileBreakdown = \(row: DatabaseRow\) => \{/);
     expect(source).toMatch(/const fillOpenBreakdowns = \(\) => \{/);
-    // No per-row request survives anywhere in the page: this is the property
-    // the token used to protect, now enforced by absence.
+    // No per-row request survives anywhere in the page — the property the token
+    // would otherwise have to protect, enforced by absence instead.
     expect(source).not.toContain("loadBreakdown");
     expect(source).not.toMatch(/getQueries\(/);
     // The cache AND the section it is filed from are cleared in run's `before`

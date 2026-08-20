@@ -117,12 +117,12 @@ export interface QueryPlansResponse {
    * `on` = capture ran and this statement has no plan, which is normal.
    * Optional because a server predating the field sends nothing at all.
    *
-   * READ IT AS PAST TENSE. The backend derives it from the stream SCHEMA —
+   * Read it as past tense. The backend derives it from the stream SCHEMA —
    * whether `o2_dbm_plan_hash` is present — so it says capture ran at some
-   * point in this stream's history, NOT that it is running now. (With DBM
-   * enabled the server always accepts plan records — the per-signal ingest
-   * knobs are gone — so "on but silent now" can only mean the COLLECTOR
-   * stopped shipping the feed, which `noPlanForQuery`'s copy allows for.)
+   * point in this stream's history, not that it is running now. With DBM
+   * enabled the server always accepts plan records, so "on but silent now" can
+   * only mean the collector stopped shipping the feed, which
+   * `noPlanForQuery`'s copy allows for.
    */
   plan_capture?: "on" | "off";
 }
@@ -193,10 +193,10 @@ function readString(node: Record<string, unknown>, key: string): string | null {
  * costs as STRINGS. Parsed here rather than in the tree walker so neither
  * engine's vocabulary leaks into the other's.
  *
- * Without this a MySQL fleet saw "the plan could not be read" over a plan that
- * had been captured and stored perfectly — the reader is denied the single
- * most actionable fact on the page (`ALL` over 345k rows is the missing index),
- * and the section blames a read that never failed.
+ * Without this a MySQL fleet reads "the plan could not be read" over a plan
+ * captured and stored perfectly, denying the reader the most actionable fact on
+ * the page (`ALL` over a large row count is the missing index) and blaming a
+ * read that never failed.
  */
 function flattenMysqlPlan(queryBlock: unknown): PlanNodeRow[] {
   const out: PlanNodeRow[] = [];
@@ -526,11 +526,8 @@ export function planDriftLevel(res: QueryPlansResponse): PlanDriftLevel {
  * `COMMIT`, `ROLLBACK` or `SHOW`, so those fingerprints legitimately have no
  * plan while capture runs perfectly.
  *
- * Two further states existed while plan ingest sat behind per-signal server
- * knobs (`noExecutionCaptured`, `captureKnobOff` — both branched on flags the
- * server no longer has). With DBM enabled the server always accepts both
- * producers' records, so the schema-presence heuristic above is the whole
- * distinction that remains.
+ * With DBM enabled the server always accepts both producers' records, so the
+ * schema-presence heuristic above is the whole distinction there is to draw.
  */
 export function planEmptyReason(res: QueryPlansResponse): "captureOff" | "noPlanForQuery" | null {
   if ((res.hits?.length ?? 0) > 0) return null;

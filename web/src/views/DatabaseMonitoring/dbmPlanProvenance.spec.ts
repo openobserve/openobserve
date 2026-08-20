@@ -69,8 +69,8 @@ describe("per-row plan provenance", () => {
     const loopAt = section.indexOf('v-for="plan in plans"');
     const beforeLoop = section.slice(0, loopAt);
 
-    // The header must no longer brand EVERY plan an estimate — with two
-    // producers that label is wrong for half the rows.
+    // The header must not brand EVERY plan an estimate — with two producers
+    // that label is wrong for half the rows.
     expect(beforeLoop, "a section-level gap tag calls executed plans estimates").not.toContain(
       'value="gap"',
     );

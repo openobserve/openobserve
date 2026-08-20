@@ -153,7 +153,7 @@ describe("the resolved overlap values do not follow the traced ranking", () => {
     const [, mysqlServer, pgClient] = resolved;
     expect(mysqlServer.time.value).toBeLessThan(pgClient.time.value as number);
     // ...even though the backend ranked the MySQL row HIGHER, on its traced
-    // duration, which is the number no longer on screen.
+    // duration, which is not the number on screen.
     const tracedOrder = CLIENT_ROWS.map((r) => r.total_time_ns);
     expect(tracedOrder[1]).toBeLessThan(tracedOrder[2] as number);
   });

@@ -1010,18 +1010,18 @@ const totalCalls = computed(() =>
  * The window's totals for the two OVERLAP tiles, summed over the SAME vantage
  * the table beneath them is showing.
  *
- * Two rules, and the second is the one that used to be broken:
+ * Two rules:
  *
  *  • Never mix. A total that adds server counts for the statements the
  *    databases reported to traced counts for the rest is a number from no
  *    single population — bigger than either vantage measured, and quotable as
- *    neither. So the tile sums the server figures only when EVERY row on
+ *    neither. So the tile sums the server figures only when every row on
  *    screen resolved to the server, and otherwise stays with the traced total
  *    it can add honestly.
- *  • Follow the table. In FALLBACK mode the table below is the database's own
- *    list, and these tiles kept summing a trace vantage that returned nothing
- *    — four figures describing rows that are not on screen. They now sum the
- *    fallback rows.
+ *  • Follow the table. In fallback mode the table below is the database's own
+ *    list, so the tiles sum the fallback rows; summing a trace vantage that
+ *    returned nothing would put four figures on screen describing rows that
+ *    are not.
  */
 const overlapTotals = computed(() => {
   // Fallback mode: the table IS the server list, so the tiles are its totals.
@@ -1211,12 +1211,11 @@ const filterEntry = createDbmFilterEntry(() => {
  * as `database: orders-db` rather than a bare value with no subject.
  */
 const dimensionFilters = computed<DbmScopeFilter[]>(() => {
-  // In fallback mode the options must describe the list ON SCREEN. Every
-  // `options:` below used to derive from `rows` alone — which is empty exactly
-  // when the fallback fires — so hoisting the control out of the client
-  // table's toolbar (see the template) would otherwise have produced five
-  // empty selects. The server rows are unioned in, so the values offered are
-  // the values the visible table actually contains.
+  // In fallback mode the options must describe the list ON SCREEN. Deriving
+  // each `options:` below from `rows` alone gives five empty selects, because
+  // `rows` is empty exactly when the fallback fires. The server rows are
+  // unioned in, so the values offered are the values the visible table actually
+  // contains.
   const serverList = serverListShown.value ? filteredServerRows.value : [];
 
   const instance = filterEntry({
@@ -1417,11 +1416,10 @@ const loadQueries = async (token: number) => {
     baselineStartTime: baselineWindow.value.startTime,
     baselineEndTime: baselineWindow.value.endTime,
     // The database-reported fallback rides THIS response when the client
-    // answer is an exact zero. It used to be a second, SEQUENTIAL request
-    // issued after this one landed — on the deployment where it always fires
-    // (collector wired, no traced traffic), that was two round trips before
-    // anything could be drawn. The server runs the same conditional `/badges`
-    // has always run, so the tab and its badge still fall back together.
+    // answer is an exact zero, rather than costing a second sequential request
+    // on exactly the deployment where it always fires (collector wired, no
+    // traced traffic). The server runs the same conditional `/badges` runs, so
+    // the tab and its badge fall back together.
     includeServerFallback: true,
   });
 
@@ -1468,12 +1466,12 @@ const loadQueries = async (token: number) => {
   // vantage is honestly empty; a populated table clears it so stale server rows
   // can never sit under a live client ranking.
   //
-  // It arrives WITH this response now (`include_server_fallback`), so the
-  // skeleton covers it for free — there is no second read for the spinner to
-  // race. That timing used to be delicate: the empty client answer lands in
-  // milliseconds on an org with no trace streams, so clearing `loading` before
-  // the fallback returned popped the empty state with no visible loading at
-  // all, only for the fallback table to appear beneath it half a second later.
+  // It arrives WITH this response (`include_server_fallback`), so the skeleton
+  // covers it for free and there is no second read for the spinner to race.
+  // Fetching it separately makes the timing delicate: the empty client answer
+  // lands in milliseconds on an org with no trace streams, so `loading` clears
+  // before the fallback returns, popping the empty state with no visible
+  // loading at all and the fallback table appearing beneath it later.
   //
   // A `null` section is not an empty one. The fallback reads a LOGS stream
   // while this page's own read is Traces-auth, so a reader can be entitled to
@@ -1992,13 +1990,12 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
   // column legitimately mixes vantages (a statement the databases never
   // reported keeps its traced count).
   //
-  // NOT SORTABLE, and it cannot become sortable without a different read.
+  // Not sortable, and it cannot become sortable without a different read.
   // The backend ranks on the TRACED count and truncates to that ranking
   // (`sort_rows` then `hits.truncate(limit)`) BEFORE these server counters are
   // joined on here, in the browser. So the ordering and the printed figure are
-  // two different numbers, and offering the sort meant a descending column
-  // whose top row showed a smaller value than rows beneath it — measured on
-  // the live fleet as 35 inversions across 100 rows.
+  // two different numbers, and offering the sort yields a descending column
+  // whose top row shows a smaller value than rows beneath it.
   //
   // The three ways out and why none is taken: re-sorting client-side ranks
   // only the survivors of the traced top-N (live: 100 of 130 rows), so it
@@ -2050,17 +2047,17 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
   },
   {
     // The id IS the backend sort key, so the cell slot is `#cell-total_time_ns`.
-    // It remains the page's DEFAULT ranking (`sortBy`) — what changed is that
-    // the header no longer offers it as a column sort.
+    // It is the page's default ranking (`sortBy`), but the header does not
+    // offer it as a column sort.
     id: "total_time_ns",
     header: t("dbm.queries.columns.load"),
     accessorKey: "total_time_ns",
     size: 190,
-    // NOT SORTABLE, for the reason spelled out on the calls column above, with
-    // one dimension more: this column's values are not even the same UNIT
-    // across rows. `exec_time_s` is EXECUTION time on Postgres and WAIT time
+    // Not sortable, for the reason spelled out on the calls column above, with
+    // one dimension more: this column's values are not even the same unit
+    // across rows. `exec_time_s` is execution time on Postgres and wait time
     // on MySQL/MariaDB, while a row that fell back to traces is round-trip
-    // INCLUDING network and pool wait. Ranking those against each other reads
+    // including network and pool wait. Ranking those against each other reads
     // three measures as one, which is the misreading the per-row qualifier
     // exists to prevent.
     sortable: false,
@@ -2124,11 +2121,11 @@ const defaultColumnVisibility = { p99_ns: false, max_ns: false, services: false 
  *
  * This is the REQUEST whitelist — which keys the endpoint accepts — and it is
  * deliberately WIDER than the set of sortable headers. `total_time_ns` is the
- * page's default ranking and `calls` can arrive in a URL, so both must still
- * be sendable; neither is offered as a column sort, because the figures those
- * two columns DISPLAY are resolved server-first and no longer match the field
- * the backend ranks on. Do not prune this list to match the headers: that
- * would drop the default ranking the page opens with.
+ * page's default ranking and `calls` can arrive in a URL, so both must be
+ * sendable; neither is offered as a column sort, because the figures those two
+ * columns display are resolved server-first and do not match the field the
+ * backend ranks on. Do not prune this list to match the headers: that would
+ * drop the default ranking the page opens with.
  */
 const SORT_KEYS: QuerySortKey[] = [
   "calls",
@@ -2183,7 +2180,7 @@ const openQueryDetail = (row: QueryRow, tab?: string) => {
  *
  * A reload is mandatory, not cosmetic: the baseline window IS one of the two
  * fetches, so leaving the old response in place would print deltas and insights
- * against a window the toolbar no longer names.
+ * against a window the toolbar does not name.
  */
 const onBaselineChange = (value: unknown) => {
   if (value !== "previous" && value !== "yesterday") return;
@@ -2269,9 +2266,9 @@ const syncUrl = () => {
 };
 
 /**
- * Every cause resolves to an action — `not-instrumented` is the default on a
- * fresh install, and it used to fall through here and do nothing, which made
- * the most prominent button on an empty page a dead click.
+ * Every cause resolves to an action, including `not-instrumented` — the default
+ * on a fresh install. A cause that falls through here makes the most prominent
+ * button on an empty page a dead click.
  */
 const onEmptyAction = (cause: DbmEmptyCauseId) => {
   switch (dbmEmptyAction(cause)) {

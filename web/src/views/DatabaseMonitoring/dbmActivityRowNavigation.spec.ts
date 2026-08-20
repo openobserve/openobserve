@@ -18,12 +18,9 @@
  *
  * `activityQueryDetailTarget` decides WHERE a row goes and is unit-tested on
  * its own in `utils/dbm/activity.spec.ts` — including the refusal to navigate a
- * session that names no query. But the defect this closes was never in that
- * decision: it was that the page had no row navigation at all, so an operator
- * watching one session saturate an instance retyped its fingerprint into the
- * Queries search. The regression worth pinning here is therefore the WIRING —
- * that the table binds a row click, and that the handler routes through the
- * helper rather than assembling a route of its own.
+ * session that names no query. What is pinned here is the WIRING: that the
+ * table binds a row click, and that the handler routes through the helper
+ * rather than assembling a route of its own.
  *
  * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
  */

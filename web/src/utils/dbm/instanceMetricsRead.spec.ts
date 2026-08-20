@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   DBM_METRIC_STREAM_NAMES,
   collectInstanceMetrics,
+  foldServerInstanceMetrics,
   type DbmMetricStreamReader,
 } from "./instanceMetricsRead";
 import { DBM_INSTANCE_METRICS } from "./instanceMetrics";
@@ -433,5 +434,136 @@ describe("collectInstanceMetrics", () => {
       fieldsByStream: new Map([["mysql_threads", new Set(["kind"])]]),
     });
     expect(result.metricsByKey.get("postgresql|pgprod-1")?.connections?.latest).toBe(20);
+  });
+});
+
+describe("foldServerInstanceMetrics", () => {
+  /** One wire row, as the server's UNION arm projects it. */
+  const hit = (
+    role: string,
+    system: string,
+    instance: string,
+    value: number,
+    timestamp: number,
+    series: string | null = null,
+  ) => ({ role, system, instance, series, value, _timestamp: timestamp });
+
+  /** The server's declaration of a stream it actually swept. */
+  const swept = (stream: string) => {
+    const spec = DBM_INSTANCE_METRICS.find((candidate) => candidate.stream === stream);
+    if (!spec) throw new Error(`no such stream in the catalog: ${stream}`);
+    return {
+      stream: spec.stream,
+      role: spec.role,
+      system: spec.system,
+      cumulative: spec.cumulative,
+      aggregate: spec.aggregate,
+    };
+  };
+
+  it("keys a reading under (engine, host) with the port stripped", () => {
+    const { metricsByKey } = foldServerInstanceMetrics(
+      [hit("connections", "postgresql", "pg-1.internal:5432", 12, 1_000)],
+      [swept("postgresql_backends")],
+    );
+    expect(metricsByKey.get("postgresql|pg-1.internal")?.connections?.latest).toBe(12);
+  });
+
+  /**
+   * `connections` is served by both `postgresql_backends` and `mysql_threads`,
+   * so a fold grouping by role alone would key a MySQL endpoint under
+   * Postgres's identity column and produce a key that joins to nothing — a
+   * blank health column with a full result set behind it.
+   */
+  it("routes one role served by two engines to the right engine each", () => {
+    const { metricsByKey } = foldServerInstanceMetrics(
+      [
+        hit("connections", "postgresql", "pg-1:5432", 7, 1_000),
+        hit("connections", "mysql", "my-1:3306", 40, 1_000),
+      ],
+      [swept("postgresql_backends"), swept("mysql_threads")],
+    );
+    expect(metricsByKey.get("postgresql|pg-1")?.connections?.latest).toBe(7);
+    expect(metricsByKey.get("mysql|my-1")?.connections?.latest).toBe(40);
+    // And neither leaked into the other's key.
+    expect(metricsByKey.get("postgresql|my-1")).toBeUndefined();
+    expect(metricsByKey.get("mysql|pg-1")).toBeUndefined();
+  });
+
+  it("sums the per-database series into one instance figure", () => {
+    const { metricsByKey } = foldServerInstanceMetrics(
+      [
+        hit("connections", "postgresql", "pg-1:5432", 3, 2_000, "app"),
+        hit("connections", "postgresql", "pg-1:5432", 5, 2_000, "reports"),
+      ],
+      [swept("postgresql_backends")],
+    );
+    expect(metricsByKey.get("postgresql|pg-1")?.connections?.latest).toBe(8);
+  });
+
+  /**
+   * A cumulative counter reports its window DELTA, not its reading — the rule
+   * `foldMetricRows` owns, exercised here through the server shape so the
+   * adapter cannot quietly bypass it by mislabelling the spec.
+   */
+  it("differences a cumulative counter rather than reporting its reading", () => {
+    const { metricsByKey } = foldServerInstanceMetrics(
+      [
+        hit("deadlocks", "postgresql", "pg-1:5432", 100, 1_000, "app"),
+        hit("deadlocks", "postgresql", "pg-1:5432", 106, 2_000, "app"),
+      ],
+      [swept("postgresql_deadlocks")],
+    );
+    expect(metricsByKey.get("postgresql|pg-1")?.deadlocks?.latest).toBe(6);
+  });
+
+  /** One sample of a counter differences to nothing — unknown, not zero. */
+  it("reports null for a counter with a single sample", () => {
+    const { metricsByKey } = foldServerInstanceMetrics(
+      [hit("deadlocks", "postgresql", "pg-1:5432", 100, 1_000, "app")],
+      [swept("postgresql_deadlocks")],
+    );
+    expect(metricsByKey.get("postgresql|pg-1")?.deadlocks?.latest).toBeNull();
+  });
+
+  /** An instance's lag is its WORST replica's, never their sum. */
+  it("takes the max across replicas for replication lag", () => {
+    const { metricsByKey } = foldServerInstanceMetrics(
+      [
+        hit("replicationLag", "postgresql", "pg-1:5432", 400, 2_000, "10.0.0.1"),
+        hit("replicationLag", "postgresql", "pg-1:5432", 900, 2_000, "10.0.0.2"),
+      ],
+      [swept("postgresql_replication_data_delay")],
+    );
+    expect(metricsByKey.get("postgresql|pg-1")?.replicationLag?.latest).toBe(900);
+  });
+
+  /**
+   * `single` must not be summed: one reading per instance repeated across
+   * scrapes, and summing the repeats multiplies the denominator and halves
+   * every saturation figure on the page.
+   */
+  it("does not sum a repeated single-valued limit", () => {
+    const { metricsByKey } = foldServerInstanceMetrics(
+      [
+        hit("connectionLimit", "postgresql", "pg-1:5432", 100, 1_000),
+        hit("connectionLimit", "postgresql", "pg-1:5432", 100, 2_000),
+      ],
+      [swept("postgresql_connection_max")],
+    );
+    expect(metricsByKey.get("postgresql|pg-1")?.connectionLimit?.latest).toBe(100);
+  });
+
+  it("ignores rows whose stream the server never reported sweeping", () => {
+    const { metricsByKey } = foldServerInstanceMetrics(
+      [hit("deadlocks", "postgresql", "pg-1:5432", 5, 1_000, "app")],
+      [swept("postgresql_backends")],
+    );
+    expect(metricsByKey.size).toBe(0);
+  });
+
+  it("is empty, not thrown, for an empty sweep", () => {
+    expect(foldServerInstanceMetrics([], []).metricsByKey.size).toBe(0);
+    expect(foldServerInstanceMetrics([], []).failedStreams).toEqual([]);
   });
 });

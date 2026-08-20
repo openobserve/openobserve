@@ -61,16 +61,16 @@ describe("groupNavLinks", () => {
     // changes shape — it collapses into the Reliability tile in its own slot —
     // and traces, which keeps its slot but gains its NAV_SUBNAV flyout. Infra
     // is the one INSERTION: it absorbs nothing, so it adds a tile rather than
-    // replacing one, anchored directly after Traces.
+    // replacing one, anchored directly after Reliability.
     expect(keysOf(groupNavLinks(input))).toEqual([
       "link:home",
       "link:logs",
       "link:metrics",
       "linkGroup:traces",
-      "linkGroup:infra",
       "link:rum",
       "link:dashboards",
       "linkGroup:reliability",
+      "linkGroup:infra",
       "link:iam",
       "link:settings",
     ]);
@@ -421,13 +421,34 @@ describe("groupNavLinks", () => {
     expect(infra?.children.map((c) => c.name)).toEqual(["dbmDatabases"]);
   });
 
-  it("anchors Infra directly after Traces", () => {
-    const entries = groupNavLinks([link("home"), link("traces"), link("rum")]);
+  it("anchors Infra directly after Reliability", () => {
+    const entries = groupNavLinks([link("home"), link("traces"), link("alertList"), link("iam")]);
     expect(keysOf(entries)).toEqual([
       "link:home",
       "linkGroup:traces",
+      "linkGroup:reliability",
       "linkGroup:infra",
-      "link:rum",
+      "link:iam",
+    ]);
+  });
+
+  it("puts Infra ahead of Data when both are anchored to Reliability", () => {
+    // Both groups name `reliability` as their anchor, so the anchor alone does
+    // not decide which of the two lands first — NAV_GROUPS declaration order
+    // does. Infra is declared before Data precisely so it sits immediately
+    // below the Reliability tile, with Data following it.
+    const entries = groupNavLinks([
+      link("home"),
+      link("streams"),
+      link("pipeline"),
+      link("alertList"),
+      link("sloList"),
+    ]);
+    expect(keysOf(entries)).toEqual([
+      "link:home",
+      "linkGroup:reliability",
+      "linkGroup:infra",
+      "linkGroup:data",
     ]);
   });
 
@@ -470,10 +491,11 @@ describe("groupNavLinks", () => {
     }
   });
 
-  it("still emits Infra when Traces is hidden (anchor absent → default placement)", () => {
-    // custom_hide_menus can remove Traces. Infra absorbs nothing, so it has no
-    // first-absorbed slot to fall back to and lands via the safety net — it must
-    // still appear, since Database Monitoring does not depend on Traces.
+  it("still emits Infra when Reliability is absent (anchor absent → default placement)", () => {
+    // custom_hide_menus can remove Alerts, and with it the Reliability tile.
+    // Infra absorbs nothing, so it has no first-absorbed slot to fall back to
+    // and lands via the safety net — it must still appear, since Database
+    // Monitoring does not depend on Reliability.
     const entries = groupNavLinks([link("home"), link("logs")]);
     expect(infraGroup(entries)).toBeTruthy();
     expect(keysOf(entries)).toEqual(["link:home", "link:logs", "linkGroup:infra"]);

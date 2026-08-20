@@ -102,16 +102,16 @@ describe("recommendations section wiring", () => {
   });
 
   /**
-   * THE VOLUME FIX. `buildRecommendations` emits one entry PER DETECTED ITEM,
-   * so a database with fifteen blocked sessions rendered fifteen list items and
-   * the strip became a wall nobody read. The page must render the COLLAPSED
-   * list — one row per rule — rather than iterating the raw one.
+   * `buildRecommendations` emits one entry per detected item, so a database
+   * with fifteen blocked sessions would render fifteen list items and the strip
+   * becomes a wall nobody reads. The page must render the collapsed list — one
+   * row per rule — rather than iterating the raw one.
    */
   it("renders one row per rule, not one per detected item", () => {
     const src = source();
     expect(src).toContain("collapseRecommendations");
-    // The v-for must walk the collapsed list. Iterating `recommendations`
-    // directly is the uncapped rendering this replaced.
+    // The v-for must walk the collapsed list; iterating `recommendations`
+    // directly is the uncapped rendering.
     expect(src).toMatch(/v-for="entry in collapsedRecommendations"/);
     expect(src).not.toMatch(/v-for="rec in recommendations"/);
   });

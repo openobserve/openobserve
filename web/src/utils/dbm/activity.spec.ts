@@ -444,11 +444,10 @@ describe("buildWaitBreakdown", () => {
   });
 
   /**
-   * But `share: 0` beside a NON-ZERO session count is arithmetically
+   * But `share: 0` beside a non-zero session count is arithmetically
    * impossible: the backend emits `0.0` as its divide-by-zero fallback when the
-   * aggregate total comes out zero (a column-alias regression makes every
-   * `sessions` read as 0). Rendering that as a confident "0%" next to "4,710
-   * sessions" is a wrong number stated with certainty, so it degrades to no
+   * aggregate total comes out zero. Rendering that as a confident "0%" next to
+   * "4,710 sessions" states a wrong number with certainty, so it degrades to no
    * share at all.
    */
   it("refuses a zero share that contradicts a non-zero session count", () => {

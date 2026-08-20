@@ -17,10 +17,9 @@
  * The OVERLAP resolver: which vantage supplies a measure both of them can.
  *
  * Two figures on the query page — total database time, and the call count —
- * exist in both feeds. The page used to print the trace-derived one under a
- * vantage-qualified heading and the server one again, lower down, under a
- * second heading. A reader comparing them found two different numbers for one
- * question and had to work out which to quote.
+ * exist in both feeds. Printing both, each under its own vantage-qualified
+ * heading, gives a reader two different numbers for one question and leaves
+ * them to work out which to quote.
  *
  * **The database server wins.** It counts every client, traced or not, and it
  * measures the work the engine actually did. The trace vantage sees only
@@ -29,8 +28,8 @@
  * demoted to a second line, which would restore the same two-numbers problem in
  * smaller type.
  *
- * **The engine qualifier is not optional.** `exec_time_s` is EXECUTION time on
- * Postgres and WAIT time on MySQL/MariaDB. Under a generic "Database time"
+ * **The engine qualifier is not optional.** `exec_time_s` is execution time on
+ * Postgres and wait time on MySQL/MariaDB. Under a generic "Database time"
  * heading with no qualifier, a MySQL wait figure reads as execution time — a
  * misreading that sends a DBA to optimise a query that was only ever queueing.
  * So the generic label always ships with `qualifierKey`, and there is no code

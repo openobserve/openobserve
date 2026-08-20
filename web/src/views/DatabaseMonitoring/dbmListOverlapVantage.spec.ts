@@ -121,7 +121,7 @@ describe("QueriesPage sources its overlap measures from the database", () => {
     const cell = cellSlot(source, "total_time_ns");
     expect(cell).toContain("row.overlapTime.value");
     expect(cell).toContain("row.overlapTime.qualifierKey");
-    // The raw traced duration no longer feeds the cell.
+    // The raw traced duration must not feed the cell.
     expect(cell).not.toMatch(/:total-time-ns="row\.total_time_ns"/);
   });
 

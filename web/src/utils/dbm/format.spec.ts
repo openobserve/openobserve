@@ -332,8 +332,8 @@ describe("badgeCount — a tab badge may not show a cap as a total", () => {
   });
 
   it("marks a floor at any cap, not just the default 100", () => {
-    // Pins the RULE, not the one fixture the bug was found at — a hard-coded
-    // `count === 100` check would pass the case above and fail here.
+    // Pins the rule rather than one fixture: a hard-coded `count === 100` check
+    // would pass the case above and fail here.
     expect(badgeCount({ count: 1000, complete: false })).toBe("1000+");
     expect(badgeCount({ count: 7, complete: false })).toBe("7+");
   });
@@ -445,9 +445,9 @@ describe("formatAge", () => {
   });
 
   /**
-   * The unification pin: two pages used to cap this at minutes, so a
-   * three-hour-old sample printed "180m ago" — arithmetic handed back to the
-   * reader. Every page now climbs to hours and days.
+   * Every page climbs to hours and days rather than capping at minutes, so a
+   * three-hour-old sample never prints "180m ago" and hands arithmetic back to
+   * the reader.
    */
   it("says 3h ago, never 180m ago", () => {
     vi.useFakeTimers();

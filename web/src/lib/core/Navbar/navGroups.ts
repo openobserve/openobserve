@@ -206,52 +206,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
     ],
   },
   {
-    key: "data",
-    titleKey: "menu.data",
-    icon: "database",
-    parentLink: "/streams",
-    absorbs: ["streams", "pipeline", "ingestion"],
-    // Data follows the Reliability tile. This is load-bearing: without it Data
-    // lands at its own first absorbed item (pipeline/streams), near the TOP of
-    // the rail, ahead of Experience and Dashboards.
-    placeAfter: "reliability",
-    children: [
-      { titleKey: "menu.index", icon: "window", name: "logstreams", requires: "streams" },
-      // Pipeline expands into its own tabbed sub-pages (same visibility rules).
-      {
-        titleKey: "function.streamPipeline",
-        icon: "lan",
-        name: "pipelines",
-        requires: "pipeline",
-        gate: "streamPipelines",
-      },
-      { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
-      {
-        titleKey: "function.enrichmentTables",
-        icon: "dataset",
-        name: "enrichmentTables",
-        requires: "pipeline",
-      },
-      {
-        titleKey: "menu.ingestion",
-        icon: "data-plus-line",
-        name: "ingestion",
-        requires: "ingestion",
-      },
-    ],
-  },
-  {
-    key: "dashboards",
-    titleKey: "menu.dashboard",
-    icon: "dashboard",
-    parentLink: "/dashboards",
-    absorbs: ["dashboards", "reports"],
-    children: [
-      { titleKey: "menu.dashboard", icon: "dashboard", name: "dashboards", requires: "dashboards" },
-      { titleKey: "menu.report", icon: "description", name: "reports", requires: "reports" },
-    ],
-  },
-  {
     key: "infra",
     titleKey: "menu.infra",
     icon: "dns",
@@ -265,11 +219,17 @@ export const NAV_GROUPS: NavGroupDef[] = [
     // which is also what lets it render as a single-child group for now.
     absorbs: [],
     standalone: true,
-    // Directly after Traces. Infra reads the same telemetry from the
-    // infrastructure side that Traces reads from the request side, so the two
-    // sit together; and this is where a user who knew Database Monitoring as a
-    // Traces flyout child will look for it first.
-    placeAfter: "traces",
+    // Directly after Reliability, ahead of Data. Database Monitoring is read
+    // the way Alerts/SLOs/Incidents are — you arrive because something is slow
+    // or stuck — so Infra belongs with the operational tiles rather than up
+    // among the telemetry explorers.
+    //
+    // Data names the SAME anchor, so the anchor alone does not order the two:
+    // `emitAfter` collects anchored groups in NAV_GROUPS declaration order.
+    // Infra is therefore declared BEFORE Data in this array, which is what puts
+    // it immediately below the Reliability tile. Moving it back below Data here
+    // would silently drop it one slot.
+    placeAfter: "reliability",
     children: [
       // Moved here from the Traces flyout. The routes are always registered
       // (the guard redirects when the feature is off), so the `gate` is what
@@ -310,6 +270,53 @@ export const NAV_GROUPS: NavGroupDef[] = [
           "dbmTableHealth",
         ],
       },
+    ],
+  },
+  {
+    key: "data",
+    titleKey: "menu.data",
+    icon: "database",
+    parentLink: "/streams",
+    absorbs: ["streams", "pipeline", "ingestion"],
+    // Data follows the Reliability tile — after Infra, which names the same
+    // anchor and is declared ahead of it. This is load-bearing: without it Data
+    // lands at its own first absorbed item (pipeline/streams), near the TOP of
+    // the rail, ahead of Experience and Dashboards.
+    placeAfter: "reliability",
+    children: [
+      { titleKey: "menu.index", icon: "window", name: "logstreams", requires: "streams" },
+      // Pipeline expands into its own tabbed sub-pages (same visibility rules).
+      {
+        titleKey: "function.streamPipeline",
+        icon: "lan",
+        name: "pipelines",
+        requires: "pipeline",
+        gate: "streamPipelines",
+      },
+      { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
+      {
+        titleKey: "function.enrichmentTables",
+        icon: "dataset",
+        name: "enrichmentTables",
+        requires: "pipeline",
+      },
+      {
+        titleKey: "menu.ingestion",
+        icon: "data-plus-line",
+        name: "ingestion",
+        requires: "ingestion",
+      },
+    ],
+  },
+  {
+    key: "dashboards",
+    titleKey: "menu.dashboard",
+    icon: "dashboard",
+    parentLink: "/dashboards",
+    absorbs: ["dashboards", "reports"],
+    children: [
+      { titleKey: "menu.dashboard", icon: "dashboard", name: "dashboards", requires: "dashboards" },
+      { titleKey: "menu.report", icon: "description", name: "reports", requires: "reports" },
     ],
   },
   {

@@ -20,14 +20,12 @@
 //! verbatim. If a collector release renames a field, these fail loudly rather than silently
 //! returning empty events.
 //!
-//! DEADLOCK / BLOCKING / CHAIN-ASSEMBLY UNIT TESTS MOVED TO ENTERPRISE. Their
-//! subjects (`canonicalize_pg_deadlock`, `canonicalize_blocking`,
-//! `assemble_chains`, …) now live in `o2_enterprise::enterprise::db_monitoring`
-//! and their tests moved with them, verbatim, to that crate's
-//! `db_monitoring/tests.rs`. What stays here is the handful that call the OSS
-//! DISPATCHER, [`canonicalize_record`] — the property they pin is which arm
-//! claims a record, which is only observable from this side of the boundary.
-//! Those run on the enterprise build and are gated accordingly.
+//! The deadlock/blocking/chain-assembly canonicalizers (`canonicalize_pg_deadlock`,
+//! `canonicalize_blocking`, `assemble_chains`, …) live in
+//! `o2_enterprise::enterprise::db_monitoring` and are unit-tested in that crate's
+//! `db_monitoring/tests.rs`. What lives here calls the OSS DISPATCHER,
+//! [`canonicalize_record`], to pin which arm claims a record — a property only
+//! observable from this side of the boundary. Those tests are enterprise-gated.
 
 use std::collections::BTreeMap;
 
@@ -114,11 +112,10 @@ fn pg_blocking_record() -> Map<String, Value> {
     }))
 }
 
-/// Proof — a row the SHIPPED SQL Server deadlock shred actually returned against
-/// the rig (`tests/dbm-server-vantage/captures/mssql-deadlock.xml`). Kept here
-/// because the W8 recipe-classification tests below feed one realistic row per
-/// shipped recipe tag, `mssql_deadlock` included; the deadlock CANONICALIZER's
-/// own tests moved to enterprise along with their copy of this fixture.
+/// A row the shipped SQL Server deadlock shred returns against the rig
+/// (`tests/dbm-server-vantage/captures/mssql-deadlock.xml`). Used by the W8
+/// recipe-classification tests below, which feed one realistic row per shipped
+/// recipe tag; the deadlock canonicalizer's own tests live in enterprise.
 fn mssql_deadlock_row(spid: &str, victim: &str, query: &str) -> Map<String, Value> {
     obj(json!({
         "_timestamp": 1_786_166_303_139_783i64,
@@ -137,11 +134,10 @@ fn mssql_deadlock_row(spid: &str, victim: &str, query: &str) -> Map<String, Valu
 
 // ─── Dispatch: which arm claims which record ─────────────────────────────────
 //
-// These call the OSS DISPATCHER, so they stay here even though their subjects
-// moved. On an enterprise build the two hooks canonicalize and the assertions
-// are the ones that shipped; on OSS the same records are enterprise-owned and
-// must yield NOTHING rather than leaking into a neighbouring arm — asserted by
-// `enterprise_owned_records_do_not_canonicalize_on_oss` below.
+// These call the OSS DISPATCHER, so they belong here even though their subjects
+// are enterprise-owned. On an enterprise build the two hooks canonicalize; on OSS
+// the same records must yield NOTHING rather than leak into a neighbouring arm,
+// asserted by `enterprise_owned_records_do_not_canonicalize_on_oss` below.
 
 #[cfg(feature = "enterprise")]
 #[test]
@@ -277,24 +273,19 @@ fn enterprise_owned_records_do_not_canonicalize_on_oss() {
     );
 }
 
-/// **Where the enterprise hooks are CALLED, pinned.**
+/// Pins WHERE the two enterprise hooks sit in the dispatcher: hook 1 above
+/// `explain`/`statement_duration`, hook 2 below them. A record carrying BOTH an
+/// `o2_pg_event` value and an `o2_recipe` tag makes the ordering observable, and
+/// is constructible by anyone who can POST to `/_json`, since the logs paths
+/// flatten caller keys straight onto the record.
 ///
-/// Task 2 placed the two hooks at the exact positions the deadlock and
-/// recipe-tag arms occupied: hook 1 above `explain`/`statement_duration`, hook 2
-/// below them. That PLACEMENT is the only thing left that can regress, and a
-/// record carrying BOTH an `o2_pg_event` value and an `o2_recipe` tag —
-/// constructible by anyone who can POST to `/_json`, since the logs paths
-/// flatten caller keys straight onto the record — is what makes it observable.
-///
-/// 🚨 A test that called `claim_recipe_tags` / `claim_deadlock_markers` DIRECTLY
-/// would be vacuous. Both decline non-matching records by their first line, so
-/// such a test passes against a correct hook, a broken hook, and an empty map
-/// alike; it could not detect a worker hoisting hook 2 above the
-/// `statement_duration` arm, which is the exact regression this exists to catch.
-/// The property is only observable through `canonicalize_record`, so that is
-/// what is called, and the records are built from the REAL fixtures so each arm
-/// genuinely matches — an arm that fails its internal checks returns `None` and
-/// the assertion would prove nothing.
+/// Calling `claim_recipe_tags` / `claim_deadlock_markers` directly would be
+/// vacuous: both decline non-matching records on their first line, so such a test
+/// passes against a correct hook, a broken hook, and an empty map alike, and
+/// cannot see hook 2 hoisted above the `statement_duration` arm. Only
+/// `canonicalize_record` exposes the ordering. The records are built from the REAL
+/// fixtures so every arm genuinely matches — an arm that fails its internal checks
+/// returns `None`, and the assertion would prove nothing.
 #[cfg(feature = "enterprise")]
 #[test]
 fn enterprise_hooks_do_not_shadow_oss_arms() {
@@ -377,11 +368,10 @@ fn enterprise_hooks_do_not_shadow_oss_arms() {
 
 // ─── Deliverable D: cross-path fingerprint equality ─────────────────────────
 
-/// THE correlation guarantee: a statement fingerprinted from a SERVER log record
+/// The correlation guarantee: a statement fingerprinted from a SERVER log record
 /// must equal the fingerprint the CLIENT span enrichment computes for the same
-/// statement. Proof §2.6 observed byte-identical normalized text across vantages;
-/// this pins it as a contract so a normalizer change can never silently break the
-/// join that makes deadlocks clickable.
+/// statement, byte-identical normalized text included. This fingerprint is the
+/// join key that makes a deadlock clickable through to its query.
 #[test]
 fn server_vantage_fingerprint_matches_span_path_fingerprint() {
     let statement = "SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'ACME-42'";
@@ -440,15 +430,13 @@ fn empty_statement_yields_no_fingerprint() {
     );
 }
 
-// ─── Ingest wiring (regression: the OTLP path was never canonicalized) ────────
+// ─── Ingest wiring ───────────────────────────────────────────────────────────
 
-/// EVERY logs ingest path must call [`server_vantage::apply_to_record`].
-///
-/// Regression guard for a live end-to-end failure: canonicalization was inlined in
-/// `logs/ingest.rs` (the JSON `/_json` + `/_bulk` path) ONLY, while every shipped collector
-/// recipe exports over OTLP to `/v1/logs`, which is handled by `logs/otlp.rs`. Real captured
-/// deadlocks therefore landed with their raw `dl_*` fields and ZERO `o2_dbm_*` columns, and
-/// `GET /traces/db_monitoring/deadlocks` returned nothing — with no error anywhere.
+/// EVERY logs ingest path must call [`server_vantage::apply_to_record`]: the JSON
+/// `/_json` + `/_bulk` path in `logs/ingest.rs`, and the OTLP `/v1/logs` path in
+/// `logs/otlp.rs` that every shipped collector recipe exports to. A path that
+/// assembles records without it drops all `o2_dbm_*` columns silently — the reads
+/// then return nothing, with no error anywhere.
 ///
 /// A behavioral unit test cannot catch a MISSING call site, so this asserts on the source: any
 /// new logs ingest path must either call the helper or consciously update this list.
@@ -470,20 +458,19 @@ fn every_logs_ingest_path_applies_canonicalization() {
     }
 }
 
-// ─── Storage shape (regression: nested values kill the whole ingest batch) ────
+// ─── Storage shape: nested values kill the whole ingest batch ─────────────────
 
 /// Every canonical value must be a SCALAR.
 ///
-/// Regression guard for a live end-to-end failure. `config::utils::schema` infers the logs
-/// schema from the record and hard-errors with "Cannot infer schema from non-basic type value"
-/// on any array/object — and that error rejects the ENTIRE ingest batch, so one deadlock record
-/// silently discarded every log shipped alongside it. Canonicalization runs AFTER flattening (it
-/// must — it reads the flattened receiver fields), so nothing downstream will flatten a nested
-/// value we emit here. `o2_dbm_participants` is therefore a JSON string.
+/// `config::utils::schema` infers the logs schema from the record and hard-errors with
+/// "Cannot infer schema from non-basic type value" on any array/object, and that error
+/// rejects the ENTIRE ingest batch — one deadlock record would discard every log shipped
+/// alongside it. Canonicalization runs AFTER flattening (it must: it reads the flattened
+/// receiver fields), so nothing downstream flattens a nested value emitted here.
+/// `o2_dbm_participants` is therefore a JSON string.
 ///
-/// Both fixtures are enterprise-owned, so this runs on the enterprise build.
-/// The scalar invariant itself is `config`-wide; the enterprise suite carries
-/// its own writers' half.
+/// Both fixtures are enterprise-owned, so this runs on the enterprise build; the
+/// enterprise suite carries the writers' half of the same invariant.
 #[cfg(feature = "enterprise")]
 #[test]
 fn canonical_record_contains_only_scalars() {
@@ -556,30 +543,26 @@ fn mssql_blocking_survives_the_ingest_entry_point() {
 
 // ─── The three-way tag contract ──────────────────────────────────────────────
 //
-// WHY A SOURCE-SCRAPING TEST. The `o2_recipe` / `o2_*_event` tags are a contract
-// between three files in three languages that no compiler connects:
+// The `o2_recipe` / `o2_*_event` tags are a contract between three files in three
+// languages that no compiler connects:
 //
 //   1. web/.../dbmShared.ts        — the recipes we SHIP; they stamp the tags.
 //   2. server_vantage.rs           — the dispatcher; it matches on the tags.
 //   3. tests/dbm-server-vantage/   — the capture rig; it must EXERCISE them.
 //
 // Rename a tag on any one side and the other two keep compiling, keep passing
-// their own unit tests, and the product silently stops canonicalizing: records
-// land in `dbm_server` with raw collector fields and zero `o2_dbm_*` columns, so
-// the Deadlocks / Blocked-queries pages read "collecting, but nothing here".
-// That is the worst failure shape this feature has, and it has already happened
-// twice (see `every_logs_ingest_path_applies_canonicalization` above).
+// their own unit tests, and canonicalization silently stops: records land in
+// `dbm_server` with raw collector fields and zero `o2_dbm_*` columns, so the
+// Deadlocks / Blocked-queries pages read "collecting, but nothing here".
 //
-// EVERYTHING IS DISCOVERED, NOTHING IS HARDCODED. A hardcoded expected-tag list
-// is a fourth copy of the contract: it passes forever while a NEW recipe is
-// added on one side only, which is precisely the drift that let three recipes
-// ship without the rig ever running them. The sets below are extracted from each
-// file's own text and compared to each other, so adding a recipe to dbmShared.ts
-// fails this test until the backend and the rig both catch up.
+// Every tag set below is DISCOVERED from each file's own text, never hardcoded.
+// A hardcoded expected-tag list is a fourth copy of the contract: it stays green
+// while a new recipe is added on one side only. Comparing the extracted sets to
+// each other makes adding a recipe to dbmShared.ts fail until the backend and the
+// rig both catch up.
 //
-// `include_str!` is compile-time on purpose: if a file is moved or renamed, this
-// fails to BUILD rather than failing at runtime with a confusing missing-path
-// error, and the person doing the move is told immediately.
+// `include_str!` is compile-time on purpose: a moved or renamed file fails to
+// BUILD rather than failing at runtime with a confusing missing-path error.
 
 const SHIPPED_RECIPES_TS: &str =
     include_str!("../../../../../web/src/components/ingestion/setupCard/content/dbmShared.ts");
@@ -710,12 +693,10 @@ fn shipped_recipe_tags_and_backend_dispatch_agree() {
 
     // ...and prove they are DISCOVERED, not hardcoded.
     //
-    // A cardinality guard alone is satisfied by a literal list, which is a fourth
-    // copy of the contract: it reports green while the real files drift apart —
-    // exactly the bug this whole test exists to prevent. An adversarial stub that
-    // replaced both extractors with a hardcoded table passed the assertions above
-    // against genuinely drifted sources, so each tag must be traceable to text in
-    // the file it supposedly came from.
+    // A cardinality guard alone is satisfied by a literal list, which stays green
+    // while the real files drift apart. Each tag must therefore be traceable to
+    // text in the file it claims to come from, or an extractor could return a
+    // hardcoded table and still pass the assertions above.
     for tag in &shipped {
         assert!(
             SHIPPED_RECIPES_TS.contains(&format!("'{tag}'")),
@@ -771,12 +752,10 @@ fn shipped_filelog_event_keys_and_backend_dispatch_agree() {
 
 /// EDGE 3 — the capture rig must exercise every recipe we ship.
 ///
-/// THE GAP THIS TEST WAS WRITTEN FOR. The rig is the only place these recipes
-/// ever run against a real server, and it was missing `mariadb_lock_waits`,
-/// `mssql_blocking_chain` and `mssql_deadlock` — so three shipped recipes had
-/// never been executed, while the rig's README implied full coverage. The rig
-/// may legitimately carry EXTRA exploratory recipes (pg_activity, mysql_digest,
-/// …) that we do not ship, so this is a subset check, not equality.
+/// The rig is the only place these recipes run against a real server, so every
+/// shipped recipe must appear in it. The rig may legitimately carry EXTRA
+/// exploratory recipes (pg_activity, mysql_digest, …) that are not shipped, so
+/// this is a subset check, not equality.
 #[test]
 fn capture_rig_exercises_every_shipped_recipe() {
     let shipped = recipe_tags_in_sql(SHIPPED_RECIPES_TS);
@@ -786,9 +765,8 @@ fn capture_rig_exercises_every_shipped_recipe() {
         in_rig.len() >= 4,
         "expected to discover the rig's o2_recipe tags, found {in_rig:?}"
     );
-    // Discovered, not hardcoded — see the note in EDGE 1. A literal list here
-    // would report the rig as complete no matter what the rig actually runs,
-    // which is the very gap this test was written to close.
+    // Discovered, not hardcoded (see the note in EDGE 1): a literal list would
+    // report the rig complete no matter what the rig actually runs.
     for tag in &in_rig {
         assert!(
             RIG_COLLECTOR_YAML.contains(&format!("'{tag}'")),
@@ -806,12 +784,11 @@ fn capture_rig_exercises_every_shipped_recipe() {
 
 /// EDGE 3b — the rig's logs pipeline must match the SHIPPED pipeline's shape.
 ///
-/// The shipped config drops every untagged record with `filter/dbm` before
-/// export. On a real deployment the tagged events were 787 rows against 4.8
-/// MILLION untagged ones in the same hour, and the Deadlocks page slowed to
-/// 8-18s. A rig without that processor is not exercising the pipeline we ship —
-/// it would never reproduce a filter that wrongly drops a new recipe's records,
-/// which is the one failure the filter itself can cause.
+/// The shipped config drops every untagged record with `filter/dbm` before export,
+/// because untagged records outnumber tagged ones by orders of magnitude and the
+/// Deadlocks page reads the same stream. A rig without that processor would never
+/// reproduce a filter that wrongly drops a new recipe's records, which is the one
+/// failure the filter itself can cause.
 #[test]
 fn capture_rig_runs_the_shipped_dbm_filter() {
     assert!(
@@ -883,14 +860,13 @@ fn capture_rig_runs_the_shipped_dbm_filter() {
 // The OTel `postgresqlreceiver`/`mysqlreceiver` emit `db.server.query_sample` and
 // `db.server.top_query` whose ONLY discriminator is the OTLP LogRecord `EventName`
 // field — not an attribute, and the Body is unset (spec X3, verified against
-// contrib v0.158.0 `generated_logs.go`). OpenObserve's logs ingest dropped it, so
-// `canonicalize_record` could not tell the two events apart.
-//
-// W1 surfaces it as `o2_event_name` and reserves the key against spoofing (D-I).
+// contrib v0.158.0 `generated_logs.go`). Logs ingest surfaces it as
+// `o2_event_name`, which `canonicalize_record` dispatches on, and reserves the key
+// against spoofing (D-I).
 
-/// A record shaped like a receiver `top_query` event AFTER OTLP flattening.
-/// Attribute dots become underscores on the flattened map (measured: a
-/// `postgresql.calls` attribute arrives at `apply_to_record` as `postgresql_calls`).
+/// A record shaped like a receiver `top_query` event AFTER OTLP flattening, where
+/// attribute dots have become underscores: a `postgresql.calls` attribute reaches
+/// `apply_to_record` as `postgresql_calls`.
 fn top_query_flattened_record() -> Map<String, Value> {
     obj(json!({
         "_timestamp": 1_786_165_745_930_000i64,
@@ -914,10 +890,9 @@ fn query_sample_flattened_record() -> Map<String, Value> {
 
 // ─── event_name_of: the reader W2/W3 dispatch on ─────────────────────────────
 
-/// The two receiver events differ ONLY by this value — the helper must not
-/// collapse them. A reader that returned a constant, or matched a prefix, would
-/// make `query_sample` and `top_query` indistinguishable, which is the exact
-/// failure W1 exists to prevent.
+/// The two receiver events differ ONLY by this value, so the helper must not
+/// collapse them: a reader returning a constant, or matching a prefix, would make
+/// `query_sample` and `top_query` indistinguishable.
 #[test]
 fn event_name_of_distinguishes_the_two_receiver_events() {
     let mut sample = query_sample_flattened_record();
@@ -956,10 +931,11 @@ fn event_name_of_is_none_when_absent() {
 /// An EMPTY event name is not an event name.
 ///
 /// The producer loop only inserts when non-empty, so the OTLP path cannot produce
-/// this. It is pinned because `event_name_of` is a PUBLIC reader that W2/W3 will
-/// dispatch on, and `Some("")` would make a nameless record match a `_ =>` arm as
-/// though it were a receiver event. (Note a VRL pipeline could NOT smuggle one in:
-/// `o2_event_name` is reserved, so the pipeline-results call site strips it too.)
+/// this, and a VRL pipeline cannot smuggle one in either — `o2_event_name` is
+/// reserved, so the pipeline-results call site strips it. It is pinned anyway
+/// because `event_name_of` is a PUBLIC reader that W2/W3 dispatch on, and
+/// `Some("")` would make a nameless record match a `_ =>` arm as though it were a
+/// receiver event.
 #[test]
 fn event_name_of_is_none_for_an_empty_string() {
     let mut rec = top_query_flattened_record();
@@ -1003,15 +979,14 @@ fn event_name_of_is_none_for_a_non_string_value() {
 /// `apply_to_record` CANNOT distinguish a trusted value from a spoofed one, and
 /// must therefore strip unconditionally.
 ///
-/// This is the subtle heart of D-I, and getting it backwards produces a security
-/// hole. `apply_to_record` receives only a `&mut Map` — a trusted OTLP-derived
-/// `o2_event_name` and a caller-forged one are byte-identical at that boundary.
-/// Any rule that preserved "the trusted one" could only be guessing from the
-/// record's SHAPE, which is exactly what a spoofer controls: a caller POSTing
+/// `apply_to_record` receives only a `&mut Map`, where a trusted OTLP-derived
+/// `o2_event_name` and a caller-forged one are byte-identical. Any rule that
+/// preserved "the trusted one" could only guess from the record's SHAPE, which is
+/// exactly what a spoofer controls: a caller POSTing
 /// `{"postgresql_calls":42,"o2_event_name":"db.server.top_query"}` to `/_json`
 /// would corroborate its own forgery and be believed.
 ///
-/// So the strip is unconditional, and re-insertion of the trusted value is the
+/// The strip is therefore unconditional, and re-inserting the trusted value is the
 /// PRODUCER LOOP's job, after the strip (spec D-I). This test pins the strip half;
 /// `otlp_reinserts_the_trusted_event_name_after_canonicalization` pins the other.
 #[test]
@@ -1088,10 +1063,10 @@ fn record_without_event_name_is_unchanged() {
 /// That makes the pre-scan's prefix set load-bearing: a reserved field the
 /// scan did not cover would dodge the strip entirely and become forgeable. So
 /// every `ALL_DBM_FIELDS` member must trip the predicate on its own, and a
-/// plain record must not (the byte-identical pass-through itself is pinned by
-/// `record_without_event_name_is_unchanged`; that a covered record still gets
-/// stripped exactly as before is pinned by the strip tests, e.g.
-/// `caller_supplied_table_columns_are_stripped`).
+/// plain record must not. `record_without_event_name_is_unchanged` pins the
+/// byte-identical pass-through, and the strip tests (e.g.
+/// `caller_supplied_table_columns_are_stripped`) pin that a covered record is
+/// still stripped.
 #[test]
 fn the_strip_prescan_covers_every_reserved_field() {
     for f in server_vantage::ALL_DBM_FIELDS {
@@ -1114,9 +1089,8 @@ fn the_strip_prescan_covers_every_reserved_field() {
     );
 }
 
-/// The no-regression guarantee must hold for the DBM records that DO canonicalize
-/// today: the deadlock path must not gain an `o2_event_name` column just because
-/// W1 exists. Enterprise-only, since deadlocks canonicalize only there now.
+/// The deadlock path must not gain an `o2_event_name` column: a filelog record has
+/// no OTLP envelope. Enterprise-only, since deadlocks canonicalize only there.
 #[cfg(feature = "enterprise")]
 #[test]
 fn existing_deadlock_canonicalization_gains_no_event_name_column() {
@@ -1137,10 +1111,9 @@ fn existing_deadlock_canonicalization_gains_no_event_name_column() {
 
 // ─── A2 · shape-sniff fallback (spec D-A option A2) ──────────────────────────
 //
-// `apply_to_record` is called from `ingest.rs:726` (the JSON `/_json` path), which
-// has NO OTLP envelope and therefore never carries an event name. Shape-sniffing
-// is the ONLY mechanism by which that path can ever reach the W2/W3 arms, so it is
-// load-bearing rather than a nicety (spec D-A correction 2).
+// The JSON `/_json` path in `logs/ingest.rs` calls `apply_to_record` with no OTLP
+// envelope, so those records never carry an event name. Shape-sniffing is the ONLY
+// way that path reaches the W2/W3 arms (spec D-A correction 2).
 
 /// `postgresql.calls` is the top_query-only counter (query_sample has no call
 /// count), so its presence identifies the event on an envelope-less record.
@@ -1189,8 +1162,8 @@ fn shape_sniff_is_silent_on_records_that_are_not_receiver_events() {
         ),
         // `db.query.text` is carried by BOTH receiver events and by ordinary
         // database logs, so it is NOT a discriminator. A sniff keyed on it (or on
-        // "has query text but no state") would misclassify every record below —
-        // verified to pass the rest of this suite, hence these cases.
+        // "has query text but no state") would misclassify every record below and
+        // still pass the rest of this suite, hence these cases.
         (
             "query text alone",
             obj(json!({"db_query_text": "SELECT 1"})),
@@ -1219,10 +1192,10 @@ fn shape_sniff_is_silent_on_records_that_are_not_receiver_events() {
 /// ALONE.
 ///
 /// The fixtures above bundle several attributes together, so a sniff keyed on an
-/// unsanctioned bystander passes them by accident — verified: keying query_sample
-/// detection solely on `postgresql_pid` (which only the query_sample fixture
-/// happens to carry) satisfies every other test in this file. These minimal
-/// records force the documented attributes to be the actual discriminators.
+/// unsanctioned bystander passes them by accident: keying query_sample detection
+/// solely on `postgresql_pid`, which only that fixture happens to carry, satisfies
+/// every other test in this file. These minimal records force the documented
+/// attributes to be the actual discriminators.
 #[test]
 fn each_sanctioned_discriminator_identifies_its_event_on_its_own() {
     // `postgresql.calls` alone => top_query. Nothing else present.
@@ -1270,7 +1243,7 @@ fn the_two_queryid_spellings_are_not_confused() {
 /// Precedence must be defined when a record carries BOTH discriminators.
 ///
 /// No other fixture carries both, so without this the ordering of the sniff's
-/// branches is arbitrary — and upstream attribute churn (X8: names moved twice in
+/// branches is unpinned, and upstream attribute churn (X8: names moved twice in
 /// 14 releases) makes a mixed record plausible rather than theoretical.
 /// `postgresql.calls` is the stronger signal: it is top_query-ONLY, whereas a
 /// session row can legitimately carry many fields.
@@ -1357,31 +1330,24 @@ fn resolution_is_none_when_neither_source_identifies_an_event() {
 
 // ─── Producer-loop wiring (the insertion point itself) ───────────────────────
 //
-// SOURCE-SCRAPING guards over `logs/otlp.rs`: `handle_request` is async and
-// writes through infra, so the wiring is asserted on the source (the
-// `every_logs_ingest_path_applies_canonicalization` precedent). The three
-// tests share the offset/landmark helpers below; every distinct property each
-// asserts guarded a real shipped bug.
+// Source-scraping guards over `logs/otlp.rs`: `handle_request` is async and writes
+// through infra, so the wiring is asserted on the source, as in
+// `every_logs_ingest_path_applies_canonicalization`. The three tests share the
+// offset/landmark helpers below.
 
 /// EVERY `apply_to_record` call site in `otlp.rs` must restore the trusted
 /// event name across the strip — spec D-I: "The OTLP producer loop re-inserts
 /// the trusted value **after** the strip". The strip is unconditional because
 /// provenance is invisible inside `apply_to_record` (see
-/// `apply_to_record_strips_the_event_name_it_cannot_authenticate`), so the only
-/// place the value can be restored is where it is still recoverable. Without
-/// the restore the field is plumbed to nowhere and W1 delivers nothing.
+/// `apply_to_record_strips_the_event_name_it_cannot_authenticate`), so the value
+/// must be restored wherever it is still recoverable.
 ///
-/// Regression guard for two real misses found in review. The first version of W1
-/// restored only at the non-pipeline site; the second added the evaluation-only
-/// replay but still skipped the USER-pipeline results loop, on the incorrect belief
-/// that the value was unrecoverable there. It is not: that loop's `idx` indexes
-/// `pipeline_inputs` (the same way it indexes `original_options` to recover
-/// `_original`), and those buffered records still carry the producer-loop value.
-///
-/// Why it matters: without the restore, attaching ANY user pipeline to a DBM stream
-/// — even a no-op VRL — silently strips the discriminator and makes
-/// `db.server.query_sample` and `db.server.top_query` indistinguishable again, which
-/// is precisely the bug W1 exists to fix.
+/// The USER-pipeline results loop counts: its `idx` indexes `pipeline_inputs` the
+/// same way it indexes `original_options` to recover `_original`, and those
+/// buffered records still carry the producer-loop value. A site that skips the
+/// restore means attaching ANY user pipeline to a DBM stream — even a no-op VRL —
+/// strips the discriminator and makes `db.server.query_sample` and
+/// `db.server.top_query` indistinguishable.
 #[test]
 fn every_apply_site_restores_the_event_name() {
     let src = include_str!("../../logs/otlp.rs");
@@ -1418,12 +1384,10 @@ fn every_apply_site_restores_the_event_name() {
         // after canonicalization at every one of the three sites.
         //
         // NOT a window stretching to the next `apply_to_record`: that swallows the
-        // NEXT site's restore and reports every site as covered (verified — with the
-        // user-pipeline restore deleted, such a window still passed by reaching the
-        // following site's code ~5 KB later). NOT a fixed byte count either: the
-        // sites' comments differ in length, so the real restores sit +966, +237 and
-        // +150 bytes out, and any constant that admits the first would be slack
-        // enough to be meaningless for the others.
+        // NEXT site's restore and reports every site as covered even when one is
+        // missing. NOT a fixed byte count either — the sites' comments differ in
+        // length, so any constant loose enough to admit the furthest restore is too
+        // slack to mean anything for the others.
         let end = src[site..]
             .find("refactor_map")
             .map(|o| site + o)
@@ -1442,16 +1406,14 @@ fn every_apply_site_restores_the_event_name() {
 /// and comments.
 ///
 /// Deliberately not a plain `find("O2_EVENT_NAME")`: the first occurrence is the
-/// `use` statement, and every ordering assertion would then pass vacuously
-/// (verified — with a top-of-file import the first hit lands ~byte 1654, before
-/// every landmark in the function).
+/// `use` statement, which sits before every landmark in the function, so every
+/// ordering assertion would pass vacuously.
 ///
 /// Imports are excluded by SKIPPING PAST THE IMPORT REGION rather than by testing
 /// whether a line starts with `use `. `cargo fmt` merges a new import into the
 /// existing `use crate::{ ... };` block, putting the const on a continuation line
-/// that starts with neither `use` nor `//` — a line-prefix filter silently treats
-/// that import as the insertion. (Observed: fmt did exactly this and broke three
-/// tests with a misleading "must be inside the producer loop" message.)
+/// that starts with neither `use` nor `//`, which a line-prefix filter would
+/// mistake for the insertion.
 fn event_name_write_offsets(src: &str) -> Vec<usize> {
     // The first function definition marks the end of the import region.
     let code_starts = src
@@ -1484,25 +1446,22 @@ fn event_name_insertion_offset(src: &str) -> usize {
 /// right SLOT: inside the producer loop, after the attribute copy and the
 /// `_original` snapshot, before the pipeline push and flattening.
 ///
-/// The behavior the surfacing half guards is measured: with the field
-/// unplumbed, a LogRecord carrying `EventName = "db.server.top_query"` reaches
-/// `apply_to_record` as `{_timestamp, body, dropped_attributes_count,
-/// postgresql_calls, severity}` — no event name anywhere.
+/// Without the surfacing, a LogRecord carrying `EventName = "db.server.top_query"`
+/// reaches `apply_to_record` with no event name anywhere on it.
 ///
 /// Spec D-A correction 1: the insertion MUST be in the producer loop, where
-/// `log_record` is in scope, NOT at the three `apply_to_record` call sites — site
-/// `:382` iterates pipeline results where `log_record` does not exist. One
-/// insertion there covers both the pipeline and non-pipeline branches.
+/// `log_record` is in scope, NOT at the three `apply_to_record` call sites — the
+/// pipeline-results site iterates results where `log_record` does not exist. One
+/// insertion in the loop covers both the pipeline and non-pipeline branches.
 ///
-/// The ordering half is ANTI-SPOOF, not "so the canonicalizer can see it" (the
-/// reservation strip removes the field before any canonicalizer arm could read
-/// it): written after `log_record.attributes` are copied onto `rec`, a receiver
-/// attribute literally named `o2_event_name` is overwritten by the trusted
-/// value rather than winning — the same slot and the same reason `trace_id`
-/// and `span_id` are written where they are. And it must follow the
-/// `_original` snapshot: `_original` is a verbatim copy of what the customer
-/// sent, replayed on recovery, and writing a synthesized field into it makes
-/// the copy non-verbatim.
+/// The ordering is ANTI-SPOOF, not "so the canonicalizer can see it" (the
+/// reservation strip removes the field before any canonicalizer arm could read it).
+/// Written after `log_record.attributes` are copied onto `rec`, a receiver
+/// attribute literally named `o2_event_name` is overwritten by the trusted value
+/// rather than winning — the same slot and the same reason `trace_id` and `span_id`
+/// are written where they are. It must also follow the `_original` snapshot, which
+/// is a verbatim copy of what the customer sent and is replayed on recovery: a
+/// synthesized field written into it makes the copy non-verbatim.
 #[test]
 fn otlp_producer_loop_surfaces_the_event_name() {
     let src = include_str!("../../logs/otlp.rs");
@@ -1545,10 +1504,10 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // write outside the pipeline/non-pipeline conditional, since that push is the
     // first statement of the pipeline arm — so ONE write serves both branches.
     //
-    // Deliberately NOT also anchored on `if !executable_pipelines.is_empty()`: that
-    // string appears FIVE times in this file (setup, guards, both loops) and an
-    // earlier version of this test matched an occurrence ~170 lines above the
-    // producer loop, failing a correct implementation.
+    // Deliberately NOT also anchored on `executable_pipelines.is_empty()`: that
+    // string appears five times in this file (setup, guards, both loops), so an
+    // offset comparison against it can pair the insertion with an occurrence far
+    // above the producer loop and fail a correct implementation.
 
     // It must be written where `log_record` is still in scope — i.e. after `rec`
     // is created in the producer loop. This is what makes it the PRODUCER loop
@@ -1596,12 +1555,11 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     );
 }
 
-/// The innermost block header still unclosed at byte `at` — walking backwards
-/// tracking brace depth. This is what makes the guard checks below BRACE
-/// BALANCE, not byte distance: a fixed-size window is bypassable by an
-/// unguarded insert placed just after an unrelated CLOSED
-/// `if !log_record.event_name.is_empty() { ... }` block, which sits a few bytes
-/// from a matching `rfind` and passes.
+/// The innermost block header still unclosed at byte `at`, found by walking
+/// backwards tracking brace depth. Brace balance rather than byte distance: a
+/// fixed-size window is bypassable by an unguarded insert placed just after an
+/// unrelated CLOSED `if !log_record.event_name.is_empty() { ... }` block, which
+/// sits a few bytes from a matching `rfind`.
 fn enclosing_block_header(src: &str, at: usize) -> &str {
     let head = &src[..at];
     let mut depth = 0i32;
@@ -1622,12 +1580,11 @@ fn enclosing_block_header(src: &str, at: usize) -> &str {
     panic!("a write must sit inside some block");
 }
 
-/// Every write must be GUARDED — on a non-empty event name (or an ordinary log
-/// line acquires an empty column, the exact whole-product regression W1 must
-/// avoid), and, for the producer-loop writes, on `db_monitoring.enabled`
-/// (matching `apply_to_record`'s early return: without it an operator who set
-/// `ZO_DB_MONITORING_ENABLED=false` still gets a DBM column written onto every
-/// receiver record, for a feature they turned off).
+/// Every write must be GUARDED on a non-empty event name, or an ordinary log line
+/// acquires an empty column; producer-loop writes must also be guarded on
+/// `db_monitoring.enabled`, matching `apply_to_record`'s early return, so an
+/// operator who set `ZO_DB_MONITORING_ENABLED=false` gets no DBM column written
+/// onto receiver records.
 #[test]
 fn every_event_name_write_is_guarded_on_non_empty() {
     let src = include_str!("../../logs/otlp.rs");
@@ -1685,10 +1642,9 @@ fn every_event_name_write_is_guarded_on_non_empty() {
 // live Postgres 16 / MySQL 8.4), flattened the way logs ingest flattens it:
 // attribute dots become underscores, `intValue` arrives as a JSON number.
 //
-// Hand-authoring these would defeat the point. The deleted ENGINE_SUPPORT.md
-// records why: a hand-authored MySQL fixture once hid the deadlock
-// victim-detection bug, because a fixture shaped like the PARSER instead of the
-// PRODUCER agrees with whatever the parser does.
+// Hand-authoring these would defeat the point: a fixture shaped like the PARSER
+// instead of the PRODUCER agrees with whatever the parser does, and stops being
+// evidence about the wire shape.
 
 /// `pg-query-sample.jsonl` line 1, verbatim — an UNBLOCKED idle session.
 ///
@@ -1696,8 +1652,8 @@ fn every_event_name_write_is_guarded_on_non_empty() {
 /// (measured 58/58 records, spec E3), so presence proves nothing; `pids != '{}'`
 /// is the only blocked-ness predicate.
 /// A real `db.server.query_sample` from `sqlserverreceiver` 0.158.0, captured
-/// verbatim off the rig (`mssql_server` org, blocked UPDATE under lock
-/// contention). Every attribute name below is the MEASURED wire shape.
+/// verbatim off the rig (blocked UPDATE under lock contention). Every attribute
+/// name below is the measured wire shape.
 fn mssql_query_sample_blocked() -> Map<String, Value> {
     obj(json!({
         "_timestamp": 1_787_115_615_903_000i64,
@@ -1732,16 +1688,14 @@ fn mssql_query_sample_blocked() -> Map<String, Value> {
     }))
 }
 
-/// THE BUG THIS PINS: every SQL Server session sample was DISCARDED.
+/// A SQL Server session sample must canonicalize rather than be dropped.
 ///
-/// `canonicalize_query_sample` reads the session id from a fixed list of
-/// attribute names, and that list knew only `postgresql_pid` /
-/// `mysql_session_id` / `mysql_threads_thread_id`. `sqlserverreceiver` emits a
-/// complete sample — session id, request status, wait type, blocking spid,
-/// elapsed time — but under `sqlserver_*` names, so the `?` on that lookup
-/// bailed and the whole record was dropped. Live, the rows reached the stream
-/// carrying no `o2_dbm_kind` at all and the Activity tab stayed empty on SQL
-/// Server no matter how much load the server was under.
+/// `canonicalize_query_sample` reads the session id from a fixed list of attribute
+/// names, and `sqlserverreceiver` spells its complete sample — session id, request
+/// status, wait type, blocking spid, elapsed time — under `sqlserver_*` names. A
+/// name missing from that list makes the lookup bail and discards the whole record,
+/// which then reaches the stream with no `o2_dbm_kind` and never appears in
+/// Activity.
 #[test]
 fn mssql_query_sample_is_not_discarded_for_want_of_a_session_id() {
     let sample = server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked())
@@ -1785,8 +1739,8 @@ fn mssql_query_sample_carries_its_blocker_state_and_wait() {
 
 #[test]
 fn mssql_wait_time_is_milliseconds_not_seconds() {
-    // UNITS DIFFER BETWEEN ENGINES and this is the easy 1000x bug: Postgres's
-    // `blocking.wait_duration` is SECONDS, SQL Server's `wait_time` is
+    // Units differ between engines, and mixing them is a silent 1000x error:
+    // Postgres's `blocking.wait_duration` is SECONDS, SQL Server's `wait_time` is
     // MILLISECONDS. 11.839 ms is a sub-second wait, not a twelve-second one.
     let sample =
         server_vantage::canonicalize_query_sample(&mssql_query_sample_blocked()).expect("sample");
@@ -1890,13 +1844,10 @@ fn pg_query_sample_blocked() -> Map<String, Value> {
 /// tuple-lock queue with two blockers, which is normal on a lock queue (E2).
 /// `{82363,81491}` is comma-separated with NO space.
 ///
-/// This is the ONLY captured record that carries populated
-/// `blocking.start_time` and `blocking.transaction.start_time`, so it is the
-/// only fixture that can exercise `wait_start`/`xact_start` in their non-empty
-/// form. An earlier revision of this fixture was hand-edited and blanked both,
-/// which left the DBA review's "single most important column" (transaction age)
-/// tested only in its empty-sentinel form — a fixture shaped like the parser
-/// instead of the producer.
+/// This is the ONLY captured record that carries populated `blocking.start_time`
+/// and `blocking.transaction.start_time`, so it is the only fixture that can
+/// exercise `wait_start`/`xact_start` in their non-empty form. Blanking either
+/// leaves transaction age tested only in its empty-sentinel form.
 fn pg_query_sample_multi_blocked() -> Map<String, Value> {
     obj(json!({
         "_timestamp": 1_786_415_629_732_000i64,
@@ -2081,13 +2032,11 @@ fn query_sample_stores_normalized_statement_text() {
 
 // ─── E2/E3 · the blocking-pids sentinel trap ─────────────────────────────────
 
-/// **The decisive trap.** `postgresql.blocking.pids` is a STRING holding a PG
-/// array literal, and the unblocked sentinel is exactly `{}` — NOT `""`.
-///
-/// Measured: 5495/5783 unblocked records carry `'{}'`, and all seven
-/// `postgresql.blocking.*` attributes are present on every record (E3). A rule
-/// that tested for `""` would see a non-empty string and mark EVERY sampled
-/// session blocked, which is the phantom-blocked-sessions failure this pins.
+/// `postgresql.blocking.pids` is a STRING holding a PG array literal, and the
+/// unblocked sentinel is exactly `{}`, NOT `""`. All seven
+/// `postgresql.blocking.*` attributes are present on every record (E3), so a rule
+/// testing for `""` sees a non-empty string and marks EVERY sampled session
+/// blocked.
 #[test]
 fn empty_pg_array_literal_is_not_blocked() {
     let s = server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked())
@@ -2611,7 +2560,7 @@ fn client_supplied_activity_columns_are_stripped() {
     );
 }
 
-// ─── Findings from the cold test review (all reproduced before acting) ───────
+// ─── Sentinel and wire-shape traps in the query_sample attributes ────────────
 
 /// **E5 — the server-side id can be NEGATIVE, and that is the majority case.**
 ///
@@ -2641,8 +2590,8 @@ fn negative_server_query_ids_survive_verbatim() {
     );
 }
 
-/// **The on-CPU sentinel.** A Postgres backend running on CPU reports an EMPTY
-/// wait event, not a null one (measured: 294 records). Because `by_wait_event`
+/// A Postgres backend running on CPU reports an EMPTY wait event, not a null one.
+/// Because `by_wait_event`
 /// GROUPs BY these columns, storing `""` verbatim yields a second empty bucket
 /// beside the null bucket — the same population split in two, and every `share`
 /// skewed. The empty string is a sentinel, exactly as it is for the lock family.
@@ -2708,9 +2657,8 @@ fn client_address_maps_from_the_attributes_the_receivers_emit() {
 /// peer address. Port 0 is not assignable, so rendering either in a "which host
 /// to go kill" column invents an endpoint that does not exist.
 ///
-/// The `0` case was found by a surviving `>= 0` → `> 0` mutation: the boundary
-/// was untested, and the implementation was in fact wrong on the more common of
-/// the two spellings.
+/// The `0` spelling is the more common of the two, and a `> 0` boundary admits it
+/// while rejecting only `-1`, so both are asserted.
 #[test]
 fn sentinel_client_port_is_not_a_port() {
     let s = server_vantage::canonicalize_query_sample(&pg_query_sample_blocked())
@@ -2828,8 +2776,8 @@ fn a_live_session_carries_a_duration_value_beside_its_state() {
     );
 }
 
-/// **The write side and the reservation list must name the SAME columns — for
-/// EVERY writer.**
+/// The write side and the reservation list must name the SAME columns, for EVERY
+/// writer.
 ///
 /// `ALL_DBM_FIELDS` is the strip list, the read-side projection allowlist and the
 /// schema gate. A column `to_record()` writes but the array does not name is
@@ -2837,8 +2785,8 @@ fn a_live_session_carries_a_duration_value_beside_its_state() {
 /// — and no membership test catches it, because membership tests only walk the
 /// array. This walks the OTHER direction, over every canonicalizer's output.
 /// Together with the no-duplicates + length pin in
-/// `the_reserved_field_list_has_no_duplicates`, it subsumes the per-kind
-/// explicit membership lists this file used to carry.
+/// `the_reserved_field_list_has_no_duplicates`, it subsumes any per-kind explicit
+/// membership list.
 #[test]
 fn every_column_any_writer_emits_is_reserved() {
     let mut records: Vec<(&str, BTreeMap<String, Value>)> = Vec::new();
@@ -2864,11 +2812,10 @@ fn every_column_any_writer_emits_is_reserved() {
                 .to_record(),
         ));
     }
-    // The deadlock, blocking, table-stats and index-stats writers moved to
-    // `o2_enterprise`; their half of this walk moved with them
-    // (`all_enterprise_columns_are_reserved`). `ALL_DBM_FIELDS` lives in
-    // `config` and stays ONE array covering both — the reservation is shared,
-    // only the writers split.
+    // The deadlock, blocking, table-stats and index-stats writers live in
+    // `o2_enterprise`, and `all_enterprise_columns_are_reserved` there walks their
+    // half. `ALL_DBM_FIELDS` lives in `config` and is ONE array covering both: the
+    // reservation is shared even though the writers are split.
     records.push((
         "explain",
         server_vantage::canonicalize_pg_auto_explain(&pg_auto_explain_flattened())
@@ -2883,10 +2830,10 @@ fn every_column_any_writer_emits_is_reserved() {
     ));
 
     // Iterating "whatever the writers emit" is satisfied by a walk that emits
-    // NOTHING, so the population is pinned. 5 activity + 2 top_query + explain
-    // + statement = 9. The deadlock, blocking, table-stats and index-stats
-    // fixtures left for `o2_enterprise`. If this fails LOW, a fixture was
-    // dropped — restore it rather than lowering the number.
+    // NOTHING, so the population is pinned: 5 activity + 2 top_query + explain +
+    // statement = 9, with the deadlock, blocking, table-stats and index-stats
+    // fixtures owned by `o2_enterprise`. A failure BELOW 9 means a fixture was
+    // dropped; restore it rather than lowering the number.
     assert_eq!(
         records.len(),
         9,
@@ -2938,14 +2885,11 @@ fn every_column_any_writer_emits_is_reserved() {
     }
 }
 
-/// **The activity arm is always on.**
-///
-/// The opt-in knob that used to gate query_sample ingest was removed when the
-/// DBM config collapsed to the single `ZO_DB_MONITORING_ENABLED` switch, so a
-/// query_sample record must canonicalize through the REAL dispatcher with no
-/// env juggling at all — and the two pre-existing kinds keep canonicalizing
-/// beside it (enterprise-only: on OSS those two kinds are not canonicalized,
-/// which `enterprise_owned_records_do_not_canonicalize_on_oss` pins instead).
+/// The activity arm is always on: `ZO_DB_MONITORING_ENABLED` is the single switch,
+/// with no per-arm opt-in, so a query_sample record canonicalizes through the REAL
+/// dispatcher with no env juggling, alongside the deadlock and blocking kinds. On
+/// OSS those two kinds are not canonicalized at all, which
+/// `enterprise_owned_records_do_not_canonicalize_on_oss` pins instead.
 #[test]
 fn the_activity_dispatch_arm_is_always_on() {
     let out = canonicalize_record(&with_event_name(pg_query_sample_unblocked()))
@@ -2968,20 +2912,18 @@ fn the_activity_dispatch_arm_is_always_on() {
     }
 }
 
-/// **The instance must resolve, or `?instance=` filters nothing.**
+/// The instance must resolve, or `?instance=` filters nothing.
 ///
-/// `detect_instance` was written for the sqlquery-recipe rows, which carry
-/// `server_address`. The OTLP receiver path is a genuinely different shape: in
-/// all 1124 captured batches the instance identity lives in the RESOURCE
-/// attributes — `service.instance.id = "postgres:5432"` (Postgres) and
-/// `mysql.instance.endpoint = "mysql:3306"` (MySQL) — which flatten to
-/// `service_instance_id` / `mysql_instance_endpoint`. Neither is in
-/// `detect_instance`'s alias list.
+/// The sqlquery-recipe rows carry `server_address`, but the OTLP receiver path is a
+/// different shape: the instance identity lives in the RESOURCE attributes —
+/// `service.instance.id = "postgres:5432"` (Postgres) and
+/// `mysql.instance.endpoint = "mysql:3306"` (MySQL) — flattened to
+/// `service_instance_id` / `mysql_instance_endpoint`.
 ///
-/// The trap this also pins: the sample's own `network_peer_address` is the
-/// CLIENT's address (`172.21.0.6/32`), so reaching for a peer-ish field labels
-/// every session with the client IP — wrong, and it would still satisfy any test
-/// that merely asserted "instance is populated".
+/// The sample's own `network_peer_address` is the CLIENT's address
+/// (`172.21.0.6/32`), so reaching for a peer-ish field labels every session with
+/// the client IP while still satisfying any test that merely asserts "instance is
+/// populated".
 #[test]
 fn activity_resolves_the_server_instance_not_the_client_address() {
     let mut pg = pg_query_sample_unblocked();
@@ -3292,9 +3234,8 @@ fn a_zero_duration_lock_wait_is_still_a_sentinel() {
     );
 }
 
-/// MySQL still names no BLOCKER, and a wait duration must not imply one. This is
-/// the pairing that keeps the fix honest: Blocked queries can now say how long,
-/// and still cannot say who.
+/// MySQL names no BLOCKER, and a wait duration must not imply one: Blocked queries
+/// can say how long on MySQL, and still cannot say who.
 #[test]
 fn a_mysql_lock_wait_still_names_no_blocker() {
     let mut rec = mysql_query_sample();
@@ -3400,13 +3341,10 @@ fn mssql_top_query_with_plan() -> Map<String, Value> {
     }))
 }
 
-/// THE GAP THIS PINS: SQL Server plans were emitted and then dropped.
-///
-/// `sqlserverreceiver` puts an obfuscated XML showplan on every top query, and
-/// the attribute reached the stream — `sqlserver.query_plan` is present in the
-/// raw capture. The canonicalizer read only the Postgres and MySQL names, so
-/// the column stayed null and the Query-plan view had nothing to render on
-/// SQL Server, for want of one entry in a lookup list.
+/// `sqlserverreceiver` puts an obfuscated XML showplan on every top query under
+/// `sqlserver.query_plan`, so the canonicalizer's plan-attribute lookup must name
+/// it alongside the Postgres and MySQL spellings or the Query-plan view has
+/// nothing to render on SQL Server.
 #[test]
 fn mssql_top_query_plan_is_not_dropped() {
     let sample = server_vantage::canonicalize_top_query(&mssql_top_query_with_plan())
@@ -3433,12 +3371,10 @@ fn mssql_top_query_plan_is_not_dropped() {
          raw XML would flip on every execution and fake a plan change"
     );
 
-    // AND THE PLAN MUST SURVIVE TO THE RECORD despite having no hash. The
-    // earlier version of this test stopped at the struct and passed while the
-    // flattened record still dropped the plan: `to_record` emitted it only
-    // when a hash was ALSO present, so every SQL Server plan was read and then
-    // discarded one step later. Asserting on the struct alone is not enough —
-    // the column is what the UI reads.
+    // The plan must survive to the RECORD despite having no hash: `to_record` must
+    // not gate the plan column on a hash being present, or every SQL Server plan is
+    // read and then discarded one step later. Asserting on the struct alone would
+    // miss that — the column is what the UI reads.
     let rec = sample.to_record();
     assert!(
         rec.contains_key(config::meta::db_monitoring::O2_DBM_PLAN),
@@ -3845,13 +3781,10 @@ fn plan_of_reads_the_stored_string_and_tolerates_garbage() {
     }
 }
 
-/// **The MySQL record is materially thinner, and the UI must not pretend
-/// otherwise.**
-///
-/// Eight attributes against Postgres's seventeen. Critically there is NO
-/// `db.namespace`, so a MySQL top query cannot be attributed to a database —
-/// inventing one (say, from the instance) would attribute rows to a database
-/// that was never named.
+/// The MySQL record is materially thinner and the columns it does not carry must
+/// stay null: eight attributes against Postgres's seventeen, and notably no
+/// `db.namespace`, so a MySQL top query cannot be attributed to a database.
+/// Deriving one from the instance would attribute rows to a database never named.
 #[test]
 fn mysql_top_query_canonicalizes_and_leaves_the_missing_columns_null() {
     let s = server_vantage::canonicalize_top_query(&mysql_top_query())
@@ -3914,13 +3847,11 @@ fn mysql_top_query_canonicalizes_and_leaves_the_missing_columns_null() {
     }
 }
 
-/// **E8: `mysql.query_plan.hash` is NOT a plan hash — it is the statement
-/// digest.**
-///
-/// Verified on the capture: the two attributes are byte-identical. Using it for
-/// drift detection means the hash changes exactly when the STATEMENT changes,
-/// which is never, since the statement is the grouping key. Every plan change
-/// would be invisible while the feature reported it was watching.
+/// E8: `mysql.query_plan.hash` is NOT a plan hash — it is the statement digest, and
+/// the two attributes are byte-identical on the wire. Using it for drift detection
+/// means the hash changes exactly when the STATEMENT changes, which never happens
+/// since the statement is the grouping key, so every plan change stays invisible
+/// while the feature reports it is watching.
 #[test]
 fn the_mysql_plan_hash_attribute_is_never_used_as_a_plan_hash() {
     let rec = mysql_top_query();
@@ -3946,11 +3877,11 @@ fn the_mysql_plan_hash_attribute_is_never_used_as_a_plan_hash() {
         "our hash is our own 16-hex rendering, not the receiver's 64-char digest"
     );
 
-    // The decisive property, and the one an equality against `plan_hash(..)`
-    // cannot express: OUR hash tracks the PLAN, while the receiver's tracks the
-    // STATEMENT. Same statement, different plan — the receiver's attribute is
-    // unmoved by construction, and ours must move. This is the whole reason E8
-    // disqualifies it for drift detection.
+    // The decisive property, and the one an equality against `plan_hash(..)` cannot
+    // express: our hash tracks the PLAN, the receiver's tracks the STATEMENT. On the
+    // same statement with a different plan the receiver's attribute is unmoved by
+    // construction and ours must move, which is why E8 disqualifies it for drift
+    // detection.
     let mut replanned = mysql_top_query();
     replanned.insert(
         "mysql_query_plan".into(),
@@ -4190,7 +4121,7 @@ fn plan_hash_ignores_runtime_fields() {
     );
 }
 
-/// **An index flip on the same scan node is THE canonical plan regression.**
+/// An index flip on the same scan node is the canonical plan regression.
 ///
 /// Same node type, same relation, different index — if `Index Name` is excluded
 /// from the hash this reads as no change at all, and the one structural
@@ -4486,11 +4417,9 @@ fn top_query_reaches_its_arm_by_shape_sniff() {
     );
 }
 
-/// **The top_query arm is always on.**
-///
-/// The opt-in knob that used to gate this arm was removed when the DBM config
-/// collapsed to the single `ZO_DB_MONITORING_ENABLED` switch. Asserted through
-/// the DISPATCH with no env juggling: a top_query record must canonicalize.
+/// The top_query arm is always on: `ZO_DB_MONITORING_ENABLED` is the single
+/// switch, with no per-arm opt-in. Asserted through the DISPATCH with no env
+/// juggling — a top_query record must canonicalize.
 #[test]
 fn top_query_dispatch_is_always_on() {
     let mut rec = pg_top_query();
@@ -4552,7 +4481,7 @@ fn each_record_kind_reaches_its_own_arm() {
     }
 }
 
-/// **The single DBM switch disables top_query ingest entirely.**
+/// The single DBM switch disables top_query ingest entirely.
 ///
 /// `apply_to_record` early-returns when `db_monitoring.enabled` is off, BEFORE
 /// the reservation strip. So with DBM off nothing is canonicalized — which
@@ -4649,7 +4578,7 @@ fn pg_deep_plan() -> &'static str {
     "[{\"Plan\":{\"Node Type\":\"Limit\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":281384.24,\"Total Cost\":281397.50,\"Plan Rows\":5306,\"Plan Width\":99,\"Plans\":[{\"Node Type\":\"Sort\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":281384.24,\"Total Cost\":281516.89,\"Plan Rows\":53059,\"Plan Width\":99,\"Sort Key\":[\"(count(l.id)) DESC\"],\"Plans\":[{\"Node Type\":\"Aggregate\",\"Strategy\":\"Sorted\",\"Partial Mode\":\"Finalize\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":248087.92,\"Total Cost\":268505.35,\"Plan Rows\":53059,\"Plan Width\":99,\"Group Key\":[\"o.customer_ref\",\"o.note\"],\"Plans\":[{\"Node Type\":\"Gather Merge\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":248087.92,\"Total Cost\":267178.88,\"Plan Rows\":106118,\"Plan Width\":99,\"Workers Planned\":2,\"Plans\":[{\"Node Type\":\"Aggregate\",\"Strategy\":\"Sorted\",\"Partial Mode\":\"Partial\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":247087.89,\"Total Cost\":253930.20,\"Plan Rows\":53059,\"Plan Width\":99,\"Group Key\":[\"o.customer_ref\",\"o.note\"],\"Plans\":[{\"Node Type\":\"Sort\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":247087.89,\"Total Cost\":248665.82,\"Plan Rows\":631172,\"Plan Width\":99,\"Sort Key\":[\"o.customer_ref\",\"o.note\"],\"Plans\":[{\"Node Type\":\"Hash Join\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":true,\"Async Capable\":false,\"Join Type\":\"Inner\",\"Startup Cost\":19473.25,\"Total Cost\":48199.81,\"Plan Rows\":631172,\"Plan Width\":99,\"Inner Unique\":\"?\",\"Hash Cond\":\"( l.order_id = o.id )\",\"Plans\":[{\"Node Type\":\"Seq Scan\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":true,\"Async Capable\":false,\"Relation Name\":\"order_lines\",\"Alias\":\"l\",\"Startup Cost\":0.00,\"Total Cost\":17450.72,\"Plan Rows\":631172,\"Plan Width\":16},{\"Node Type\":\"Hash\",\"Parent Relationship\":\"Inner\",\"Parallel Aware\":true,\"Async Capable\":false,\"Startup Cost\":13254.77,\"Total Cost\":13254.77,\"Plan Rows\":221078,\"Plan Width\":99,\"Plans\":[{\"Node Type\":\"Seq Scan\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":true,\"Async Capable\":false,\"Relation Name\":\"orders\",\"Alias\":\"o\",\"Startup Cost\":0.00,\"Total Cost\":13254.77,\"Plan Rows\":221078,\"Plan Width\":99}]}]}]}]}]}]}]}]},\"JIT\":{\"Functions\":\"?\",\"Options\":{\"Inlining\":false,\"Optimization\":false,\"Expressions\":true,\"Deforming\":true}}}]"
 }
 
-/// **A change at the DEEPEST node must move the hash.**
+/// A change at the DEEPEST node must move the hash.
 ///
 /// The captured plan nests 19 levels: Limit → Sort → Aggregate(Finalize) →
 /// Gather Merge → Aggregate(Partial) → Sort → Hash Join → {Seq Scan, Hash → Seq
@@ -5052,12 +4981,10 @@ fn a_query_sample_never_lands_as_a_top_query() {
     );
 }
 
-/// **A whitespace-only or literal-null plan is no plan.**
-///
-/// E6's empty string is the measured case, but a VRL pipeline or a transformed
-/// record can deliver `" "` or `"null"`. Storing either yields a row with a plan
-/// column and no hash — a blank plan tree in the UI beside a query that looks
-/// like it was explained.
+/// A whitespace-only or literal-null plan is no plan. E6's empty string is the
+/// measured case, but a VRL pipeline or a transformed record can deliver `" "` or
+/// `"null"`; storing either yields a row with a plan column and no hash, rendering
+/// a blank plan tree beside a query that appears to have been explained.
 #[test]
 fn a_blank_or_null_plan_is_treated_as_no_plan() {
     for blank in ["", "   ", "null"] {
@@ -5122,19 +5049,17 @@ fn the_top_query_record_round_trips_with_correct_types() {
     );
 }
 
-/// **B19 — the trusted event name must survive the strip.**
+/// The trusted event name must survive the strip.
 ///
 /// `apply_to_record` strips every `ALL_DBM_FIELDS` member before dispatching, and
 /// `O2_EVENT_NAME` is one of them. Canonicalization then falls back to
 /// `sniff_event_name`, which is Postgres-only by construction — MySQL records carry
-/// no `postgresql.*` attribute to sniff on. So in production every MySQL receiver
-/// event was silently dropped: measured 0 of 170 `top_query` and 0 of 11
-/// `query_sample` canonicalized in one 150s window, against 373/373 and 242/242 for
-/// Postgres on the same binary.
+/// no `postgresql.*` attribute to sniff on — so a MySQL receiver event whose name
+/// did not survive is dropped entirely.
 ///
-/// Every pre-existing MySQL test called `canonicalize_record` DIRECTLY, skipping the
-/// strip, so none reproduced the production sequence. This one goes through
-/// `apply_to_record` — the entry point the OTLP and JSON ingest paths actually call.
+/// Asserted through `apply_to_record`, the entry point the OTLP and JSON ingest
+/// paths call: a test calling `canonicalize_record` directly skips the strip and
+/// cannot see this at all.
 #[test]
 fn apply_to_record_canonicalizes_mysql_receiver_events() {
     let mut rec = mysql_top_query();
@@ -5169,10 +5094,8 @@ fn apply_to_record_still_canonicalizes_postgres_receiver_events() {
     );
 }
 
-/// The OTHER half of B19: `query_sample` is discriminated the same way, so a
-/// non-Postgres activity row was dropped for the same reason. Measured alongside
-/// the top_query figures: 0 of 11 MySQL `query_sample` canonicalized against
-/// 242/242 for Postgres.
+/// The other half: `query_sample` is discriminated the same way, so a non-Postgres
+/// activity row depends on the carried name just as `top_query` does.
 #[test]
 fn apply_to_record_canonicalizes_mysql_query_sample() {
     // The real knob, not `dispatch_activity`: that helper BYPASSES the gate rather
@@ -5190,16 +5113,13 @@ fn apply_to_record_canonicalizes_mysql_query_sample() {
     );
 }
 
-/// **The strip must not become a back door.**
-///
-/// Carrying the event name across the strip is what fixes B19, so the obvious way
-/// to get it wrong is to let a CALLER-SUPPLIED name reach the stored record. The
-/// JSON ingest path has no OTLP envelope, so a name on that record came from the
-/// request body. Dispatch may honour it — that is what `sniff_event_name`'s
-/// fallback already does for Postgres by shape — but the field itself must still
-/// be stripped, exactly as `apply_to_record_strips_the_event_name_it_cannot_
-/// authenticate` requires. Pinned here for the MySQL path specifically, because
-/// that is the path the fix newly enables.
+/// The strip must not become a back door: carrying the event name across the strip
+/// must never let a CALLER-SUPPLIED name reach the stored record. The JSON ingest
+/// path has no OTLP envelope, so a name on that record came from the request body.
+/// Dispatch may honour it — `sniff_event_name`'s fallback already does for Postgres
+/// by shape — but the field itself must still be stripped, as
+/// `apply_to_record_strips_the_event_name_it_cannot_authenticate` requires. Pinned
+/// here for the MySQL path, which reaches the arm only by the carried name.
 #[test]
 fn the_carried_event_name_is_not_stored_on_the_record() {
     let mut rec = mysql_top_query();
@@ -5220,17 +5140,16 @@ fn the_carried_event_name_is_not_stored_on_the_record() {
 //
 // Every fixture below is the VERBATIM wire shape measured off the live rig
 // (`o2-dbm-capture/collector/server.yaml` R3a, flattened as logs ingest stores
-// it). The recipe declares `table_name` as the recipe's `body_column`, so the
-// table name arrives as `body` and NOT as a `table_name` attribute — the exact
-// producer/parser mismatch that shipped two DBM bugs green through 205 tests.
+// it). The recipe declares `table_name` as its `body_column`, so the table name
+// arrives as `body` and NOT as a `table_name` attribute — a producer/parser
+// mismatch a hand-authored fixture would not reproduce.
 
 #[cfg(feature = "enterprise")]
-/// Table-driven canonicalization check: run `rec` through `apply_to_record`
-/// (the production entry point — the B19 discipline: tests that call
-/// `canonicalize_record` directly skip the strip and repeat the hole that
-/// shipped two DBM bugs green) and assert each `(column, expected)` pair.
-/// `None` pins a DELIBERATE absence — an absent column and a fabricated zero
-/// are different claims.
+/// Table-driven canonicalization check: run `rec` through `apply_to_record`, the
+/// production entry point, and assert each `(column, expected)` pair. Calling
+/// `canonicalize_record` directly would skip the reservation strip and miss the
+/// dispatch failures that only the full path exposes. `None` pins a DELIBERATE
+/// absence — an absent column and a fabricated zero are different claims.
 #[track_caller]
 fn assert_canonicalizes(
     name: &str,
@@ -5275,13 +5194,10 @@ fn pg_table_stats_record() -> Map<String, Value> {
 }
 
 #[cfg(feature = "enterprise")]
-/// **Through `apply_to_record`, the production entry point — never
-/// `canonicalize_record` directly.**
-///
-/// B19 shipped broken for weeks because every test called the internal function
-/// while the ingest paths called the outer one, and the strip loop between them
-/// removed the field dispatch depended on. A table-stats test that skips the
-/// strip would repeat that exact hole.
+/// Through `apply_to_record`, the production entry point, never
+/// `canonicalize_record` directly: the strip loop between the two removes the field
+/// dispatch depends on, so a test that skips it cannot see a dispatch failure the
+/// ingest paths would hit.
 #[test]
 fn table_stats_canonicalizes_through_the_ingest_entry_point() {
     let mut rec = pg_table_stats_record();
@@ -5625,18 +5541,14 @@ fn table_stats_reads_each_relation_from_its_own_record() {
 }
 
 #[cfg(feature = "enterprise")]
-/// **A record pulled off the LIVE rig, verbatim** — the negative control the
-/// TDD skill requires for anything crossing a wire.
+/// A record pulled off the LIVE rig, verbatim: SELECTed out of the `dbm_server`
+/// stream while the recipe was running, so its key set is the producer's rather
+/// than one shaped like the parser.
 ///
-/// Two DBM bugs shipped green through 205 test functions because the fixtures
-/// were shaped like the parser instead of like the collector. This one was
-/// SELECTed out of the `dbm_server` stream while the recipe was running, so its
-/// key set is the producer's, not ours.
-///
-/// It differs from the hand-built fixtures in a way that matters: the rig emits
-/// NO `server_address`, so the instance is genuinely unknown. That must read as
-/// absent rather than being invented from another field — a table attributed to
-/// the wrong server is worse than one attributed to none.
+/// It differs from the hand-built fixtures in a way that matters: the rig emits NO
+/// `server_address`, so the instance is genuinely unknown. That must read as absent
+/// rather than being invented from another field — a table attributed to the wrong
+/// server is worse than one attributed to none.
 fn pg_table_stats_live_record() -> Map<String, Value> {
     obj(json!({
         "_timestamp": 1_786_504_457_051_326i64,
@@ -5765,9 +5677,9 @@ fn table_stats_inherits_the_master_off_switch() {
 //     Reading `body` as the identity — the table-stats convention — would file
 //     every index under a DDL statement.
 //
-// Two fixtures, materially inverted in every numeric field: a never-scanned
-// index and a heavily-used one. A single fixture would let a hard-coded lookup
-// masquerade as a parser, which is how two stub attacks survived in W10.
+// Two fixtures, materially inverted in every numeric field: a never-scanned index
+// and a heavily-used one. A single fixture would let a hard-coded lookup
+// masquerade as a parser.
 
 /// A real never-scanned index — `idx_scan = 0` over 2.8 MB.
 fn pg_index_stats_unused_record() -> Map<String, Value> {
@@ -5815,8 +5727,8 @@ fn pg_index_stats_used_record() -> Map<String, Value> {
 }
 
 #[cfg(feature = "enterprise")]
-/// **Through `apply_to_record`, the production entry point.** B19 shipped
-/// broken for weeks because tests called the internal function instead.
+/// Through `apply_to_record`, the production entry point — calling
+/// `canonicalize_record` directly would skip the reservation strip.
 #[test]
 fn index_stats_canonicalizes_through_the_ingest_entry_point() {
     let mut rec = pg_index_stats_unused_record();
@@ -5903,11 +5815,10 @@ fn index_stats_reads_a_used_index_from_its_own_row() {
 #[cfg(feature = "enterprise")]
 /// A CONSTRAINT index must be marked as one.
 ///
-/// Verified against the live rig: three of the six largest indexes there are
-/// `*_pkey`, and `idx_scan = 0` on a primary key means only that the planner
-/// has not chosen it for a LOOKUP — the constraint is still enforced on every
-/// insert. Without this flag the unused-index rule cannot tell a redundant
-/// index from a primary key, and recommends reviewing the latter.
+/// `idx_scan = 0` on a primary key means only that the planner has not chosen it
+/// for a LOOKUP — the constraint is still enforced on every insert. Without this
+/// flag the unused-index rule cannot tell a redundant index from a primary key,
+/// and recommends reviewing the latter.
 #[test]
 fn index_stats_marks_a_constraint_index_as_unique() {
     let mut unique = pg_index_stats_unused_record();
@@ -5997,10 +5908,8 @@ fn index_stats_without_an_index_name_is_dropped() {
 // Every fixture below is the VERBATIM wire shape captured off the live
 // dbm-server-vantage rig on 2026-08-13 (MySQL 8.4 / MariaDB 11.8, contrib
 // 0.158.0) — `tests/dbm-server-vantage/captures/{mysql,mariadb}-{table,index}-
-// stats.jsonl`, flattened as logs ingest stores it. That rig pass was the
-// release gate the plan flags for these recipes; the previously recipe-shaped
-// fixtures here are replaced by the measured rows. Note `server_address`
-// carries NO port: the shipped recipes stamp the bare `{host}`.
+// stats.jsonl`, flattened as logs ingest stores it. Note `server_address` carries
+// NO port: the shipped recipes stamp the bare `{host}`.
 
 /// One real `mysql_table_stats` row (`orders`, mysql-table-stats.jsonl).
 fn mysql_table_stats_record() -> Map<String, Value> {
@@ -6087,11 +5996,10 @@ fn mysql_index_stats_unused_record() -> Map<String, Value> {
 }
 
 #[cfg(feature = "enterprise")]
-/// A FUNCTIONAL index (`(LOWER(customer_ref))`), verbatim from the rig — the
-/// row that exposed the recipe bug: an expression key part has NULL
-/// `COLUMN_NAME`, which nulled GROUP_CONCAT and then the whole `index_def`
-/// (the body_column). The shipped fix COALESCEs to `(EXPRESSION)`, and this
-/// is what the fixed recipe emits.
+/// A FUNCTIONAL index (`(LOWER(customer_ref))`), verbatim from the rig. An
+/// expression key part has NULL `COLUMN_NAME`, which would null GROUP_CONCAT and
+/// with it the whole `index_def` body_column, so the recipe COALESCEs to
+/// `(EXPRESSION)`; this is what it emits.
 fn mysql_index_stats_functional_record() -> Map<String, Value> {
     obj(json!({
         "_timestamp": 1_786_500_000_000_000i64,
@@ -6131,8 +6039,8 @@ fn mariadb_index_stats_record() -> Map<String, Value> {
 }
 
 #[cfg(feature = "enterprise")]
-/// **Through `apply_to_record`, the production entry point** — the same B19
-/// discipline every fixture in this file follows.
+/// Through `apply_to_record`, the production entry point, as every fixture in this
+/// file is asserted.
 #[test]
 fn mysql_table_stats_canonicalizes_as_mysql() {
     assert_canonicalizes(
@@ -6226,8 +6134,7 @@ fn mariadb_table_stats_canonicalizes_as_mariadb() {
             // A STATS_PERSISTENT=0 table has no innodb_table_stats row — `""`
             // is 'never', exactly as the PG recipe's empty timestamp reads.
             (server_vantage::O2_DBM_LAST_ANALYZE, None),
-            // With no persistent stats, n_live_tup is the TABLE_ROWS fallback
-            // — measured live on the rig.
+            // With no persistent stats, n_live_tup is the TABLE_ROWS fallback.
             (server_vantage::O2_DBM_LIVE_TUPLES, Some(json!(3i64))),
         ],
     );
@@ -6332,10 +6239,10 @@ fn mysql_index_stats_functional_index_keeps_its_identity_and_definition() {
 }
 
 #[cfg(feature = "enterprise")]
-/// **The MariaDB shape's missing `idx_scan` stays missing.** performance_schema
-/// is OFF by default on MariaDB, so the recipe omits the usage join entirely —
-/// and a zero invented here would BE the never-scanned finding, fabricated for
-/// every index on every MariaDB server.
+/// The MariaDB shape's missing `idx_scan` stays missing. performance_schema is OFF
+/// by default on MariaDB, so the recipe omits the usage join entirely, and a zero
+/// invented here would BE the never-scanned finding, fabricated for every index on
+/// every MariaDB server.
 #[test]
 fn mariadb_index_stats_leaves_absent_idx_scan_absent() {
     assert_canonicalizes(
@@ -6361,10 +6268,10 @@ fn mariadb_index_stats_leaves_absent_idx_scan_absent() {
 }
 
 #[cfg(feature = "enterprise")]
-/// **The other kinds must not regress** — the widened `||` chains sit beside
-/// five existing dispatch arms, and the cheapest way to break them is a tag
-/// that overlaps. Same pattern as `adding_table_stats_leaves_the_other_
-/// recipes_dispatching`.
+/// The engine-twin arms must coexist with the other five dispatch arms: the
+/// widened `||` chains sit beside them and an overlapping tag is the cheapest way
+/// to break one. Same pattern as
+/// `adding_table_stats_leaves_the_other_recipes_dispatching`.
 #[test]
 fn adding_the_engine_twins_leaves_the_others_dispatching() {
     // Deadlocks and blocking are enterprise-owned; on OSS the coexistence
@@ -6416,9 +6323,9 @@ fn adding_the_engine_twins_leaves_the_others_dispatching() {
 // answer, so the author's recipe reads as a healthy quiet database.
 //
 // These tests pin the write-side signal that turns that silence into a report.
-// They all go through `apply_to_record`, the production entry point — a test
-// calling `canonicalize_record` directly would pass against the broken
-// behaviour, which is exactly the gap that hid B19 for weeks.
+// They all go through `apply_to_record`, the production entry point: a test calling
+// `canonicalize_record` directly bypasses the strip and would pass even when the
+// ingest path drops the record.
 
 /// A custom `sqlquery` recipe, shaped like a real one a user would write:
 /// engine-agnostic aliased columns, a `server_address`, and a tag we do not
@@ -6644,9 +6551,9 @@ fn w8_every_recognized_recipe_is_enterprise_only_on_oss() {
     }
 }
 
-/// The enterprise half of the same classification: with the canonicalizers
-/// compiled in, every member is genuinely `Handled` — the fix must not leave
-/// enterprise builds reporting their own working recipes as unavailable.
+/// The enterprise half of the same classification: with the canonicalizers compiled
+/// in, every member is genuinely `Handled`, so an enterprise build must never
+/// report its own working recipes as unavailable.
 #[cfg(feature = "enterprise")]
 #[test]
 fn w8_every_recognized_recipe_is_handled_on_enterprise() {
@@ -6689,10 +6596,10 @@ fn w8_classifies_an_unshipped_tag_as_unknown_on_both_builds() {
 
 /// The reporter must be a CLASSIFIER, not a list of tags we thought of.
 ///
-/// A hard-coded lookup of the fixture tags above passes every other W8 test —
-/// measured: the rung-1 stub attack survived 7/7. The whole point of W8 is the
-/// tag nobody enumerated, so this generates tags no implementation could have
-/// baked in, and asserts each is reported BY NAME.
+/// A hard-coded lookup of the fixture tags above passes every other W8 test. The
+/// whole point of W8 is the tag nobody enumerated, so this generates tags at
+/// runtime that no implementation could have baked in, and asserts each is
+/// reported BY NAME.
 #[test]
 fn w8_reports_a_tag_no_implementation_could_have_enumerated() {
     // Derived at runtime, so they cannot appear as literals in the source.
@@ -6723,14 +6630,11 @@ fn w8_reports_a_tag_no_implementation_could_have_enumerated() {
 /// "we could not read your recipe" signal that fires on the recipes we ship is
 /// noise, and would fire on every row of the reference rig.
 ///
-/// **What changed with the enterprise split.** "Not unrecognized" is no longer
-/// the same thing as "silent". On OSS all 11 members canonicalize to nothing,
-/// and the old assertion (`take_unrecognized_recipe == None`, full stop) passed
-/// for exactly that reason while the row vanished — the silent-wrong-story W8
-/// exists to prevent. So each member is asserted on BOTH axes: never
-/// misreported as unrecognized (`take_unrecognized_recipe` is `None` — the fix
-/// is not a collector-config edit), AND classified with the answer this build
-/// can actually honour.
+/// "Not unrecognized" is not the same thing as "not silent": on OSS all 11 members
+/// canonicalize to nothing, so `take_unrecognized_recipe == None` alone holds while
+/// the row still vanishes. Each member is therefore asserted on BOTH axes: never
+/// misreported as unrecognized (the fix is not a collector-config edit), AND
+/// classified with the answer this build can actually honour.
 #[test]
 fn w8_every_member_of_the_recognized_array_is_classified_not_silent() {
     // What this build can honour: enterprise canonicalizes all 11; OSS
@@ -6758,11 +6662,10 @@ fn w8_every_member_of_the_recognized_array_is_classified_not_silent() {
         );
     }
 
-    // And over each shipped recipe's realistic fixture. The four blocking
-    // recipes share the aliased-column shape by construction, so the tag is
-    // the only thing that varies — which is precisely the input this
-    // classifier reads. The fixtures stay OSS-side (raw records only; the
-    // canonicalizers moved) because this test runs on both builds.
+    // And over each shipped recipe's realistic fixture. The four blocking recipes
+    // share the aliased-column shape by construction, so the tag is the only thing
+    // that varies, which is exactly the input this classifier reads. The fixtures
+    // are raw records and stay OSS-side because this test runs on both builds.
     let tagged_blocking = |tag: &str| {
         let mut r = pg_blocking_record();
         r.insert("o2_recipe".into(), json!(tag));
@@ -6832,8 +6735,8 @@ fn w8_a_tag_already_warned_about_stays_silent() {
     );
 }
 
-/// THE BOUND. Once the budget is spent, a brand-new tag must NOT be named —
-/// naming it is what would grow the set without limit.
+/// Once the budget is spent, a brand-new tag must NOT be named: naming it is what
+/// would grow the set without limit.
 #[test]
 fn w8_the_warned_set_never_grows_past_its_budget() {
     let full: Vec<String> = (0..32).map(|i| format!("tag_{i}")).collect();
@@ -6909,15 +6812,13 @@ fn pg_fp(text: &str) -> Option<String> {
     fingerprint_statement(text, Some("postgresql")).1
 }
 
-/// **T1 measurement (a), first half: the wrapper IS part of the hash.**
+/// T1 measurement (a), first half: the wrapper IS part of the hash.
 ///
-/// The design doc hoped `walk_plan_structure` would hash auto_explain's
-/// object-wrapped `{"Query Text":…, "Plan":{…}}` identically to the receiver's
-/// array-wrapped `[{"Plan":{…}}]` and demanded proof. Measured: it does NOT —
-/// the walker emits `[`/`]` delimiters, so the two wrappers of the SAME
-/// Seq Scan structure hash differently. This test pins the measured divergence
-/// so nobody "simplifies" `canonicalize_pg_auto_explain` back to hashing the
-/// raw document — that would silently split every logical plan into two hashes.
+/// `walk_plan_structure` emits `[`/`]` delimiters, so auto_explain's
+/// object-wrapped `{"Query Text":…, "Plan":{…}}` and the receiver's array-wrapped
+/// `[{"Plan":{…}}]` hash DIFFERENTLY even for the same Seq Scan structure. Pinned
+/// so `canonicalize_pg_auto_explain` is never simplified back to hashing the raw
+/// document, which would split every logical plan into two hashes.
 #[test]
 fn t1_wrapper_shape_is_part_of_plan_hash() {
     let fx = ae_fixture();
@@ -7125,10 +7026,9 @@ fn t1_statements_over_max_norm_input_orphan_the_fingerprint_join() {
     );
 }
 
-/// A prepared statement's auto_explain `Query Text` is the PREPARE source, not
-/// the underlying SELECT — it joins the pgss `PREPARE …` row, not the bare
-/// statement's row. Consistent on both sides, so nothing is lost; pinned so
-/// the behavior is documented rather than rediscovered.
+/// A prepared statement's auto_explain `Query Text` is the PREPARE source, not the
+/// underlying SELECT, so it joins the pgss `PREPARE …` row rather than the bare
+/// statement's. Consistent on both sides, so nothing is lost.
 #[test]
 fn t1_prepared_statement_text_fingerprints_as_the_prepare_row() {
     let fx = ae_fixture();
@@ -7719,23 +7619,22 @@ fn ws1_zero_query_id_is_not_a_join_key() {
 // don't-clobber, the FTS/bloom exclusion and the migration case — all live in
 // the decision.
 //
-// The seed exists because `/badges` was measured at 7.33 s on a stream holding
-// 2.84 M rows/hour against 0.14 s on an empty one. It replaces an earlier
-// partition-key implementation; see `needs_kind_index_field` for why the two
-// cannot coexist on one stream.
+// The seed exists because the DBM reads scan a stream shared with all other logs,
+// where an unindexed `o2_dbm_kind` predicate costs seconds per badge query. It is
+// mutually exclusive with a partition key on the same field; see
+// `needs_kind_index_field` for why the two cannot coexist on one stream.
 
 use config::meta::stream::{StreamPartition, StreamSettings};
 
 /// The field IS set — the base claim. A stream with default settings comes back
 /// carrying the kind column as a secondary-index field, FIRST.
 ///
-/// It is no longer the ONLY one: the deadlock/blocking reads OR the kind
+/// It is not the only seeded field: the deadlock/blocking reads OR the kind
 /// predicate together with marker columns, and an OR is index-eligible only if
-/// every operand is indexed, so the marker columns are seeded beside it. That
-/// half is pinned by `idx_seed_covers_every_marker_column_of_the_deadlock_or`
-/// and `idx_seed_set_is_exactly_the_or_predicate_columns`; this test keeps
-/// asserting the canonical column specifically, because it is the operand every
-/// DBM read has and the one the whole mechanism is anchored on.
+/// every operand is indexed, so the marker columns are seeded beside it
+/// (`idx_seed_covers_every_marker_column_of_the_deadlock_or` and
+/// `idx_seed_set_is_exactly_the_or_predicate_columns`). This test asserts the kind
+/// column specifically, because it is the operand every DBM read has.
 #[test]
 fn idx_seed_sets_the_kind_index_field() {
     let mut settings = StreamSettings::default();
@@ -7940,23 +7839,23 @@ fn idx_seed_respects_a_user_configured_kind_index() {
     );
 }
 
-/// THE MIGRATION CASE: a stream already carrying the previous implementation's
-/// `o2_dbm_kind` partition key.
+/// A stream already carrying an `o2_dbm_kind` PARTITION KEY must not be seeded on
+/// that field.
 ///
-/// `persist_stream_settings` rejects any field that is both a partition key and
-/// a secondary index, and the check is SYMMETRIC — it fails whichever list we
-/// add to. Partition keys are also append-only: omitting one from a settings
-/// write marks it `disabled: true` and KEEPS it in `partition_keys`, where the
-/// intersection check still sees it. So such a stream cannot be converted from
-/// this code path at all, and attempting it would fail the save on every batch
-/// forever. We stand down instead — on THAT FIELD.
+/// `persist_stream_settings` rejects any field that is both a partition key and a
+/// secondary index, and the check is SYMMETRIC — it fails whichever list is added
+/// to. Partition keys are also append-only: omitting one from a settings write
+/// marks it `disabled: true` and KEEPS it in `partition_keys`, where the
+/// intersection check still sees it. Such a stream cannot be converted from this
+/// code path at all, and attempting it would fail the save on every batch forever,
+/// so the seed stands down on that field.
 ///
-/// The stand-down is per field, not for the whole set: the store's rejection is
-/// per field but fails the entire settings write, so including the conflicted
-/// one would take the marker columns down with it forever. The markers are
-/// still seeded (`idx_seed_skips_only_the_partition_key_conflicted_field`
-/// pins the mirror case); what this test holds is that the conflicted field
-/// itself is never added and never stamped, whatever its flag or type.
+/// The stand-down is per field, not for the whole set: the rejection is per field
+/// but fails the entire settings write, so including the conflicted one would take
+/// the marker columns down with it forever. The markers are still seeded
+/// (`idx_seed_skips_only_the_partition_key_conflicted_field` pins that mirror
+/// case); this test holds that the conflicted field itself is never added and
+/// never stamped, whatever its flag or type.
 #[test]
 fn idx_seed_declines_when_the_field_is_already_a_partition_key() {
     // Enabled, disabled, and non-default type all block equally: the store's
@@ -8051,16 +7950,13 @@ fn idx_seed_proceeds_when_the_field_is_a_bloom_filter_field() {
     );
 }
 
-/// The bounded-cardinality tripwire, kept from the partition-key implementation
-/// because it still means something — just for a different reason.
-///
-/// It no longer guards write-side file fan-out (an index does not split files).
-/// It guards SELECTIVITY: a tantivy index only pays off when a term matches a
-/// small minority of rows, and `guard_matched_rows` abandons the index for a
-/// file once matches exceed `inverted_index_skip_threshold` percent (default
-/// 35). With 8 kinds the most common one, `activity`, was measured at ~21.6% —
-/// under the cutoff but not comfortably. Fewer kinds would mean a LARGER share
-/// each and a greater chance of tripping the guard, so this stays a tripwire.
+/// A bounded-cardinality tripwire guarding SELECTIVITY: a tantivy index only pays
+/// off when a term matches a small minority of rows, and `guard_matched_rows`
+/// abandons the index for a file once matches exceed
+/// `inverted_index_skip_threshold` percent (default 35). With 8 kinds the most
+/// common one, `activity`, sits around 21% — under the cutoff but not comfortably.
+/// Fewer kinds means a LARGER share each and a greater chance of tripping the
+/// guard.
 #[test]
 fn idx_seed_kind_cardinality_stays_small() {
     let kinds = [

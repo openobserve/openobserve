@@ -78,29 +78,39 @@ use crate::auth::check_permissions;
 /// export to (`stream-name: dbm_server`).
 const DEFAULT_SERVER_STREAM: &str = "dbm_server";
 
+/// The DBM stream-read decision, split from the OFGA round trips that produce
+/// its inputs so the rule itself is unit-testable without a live OpenFGA store.
+///
+/// `module_grant` is `db_monitoring:_all_{org}` — the module-level permission
+/// the role editor hands out; `stream_grant` is the per-stream check. Either
+/// one suffices, and neither means denied — that last clause is the security
+/// property, so it has its own test.
+const fn stream_read_decision(module_grant: bool, stream_grant: bool) -> bool {
+    module_grant || stream_grant
+}
+
 /// Whether `user_id` may read `stream_name` of `stream_type` in `org_id`.
 ///
-/// WHY THIS EXISTS. Every DBM read runs its SQL with `user_id: None` (org-scoped
-/// like the service-graph template it was modelled on), and three endpoints take
-/// a caller-supplied `stream` parameter. Without a check here, any org member
-/// could read ANY trace or logs stream in the org through DBM — including
-/// streams their role denies them everywhere else in the product.
+/// DBM runs its SQL with `user_id: None` (org-scoped), and three endpoints take
+/// a caller-supplied `stream` parameter, so without this check any org member
+/// could read any trace or logs stream in the org through DBM.
 ///
-/// Delegates to [`crate::auth::check_permissions`], which is the app-wide
-/// convention (alerts, dashboards, model pricing, org management all call it):
-/// it is dual-implemented, resolves the caller's role from the DB, maps the
-/// stream type through `OFGA_MODELS`, and returns `true` for root users.
+/// Delegates to [`crate::auth::check_permissions`], which resolves the caller's
+/// role from the DB, maps the stream type through `OFGA_MODELS`, and returns
+/// `true` for root users.
+///
+/// Two grants satisfy it, per [`stream_read_decision`]. The `db_monitoring`
+/// module grant is consulted first, since that grant is how DBM access is
+/// handed out; failing that, the per-stream check runs.
 ///
 /// On OSS the underlying helper is a stub returning `false`, so this wrapper
-/// returns `true` there — the endpoints that DO reach it on OSS are the ones
-/// whose documented posture is org-level visibility (FRD NFR-6), and denying
-/// every read on a build with no OFGA to consult would break them rather than
-/// secure them. The gate that matters is the enterprise one, where RBAC is
-/// actually configured.
+/// returns `true` there: the endpoints that reach it on OSS are the ones whose
+/// documented posture is org-level visibility (FRD NFR-6). The enterprise path
+/// is the gate that matters.
 ///
-/// Note this wrapper is not what gates the enterprise-only endpoints: on OSS,
-/// deadlocks/blocking/table health never get here at all, because their
-/// handlers are `#[cfg]`-stubbed to 403 before any auth or search runs.
+/// This wrapper does not gate the enterprise-only endpoints — on OSS,
+/// deadlocks/blocking/table health are `#[cfg]`-stubbed to 403 before any auth
+/// or search runs.
 async fn can_read_stream(
     org_id: &str,
     user_id: &str,
@@ -109,23 +119,64 @@ async fn can_read_stream(
 ) -> bool {
     #[cfg(feature = "enterprise")]
     {
-        // Same guard every other caller uses: with OFGA off there is no
-        // authorization model to consult, so the org-level posture stands.
+        // With OFGA off there is no authorization model to consult, so the
+        // org-level posture stands: the deployment has expressed no per-stream
+        // policy for this check to enforce.
         if !get_openfga_config().enabled {
             return true;
         }
-        return check_permissions(
-            &config::utils::str::into_ofga_supported_format(stream_name),
+
+        // The module grant first. `db_monitoring` is an org-level resource with
+        // no per-object entities, so the object id is the org and `use_all_org`
+        // is true — the check lands on `db_monitoring:_all_{org}`, the tuple the
+        // role editor writes for the module toggle.
+        //
+        // This short-circuit is scoped to DBM: `can_read_stream` is private to
+        // this module. It is not a general stream bypass — every row-bearing DBM
+        // query constrains itself to database records: the client vantage on
+        // `o2_db_fingerprint IS NOT NULL`, the server vantage on
+        // `o2_dbm_kind = '<kind>'` (or `o2_dbm_engine IS NOT NULL` for
+        // instances). A module grant buys the DB rows of a stream and nothing
+        // else.
+        //
+        // One deliberate exception: `build_probe_sql` scans without a kind
+        // predicate, because counting untagged rows is how the liveness probe
+        // distinguishes "collector alive, database healthy" from "collector
+        // dead". It projects only `_timestamp` and the kind column and reduces
+        // them to counts, so no field value reaches the wire — but on a
+        // caller-supplied `?stream=` it does expose a row count (capped at
+        // PROBE_SCAN_LIMIT) and a newest-row timestamp. Known and accepted.
+        if check_permissions(
+            org_id,
             org_id,
             user_id,
-            stream_type.as_str(),
+            "db_monitoring",
             "GET",
             None,
-            false,
             true,
             false,
+            false,
         )
-        .await;
+        .await
+        {
+            return stream_read_decision(true, false);
+        }
+
+        return stream_read_decision(
+            false,
+            check_permissions(
+                &config::utils::str::into_ofga_supported_format(stream_name),
+                org_id,
+                user_id,
+                stream_type.as_str(),
+                "GET",
+                None,
+                false,
+                true,
+                false,
+            )
+            .await,
+        );
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -441,14 +492,10 @@ pub(crate) fn build_stats_sql_projected(
 /// `> start` ≡ `>= start + 1`, and `< end` is already exclusive: `(start, end)`
 /// is the payload `[start + 1, end)`.
 ///
-/// REGRESSION GUARD: `hi` was briefly `end_time + 1`, which admitted that
-/// trailing window. Before the inline `_timestamp > start AND _timestamp <= end`
-/// was dropped from the SQL, the effective range was the INTERSECTION of the
-/// payload `[start, end)` with it — the open span `(start, end)` — so the
-/// upper edge was exclusive all along, via the payload half. Reproducing only
-/// the inline half over-counted by exactly one window: measured live as a
-/// uniform 4/3 (+33%) call count on every database for a 1h window against
-/// 900s rollups. See `test_stats_read_range_excludes_window_ending_at_end_time`.
+/// The upper edge stays EXCLUSIVE: `hi` is `end_time`, not `end_time + 1`.
+/// Admitting the window that ends exactly at `end_time` over-counts by one
+/// window (a uniform +33% on a 1h window against 900s rollups). See
+/// `test_stats_read_range_excludes_window_ending_at_end_time`.
 ///
 /// Saturating, so an `i64::MAX` end cannot wrap the window inside out.
 pub(crate) fn stats_read_range(start_time: i64, end_time: i64) -> (i64, i64) {
@@ -485,12 +532,8 @@ pub(crate) fn fingerprint_pred(fingerprint: &str) -> String {
 /// The same predicate over RAW TRACE SPANS, which carry the column under its
 /// `o2_db_` name — the split [`ScopeFilters::span_sql_preds`] exists for.
 ///
-/// This is the last piece of DBM SQL the BROWSER used to build. The query
-/// detail page could not scope `/samples` to one statement, so it hand-rolled
-/// `SELECT … WHERE o2_db_fingerprint = '…'` against the trace stream and
-/// carried its own `escapeSingleQuotes` and `isSafeStreamName` defenses to do
-/// it. Both the escaping and the stream-name validation now live here, where
-/// the rest of this module's SQL is built and injection-tested.
+/// Escaping and stream-name validation live here, with the rest of this
+/// module's SQL, so they stay injection-tested in one place.
 pub(crate) fn span_fingerprint_pred(fingerprint: &str) -> String {
     format!("\n    AND o2_db_fingerprint = '{}'", escape_sq(fingerprint))
 }
@@ -721,9 +764,9 @@ fn stamp_trace_streams<'a>(merged: &mut Value, rows: impl IntoIterator<Item = &'
 /// Fold `error_class` rollup rows (one per window × (system, instance, env,
 /// status code)) into one exact count per status code, largest first — the
 /// FR-5 errors-by-code breakdown. These are the rollup's exact per-SQLSTATE
-/// counts, never the sample-derived approximation the detail page previously
-/// held: samples are capped, so counting them undercounts precisely when
-/// errors matter most. An empty code becomes `unknown`, matching the rollup's
+/// counts, never a sample-derived approximation: samples are capped, so
+/// counting them undercounts precisely when errors matter most. An empty code
+/// becomes `unknown`, matching the rollup's
 /// own `COALESCE(o2_db_status_code, 'unknown')` bucket. Ties sort by code so
 /// the output is deterministic.
 pub(crate) fn fold_error_code_counts(rows: &[Value]) -> Vec<Value> {
@@ -931,14 +974,11 @@ pub(crate) fn group_query_rows(
             merged["operation"] = json!(operation);
             merged["stmt_class"] = json!(stmt_class);
             // The scalar survives the fold when the constituents agree on
-            // exactly one database. It used to vanish here unconditionally —
-            // collected into `namespaces` but never re-emitted — and the
-            // scalar is the server-vantage JOIN KEY: without it the detail
-            // page could not ask for the database's own counters and rendered
-            // "not collected" over 1,000+ matching server records (verified
-            // live on fingerprint fa61ae4b0c9ff1a2). Never invented when the
-            // fingerprint genuinely ran on several databases: attributing one
-            // database's counters to another is worse than asking nothing.
+            // exactly one database. It is the server-vantage join key: without
+            // it the detail page cannot ask for the database's own counters.
+            // Never invented when the fingerprint genuinely ran on several
+            // databases — attributing one database's counters to another is
+            // worse than asking nothing.
             if namespaces.len() == 1 {
                 merged["db_namespace"] = json!(namespaces.iter().next().unwrap());
             }
@@ -1103,24 +1143,16 @@ async fn compute_tail(
     q_start: i64,
     q_end: i64,
 ) -> Option<TailData> {
-    // THE DELTA IS THE PART OF THE CALLER'S RANGE THE ROLLUP HAS NOT COVERED.
+    // The delta is the part of the caller's range the rollup has not covered.
     //
     // The rollup offset is the split point: everything at or before it is
     // already in `_o2_db_stats` (cheap), everything after it is still only raw
     // spans (expensive). So the delta is exactly `[max(offset, q_start), q_end]`
-    // — both bounds derived from the REQUEST.
+    // — both bounds derived from the REQUEST, never from the wall clock.
     //
-    // This used to be `[max(offset, now − interval), now]`: a window off the
-    // WALL CLOCK that ignored the caller's range entirely (it was not even
-    // passed in). Two consequences, both fixed by deriving it from the query:
-    //
-    //  - it answered a question about the past with data from the present, so `collect_tails` had
-    //    to DISCARD any tail that did not overlap the requested window. A historical read paid for
-    //    a delta it then threw away.
-    //  - `now` moved on every request, so no two requests ever asked the same question and the
-    //    search result cache could never match one. Anchoring both bounds to the request is what
-    //    makes the read cacheable at all — every viewer of the same window now asks the identical
-    //    query.
+    // Deriving both bounds from the request is what makes the read cacheable:
+    // a `now`-anchored window moves on every request, so no two requests ask
+    // the same question and the search result cache can never match one.
     //
     // Clamped to the request: a rollup ahead of `q_end` (a historical window
     // fully rolled up) leaves nothing to do, and `tail_start > tail_end` would
@@ -1425,9 +1457,8 @@ async fn collect_tails(
     start_time: i64,
     end_time: i64,
 ) -> CollectedTails {
-    // ONE prefix read for every stream's offset — this used to be a meta-DB
-    // round trip per stream here, plus a second one inside each tail
-    // computation. A stream absent from the map is a fresh stream (offset 0),
+    // ONE prefix read for every stream's offset, rather than a meta-DB round
+    // trip per stream. A stream absent from the map is a fresh stream (offset 0),
     // exactly as `get_offset` answers for a missing key; a failed LIST is not
     // a fleet of fresh streams — the tails are skipped for this request and
     // staleness surfaces through `data_through` alone, the same degradation
@@ -1516,9 +1547,8 @@ fn parse_baseline_pair(
     }
 }
 
-/// Run one window reader for the current window and — CONCURRENTLY, when one
-/// was requested — the Δ baseline window. The pair used to be two sequential
-/// HTTP requests from the page.
+/// Run one window reader for the current window and — concurrently, when one
+/// was requested — the Δ baseline window.
 async fn read_current_and_baseline<T, F, Fut>(
     read_window: F,
     start_time: i64,
@@ -1566,8 +1596,7 @@ pub struct DatabasesQuery {
     /// response. The CLIENT computes the bounds — the baseline is a reader
     /// choice (previous window, same hours yesterday) this endpoint must not
     /// guess at. Both or neither; the pair rides one round trip and the two
-    /// windows are read concurrently, where the page used to issue two
-    /// requests for them.
+    /// windows are read concurrently.
     pub baseline_start_time: Option<i64>,
     pub baseline_end_time: Option<i64>,
     /// Fold the per-instance schema → service split into THIS response, keyed
@@ -1577,10 +1606,10 @@ pub struct DatabasesQuery {
     /// a drill-down nobody has opened yet on first paint.
     ///
     /// It costs no additional search: the fingerprint rows the split needs are
-    /// the `query_stats` pool this window ALREADY read to compute
+    /// the `query_stats` pool this window already read to compute
     /// `calling_services`. The fold is the same `group_query_rows(.., None,
     /// false)` the queries endpoint runs for `stmt_class=all` under an
-    /// instance scope, so the rows are the ones the page used to receive.
+    /// instance scope.
     pub include_breakdown: Option<bool>,
 }
 
@@ -2015,10 +2044,8 @@ pub async fn get_dbm_queries(
 
     // ── The zero-trace fallback, folded server-side ──────────────────────
     //
-    // The SAME conditional `/badges` runs, exposed to the tab that draws the
-    // rows: the page used to await this response and then issue
-    // `/server_queries` itself, which is two sequential round trips on the one
-    // deployment where the second is guaranteed to be needed.
+    // The same conditional `/badges` runs, exposed to the tab that draws the
+    // rows, so the fallback costs one round trip instead of two.
     //
     // Armed only by an EXACT zero. A `total` of 0 is the client vantage saying
     // truthfully "no traced traffic", which is false about the ORG when the
@@ -2379,9 +2406,8 @@ pub async fn get_dbm_query_history(
     );
 
     // FR-5 errors-by-code: the rollup's EXACT per-status-code counts
-    // (`error_class` records), summed across the windows in range. The detail
-    // page used to derive these from its capped sample rows, which undercounts
-    // exactly when errors spike.
+    // (`error_class` records), summed across the windows in range. Sample-derived
+    // counts undercount exactly when errors spike, so they are not used here.
     //
     // `error_class` rows exist at (system, instance, env) — they carry no
     // namespace/service columns, so under one of those narrower filters the
@@ -2423,9 +2449,7 @@ pub async fn get_dbm_query_history(
         }
     };
 
-    // Three independent reads over the same summary stream, CONCURRENTLY —
-    // this chain (plus the backfill and tails below) used to be a serial
-    // sequence of up to ~10 awaited searches.
+    // Three independent reads over the same summary stream, concurrently.
     let (fp_res, totals_res, error_classes) = tokio::join!(
         run_stats_search(&org_id, user_id, fp_sql, start_time, end_time),
         run_stats_search(&org_id, user_id, totals_sql, start_time, end_time),
@@ -2797,13 +2821,9 @@ pub struct SamplesQuery {
     /// Scope the ranking to ONE statement — "show me the slowest executions of
     /// this query", the question the detail page asks.
     ///
-    /// Without it that page had no endpoint to ask, so it built the SQL in the
-    /// BROWSER: raw `SELECT … FROM "<stream>" WHERE o2_db_fingerprint = '…'`,
-    /// with its own single-quote escaping and its own stream-name validator,
-    /// against a stream name that arrives from `route.query`. The predicate is
-    /// built here now, through the same escaping every other predicate in this
-    /// module uses, and the stream is resolved through `involved_streams`
-    /// rather than interpolated from a URL.
+    /// The predicate is built here, through the same escaping every other
+    /// predicate in this module uses, and the stream is resolved through
+    /// `involved_streams` rather than interpolated from a URL.
     pub fingerprint: Option<String>,
 }
 
@@ -4212,11 +4232,10 @@ fn deadlock_event_from_row(row: &Value) -> server_vantage::DeadlockEvent {
 /// every DETAIL entry: emitting banners would put a participant-less row on the
 /// page for every PG deadlock and double the visible count.
 ///
-/// The residual duplicate risk is not double-EMISSION but double-INGESTION — the
+/// The residual duplicate risk is double-INGESTION, not double-emission: the
 /// same log line ingested by both an OSS and an enterprise node in a mixed
-/// cluster is two distinct rows, and the fallback makes the previously-invisible
-/// one visible. That duplicate was always there, merely hidden; it resolves once
-/// every node is enterprise.
+/// cluster is two distinct rows, and this fallback makes both visible. It
+/// resolves once every node is enterprise.
 #[cfg(feature = "enterprise")]
 fn deadlock_event_for_row(row: &Value) -> Option<server_vantage::DeadlockEvent> {
     if get_str(row, server_vantage::O2_DBM_KIND) == server_vantage::KIND_DEADLOCK {
@@ -4369,14 +4388,10 @@ impl ScopeNarrowing {
 /// the window, not another side).
 ///
 /// **An EMPTY instance is not a group.** The shipped filelog deadlock recipes tag
-/// neither instance nor database, so every MySQL/MariaDB host reporting into one
-/// `dbm_server` stream used to land in the single bucket `("mysql", "", "")` —
-/// `unwrap_or_default()` turned "we do not know which server" into "the same
-/// server". Verified against this merge: two hosts each having their own
-/// two-sided deadlock inside the 2 s window fused into ONE 4-participant event
-/// (pids 41/42/71/72), and `rank_deadlock_shapes` then ranked a `query_shape`
-/// matching no real lock-ordering bug. The transaction-id guard does not catch it
-/// — ids differ across servers, so it PERMITS the merge.
+/// neither instance nor database, so untagged sides would otherwise all land in
+/// the single bucket `("mysql", "", "")`, fusing unrelated hosts' deadlocks into
+/// one multi-participant event. The transaction-id guard does not catch this —
+/// ids differ across servers, so it permits the merge.
 ///
 /// So an untagged side is not stitched at all: it passes through as the
 /// one-participant event it is, flagged `partial` on the wire. That over-reports
@@ -6266,10 +6281,9 @@ pub(crate) fn build_dbm_plans_sql(
         fp = server_vantage::O2_DBM_FINGERPRINT,
         fp_val = escape_sq(fingerprint),
         // A row with NO plan is not a plan row. Rows for the same statement
-        // that carry only metrics used to form their own group, so the view
-        // rendered an empty card beside the real one — and on SQL Server, where
-        // there is no hash to distinguish them, the empty group could sort
-        // first and be the only thing a reader saw.
+        // that carry only metrics must not form their own group: that renders
+        // an empty card beside the real one, and on SQL Server — where there is
+        // no hash to distinguish them — the empty group can sort first.
         plan_not_null = if has_plan {
             format!("{} IS NOT NULL", server_vantage::O2_DBM_PLAN)
         } else {
@@ -7901,8 +7915,7 @@ pub async fn get_dbm_query_insights(
     let prologue = server_prologue(org, user).await;
     let prologue = prologue.as_ref();
 
-    // No join key, no request — the same decision the page used to make in the
-    // browser.
+    // No join key, no request.
     let wants_metrics = has_server_metrics_join_key(q.engine.as_deref(), q.database.as_deref());
 
     let (plans, server_metrics) =
@@ -8341,18 +8354,15 @@ fn table_health_row_to_dto(row: &Value) -> Value {
 
 // ─── Instances (`/instances`) — the fleet's identity list ────────────────────
 //
-// WHAT THIS IS FOR, and why no existing endpoint answers it.
-//
 // Every DBM tab renders a scope filter whose "database" (instance) picker must
 // offer every instance the org HAS — not merely the ones whose rows happen to
-// be on screen. Each page used to derive its options from its own loaded rows,
-// which fails in three separate ways that all look like "the filter is broken":
+// be on screen. Deriving the options from a page's own loaded rows fails three
+// ways that all look like "the filter is broken":
 //
 //   * a feed that names no instance leaves the picker EMPTY (deadlocks return no identity of their
 //     own),
 //   * a feed no engine populates DROPS that engine (SQL Server has no session sampler, so Activity
-//     could never offer `mssql-prod-1` — while a chip set from another tab still displayed it,
-//     unselectable and unclearable),
+//     cannot offer `mssql-prod-1`),
 //   * a CAPPED read (activity stops at 100 sampled sessions) makes the list first-page-local rather
 //     than window-local.
 //
@@ -8722,12 +8732,10 @@ async fn read_table_health_body(
     };
     let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), None, &present);
 
-    // The two sections are two searches over the same stream, run CONCURRENTLY
-    // when both are wanted — they used to be two endpoints, which the page
-    // called sequentially and paid a full extra round trip for. The merge
-    // keeps their one meaningful independence: tables are the page, so a table
-    // failure is still a 500, while an index failure degrades to an empty
-    // section — the rules that need no index data must keep rendering.
+    // The two sections are two searches over the same stream, run concurrently
+    // when both are wanted. They keep one meaningful independence: tables are
+    // the page, so a table failure is a 500, while an index failure degrades to
+    // an empty section — the rules that need no index data must keep rendering.
     let table_search = async {
         match build_dbm_table_health_sql(stream, &preds, limit, &present) {
             Some(sql) => {
@@ -8921,14 +8929,8 @@ pub struct BadgesQuery {
     /// ACCEPTS each dimension — the same matrix the pages apply to their own
     /// reads, because a badge must count what its tab would show.
     ///
-    /// This used to be `system` alone, forwarded to only three of the seven
-    /// slices, which was inherited from the browser fan-out this replaced
-    /// rather than chosen. It made the strip answer a different question than
-    /// the tabs it labels: measured live, `/deadlocks` returns 91 unfiltered
-    /// and 7 under `system=postgresql`, while the badge said 91 either way,
-    /// and `/server_samples` narrows from 73 rows to 0 under
-    /// `instance=postgres` while the Slowest-calls badge could not narrow at
-    /// all — there was no field here to carry it.
+    /// Forwarding a narrower scope than a tab applies would make the strip
+    /// answer a different question than the tab it labels.
     ///
     /// A dimension a slice does not accept is simply not sent to it. That is
     /// honest rather than lossy: the databases endpoint has no namespace
@@ -8964,20 +8966,17 @@ pub(crate) struct BadgeSliceResults {
 impl BadgeSliceResults {
     /// Whether every slice was DENIED — the only case the whole request 403s.
     /// A mix of denials and other failures still answers with the members
-    /// that could: each badge owns its own failure, exactly as the browser
-    /// fan-out's `allSettled` did.
+    /// that could: each badge owns its own failure.
     pub(crate) fn all_forbidden(&self) -> bool {
         let forbidden = |r: &Result<Value, HttpResponse>| matches!(r, Err(resp) if resp.status() == axum::http::StatusCode::FORBIDDEN);
         let all =
             forbidden(&self.databases) && forbidden(&self.queries) && forbidden(&self.activity);
         // On OSS `deadlocks`, `blocking` and `table_health` are ALWAYS
         // `Err(403)` — they are Enterprise capabilities — so consulting them
-        // here would make a whole-request 403 strictly EASIER to reach: a
-        // caller who used to get a 200 with partial members (because the
-        // deadlocks slice succeeded) would now get a blanket denial. Only
-        // members that can actually succeed are consulted. A `let` rebinding
-        // rather than `#[cfg]` on a `return`, which trips
-        // `clippy::needless_return`.
+        // here would make a whole-request 403 strictly easier to reach, turning
+        // a partial-member 200 into a blanket denial. Only members that can
+        // actually succeed are consulted. A `let` rebinding rather than
+        // `#[cfg]` on a `return`, which trips `clippy::needless_return`.
         #[cfg(feature = "enterprise")]
         let all = all
             && forbidden(&self.deadlocks)
@@ -9065,10 +9064,9 @@ pub(crate) fn databases_slice_reports_zero_calls(databases: &Result<Value, HttpR
 /// GET /{org_id}/db_monitoring/badges — every tab badge in one read.
 ///
 /// Runs the six sibling endpoints' bodies concurrently and — when the
-/// client-vantage answer is exactly zero — the server-vantage fallbacks the
-/// strip used to fetch itself, so the shell's per-window cost is this call
-/// plus the page's own read. Each member is that endpoint's unchanged
-/// response body, or `null` when its read failed.
+/// client-vantage answer is exactly zero — the server-vantage fallbacks, so the
+/// shell's per-window cost is this call plus the page's own read. Each member is
+/// that endpoint's unchanged response body, or `null` when its read failed.
 #[utoipa::path(
     get,
     path = "/{org_id}/db_monitoring/badges",
@@ -9303,6 +9301,632 @@ pub async fn get_dbm_badges(
     MetaHttpResponse::json(slices.into_envelope())
 }
 
+// ─── FR-1 instance health · the receiver-vantage metric sweep ────────────────
+//
+// This sweep is served here rather than from the generic `/streams` and
+// `/_search?type=metrics` endpoints for an authorization reason, not a
+// performance one: those endpoints authorize against `metrics` and `stream`
+// objects, so a user holding only the `db_monitoring` module grant gets a 403
+// from every one of them on a page they are entitled to read. Served from a
+// `/db_monitoring/*`
+// route the read authorizes against `db_monitoring`, which is the whole point
+// of a module grant.
+//
+// THE SQL IS SERVER-CONSTRUCTED AND THE CATALOG IS A CONSTANT. There is no
+// parameter here that lets a caller name a stream or contribute SQL, and that
+// is a security property rather than an ergonomic one: the module grant must
+// buy DATABASE HEALTH COLUMNS, not arbitrary access to the metrics streams.
+// Adding a `?streams=` or `?sql=` knob would convert this endpoint into the
+// generic search API wearing a DBM route, and hand every DBM grantee exactly
+// the access the module boundary exists to withhold.
+
+/// How rows sharing a timestamp combine into one instance's figure.
+///
+/// Mirrors `DbmMetricAggregate` in `web/src/utils/dbm/instanceMetrics.ts` —
+/// the FOLD still runs in the browser (see [`build_instance_metrics_sql`] on
+/// why), so this exists to travel with the row and tell the client which rule
+/// applies without the client re-deriving it from a stream name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DbmMetricAggregate {
+    /// One row per database; only their total is the instance's figure.
+    Sum,
+    /// One reading per instance, repeated. Summing repeats would multiply a
+    /// denominator and halve every saturation figure.
+    Single,
+    /// One row per REPLICA. An instance's lag is its worst replica's; summing
+    /// reports a lag no replica actually has.
+    Max,
+}
+
+impl DbmMetricAggregate {
+    /// The wire token, matching the client's `DbmMetricAggregate` union.
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Sum => "sum",
+            Self::Single => "single",
+            Self::Max => "max",
+        }
+    }
+}
+
+/// One metric stream in the instance-health catalog.
+///
+/// A PORT of `DBM_INSTANCE_METRICS` in `web/src/utils/dbm/instanceMetrics.ts`,
+/// deliberately field-for-field: the client still folds these rows, so a
+/// divergence between the two lists is a silent wrong answer rather than a
+/// compile error. `instance_metrics_catalog_matches_the_client_spec` pins the
+/// two together against the TypeScript source itself.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct DbmMetricSpec {
+    /// Canonical engine token, matching the client vantage's `db_system`.
+    pub system: &'static str,
+    /// The role this reading plays in the health column.
+    pub role: &'static str,
+    /// The metric name as OpenObserve stores it — one stream per metric.
+    pub stream: &'static str,
+    /// A monotonic counter: the window's figure is its delta, not its reading.
+    pub cumulative: bool,
+    pub aggregate: DbmMetricAggregate,
+    /// Columns that split one instance's rows into separate series — the
+    /// database on a per-database metric, the replica on replication lag.
+    pub series_columns: &'static [&'static str],
+    /// The column carrying this engine's instance endpoint.
+    pub identity_column: &'static str,
+    /// Narrows a stream carrying several series, e.g. `mysql_threads`' kinds.
+    pub filter: Option<(&'static str, &'static str)>,
+}
+
+/// postgresqlreceiver writes its endpoint here; mysqlreceiver writes a UUID.
+const PG_IDENTITY: &str = "service_instance_id";
+/// mysqlreceiver's endpoint — the only MySQL column worth joining on.
+const MYSQL_IDENTITY: &str = "mysql_instance_endpoint";
+
+/// The metrics the health column reads.
+///
+/// Stream names are the metric names after OpenObserve's sanitisation (every
+/// run outside `[A-Za-z0-9_:]` becomes `_`), so a typo here reads an empty
+/// stream forever and is indistinguishable from a receiver switched off.
+///
+/// Every column name is a CLAIM about the collector, never a fact about the
+/// stream — collectors rename attributes across versions. Which is why
+/// [`build_instance_metrics_sql`] intersects this list with each stream's REAL
+/// schema before naming a single column.
+///
+/// NO `mariadb_*` ENTRY, deliberately. No mariadb receiver exists upstream — a
+/// MariaDB server is scraped by the MYSQL receiver pointed at it, so its
+/// readings land in the `mysql_*` streams. The client aliases `mariadb` to
+/// `mysql` at the join (`metricSystemFor`); duplicating the specs here would
+/// read every mysql stream twice and fabricate a second fleet row per instance.
+pub(crate) const DBM_INSTANCE_METRICS: &[DbmMetricSpec] = &[
+    DbmMetricSpec {
+        system: "postgresql",
+        role: "connections",
+        stream: "postgresql_backends",
+        cumulative: false,
+        aggregate: DbmMetricAggregate::Sum,
+        // The RECEIVER's attribute (`postgresql.database.name`, sanitised),
+        // not semconv's `db.namespace` — schemas are trusted over specs.
+        series_columns: &["postgresql_database_name"],
+        identity_column: PG_IDENTITY,
+        filter: None,
+    },
+    DbmMetricSpec {
+        system: "postgresql",
+        role: "connectionLimit",
+        stream: "postgresql_connection_max",
+        cumulative: false,
+        aggregate: DbmMetricAggregate::Single,
+        series_columns: &[],
+        identity_column: PG_IDENTITY,
+        filter: None,
+    },
+    DbmMetricSpec {
+        system: "postgresql",
+        role: "replicationLag",
+        stream: "postgresql_replication_data_delay",
+        cumulative: false,
+        // One row per replica (`replication_client` is the replica's address).
+        aggregate: DbmMetricAggregate::Max,
+        series_columns: &["replication_client"],
+        identity_column: PG_IDENTITY,
+        filter: None,
+    },
+    DbmMetricSpec {
+        system: "postgresql",
+        role: "cacheHit",
+        stream: "postgresql_blks_hit",
+        cumulative: true,
+        aggregate: DbmMetricAggregate::Sum,
+        series_columns: &["postgresql_database_name"],
+        identity_column: PG_IDENTITY,
+        filter: None,
+    },
+    DbmMetricSpec {
+        system: "postgresql",
+        role: "cacheRead",
+        stream: "postgresql_blks_read",
+        cumulative: true,
+        aggregate: DbmMetricAggregate::Sum,
+        series_columns: &["postgresql_database_name"],
+        identity_column: PG_IDENTITY,
+        filter: None,
+    },
+    DbmMetricSpec {
+        system: "postgresql",
+        role: "deadlocks",
+        stream: "postgresql_deadlocks",
+        cumulative: true,
+        aggregate: DbmMetricAggregate::Sum,
+        series_columns: &["postgresql_database_name"],
+        identity_column: PG_IDENTITY,
+        filter: None,
+    },
+    DbmMetricSpec {
+        system: "mysql",
+        role: "connections",
+        stream: "mysql_threads",
+        cumulative: false,
+        aggregate: DbmMetricAggregate::Sum,
+        series_columns: &[],
+        identity_column: MYSQL_IDENTITY,
+        // One stream carries all four thread kinds; `created` is a lifetime
+        // total, and summing it in reads as massive saturation.
+        filter: Some(("kind", "connected")),
+    },
+    DbmMetricSpec {
+        system: "mysql",
+        role: "replicationLag",
+        stream: "mysql_replica_time_behind_source",
+        cumulative: false,
+        aggregate: DbmMetricAggregate::Max,
+        series_columns: &[],
+        identity_column: MYSQL_IDENTITY,
+        filter: None,
+    },
+    // ONE STREAM, TWO ROLES. Postgres publishes hits and disk reads as two
+    // metrics; mysqlreceiver publishes `mysql.buffer_pool.operations` with an
+    // `operation` dimension, so both roles read one stream and are told apart
+    // by `filter`. The two values are NOT disjoint — `read_requests` counts
+    // every logical read and `reads` is the subset that missed — which is why
+    // the client routes MySQL through `overlappingCacheHitRatio`.
+    DbmMetricSpec {
+        system: "mysql",
+        role: "cacheHit",
+        stream: "mysql_buffer_pool_operations",
+        cumulative: true,
+        aggregate: DbmMetricAggregate::Sum,
+        series_columns: &[],
+        identity_column: MYSQL_IDENTITY,
+        filter: Some(("operation", "read_requests")),
+    },
+    DbmMetricSpec {
+        system: "mysql",
+        role: "cacheRead",
+        stream: "mysql_buffer_pool_operations",
+        cumulative: true,
+        aggregate: DbmMetricAggregate::Sum,
+        series_columns: &[],
+        identity_column: MYSQL_IDENTITY,
+        filter: Some(("operation", "reads")),
+    },
+    DbmMetricSpec {
+        system: "mysql",
+        role: "connectionLimit",
+        // `mysql.connection.max` from the setup card's `sqlquery/mysql_limits`
+        // recipe — mysqlreceiver publishes no `max_connections` of its own.
+        stream: "mysql_connection_max",
+        cumulative: false,
+        aggregate: DbmMetricAggregate::Single,
+        series_columns: &[],
+        identity_column: MYSQL_IDENTITY,
+        filter: None,
+    },
+];
+
+/// The wire column carrying each row's role, so one result set folds per spec.
+///
+/// The arms have DIFFERENT identity columns and different label columns, so
+/// without a discriminator a `connections` row and a `connectionLimit` row are
+/// indistinguishable once unioned and every reading folds under the wrong role.
+/// Prefixed `o2_` because it is ours, not the collector's — a receiver that one
+/// day publishes a `role` label cannot collide with it.
+const METRIC_ROLE_COL: &str = "o2_metric_role";
+
+/// The wire column carrying each row's ENGINE.
+///
+/// The role is not enough on its own: `connections` is served by
+/// `postgresql_backends` AND `mysql_threads`, so a client grouping by role
+/// alone cannot tell which of the two identity columns a row's instance came
+/// from. The join key is `(engine, host)`, so guessing wrong keys the reading
+/// under an instance that does not exist and the health cell stays blank with
+/// a full result set behind it.
+const METRIC_SYSTEM_COL: &str = "o2_metric_system";
+
+/// How many samples one instance-metrics sweep may return.
+///
+/// The whole sweep now shares ONE budget where the browser gave each of eight
+/// streams its own 5000. A metric arrives once per collection interval per
+/// instance, so this stays generous for a real fleet while bounding the union.
+const INSTANCE_METRICS_SAMPLE_LIMIT: usize = 20000;
+
+/// A stream name is interpolated as an identifier and must never escape it.
+/// The catalog is a constant so this can only ever fail on a typo above, but
+/// the gate is cheap and the failure mode it forecloses is SQL injection.
+fn is_safe_metric_stream(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b':' || b == b'-')
+}
+
+/// The whole instance-metrics sweep as ONE `UNION ALL`, or `None`.
+///
+/// One union rather than N searches: eight searches are eight DataFusion plans,
+/// eight scheduler entries and eight round trips (~208 ms wall against ~55 ms
+/// for the union on the live rig). The arms are independent scans with no join
+/// between them, so the planner runs them concurrently inside one plan and pays
+/// the fixed cost once.
+///
+/// The arms are UNIFORM because `UNION ALL` requires every arm to agree on arity
+/// and types, and the specs do not: the identity lives in
+/// `service_instance_id` on Postgres and `mysql_instance_endpoint` on MySQL,
+/// the label column is a database name here and a replica address there. So
+/// each arm PROJECTS ONTO a fixed five-column shape — timestamp, value, role,
+/// instance, series label — aliasing its own columns into it and filling an
+/// absent label with a NULL literal. The client's fold reads the shape back.
+///
+/// The fold stays the CLIENT'S. The folding rules — per-series
+/// grouping, counter differencing with reset detection, gauge-vs-counter
+/// figures, the `mariadb`→`mysql` alias, host normalisation across the two
+/// vantages — are ~200 lines pinned by `instanceMetrics.spec.ts`, and they run
+/// on rows the page already holds. Re-implementing them here would duplicate
+/// every rule in a second language with no test able to see the two drift. The
+/// EXPENSIVE half is the sweep, and that is what moved; the rows come back in
+/// exactly the shape `foldMetricRows` already consumes, so every existing
+/// client test keeps testing the code that really runs.
+///
+/// The grid stamp: the result cache resolves a complex query's timestamp
+/// column from its SELECT output, and a union is complex — so `_timestamp` is
+/// projected (it is real data here, not a synthetic stamp; the fold needs it).
+/// The `anchor_micros` grid floor rides in the ROLE column's sibling so two
+/// viewers of one window emit byte-identical SQL and share a cache entry;
+/// stamping raw `now` would give every reader its own key. See
+/// `build_dbm_instances_sql_at` for the same argument at length.
+///
+/// `fields_by_stream` is each stream's REAL schema. A stream absent from the
+/// map does not exist and is skipped — four of the catalog's metrics are
+/// `enabled: false` upstream, so a missing stream is the ORDINARY case, and
+/// naming one would 400 the entire union and blank the column for the streams
+/// that do exist.
+/// Used by the tests, which assert on the SQL TEXT; the handler wants the
+/// swept list beside it and calls [`build_instance_metrics_query`] directly.
+#[cfg(test)]
+pub(crate) fn build_instance_metrics_sql(
+    fields_by_stream: &HashMap<String, HashSet<String>>,
+    anchor_micros: i64,
+) -> Option<String> {
+    build_instance_metrics_query(fields_by_stream, anchor_micros).map(|(sql, _)| sql)
+}
+
+/// [`build_instance_metrics_sql`] with the list of specs the union ACTUALLY
+/// swept beside it.
+///
+/// The two must be derived together. A stream can be present in the schema map
+/// and still be dropped from the union — a missing identity or filter column
+/// makes it unqueryable — so a caller that reported "swept" from the schema map
+/// alone would tell the client a stream was read that never entered the query.
+/// The client folds by that list, and a role it is told to expect but never
+/// receives is a cell that renders as an unread stream rather than an absent
+/// one.
+pub(crate) fn build_instance_metrics_query(
+    fields_by_stream: &HashMap<String, HashSet<String>>,
+    anchor_micros: i64,
+) -> Option<(String, Vec<&'static DbmMetricSpec>)> {
+    // The window's upper bound, FLOORED to the rollup grid.
+    //
+    // The scan is really bounded by the request payload (the planner pushes
+    // `(start_time, end_time)` down onto each arm — see the rollup's builder
+    // note), so this predicate narrows nothing the payload had not narrowed.
+    // Its job is to make the SQL TEXT identical for every viewer of one grid
+    // window: the raw `end_time` moves with each reader's clock, and a cache
+    // key derived from SQL that never repeats is a cache that never hits.
+    let grid = rollup::floor_to_grid(anchor_micros);
+    let ts = config::TIMESTAMP_COL_NAME;
+
+    let mut arms: Vec<String> = Vec::new();
+    let mut swept: Vec<&'static DbmMetricSpec> = Vec::new();
+    for spec in DBM_INSTANCE_METRICS {
+        if !is_safe_metric_stream(spec.stream) {
+            continue;
+        }
+        let Some(fields) = fields_by_stream.get(spec.stream) else {
+            // The stream does not exist. Ordinary — skip it.
+            continue;
+        };
+        // The identity is LOAD-BEARING: a reading with no instance joins to
+        // nothing, so the stream is dropped rather than queried without it.
+        if !fields.contains(spec.identity_column) {
+            continue;
+        }
+        // A filter column is load-bearing too — `mysql_threads` without its
+        // `kind` predicate sums four thread kinds into the connection count.
+        if let Some((column, _)) = spec.filter
+            && !fields.contains(column)
+        {
+            continue;
+        }
+        // The value and timestamp are the reading itself.
+        if !fields.contains("value") || !fields.contains(ts) {
+            continue;
+        }
+        // The series columns are OPTIONAL: they buy the per-database split,
+        // and not every collector emits the label. Losing the whole health
+        // signal over one absent label inverts the contract, so a missing one
+        // costs the split and nothing else — the same trade the client's
+        // retry-without-series-columns path already makes.
+        let label = spec
+            .series_columns
+            .iter()
+            .find(|column| fields.contains(**column))
+            .map(|column| (*column).to_string())
+            .unwrap_or_else(|| "CAST(NULL AS VARCHAR)".to_string());
+
+        let filter = match spec.filter {
+            Some((column, value)) => {
+                format!(" AND {column} = '{}'", escape_sq(value))
+            }
+            None => String::new(),
+        };
+        arms.push(format!(
+            "SELECT {ts}, value AS o2_metric_value, '{role}' AS {role_col}, \
+             '{system}' AS {system_col}, \
+             {identity} AS o2_metric_instance, {label} AS o2_metric_series \
+             FROM \"{stream}\" WHERE {ts} <= {grid} AND {identity} IS NOT NULL{filter}",
+            role = spec.role,
+            role_col = METRIC_ROLE_COL,
+            // The ENGINE, projected per row. One role is served by two engines
+            // (`connections` is both `postgresql_backends` and `mysql_threads`),
+            // so a client folding by role alone cannot tell which identity
+            // column a row's instance came out of — and keying a MySQL endpoint
+            // under Postgres's column produces a key that joins to nothing.
+            system = spec.system,
+            system_col = METRIC_SYSTEM_COL,
+            identity = spec.identity_column,
+            stream = escape_ident(spec.stream),
+        ));
+        swept.push(spec);
+    }
+
+    // No arm at all is no query — a union with no arms is not valid SQL, and
+    // an empty health column is a renderable answer.
+    if arms.is_empty() {
+        return None;
+    }
+    // Newest FIRST. The search caps the rows it returns, and ordered oldest
+    // first that cap discards the most RECENT readings — "latest" then comes
+    // from early in the window and a saturated instance reads as calm.
+    Some((
+        format!(
+            "SELECT * FROM ({}) ORDER BY {ts} DESC",
+            arms.join(" UNION ALL "),
+        ),
+        swept,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct InstanceMetricsQuery {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+}
+
+/// GET /{org_id}/db_monitoring/instance_metrics — the receiver's health view.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/db_monitoring/instance_metrics",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringInstanceMetrics",
+    summary = "Database Monitoring: instance health from the collector's metric streams",
+    description = "Connection saturation, cache hit ratio, replication lag and deadlock counts for every database instance the org's collector reports on, swept from the metric streams in ONE query. The stream list and the SQL are server-constructed: this endpoint takes no stream or query parameter, so a `db_monitoring` grant buys database health columns and not general metrics access.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    )
+)]
+pub async fn get_dbm_instance_metrics(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<InstanceMetricsQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    match read_instance_metrics_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The instance-health rows, as [`get_dbm_instance_metrics`] returns them.
+///
+/// GRACEFUL DEGRADATION IS THE CONTRACT. The client deliberately does not await
+/// this read and swallows its errors — the query table is the page, and the
+/// health column is an ornament on it. So every recoverable condition here
+/// returns an EMPTY 200 rather than an error: no metric stream exists, no
+/// stream carries the identity columns, the catalog is empty. Only a genuine
+/// search failure is a 500, and the client treats even that as a blank column.
+async fn read_instance_metrics_body(
+    org_id: &str,
+    user_id: &str,
+    q: &InstanceMetricsQuery,
+) -> Result<Value, HttpResponse> {
+    // Auth BEFORE anything else, so stream existence cannot be probed by a
+    // caller who may not read it — the same ordering every sibling uses.
+    //
+    // Authorized against METRICS, which is what these streams are. On
+    // enterprise `can_read_stream` consults the `db_monitoring` module grant
+    // first and falls back to a per-stream check, so a module grantee is
+    // admitted here exactly as they are on the other DBM routes, while a caller
+    // with neither the module grant nor metrics access is denied. The stream
+    // named in the check is the
+    // catalog's first, standing for the fixed set: the caller cannot choose it.
+    let probe_stream = DBM_INSTANCE_METRICS
+        .first()
+        .map(|spec| spec.stream)
+        .unwrap_or("postgresql_backends");
+    if !can_read_stream(org_id, user_id, probe_stream, StreamType::Metrics).await {
+        return Err(unauthorized_response());
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
+    }
+
+    // Each catalog stream's REAL schema, concurrently. This is the server-side
+    // replacement for the browser's `/streams?type=metrics` catalog read plus
+    // its per-stream `/streams/{s}/schema` calls — nine round trips collapsed
+    // into cache-backed local lookups. A stream that does not exist resolves to
+    // `None` and is simply absent from the map, which is how
+    // `build_instance_metrics_sql` learns to skip it.
+    let mut wanted: Vec<&str> = DBM_INSTANCE_METRICS.iter().map(|s| s.stream).collect();
+    wanted.sort_unstable();
+    wanted.dedup();
+    let schemas = join_all(wanted.into_iter().map(|stream| async move {
+        let fields = match infra::schema::get(org_id, stream, StreamType::Metrics).await {
+            Ok(schema) => schema
+                .fields()
+                .iter()
+                .map(|f| f.name().to_string())
+                .collect::<HashSet<String>>(),
+            // A stream that has never been written has no schema. That is the
+            // ordinary "receiver not enabled" case, NOT an error.
+            Err(_) => HashSet::new(),
+        };
+        (stream.to_string(), fields)
+    }))
+    .await;
+    let fields_by_stream: HashMap<String, HashSet<String>> = schemas
+        .into_iter()
+        .filter(|(_, fields)| !fields.is_empty())
+        .collect();
+
+    let Some((sql, swept)) = build_instance_metrics_query(&fields_by_stream, end_time) else {
+        // No metric stream exists. An empty answer, not an error — this is what
+        // a deployment whose collector ships no database metrics looks like.
+        return Ok(json!({ "hits": [], "streams": [] }));
+    };
+
+    let hits = run_metrics_search(org_id, Some(user_id), sql, start_time, end_time)
+        .await
+        .map_err(|e| {
+            log::error!("[DbMonitoring] instance metrics search failed for {org_id}: {e}");
+            MetaHttpResponse::internal_error(e)
+        })?;
+
+    // Project onto the shape the client's `foldMetricRows` consumes. The spec
+    // travels WITH the rows so the client folds by the server's catalog rather
+    // than a second copy of it that could drift.
+    // Exactly the specs the union swept — NOT every stream whose schema
+    // exists. A stream present but unqueryable (no identity column) never
+    // entered the query, and telling the client to expect its role would
+    // render an unread stream as a read one that reported nothing.
+    let streams: Vec<Value> = swept
+        .iter()
+        .map(|spec| {
+            json!({
+                "stream": spec.stream,
+                "role": spec.role,
+                "system": spec.system,
+                "cumulative": spec.cumulative,
+                "aggregate": spec.aggregate.as_str(),
+            })
+        })
+        .collect();
+
+    let out: Vec<Value> = hits
+        .iter()
+        .filter_map(|row| {
+            let role = row.get(METRIC_ROLE_COL).and_then(|v| v.as_str())?;
+            let instance = row
+                .get("o2_metric_instance")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())?;
+            let value = row.get("o2_metric_value").and_then(as_f64_loose)?;
+            let timestamp = get_i64(row, config::TIMESTAMP_COL_NAME);
+            if timestamp == 0 {
+                return None;
+            }
+            let system = row.get(METRIC_SYSTEM_COL).and_then(|v| v.as_str())?;
+            let series = row
+                .get("o2_metric_series")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+            Some(json!({
+                "role": role,
+                "system": system,
+                "instance": instance,
+                "series": series,
+                "value": value,
+                config::TIMESTAMP_COL_NAME: timestamp,
+            }))
+        })
+        .collect();
+
+    Ok(json!({ "hits": out, "streams": streams }))
+}
+
+/// Run one instance-metrics query against the METRICS streams.
+///
+/// The twin of [`run_events_search`], differing only in stream type — which is
+/// the one thing that must not be shared by a parameter, because a read that
+/// names the wrong stream type consults the wrong OFGA object and silently
+/// authorizes (see [`DbmVantage`]). Cached, through the same cache wrapper
+/// every sibling read uses: the window is the caller's, so repeated views of
+/// one window share one answer.
+async fn run_metrics_search(
+    org_id: &str,
+    user_id: Option<&str>,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<Value>, anyhow::Error> {
+    let req = rollup::dbm_search_request(
+        sql,
+        start_time,
+        end_time,
+        INSTANCE_METRICS_SAMPLE_LIMIT as i64,
+        30,
+        true,
+    );
+    // `user_id` carries the role-derived query-range limit and attribution, NOT
+    // authorization — the handler above checked that already.
+    let trace_id = config::ider::generate();
+    let resp = search_service::cache::search(
+        &trace_id,
+        org_id,
+        StreamType::Metrics,
+        user_id.map(str::to_string),
+        &req,
+        String::new(),
+        false,
+        None,
+        false,
+    )
+    .await?;
+    super::hits_or_partial_error(resp, "instance_metrics")
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -9375,6 +9999,97 @@ mod tests {
     }
 
     // ── Stream RBAC ─────────────────────────────────────────────────────────
+
+    /// A role granting the `db_monitoring` MODULE
+    /// (`{"object":"db_monitoring:_all_default","permission":"AllowAll"}`) and
+    /// nothing else must reach all ten DBM endpoints.
+    ///
+    /// Six of them — `instances`, `activity`, `server_queries`, `deadlocks`,
+    /// `blocking`, `table_health` — route through `involved_streams`, which
+    /// filters every candidate through `can_read_stream`. If `can_read_stream`
+    /// consults only the `traces`/`logs`/`metrics` stream objects, the module
+    /// grant is never consulted, every candidate filters out, and each handler
+    /// maps the empty result to `unauthorized_response()`. The other four
+    /// (`badges`, `databases`, `queries`, `samples`) are rollup-backed and never
+    /// reach it.
+    ///
+    /// The module grant is the intended way to hand someone DBM: it must cover
+    /// the DB-related streams these handlers read.
+    #[test]
+    fn module_grant_alone_authorizes_a_dbm_stream_read() {
+        assert!(
+            stream_read_decision(true, false),
+            "a caller holding the db_monitoring module grant must be able to \
+             read a DBM stream with no per-stream grant — that grant is the \
+             whole point of making DBM a grantable module"
+        );
+    }
+
+    /// The guard that keeps the module-grant short-circuit from being a blanket
+    /// allow: a caller holding NEITHER the module grant NOR a per-stream grant
+    /// must still be denied. Without this, `stream_read_decision` could quietly
+    /// become `true` and every DBM read would authorize everyone.
+    #[test]
+    fn neither_grant_is_still_denied() {
+        assert!(
+            !stream_read_decision(false, false),
+            "no module grant and no stream grant must stay denied — this is \
+             the line between scoping DBM reads to the module permission and \
+             opening every stream to every org member"
+        );
+    }
+
+    /// The per-stream path DBM has always had must keep working on its own,
+    /// for callers granted individual streams rather than the module.
+    #[test]
+    fn per_stream_grant_alone_still_authorizes() {
+        assert!(
+            stream_read_decision(false, true),
+            "the pre-existing per-stream grant must keep authorizing"
+        );
+    }
+
+    /// The module grant must be consulted against the `db_monitoring` object
+    /// at the ORG level, not against a stream object.
+    ///
+    /// `db_monitoring` is registered in OFGA as a module-level resource with
+    /// no per-object entities (`Resource::new("db_monitoring", ..., false)`),
+    /// and the route table authorizes every `/{org}/db_monitoring/*` endpoint
+    /// as `EntitySource::Org` — which `resolve_permission` turns into object
+    /// id = org_id with `use_all_org = true`, i.e. the check lands on
+    /// `db_monitoring:_all_{org}`, exactly the tuple the role editor writes.
+    ///
+    /// Passing the stream name as the object id, or `use_all_org = false`,
+    /// would check `db_monitoring:{stream}` / `db_monitoring:{org}` — objects
+    /// no grant ever creates, so the module grant would silently never match
+    /// and the defect would come straight back. Asserted by scraping the
+    /// source because the call itself needs a live OFGA store.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn module_grant_is_checked_against_the_org_level_db_monitoring_object() {
+        let src = include_str!("api.rs");
+        let start = src
+            .find("async fn can_read_stream(")
+            .expect("can_read_stream must exist");
+        let body = &src[start..start + 2600];
+
+        let call = body
+            .find("check_permissions(")
+            .expect("can_read_stream must consult check_permissions");
+        let args = &body[call..body.len().min(call + 400)];
+
+        assert!(
+            args.contains("\"db_monitoring\""),
+            "can_read_stream must ask OFGA about the `db_monitoring` module \
+             object; asking only about the stream type is the defect"
+        );
+        // Object id is the org, not the stream: `db_monitoring` has no
+        // per-object entities, so a stream-named object can never match.
+        assert!(
+            !args.contains("into_ofga_supported_format(stream_name)"),
+            "the module check must not pass the stream name as the object id"
+        );
+    }
 
     /// On OSS there is no OFGA to consult, so `can_read_stream` must pass
     /// everything through — DBM's documented OSS posture is org-level
@@ -9469,16 +10184,12 @@ mod tests {
     /// is the database's own records, which arrive as LOGS. Getting this
     /// backwards consults the wrong OFGA object and SILENTLY AUTHORIZES.
     ///
-    /// This used to be five separate tests that GREPPED each handler's source
-    /// for the literal `StreamType::Logs` near its `can_read_stream(` call —
-    /// which is how they kept surviving refactors vacuously: when a check moved
-    /// out of the function the grep was pointed at, the scrape found a
-    /// different function's body (or a wrapper with no check in it) and either
-    /// panicked on an unrelated message or passed on someone else's gate. The
-    /// mapping is a pure function now, so the rule itself is a behavioural
-    /// assertion, and `assert_gates_on_vantage` only has to prove each read
-    /// NAMES its vantage — a much weaker thing to scrape, with a guard that
-    /// fails loudly if the function it scraped is not the one it meant.
+    /// The mapping is a pure function, so the rule is asserted behaviourally
+    /// rather than by grepping handler source for `StreamType::Logs` near a
+    /// `can_read_stream(` call — a scrape that passes vacuously once the check
+    /// moves. `assert_gates_on_vantage` only has to prove each read NAMES its
+    /// vantage, with a guard that fails loudly if the function it scraped is
+    /// not the one it meant.
     #[test]
     fn test_required_stream_matches_the_vantage() {
         assert_eq!(
@@ -9635,11 +10346,11 @@ mod tests {
     /// `get_dbm_query_history` takes `backfill_stream` from the caller's
     /// `?stream=` and runs up to `HISTORY_BACKFILL_MAX_WINDOWS` raw-span
     /// aggregations through `rollup::run_dbm_search` with `user_id: None`. The
-    /// `involved_streams` gate catches the same param, but it used to be the ONLY
-    /// gate and it runs after that loop: the 403 discards the aggregates, so
-    /// nothing leaks, but the queries had already executed against another team's
-    /// stream and their duration is observable. `get_dbm_query_endpoints`
-    /// (`can_read_stream` at the top, before range parsing) is the pattern.
+    /// `involved_streams` gate catches the same param but runs after that loop:
+    /// its 403 discards the aggregates, so nothing leaks, yet the queries have
+    /// already executed against another team's stream and their duration is
+    /// observable. `get_dbm_query_endpoints` (`can_read_stream` at the top,
+    /// before range parsing) is the pattern.
     ///
     /// Asserted on SOURCE ORDER because it cannot be asserted on behaviour here:
     /// `can_read_stream` is unconditionally permissive on OSS (see
@@ -9747,7 +10458,7 @@ mod tests {
         }
     }
 
-    // THE REGRESSION THAT WAS SILENTLY LIVE. Rollup `_timestamp` is the window
+    // Rollup `_timestamp` is the window
     // END, so a row stamped exactly on `start_time` is the PREVIOUS range's
     // last window: two adjacent reads sharing an edge must not both count it.
     // The payload filter is `>= lo AND < hi`, so excluding that row requires
@@ -10748,7 +11459,7 @@ mod tests {
             "a missing stream must be a null section, never an empty list that \
              reads as 'no callers'"
         );
-        // The standalone route survives — this wave adds, never removes.
+        // The standalone route stays registered alongside the folded section.
         assert!(src.contains("pub async fn get_dbm_query_endpoints("));
     }
 
@@ -10827,8 +11538,7 @@ mod tests {
         }
         // A 403 survives as a 403 rather than becoming "nothing captured".
         assert!(handler.contains("unauthorized_response()"));
-        // Both superseded routes stay registered — this wave adds, never
-        // removes.
+        // Both superseded routes stay registered for compatibility.
         assert!(src.contains("pub async fn get_dbm_query_plans("));
         assert!(src.contains("pub async fn get_dbm_query_server_metrics("));
     }
@@ -10923,8 +11633,8 @@ mod tests {
         assert!(folded.as_object().unwrap().is_empty());
     }
 
-    /// Capped per instance at the same limit the page used to pass, and ranked
-    /// heaviest first so the cap keeps the rows that carry the shape.
+    /// Capped per instance and ranked heaviest first, so the cap keeps the rows
+    /// that carry the shape.
     #[test]
     fn test_fold_breakdown_by_instance_ranks_and_caps() {
         let pool: Vec<Value> = (0..DEFAULT_BREAKDOWN_LIMIT + 10)
@@ -11263,14 +11973,13 @@ mod tests {
 
     // ── A failed schema read is an error, not an empty schema ───────────────
     //
-    // `present_dbm_columns` used to end in `.unwrap_or_default()`, which made an
-    // `Err` from `infra::schema::get` indistinguishable from "this stream has no
-    // DBM columns". The two tests below pin the two halves of the fix: the type
-    // can now CARRY an error, and the honest empty case is still `Ok`.
+    // An `Err` from `infra::schema::get` must stay distinguishable from "this
+    // stream has no DBM columns". The two tests below pin both halves: the type
+    // CARRIES an error, and the honest empty case is still `Ok`.
 
     /// The signature must be able to say "the read failed".
     ///
-    /// Asserted structurally rather than by faking a DB fault: with the old
+    /// Asserted structurally rather than by faking a DB fault: with a bare
     /// `-> HashSet<String>` return type there is no value that expresses failure
     /// at all, so both callers were forced to invent a verdict from an empty set.
     /// A nonexistent stream is NOT that failure — `infra::schema::get` answers
@@ -11303,17 +12012,15 @@ mod tests {
         );
     }
 
-    /// The signature alone is not the fix — every CALLER must honour it.
+    /// The signature alone is not enough — every CALLER must honour it.
     ///
-    /// Mutation-tested: reintroducing the bug one level up
-    /// (`present_dbm_columns(..).await.unwrap_or_default()` at a call site) keeps
-    /// the honest `Result` type and passes every other test in this file, while
-    /// restoring the exact false verdict — so the call sites are pinned too.
+    /// Mutation-tested: `present_dbm_columns(..).await.unwrap_or_default()` at a
+    /// call site keeps the honest `Result` type and passes every other test in
+    /// this file while restoring the false verdict, so the call sites are pinned
+    /// too.
     ///
-    /// The handler list is DISCOVERED from the source rather than hardcoded.
-    /// It used to name `deadlocks` and `blocking` literally, which meant a new
-    /// `get_dbm_*` handler silently escaped the guard — the one failure mode a
-    /// pinning test must not have, since nothing would fail to tell you.
+    /// The handler list is DISCOVERED from the source rather than hardcoded, so
+    /// a new `get_dbm_*` handler cannot silently escape the guard.
     #[test]
     fn test_no_caller_swallows_a_schema_read_error() {
         let src = include_str!("api.rs");
@@ -11557,13 +12264,11 @@ mod tests {
     /// THE FINDING: the boundary TIMESTAMP cannot move the verdict, in either
     /// direction, at any position relative to the window.
     ///
-    /// This started as an "is the boundary inclusive at `start_time`" test and
-    /// became the test that killed the boundary. Sweeping the earliest canonical
-    /// row across every interesting position — before the window, exactly at its
-    /// start, one microsecond after, deep inside, and absent altogether — while
-    /// holding `has_raw_row` fixed must not change the answer once. If a future
-    /// change makes it change, the mechanism has silently acquired a
-    /// timestamp-comparison bug of exactly the kind that hides raw rows under
+    /// Sweeping the earliest canonical row across every interesting position —
+    /// before the window, exactly at its start, one microsecond after, deep
+    /// inside, and absent altogether — while holding `has_raw_row` fixed must
+    /// not change the answer once. If it does, the mechanism has acquired a
+    /// timestamp-comparison bug of the kind that hides raw rows under
     /// interleaving.
     #[cfg(feature = "enterprise")]
     #[test]
@@ -11931,9 +12636,8 @@ mod tests {
             50,
             &proj(&all_cols(), None),
         );
-        // `WHERE`, not `AND`: the kind predicate now LEADS the clause. The
-        // `_timestamp` bound that used to precede it moved into the request
-        // payload, so nothing is left for it to be conjoined to.
+        // `WHERE`, not `AND`: the kind predicate LEADS the clause, because the
+        // `_timestamp` bound rides the request payload rather than the SQL.
         let expected_kind = format!("WHERE {} = 'deadlock'", server_vantage::O2_DBM_KIND);
         assert!(
             off.contains(&expected_kind),
@@ -12579,13 +13283,12 @@ mod tests {
     /// — `*** (N) TRANSACTION:` carries the thread and statement, while
     /// `*** (N) HOLDS THE LOCK(S):` carries the locked object, the lock mode and
     /// the DATABASE. `line_start_pattern` splits on the timestamp, so the two
-    /// can never share a record. Measured on the rig before this was handled: of
-    /// 108 records carrying a participant, ZERO carried a database; of 252
-    /// carrying a database, ZERO carried a participant. Every stitched deadlock
-    /// therefore had `objects: []`, null lock_mode/lock_target and a null
-    /// database — and because `my_db` is the ONLY MySQL source in
-    /// `detect_database`, the Deadlocks tab's `?database=` filter could not work
-    /// on MySQL or MariaDB at all.
+    /// can never share a record: a participant record carries no database and a
+    /// database record carries no participant. Without stitching them, every
+    /// deadlock has `objects: []`, null lock_mode/lock_target and a null
+    /// database — and since `my_db` is the ONLY MySQL source in
+    /// `detect_database`, the Deadlocks tab's `?database=` filter cannot work on
+    /// MySQL or MariaDB at all.
     ///
     /// Three things have to hold together, and each broke the other two when it
     /// was got wrong:
@@ -14864,7 +15567,7 @@ mod tests {
     /// `not_collecting() == true` on a perfectly healthy stream.
     ///
     /// Under `OR`, that blip makes the page announce a broken collector WHILE
-    /// RENDERING SESSIONS. Found by a surviving `&& → ||` mutation.
+    /// RENDERING SESSIONS.
     #[test]
     fn test_not_collecting_requires_both_an_empty_page_and_a_silent_probe() {
         let silent = CollectionProbe::default();
@@ -15987,10 +16690,9 @@ mod tests {
     /// The whole point of this endpoint: NO kind predicate.
     ///
     /// Every feed's records carry the identity columns, so filtering to one
-    /// kind reintroduces exactly the per-feed incompleteness this exists to
-    /// remove. Measured on the rig before the fix, a per-feed list named 2 of
-    /// 4 engines from activity, 2 of 4 from table_health and 0 of 4 from
-    /// deadlocks — so a tab could not offer an instance it had no rows for.
+    /// kind reintroduces the per-feed incompleteness this exists to remove: a
+    /// per-feed list names only the engines that feed has rows for, so a tab
+    /// could not offer an instance it had no rows for.
     #[test]
     fn test_instances_sql_unions_every_feed() {
         let sql = build_dbm_instances_sql("dbm_server", None, &all_cols()).expect("instances sql");
@@ -16959,35 +17661,14 @@ mod tests {
         );
     }
 
-    /// A BADGE COUNTS WHAT ITS TAB WOULD SHOW.
+    /// A capped read must say so.
     ///
-    /// `/badges` used to forward only `system`, and only to the databases,
-    /// queries and server-fallback slices — the four event slices were
-    /// constructed with every dimension hardcoded `None`. That was inherited
-    /// from the browser fan-out it replaced rather than chosen, and it made the
-    /// strip answer a different question than the tabs it labels: measured
-    /// live, `/deadlocks` returns 91 unfiltered and 7 under
-    /// `system=postgresql`, while the Deadlocks BADGE said 91 either way.
-    /// Slowest calls was worse — `/server_samples` honours `instance` (73 rows
-    /// to 0), but the badge could not narrow at all, because `BadgesQuery` had
-    /// no field to carry it.
-    ///
-    /// Each dimension goes to exactly the slices whose endpoint ACCEPTS it —
-    /// the same matrix the pages already use, so a badge and its tab are
-    /// answering one question. A dimension a slice does not accept is simply
-    /// not sent to it, which is honest rather than lossy: the Overview tab
-    /// cannot narrow by namespace either.
-    /// A CAPPED READ MUST SAY SO.
-    ///
-    /// `/table_health` returns `total: hits.len()` and no `truncated` flag at
-    /// all, while every sibling that caps discloses it with
-    /// `rows.len() >= limit`. Measured live: `?limit=100` answers `total: 100`
-    /// and `?limit=500` answers `total: 500` — the number is the row cap, not
-    /// the population, and it is the number the Table health BADGE prints. So
-    /// a fleet with 400 relations rendered a stable `100`, which reads as a
-    /// measurement that is not changing rather than one that is not being
-    /// taken. `badgeCount` already renders a capped claim as `100+`; it was
-    /// never given one to render.
+    /// `/table_health` returns `total: hits.len()`, so without a `truncated`
+    /// flag the number is the row cap rather than the population — and it is
+    /// the number the Table health badge prints, making a capped count read as
+    /// a stable measurement. Every sibling that caps discloses it with
+    /// `rows.len() >= limit`, and `badgeCount` renders a capped claim as
+    /// `100+`.
     #[test]
     fn test_table_health_discloses_its_row_cap() {
         let src = include_str!("api.rs");
@@ -17007,6 +17688,8 @@ mod tests {
         );
     }
 
+    /// A badge counts what its tab would show: each scope dimension reaches
+    /// exactly the slices whose endpoint accepts it.
     #[test]
     fn test_badges_forwards_each_dimension_to_the_slices_that_accept_it() {
         let src = include_str!("api.rs");
@@ -17235,15 +17918,16 @@ mod tests {
                 );
             }
         }
-        // FOUR, not three: the stats harness, the events harness, and the rollup
+        // FIVE: the stats harness, the events harness, the METRICS harness
+        // (`run_metrics_search`, the instance-health sweep), and the rollup
         // harness — the last spelling the call TWICE, once through the cache
         // wrapper (reads) and once through the bare planner (the rollup writer,
-        // which must not cache). Both branches consume a response; both guarded.
+        // which must not cache). Every branch consumes a response; all guarded.
         assert_eq!(
-            total, 4,
-            "expected the stats and events harnesses plus the rollup harness's \
-             cached/uncached pair; found {total} — a new search was added, and \
-             it must decide what it does with a partial response"
+            total, 5,
+            "expected the stats, events and metrics harnesses plus the rollup \
+             harness's cached/uncached pair; found {total} — a new search was \
+             added, and it must decide what it does with a partial response"
         );
     }
 
@@ -17342,6 +18026,451 @@ mod tests {
             code.contains("hits_or_partial_error"),
             "propagating an error the read never raises defends nothing — the \
              partial guard must exist for this ordering to matter"
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests_instance_metrics {
+    use super::*;
+
+    /// Every stream the catalog names, as a schema-complete deployment.
+    fn all_metric_fields() -> HashMap<String, HashSet<String>> {
+        DBM_INSTANCE_METRICS
+            .iter()
+            .map(|spec| {
+                let mut fields: HashSet<String> = HashSet::new();
+                fields.insert(config::TIMESTAMP_COL_NAME.to_string());
+                fields.insert("value".to_string());
+                fields.insert(spec.identity_column.to_string());
+                for column in spec.series_columns {
+                    fields.insert((*column).to_string());
+                }
+                if let Some((column, _)) = spec.filter {
+                    fields.insert(column.to_string());
+                }
+                (spec.stream.to_string(), fields)
+            })
+            .collect()
+    }
+
+    /// RED 1 — the sweep is ONE query, not N.
+    ///
+    /// The whole speedup is that eight searches become one UNION ALL, so the
+    /// builder must emit a single statement that names every present stream.
+    #[test]
+    fn test_instance_metrics_sql_is_one_union_over_every_present_stream() {
+        let fields = all_metric_fields();
+        let sql = build_instance_metrics_sql(&fields, 1_800_000_000_000_000)
+            .expect("a schema-complete deployment must yield sql");
+
+        for spec in DBM_INSTANCE_METRICS {
+            assert!(
+                sql.contains(&format!("FROM \"{}\"", spec.stream)),
+                "every present stream must be a UNION arm: {} missing from {sql}",
+                spec.stream
+            );
+        }
+        assert!(
+            sql.contains("UNION ALL"),
+            "the sweep must be one union, not N searches: {sql}"
+        );
+    }
+
+    /// RED 2 — a stream that does not exist is SKIPPED, not an error.
+    ///
+    /// Four of the catalog's metrics are `enabled: false` upstream, so a
+    /// missing stream is the ordinary case. Naming one in the union 400s the
+    /// whole read and blanks the health column for the streams that DO exist.
+    #[test]
+    fn test_absent_metric_stream_is_skipped_rather_than_named() {
+        let mut fields = all_metric_fields();
+        fields.remove("postgresql_deadlocks");
+        let sql = build_instance_metrics_sql(&fields, 1_800_000_000_000_000).expect("sql");
+
+        assert!(
+            !sql.contains("postgresql_deadlocks"),
+            "an absent stream must not be named — it 400s the whole union: {sql}"
+        );
+        assert!(
+            sql.contains("FROM \"postgresql_backends\""),
+            "the streams that DO exist must still be read: {sql}"
+        );
+    }
+
+    /// RED 3 — no present stream at all is `None`, never a malformed union.
+    #[test]
+    fn test_no_present_streams_yields_no_sql() {
+        assert!(
+            build_instance_metrics_sql(&HashMap::new(), 1_800_000_000_000_000).is_none(),
+            "an empty catalog must yield no query rather than a union with no arms"
+        );
+    }
+
+    /// RED 4 — every arm carries the ROLE, so one result set folds per spec.
+    ///
+    /// The arms have different identity columns and different label columns;
+    /// without a discriminator the client cannot tell a `connections` row from
+    /// a `connectionLimit` row and every reading folds under the wrong role.
+    #[test]
+    fn test_every_union_arm_tags_its_role_and_stream() {
+        let fields = all_metric_fields();
+        let sql = build_instance_metrics_sql(&fields, 1_800_000_000_000_000).expect("sql");
+        for spec in DBM_INSTANCE_METRICS {
+            assert!(
+                sql.contains(&format!("'{}' AS o2_metric_role", spec.role)),
+                "role {} must be projected so the fold can route the row: {sql}",
+                spec.role
+            );
+        }
+    }
+
+    /// RED 5 — a stream missing its IDENTITY column is dropped whole.
+    ///
+    /// The identity is what joins a reading to a database row. Querying around
+    /// it would return numbers that belong to no instance, and naming a column
+    /// the stream lacks 400s the union.
+    #[test]
+    fn test_stream_without_its_identity_column_is_dropped() {
+        let mut fields = all_metric_fields();
+        fields
+            .get_mut("postgresql_backends")
+            .expect("fixture")
+            .remove("service_instance_id");
+        let sql = build_instance_metrics_sql(&fields, 1_800_000_000_000_000).expect("sql");
+        assert!(
+            !sql.contains("postgresql_backends"),
+            "a reading with no instance identity joins to nothing: {sql}"
+        );
+    }
+
+    /// RED 6 — a missing OPTIONAL label column costs the split, not the stream.
+    ///
+    /// The series columns buy the per-database split. Losing the whole health
+    /// signal over one optional label inverts the contract — the client's
+    /// `collectInstanceMetrics` already retries without them for this reason.
+    #[test]
+    fn test_missing_series_column_keeps_the_stream_without_the_split() {
+        let mut fields = all_metric_fields();
+        fields
+            .get_mut("postgresql_backends")
+            .expect("fixture")
+            .remove("postgresql_database_name");
+        let sql = build_instance_metrics_sql(&fields, 1_800_000_000_000_000).expect("sql");
+        // Scoped to the AFFECTED arm: the sibling streams still carry the
+        // label legitimately, so asserting over the whole union would pass
+        // only by accident and fail for the wrong reason.
+        let arm = sql
+            .split(" UNION ALL ")
+            .find(|arm| arm.contains("FROM \"postgresql_backends\""))
+            .expect("an optional label must not cost the whole stream");
+        assert!(
+            !arm.contains("postgresql_database_name"),
+            "a column this stream lacks must not be named in its arm: {arm}"
+        );
+        assert!(
+            arm.contains("CAST(NULL AS VARCHAR) AS o2_metric_series"),
+            "the arm must still project the union's fixed shape: {arm}"
+        );
+        // The union stays uniform — the label column is filled, not dropped.
+        assert!(
+            sql.contains("postgresql_database_name AS o2_metric_series"),
+            "streams that DO carry the label must keep their split: {sql}"
+        );
+    }
+
+    /// RED 7 — the window is GRID-STAMPED, so the result cache can key it.
+    ///
+    /// Same rule the instances read follows: two viewers of one window must
+    /// produce byte-identical SQL, or the cache key differs and no entry is
+    /// ever reused.
+    #[test]
+    fn test_instance_metrics_sql_is_stable_within_a_grid_window() {
+        let fields = all_metric_fields();
+        let end = 1_800_000_000_000_000_i64;
+        let a = build_instance_metrics_sql(&fields, end).expect("sql");
+        let b = build_instance_metrics_sql(&fields, end + 1_000_000).expect("sql");
+        assert_eq!(
+            a, b,
+            "two reads one second apart in one window must hash to the same cache key"
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests_instance_metrics_contract {
+    use super::*;
+
+    /// The client TypeScript source, read at compile time.
+    ///
+    /// Path is relative to this file:
+    ///   src/core/src/traces/db_monitoring/api.rs
+    ///   → ../../../../../web/src/utils/dbm/instanceMetrics.ts
+    const CLIENT_SPEC: &str = include_str!("../../../../../web/src/utils/dbm/instanceMetrics.ts");
+
+    /// The catalog here and the catalog in the browser must name the SAME
+    /// streams.
+    ///
+    /// The fold still runs client-side, keyed by role, so a stream this server
+    /// sweeps but the client cannot fold is wasted work, and a stream the
+    /// client expects but this server never sweeps is a silently blank health
+    /// cell. Neither shows up as a failure anywhere else — the page just
+    /// renders slightly less, which is exactly the defect class this whole
+    /// module keeps refusing to ship.
+    #[test]
+    fn instance_metrics_catalog_matches_the_client_spec() {
+        for spec in DBM_INSTANCE_METRICS {
+            assert!(
+                CLIENT_SPEC.contains(&format!("stream: \"{}\"", spec.stream)),
+                "server sweeps `{}` but the client spec does not name it — the \
+                 rows come back and nothing folds them",
+                spec.stream
+            );
+            assert!(
+                CLIENT_SPEC.contains(&format!("role: \"{}\"", spec.role)),
+                "server tags rows `{}` but the client knows no such role",
+                spec.role
+            );
+        }
+        // And the other direction: a stream the CLIENT names that this server
+        // never sweeps is a permanently blank cell.
+        for line in CLIENT_SPEC.lines() {
+            let Some(rest) = line.trim().strip_prefix("stream: \"") else {
+                continue;
+            };
+            let Some(stream) = rest.split('"').next() else {
+                continue;
+            };
+            assert!(
+                DBM_INSTANCE_METRICS.iter().any(|s| s.stream == stream),
+                "the client spec names `{stream}` but the server sweep omits it \
+                 — that cell can never populate"
+            );
+        }
+    }
+
+    /// The identity columns must agree across the two languages too.
+    ///
+    /// The identity is what joins a reading to a database row. If the server
+    /// projected `service_instance_id` where the client reads
+    /// `mysql_instance_endpoint`, every row would arrive and every one would
+    /// fail to join — a blank column with a full result set behind it.
+    #[test]
+    fn instance_metrics_identity_columns_match_the_client_spec() {
+        assert!(
+            CLIENT_SPEC.contains("PG_IDENTITY = \"service_instance_id\""),
+            "the client's Postgres identity column moved; the server's join key \
+             is now wrong and every PG health cell will blank"
+        );
+        assert!(
+            CLIENT_SPEC.contains("MYSQL_IDENTITY = \"mysql_instance_endpoint\""),
+            "the client's MySQL identity column moved; see above"
+        );
+        for spec in DBM_INSTANCE_METRICS {
+            let expected = match spec.system {
+                "postgresql" => PG_IDENTITY,
+                "mysql" => MYSQL_IDENTITY,
+                other => panic!("unknown engine in the catalog: {other}"),
+            };
+            assert_eq!(
+                spec.identity_column, expected,
+                "`{}` must join on its own engine's identity column — MySQL's \
+                 `service_instance_id` is a UUID and joins to nothing",
+                spec.stream
+            );
+        }
+    }
+
+    /// The endpoint accepts NO stream and NO SQL from the caller.
+    ///
+    /// This is the security property the whole design rests on. The
+    /// `db_monitoring` module grant is meant to buy DATABASE HEALTH COLUMNS;
+    /// a `?streams=` or `?sql=` parameter would turn this route into the
+    /// generic metrics search API wearing a DBM path, and hand every DBM
+    /// grantee exactly the arbitrary metrics access the module boundary exists
+    /// to withhold. Asserted structurally because no behavioural test can see
+    /// a parameter that was never added.
+    #[test]
+    fn instance_metrics_query_accepts_no_caller_supplied_sql_or_streams() {
+        let src = include_str!("api.rs");
+        let start = src
+            .find("pub struct InstanceMetricsQuery {")
+            .expect("InstanceMetricsQuery must exist");
+        let end = start
+            + src[start..]
+                .find('}')
+                .expect("InstanceMetricsQuery must be a struct");
+        let body = &src[start..end];
+
+        for forbidden in ["sql", "stream", "streams", "query", "table", "metric"] {
+            assert!(
+                !body.contains(&format!("pub {forbidden}:")),
+                "InstanceMetricsQuery must not accept `{forbidden}` — the SQL and \
+                 the stream list are server-constructed, and that is a security \
+                 property, not a convenience:\n{body}"
+            );
+        }
+        // Only the window is the caller's.
+        assert!(
+            body.contains("pub start_time:") && body.contains("pub end_time:"),
+            "the window is the one thing the caller does supply:\n{body}"
+        );
+    }
+
+    /// Every stream the sweep can ever name is a safe identifier.
+    ///
+    /// The catalog is a constant, so this can only fail on a typo — but the
+    /// failure it forecloses is SQL injection through a table name, and the
+    /// guard is one loop.
+    #[test]
+    fn every_catalog_stream_is_a_safe_identifier() {
+        for spec in DBM_INSTANCE_METRICS {
+            assert!(
+                is_safe_metric_stream(spec.stream),
+                "`{}` is not a safe identifier and would be interpolated into \
+                 a FROM clause",
+                spec.stream
+            );
+            if let Some((column, value)) = spec.filter {
+                assert!(
+                    is_safe_metric_stream(column),
+                    "filter column `{column}` is interpolated bare into the WHERE"
+                );
+                assert!(
+                    !value.contains('\''),
+                    "filter value `{value}` must not carry a quote"
+                );
+            }
+        }
+    }
+
+    /// A caller with NEITHER the module grant NOR metrics access is denied.
+    ///
+    /// The endpoint's whole reason for existing is that the `db_monitoring`
+    /// module grant admits a caller the generic `/streams` and `/_search`
+    /// routes turned away. That must not become "admits everyone": the read
+    /// goes through `can_read_stream`, whose deny path is
+    /// `stream_read_decision(false, false)`.
+    #[test]
+    fn instance_metrics_denies_a_caller_with_neither_grant() {
+        assert!(
+            !stream_read_decision(false, false),
+            "no module grant and no metrics grant must stay denied"
+        );
+    }
+
+    /// The read authorizes against METRICS, which is what these streams are.
+    ///
+    /// Naming the wrong stream type consults the wrong OFGA object and
+    /// SILENTLY AUTHORIZES — the one wire-up mistake in this file with a
+    /// security consequence (see `DbmVantage`). These streams are neither
+    /// vantage's: they are the COLLECTOR's, so the check names
+    /// `StreamType::Metrics` directly rather than borrowing a vantage.
+    #[test]
+    fn instance_metrics_authorizes_against_the_metrics_stream_type() {
+        let src = include_str!("api.rs");
+        let start = src
+            .find("async fn read_instance_metrics_body(")
+            .expect("the read body must exist");
+        let body = &src[start..start + 2200];
+        let call = body
+            .find("can_read_stream(")
+            .expect("the read must authorize before it does anything else");
+        let args = &body[call..body.len().min(call + 200)];
+        assert!(
+            args.contains("StreamType::Metrics"),
+            "these are metrics streams; authorizing them as Logs or Traces \
+             consults an object no grant ever creates:\n{args}"
+        );
+        // Auth comes FIRST — before the range parse and before any schema
+        // lookup, so stream existence cannot be probed by a caller who may not
+        // read it. Same ordering every sibling enforces.
+        let range = body
+            .find("resolve_range(")
+            .expect("the read must resolve its range");
+        assert!(
+            call < range,
+            "auth must precede range parsing and schema reads, or existence \
+             becomes probeable"
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests_instance_metrics_swept {
+    use super::*;
+
+    fn fields_for(spec: &DbmMetricSpec) -> HashSet<String> {
+        let mut fields: HashSet<String> = HashSet::new();
+        fields.insert(config::TIMESTAMP_COL_NAME.to_string());
+        fields.insert("value".to_string());
+        fields.insert(spec.identity_column.to_string());
+        for column in spec.series_columns {
+            fields.insert((*column).to_string());
+        }
+        if let Some((column, _)) = spec.filter {
+            fields.insert(column.to_string());
+        }
+        fields
+    }
+
+    fn all_metric_fields() -> HashMap<String, HashSet<String>> {
+        DBM_INSTANCE_METRICS
+            .iter()
+            .map(|spec| (spec.stream.to_string(), fields_for(spec)))
+            .collect()
+    }
+
+    /// The reported sweep list is what the QUERY did, not what the schema map
+    /// held.
+    ///
+    /// A stream can exist and still be unqueryable — no identity column means
+    /// its readings join to nothing, so it never enters the union. Reporting
+    /// it as swept tells the client to expect a role that can never arrive,
+    /// and the cell renders an unread stream as a read one that found nothing.
+    /// Those are different facts and the page words them differently.
+    #[test]
+    fn swept_list_names_only_the_streams_the_union_really_reads() {
+        let mut fields = all_metric_fields();
+        // Present in the catalog, but missing the column that makes it
+        // queryable — the exact case the schema map alone cannot see.
+        fields
+            .get_mut("postgresql_backends")
+            .expect("fixture")
+            .remove("service_instance_id");
+
+        let (sql, swept) =
+            build_instance_metrics_query(&fields, 1_800_000_000_000_000).expect("sql");
+
+        assert!(
+            !swept
+                .iter()
+                .any(|spec| spec.stream == "postgresql_backends"),
+            "a stream dropped from the union must not be reported as swept"
+        );
+        assert!(
+            !sql.contains("postgresql_backends"),
+            "and it must genuinely not be in the query: {sql}"
+        );
+        // Every stream that IS reported swept must really be an arm.
+        for spec in &swept {
+            assert!(
+                sql.contains(&format!("FROM \"{}\"", spec.stream)),
+                "`{}` is reported swept but is not a union arm",
+                spec.stream
+            );
+        }
+    }
+
+    /// Every arm of the union is reported, so the client can fold all of it.
+    #[test]
+    fn swept_list_covers_every_arm_of_a_complete_sweep() {
+        let (_, swept) =
+            build_instance_metrics_query(&all_metric_fields(), 1_800_000_000_000_000).expect("sql");
+        assert_eq!(
+            swept.len(),
+            DBM_INSTANCE_METRICS.len(),
+            "a schema-complete deployment must report every catalog entry as swept"
         );
     }
 }

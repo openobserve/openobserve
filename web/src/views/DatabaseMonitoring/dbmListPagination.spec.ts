@@ -16,11 +16,10 @@
 /**
  * The DBM list pages paginate, and a capped page says so.
  *
- * Every one of them shipped `pagination="none"`, which is defensible only while
- * the row count is small: with a 500-row activity sample the reader gets one
- * unbounded scroll and no way to say "page 3". Turning pagination on is a
- * one-prop change, so the regression worth pinning is not that the prop flipped
- * — it is the HONESTY consequence of flipping it.
+ * `pagination="none"` is defensible only while the row count is small: with a
+ * 500-row activity sample the reader gets one unbounded scroll and no way to
+ * say "page 3". Turning pagination on is a one-prop change, so what is worth
+ * pinning is not the prop itself but the honesty consequence of it.
  *
  * The capped endpoints (`/activity`, `/deadlocks`, `/blocking`, `/samples`)
  * cap their reads and disclose it with `truncated`. `OTablePagination` prints
@@ -182,9 +181,8 @@ describe("pagination never claims a capped read is complete", () => {
 });
 
 /**
- * Behaviour the pages ALREADY have, which pagination must not quietly take
- * away. Regression guards, kept in their own block so a failure in the
- * pagination suites above stays legible on its own.
+ * Behaviour pagination must not quietly take away, kept in its own block so a
+ * failure in the pagination suites above stays legible on its own.
  */
 describe("paginating the lists does not cost them their existing honesty", () => {
   /**

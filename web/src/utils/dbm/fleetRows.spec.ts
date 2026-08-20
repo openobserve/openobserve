@@ -249,8 +249,7 @@ describe("unionFleetRows", () => {
 
   // The engine filter is a request param, so the server applies it to the
   // client rows only. Appending every discovered instance regardless would put
-  // MySQL rows on screen under a chip that says "postgresql" — a filter that
-  // lies is worse than no filter.
+  // MySQL rows on screen under a chip that says "postgresql".
   it("honours an engine filter for the instances it discovers", () => {
     const rows = unionFleetRows(
       [],

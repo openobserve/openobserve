@@ -16,12 +16,11 @@
 //! Golden-corpus table tests for the DBM normalizer/enrichment
 //! (spec: `docs/___databsepages/plans-and-specs/2026-08-07-dbm-phase1-test-approach-design.md` §2).
 //!
-//! RED-phase rules encoded here:
-//! - fingerprints are asserted via EQUALITY CLASSES (`fingerprint_class`), never literal hashes —
-//!   the hash manifest joins only after first green, together with the `fp_version` meta-test;
+//! Assertion rules:
+//! - fingerprints are asserted via EQUALITY CLASSES (`fingerprint_class`), never literal hashes;
 //! - every other `expect` field is asserted literally against the full `o2_db_*` record;
-//! - the NFR-2 blanket invariant: no declared literal from ANY case may appear as a substring of
-//!   `query_norm` in ANY case — raw-text fallback can never make the suite green.
+//! - NFR-2 blanket invariant: no declared literal from ANY case may appear as a substring of
+//!   `query_norm` in ANY case, so a raw-text fallback can never make the suite green.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -184,8 +183,8 @@ fn assert_str_field(id: &str, out: &BTreeMap<String, Value>, key: &str, expect: 
     );
 }
 
-/// Run enrich for one case and assert the full `o2_db_*` record (everything except the
-/// fingerprint value, which is only class-asserted in the red phase).
+/// Run enrich for one case and assert the full `o2_db_*` record. The fingerprint VALUE is
+/// asserted only through equality classes, never as a literal hash.
 pub(super) fn check_case(case: &Case) -> Option<BTreeMap<String, Value>> {
     let out = enrich(&case.input.attrs, case.input.span_kind);
     match &case.expect {
@@ -206,7 +205,7 @@ pub(super) fn check_case(case: &Case) -> Option<BTreeMap<String, Value>> {
                 )
             });
             // Fingerprint: always present, 16 lowercase hex chars (design §3.1). The VALUE is
-            // asserted only through equality classes — never a literal hash in the red phase.
+            // asserted only through equality classes, never as a literal hash.
             let fp = out_str(&out, O2_DB_FINGERPRINT)
                 .unwrap_or_else(|| panic!("case {}: o2_db_fingerprint missing", case.id));
             assert!(
@@ -286,8 +285,8 @@ fn corpus_all_files() {
 
 // -- cross-corpus invariants -------------------------------------------------
 
-/// Red-phase fingerprint rule: cases sharing a `fingerprint_class` must produce ONE fingerprint;
-/// cases in different classes must produce DIFFERENT fingerprints. Never literal hash values.
+/// Cases sharing a `fingerprint_class` must produce ONE fingerprint; cases in different classes
+/// must produce DIFFERENT fingerprints. Asserted by class, never against literal hash values.
 #[test]
 fn fingerprint_equality_classes() {
     let mut classes: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -583,9 +582,8 @@ fn normalize_cached_hit_matches_direct_normalize_and_caches_failures() {
 // o2_db_env comes from RESOURCE attributes (design §3.1 row `o2_db_env`:
 // `deployment.environment.name` → `deployment.environment`, resource attrs).
 // The OTLP call site keeps resource attrs in a separate `service_`-prefixed
-// map; the JSON path's flat record carries them as `service_*` keys. Both
-// shapes must resolve — found live: env was silently absent on every real
-// OTLP ingest because enrich only saw span attrs.
+// map; the JSON path's flat record carries them as `service_*` keys. Enrichment
+// must resolve env from both shapes, since span attrs alone never carry it.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -671,9 +669,9 @@ fn resource_only_db_attrs_do_not_qualify_span() {
 }
 
 // ---------------------------------------------------------------------------
-// UTF-8 pass-through in the Mongo command-doc folder (regression: bytes were
-// pushed `as char`, so any byte >= 0x80 re-encoded as a Latin-1 codepoint —
-// non-ASCII keys/collection names became mojibake in query_norm)
+// UTF-8 pass-through in the Mongo command-doc folder: the folder walks bytes, so
+// it must reassemble multi-byte sequences rather than push each byte `as char`,
+// which would turn non-ASCII keys/collection names into mojibake in query_norm.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -718,7 +716,7 @@ fn json_path_flat_record_resolves_env_from_service_prefixed_key() {
     assert_eq!(out_str(&out, O2_DB_ENV).as_deref(), Some("capture-env-a"));
 }
 
-// ─── Stream eligibility gate (regression: the `o2_db_*`-only schema) ─────────
+// ─── Stream eligibility gate ─────────────────────────────────────────────────
 
 /// Build a trace-stream schema from field names, all Utf8 — only presence matters
 /// to the gate.
@@ -741,28 +739,22 @@ fn full_span_stream_with_db_columns_is_eligible() {
     assert!(super::stream_supports_db_monitoring(&schema_of(&fields)));
 }
 
-/// A trace stream with no DB columns is not eligible (the original gate's job).
+/// A trace stream with no DB columns is not eligible.
 #[test]
 fn span_stream_without_db_columns_is_not_eligible() {
     let fields: Vec<&str> = super::REQUIRED_SPAN_FIELDS.to_vec();
     assert!(!super::stream_supports_db_monitoring(&schema_of(&fields)));
 }
 
-/// THE REGRESSION. `ensure_db_fields_in_schema` provisions the eleven `o2_db_*`
-/// columns via `infra::schema::merge`, and on a stream with no schema yet that
-/// takes merge's CREATE branch — persisting and caching a schema whose ONLY
-/// fields are `o2_db_*`. That schema HAS `o2_db_fingerprint`, so a
-/// fingerprint-only gate passed it through and every DBM read then died at plan
-/// time with `Schema error: No field named _timestamp` (live on
-/// `rig4_ent_t/default`: `/traces/db_monitoring/samples` answered HTTP 500 and
-/// the rollup logged `offset NOT advanced` on every tick).
-///
-/// Such a stream has no DB spans to report, so the gate must exclude it and let
-/// the endpoints answer an empty window.
+/// A schema whose ONLY fields are `o2_db_*` is not eligible, even though it carries
+/// `o2_db_fingerprint`. `ensure_db_fields_in_schema` can create exactly that schema
+/// on a stream that has none yet, and such a stream has no spans to report: querying
+/// it fails at plan time with `No field named _timestamp` instead of answering an
+/// empty window.
 #[test]
 fn o2_db_only_schema_is_not_eligible() {
     let db_only = schema_of(&super::ALL_DB_FIELDS);
-    // The precondition that fooled the old gate.
+    // A fingerprint-only gate would accept this schema.
     assert!(
         db_only.field_with_name(super::O2_DB_FINGERPRINT).is_ok(),
         "precondition: the truncated schema does carry the fingerprint column"
@@ -774,10 +766,9 @@ fn o2_db_only_schema_is_not_eligible() {
     );
 }
 
-/// Each base column is individually load-bearing: dropping any ONE of them from
-/// an otherwise-complete DB stream makes it ineligible. Guards against a future
-/// edit trimming `REQUIRED_SPAN_FIELDS` to just the timestamp — `service_name`
-/// and `end_time - start_time` failed on the same live stream.
+/// Each base column is individually load-bearing: dropping any ONE of them from an
+/// otherwise-complete DB stream makes it ineligible. The read SQL projects all five,
+/// so `REQUIRED_SPAN_FIELDS` must not be trimmed to just the timestamp.
 #[test]
 fn every_required_span_field_is_load_bearing() {
     for omitted in super::REQUIRED_SPAN_FIELDS {
@@ -794,11 +785,9 @@ fn every_required_span_field_is_load_bearing() {
     }
 }
 
-/// The user-visible error verbatim. DataFusion listed exactly these nine columns
-/// as "Valid fields" for stream `default` on org `rig4_ent_t` while reporting
-/// `No field named _timestamp` — the nine are the ten Utf8 `o2_db_*` columns
-/// minus `o2_db_user`, which the projection had already pruned. Gating on this
-/// exact set must exclude the stream.
+/// The nine-column shape DataFusion reports as "Valid fields" when it rejects such a
+/// stream: the ten Utf8 `o2_db_*` columns minus the projection-pruned `o2_db_user`.
+/// Gating on this exact set must exclude the stream.
 #[test]
 fn the_reported_nine_column_schema_is_not_eligible() {
     let reported = schema_of(&[

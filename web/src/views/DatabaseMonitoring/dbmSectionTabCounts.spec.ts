@@ -17,17 +17,14 @@
  * The L2 tab bar states how much is happening in EVERY view, from whichever
  * view you are standing in.
  *
- * This suite used to read the pages' SOURCE, because each page built its
- * own badge fan-out and the only thing they shared was a convention. They now
- * share an implementation — `DbmShell` issues ONE `/badges` request and the
- * pages render the snapshot — so the same requirements are asserted by CALLING
- * it, which is both stronger and no longer coupled to how any page spells its
- * variables. The envelope's members are the six endpoints' own bodies (`null`
- * for a failed slice), so the fold here exercises exactly what the server
- * returns.
+ * The pages share one implementation — `DbmShell` issues a single `/badges`
+ * request and the pages render the snapshot — so the requirements are asserted
+ * by calling it rather than by scanning page source. The envelope's members are
+ * the six endpoints' own bodies (`null` for a failed slice), so the fold here
+ * exercises exactly what the server returns.
  *
- * What survives here as a source scan is only the property no unit test can
- * see: that a page does not fan out BEHIND the shell's back.
+ * The one source scan that remains covers the property no unit test can see:
+ * that a page does not fan out behind the shell's back.
  */
 
 import { readFileSync } from "node:fs";
@@ -45,10 +42,9 @@ vi.mock("@/services/db_monitoring", () => ({
   default: {
     // The strip's one request.
     getBadges: vi.fn(),
-    // The composable must never reach these itself anymore — the per-endpoint
-    // reads and the zero-trace fallback pair both moved server-side. Mocked so
-    // a regression calls a spy (asserted never-called below) instead of the
-    // network.
+    // The composable must never reach these itself: the per-endpoint reads and
+    // the zero-trace fallback pair are both server-side. Mocked so a stray call
+    // hits a spy (asserted never-called below) instead of the network.
     getDatabases: vi.fn(),
     getQueries: vi.fn(),
     getActivity: vi.fn(),
@@ -136,10 +132,9 @@ describe("the one badges request answers every tab's badge at once", () => {
    * counts. `hits`/`total` on the activity member is a row-limited sample, so
    * sourcing the badge from it would render a constant cap as the population.
    *
-   * This also pins a bug the consolidation fixed: TableHealthPage used to pass
-   * the whole activity RESPONSE to `activitySampleTotal`, which expects the
-   * `by_state` array. An object has no `.length`, so that badge silently
-   * resolved to `null` on every load and had never once rendered a number.
+   * `activitySampleTotal` expects the `by_state` array, not the whole activity
+   * response: an object has no `.length`, so passing one resolves the badge to
+   * `null` on every load without ever rendering a number.
    */
   it("sources the activity badge from the state breakdown, not from hits", async () => {
     badgesAnswer({
@@ -267,8 +262,7 @@ describe("the zero-trace fallback counts what the tabs actually show", () => {
     const counts = await fetchDbmTabCounts("acme", WINDOW);
     // A null member is UNKNOWN, so nothing overwrites the client answer. That
     // answer is an overlap zero, which D6/L2 withhold rather than qualify —
-    // the badge is blank, not `0 client-observed`. (This assertion previously
-    // pinned `"0"`, which was the fabricated zero itself.)
+    // the badge is blank, not `0 client-observed`.
     expect(badgeCount(counts.queryCount)).toBeNull();
     expect(claimedCount(counts.queryCount)).toBeNull();
   });
@@ -339,19 +333,16 @@ describe("a failed slice blanks its own badge and nothing else", () => {
   });
 
   /**
-   * THE REGRESSION TEST for `samples is not iterable`.
+   * Pins that the snapshot always carries every key, so `samples is not
+   * iterable` is unrepresentable.
    *
-   * The predecessor cache was keyed per page because the pages built
-   * DIVERGENT payload shapes: only Table health carried `blockingSamples`. A
-   * shared key therefore let whichever page loaded first decide what the others
-   * got, and landing on Deadlocks then switching to Table health handed it a
-   * payload with no `blockingSamples` — `chainsFromSamples` threw out of a Vue
-   * computed.
-   *
-   * The snapshot has ONE shape with every key always present, so that is now
-   * unrepresentable. Asserted on the failure paths specifically — every member
+   * Divergent per-page payload shapes — only Table health carrying
+   * `blockingSamples` — let whichever page loaded first decide what the others
+   * got, so landing on Deadlocks then switching to Table health handed it a
+   * payload with no `blockingSamples` and `chainsFromSamples` threw out of a
+   * Vue computed. Asserted on the failure paths specifically — every member
    * null, and the whole request rejected — because those are the paths that
-   * used to produce the missing field.
+   * can drop a field.
    */
   it.each(["activityStates", "sessions", "blockingSamples"] as const)(
     "%s is an array even when every member is null",
@@ -373,13 +364,12 @@ describe("a failed slice blanks its own badge and nothing else", () => {
   /**
    * A total request failure REJECTS rather than folding to a row of `null`s.
    *
-   * The two are different answers and used to be indistinguishable: a member
-   * `null` is "this slice could not be read", while a dead request is "nothing
-   * was learned at all". Folding the second into the first let `load` write
-   * blanks over badges that already held real numbers, which is the badge
-   * vanishing on tab switch. The caller decides what a dead request means,
-   * because only it knows whether anything was known before — see
-   * `dbmTabCountsResilience.spec.ts`.
+   * The two are different answers: a member `null` is "this slice could not be
+   * read", while a dead request is "nothing was learned at all". Folding the
+   * second into the first lets `load` write blanks over badges that already
+   * held real numbers, which is the badge vanishing on tab switch. The caller
+   * decides what a dead request means, because only it knows whether anything
+   * was known before — see `dbmTabCountsResilience.spec.ts`.
    */
   it("rejects when the request itself failed, rather than claiming zero", async () => {
     service.getBadges.mockRejectedValue(new Error("boom"));
@@ -711,9 +701,9 @@ describe("an empty vantage withholds its overlap badge (D6/L2)", () => {
   });
 
   /**
-   * REGRESSION GUARD for the traced org. A real client-vantage number must
-   * still render, still qualified — withholding is for the ZERO only, and a
-   * rule that blanked every client count would break the `default` org.
+   * A real client-vantage number must still render, still qualified:
+   * withholding is for the zero only, and a rule that blanked every client
+   * count would break the `default` org.
    */
   it("leaves a real client-vantage count alone", async () => {
     badgesAnswer(fullEnvelope());

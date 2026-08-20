@@ -15,21 +15,16 @@
 
 /**
  * The DBM "verify" step's copy must match what each engine's shipped config
- * ACTUALLY collects.
+ * actually collects.
  *
  * This is the one step that tells a user how long to wait before concluding
- * something is broken, so a wrong number here manufactures a support ticket:
- * the reader watches an empty tab for the interval we promised, then reports a
- * collector that is working exactly as designed.
+ * something is broken, so a wrong number manufactures a support ticket: the
+ * reader watches an empty tab for the interval promised, then reports a
+ * collector working exactly as designed. Postgres in particular runs its
+ * table/index recipes at 300s rather than MySQL's 60s, because
+ * `pg_total_relation_size` is O(schema).
  *
- * The bug this pins: `dbmVerifyFullDesc` said "Table health fills after the
- * first 60-second snapshot" and was rendered by BOTH Postgres and MySQL. It is
- * true for MySQL, whose table/index recipes run at `collection_interval: 60s`,
- * and false for Postgres, which runs them at 300s on purpose —
- * `pg_total_relation_size` is O(schema) and measured 3.0s at 50k tables. A
- * Postgres user was told to expect data four minutes before it could exist.
- *
- * The assertions read the interval out of the GENERATED YAML rather than
+ * The assertions read the interval out of the generated YAML rather than
  * restating it, so the copy and the config cannot drift apart: change the
  * recipe's interval and the test fails until the sentence is changed too.
  */
@@ -101,19 +96,18 @@ describe("the DBM verify step promises the wait each engine really has", () => {
   });
 
   it("gives MariaDB the variant that discloses the missing sample text", () => {
-    // MariaDB now fills Activity and Top queries too (mysqlreceiver's events),
-    // so the generic sentence would UNDER-promise. But the MySQL variant would
-    // mis-promise in the other direction: it names the MySQL 8.0.22 plan floor,
-    // a version a MariaDB user has no way to check. MariaDB's own variant
-    // carries the one real gap the receiver discloses — no sampled statement
-    // text — so an empty query column reads as documented, not broken.
+    // MariaDB fills Activity and Top queries too (mysqlreceiver's events), so
+    // the generic sentence under-promises, while the MySQL variant names the
+    // 8.0.22 plan floor a MariaDB user has no way to check. MariaDB's own
+    // variant carries the one real gap the receiver discloses — no sampled
+    // statement text — so an empty query column reads as documented.
     const step = verifyStepOf(mariadbCard(SUBS, gt));
     expect(step?.descriptionKey).toBe("ingestion.setupCard.dbmVerifyFullNoSampleTextDesc");
   });
 
   it("gives SQL Server the full wording with no engine-version caveat", () => {
-    // SQL Server ships table health AND sqlserverreceiver's events, so the
-    // generic "events appear" sentence under-promised three tabs. It has no
+    // SQL Server ships table health and sqlserverreceiver's events, so the
+    // generic "events appear" sentence under-promises three tabs. It has no
     // version floor on plans, so it must not inherit MySQL's 8.0.22 sentence.
     const step = verifyStepOf(sqlServerCard(SUBS, gt));
     expect(step?.descriptionKey).toBe("ingestion.setupCard.dbmVerifyFullPlainPlansDesc");
@@ -137,9 +131,9 @@ describe("the verify copy stays consistent with the shipped recipes", () => {
   });
 
   it("does not promise Table health where none is collected", () => {
-    // Every shipped card now renders the Table health pill, but this key is
-    // still the fallback for a config without the table/index recipes — so it
-    // must keep NOT naming a tab such a config would never fill.
+    // Every shipped card renders the Table health pill, but this key remains
+    // the fallback for a config without the table/index recipes, so it must not
+    // name a tab such a config would never fill.
     expect(setupCard.dbmVerifyDesc).not.toContain("Table health");
   });
 
@@ -164,8 +158,8 @@ describe("the verify copy stays consistent with the shipped recipes", () => {
   });
 
   it("points every variant at the section's real location", () => {
-    // The section moved from Traces to Infra; copy that names the old path
-    // sends the reader to a menu that no longer holds it.
+    // The section lives under Infra, not Traces; copy naming the wrong path
+    // sends the reader to a menu that does not hold it.
     for (const key of [
       "dbmVerifyDesc",
       "dbmVerifyFullDesc",
