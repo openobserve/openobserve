@@ -256,7 +256,8 @@
               v-model:open="presetsOpen"
               :team-id="teamId"
               :members="members"
-              :has-schedule="!!schedule?.rotations?.length"
+              :timezone="team?.timezone ?? 'UTC'"
+              :rotation-count="schedule?.rotations?.length ?? 0"
               @applied="onScheduleSaved"
             />
 

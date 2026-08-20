@@ -298,6 +298,9 @@ export type PresetInputKind =
   | "minute_of_day"
   | "timezone"
   | "duration_micros"
+  /** An instant, in micros since the epoch — a date and a time read in a zone,
+   *  which is not the control a duration takes. */
+  | "timestamp_micros"
   | "text"
   | "member_list";
 
