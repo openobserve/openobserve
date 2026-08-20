@@ -109,6 +109,76 @@ export interface RemoteTaskPayload {
   fromVersion?: number;
 }
 
+export type RemoteTaskSecretPurpose = "auth" | "signing";
+
+export type RemoteTaskSecretMaterial =
+  { type: "token"; value: string } | { type: "basic"; username: string; password: string };
+
+export interface RemoteTaskSecretMetadata {
+  secretRef: string;
+  purpose: RemoteTaskSecretPurpose;
+  keyId?: string | null;
+  state: string;
+  lastVerifiedAt?: number | null;
+  graceExpiresAt?: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface RemoteTaskSecretWrite {
+  metadata: RemoteTaskSecretMetadata;
+  /** Returned exactly once for create and rotate operations. */
+  material: RemoteTaskSecretMaterial;
+}
+
+export interface CreateRemoteTaskSecretPayload {
+  purpose: RemoteTaskSecretPurpose;
+  material?: RemoteTaskSecretMaterial;
+  keyId?: string;
+}
+
+export type CreateRemoteTaskAuthPayload =
+  | { type: "none" }
+  | { type: "bearer"; secret: RemoteTaskSecretMaterial }
+  | { type: "basic"; secret: RemoteTaskSecretMaterial }
+  | {
+      type: "api_key_header";
+      headerName: string;
+      secret: RemoteTaskSecretMaterial;
+    };
+
+export interface CreateRemoteTaskHeaderPayload {
+  key: string;
+  value?: string;
+  secret?: RemoteTaskSecretMaterial;
+}
+
+export interface CreateRemoteTaskSigningPayload {
+  enabled: boolean;
+  /** Omit to have OpenObserve generate HMAC material. */
+  secret?: RemoteTaskSecretMaterial;
+  keyId?: string;
+}
+
+export type CreateRemoteTaskPayload = Omit<
+  RemoteTaskPayload,
+  "auth" | "customHeaders" | "signing" | "fromVersion"
+> & {
+  auth?: CreateRemoteTaskAuthPayload;
+  customHeaders?: CreateRemoteTaskHeaderPayload[];
+  signing?: CreateRemoteTaskSigningPayload;
+};
+
+export interface GeneratedRemoteTaskSigningSecret {
+  keyId: string;
+  material: RemoteTaskSecretMaterial;
+}
+
+export type CreateRemoteTaskResult = RemoteTask & {
+  /** Present only for server-generated HMAC material; show or copy it now. */
+  generatedSigningSecret?: GeneratedRemoteTaskSigningSecret | null;
+};
+
 export interface RemoteTaskTestConnectionPayload {
   input?: any;
   metadata?: any;
@@ -167,12 +237,25 @@ const remoteTasksService = {
     (await http().get(`/api/${orgId}/remote_tasks/${entityId}`)).data,
 
   versions: async (orgId: string, entityId: string): Promise<RemoteTask[]> =>
-    unwrapList<RemoteTask>(
-      await http().get(`/api/${orgId}/remote_tasks/${entityId}/versions`),
+    unwrapList<RemoteTask>(await http().get(`/api/${orgId}/remote_tasks/${entityId}/versions`)),
+
+  create: async (
+    orgId: string,
+    payload: CreateRemoteTaskPayload,
+  ): Promise<CreateRemoteTaskResult> =>
+    (await http().post(`/api/${orgId}/remote_tasks`, payload)).data,
+
+  listSecrets: async (orgId: string, entityId: string): Promise<RemoteTaskSecretMetadata[]> =>
+    unwrapList<RemoteTaskSecretMetadata>(
+      await http().get(`/api/${orgId}/remote_tasks/${entityId}/secrets`),
     ),
 
-  create: async (orgId: string, payload: RemoteTaskPayload): Promise<RemoteTask> =>
-    (await http().post(`/api/${orgId}/remote_tasks`, payload)).data,
+  createSecret: async (
+    orgId: string,
+    entityId: string,
+    payload: CreateRemoteTaskSecretPayload,
+  ): Promise<RemoteTaskSecretWrite> =>
+    (await http().post(`/api/${orgId}/remote_tasks/${entityId}/secrets`, payload)).data,
 
   /** Save the head's single draft. Published versions are untouched. */
   saveDraft: async (
@@ -195,8 +278,7 @@ const remoteTasksService = {
     entityId: string,
     payload: RemoteTaskTestConnectionPayload = {},
   ): Promise<RemoteTaskPublishResult> =>
-    (await http().post(`/api/${orgId}/remote_tasks/${entityId}/test_connection`, payload))
-      .data,
+    (await http().post(`/api/${orgId}/remote_tasks/${entityId}/test_connection`, payload)).data,
 
   /** Volatile test-run bench. Returns the per-row exchange and nothing durable. */
   testRun: async (
@@ -204,10 +286,9 @@ const remoteTasksService = {
     entityId: string,
     samples: RemoteTaskTestRunSample[],
   ): Promise<RemoteTaskTestRunRow[]> => {
-    const response = await http().post(
-      `/api/${orgId}/remote_tasks/${entityId}/test_run`,
-      { samples },
-    );
+    const response = await http().post(`/api/${orgId}/remote_tasks/${entityId}/test_run`, {
+      samples,
+    });
     return response?.data?.results ?? [];
   },
 
