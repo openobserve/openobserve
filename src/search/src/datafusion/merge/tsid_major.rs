@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use arrow::{
     array::{Array, ArrayRef as ArrowArrayRef, Int64Array, RecordBatch, UInt32Array, UInt64Array},
-    compute::{concat_batches, max, min, take},
+    compute::{cast, concat_batches, max, min, take},
     datatypes::{DataType, Field},
     ipc::{
         CompressionType,
@@ -29,9 +29,7 @@ use config::{
     meta::{
         promql::{
             EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL,
-            tsid_layout::{
-                MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT, TSID_SERIES_INDEX_ROW_START,
-            },
+            tsid_layout::{MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT},
         },
         stream::FileMeta,
     },
@@ -194,22 +192,28 @@ fn proportional_original_size(source_meta: &FileMeta, records: i64) -> i64 {
     i64::try_from(estimate).unwrap_or(i64::MAX)
 }
 
-/// Streaming writer for a TSID-major `.midx` series index. Every row describes
-/// one contiguous TSID run in the data file: `(row_start, row_count)` plus
-/// every label column of the run's first row. Runs that cross an input
-/// RecordBatch boundary appear as two adjacent entries; query-time range
+/// Streaming writer for a TSID-major `.midx` series index. Every row
+/// describes one contiguous TSID run in the data file: its row count plus the
+/// label columns of the run's first row (`__hash__` excluded — matchers never
+/// reference it). Runs tile the data file, so a run's starting row is the
+/// prefix sum of the preceding counts and is not stored. Runs that cross an
+/// input RecordBatch boundary appear as two adjacent entries; query-time range
 /// coalescing makes that representation equivalent without buffering samples.
+///
+/// Entries are buffered raw (one row per run) and written as a single
+/// dictionary-encoded, ZSTD-compressed IPC batch at [`finish`]: adjacent runs
+/// are different series, so raw label rows have no locality for the
+/// compressor, while label cardinality is far below the run count. One batch
+/// per file also means one dictionary per column and whole-column compression
+/// frames. The buffer is small next to the Parquet file built alongside.
+///
+/// [`finish`]: TsidSeriesIndexWriter::finish
 struct TsidSeriesIndexWriter {
-    writer: ArrowFileWriter<Vec<u8>>,
     schema: Arc<Schema>,
     hash_index: usize,
     label_indices: Vec<usize>,
-    rows_written: u64,
     pending_batches: Vec<RecordBatch>,
-    pending_rows: usize,
 }
-
-const TSID_SERIES_INDEX_BATCH_ROWS: usize = 4096;
 
 impl TsidSeriesIndexWriter {
     fn try_new(source_schema: &Arc<Schema>) -> Result<Self> {
@@ -223,41 +227,27 @@ impl TsidSeriesIndexWriter {
             .filter_map(|(index, field)| {
                 (!matches!(
                     field.name().as_str(),
-                    TIMESTAMP_COL_NAME | VALUE_LABEL | EXEMPLARS_LABEL
+                    TIMESTAMP_COL_NAME | VALUE_LABEL | EXEMPLARS_LABEL | HASH_LABEL
                 ))
                 .then_some(index)
             })
             .collect::<Vec<_>>();
 
-        let mut fields = vec![
-            Arc::new(Field::new(
-                TSID_SERIES_INDEX_ROW_START,
-                DataType::UInt64,
-                false,
-            )),
-            Arc::new(Field::new(
-                TSID_SERIES_INDEX_ROW_COUNT,
-                DataType::UInt32,
-                false,
-            )),
-        ];
+        let mut fields = vec![Arc::new(Field::new(
+            TSID_SERIES_INDEX_ROW_COUNT,
+            DataType::UInt32,
+            false,
+        ))];
         fields.extend(
             label_indices
                 .iter()
                 .map(|index| source_schema.fields()[*index].clone()),
         );
-        let schema = Arc::new(Schema::new(fields));
-        let options =
-            IpcWriteOptions::default().try_with_compression(Some(CompressionType::ZSTD))?;
-        let writer = ArrowFileWriter::try_new_with_options(Vec::new(), &schema, options)?;
         Ok(Self {
-            writer,
-            schema,
+            schema: Arc::new(Schema::new(fields)),
             hash_index,
             label_indices,
-            rows_written: 0,
             pending_batches: Vec::new(),
-            pending_rows: 0,
         })
     }
 
@@ -277,7 +267,6 @@ impl TsidSeriesIndexWriter {
         }
         let num_rows = batch.num_rows();
         let mut first_rows = Vec::new();
-        let mut row_starts = Vec::new();
         let mut row_counts = Vec::new();
         let mut run_start = 0;
         while run_start < num_rows {
@@ -289,7 +278,6 @@ impl TsidSeriesIndexWriter {
             first_rows.push(u32::try_from(run_start).map_err(|_| {
                 DataFusionError::Execution("metrics batch exceeds u32 row index".to_string())
             })?);
-            row_starts.push(self.rows_written + run_start as u64);
             row_counts.push(u32::try_from(run_end - run_start).map_err(|_| {
                 DataFusionError::Execution("TSID run exceeds u32 row count".to_string())
             })?);
@@ -297,38 +285,50 @@ impl TsidSeriesIndexWriter {
         }
 
         let indices = UInt32Array::from(first_rows);
-        let mut columns: Vec<ArrowArrayRef> = vec![
-            Arc::new(UInt64Array::from(row_starts)),
-            Arc::new(UInt32Array::from(row_counts)),
-        ];
+        let mut columns: Vec<ArrowArrayRef> = vec![Arc::new(UInt32Array::from(row_counts))];
         for index in &self.label_indices {
             columns.push(take(batch.column(*index).as_ref(), &indices, None)?);
         }
-        let sidecar_batch = RecordBatch::try_new(Arc::clone(&self.schema), columns)?;
-        self.pending_rows += sidecar_batch.num_rows();
-        self.pending_batches.push(sidecar_batch);
-        if self.pending_rows >= TSID_SERIES_INDEX_BATCH_ROWS {
-            self.flush_pending()?;
-        }
-        self.rows_written += num_rows as u64;
+        self.pending_batches
+            .push(RecordBatch::try_new(Arc::clone(&self.schema), columns)?);
         Ok(())
     }
 
-    fn flush_pending(&mut self) -> Result<()> {
-        if self.pending_batches.is_empty() {
-            return Ok(());
-        }
-        let batch = concat_batches(&self.schema, &self.pending_batches)?;
-        self.writer.write(&batch)?;
-        self.pending_batches.clear();
-        self.pending_rows = 0;
-        Ok(())
+    fn finish(self) -> Result<Vec<u8>> {
+        let batch = dictionary_encode(&concat_batches(&self.schema, &self.pending_batches)?)?;
+        let options =
+            IpcWriteOptions::default().try_with_compression(Some(CompressionType::ZSTD))?;
+        let mut writer =
+            ArrowFileWriter::try_new_with_options(Vec::new(), batch.schema_ref(), options)?;
+        writer.write(&batch)?;
+        Ok(writer.into_inner()?)
     }
+}
 
-    fn finish(mut self) -> Result<Vec<u8>> {
-        self.flush_pending()?;
-        Ok(self.writer.into_inner()?)
+/// Dictionary-encode the string label columns as `Dictionary(Int32, Utf8)`.
+fn dictionary_encode(batch: &RecordBatch) -> Result<RecordBatch> {
+    let mut fields = Vec::with_capacity(batch.num_columns());
+    let mut columns = Vec::with_capacity(batch.num_columns());
+    for (field, column) in batch.schema().fields().iter().zip(batch.columns()) {
+        let (field, column) = match field.data_type() {
+            DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
+                let dictionary =
+                    DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8));
+                let column = cast(&cast(column, &DataType::Utf8)?, &dictionary)?;
+                (
+                    Arc::new(field.as_ref().clone().with_data_type(dictionary)),
+                    column,
+                )
+            }
+            _ => (Arc::clone(field), Arc::clone(column)),
+        };
+        fields.push(field);
+        columns.push(column);
     }
+    Ok(RecordBatch::try_new(
+        Arc::new(Schema::new(fields)),
+        columns,
+    )?)
 }
 
 #[cfg(test)]
@@ -458,7 +458,7 @@ mod tests {
     fn test_tsid_series_index_records_exact_parquet_ranges() {
         use std::io::Cursor;
 
-        use arrow::ipc::reader::FileReader as ArrowFileReader;
+        use arrow::{array::DictionaryArray, datatypes::Int32Type, ipc::reader::FileReader};
 
         let schema = Arc::new(Schema::new(vec![
             Field::new(HASH_LABEL, DataType::UInt64, false),
@@ -492,30 +492,22 @@ mod tests {
         writer.write(&batch2).unwrap();
 
         let bytes = writer.finish().unwrap();
-        let batches = ArrowFileReader::try_new(Cursor::new(bytes), None)
+        let batches = FileReader::try_new(Cursor::new(bytes), None)
             .unwrap()
             .collect::<std::result::Result<Vec<_>, _>>()
             .unwrap();
+        // the whole index is one batch, labels dictionary-encoded, no
+        // __hash__ column and no stored row starts
         assert_eq!(batches.len(), 1);
+        let batch = &batches[0];
+        assert!(batch.schema().field_with_name(HASH_LABEL).is_err());
+        assert_eq!(batch.num_columns(), 2);
         assert_eq!(
-            batches[0]
-                .schema()
-                .field_with_name("path")
-                .unwrap()
-                .data_type(),
-            &DataType::Utf8View,
-            "the sidecar preserves the label view type"
+            batch.schema().field_with_name("path").unwrap().data_type(),
+            &DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8)),
         );
 
-        let starts = batches[0]
-            .column_by_name(config::meta::promql::tsid_layout::TSID_SERIES_INDEX_ROW_START)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<UInt64Array>()
-            .unwrap()
-            .values()
-            .to_vec();
-        let counts = batches[0]
+        let counts = batch
             .column_by_name(config::meta::promql::tsid_layout::TSID_SERIES_INDEX_ROW_COUNT)
             .unwrap()
             .as_any()
@@ -524,53 +516,20 @@ mod tests {
             .values()
             .to_vec();
         // runs: hash 1 rows 0..2, hash 2 rows 2..3 and 3..4 (split at the
-        // batch boundary), hash 3 rows 4..5
-        assert_eq!(starts, vec![0, 2, 3, 4]);
+        // batch boundary), hash 3 rows 4..5; starts are the prefix sums
         assert_eq!(counts, vec![2, 1, 1, 1]);
-    }
 
-    #[test]
-    fn test_tsid_series_index_coalesces_many_small_writes() {
-        use std::io::Cursor;
-
-        use arrow::ipc::reader::FileReader as ArrowFileReader;
-
-        let row_count = TSID_SERIES_INDEX_BATCH_ROWS + 1;
-        let schema = Arc::new(Schema::new(vec![
-            Field::new(HASH_LABEL, DataType::UInt64, false),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new(VALUE_LABEL, DataType::Float64, false),
-        ]));
-        let batch = RecordBatch::try_new(
-            Arc::clone(&schema),
-            vec![
-                Arc::new(UInt64Array::from_iter_values(
-                    (0..row_count).map(|value| value as u64),
-                )),
-                Arc::new(Int64Array::from_iter_values(
-                    (0..row_count).map(|value| value as i64),
-                )),
-                Arc::new(Float64Array::from_iter_values(
-                    (0..row_count).map(|value| value as f64),
-                )),
-            ],
-        )
-        .unwrap();
-
-        let mut writer = TsidSeriesIndexWriter::try_new(&schema).unwrap();
-        for row in 0..row_count {
-            writer.write(&batch.slice(row, 1)).unwrap();
-        }
-
-        let bytes = writer.finish().unwrap();
-        let batches = ArrowFileReader::try_new(Cursor::new(bytes), None)
+        let paths = batch
+            .column_by_name("path")
             .unwrap()
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .unwrap();
-        assert_eq!(batches.len(), 2);
-        assert_eq!(
-            batches.iter().map(RecordBatch::num_rows).sum::<usize>(),
-            row_count
-        );
+            .as_any()
+            .downcast_ref::<DictionaryArray<Int32Type>>()
+            .unwrap()
+            .downcast_dict::<arrow::array::StringArray>()
+            .unwrap()
+            .into_iter()
+            .map(|value| value.unwrap().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(paths, vec!["a", "b", "b", "c"]);
     }
 }

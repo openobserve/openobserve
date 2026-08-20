@@ -21,7 +21,7 @@ use std::{
 };
 
 use arrow::{
-    array::{Array, BooleanArray, RecordBatch, UInt32Array, UInt64Array},
+    array::{Array, BooleanArray, RecordBatch, UInt32Array},
     datatypes::{Schema, SchemaRef},
     ipc::reader::FileReaderBuilder as ArrowFileReaderBuilder,
 };
@@ -30,9 +30,7 @@ use config::{
     meta::{
         promql::{
             EXEMPLARS_LABEL, VALUE_LABEL,
-            tsid_layout::{
-                MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT, TSID_SERIES_INDEX_ROW_START,
-            },
+            tsid_layout::{MetricsFileLayout, TSID_SERIES_INDEX_ROW_COUNT},
         },
         stream::{FileKey, FileSelection},
     },
@@ -291,10 +289,7 @@ fn decode_series_index(
     let file_schema = ArrowFileReaderBuilder::new()
         .build(Cursor::new(bytes.clone()))?
         .schema();
-    let mut projection = vec![
-        file_schema.index_of(TSID_SERIES_INDEX_ROW_START)?,
-        file_schema.index_of(TSID_SERIES_INDEX_ROW_COUNT)?,
-    ];
+    let mut projection = vec![file_schema.index_of(TSID_SERIES_INDEX_ROW_COUNT)?];
     for label in labels {
         match file_schema.index_of(label) {
             Ok(index) => projection.push(index),
@@ -334,13 +329,16 @@ fn create_physical_filter(
     create_physical_expr(&filter, &df_schema, &ExecutionProps::new()).map(Some)
 }
 
+/// Evaluate `filter` over the run rows and collect the selected physical row
+/// ranges. Runs tile the data file, so each run's start is the prefix sum of
+/// the preceding counts.
 fn evaluate_series_index(
     data: &SeriesIndexData,
     filter: Option<&dyn PhysicalExpr>,
 ) -> Result<Vec<Range<usize>>> {
-    let start_index = data.schema.index_of(TSID_SERIES_INDEX_ROW_START)?;
     let count_index = data.schema.index_of(TSID_SERIES_INDEX_ROW_COUNT)?;
     let mut ranges: Vec<Range<usize>> = Vec::new();
+    let mut next_row: usize = 0;
 
     for batch in &data.batches {
         let mask = match filter {
@@ -358,13 +356,6 @@ fn evaluate_series_index(
             None => BooleanArray::from(vec![true; batch.num_rows()]),
         };
         let mask = &mask;
-        let starts = batch
-            .column(start_index)
-            .as_any()
-            .downcast_ref::<UInt64Array>()
-            .ok_or_else(|| {
-                DataFusionError::Execution("TSID series-index row start is not UInt64".to_string())
-            })?;
         let counts = batch
             .column(count_index)
             .as_any()
@@ -374,26 +365,24 @@ fn evaluate_series_index(
             })?;
 
         for row in 0..batch.num_rows() {
-            if mask.is_null(row) || !mask.value(row) {
-                continue;
-            }
-            let start = usize::try_from(starts.value(row)).map_err(|_| {
-                DataFusionError::Execution("TSID series-index row start exceeds usize".to_string())
-            })?;
-            let end = start
-                .checked_add(counts.value(row) as usize)
-                .ok_or_else(|| {
-                    DataFusionError::Execution("TSID series-index row range overflow".to_string())
-                })?;
-            if start == end {
+            let count = counts.value(row) as usize;
+            if count == 0 {
                 return Err(DataFusionError::Execution(
                     "TSID series-index contains an empty row range".to_string(),
                 ));
             }
+            let start = next_row;
+            let end = start.checked_add(count).ok_or_else(|| {
+                DataFusionError::Execution("TSID series-index row range overflow".to_string())
+            })?;
+            next_row = end;
+            if mask.is_null(row) || !mask.value(row) {
+                continue;
+            }
             if let Some(previous) = ranges.last_mut()
-                && start <= previous.end
+                && start == previous.end
             {
-                previous.end = previous.end.max(end);
+                previous.end = end;
             } else {
                 ranges.push(start..end);
             }
@@ -405,8 +394,8 @@ fn evaluate_series_index(
 #[cfg(test)]
 mod tests {
     use arrow::{
-        array::{StringViewArray, UInt32Array, UInt64Array},
-        datatypes::{DataType, Field},
+        array::{DictionaryArray, UInt32Array},
+        datatypes::{DataType, Field, Int32Type},
         ipc::writer::FileWriter as ArrowFileWriter,
     };
     use bytes::Bytes;
@@ -442,17 +431,18 @@ mod tests {
 
     #[test]
     fn evaluates_and_coalesces_selected_ranges() {
+        // dictionary-encoded label column, exactly as the writer produces it;
+        // run starts are the prefix sums of the counts: 0, 2, 4, 5
+        let paths: DictionaryArray<Int32Type> = vec!["a", "b", "a", "a"].into_iter().collect();
         let schema = Arc::new(Schema::new(vec![
-            Field::new(TSID_SERIES_INDEX_ROW_START, DataType::UInt64, false),
             Field::new(TSID_SERIES_INDEX_ROW_COUNT, DataType::UInt32, false),
-            Field::new("path", DataType::Utf8View, false),
+            Field::new("path", paths.data_type().clone(), false),
         ]));
         let batch = RecordBatch::try_new(
             Arc::clone(&schema),
             vec![
-                Arc::new(UInt64Array::from(vec![0, 2, 4, 5])),
                 Arc::new(UInt32Array::from(vec![2, 2, 1, 3])),
-                Arc::new(StringViewArray::from(vec!["a", "b", "a", "a"])),
+                Arc::new(paths),
             ],
         )
         .unwrap();
@@ -475,7 +465,8 @@ mod tests {
             vec![Range { start: 0, end: 8 }]
         );
 
-        // regex matchers go through regexp_like on the (Utf8View) label column
+        // regex matchers go through regexp_like on the label column, which is
+        // cast out of its dictionary encoding
         let matchers = Matchers::new(vec![Matcher {
             op: MatchOp::NotRe(regex::Regex::new("a").unwrap()),
             name: "path".to_string(),
@@ -488,19 +479,19 @@ mod tests {
         );
     }
 
-    /// Serialize a sidecar with the given label columns (in this order).
-    fn sidecar_bytes(labels: &[(&str, Vec<&str>)], starts: Vec<u64>, counts: Vec<u32>) -> Bytes {
-        let mut fields = vec![
-            Field::new(TSID_SERIES_INDEX_ROW_START, DataType::UInt64, false),
-            Field::new(TSID_SERIES_INDEX_ROW_COUNT, DataType::UInt32, false),
-        ];
-        let mut columns: Vec<Arc<dyn Array>> = vec![
-            Arc::new(UInt64Array::from(starts)),
-            Arc::new(UInt32Array::from(counts)),
-        ];
+    /// Serialize a series index with the given label columns (in this order),
+    /// dictionary-encoded like the writer's output.
+    fn sidecar_bytes(labels: &[(&str, Vec<&str>)], counts: Vec<u32>) -> Bytes {
+        let mut fields = vec![Field::new(
+            TSID_SERIES_INDEX_ROW_COUNT,
+            DataType::UInt32,
+            false,
+        )];
+        let mut columns: Vec<Arc<dyn Array>> = vec![Arc::new(UInt32Array::from(counts))];
         for (name, values) in labels {
-            fields.push(Field::new(*name, DataType::Utf8View, true));
-            columns.push(Arc::new(StringViewArray::from(values.clone())));
+            let values: DictionaryArray<Int32Type> = values.iter().copied().collect();
+            fields.push(Field::new(*name, values.data_type().clone(), true));
+            columns.push(Arc::new(values));
         }
         let schema = Arc::new(Schema::new(fields));
         let batch = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
@@ -525,12 +516,10 @@ mod tests {
                 ("job", vec!["j", "j", "j"]),
                 ("path", vec!["a", "a", "b"]),
             ],
-            vec![0, 3, 5],
             vec![3, 2, 4],
         );
         let file2 = sidecar_bytes(
             &[("path", vec!["b", "a"]), ("instance", vec!["i1", "i1"])],
-            vec![0, 7],
             vec![7, 1],
         );
         for (name, bytes, expected) in [
@@ -538,7 +527,7 @@ mod tests {
             ("f2", file2, vec![Range { start: 7, end: 8 }]),
         ] {
             let data = decode_series_index(name, bytes, &labels).unwrap();
-            assert_eq!(data.schema.fields().len(), 4, "{name}");
+            assert_eq!(data.schema.fields().len(), 3, "{name}");
             let filter = create_physical_filter(&data.schema, &matchers).unwrap();
             assert_eq!(
                 evaluate_series_index(&data, filter.as_deref()).unwrap(),
@@ -557,13 +546,9 @@ mod tests {
         ]);
 
         // sidecar without `instance`: only the `path` matcher is evaluated
-        let partial = sidecar_bytes(
-            &[("path", vec!["a", "b", "a"])],
-            vec![0, 2, 6],
-            vec![2, 4, 1],
-        );
+        let partial = sidecar_bytes(&[("path", vec!["a", "b", "a"])], vec![2, 4, 1]);
         let data = decode_series_index("partial", partial, &labels).unwrap();
-        assert_eq!(data.schema.fields().len(), 3);
+        assert_eq!(data.schema.fields().len(), 2);
         let filter = create_physical_filter(&data.schema, &matchers).unwrap();
         assert!(filter.is_some());
         assert_eq!(
@@ -572,9 +557,9 @@ mod tests {
         );
 
         // sidecar with none of the matched labels: the whole file is selected
-        let none = sidecar_bytes(&[("job", vec!["j", "j"])], vec![0, 4], vec![4, 2]);
+        let none = sidecar_bytes(&[("job", vec!["j", "j"])], vec![4, 2]);
         let data = decode_series_index("none", none, &labels).unwrap();
-        assert_eq!(data.schema.fields().len(), 2);
+        assert_eq!(data.schema.fields().len(), 1);
         let filter = create_physical_filter(&data.schema, &matchers).unwrap();
         assert!(filter.is_none());
         assert_eq!(

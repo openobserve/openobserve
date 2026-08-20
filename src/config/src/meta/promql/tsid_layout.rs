@@ -22,7 +22,6 @@ use arrow_schema::{DataType, Schema};
 use super::HASH_LABEL;
 use crate::{FileFormat, meta::stream::StreamType};
 
-pub const TSID_SERIES_INDEX_ROW_START: &str = "__oo_midx_row_start";
 pub const TSID_SERIES_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
 
 /// True when `stream_type` uses the TSID-major layout

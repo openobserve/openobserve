@@ -44,8 +44,14 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             continue;
         };
         let field_type = field.data_type().clone();
+        // dictionary-encoded label columns (the `.midx` series index) compare
+        // and cast by their value type
+        let value_type = match &field_type {
+            DataType::Dictionary(_, value_type) => value_type.as_ref().clone(),
+            other => other.clone(),
+        };
         let literal = |value: String| -> Expr {
-            match &field_type {
+            match &value_type {
                 // Explicitly type equality matcher literals to the label column;
                 // an untyped literal would become Utf8View == Utf8 at execution.
                 DataType::Utf8View => lit(ScalarValue::Utf8View(Some(value))),
@@ -59,9 +65,12 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             MatchOp::Re(regex) => {
                 let regex = format!("^{}$", regex.as_str());
                 // DataFusion 54 can lower a regex on Utf8View to a mixed-type
-                // equality/LIKE expression. Cast only regex matchers until that
-                // optimizer bug is fixed; equality matchers stay zero-copy views.
-                let value = if field_type == DataType::Utf8View {
+                // equality/LIKE expression (cast only regex matchers until that
+                // optimizer bug is fixed; equality matchers stay zero-copy
+                // views), and regexp_like does not accept dictionary input.
+                let value = if field_type == DataType::Utf8View
+                    || matches!(field_type, DataType::Dictionary(..))
+                {
                     cast(col(mat.name.clone()), DataType::Utf8)
                 } else {
                     col(mat.name.clone())
@@ -70,7 +79,9 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             }
             MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
-                let value = if field_type == DataType::Utf8View {
+                let value = if field_type == DataType::Utf8View
+                    || matches!(field_type, DataType::Dictionary(..))
+                {
                     cast(col(mat.name.clone()), DataType::Utf8)
                 } else {
                     col(mat.name.clone())
