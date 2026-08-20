@@ -32,6 +32,8 @@ const AIAgentBehaviorPage = () =>
 const AIDatasetsPage = () => import("@/enterprise/views/AIObservability/DatasetsPage.vue");
 const AIDatasetDetailPage = () =>
   import("@/enterprise/views/AIObservability/DatasetDetailPage.vue");
+const AIExperimentComparePage = () =>
+  import("@/enterprise/views/AIObservability/ExperimentComparePage.vue");
 const AIExperimentDetailPage = () =>
   import("@/enterprise/views/AIObservability/ExperimentDetailPage.vue");
 const AIExperimentsPage = () => import("@/enterprise/views/AIObservability/ExperimentsPage.vue");
@@ -166,6 +168,12 @@ const useEnvRoutes = () => {
           name: "aiExperimentCreate",
           component: AIExperimentCreatePage,
           meta: { title: "New Experiment", keepAlive: false },
+        },
+        {
+          path: "experiments/compare/:baselineId/:candidateId",
+          name: "aiExperimentCompare",
+          component: AIExperimentComparePage,
+          meta: { title: "Compare Experiments", keepAlive: false },
         },
         {
           path: "experiments/:id",

@@ -828,6 +828,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
+          v-if="showSelectAll !== false"
           :model-value="isAllSelected ?? false"
           :indeterminate="isIndeterminate ?? false"
           row-id="all"
