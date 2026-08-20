@@ -78,18 +78,16 @@ impl MergeMode {
         stream_type: StreamType,
         stream_name: &str,
         schema: &Schema,
-        max_ts: i64,
+        _max_ts: i64,
         finalize: bool,
     ) -> Self {
         #[cfg(feature = "enterprise")]
         if finalize
             && stream_type == StreamType::Metrics
-            && let Some(rule) = get_largest_downsampling_rule(stream_name, max_ts)
+            && let Some(rule) = get_largest_downsampling_rule(stream_name, _max_ts)
         {
             return Self::Downsampling(rule.clone());
         }
-        #[cfg(not(feature = "enterprise"))]
-        let _ = max_ts;
         if metrics_tsid_major_stream(stream_type, schema) {
             return if finalize {
                 Self::TsidMajor
