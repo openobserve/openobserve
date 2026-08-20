@@ -35,18 +35,27 @@ const stubs = {
     props: ["disabled"],
     template: `<button :disabled="disabled"><slot /></button>`,
   },
-  OInput: {
-    name: "OInput",
-    props: ["modelValue"],
-    emits: ["update:modelValue"],
-    template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
-  },
   OSelect: {
     name: "OSelect",
     props: ["modelValue", "options"],
     emits: ["update:modelValue"],
     template: `<select :value="modelValue" />`,
   },
+  OCombobox: {
+    name: "OCombobox",
+    props: ["modelValue", "items"],
+    emits: ["update:modelValue"],
+    template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
+  },
+  /// The chip's own two-segment rendering is its spec's business; here it only
+  /// has to say which condition it carries.
+  ODimensionChip: {
+    name: "ODimensionChip",
+    props: ["dimKey", "keyLabel", "value", "removable"],
+    emits: ["remove"],
+    template: `<span><span class="chip-label">{{ keyLabel || dimKey }} = {{ value }}</span><button class="chip-remove" @click="$emit('remove')" /></span>`,
+  },
+  OTimeCell: { name: "OTimeCell", props: ["value", "unit"], template: `<span />` },
 };
 
 const TEAMS = [
@@ -107,7 +116,9 @@ async function addCondition(wrapper: Wrapper, name: string, value: string) {
   await wrapper
     .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
     .vm.$emit("update:modelValue", name);
-  await wrapper.find('[data-test="oncall-rule-editor-dimension-value"]').setValue(value);
+  await wrapper
+    .findComponent('[data-test="oncall-rule-editor-dimension-value"]')
+    .vm.$emit("update:modelValue", value);
   await wrapper.find('[data-test="oncall-rule-editor-confirm-condition"]').trigger("click");
 }
 
@@ -127,6 +138,24 @@ describe("OnCallRuleEditor", () => {
   it("seeds from a claim's pre-filled dimensions", async () => {
     const wrapper = render({ initialDimensions: { "k8s-namespace": "risk" } });
     await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-namespace"]').exists()).toBe(
+      true,
+    );
+  });
+
+  /// The chip is the control: dismissing a condition is a click on the thing
+  /// it names, not on a button parked beside it.
+  it("drops a condition from its own chip", async () => {
+    const wrapper = render({
+      initialDimensions: { "k8s-namespace": "risk", service: "risk-api" },
+    });
+    await flushPromises();
+
+    await wrapper
+      .find('[data-test="oncall-rule-editor-condition-service"] .chip-remove')
+      .trigger("click");
+
+    expect(wrapper.find('[data-test="oncall-rule-editor-condition-service"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-namespace"]').exists()).toBe(
       true,
     );
@@ -160,7 +189,9 @@ describe("OnCallRuleEditor", () => {
       .vm.$emit("update:modelValue", "k8s-cluster");
     expect(problem()).toContain("value it has to equal");
 
-    await wrapper.find('[data-test="oncall-rule-editor-dimension-value"]').setValue("prod");
+    await wrapper
+      .findComponent('[data-test="oncall-rule-editor-dimension-value"]')
+      .vm.$emit("update:modelValue", "prod");
     expect(wrapper.find('[data-test="oncall-rule-editor-dimension-problem"]').exists()).toBe(false);
   });
 
@@ -175,7 +206,9 @@ describe("OnCallRuleEditor", () => {
     await wrapper
       .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
       .vm.$emit("update:modelValue", "k8s-cluster");
-    await wrapper.find('[data-test="oncall-rule-editor-dimension-value"]').setValue("staging");
+    await wrapper
+      .findComponent('[data-test="oncall-rule-editor-dimension-value"]')
+      .vm.$emit("update:modelValue", "staging");
 
     expect(
       wrapper.find('[data-test="oncall-rule-editor-confirm-condition"]').attributes("disabled"),
@@ -215,9 +248,11 @@ describe("OnCallRuleEditor", () => {
     await flushPromises();
     await addCondition(wrapper, "k8s-namespace", "risk");
 
-    const summary = wrapper.find('[data-test="oncall-rule-editor-catch-summary"]').text();
-    expect(summary).toContain("2 signals");
-    expect(summary).toContain("9 fires");
+    expect(wrapper.find('[data-test="oncall-rule-editor-catch-count"]').text()).toContain(
+      "9 pages match",
+    );
+    expect(wrapper.find('[data-test="oncall-rule-editor-catch-s1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-rule-editor-catch-s3"]').exists()).toBe(false);
   });
 
   it("says so when a draft would catch nothing in the queue", async () => {
@@ -234,15 +269,45 @@ describe("OnCallRuleEditor", () => {
   it("starts from a signal without pinning its evidence", async () => {
     const wrapper = render();
     await flushPromises();
-    wrapper
-      .findComponent('[data-test="oncall-rule-editor-from-signal"]')
-      .vm.$emit("update:modelValue", "s1");
-    await wrapper.vm.$nextTick();
+    await wrapper.find('[data-test="oncall-rule-editor-use-s1"]').trigger("click");
 
     expect(wrapper.find('[data-test="oncall-rule-editor-condition-service"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-pod-name"]').exists()).toBe(
       false,
     );
+  });
+
+  /// Two different emergencies share the queue: a path the catch-all absorbed
+  /// paged the wrong team, one without a default paged nobody at all. The row a
+  /// rule is started from has to say which it was.
+  it("says what each startable signal did before offering it", async () => {
+    const wrapper = render({
+      signals: [{ ...SIGNALS[0], defaulted_team_id: "team_2" }, SIGNALS[1]],
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-signal-s1"]').text()).toContain(
+      "caught by Payments",
+    );
+    expect(wrapper.find('[data-test="oncall-rule-editor-signal-s2"]').text()).toContain(
+      "paged nobody",
+    );
+  });
+
+  /// The panel is a check, not a list — past the shown rows the remainder is
+  /// counted, and it names the team they would all page from now on.
+  it("counts the matches it does not show and names their new owner", async () => {
+    const many = Array.from({ length: 6 }, (_, index) => ({
+      ...SIGNALS[1],
+      id: `m${index}`,
+      last_title: `risk_api_slow_${index}`,
+    })) as any;
+    const wrapper = render({ signals: many });
+    await flushPromises();
+    await addCondition(wrapper, "k8s-namespace", "risk");
+
+    const more = wrapper.find('[data-test="oncall-rule-editor-catch-more"]').text();
+    expect(more).toContain("2 more");
+    expect(more).toContain("Search");
   });
 
   /// "Page" has to say what paging means, or it is a team name with no
