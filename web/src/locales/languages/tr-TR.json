@@ -12456,9 +12456,12 @@
       "statusConnecting": "Bağlanıyor",
       "statusOffline": "Çevrimdışı",
       "statusDown": "Kapalı",
+      "statusUnknown": "Bilinmiyor",
       "connectingMessage": "İlk aracının bağlanması bekleniyor — kurulumdan kısa süre sonra ulaşacak.",
       "offlineMessage": "Aracının bağlantısı yakın zamanda koptu — yeniden bağlanana kadar kontrol buradan çalışmayacak.",
       "downMessage": "Bir günden uzun süredir aracı yok — bir aracı yeniden bağlanana kadar bu konum kontrolü çalıştırmayacak.",
+      "unknownMessage": "Ajanlar sağlık durumlarını yalnızca kayıtlı oldukları kümeye bildirir, bu yüzden bu küme bunu doğrulayamıyor. Konum büyük olasılıkla çalışıyor.",
+      "unknownAgents": "Ajan durumu burada kullanılamıyor",
       "noSearchResults": "Aramanızla eşleşen konum yok",
       "noPublicMatches": "Aramanızla eşleşen genel konum yok",
       "noPrivateMatches": "Aramanızla eşleşen özel konum yok",
@@ -12972,7 +12975,9 @@
       "status": {
         "online": "Çevrimiçi",
         "offline": "Çevrimdışı",
-        "pending": "Beklemede"
+        "pending": "Beklemede",
+        "unknown": "Bilinmiyor",
+        "unknownHint": "Ajanlar sağlık durumlarını yalnızca kayıtlı oldukları kümeye bildirir, bu yüzden bu küme bunu doğrulayamıyor. Konum büyük olasılıkla çalışıyor."
       },
       "table": {
         "name": "Ad",
@@ -13028,6 +13033,7 @@
         "agentName": "Agent",
         "restartConfig": "Yeniden başlatma yapılandırması — bu aracının kurulum komutunu kopyalayarak kurulumu / docker yeniden başlatmayı tekrar çalıştırın (ör. bir belirteç rotasyonundan sonra)",
         "noAgents": "Bu konum için henüz hiçbir agent kaydolmadı.",
+        "agentsUnavailable": "Bu konumdaki ajanlar başka bir kümeye kayıtlı ve burada görünmüyorlar.",
         "checksTitle": "Bu konumdan çalışan kontroller",
         "checkName": "Ad",
         "noChecks": "Bu konuma henüz hiçbir kontrol atanmadı.",

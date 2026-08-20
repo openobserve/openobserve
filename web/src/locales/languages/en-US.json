@@ -12452,9 +12452,12 @@
       "statusConnecting": "Connecting",
       "statusOffline": "Offline",
       "statusDown": "Down",
+      "statusUnknown": "Unknown",
       "connectingMessage": "Waiting for the first agent to check in — it will arrive shortly after install.",
       "offlineMessage": "Agent recently dropped — the check won't run from here until it reconnects.",
       "downMessage": "No agent for over a day — this location won't run the check until an agent reconnects.",
+      "unknownMessage": "Agents report their health only to the cluster they registered with, so this one can't confirm it. The location may well be running.",
+      "unknownAgents": "Agent status unavailable here",
       "noSearchResults": "No locations match your search",
       "noPublicMatches": "No public locations match your search",
       "noPrivateMatches": "No private locations match your search",
@@ -12968,7 +12971,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "Pending"
+        "pending": "Pending",
+        "unknown": "Unknown",
+        "unknownHint": "Agents report their health only to the cluster they registered with, so this one can't confirm it. The location may well be running."
       },
       "table": {
         "name": "Name",
@@ -13024,6 +13029,7 @@
         "agentName": "Agent",
         "restartConfig": "Restart config — copy this agent's setup command to re-run install / docker restart (e.g. after a token rotation)",
         "noAgents": "No agents have registered for this location yet.",
+        "agentsUnavailable": "This location's agents registered with another cluster and are not visible here.",
         "checksTitle": "Checks running from this location",
         "checkName": "Name",
         "noChecks": "No checks are assigned to this location yet.",

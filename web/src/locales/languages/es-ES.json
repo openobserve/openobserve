@@ -12456,9 +12456,12 @@
       "statusConnecting": "Conectando",
       "statusOffline": "Desconectado",
       "statusDown": "Caído",
+      "statusUnknown": "Desconocido",
       "connectingMessage": "Esperando a que el primer agente se registre — llegará poco después de la instalación.",
       "offlineMessage": "El agente se desconectó recientemente — la verificación no se ejecutará desde aquí hasta que se reconecte.",
       "downMessage": "Sin agente durante más de un día — esta ubicación no ejecutará la verificación hasta que un agente se reconecte.",
+      "unknownMessage": "Los agentes informan de su estado solo al clúster con el que se registraron, por lo que este no puede confirmarlo. Es posible que la ubicación esté en funcionamiento.",
+      "unknownAgents": "Estado del agente no disponible aquí",
       "noSearchResults": "Ninguna ubicación coincide con tu búsqueda",
       "noPublicMatches": "Ninguna ubicación pública coincide con tu búsqueda",
       "noPrivateMatches": "Ninguna ubicación privada coincide con tu búsqueda",
@@ -12972,7 +12975,9 @@
       "status": {
         "online": "En línea",
         "offline": "Desconectado",
-        "pending": "Pendiente"
+        "pending": "Pendiente",
+        "unknown": "Desconocido",
+        "unknownHint": "Los agentes informan de su estado solo al clúster con el que se registraron, por lo que este no puede confirmarlo. Es posible que la ubicación esté en funcionamiento."
       },
       "table": {
         "name": "Nombre",
@@ -13028,6 +13033,7 @@
         "agentName": "Agente",
         "restartConfig": "Reiniciar configuración — copie el comando de configuración de este agente para volver a ejecutar la instalación / reinicio de Docker (p. ej., después de una rotación de token)",
         "noAgents": "Aún no se han registrado agentes para esta ubicación.",
+        "agentsUnavailable": "Los agentes de esta ubicación se registraron en otro clúster y no son visibles aquí.",
         "checksTitle": "Verificaciones ejecutándose desde esta ubicación",
         "checkName": "Nombre",
         "noChecks": "Aún no se asignan verificaciones a esta ubicación.",

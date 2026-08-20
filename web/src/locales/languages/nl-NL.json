@@ -12456,9 +12456,12 @@
       "statusConnecting": "Verbinden",
       "statusOffline": "Offline",
       "statusDown": "Niet beschikbaar",
+      "statusUnknown": "Onbekend",
       "connectingMessage": "Wachten op de eerste agent die incheckt — deze zal kort na installatie arriveren.",
       "offlineMessage": "Agent is recent weggevallen — de controle wordt vanaf hier niet uitgevoerd totdat deze opnieuw verbinding maakt.",
       "downMessage": "Al meer dan een dag geen agent — deze locatie zal de controle niet uitvoeren totdat een agent opnieuw verbinding maakt.",
+      "unknownMessage": "Agents rapporteren hun gezondheid alleen aan het cluster waarmee ze zijn geregistreerd, dus deze kan het niet bevestigen. De locatie draait mogelijk gewoon.",
+      "unknownAgents": "Agentstatus hier niet beschikbaar",
       "noSearchResults": "Geen locaties gevonden voor uw zoekopdracht",
       "noPublicMatches": "Geen openbare locaties gevonden voor uw zoekopdracht",
       "noPrivateMatches": "Geen privélocaties gevonden voor uw zoekopdracht",
@@ -12972,7 +12975,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "In behandeling"
+        "pending": "In behandeling",
+        "unknown": "Onbekend",
+        "unknownHint": "Agents rapporteren hun gezondheid alleen aan het cluster waarmee ze zijn geregistreerd, dus deze kan het niet bevestigen. De locatie draait mogelijk gewoon."
       },
       "table": {
         "name": "Naam",
@@ -13028,6 +13033,7 @@
         "agentName": "Agent",
         "restartConfig": "Configuratie opnieuw starten — kopieer het installatiecommando van deze agent om de installatie opnieuw uit te voeren / docker opnieuw te starten (bijv. na een tokenrotatie)",
         "noAgents": "Er hebben zich nog geen agenten geregistreerd voor deze locatie.",
+        "agentsUnavailable": "De agents van deze locatie zijn geregistreerd bij een ander cluster en zijn hier niet zichtbaar.",
         "checksTitle": "Controles die vanaf deze locatie worden uitgevoerd",
         "checkName": "Naam",
         "noChecks": "Er zijn nog geen controles toegewezen aan deze locatie.",

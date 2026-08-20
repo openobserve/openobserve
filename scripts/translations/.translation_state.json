@@ -12661,8 +12661,11 @@
       "statusDown": "b86d11af79188e58",
       "statusOffline": "a1794783aab72d20",
       "statusReady": "5fa7aac5375c5815",
+      "statusUnknown": "b764cdc0eab71374",
       "title": "95c61170318a2851",
       "toggleFailed": "bf60121ca191b16e",
+      "unknownAgents": "0e7cb1802ba90a29",
+      "unknownMessage": "41db47d55dff94f0",
       "updateClose": "ec146cf4339c74c6",
       "updateFailed": "84c3a675a48ff67e",
       "updateSuccess": "962906f4f658a9a2",
@@ -12717,6 +12720,7 @@
         "agentName": "11b39c93777e8f1f",
         "agentsSubtitle": "e1ba4bf7a102f71e",
         "agentsTitle": "279b44d2ab4b40c0",
+        "agentsUnavailable": "9354bfc5c7065b2a",
         "back": "7e411e6d1fb73865",
         "checkName": "dcd1d5223f73b3a9",
         "checksTitle": "10014025dca36813",
@@ -12761,7 +12765,9 @@
       "status": {
         "offline": "a1794783aab72d20",
         "online": "0d21bd52022ca7f7",
-        "pending": "331551b0de4157c9"
+        "pending": "331551b0de4157c9",
+        "unknown": "b764cdc0eab71374",
+        "unknownHint": "41db47d55dff94f0"
       },
       "table": {
         "agents": "279b44d2ab4b40c0",

@@ -12456,9 +12456,12 @@
       "statusConnecting": "Đang kết nối",
       "statusOffline": "Ngoại tuyến",
       "statusDown": "Ngừng hoạt động",
+      "statusUnknown": "Không xác định",
       "connectingMessage": "Đang chờ agent đầu tiên kết nối — nó sẽ xuất hiện ngay sau khi cài đặt.",
       "offlineMessage": "Agent vừa bị ngắt kết nối — lượt kiểm tra sẽ không chạy từ đây cho đến khi nó kết nối lại.",
       "downMessage": "Không có agent nào trong hơn một ngày — vị trí này sẽ không chạy lượt kiểm tra cho đến khi có agent kết nối lại.",
+      "unknownMessage": "Các agent chỉ báo cáo tình trạng của chúng cho cụm mà chúng đã đăng ký, vì vậy cụm này không thể xác nhận được. Vị trí này có thể đang hoạt động.",
+      "unknownAgents": "Trạng thái agent không khả dụng tại đây.",
       "noSearchResults": "Không có vị trí nào khớp với tìm kiếm của bạn",
       "noPublicMatches": "Không có vị trí công khai nào khớp với tìm kiếm của bạn",
       "noPrivateMatches": "Không có vị trí riêng tư nào khớp với tìm kiếm của bạn",
@@ -12972,7 +12975,9 @@
       "status": {
         "online": "Trực tuyến",
         "offline": "Ngoại tuyến",
-        "pending": "Đang chờ"
+        "pending": "Đang chờ",
+        "unknown": "Không xác định",
+        "unknownHint": "Các agent chỉ báo cáo tình trạng của chúng cho cụm mà chúng đã đăng ký, vì vậy cụm này không thể xác nhận được. Vị trí này có thể đang hoạt động."
       },
       "table": {
         "name": "Tên",
@@ -13028,6 +13033,7 @@
         "agentName": "Agent",
         "restartConfig": "Cấu hình khởi động lại — sao chép lệnh thiết lập của agent này để chạy lại cài đặt / khởi động lại docker (ví dụ sau khi xoay vòng token)",
         "noAgents": "Chưa có agent nào đăng ký cho vị trí này.",
+        "agentsUnavailable": "Các agent của vị trí này đã đăng ký với một cụm khác và không hiển thị ở đây.",
         "checksTitle": "Các kiểm tra đang chạy từ vị trí này",
         "checkName": "Tên",
         "noChecks": "Chưa có kiểm tra nào được gán cho vị trí này.",

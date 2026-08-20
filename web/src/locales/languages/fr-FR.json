@@ -12456,9 +12456,12 @@
       "statusConnecting": "Connexion en cours",
       "statusOffline": "Hors ligne",
       "statusDown": "Indisponible",
+      "statusUnknown": "Inconnu",
       "connectingMessage": "En attente du premier agent — il arrivera peu après l'installation.",
       "offlineMessage": "L'agent s'est déconnecté récemment — le contrôle ne s'exécutera pas depuis cet emplacement tant qu'il ne s'est pas reconnecté.",
       "downMessage": "Aucun agent depuis plus d'un jour — cet emplacement n'exécutera pas le contrôle tant qu'un agent ne se reconnecte pas.",
+      "unknownMessage": "Les agents signalent leur état de santé uniquement au cluster avec lequel ils sont enregistrés, donc celui-ci ne peut pas le confirmer. L'emplacement peut très bien être en cours d'exécution.",
+      "unknownAgents": "Statut de l'agent indisponible ici",
       "noSearchResults": "Aucun emplacement ne correspond à votre recherche",
       "noPublicMatches": "Aucun emplacement public ne correspond à votre recherche",
       "noPrivateMatches": "Aucun emplacement privé ne correspond à votre recherche",
@@ -12972,7 +12975,9 @@
       "status": {
         "online": "En ligne",
         "offline": "Hors ligne",
-        "pending": "En attente"
+        "pending": "En attente",
+        "unknown": "Inconnu",
+        "unknownHint": "Les agents signalent leur état de santé uniquement au cluster avec lequel ils sont enregistrés, donc celui-ci ne peut pas le confirmer. L'emplacement peut très bien être en cours d'exécution."
       },
       "table": {
         "name": "Nom",
@@ -13028,6 +13033,7 @@
         "agentName": "Agent",
         "restartConfig": "Redémarrer la configuration — copiez la commande d'installation de cet agent pour relancer l'installation / le redémarrage Docker (par exemple après une rotation de jeton).",
         "noAgents": "Aucun agent ne s'est encore enregistré pour cet emplacement.",
+        "agentsUnavailable": "Les agents de cet emplacement sont enregistrés auprès d'un autre cluster et ne sont pas visibles ici.",
         "checksTitle": "Vérifications en cours depuis cet emplacement",
         "checkName": "Nom",
         "noChecks": "Aucune vérification n'est encore assignée à cet emplacement.",

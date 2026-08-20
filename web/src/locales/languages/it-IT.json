@@ -12456,9 +12456,12 @@
       "statusConnecting": "Connessione",
       "statusOffline": "Offline",
       "statusDown": "Non disponibile",
+      "statusUnknown": "Sconosciuto",
       "connectingMessage": "In attesa che il primo agente si connetta — arriverà subito dopo l'installazione.",
       "offlineMessage": "L'agente si è disconnesso di recente — il controllo non verrà eseguito da qui finché non si riconnette.",
       "downMessage": "Nessun agente per oltre un giorno — questa posizione non eseguirà il controllo finché un agente non si riconnette.",
+      "unknownMessage": "Gli agenti riportano il loro stato di salute solo al cluster con cui si sono registrati, quindi questo non può confermarlo. La posizione potrebbe benissimo essere operativa.",
+      "unknownAgents": "Stato agente non disponibile qui",
       "noSearchResults": "Nessuna posizione corrisponde alla tua ricerca",
       "noPublicMatches": "Nessuna posizione pubblica corrisponde alla tua ricerca",
       "noPrivateMatches": "Nessuna posizione privata corrisponde alla tua ricerca",
@@ -12972,7 +12975,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "In attesa"
+        "pending": "In attesa",
+        "unknown": "Sconosciuto",
+        "unknownHint": "Gli agenti riportano il loro stato di salute solo al cluster con cui si sono registrati, quindi questo non può confermarlo. La posizione potrebbe benissimo essere operativa."
       },
       "table": {
         "name": "Nome",
@@ -13028,6 +13033,7 @@
         "agentName": "Agente",
         "restartConfig": "Riavvio configurazione — copia il comando di configurazione di questo agente per rieseguire l'installazione / il riavvio di docker (ad es. dopo una rotazione del token)",
         "noAgents": "Nessun agente si è ancora registrato per questa posizione.",
+        "agentsUnavailable": "Gli agenti di questa posizione sono registrati con un altro cluster e non sono visibili qui.",
         "checksTitle": "Controlli in esecuzione da questa posizione",
         "checkName": "Nome",
         "noChecks": "Nessun controllo è ancora assegnato a questa posizione.",
