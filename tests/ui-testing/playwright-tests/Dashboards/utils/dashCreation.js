@@ -253,6 +253,96 @@ export async function reopenDashboardFromList(page, dashboardName) {
 }
 
 /**
+ * A one-line snapshot of what the dashboard view actually rendered, for failure
+ * messages. A bare `locator.waitFor` timeout says only "the button never showed",
+ * which is the one thing already known — this says what was on screen instead.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<string>}
+ */
+async function describeDashboardView(page) {
+  const state = await page
+    .evaluate(() => ({
+      url: location.href,
+      backBtn: !!document.querySelector('[data-test="dashboard-back-btn"]'),
+      // RenderDashboardCharts' own container — absent means the view body never mounted
+      chartsContainer: !!document.querySelector(".render-dashboard-charts-container"),
+      panelContainers: document.querySelectorAll('[data-test="dashboard-panel-container"]').length,
+      tabList: !!document.querySelector('[data-test="dashboard-tab-list"]'),
+      // The empty-state illustration renders alongside the add-panel card, but the
+      // card itself is gated on `!viewOnly` — art present + button absent narrows
+      // the cause to a view-only render rather than a load that never finished.
+      emptyStateArt: !!document.querySelector('[data-test="empty-panel-art"]'),
+      toast:
+        document.querySelector("[data-test-variant]")?.getAttribute("data-test-message") ?? null,
+    }))
+    .catch((e) => ({ evaluateFailed: e.message }));
+  return JSON.stringify(state);
+}
+
+/**
+ * Wait for a freshly created (empty) dashboard to be ready for `addPanel()`.
+ *
+ * createDashboard() returns as soon as /dashboards/view is reachable and the
+ * header's back button has mounted, but the empty-state add-panel button lives in
+ * RenderDashboardCharts (v-if="!panels.length"), which only renders once the
+ * dashboard GET and variables init have finished. Under parallel load that lands
+ * well after the header.
+ *
+ * Occasionally that initial load wedges outright and no amount of extra waiting
+ * helps — the previous single 30s wait then died with an opaque timeout. Recovery
+ * is a re-navigation to the view URL, which re-runs the dashboard GET and variables
+ * init; the dashboard already exists by this point, so it is safe and idempotent.
+ *
+ * The re-navigation deliberately uses the URL captured on entry rather than
+ * page.reload(): when that first load fails outright the app bounces back to the
+ * dashboards list, and reloading would just reload the list forever. If it still
+ * isn't ready, fail with what was actually on screen rather than a bare timeout.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} dashboardName - only used for logging
+ */
+export async function waitForEmptyDashboardReady(page, dashboardName) {
+  const addPanelBtn = page.locator(SELECTORS.ADD_PANEL_BTN);
+  // createDashboard() has just landed on /dashboards/view, so this is the URL to
+  // return to. Capture it now — by the time the wait below expires the app may
+  // have navigated away.
+  const viewUrl = page.url();
+
+  try {
+    await addPanelBtn.waitFor({ state: "visible", timeout: 20000 });
+    return;
+  } catch {
+    testLogger.warn("Empty-state add-panel button did not render, re-opening dashboard view", {
+      dashboardName,
+      viewUrl,
+      state: await describeDashboardView(page),
+    });
+  }
+
+  if (!/\/dashboards\/view/.test(viewUrl)) {
+    throw new Error(
+      `setupTestDashboard("${dashboardName}"): expected to be on the dashboard view after ` +
+        `createDashboard(), but the URL was ${viewUrl}. Dashboard view state: ${await describeDashboardView(page)}`
+    );
+  }
+
+  await page.goto(viewUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
+
+  try {
+    await addPanelBtn.waitFor({ state: "visible", timeout: 30000 });
+    testLogger.info("Empty-state add-panel button rendered after re-opening the view", {
+      dashboardName,
+    });
+  } catch {
+    throw new Error(
+      `setupTestDashboard("${dashboardName}"): the empty-state add-panel button never rendered, ` +
+        `even after re-opening ${viewUrl}. Dashboard view state: ${await describeDashboardView(page)}`
+    );
+  }
+}
+
+/**
  * Set up a test dashboard for variable tests
  * Consolidates the common pattern of navigating to dashboards,
  * creating a dashboard, and waiting for it to be ready
@@ -274,13 +364,7 @@ export async function setupTestDashboard(page, pm, dashboardName, options = {}) 
   await pm.dashboardCreate.createDashboard(dashboardName);
 
   if (waitForAddPanelBtn) {
-    // createDashboard() returns as soon as /dashboards/view is reachable and the
-    // header's back button has mounted, but the empty-state add-panel button
-    // lives in RenderDashboardCharts (v-if="!panels.length"), which only renders
-    // once the dashboard GET and variables init have finished. Under parallel CI
-    // load that lands well after the header, so this wait needs the same budget
-    // as the other post-navigation waits here rather than a tight 10s.
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 30000 });
+    await waitForEmptyDashboardReady(page, dashboardName);
   }
 
   testLogger.info('Test dashboard setup complete', { dashboardName });

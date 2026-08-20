@@ -1,0 +1,18 @@
+# Drives O2RumTester across screens to exercise view + action tracking.
+appId: com.o2rumtester
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "O2 RUM Tester"
+    timeout: 40000
+- tapOn: "Go to Details →"
+- assertVisible: "Details"
+- tapOn: "Custom action (tap)"
+- tapOn: "← Back to Home"
+- extendedWaitUntil:
+    visible: "O2 RUM Tester"
+    timeout: 40000
+- tapOn: "Go to Checkout form →"
+- assertVisible: "Checkout (masking test)"
+- tapOn: "← Back to Home"

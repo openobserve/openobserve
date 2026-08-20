@@ -625,6 +625,12 @@
     "delete": "Xóa",
     "remove": "Xóa bỏ",
     "export": "Xuất",
+    "download": "Tải xuống",
+    "openProviderOnRegistry": "OpenObserve provider trên {registry}",
+    "exportTerraformTabTooltip": "Cấu hình tương tự áp dụng với Terraform hoặc OpenTofu.",
+    "exportTerraformEmpty": "Không có tài nguyên Terraform nào cho lựa chọn này. Hãy xuất nó dưới dạng JSON.",
+    "exportTerraformSkipped": "Không bao gồm: {names}. OpenObserve Terraform provider không có tài nguyên cho các mục này.",
+    "exportTerraformDropped": "Bỏ sót — lược đồ provider không thể chứa các trường này: {fields}.",
     "actions": "Hành động",
     "version": "Phiên bản",
     "updated_at": "Cập nhật lúc",
@@ -820,13 +826,7 @@
     "backTo": "Quay lại {label}",
     "boolTrue": "Đúng",
     "boolFalse": "Sai",
-    "browserTimeWithZone": "Giờ trình duyệt ({zone})",
-    "download": "Tải xuống",
-    "openProviderOnRegistry": "OpenObserve provider trên {registry}",
-    "exportTerraformTabTooltip": "Cấu hình tương tự áp dụng với Terraform hoặc OpenTofu.",
-    "exportTerraformEmpty": "Không có tài nguyên Terraform nào cho lựa chọn này. Hãy xuất nó dưới dạng JSON.",
-    "exportTerraformSkipped": "Không bao gồm: {names}. OpenObserve Terraform provider không có tài nguyên cho các mục này.",
-    "exportTerraformDropped": "Bỏ sót — lược đồ provider không thể chứa các trường này: {fields}."
+    "browserTimeWithZone": "Giờ trình duyệt ({zone})"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "Không có dữ liệu"
     },
     "importAlertTitle": "Nhập cảnh báo",
+    "exportDialogTitle": "Xuất cảnh báo | Xuất {count} cảnh báo",
+    "exportDialogSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve.",
     "jsonFilesOnlyHint": "Chỉ chấp nhận tệp .json",
     "outputMessages": "Thông báo đầu ra",
     "destinationsRequiredLabel": "Điểm đến *",
@@ -7370,9 +7372,7 @@
     "sloKind": "Loại điều kiện",
     "sloLongWindow": "Cửa sổ dài",
     "sloShortWindow": "Cửa sổ ngắn",
-    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
-    "exportDialogTitle": "Xuất cảnh báo | Xuất {count} cảnh báo",
-    "exportDialogSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve."
+    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây."
   },
   "alert_dependencies": {
     "actionOpen": "Mở",
@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Đã hủy ghi hình — cửa sổ ghi hình đã bị đóng",
       "restoreFailedHint": "hành trình không thể đến điểm bạn đã chọn cho đến khi bước này hoàn tất",
       "recordBeforeFailedStep": "Ghi trước bước {step}",
-      "recordingHere": "Ghi hình tại đây",
+      "newStepsLandHere": "Các bước mới sẽ xuất hiện tại đây",
       "recordBeforeStep": "Ghi hình trước bước này",
       "recordBeforeStepHint": "Phát lại hành trình đến điểm này, sau đó ghi các bước mới trước đó.",
       "recordBeforeNeedsNewerExtension": "Cập nhật tiện ích mở rộng ghi hình để ghi từ một bước cụ thể.",
@@ -12456,9 +12456,12 @@
       "statusConnecting": "Đang kết nối",
       "statusOffline": "Ngoại tuyến",
       "statusDown": "Ngừng hoạt động",
+      "statusUnknown": "Không xác định",
       "connectingMessage": "Đang chờ agent đầu tiên kết nối — nó sẽ xuất hiện ngay sau khi cài đặt.",
       "offlineMessage": "Agent vừa bị ngắt kết nối — lượt kiểm tra sẽ không chạy từ đây cho đến khi nó kết nối lại.",
       "downMessage": "Không có agent nào trong hơn một ngày — vị trí này sẽ không chạy lượt kiểm tra cho đến khi có agent kết nối lại.",
+      "unknownMessage": "Các agent chỉ báo cáo tình trạng của chúng cho cụm mà chúng đã đăng ký, vì vậy cụm này không thể xác nhận được. Vị trí này có thể đang hoạt động.",
+      "unknownAgents": "Trạng thái agent không khả dụng tại đây.",
       "noSearchResults": "Không có vị trí nào khớp với tìm kiếm của bạn",
       "noPublicMatches": "Không có vị trí công khai nào khớp với tìm kiếm của bạn",
       "noPrivateMatches": "Không có vị trí riêng tư nào khớp với tìm kiếm của bạn",
@@ -12657,6 +12660,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "Không thuộc bước nào ({count})",
+      "allSteps": "Tất cả các bước ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12671,9 +12677,17 @@
       "reload": "Tải lại trang",
       "retry": "Retry",
       "unattributedCount": "{count} sự kiện không được gán cho bước nào",
-      "stepFilterBanner": "Hiển thị sự kiện cho bước {step}",
-      "clearStepFilter": "Xóa",
-      "rowTitleWithTimestamps": "{label}\nkhởi tạo {initiated} · quan sát {observed}"
+      "rowTitleWithTimestamps": "{label}\nkhởi tạo {initiated} · quan sát {observed}",
+      "detailEvent": "Sự kiện",
+      "detailOccurred": "Đã xảy ra",
+      "detailInitiated": "Khởi tạo",
+      "detailResourceType": "Loại tài nguyên",
+      "detailLevel": "Mức độ",
+      "detailOrigin": "Nguồn gốc",
+      "detailFirstParty": "Bên thứ nhất",
+      "detailThirdParty": "Bên thứ ba",
+      "detailStackTrace": "Dấu vết ngăn xếp",
+      "footerEvents": "Sự kiện"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12721,8 +12735,7 @@
       "evidenceCounts": "{consoleErrors} lỗi console · {pageErrors} lỗi trang · {failed} yêu cầu thất bại · {nonOk} phản hồi không phải 2xx",
       "evidenceTruncated": "Một số sự kiện đã bị bỏ qua trong lần chạy này vì đã đạt giới hạn thu thập. Tập hợp này cho biết những gì đã diễn ra.",
       "pageActivity": "Hoạt động trang",
-      "pageActivityCount": "{shown} trên {total}",
-      "pageActivityCountTruncated": "{shown} trên {total}+",
+      "pageActivityEvents": "{count} sự kiện | {count} sự kiện",
       "pageActivityViewAllShort": "Xem tất cả trong Bằng chứng",
       "expandScreenshot": "Mở rộng"
     },
@@ -12972,7 +12985,9 @@
       "status": {
         "online": "Trực tuyến",
         "offline": "Ngoại tuyến",
-        "pending": "Đang chờ"
+        "pending": "Đang chờ",
+        "unknown": "Không xác định",
+        "unknownHint": "Các agent chỉ báo cáo tình trạng của chúng cho cụm mà chúng đã đăng ký, vì vậy cụm này không thể xác nhận được. Vị trí này có thể đang hoạt động."
       },
       "table": {
         "name": "Tên",
@@ -13028,6 +13043,7 @@
         "agentName": "Agent",
         "restartConfig": "Cấu hình khởi động lại — sao chép lệnh thiết lập của agent này để chạy lại cài đặt / khởi động lại docker (ví dụ sau khi xoay vòng token)",
         "noAgents": "Chưa có agent nào đăng ký cho vị trí này.",
+        "agentsUnavailable": "Các agent của vị trí này đã đăng ký với một cụm khác và không hiển thị ở đây.",
         "checksTitle": "Các kiểm tra đang chạy từ vị trí này",
         "checkName": "Tên",
         "noChecks": "Chưa có kiểm tra nào được gán cho vị trí này.",
@@ -13694,6 +13710,7 @@
       "resumingAlerts": "Đang tiếp tục cảnh báo...",
       "pausingAlerts": "Đang tạm dừng cảnh báo...",
       "errorExportingAlertsPleaseTryAgain": "Lỗi khi xuất cảnh báo. Vui lòng thử lại.",
+      "someAlertsCouldNotBeExported": "Không thể đọc {names}. Phần còn lại đã sẵn sàng để xuất.",
       "successfullyExportedAlert": "Đã xuất thành công {count} cảnh báo | Đã xuất thành công {count} cảnh báo",
       "exportingAlerts": "Đang xuất cảnh báo...",
       "pleaseWaitWhileSearchingForDashboards": "Vui lòng đợi trong khi tìm kiếm bảng điều khiển...",
@@ -13748,8 +13765,7 @@
       "alertSavedSuccessfully": "Đã lưu cảnh báo thành công.",
       "alertUpdatedSuccessfully": "Đã cập nhật cảnh báo thành công.",
       "openingDedupConfig": "Đang mở cấu hình khử trùng lặp cho: {name}",
-      "editingAlert": "Đang chỉnh sửa cảnh báo: {name}",
-      "someAlertsCouldNotBeExported": "Không thể đọc {names}. Phần còn lại đã sẵn sàng để xuất."
+      "editingAlert": "Đang chỉnh sửa cảnh báo: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Đã cập nhật khóa mã hóa thành công",
@@ -14264,6 +14280,11 @@
     "move": "Di chuyển",
     "moveTitle": "Di chuyển {count} SLO sang thư mục khác",
     "moveSelected": "Di chuyển {count} mục đã chọn",
+    "exportTitle": "Xuất SLO | Xuất {count} SLO",
+    "exportSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve.",
+    "exportFailed": "Không thể đọc định nghĩa SLO. Vui lòng thử lại.",
+    "exportPartial": "Không thể đọc {names}. Phần còn lại đã sẵn sàng để xuất.",
+    "exportSucceeded": "Đã xuất {count} SLO | Đã xuất {count} SLO",
     "moved": "Đã di chuyển {count} SLO sang {folder}",
     "moveFailed": "Di chuyển thất bại",
     "preview": {
@@ -14318,12 +14339,7 @@
       "editTargetMissing": "Cảnh báo đó không còn trên SLO này.",
       "describeBurn": "Tỷ lệ đốt > {critical} trong {long} và {short}",
       "describeBudget": "Ngân sách lỗi đã tiêu thụ > {critical}%"
-    },
-    "exportTitle": "Xuất SLO | Xuất {count} SLO",
-    "exportSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve.",
-    "exportFailed": "Không thể đọc định nghĩa SLO. Vui lòng thử lại.",
-    "exportPartial": "Không thể đọc {names}. Phần còn lại đã sẵn sàng để xuất.",
-    "exportSucceeded": "Đã xuất {count} SLO | Đã xuất {count} SLO"
+    }
   },
   "promql": {
     "operations": {

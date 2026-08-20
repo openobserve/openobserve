@@ -76,6 +76,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_workflows_migration = false;
     let mut need_synthetics_migration = false;
     let mut need_stream_names_migration = false;
+    let mut need_annotation_queues_datasets_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -262,6 +263,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_36 = version_compare::Version::from("0.0.36").unwrap();
                 let v0_0_37 = version_compare::Version::from("0.0.37").unwrap();
                 let v0_0_38 = version_compare::Version::from("0.0.38").unwrap();
+                let v0_0_39 = version_compare::Version::from("0.0.39").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -347,6 +349,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if existing_model_version < v0_0_38 {
                     log::info!("[OFGA:Local] stream names migration needed");
                     need_stream_names_migration = true;
+                }
+                if existing_model_version < v0_0_39 {
+                    log::info!(
+                        "[OFGA:Local] annotation queues and datasets permissions migration needed"
+                    );
+                    need_annotation_queues_datasets_migration = true;
                 }
             }
 
@@ -491,6 +499,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_workflows_migration {
                         get_ownership_all_org_tuple(org_name, "workflows", &mut tuples);
+                    }
+                    if need_annotation_queues_datasets_migration {
+                        get_ownership_all_org_tuple(org_name, "annotation_queues", &mut tuples);
+                        get_ownership_all_org_tuple(org_name, "datasets", &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {

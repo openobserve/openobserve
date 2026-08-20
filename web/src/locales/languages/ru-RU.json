@@ -625,6 +625,12 @@
     "delete": "Удалить",
     "remove": "Убрать",
     "export": "Экспорт",
+    "download": "Скачать",
+    "openProviderOnRegistry": "Провайдер OpenObserve в {registry}",
+    "exportTerraformTabTooltip": "Та же конфигурация применима с Terraform или OpenTofu.",
+    "exportTerraformEmpty": "Для этого выбора не существует ресурса Terraform. Экспортируйте его как JSON.",
+    "exportTerraformSkipped": "Не включено: {names}. Провайдер OpenObserve Terraform не имеет ресурса для них.",
+    "exportTerraformDropped": "Исключено — схема провайдера не может содержать эти поля: {fields}.",
     "actions": "Действия",
     "version": "Версия",
     "updated_at": "Обновлено",
@@ -820,13 +826,7 @@
     "backTo": "Назад к {label}",
     "boolTrue": "Истина",
     "boolFalse": "Ложь",
-    "browserTimeWithZone": "Время браузера ({zone})",
-    "download": "Скачать",
-    "openProviderOnRegistry": "Провайдер OpenObserve в {registry}",
-    "exportTerraformTabTooltip": "Та же конфигурация применима с Terraform или OpenTofu.",
-    "exportTerraformEmpty": "Для этого выбора не существует ресурса Terraform. Экспортируйте его как JSON.",
-    "exportTerraformSkipped": "Не включено: {names}. Провайдер OpenObserve Terraform не имеет ресурса для них.",
-    "exportTerraformDropped": "Исключено — схема провайдера не может содержать эти поля: {fields}."
+    "browserTimeWithZone": "Время браузера ({zone})"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "Нет данных"
     },
     "importAlertTitle": "Импорт оповещения",
+    "exportDialogTitle": "Экспортировать оповещение | Экспортировать {count} оповещений",
+    "exportDialogSubtitle": "Проверьте определение, затем скачайте его в формате JSON или Terraform для провайдера OpenObserve.",
     "jsonFilesOnlyHint": "только файлы .json",
     "outputMessages": "Выходные сообщения",
     "destinationsRequiredLabel": "Назначения *",
@@ -7370,9 +7372,7 @@
     "sloKind": "Тип условия",
     "sloLongWindow": "Длинное окно",
     "sloShortWindow": "Короткое окно",
-    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда.",
-    "exportDialogTitle": "Экспортировать оповещение | Экспортировать {count} оповещений",
-    "exportDialogSubtitle": "Проверьте определение, затем скачайте его в формате JSON или Terraform для провайдера OpenObserve."
+    "sloCloneDisabled": "SLO-оповещения создаются на странице SLO, поэтому их нельзя клонировать отсюда."
   },
   "alert_dependencies": {
     "actionOpen": "Открыть",
@@ -12323,7 +12323,7 @@
       "restoreCancelledWindowClosed": "Запись отменена — окно рекордера было закрыто",
       "restoreFailedHint": "путь не может достичь выбранной точки, пока этот шаг не пройден",
       "recordBeforeFailedStep": "Записать перед шагом {step}",
-      "recordingHere": "Запись здесь",
+      "newStepsLandHere": "Новые шаги добавляются сюда",
       "recordBeforeStep": "Записать перед этим шагом",
       "recordBeforeStepHint": "Воспроизведите путь до этого момента, затем запишите новые шаги перед ним.",
       "recordBeforeNeedsNewerExtension": "Обновите расширение рекордера, чтобы записывать с определённого шага.",
@@ -12456,9 +12456,12 @@
       "statusConnecting": "Подключение",
       "statusOffline": "Офлайн",
       "statusDown": "Недоступно",
+      "statusUnknown": "Неизвестно",
       "connectingMessage": "Ожидание первого агента — он появится вскоре после установки.",
       "offlineMessage": "Агент недавно отключился — проверка не будет запускаться отсюда, пока он не переподключится.",
       "downMessage": "Нет агента более суток — эта локация не будет запускать проверку, пока агент не переподключится.",
+      "unknownMessage": "Агенты передают информацию о своём состоянии только в тот кластер, в котором они зарегистрированы, поэтому этот кластер не может подтвердить её. Локация, скорее всего, работает.",
+      "unknownAgents": "Здесь статус агента недоступен",
       "noSearchResults": "Нет локаций, соответствующих вашему поиску",
       "noPublicMatches": "Нет публичных локаций, соответствующих вашему поиску",
       "noPrivateMatches": "Нет приватных локаций, соответствующих вашему поиску",
@@ -12657,6 +12660,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "Не отнесено к шагу ({count})",
+      "allSteps": "Все шаги ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12671,9 +12677,17 @@
       "reload": "Перезагрузить страницу",
       "retry": "Retry",
       "unattributedCount": "{count} событий не отнесено ни к одному шагу",
-      "stepFilterBanner": "Показаны события для шага {step}",
-      "clearStepFilter": "Очистить",
-      "rowTitleWithTimestamps": "{label}\nинициировано {initiated} · наблюдалось {observed}"
+      "rowTitleWithTimestamps": "{label}\nинициировано {initiated} · наблюдалось {observed}",
+      "detailEvent": "Событие",
+      "detailOccurred": "Произошло",
+      "detailInitiated": "Инициировано",
+      "detailResourceType": "Тип ресурса",
+      "detailLevel": "Уровень",
+      "detailOrigin": "Происхождение",
+      "detailFirstParty": "Первая сторона",
+      "detailThirdParty": "Третья сторона",
+      "detailStackTrace": "Трассировка стека",
+      "footerEvents": "События"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12721,8 +12735,7 @@
       "evidenceCounts": "{consoleErrors} ошибок консоли · {pageErrors} ошибок страницы · {failed} неудачных запросов · {nonOk} ответов не 2xx",
       "evidenceTruncated": "Некоторые события были отброшены во время этого запуска, поскольку был достигнут предел захвата. Пакет показывает, что было пропущено.",
       "pageActivity": "Активность страницы",
-      "pageActivityCount": "{shown} из {total}",
-      "pageActivityCountTruncated": "{shown} из {total}+",
+      "pageActivityEvents": "{count} событие | {count} событий",
       "pageActivityViewAllShort": "Просмотреть все в уликах",
       "expandScreenshot": "Развернуть"
     },
@@ -12972,7 +12985,9 @@
       "status": {
         "online": "В сети",
         "offline": "Не в сети",
-        "pending": "Ожидание"
+        "pending": "Ожидание",
+        "unknown": "Неизвестно",
+        "unknownHint": "Агенты передают информацию о своём состоянии только в тот кластер, в котором они зарегистрированы, поэтому этот кластер не может подтвердить её. Локация, скорее всего, работает."
       },
       "table": {
         "name": "Имя",
@@ -13028,6 +13043,7 @@
         "agentName": "Агент",
         "restartConfig": "Перезапуск конфигурации — скопируйте команду настройки этого агента, чтобы повторно запустить установку / перезапуск docker (например, после ротации токена).",
         "noAgents": "Для этого местоположения еще не зарегистрировано ни одного агента.",
+        "agentsUnavailable": "Агенты этой локации зарегистрированы в другом кластере и здесь не видны.",
         "checksTitle": "Проверки, выполняемые из этого местоположения",
         "checkName": "Имя",
         "noChecks": "Для этого местоположения еще не назначено ни одной проверки.",
@@ -13694,6 +13710,7 @@
       "resumingAlerts": "Возобновление оповещений...",
       "pausingAlerts": "Приостановка оповещений...",
       "errorExportingAlertsPleaseTryAgain": "Ошибка при экспорте оповещений. Пожалуйста, попробуйте еще раз.",
+      "someAlertsCouldNotBeExported": "Не удалось прочитать {names}. Остальные готовы к экспорту.",
       "successfullyExportedAlert": "Успешно экспортировано {count} оповещение | Успешно экспортировано {count} оповещений",
       "exportingAlerts": "Экспорт оповещений...",
       "pleaseWaitWhileSearchingForDashboards": "Пожалуйста, подождите, идет поиск дашбордов...",
@@ -13748,8 +13765,7 @@
       "alertSavedSuccessfully": "Оповещение успешно сохранено.",
       "alertUpdatedSuccessfully": "Оповещение успешно обновлено.",
       "openingDedupConfig": "Открытие конфигурации дедупликации для: {name}",
-      "editingAlert": "Редактирование оповещения: {name}",
-      "someAlertsCouldNotBeExported": "Не удалось прочитать {names}. Остальные готовы к экспорту."
+      "editingAlert": "Редактирование оповещения: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Ключ шифрования успешно обновлён",
@@ -14264,6 +14280,11 @@
     "move": "Переместить",
     "moveTitle": "Переместить {count} SLO в другую папку",
     "moveSelected": "Переместить выбранные: {count}",
+    "exportTitle": "Экспортировать SLO | Экспортировать {count} SLO",
+    "exportSubtitle": "Просмотрите определение, затем скачайте его как JSON или как Terraform для провайдера OpenObserve.",
+    "exportFailed": "Не удалось прочитать определение SLO. Пожалуйста, попробуйте снова.",
+    "exportPartial": "Не удалось прочитать {names}. Остальные готовы к экспорту.",
+    "exportSucceeded": "Экспортировано {count} SLO | Экспортировано {count} SLO",
     "moved": "Перемещено {count} SLO в {folder}",
     "moveFailed": "Не удалось переместить",
     "preview": {
@@ -14318,12 +14339,7 @@
       "editTargetMissing": "Это оповещение больше не относится к этому SLO.",
       "describeBurn": "Скорость выгорания > {critical} за {long} и {short}",
       "describeBudget": "Израсходовано бюджета ошибок > {critical}%"
-    },
-    "exportTitle": "Экспортировать SLO | Экспортировать {count} SLO",
-    "exportSubtitle": "Просмотрите определение, затем скачайте его как JSON или как Terraform для провайдера OpenObserve.",
-    "exportFailed": "Не удалось прочитать определение SLO. Пожалуйста, попробуйте снова.",
-    "exportPartial": "Не удалось прочитать {names}. Остальные готовы к экспорту.",
-    "exportSucceeded": "Экспортировано {count} SLO | Экспортировано {count} SLO"
+    }
   },
   "promql": {
     "operations": {
