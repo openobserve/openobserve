@@ -26,15 +26,9 @@ const stubs = {
   OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
   OSelect: {
     name: "OSelect",
-    props: ["modelValue", "options"],
+    props: ["modelValue", "options", "error", "errorMessage"],
     emits: ["update:modelValue"],
     template: `<select :value="modelValue" />`,
-  },
-  OInput: {
-    name: "OInput",
-    props: ["modelValue", "error", "errorMessage"],
-    emits: ["update:modelValue"],
-    template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
   OSwitch: {
     name: "OSwitch",
@@ -97,20 +91,43 @@ describe("OnCallL0Editor", () => {
     expect(emitted?.mode).toEqual({ P1: "parallel", P2: "parallel", P3: "gate", P4: "only" });
   });
 
-  /// The server REFUSES an out-of-range budget rather than clamping — an
-  /// operator who typed 900 has a belief about how long their page is held.
-  /// The editor mirrors that: no clamping, an error, and a false validity
-  /// signal the parent uses to block Save.
-  it("flags a budget outside 30-600 instead of clamping it", async () => {
+  /// The server REFUSES an out-of-range budget rather than clamping, so the
+  /// editor offers durations instead of a number field: every value that can
+  /// be picked is one the server will take.
+  it("offers only budgets the server accepts", () => {
     const wrapper = render();
-    await wrapper.find('[data-test="oncall-l0-budget"]').setValue("900");
-    expect(lastValid(wrapper)).toBe(false);
-    expect(lastL0(wrapper)?.triage_budget_seconds).toBe(900);
-    expect(
-      wrapper.findComponent('[data-test="oncall-l0-budget"]').props("error"),
-    ).toBe(true);
+    const values = (
+      wrapper.findComponent('[data-test="oncall-l0-budget"]').props("options") as {
+        value: number;
+      }[]
+    ).map((o) => o.value);
 
-    await wrapper.find('[data-test="oncall-l0-budget"]').setValue("120");
+    expect(values.length).toBeGreaterThan(0);
+    for (const seconds of values) {
+      expect(seconds).toBeGreaterThanOrEqual(30);
+      expect(seconds).toBeLessThanOrEqual(600);
+    }
+  });
+
+  /// A select holding a value that is not one of its own options reads as
+  /// chosen and submits as nothing. A stored out-of-range budget is therefore
+  /// still offered — and still reported as invalid, so the parent blocks Save
+  /// rather than sending a PUT the server refuses.
+  it("shows a stored budget the server would refuse, and blocks the save", () => {
+    const wrapper = render(l0({ triage_budget_seconds: 900 }));
+    const budget = wrapper.findComponent('[data-test="oncall-l0-budget"]');
+
+    expect((budget.props("options") as { value: number }[]).map((o) => o.value)).toContain(900);
+    expect(budget.props("error")).toBe(true);
+  });
+
+  it("emits the new budget and clears the block once one in range is picked", async () => {
+    const wrapper = render(l0({ triage_budget_seconds: 900 }));
+    await wrapper
+      .findComponent('[data-test="oncall-l0-budget"]')
+      .vm.$emit("update:modelValue", 120);
+
+    expect(lastL0(wrapper)?.triage_budget_seconds).toBe(120);
     expect(lastValid(wrapper)).toBe(true);
   });
 
@@ -126,9 +143,7 @@ describe("OnCallL0Editor", () => {
   /// engine's own defaults so a save configures what auto-creation would have.
   it("seeds from the engine defaults when the stored policy has no block", () => {
     const wrapper = render(null);
-    expect(wrapper.findComponent('[data-test="oncall-l0-budget"]').props("modelValue")).toBe(
-      "90",
-    );
+    expect(wrapper.findComponent('[data-test="oncall-l0-budget"]').props("modelValue")).toBe(90);
     expect(
       wrapper.findComponent('[data-test="oncall-l0-mode-p2"]').props("modelValue"),
     ).toBe("gate");

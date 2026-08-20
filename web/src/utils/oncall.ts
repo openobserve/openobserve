@@ -23,6 +23,7 @@ import type {
   DeliveryRecord,
   DeliveryStatus,
   EscalationTarget,
+  L0Policy,
   ResponseState,
   Rotation,
   TimeWindow,
@@ -607,6 +608,26 @@ export function isDeliverableChannel(channel: Channel): boolean {
 
 /** Priorities in the order the policy editor shows them. */
 export const PRIORITY_ORDER: AlertPriorityValue[] = [1, 2, 3, 4, 5];
+
+/**
+ * The L0 block every auto-created policy ships with — mirrors
+ * `L0Policy::defaults()` on the server.
+ *
+ * Used when a stored policy predates L0 and carries none. It lives here rather
+ * than inside the editor because the card ABOVE the editor has to summarise the
+ * gate before anybody has opened it, and reading "no block" as "off" would
+ * describe a team that is in fact gating its P2s.
+ */
+export function l0Defaults(): L0Policy {
+  return {
+    mode: { P1: "parallel", P2: "gate", P3: "gate", P4: "only" },
+    triage_budget_seconds: 90,
+    allow_promotion: true,
+    max_promotion_steps: 2,
+    allow_downgrade: true,
+    allow_suppress: false,
+  };
+}
 
 // ── Timezone ──────────────────────────────────────────────────────────────
 //

@@ -62,6 +62,15 @@ const stubs = {
     props: ["modelValue", "label"],
     template: `<label><input type="checkbox" :checked="modelValue" />{{ label }}</label>`,
   },
+  /// The "everything else" cards fold their bodies away behind a summary. That
+  /// fold is OnCallPolicySection's own behaviour and is tested there; here it
+  /// would only hide the controls these tests are about.
+  OnCallPolicySection: {
+    name: "OnCallPolicySection",
+    props: ["summary"],
+    template: `<div><slot name="badge" /><slot name="problems" />{{ summary }}<slot /></div>`,
+    methods: { expand() {} },
+  },
 };
 
 /// **The shape the server actually sends** — D-33 in the defect register. This
@@ -124,7 +133,7 @@ describe("OnCallPolicyEditor", () => {
   it("says why the other channels are absent", async () => {
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.text()).toContain("not implemented yet");
+    expect(wrapper.text()).toContain("when they can actually deliver");
   });
 
   it("shows a non-paging priority as paging nobody", async () => {
@@ -686,6 +695,10 @@ describe("targets that name a slot", () => {
 /// that `notify_default_team` had no team nominated — for a value it would not
 /// let anybody set. A screen telling somebody to fix something it will not let
 /// them touch.
+///
+/// The two fields are ONE control now: "runs twice" and "then stops" is a
+/// single decision an operator reads as a single sentence. The wire still
+/// carries both, so the select encodes them as `<repeats>:<action>`.
 describe("the end of the ladder, as an edit", () => {
   beforeEach(() => {
     // The catch-all is cached module-wide so one screen reads it once;
@@ -708,6 +721,9 @@ describe("the end of the ladder, as an edit", () => {
     });
   }
 
+  const endSelect = (wrapper: ReturnType<typeof renderWith>) =>
+    wrapper.findComponent('[data-test="oncall-policy-ladder-end-select"]');
+
   const saved = () => (service.setPolicy.mock.calls.at(-1)![0] as any).data;
 
   async function save(wrapper: ReturnType<typeof renderWith>) {
@@ -719,12 +735,7 @@ describe("the end of the ladder, as an edit", () => {
     const wrapper = renderWith({ repeat_count: 3, final_action: "notify_default_team" });
     await flushPromises();
 
-    expect(
-      wrapper.findComponent('[data-test="oncall-policy-repeat-count"]').props("modelValue"),
-    ).toBe(3);
-    expect(
-      wrapper.findComponent('[data-test="oncall-policy-final-action"]').props("modelValue"),
-    ).toBe("notify_default_team");
+    expect(endSelect(wrapper).props("modelValue")).toBe("3:notify_default_team");
   });
 
   /// `repeat_count` 1 means the ladder runs once; there is no zero.
@@ -732,42 +743,43 @@ describe("the end of the ladder, as an edit", () => {
     const wrapper = renderWith();
     await flushPromises();
 
-    expect(
-      wrapper.findComponent('[data-test="oncall-policy-repeat-count"]').props("modelValue"),
-    ).toBe(1);
-    expect(
-      wrapper.findComponent('[data-test="oncall-policy-final-action"]').props("modelValue"),
-    ).toBe("stop");
+    expect(endSelect(wrapper).props("modelValue")).toBe("1:stop");
   });
 
-  it("sends both, so the ladder's end is part of the save", async () => {
+  /// Every option has to be a pair the server accepts — a select offering a
+  /// repeat count it cannot send is a save that 400s.
+  it("offers every pass count against both endings", async () => {
     const wrapper = renderWith();
     await flushPromises();
 
-    wrapper
-      .findComponent('[data-test="oncall-policy-repeat-count"]')
-      .vm.$emit("update:modelValue", 3);
-    wrapper
-      .findComponent('[data-test="oncall-policy-final-action"]')
-      .vm.$emit("update:modelValue", "notify_default_team");
+    const values = (endSelect(wrapper).props("options") as { value: string }[]).map((o) => o.value);
+    expect(values).toHaveLength(10);
+    expect(values).toContain("1:stop");
+    expect(values).toContain("5:notify_default_team");
+  });
+
+  it("sends both halves, so the ladder's end is part of the save", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+
+    endSelect(wrapper).vm.$emit("update:modelValue", "3:notify_default_team");
     await flushPromises();
     await save(wrapper);
 
     expect(saved()).toMatchObject({ repeat_count: 3, final_action: "notify_default_team" });
   });
 
-  /// The sentence has to track the controls, not the last save — otherwise it
-  /// describes a ladder the reader has already changed.
-  it("re-words itself as the controls move", async () => {
+  /// The sentence has to track the control, not the last save — otherwise it
+  /// describes a ladder the reader has already changed. It says what the
+  /// option label cannot: which team the page would actually land on.
+  it("re-words itself as the control moves", async () => {
     const wrapper = renderWith();
     await flushPromises();
     const line = () => wrapper.find('[data-test="oncall-policy-ladder-end"]').text();
 
     expect(line()).toContain("never answered");
 
-    wrapper
-      .findComponent('[data-test="oncall-policy-final-action"]')
-      .vm.$emit("update:modelValue", "notify_default_team");
+    endSelect(wrapper).vm.$emit("update:modelValue", "1:notify_default_team");
     await flushPromises();
 
     expect(line()).not.toContain("never answered");
@@ -783,9 +795,7 @@ describe("the end of the ladder, as an edit", () => {
 
     expect(wrapper.find(warning).exists()).toBe(false);
 
-    wrapper
-      .findComponent('[data-test="oncall-policy-final-action"]')
-      .vm.$emit("update:modelValue", "notify_default_team");
+    endSelect(wrapper).vm.$emit("update:modelValue", "1:notify_default_team");
     await flushPromises();
 
     expect(wrapper.find(warning).exists()).toBe(true);
@@ -795,17 +805,225 @@ describe("the end of the ladder, as an edit", () => {
     const wrapper = renderWith({ repeat_count: 2 });
     await flushPromises();
 
-    wrapper
-      .findComponent('[data-test="oncall-policy-repeat-count"]')
-      .vm.$emit("update:modelValue", 5);
+    endSelect(wrapper).vm.$emit("update:modelValue", "5:stop");
     await flushPromises();
 
     await wrapper.setProps({ open: false });
     await wrapper.setProps({ open: true });
     await flushPromises();
 
-    expect(
-      wrapper.findComponent('[data-test="oncall-policy-repeat-count"]').props("modelValue"),
-    ).toBe(2);
+    expect(endSelect(wrapper).props("modelValue")).toBe("2:stop");
+  });
+});
+
+/// **The ladder said out loud.** The editor is built out of target KINDS and
+/// absolute offsets, neither of which is how anybody describes a policy. The
+/// sentence is the plain reading of what the controls below it add up to, and
+/// it has to track them rather than the last save.
+describe("the ladder as one sentence", () => {
+  beforeEach(() => {
+    __resetOnCallRoutingConfig();
+    vi.clearAllMocks();
+    service.getTeamChannel.mockResolvedValue({
+      data: { team_id: "team_1", destinations: [], source: "policy" },
+    } as any);
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
+    } as any);
+    service.setPolicy.mockResolvedValue({ data: {} } as any);
+  });
+
+  const threeSteps: OnCallPolicy = {
+    ...policy,
+    rungs: [
+      {
+        priority: 1,
+        steps: [
+          { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+          { after_micros: 5 * 60_000_000, targets: [{ kind: "next_on_call" }] },
+          { after_micros: 15 * 60_000_000, targets: [{ kind: "whole_team" }] },
+        ],
+        channels: ["email"],
+      },
+    ],
+  };
+
+  function renderWith(over: Partial<OnCallPolicy> = {}) {
+    return mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy: { ...threeSteps, ...over }, open: true },
+      global: { plugins: [i18n, store], stubs },
+    });
+  }
+
+  it("names every step, when it fires, and how the ladder ends", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+
+    const line = wrapper.find('[data-test="oncall-policy-sentence"]').text();
+    expect(line).toContain("The on-call now");
+    expect(line).toContain("The secondary at 5m");
+    expect(line).toContain("The whole team at 15m");
+    expect(line).toContain("then stops");
+  });
+
+  /// A priority with no steps pages nobody. Saying "A P4 pages ." would read
+  /// as a rendering bug rather than as a decision.
+  it("says so plainly when a priority pages nobody", async () => {
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy, open: true, priority: 4 },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-policy-sentence"]').text()).toContain("pages nobody");
+  });
+
+  it("follows the controls rather than the stored policy", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+
+    wrapper
+      .findComponent('[data-test="oncall-policy-ladder-end-select"]')
+      .vm.$emit("update:modelValue", "1:notify_default_team");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-policy-sentence"]').text()).toContain("hands off");
+  });
+});
+
+/// **The first page's own delay had no control.** The connectors edit the wait
+/// BETWEEN steps, so on a ladder whose first step is held — which is what a P2
+/// usually is — the hold was visible and unreachable. It is edited in the first
+/// step's own offset cell, where the reader is already looking.
+describe("the first step's delay", () => {
+  beforeEach(() => {
+    __resetOnCallRoutingConfig();
+    vi.clearAllMocks();
+    service.getTeamChannel.mockResolvedValue({
+      data: { team_id: "team_1", destinations: [], source: "policy" },
+    } as any);
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
+    } as any);
+    service.setPolicy.mockResolvedValue({ data: {} } as any);
+  });
+
+  const twoSteps: OnCallPolicy = {
+    ...policy,
+    rungs: [
+      {
+        priority: 1,
+        steps: [
+          { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+          { after_micros: 5 * 60_000_000, targets: [{ kind: "next_on_call" }] },
+        ],
+        channels: ["email"],
+      },
+    ],
+  };
+
+  function renderWith() {
+    return mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy: twoSteps, open: true },
+      global: { plugins: [i18n, store], stubs },
+    });
+  }
+
+  /// Zero is legal and usual before the first step — P1 pages at once — and is
+  /// the only place in the ladder where it is.
+  it("offers paging at once, which no gap between steps may be", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+
+    const lead = wrapper.findComponent('[data-test="oncall-policy-step-delay-1-0"]');
+    const between = wrapper.findComponent('[data-test="oncall-policy-step-delay-1-1"]');
+
+    expect((lead.props("options") as { value: number }[]).map((o) => o.value)).toContain(0);
+    expect((between.props("options") as { value: number }[]).map((o) => o.value)).not.toContain(0);
+  });
+
+  /// Holding the first page must not close the gaps below it — the whole
+  /// ladder shifts, keeping its spacing.
+  it("shifts the whole ladder when the first page is held", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+
+    wrapper
+      .findComponent('[data-test="oncall-policy-step-delay-1-0"]')
+      .vm.$emit("update:modelValue", 5 * 60_000_000);
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+    await flushPromises();
+
+    const { rungs } = (service.setPolicy.mock.calls.at(-1)![0] as any).data;
+    expect(rungs[0].steps.map((s: any) => s.after_micros)).toEqual([
+      5 * 60_000_000,
+      10 * 60_000_000,
+    ]);
+  });
+});
+
+/// **A channel that is on and delivers nowhere looks identical to working.**
+/// The delivery card folds away, so what it reports has to survive the fold —
+/// a card that hides its own breakage reads as fine.
+describe("the delivery card", () => {
+  beforeEach(() => {
+    __resetOnCallRoutingConfig();
+    vi.clearAllMocks();
+    service.getTeamChannel.mockResolvedValue({
+      data: { team_id: "team_1", destinations: ["seed_dest"], source: "policy" },
+    } as any);
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
+    } as any);
+    service.setPolicy.mockResolvedValue({ data: {} } as any);
+    destinations.list.mockResolvedValue({ data: [{ name: "slack-oncall" }] } as any);
+  });
+
+  const webhookPolicy: OnCallPolicy = {
+    ...policy,
+    rungs: [
+      {
+        priority: 1,
+        steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" as const }] }],
+        channels: ["webhook" as const],
+      },
+    ],
+    destinations: [],
+  };
+
+  function renderWith(over: Partial<OnCallPolicy> = {}) {
+    return mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy: { ...webhookPolicy, ...over }, open: true },
+      global: { plugins: [i18n, store], stubs },
+    });
+  }
+
+  it("counts the problem on the card, not only inside it", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-policy-delivery-problems"]').text()).toContain(
+      "1 problem",
+    );
+  });
+
+  it("stops counting once the destination is chosen", async () => {
+    const wrapper = renderWith({ destinations: ["slack-oncall"] });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-policy-delivery-problems"]').exists()).toBe(false);
+  });
+
+  /// Folded away, the card has to say what it currently holds — otherwise the
+  /// only way to read the delivery setup is to open it.
+  it("summarises the channels and the room while it is folded away", async () => {
+    const wrapper = renderWith();
+    await flushPromises();
+
+    const text = wrapper.text();
+    expect(text).toContain("Chat / webhook");
+    expect(text).toContain("seed_dest");
   });
 });
