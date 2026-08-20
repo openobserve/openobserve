@@ -82,7 +82,7 @@ mod tests {
                 .add_column_if_not_exists(ColumnDef::new(Folders::Icon).string_len(64).null())
                 .to_owned()
                 .to_string(MysqlQueryBuilder),
-            r#"ALTER TABLE `folders` ADD COLUMN `icon` varchar(64) NULL"#
+            r#"ALTER TABLE `folders` ADD COLUMN IF NOT EXISTS `icon` varchar(64) NULL"#
         );
     }
 
