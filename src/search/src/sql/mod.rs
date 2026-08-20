@@ -53,6 +53,7 @@ use crate::sql::{
     },
 };
 
+pub mod complexity;
 pub mod rewriter;
 pub mod schema;
 pub mod visitor;
@@ -140,6 +141,16 @@ impl Sql {
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?
             .pop()
             .unwrap();
+
+        // Reject a pathologically deep boolean predicate before the visitors and
+        // planner walk it: `a OR b OR c ...` parses into a tree whose depth is
+        // the term count, and the recursive consumers of that tree would
+        // otherwise overflow the stack and abort the process (#12398).
+        if complexity::is_predicate_too_deep(&statement) {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "query is too complex: too many nested AND/OR/NOT conditions".to_string(),
+            )));
+        }
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
