@@ -20,11 +20,11 @@ use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::datasets::{
         CreateDatasetRequestBody, DatasetItemResponseBody, DatasetItemVersionsResponseBody,
-        DatasetResponseBody, ImportDatasetItemsResponseBody, ListDatasetItemsQuery,
-        ListDatasetItemsResponseBody, ListDatasetsResponseBody,
-        PushAnnotationQueueItemToDatasetRequestBody, PushDatasetItemRequestBody,
-        PushDatasetItemResponseBody, UpdateDatasetItemRequestBody, UpdateDatasetRequestBody,
-        UpsertDatasetItemsRequestBody, UpsertDatasetItemsResponseBody,
+        DatasetResponseBody, DatasetSnapshotRowsQuery, DatasetSnapshotRowsResponseBody,
+        ImportDatasetItemsResponseBody, ListDatasetItemsQuery, ListDatasetItemsResponseBody,
+        ListDatasetsResponseBody, PushAnnotationQueueItemToDatasetRequestBody,
+        PushDatasetItemRequestBody, PushDatasetItemResponseBody, UpdateDatasetItemRequestBody,
+        UpdateDatasetRequestBody, UpsertDatasetItemsRequestBody, UpsertDatasetItemsResponseBody,
     },
     request::annotation_queues::ensure_annotation_queue_score_configs_visible,
 };
@@ -112,6 +112,38 @@ pub async fn list_dataset_items(
 ) -> Response {
     match datasets::list_items(&org_id, &dataset_id, query.into()).await {
         Ok(page) => MetaHttpResponse::json(ListDatasetItemsResponseBody::from(page)),
+        Err(err) => dataset_error_response(err),
+    }
+}
+
+/// GetDatasetSnapshotRows
+#[utoipa::path(
+    get,
+    path = "/{org_id}/datasets/{dataset_id}/rows",
+    context_path = "/api",
+    tag = "Datasets",
+    operation_id = "GetDatasetSnapshotRows",
+    summary = "Read the row set of a pinned Dataset Snapshot",
+    description = "Resolves the Dataset's MVCC history at `version` and returns one page of the live rows that Snapshot contains. Omitting `version` reads the current Snapshot and answers with the version it resolved. This is the read an Experiment pins at creation, so it is also how a client inspects the exact rows a historical Experiment ran against.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dataset_id" = String, Path, description = "Dataset ID"),
+        DatasetSnapshotRowsQuery,
+    ),
+    responses(
+        (status = 200, body = inline(DatasetSnapshotRowsResponseBody)),
+        (status = 400, description = "Invalid page size or snapshot version", body = ()),
+        (status = 404, description = "Dataset not found", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "list"}))),
+)]
+pub async fn get_dataset_snapshot_rows(
+    Path((org_id, dataset_id)): Path<(String, String)>,
+    Query(query): Query<DatasetSnapshotRowsQuery>,
+) -> Response {
+    match datasets::snapshot_rows(&org_id, &dataset_id, query.into(), None).await {
+        Ok(page) => MetaHttpResponse::json(DatasetSnapshotRowsResponseBody::from(page)),
         Err(err) => dataset_error_response(err),
     }
 }

@@ -686,6 +686,9 @@ pub struct ExperimentResponseBody {
     pub lifecycle_version: i64,
     pub retry_count: u32,
     pub idempotency_key: Option<String>,
+    /// The organization's Baseline for this Dataset. At most one Experiment per
+    /// organization and Dataset carries it.
+    pub is_baseline: bool,
     pub created_by: String,
     pub created_at: i64,
 }
@@ -721,10 +724,22 @@ impl From<Experiment> for ExperimentResponseBody {
             lifecycle_version: value.lifecycle_version,
             retry_count: value.retry_count,
             idempotency_key: value.idempotency_key,
+            is_baseline: value.is_baseline,
             created_by: value.created_by,
             created_at: value.created_at,
         }
     }
+}
+
+/// The result of a Baseline change, naming both ends of the move.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentBaselineResponseBody {
+    pub experiment: ExperimentResponseBody,
+    /// The Experiment that held the Baseline before this call, if any. `None`
+    /// means the Dataset had no Baseline; the service never selects a
+    /// replacement on its own.
+    pub previous_baseline_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -747,6 +762,9 @@ pub struct ExperimentRowDetailResponseBody {
     pub expected_output: Option<Value>,
     pub trials: Vec<ExperimentResultSlotBody>,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
+    /// Per-case aggregate of the dimensions the customer's own code reported,
+    /// kept separate from Scorer summaries because the two are not comparable.
+    pub client_score_summaries: Vec<ExperimentClientScoreSummaryBody>,
     /// Per-dimension trial dispersion for this case. Empty for a single-trial
     /// Experiment, which has no disagreement to report.
     pub dispersion: Vec<ExperimentDimensionDispersionBody>,

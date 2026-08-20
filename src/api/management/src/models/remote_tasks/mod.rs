@@ -24,6 +24,9 @@ use openobserve_core::llm_evaluations::remote_tasks::{
     RemoteTask, RemoteTaskAuth, RemoteTaskHeader, RemoteTaskRetryPolicy, RemoteTaskSigning,
     RemoteTaskSpec, VerificationReport,
 };
+use openobserve_core::llm_evaluations::secrets::{
+    SecretMaterial, SecretMetadata, SecretOwnerKind, SecretPurpose, WrittenSecret,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -510,4 +513,160 @@ impl From<openobserve_core::llm_evaluations::remote_tasks::bench::BenchRowResult
 #[serde(rename_all = "camelCase")]
 pub struct TestRunResponseBody {
     pub results: Vec<TestRunRowResultBody>,
+}
+
+// --- Encrypted, write-only Remote Task secrets (#2437) ---
+
+#[derive(Clone, Deserialize, ToSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RemoteTaskSecretMaterialBody {
+    Token { value: String },
+    Basic { username: String, password: String },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RemoteTaskSecretPurposeBody {
+    Auth,
+    Signing,
+}
+
+impl From<RemoteTaskSecretPurposeBody> for SecretPurpose {
+    fn from(value: RemoteTaskSecretPurposeBody) -> Self {
+        match value {
+            RemoteTaskSecretPurposeBody::Auth => Self::Auth,
+            RemoteTaskSecretPurposeBody::Signing => Self::Signing,
+        }
+    }
+}
+
+impl From<SecretPurpose> for RemoteTaskSecretPurposeBody {
+    fn from(value: SecretPurpose) -> Self {
+        match value {
+            SecretPurpose::Auth => Self::Auth,
+            SecretPurpose::Signing => Self::Signing,
+        }
+    }
+}
+
+impl From<RemoteTaskSecretMaterialBody> for SecretMaterial {
+    fn from(value: RemoteTaskSecretMaterialBody) -> Self {
+        match value {
+            RemoteTaskSecretMaterialBody::Token { value } => Self::Token { value },
+            RemoteTaskSecretMaterialBody::Basic { username, password } => {
+                Self::Basic { username, password }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRemoteTaskSecretRequestBody {
+    pub purpose: RemoteTaskSecretPurposeBody,
+    /// Optional only for signing secrets, where OpenObserve generates a
+    /// cryptographically random value and returns it exactly once.
+    pub material: Option<RemoteTaskSecretMaterialBody>,
+    pub key_id: Option<String>,
+}
+
+#[derive(Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplaceRemoteTaskSecretRequestBody {
+    pub material: RemoteTaskSecretMaterialBody,
+}
+
+#[derive(Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RotateRemoteTaskSecretRequestBody {
+    /// Normally omitted so OpenObserve creates the candidate and shows it
+    /// exactly once. Accepted for deterministic external key-management flows.
+    pub material: Option<RemoteTaskSecretMaterialBody>,
+    pub key_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivateRemoteTaskSecretRequestBody {
+    pub grace_period_ms: i64,
+}
+
+#[derive(Clone, Serialize, ToSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RemoteTaskSecretMaterialResponseBody {
+    Token { value: String },
+    Basic { username: String, password: String },
+}
+
+impl From<SecretMaterial> for RemoteTaskSecretMaterialResponseBody {
+    fn from(value: SecretMaterial) -> Self {
+        match value {
+            SecretMaterial::Token { value } => Self::Token { value },
+            SecretMaterial::Basic { username, password } => Self::Basic { username, password },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTaskSecretMetadataBody {
+    pub secret_ref: String,
+    pub purpose: RemoteTaskSecretPurposeBody,
+    pub key_id: Option<String>,
+    pub state: String,
+    pub last_verified_at: Option<i64>,
+    pub grace_expires_at: Option<i64>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl From<SecretMetadata> for RemoteTaskSecretMetadataBody {
+    fn from(value: SecretMetadata) -> Self {
+        debug_assert_eq!(value.owner_kind, SecretOwnerKind::Task);
+        Self {
+            secret_ref: value.secret_ref,
+            purpose: value.purpose.into(),
+            key_id: value.key_id,
+            state: value.state,
+            last_verified_at: value.last_verified_at,
+            grace_expires_at: value.grace_expires_at,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WrittenRemoteTaskSecretResponseBody {
+    #[serde(flatten)]
+    pub metadata: RemoteTaskSecretMetadataBody,
+    /// Returned only from this create/rotate response. No read route
+    /// exposes it later.
+    pub material: RemoteTaskSecretMaterialResponseBody,
+}
+
+impl From<WrittenSecret> for WrittenRemoteTaskSecretResponseBody {
+    fn from(value: WrittenSecret) -> Self {
+        Self {
+            metadata: value.metadata.into(),
+            material: value.material.into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListRemoteTaskSecretsResponseBody {
+    pub list: Vec<RemoteTaskSecretMetadataBody>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TestRemoteTaskSecretCandidateResponseBody {
+    pub verified: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secret: Option<RemoteTaskSecretMetadataBody>,
+    pub report: VerificationReportBody,
 }

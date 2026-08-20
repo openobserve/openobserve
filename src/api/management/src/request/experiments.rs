@@ -11,12 +11,12 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
-use db::authz::set_ownership;
+use db::authz::{remove_ownership, set_ownership};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
     llm_evaluations::{
-        datasets,
+        datasets, experiment_baseline, experiment_deletion,
         experiment_dispersion::{self, NormalizationSpans},
         experiment_ingest::{self, IngestError},
         experiment_results,
@@ -33,9 +33,9 @@ use crate::{
         },
         experiments::{
             CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
-            ExperimentDetailQuery, ExperimentDetailResponseBody, ExperimentDispersionSummaryBody,
-            ExperimentPreviewQuery, ExperimentPreviewResponseBody, ExperimentResponseBody,
-            ExperimentResultPaginationBody, ExperimentResultsResponseBody,
+            ExperimentBaselineResponseBody, ExperimentDetailQuery, ExperimentDetailResponseBody,
+            ExperimentDispersionSummaryBody, ExperimentPreviewQuery, ExperimentPreviewResponseBody,
+            ExperimentResponseBody, ExperimentResultPaginationBody, ExperimentResultsResponseBody,
             ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
             ExperimentRowSnapshotBody, ExperimentSlotPageQuery, ExperimentSlotPageResponseBody,
             ListExperimentsResponseBody, RetryExperimentSlotRequestBody,
@@ -65,6 +65,7 @@ fn experiment_error_response(error: ExperimentError) -> Response {
         ) => MetaHttpResponse::not_found("Dataset not found"),
         ExperimentError::IdempotencyConflict
         | ExperimentError::InvalidLifecycleTransition { .. }
+        | ExperimentError::BaselineNotEligible(_)
         | ExperimentError::ConcurrentLifecycleUpdate => MetaHttpResponse::conflict(error),
         error => MetaHttpResponse::bad_request(error.to_string()),
     }
@@ -116,6 +117,34 @@ fn validate_comparison_dataset(
         return Err("Experiments must use the same Dataset");
     }
     Ok(())
+}
+
+/// Scoring Status of one Experiment, derived from the same evidence and the
+/// same rules the results page uses.
+async fn derive_scoring_status(
+    org_id: &str,
+    experiment: &openobserve_core::llm_evaluations::experiments::Experiment,
+    results: &openobserve_core::llm_evaluations::experiment_runner::ExperimentResults,
+) -> Result<openobserve_core::llm_evaluations::experiment_results::ScoringStatus, Response> {
+    let applicability = experiments::scoring_applicability(org_id, experiment)
+        .await
+        .map_err(|error| {
+            log::error!(
+                "[Experiment] failed to resolve scoring applicability for {}: {error}",
+                experiment.id
+            );
+            experiment_error_response(error)
+        })?;
+    let summary = experiment_results::result_summary(
+        &applicability,
+        &experiment.scorers,
+        &results.executions,
+        &results.scores,
+    );
+    Ok(experiment_results::scoring_status(
+        &summary.scoring_progress,
+        &summary.score_summaries,
+    ))
 }
 
 async fn require_experiment_visibility(
@@ -504,8 +533,22 @@ pub async fn compare_experiments(
             }
         };
     use openobserve_core::llm_evaluations::experiment_comparison::{
-        CompareExperimentsInput, ComparisonEvidence, ComparisonPolicy, compare_experiments,
+        CompareExperimentsInput, ComparisonEvidence, ComparisonPolicy, ComparisonScoringState,
+        compare_experiments,
     };
+
+    // A comparison read before scoring settles is legitimate, but it has to say
+    // so: both sides' Scoring Status decide whether this answer is final (A3.6).
+    let baseline_scoring = match derive_scoring_status(&org_id, &baseline, &baseline_results).await
+    {
+        Ok(status) => status,
+        Err(response) => return response,
+    };
+    let candidate_scoring =
+        match derive_scoring_status(&org_id, &candidate, &candidate_results).await {
+            Ok(status) => status,
+            Err(response) => return response,
+        };
     // Comparison Policies orient every Score dimension. Without one a dimension
     // is descriptive and cannot mark a row improved or regressed.
     let score_configs = match infra::table::score_configs::get_all_by_org(&org_id).await {
@@ -523,6 +566,10 @@ pub async fn compare_experiments(
             dataset_id: baseline.dataset_id,
             threshold,
             policy: &policy,
+            scoring: ComparisonScoringState {
+                baseline: baseline_scoring,
+                candidate: candidate_scoring,
+            },
             baseline: ComparisonEvidence {
                 slots: &baseline_slots,
                 executions: &baseline_results.executions,
@@ -595,9 +642,10 @@ pub async fn get_experiment_row(
     };
     let executions = row.executions;
     let scorers = experiment.scorers.clone();
-    let score_summaries =
-        experiment_results::row_result_summary(row.slots.len(), &scorers, &executions, &row.scores)
-            .score_summaries;
+    let row_summary =
+        experiment_results::row_result_summary(row.slots.len(), &scorers, &executions, &row.scores);
+    let score_summaries = row_summary.score_summaries;
+    let client_score_summaries = row_summary.client_score_summaries;
     let score_configs = match infra::table::score_configs::get_all_by_org(&org_id).await {
         Ok(configs) => configs,
         Err(error) => {
@@ -642,6 +690,7 @@ pub async fn get_experiment_row(
             .map(Into::into)
             .collect(),
         score_summaries: score_summaries.into_iter().map(Into::into).collect(),
+        client_score_summaries: client_score_summaries.into_iter().map(Into::into).collect(),
         dispersion,
         outlier_trial_index,
     };
@@ -669,6 +718,115 @@ pub async fn get_experiment_row(
 pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
     match experiments::cancel(&org_id, &experiment_id).await {
         Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Err(error) => experiment_error_response(error),
+    }
+}
+
+/// Make this Experiment the organization's Baseline for its Dataset.
+#[utoipa::path(
+    put,
+    path = "/{org_id}/experiments/{experiment_id}/baseline",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "SetExperimentBaseline",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+    ),
+    responses(
+        (status = 200, description = "Baseline moved to this Experiment", body = ExperimentBaselineResponseBody),
+        (status = 403, description = "Experiment is not accessible"),
+        (status = 404, description = "Experiment not found"),
+        (status = 409, description = "Experiment is not eligible to be a Baseline"),
+    )
+)]
+pub async fn set_experiment_baseline(
+    Path((org_id, experiment_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Err(response) =
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
+    {
+        return response;
+    }
+    match experiment_baseline::set_baseline(&org_id, &experiment_id, &user.user_id).await {
+        Ok(change) => MetaHttpResponse::json(ExperimentBaselineResponseBody {
+            experiment: ExperimentResponseBody::from(change.experiment),
+            previous_baseline_id: change.previous_baseline_id,
+        }),
+        Err(error) => experiment_error_response(error),
+    }
+}
+
+/// Give up the Baseline without choosing a replacement.
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/experiments/{experiment_id}/baseline",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "ClearExperimentBaseline",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+    ),
+    responses(
+        (status = 200, description = "Experiment is no longer the Baseline", body = ExperimentResponseBody),
+        (status = 403, description = "Experiment is not accessible"),
+        (status = 404, description = "Experiment not found"),
+    )
+)]
+pub async fn clear_experiment_baseline(
+    Path((org_id, experiment_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Err(response) =
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
+    {
+        return response;
+    }
+    match experiment_baseline::clear_baseline(&org_id, &experiment_id, &user.user_id).await {
+        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Err(error) => experiment_error_response(error),
+    }
+}
+
+/// Delete an Experiment early and start its asynchronous cleanup.
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/experiments/{experiment_id}",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "DeleteExperiment",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+    ),
+    responses(
+        (status = 200, description = "Experiment marked unavailable; cleanup started"),
+        (status = 403, description = "Experiment is not accessible"),
+        (status = 404, description = "Experiment not found"),
+        (status = 409, description = "Experiment lifecycle changed concurrently"),
+    )
+)]
+pub async fn delete_experiment(
+    Path((org_id, experiment_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Err(response) =
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "DELETE").await
+    {
+        return response;
+    }
+    match experiment_deletion::delete(&org_id, &experiment_id, &user.user_id).await {
+        Ok(()) => {
+            // The authorization object outlives the row it named, so it is
+            // removed here rather than by the cleanup sweep.
+            remove_ownership(&org_id, "experiments", Authz::new(&experiment_id)).await;
+            MetaHttpResponse::ok("Experiment deleted")
+        }
         Err(error) => experiment_error_response(error),
     }
 }
@@ -762,7 +920,7 @@ pub async fn retry_experiment_slot(
     }
 }
 
-/// Clone a cancelled Experiment into a new pending definition with isolated evidence.
+/// Clone a sealed Experiment into a new pending definition with isolated evidence.
 #[utoipa::path(
     post,
     path = "/{org_id}/experiments/{experiment_id}/clone",
@@ -772,13 +930,13 @@ pub async fn retry_experiment_slot(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("experiment_id" = String, Path, description = "Cancelled source Experiment ID"),
+        ("experiment_id" = String, Path, description = "Sealed (completed or cancelled) source Experiment ID"),
     ),
     request_body(content = CloneExperimentRequestBody, content_type = "application/json"),
     responses(
         (status = 200, description = "Pending clone created", body = ExperimentResponseBody),
         (status = 404, description = "Experiment not found"),
-        (status = 409, description = "Only cancelled Experiments can be cloned"),
+        (status = 409, description = "Only sealed Experiments can be cloned"),
     )
 )]
 pub async fn clone_experiment(
@@ -786,7 +944,7 @@ pub async fn clone_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CloneExperimentRequestBody>,
 ) -> Response {
-    match experiments::clone_cancelled(&org_id, &experiment_id, &user.user_id, body.name).await {
+    match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, body.name).await {
         Ok(experiment) => {
             set_ownership(&org_id, "experiments", Authz::new(&experiment.id)).await;
             MetaHttpResponse::json(ExperimentResponseBody::from(experiment))

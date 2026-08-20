@@ -42,9 +42,13 @@ mod flatten_compactor;
 #[cfg(feature = "enterprise")]
 mod incidents;
 #[cfg(feature = "enterprise")]
+mod llm_experiment_cleanup;
+#[cfg(feature = "enterprise")]
 mod llm_idempotency_purge;
 #[cfg(feature = "enterprise")]
 mod llm_review_reconciliation;
+#[cfg(feature = "enterprise")]
+mod llm_secret_cleanup;
 pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
@@ -1199,6 +1203,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Replayable SDK requests are retained for 24h; reclaim the lapsed ones.
     #[cfg(feature = "enterprise")]
     llm_idempotency_purge::run();
+    // Early Experiment deletion marks the head and leaves the removal to this
+    // sweep, which retries until the Experiment's own storage is gone.
+    #[cfg(feature = "enterprise")]
+    llm_experiment_cleanup::run();
+    // Signing-key rotation retains the outgoing key only until its bounded
+    // grace period ends.
+    #[cfg(feature = "enterprise")]
+    llm_secret_cleanup::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

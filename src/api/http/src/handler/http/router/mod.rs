@@ -380,6 +380,15 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
 }
 
 #[cfg(feature = "enterprise")]
+fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
+    if matches!(method, &Method::GET | &Method::HEAD | &Method::OPTIONS) {
+        return false;
+    }
+    let segments = path.split('/').collect::<Vec<_>>();
+    segments.contains(&"remote_tasks") && segments.contains(&"secrets")
+}
+
+#[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
     let method = http_method.to_string();
@@ -440,7 +449,9 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         let mut response = next.run(request).await;
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = if path.ends_with("/settings/logo") {
+            let body = if is_remote_task_secret_write(&http_method, &path) {
+                "[REDACTED: remote task secret write]".to_string()
+            } else if path.ends_with("/settings/logo") {
                 general_purpose::STANDARD.encode(&request_body)
             } else {
                 String::from_utf8(request_body).unwrap_or_default()
@@ -1143,6 +1154,10 @@ pub fn service_routes() -> Router {
                         .put(datasets::upsert_dataset_items),
                 )
                 .route(
+                    "/{org_id}/datasets/{dataset_id}/rows",
+                    get(datasets::get_dataset_snapshot_rows),
+                )
+                .route(
                     "/{org_id}/datasets/{dataset_id}/items/{item_id}",
                     get(datasets::get_dataset_item_versions)
                         .put(datasets::update_dataset_item)
@@ -1168,7 +1183,12 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/experiments/{experiment_id}",
-                    get(experiments::get_experiment),
+                    get(experiments::get_experiment).delete(experiments::delete_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/baseline",
+                    put(experiments::set_experiment_baseline)
+                        .delete(experiments::clear_experiment_baseline),
                 )
                 .route(
                     "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
@@ -1217,6 +1237,12 @@ pub fn service_routes() -> Router {
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
                 .route("/{org_id}/remote_tasks", get(remote_tasks::list_remote_tasks).post(remote_tasks::create_remote_task))
+                .route("/{org_id}/remote_tasks/{entity_id}/secrets", get(remote_tasks::list_remote_task_secrets).post(remote_tasks::create_remote_task_secret))
+                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/rotate", post(remote_tasks::rotate_remote_task_signing_secret))
+                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/test", post(remote_tasks::test_remote_task_signing_candidate))
+                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/activate", post(remote_tasks::activate_remote_task_signing_candidate))
+                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}/end_grace", post(remote_tasks::end_remote_task_signing_grace))
+                .route("/{org_id}/remote_tasks/{entity_id}/secrets/{secret_ref}", put(remote_tasks::replace_remote_task_auth_secret).delete(remote_tasks::revoke_remote_task_secret))
                 .route("/{org_id}/remote_tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
                 .route("/{org_id}/remote_tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
                 .route("/{org_id}/remote_tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
@@ -1689,6 +1715,29 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn audit_redacts_every_remote_task_secret_write_body() {
+        for (method, path) in [
+            (Method::POST, "api/org/remote_tasks/task-1/secrets"),
+            (Method::PUT, "api/org/remote_tasks/task-1/secrets/ref-1"),
+            (
+                Method::POST,
+                "api/org/remote_tasks/task-1/secrets/ref-1/rotate",
+            ),
+        ] {
+            assert!(is_remote_task_secret_write(&method, path));
+        }
+        assert!(!is_remote_task_secret_write(
+            &Method::GET,
+            "api/org/remote_tasks/task-1/secrets"
+        ));
+        assert!(!is_remote_task_secret_write(
+            &Method::POST,
+            "api/org/remote_tasks/task-1/test_run"
+        ));
+    }
 
     #[tokio::test]
     async fn test_proxy_routes() {
