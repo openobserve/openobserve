@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            sit at the same x on all four pages or clicking one makes the row
            jump under the cursor. -->
       <template #title>
-        <span class="inline-block w-52 truncate">{{ t("alerts.header") }}</span>
+        <span class="inline-block w-60 truncate">{{ t("alerts.header") }}</span>
       </template>
       <template #header-tabs>
         <AlertSectionTabs />

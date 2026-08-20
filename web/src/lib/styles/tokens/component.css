@@ -550,7 +550,11 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-default);
+  /* `border-control`, not `border-default`: the edge IS the affordance here —
+     it is the only signal that this is something you type into — so WCAG 2.1
+     SC 1.4.11 applies and wants 3:1. `border-default` reaches 1.48:1, which is
+     right for a card outline and not for a control. */
+  --color-input-border: var(--color-border-control);
   --color-input-border-hover: var(--color-primary-300);
   --color-input-border-focus: var(--color-primary-300);
   --color-input-border-error: var(--color-error-500);
@@ -575,7 +579,8 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-default);
+  /* Same reasoning as --color-input-border: an operable control's edge. */
+  --color-select-border: var(--color-border-control);
   --color-select-border-hover: var(--color-primary-300);
   --color-select-border-focus: var(--color-primary-300);
   --color-select-border-error: var(--color-error-500);

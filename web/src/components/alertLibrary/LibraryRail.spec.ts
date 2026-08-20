@@ -137,6 +137,27 @@ describe("LibraryRail", () => {
     expect(wrapper.emitted("update:category")).toBeUndefined();
   });
 
+  it("stays on the categories tab when the pack changes under it", async () => {
+    // Switching pack resets the category to "all" (a category belongs to a
+    // pack), and the category LIST changes with it. The tab must not also flip
+    // back to packs: the user opened categories to browse them, and yanking the
+    // list out from under them would make picking a pack feel like a mode exit.
+    const wrapper = mountRail();
+    await showCategories(wrapper);
+
+    await wrapper.setProps({
+      pack: "openobserve",
+      category: "all",
+      categories: [
+        { id: "all", label: raw("All"), count: 1 },
+        { id: "ingest", label: raw("Ingest"), count: 1 },
+      ],
+    });
+
+    expect(wrapper.find('[data-test="alert-library-rail-category-ingest"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-library-rail-pack-k8s"]').exists()).toBe(false);
+  });
+
   it("counts the choices behind each tab, discounting the 'all' pseudo-facet", () => {
     // The count answers "how many options are in here", which is what makes a
     // tab worth opening; counting `all` would advertise a choice that is the
