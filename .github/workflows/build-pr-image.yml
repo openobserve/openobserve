@@ -86,7 +86,7 @@ jobs:
       id-token: write
       contents: read
       packages: write
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-16
     steps:
       - name: Remove unused tools
         run: |
@@ -128,9 +128,9 @@ jobs:
 
       - name: Build and run binary
         run: |
-          cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
+          cargo build --features mimalloc --profile release-prod --target x86_64-unknown-linux-gnu
           mkdir -p bin
-          mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
+          mv target/x86_64-unknown-linux-gnu/release-prod/openobserve bin/openobserve
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -217,9 +217,9 @@ jobs:
 
       - name: Build and run binary
         run: |
-          cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
+          cargo build --features mimalloc --profile release-prod --target aarch64-unknown-linux-gnu
           mkdir -p bin
-          mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
+          mv target/aarch64-unknown-linux-gnu/release-prod/openobserve bin/openobserve
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
