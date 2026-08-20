@@ -524,7 +524,7 @@ export interface EvidenceBundle {
 }
 
 /** Severity order: what to read first, not what there is most of. */
-const EVIDENCE_GROUP_ORDER: EvidenceGroup["kind"][] = [
+export const EVIDENCE_GROUP_ORDER: EvidenceGroup["kind"][] = [
   "pageErrors",
   "requestsFailed",
   "console",

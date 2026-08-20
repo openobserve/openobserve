@@ -625,6 +625,12 @@
     "delete": "削除",
     "remove": "削除",
     "export": "[エクスポート]",
+    "download": "ダウンロード",
+    "openProviderOnRegistry": "{registry} の OpenObserve プロバイダー",
+    "exportTerraformTabTooltip": "同じ設定は Terraform または OpenTofu でも適用されます。",
+    "exportTerraformEmpty": "この選択に対応する Terraform リソースはありません。代わりに JSON としてエクスポートしてください。",
+    "exportTerraformSkipped": "含まれていません: {names}。OpenObserve Terraform プロバイダーにはこれらに対応するリソースがありません。",
+    "exportTerraformDropped": "除外されました — プロバイダースキーマはこれらのフィールドを保持できないため: {fields}。",
     "actions": "アクション",
     "version": "[バージョン]",
     "updated_at": "更新日",
@@ -820,13 +826,7 @@
     "backTo": "{label}に戻る",
     "boolTrue": "真",
     "boolFalse": "偽",
-    "browserTimeWithZone": "ブラウザ時間（{zone}）",
-    "download": "ダウンロード",
-    "openProviderOnRegistry": "{registry} の OpenObserve プロバイダー",
-    "exportTerraformTabTooltip": "同じ設定は Terraform または OpenTofu でも適用されます。",
-    "exportTerraformEmpty": "この選択に対応する Terraform リソースはありません。代わりに JSON としてエクスポートしてください。",
-    "exportTerraformSkipped": "含まれていません: {names}。OpenObserve Terraform プロバイダーにはこれらに対応するリソースがありません。",
-    "exportTerraformDropped": "除外されました — プロバイダースキーマはこれらのフィールドを保持できないため: {fields}。"
+    "browserTimeWithZone": "ブラウザ時間（{zone}）"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "データなし"
     },
     "importAlertTitle": "アラートのインポート",
+    "exportDialogTitle": "アラートをエクスポート | アラートを{count}件エクスポート",
+    "exportDialogSubtitle": "定義を確認して、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。",
     "jsonFilesOnlyHint": ".json ファイルのみ",
     "outputMessages": "出力メッセージ",
     "destinationsRequiredLabel": "宛先 *",
@@ -7370,9 +7372,7 @@
     "sloKind": "条件タイプ",
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
-    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
-    "exportDialogTitle": "アラートをエクスポート | アラートを{count}件エクスポート",
-    "exportDialogSubtitle": "定義を確認して、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。"
+    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。"
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -12660,6 +12660,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "ステップに属さない ({count})",
+      "allSteps": "すべてのステップ ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12674,9 +12677,17 @@
       "reload": "ページを再読み込み",
       "retry": "Retry",
       "unattributedCount": "{count} 件のイベントがどのステップにも関連付けられませんでした",
-      "stepFilterBanner": "ステップ {step} のイベントを表示中",
-      "clearStepFilter": "クリア",
-      "rowTitleWithTimestamps": "{label}\n開始: {initiated} · 観測: {observed}"
+      "rowTitleWithTimestamps": "{label}\n開始: {initiated} · 観測: {observed}",
+      "detailEvent": "イベント",
+      "detailOccurred": "発生",
+      "detailInitiated": "開始",
+      "detailResourceType": "リソースタイプ",
+      "detailLevel": "レベル",
+      "detailOrigin": "発生元",
+      "detailFirstParty": "ファーストパーティ",
+      "detailThirdParty": "サードパーティ",
+      "detailStackTrace": "スタックトレース",
+      "footerEvents": "イベント"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12724,8 +12735,7 @@
       "evidenceCounts": "{consoleErrors} 件のコンソールエラー · {pageErrors} 件のページエラー · {failed} 件の失敗リクエスト · {nonOk} 件の非2xxレスポンス",
       "evidenceTruncated": "この実行中にキャプチャ制限に達したため、一部のイベントが削除されました。バンドルは何が発生したかを示します。",
       "pageActivity": "ページアクティビティ",
-      "pageActivityCount": "{shown} / {total}",
-      "pageActivityCountTruncated": "{shown} / {total}+",
+      "pageActivityEvents": "{count} イベント | {count} イベント",
       "pageActivityViewAllShort": "Evidenceですべて表示",
       "expandScreenshot": "展開"
     },
@@ -13700,6 +13710,7 @@
       "resumingAlerts": "アラートを再開しています...",
       "pausingAlerts": "アラートを一時停止しています...",
       "errorExportingAlertsPleaseTryAgain": "アラートのエクスポート中にエラーが発生しました。もう一度お試しください。",
+      "someAlertsCouldNotBeExported": "{names} を読み込めませんでした。残りはエクスポートできます。",
       "successfullyExportedAlert": "アラートを{count}件エクスポートしました | アラートを{count}件エクスポートしました",
       "exportingAlerts": "アラートをエクスポートしています...",
       "pleaseWaitWhileSearchingForDashboards": "ダッシュボードを検索しています。お待ちください...",
@@ -13754,8 +13765,7 @@
       "alertSavedSuccessfully": "アラートが正常に保存されました。",
       "alertUpdatedSuccessfully": "アラートが正常に更新されました。",
       "openingDedupConfig": "重複排除設定を開いています: {name}",
-      "editingAlert": "アラートを編集中: {name}",
-      "someAlertsCouldNotBeExported": "{names} を読み込めませんでした。残りはエクスポートできます。"
+      "editingAlert": "アラートを編集中: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "暗号鍵が正常に更新されました",
@@ -14270,6 +14280,11 @@
     "move": "移動",
     "moveTitle": "{count} 個のSLOを別のフォルダに移動",
     "moveSelected": "選択した {count} 個を移動",
+    "exportTitle": "SLOをエクスポート | {count}個のSLOをエクスポート",
+    "exportSubtitle": "定義を確認し、JSONまたはOpenObserveプロバイダー用のTerraformとしてダウンロードしてください。",
+    "exportFailed": "SLO定義を読み取れませんでした。もう一度お試しください。",
+    "exportPartial": "{names}を読み取れませんでした。残りはエクスポートできます。",
+    "exportSucceeded": "{count}個のSLOをエクスポートしました | {count}個のSLOをエクスポートしました",
     "moved": "{count} 個のSLOを {folder} に移動しました",
     "moveFailed": "移動に失敗しました",
     "preview": {
@@ -14324,12 +14339,7 @@
       "editTargetMissing": "そのアラートはこのSLOにはもうありません。",
       "describeBurn": "バーンレート > {critical}（{long} と {short} にわたって）",
       "describeBudget": "エラー予算消費 > {critical}%"
-    },
-    "exportTitle": "SLOをエクスポート | {count}個のSLOをエクスポート",
-    "exportSubtitle": "定義を確認し、JSONまたはOpenObserveプロバイダー用のTerraformとしてダウンロードしてください。",
-    "exportFailed": "SLO定義を読み取れませんでした。もう一度お試しください。",
-    "exportPartial": "{names}を読み取れませんでした。残りはエクスポートできます。",
-    "exportSucceeded": "{count}個のSLOをエクスポートしました | {count}個のSLOをエクスポートしました"
+    }
   },
   "promql": {
     "operations": {
