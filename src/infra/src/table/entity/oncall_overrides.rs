@@ -7,9 +7,8 @@ pub struct Model {
     pub id: String,
     pub org_id: String,
     pub team_id: String,
-    /// Which slot the cover stands over. `None` is the default slot, which is
-    /// what every row written before slots existed meant.
-    pub slot: Option<String>,
+    /// Which rotation the cover stands over.
+    pub rotation_id: String,
     pub user_email: String,
     pub covering_for: Option<String>,
     pub start_at: i64,

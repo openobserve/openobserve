@@ -579,23 +579,28 @@ impl EscalationPolicy {
     ///
     /// | | t=0 | 5 min | 15 min | 30 min | 60 min |
     /// |---|---|---|---|---|---|
-    /// | P1 | primary + secondary + L1 | L1 | L2 | L3 | L4 |
-    /// | P2 | primary | secondary | L1 | L2 | L3 |
-    /// | P3 | primary | — | secondary | L1 | L2 |
+    /// | P1 | primary **+** secondary | whole team | whole team | whole team | whole team |
+    /// | P2 | primary | secondary | whole team | whole team | — |
+    /// | P3 | primary | — | secondary | whole team | — |
     /// | P4, P5 | nobody, ever | | | | |
     ///
     /// **P1 is parallel.** Everyone who can fix a critical outage is paged at
     /// once; §2 says so in as many words ("no 5-minute delays between primary
     /// and secondary"), and staggering them buys nothing but minutes.
     ///
-    /// The one place the ladder cannot follow the doc literally is the depth
-    /// of L2–L4. The doc gives each escalation level its own rotation slot;
-    /// this model deliberately has no per-level rotations ([`EscalationTarget`]
-    /// explains why), so the widest reach it can express is the whole team.
-    /// The later rungs therefore re-page the whole team rather than reaching
-    /// someone new — which is still the right thing for a P1 nobody has
-    /// acknowledged in an hour, and is exactly the cell a team edits once it
-    /// staffs a second rotation.
+    /// **The secondary is a rotation, not a derivation.** This function used to
+    /// build it from `NextOnCall` — one handover further along the *primary's*
+    /// roster — on the argument that "one rotation is enough to be pageable, so
+    /// a secondary needs no second schedule to staff". That argument was wrong
+    /// in a way that took a live team to see: the position then existed whether
+    /// or not anybody staffed it, so a team that *did* staff it had two answers
+    /// for one chair and got a different person at the weekend. A level now
+    /// names a rotation by id, and `secondary` here is `None` for a team that
+    /// only has one.
+    ///
+    /// The depth beyond the secondary is still the whole team, and that is now
+    /// a *choice* rather than a limit: a team with an "Engineering" rotation can
+    /// point 15 min at it, which the previous model could not express at all.
     ///
     /// P4 and P5 page nobody at all: they are recorded and shown in the
     /// product, and the agent still investigates them.
@@ -608,15 +613,20 @@ impl EscalationPolicy {
         id: impl Into<String>,
         org_id: impl Into<String>,
         team_id: impl Into<String>,
+        primary_rotation_id: impl Into<String>,
+        secondary_rotation_id: Option<String>,
     ) -> Self {
         use AlertPriority::*;
         let m = MICROS_PER_MINUTE;
-        // One rotation is enough to be pageable. The ladder walks it — on call
-        // now, then whoever it hands over to next, then everybody on that
-        // rotation — so a "secondary" needs no second schedule to staff.
-        let primary = || vec![EscalationTarget::OnCallNow];
-        let secondary = || vec![EscalationTarget::NextOnCall];
-        let l1 = || vec![EscalationTarget::EveryoneOnSchedule];
+        let primary_id = primary_rotation_id.into();
+        let primary = || vec![EscalationTarget::rotation(primary_id.clone())];
+        // A team with one rotation has no secondary rung at all, rather than a
+        // rung that quietly resolves to the person already being paged.
+        let secondary = || {
+            secondary_rotation_id
+                .as_ref()
+                .map(|r| vec![EscalationTarget::rotation(r.clone())])
+        };
         let deeper = || vec![EscalationTarget::WholeTeam];
         Self {
             id: id.into(),
@@ -634,14 +644,12 @@ impl EscalationPolicy {
                 PriorityRung {
                     priority: P1,
                     steps: vec![
-                        // §2: primary, secondary and L1 together, immediately.
+                        // §2: primary and secondary together, immediately. Not
+                        // two steps five minutes apart — a P1 that waits to
+                        // wake the backup has spent the minutes that mattered.
                         LadderStep::new(
                             0,
-                            vec![
-                                EscalationTarget::OnCallNow,
-                                EscalationTarget::NextOnCall,
-                                EscalationTarget::EveryoneOnSchedule,
-                            ],
+                            primary().into_iter().chain(secondary().unwrap_or_default()).collect(),
                         ),
                         LadderStep::new(5 * m, deeper()),
                         LadderStep::new(15 * m, deeper()),
@@ -652,26 +660,93 @@ impl EscalationPolicy {
                 },
                 PriorityRung {
                     priority: P2,
-                    steps: vec![
-                        LadderStep::new(0, primary()),
-                        LadderStep::new(5 * m, secondary()),
-                        LadderStep::new(15 * m, l1()),
-                        LadderStep::new(30 * m, deeper()),
-                        LadderStep::new(60 * m, deeper()),
-                    ],
+                    // A team with one rotation skips the secondary step rather
+                    // than filling it with the person already on the pager.
+                    steps: [
+                        Some(LadderStep::new(0, primary())),
+                        secondary().map(|s| LadderStep::new(5 * m, s)),
+                        Some(LadderStep::new(15 * m, deeper())),
+                        Some(LadderStep::new(30 * m, deeper())),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
                     channels: vec![Channel::Email],
                 },
                 PriorityRung {
                     priority: P3,
-                    steps: vec![
-                        LadderStep::new(0, primary()),
-                        LadderStep::new(15 * m, secondary()),
-                        LadderStep::new(30 * m, l1()),
-                        LadderStep::new(60 * m, deeper()),
-                    ],
+                    steps: [
+                        Some(LadderStep::new(0, primary())),
+                        secondary().map(|s| LadderStep::new(15 * m, s)),
+                        Some(LadderStep::new(30 * m, deeper())),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
                     channels: vec![Channel::Email],
                 },
                 // P4 and P5 are recorded and investigated, never paged.
+                PriorityRung {
+                    priority: P4,
+                    steps: vec![],
+                    channels: vec![],
+                },
+                PriorityRung {
+                    priority: P5,
+                    steps: vec![],
+                    channels: vec![],
+                },
+            ],
+        }
+    }
+
+    /// A ladder that pages the whole team, on the shipped timings.
+    ///
+    /// For the one caller that needs a policy and cannot know the team's
+    /// rotations: the stored rungs would not parse. Guessing a rotation id
+    /// there would be worse than useless — it would name a position that may
+    /// not exist and page nobody — so this falls back to the one target that
+    /// is always resolvable.
+    ///
+    /// Loud on purpose: a team whose policy failed to read pages *everybody*,
+    /// which somebody will notice and fix, rather than pages nobody, which
+    /// nobody notices until an outage.
+    pub fn whole_team_fallback(
+        id: impl Into<String>,
+        org_id: impl Into<String>,
+        team_id: impl Into<String>,
+    ) -> Self {
+        use AlertPriority::*;
+        let m = MICROS_PER_MINUTE;
+        let everybody = |delays: &[i64]| PriorityRung {
+            priority: P1,
+            steps: delays
+                .iter()
+                .map(|d| LadderStep::new(*d, vec![EscalationTarget::WholeTeam]))
+                .collect(),
+            channels: vec![Channel::Email],
+        };
+        Self {
+            id: id.into(),
+            org_id: org_id.into(),
+            team_id: team_id.into(),
+            destinations: vec![],
+            l0: super::agent::L0Policy::defaults(),
+            repeat_count: DEFAULT_REPEAT_COUNT,
+            final_action: FinalAction::Stop,
+            rungs: vec![
+                PriorityRung {
+                    priority: P1,
+                    ..everybody(&[0, 5 * m, 15 * m, 30 * m])
+                },
+                PriorityRung {
+                    priority: P2,
+                    ..everybody(&[0, 15 * m, 30 * m])
+                },
+                PriorityRung {
+                    priority: P3,
+                    ..everybody(&[0, 30 * m])
+                },
                 PriorityRung {
                     priority: P4,
                     steps: vec![],
@@ -943,7 +1018,13 @@ mod tests {
     const MIN: i64 = MICROS_PER_MINUTE;
 
     fn policy() -> EscalationPolicy {
-        EscalationPolicy::default_for_team("pol_1", "default", "team_1")
+        EscalationPolicy::default_for_team(
+            "pol_1",
+            "default",
+            "team_1",
+            "rot_primary",
+            Some("rot_secondary".into()),
+        )
     }
 
     fn steps(priority: AlertPriority) -> Vec<LadderStep> {
@@ -1015,13 +1096,16 @@ mod tests {
     #[test]
     fn test_the_default_ladder_needs_only_one_rotation() {
         let action = plan(&steps(AlertPriority::P2), 0, &[]);
-        assert_eq!(targets_of(&action), vec![EscalationTarget::OnCallNow]);
+        assert_eq!(targets_of(&action), vec![EscalationTarget::rotation("rot_primary")]);
 
         let later = plan(&steps(AlertPriority::P2), 5 * MIN, &[0]);
-        assert_eq!(targets_of(&later), vec![EscalationTarget::NextOnCall]);
+        assert_eq!(targets_of(&later), vec![EscalationTarget::rotation("rot_secondary")]);
 
+        // Third and fourth are the whole team. There is no "everyone on the
+        // schedule" rung any more: it unioned every slot, which is not a thing
+        // a level can name now that a level names one rotation.
         let l1 = plan(&steps(AlertPriority::P2), 15 * MIN, &[0, 5 * MIN]);
-        assert_eq!(targets_of(&l1), vec![EscalationTarget::EveryoneOnSchedule]);
+        assert_eq!(targets_of(&l1), vec![EscalationTarget::WholeTeam]);
 
         let last = plan(&steps(AlertPriority::P2), 30 * MIN, &[0, 5 * MIN, 15 * MIN]);
         assert_eq!(targets_of(&last), vec![EscalationTarget::WholeTeam]);
@@ -1036,37 +1120,33 @@ mod tests {
     /// away from the doc fails here rather than at 3am.
     #[test]
     fn test_default_ladders_match_the_published_timing_table() {
-        use EscalationTarget::{EveryoneOnSchedule, NextOnCall, OnCallNow, WholeTeam};
-
         let expected: &[(AlertPriority, &[(i64, &[EscalationTarget])])] = &[
             (
                 AlertPriority::P1,
                 &[
                     // §2: primary + secondary + L1, in parallel, at t=0.
-                    (0, &[OnCallNow, NextOnCall, EveryoneOnSchedule]),
-                    (5 * MIN, &[WholeTeam]),
-                    (15 * MIN, &[WholeTeam]),
-                    (30 * MIN, &[WholeTeam]),
-                    (60 * MIN, &[WholeTeam]),
+                    (0, &[EscalationTarget::rotation("rot_primary"), EscalationTarget::rotation("rot_secondary")]),
+                    (5 * MIN, &[EscalationTarget::WholeTeam]),
+                    (15 * MIN, &[EscalationTarget::WholeTeam]),
+                    (30 * MIN, &[EscalationTarget::WholeTeam]),
+                    (60 * MIN, &[EscalationTarget::WholeTeam]),
                 ],
             ),
             (
                 AlertPriority::P2,
                 &[
-                    (0, &[OnCallNow]),
-                    (5 * MIN, &[NextOnCall]),
-                    (15 * MIN, &[EveryoneOnSchedule]),
-                    (30 * MIN, &[WholeTeam]),
-                    (60 * MIN, &[WholeTeam]),
+                    (0, &[EscalationTarget::rotation("rot_primary")]),
+                    (5 * MIN, &[EscalationTarget::rotation("rot_secondary")]),
+                    (15 * MIN, &[EscalationTarget::WholeTeam]),
+                    (30 * MIN, &[EscalationTarget::WholeTeam]),
                 ],
             ),
             (
                 AlertPriority::P3,
                 &[
-                    (0, &[OnCallNow]),
-                    (15 * MIN, &[NextOnCall]),
-                    (30 * MIN, &[EveryoneOnSchedule]),
-                    (60 * MIN, &[WholeTeam]),
+                    (0, &[EscalationTarget::rotation("rot_primary")]),
+                    (15 * MIN, &[EscalationTarget::rotation("rot_secondary")]),
+                    (30 * MIN, &[EscalationTarget::WholeTeam]),
                 ],
             ),
             (AlertPriority::P4, &[]),
@@ -1110,9 +1190,8 @@ mod tests {
         assert_eq!(
             targets_of(&action),
             vec![
-                EscalationTarget::OnCallNow,
-                EscalationTarget::NextOnCall,
-                EscalationTarget::EveryoneOnSchedule,
+                EscalationTarget::rotation("rot_primary"),
+                EscalationTarget::rotation("rot_secondary"),
             ]
         );
     }
@@ -1213,10 +1292,9 @@ mod tests {
         assert_eq!(
             fired,
             vec![
-                (0, EscalationTarget::OnCallNow),
-                (15 * MIN, EscalationTarget::NextOnCall),
-                (30 * MIN, EscalationTarget::EveryoneOnSchedule),
-                (60 * MIN, EscalationTarget::WholeTeam),
+                (0, EscalationTarget::rotation("rot_primary")),
+                (15 * MIN, EscalationTarget::rotation("rot_secondary")),
+                (30 * MIN, EscalationTarget::WholeTeam),
             ]
         );
         assert_eq!(
@@ -1291,7 +1369,7 @@ mod tests {
     fn test_two_rungs_cannot_share_a_delay() {
         let mut p = policy();
         p.rungs[0].steps = vec![
-            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
+            LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")]),
             LadderStep::new(0, vec![EscalationTarget::WholeTeam]),
         ];
         assert_eq!(p.validate(), Err(PolicyError::DuplicateDelay(0)));
@@ -1313,8 +1391,8 @@ mod tests {
     fn test_due_rungs_come_back_in_delay_order() {
         let unordered = vec![
             LadderStep::new(30 * MIN, vec![EscalationTarget::WholeTeam]),
-            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
-            LadderStep::new(5 * MIN, vec![EscalationTarget::NextOnCall]),
+            LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")]),
+            LadderStep::new(5 * MIN, vec![EscalationTarget::rotation("rot_secondary")]),
         ];
         assert_eq!(
             delays(&plan(&unordered, MICROS_PER_HOUR, &[])),
@@ -1328,8 +1406,8 @@ mod tests {
     fn test_next_wakeup_is_the_soonest_pending_step() {
         let unordered = vec![
             LadderStep::new(30 * MIN, vec![EscalationTarget::WholeTeam]),
-            LadderStep::new(5 * MIN, vec![EscalationTarget::NextOnCall]),
-            LadderStep::new(15 * MIN, vec![EscalationTarget::EveryoneOnSchedule]),
+            LadderStep::new(5 * MIN, vec![EscalationTarget::rotation("rot_secondary")]),
+            LadderStep::new(15 * MIN, vec![EscalationTarget::everyone_in("rot_primary")]),
         ];
         assert_eq!(
             plan(&unordered, 0, &[]),
@@ -1986,9 +2064,9 @@ mod tests {
     fn test_an_impacted_record_climbs_its_first_rung_and_exactly_one_more() {
         let m = MICROS_PER_MINUTE;
         let full = vec![
-            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
-            LadderStep::new(5 * m, vec![EscalationTarget::NextOnCall]),
-            LadderStep::new(15 * m, vec![EscalationTarget::EveryoneOnSchedule]),
+            LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")]),
+            LadderStep::new(5 * m, vec![EscalationTarget::rotation("rot_secondary")]),
+            LadderStep::new(15 * m, vec![EscalationTarget::everyone_in("rot_primary")]),
             LadderStep::new(30 * m, vec![EscalationTarget::WholeTeam]),
         ];
         let cut = impacted_ladder(&full);
@@ -2009,8 +2087,8 @@ mod tests {
         let m = MICROS_PER_MINUTE;
         let jumbled = vec![
             LadderStep::new(30 * m, vec![EscalationTarget::WholeTeam]),
-            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
-            LadderStep::new(5 * m, vec![EscalationTarget::NextOnCall]),
+            LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")]),
+            LadderStep::new(5 * m, vec![EscalationTarget::rotation("rot_secondary")]),
         ];
         let cut = impacted_ladder(&jumbled);
         assert_eq!(
@@ -2023,7 +2101,7 @@ mod tests {
     /// would page somebody their own policy never names.
     #[test]
     fn test_a_one_rung_policy_gives_an_impacted_team_one_rung() {
-        let one = vec![LadderStep::new(0, vec![EscalationTarget::OnCallNow])];
+        let one = vec![LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")])];
         assert_eq!(impacted_ladder(&one).len(), 1);
         assert!(impacted_ladder(&[]).is_empty());
     }

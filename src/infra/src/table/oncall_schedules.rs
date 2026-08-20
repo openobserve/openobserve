@@ -195,7 +195,8 @@ fn narrow_to_members(schedule: &Schedule, windows: Vec<Unavailability>) -> Vec<U
     let mut people: std::collections::HashSet<String> = schedule
         .rotations
         .iter()
-        .flat_map(|r| r.members.iter())
+        .flat_map(|r| r.shift_rules.iter())
+        .flat_map(|s| s.members.iter())
         .map(|m| m.trim().to_ascii_lowercase())
         .collect();
     people.extend(
@@ -350,7 +351,7 @@ mod tests {
     #[test]
     fn test_rotations_round_trip_through_the_json_column() {
         let rotations = vec![
-            Rotation::weekly("Weekdays", vec!["ana@o2.ai".into()], 100),
+            Rotation::weekly("Weekdays", "Weekdays", vec!["ana@o2.ai".into()], 100),
         ];
         let encoded = serde_json::to_string(&rotations).unwrap();
         let s = to_schedule(model(&encoded));
@@ -380,6 +381,7 @@ mod tests {
     #[test]
     fn test_a_stored_schedule_resolves_who_is_on_call() {
         let encoded = serde_json::to_string(&vec![Rotation::weekly(
+            "rot_p",
             "Primary",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             0,
@@ -387,8 +389,15 @@ mod tests {
         .unwrap();
         let s = to_schedule(model(&encoded));
 
-        assert_eq!(s.on_call_now(0).unwrap(), "ana@o2.ai");
-        assert_eq!(s.next_on_call(0).unwrap(), "bob@o2.ai");
-        assert_eq!(s.on_call_now(MICROS_PER_WEEK).unwrap(), "bob@o2.ai");
+        assert_eq!(s.on_call_in("rot_p", 0).unwrap(), "ana@o2.ai");
+        assert_eq!(s.on_call_in("rot_p", MICROS_PER_WEEK).unwrap(), "bob@o2.ai");
+        // Display only — the calendar's "up next", which nothing pages.
+        assert_eq!(
+            s.rotation("rot_p")
+                .unwrap()
+                .next_holder(&[], 0, s.tz())
+                .unwrap(),
+            "bob@o2.ai"
+        );
     }
 }
