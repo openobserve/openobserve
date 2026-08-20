@@ -141,7 +141,7 @@ describe("ExperimentBrowser", () => {
     ]);
   });
 
-  it("uses the baseline as the default peer and opens a comparison deep link", async () => {
+  it("uses the baseline as the default peer and opens the compare screen", async () => {
     localStorage.setItem("o2_experiment_baselines_acme", JSON.stringify({ "dataset-a": "old" }));
     const wrapper = mount(ExperimentBrowser, {
       props: {
@@ -160,14 +160,11 @@ describe("ExperimentBrowser", () => {
       wrapper.get('[data-test="ai-experiment-compare"]').attributes("disabled"),
     ).toBeUndefined();
     await wrapper.get('[data-test="ai-experiment-compare"]').trigger("click");
+    // Compare now opens its own screen, with the two ids as path params.
     expect(push).toHaveBeenCalledWith({
-      name: "aiExperiments",
-      query: {
-        org_identifier: "acme",
-        dataset: "dataset-a",
-        baseline: "old",
-        candidate: "new",
-      },
+      name: "aiExperimentCompare",
+      params: { baselineId: "old", candidateId: "new" },
+      query: { org_identifier: "acme" },
     });
   });
 
@@ -220,6 +217,60 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.get('[data-test="cell-score:label-scored"]').text()).toBe("good × 1");
   });
 
+  it("caps comparison at two rows", async () => {
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [
+          experiment("one", "dataset-a", 1),
+          experiment("two", "dataset-a", 2),
+          experiment("three", "dataset-a", 3),
+        ],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    await wrapper.get('[data-test="ai-experiment-select-one"]').setValue(true);
+    await wrapper.get('[data-test="ai-experiment-select-two"]').setValue(true);
+
+    // Two picked: the third closes, and the two picked stay togglable so they
+    // can be swapped out.
+    expect(
+      wrapper.get('[data-test="ai-experiment-select-three"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(
+      wrapper.get('[data-test="ai-experiment-select-one"]').attributes("disabled"),
+    ).toBeUndefined();
+
+    await wrapper.get('[data-test="ai-experiment-select-one"]').setValue(false);
+    expect(
+      wrapper.get('[data-test="ai-experiment-select-three"]').attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  it("states the two-experiment rule before anything is selected, and counts up", async () => {
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("one", "dataset-a", 1), experiment("two", "dataset-a", 2)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    const count = () => wrapper.get('[data-test="ai-experiment-selection-count"]').text();
+    // Present with nothing selected — that is where the rule has to be learned.
+    expect(count()).toBe("aiObservability.experiments.selectionCount");
+
+    await wrapper.get('[data-test="ai-experiment-select-one"]').setValue(true);
+    expect(wrapper.find('[data-test="ai-experiment-selection-count"]').exists()).toBe(true);
+    await wrapper.get('[data-test="ai-experiment-select-two"]').setValue(true);
+    expect(
+      wrapper.get('[data-test="ai-experiment-compare"]').attributes("disabled"),
+    ).toBeUndefined();
+  });
+
   it("disables cross-dataset comparison after one selection", async () => {
     const wrapper = mount(ExperimentBrowser, {
       props: {
@@ -237,7 +288,13 @@ describe("ExperimentBrowser", () => {
     await checkboxes[0].setValue(true);
 
     expect(checkboxes[1].attributes("disabled")).toBeDefined();
-    expect(wrapper.get('[data-test="ai-experiment-comparison-reason"]').text()).toContain(
+
+    // No banner: it pushed the whole list down and back up as the selection
+    // changed. The counter below carries the rule instead, always rendered.
+    expect(wrapper.find('[data-test="ai-experiment-comparison-reason"]').exists()).toBe(false);
+    const compare = wrapper.get('[data-test="ai-experiment-compare"]');
+    expect(compare.attributes("disabled")).toBeDefined();
+    expect(compare.attributes("aria-description")).toBe(
       "aiObservability.experiments.comparisonReasons.select_two",
     );
   });

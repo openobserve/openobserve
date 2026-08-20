@@ -40,6 +40,24 @@ const comparison: ExperimentComparison = {
       candidateOnlyRowCount: 0,
       assignment: "unchanged",
     },
+    // Latency rises, which is WORSE — the raw delta is positive but the oriented
+    // one is negative. Guards the tint from following the wrong number.
+    {
+      name: "latency_ms",
+      kind: "latency",
+      baseline: 3,
+      candidate: 34,
+      delta: 31,
+      orientedDelta: -31,
+      gating: true,
+      normalized: false,
+      baselineSampleCount: 1,
+      candidateSampleCount: 1,
+      comparableRowCount: 1,
+      baselineOnlyRowCount: 0,
+      candidateOnlyRowCount: 0,
+      assignment: "regressed",
+    },
   ],
   rows: [
     {
@@ -49,56 +67,312 @@ const comparison: ExperimentComparison = {
       bucket: "regressed",
       dimensions: [],
     },
+    {
+      logicalId: "case-2",
+      baselineRowId: null,
+      candidateRowId: "fresh-row",
+      bucket: "new",
+      dimensions: [],
+    },
   ],
 };
 
-function mountPanel() {
-  return mount(ExperimentComparisonPanel, {
-    props: { comparison },
-    global: {
-      stubs: {
-        OInput: {
-          props: ["modelValue"],
-          emits: ["update:modelValue"],
-          template:
-            '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-        },
-        OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
-        OTag: { template: "<span><slot /></span>" },
-        OTable: {
-          props: ["data"],
-          template:
-            '<div><div v-for="row in data" :key="row.logicalId"><slot name="cell-bucket" :row="row" /><slot name="cell-dimensions" :row="row" /><slot name="cell-actions" :row="row" /></div></div>',
-        },
+const stubs = {
+  global: {
+    stubs: {
+      KpiCardRow: { template: "<div><slot /></div>" },
+      KpiCard: {
+        props: ["label", "icon"],
+        template:
+          '<div v-bind="$attrs" :data-icon="icon">{{ label }}<slot name="value" /><slot name="footer" /></div>',
+      },
+      OIcon: true,
+      OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
+      OTag: {
+        props: ["label", "variant"],
+        template: '<span v-bind="$attrs" :data-variant="variant">{{ label }}</span>',
+      },
+      OSelect: {
+        props: ["modelValue", "options"],
+        emits: ["update:modelValue"],
+        template: `<select v-bind="$attrs" @change="$emit('update:modelValue', Number($event.target.value))">
+            <option v-for="o in options" :key="o.value" :value="o.value" :selected="o.value === modelValue">{{ o.label }}</option>
+          </select>`,
+      },
+      OStatStrip: {
+        props: ["items", "selectedKey"],
+        emits: ["select"],
+        template: `<div data-test="stat-strip" :data-selected="selectedKey ?? ''" :data-order="items.map((i) => i.key).join(',')">
+            <button v-for="i in items" :key="i.key" :data-test="i.dataTest" :data-icon="i.icon" :data-bar="i.max ?? ''" @click="$emit('select', i.key)">{{ i.value }}</button>
+          </div>`,
+      },
+      OTable: {
+        props: ["data"],
+        emits: ["row-click"],
+        template: `<div><slot name="subheader" />
+            <div v-for="row in data" :key="row.logicalId" data-test="row" @click="$emit('row-click', row, $event)">
+              <slot name="cell-bucket" :row="row" />
+            </div></div>`,
       },
     },
+  },
+};
+
+function mountPanel(
+  override: Partial<ExperimentComparison> = {},
+  scorerNames: Record<string, string> = {},
+) {
+  return mount(ExperimentComparisonPanel, {
+    props: { comparison: { ...comparison, ...override }, scorerNames },
+    ...stubs,
   });
 }
 
 describe("ExperimentComparisonPanel", () => {
-  it("shows honest common-row counts, the assignment rule, and one-sided coverage", () => {
+  it("shows honest bucket counts and per-tile coverage", () => {
     const wrapper = mountPanel();
 
-    expect(wrapper.get('[data-test="ai-experiment-counts"]').text()).toContain("3");
-    expect(wrapper.get('[data-test="ai-experiment-comparison-rule"]').text()).toContain(
-      "Any regression wins",
-    );
-    expect(wrapper.get('[data-test="ai-experiment-one-sided-dimension"]').text()).toContain(
-      "1 baseline-only",
-    );
-    expect(wrapper.text()).toContain("3/2 samples");
+    // 3 common + 1 new + 1 missing — rows in EITHER run, not just the joined ones.
+    expect(wrapper.get('[data-test="ai-experiment-count-total"]').text()).toBe("5");
+    expect(wrapper.get('[data-test="ai-experiment-count-regressed"]').text()).toBe("1");
   });
 
-  it("emits threshold changes and the exact joined row for inspection", async () => {
+  it("keeps each tile to a single caption line", () => {
     const wrapper = mountPanel();
-    await wrapper.get("input").setValue("0.2");
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Apply")
-      ?.trigger("click");
-    await wrapper.get('[data-test="ai-experiment-comparison-inspect"]').trigger("click");
+    const latency = wrapper.get('[data-test="ai-experiment-tile-latency"]');
 
-    expect(wrapper.emitted("apply-threshold")?.[0]).toEqual([0.2]);
-    expect(wrapper.emitted("inspect")?.[0]).toEqual([comparison.rows[0]]);
+    // Three stacked caption lines is what made these tiles tall; the reference
+    // cards carry exactly one.
+    expect(latency.text()).toContain("Mean per row, over trials");
+    expect(latency.text()).not.toContain("comparable rows");
+  });
+
+  it("always renders a cost tile, even when the run recorded no cost", () => {
+    const wrapper = mountPanel();
+
+    // The fixture has no cost dimension — the backend only emits one when the
+    // executions carried a cost, so the gap has to be visible, not absent.
+    expect(wrapper.get('[data-test="ai-experiment-tile-cost"]').text()).toContain("—");
+    expect(wrapper.get('[data-test="ai-experiment-tile-latency"]').text()).toContain("34");
+  });
+
+  it("orders tiles quality-first with cost last, and never shows a gating tile", () => {
+    const wrapper = mountPanel();
+
+    const order = wrapper
+      .findAll('[data-test^="ai-experiment-tile-"]')
+      .map((w) => w.attributes("data-test"))
+      .filter((name) => !/-(delta|warning|unit)$/.test(name ?? ""));
+
+    expect(order).toEqual([
+      "ai-experiment-tile-scorers-regressed",
+      "ai-experiment-tile-weakest-scorer",
+      "ai-experiment-tile-latency",
+      "ai-experiment-tile-cost",
+    ]);
+  });
+
+  it("labels a scorer by name, keeping its version, and falls back to the raw ID", () => {
+    const scored = {
+      dimensions: [
+        { ...comparison.dimensions[0], name: "749570578629158502 · v1" },
+        { ...comparison.dimensions[0], name: "unknown-id · v2" },
+      ],
+    };
+
+    // The server names score dimensions by ID; only the Scorers API has the name.
+    const named = mountPanel(scored, { "749570578629158502": "answer_quality" });
+    expect(named.get('[data-test="ai-experiment-tile-weakest-scorer"]').text()).toContain(
+      "answer_quality · v1",
+    );
+
+    // An unresolvable ID keeps the server's string rather than showing nothing.
+    const unresolved = mountPanel(scored, {});
+    expect(unresolved.get('[data-test="ai-experiment-tile-weakest-scorer"]').text()).toContain(
+      "749570578629158502 · v1",
+    );
+  });
+
+  it("carries the detail page's icons and value formatting", () => {
+    const wrapper = mountPanel();
+
+    // Same glyphs the Experiment detail cards use for the same two concepts.
+    expect(wrapper.get('[data-test="ai-experiment-tile-latency"]').attributes("data-icon")).toBe(
+      "speed",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-tile-cost"]').attributes("data-icon")).toBe(
+      "payments",
+    );
+    expect(
+      wrapper.get('[data-test="ai-experiment-tile-scorers-regressed"]').attributes("data-icon"),
+    ).toBe("error-outline");
+
+    // Assert the unit SPAN, not the tile text — the label is "Latency (ms)", so
+    // a text match would pass with no unit rendered at all.
+    expect(wrapper.get('[data-test="ai-experiment-tile-latency-unit"]').text()).toBe("ms");
+    expect(wrapper.find('[data-test="ai-experiment-tile-cost-unit"]').exists()).toBe(false);
+  });
+
+  it("renders cost as currency on both sides and on the delta", () => {
+    const wrapper = mountPanel({
+      dimensions: [
+        {
+          ...comparison.dimensions[1],
+          kind: "cost",
+          name: "cost",
+          baseline: 0.031,
+          candidate: 0.006,
+          delta: -0.025,
+          orientedDelta: 0.025,
+        },
+      ],
+    });
+    const cost = wrapper.get('[data-test="ai-experiment-tile-cost"]');
+
+    expect(cost.text()).toContain("$0.031");
+    expect(cost.text()).toContain("$0.006");
+    expect(wrapper.get('[data-test="ai-experiment-tile-cost-delta"]').text()).toBe("-$0.025");
+  });
+
+  it("says what the latency number measures", () => {
+    const wrapper = mountPanel();
+    const latency = wrapper.get('[data-test="ai-experiment-tile-latency"]');
+
+    // A mean of per-row means over trials, in ms — not a p50.
+    expect(latency.text()).toContain("Latency (ms)");
+    expect(latency.text()).toContain("Mean per row, over trials");
+  });
+
+  it("summarises every scorer in a fixed number of tiles", () => {
+    const wrapper = mountPanel({
+      dimensions: [
+        ...comparison.dimensions,
+        {
+          ...comparison.dimensions[0],
+          name: "grounded",
+          assignment: "regressed",
+          orientedDelta: -0.4,
+        },
+        { ...comparison.dimensions[0], name: "tone", assignment: "regressed", orientedDelta: -0.2 },
+      ],
+    });
+
+    // 3 scorers, 2 of them regressed — one tile regardless of how many there are.
+    expect(wrapper.get('[data-test="ai-experiment-tile-scorers-regressed"]').text()).toContain("2");
+    expect(wrapper.get('[data-test="ai-experiment-tile-scorers-regressed"]').text()).toContain(
+      "of 3 scored",
+    );
+
+    // The weakest is the most negative ORIENTED delta, not the most negative raw one.
+    const weakest = wrapper.get('[data-test="ai-experiment-tile-weakest-scorer"]');
+    expect(weakest.text()).toContain("grounded");
+    expect(weakest.text()).toContain("-0.4");
+  });
+
+  it("warns about one-sided coverage on a tile that has it", () => {
+    const wrapper = mountPanel({
+      dimensions: [
+        { ...comparison.dimensions[1], baselineOnlyRowCount: 1, candidateOnlyRowCount: 0 },
+      ],
+    });
+
+    expect(wrapper.get('[data-test="ai-experiment-tile-latency-warning"]').text()).toContain(
+      "1 baseline-only",
+    );
+  });
+
+  it("tints a delta by its oriented direction, not its sign", () => {
+    const wrapper = mountPanel();
+
+    // Latency rose by 31 — a POSITIVE number but a worse result.
+    const latency = wrapper.get('[data-test="ai-experiment-tile-latency-delta"]');
+    expect(latency.text()).toBe("+31");
+    expect(latency.attributes("data-variant")).toBe("error-soft");
+  });
+
+  it("gathers every no-verdict bucket behind one tile", async () => {
+    const wrapper = mountPanel();
+
+    // 0 inconclusive + 1 new + 1 missing.
+    expect(wrapper.get('[data-test="ai-experiment-count-uncompared"]').text()).toBe("2");
+    await wrapper.get('[data-test="ai-experiment-count-uncompared"]').trigger("click");
+
+    // Only the `new` row is loaded; the `missing` one is counted, not listed.
+    const rows = wrapper.findAll('[data-test="row"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text()).toContain("New");
+  });
+
+  it("orders outcomes first with Total last, each carrying an icon", () => {
+    const wrapper = mountPanel();
+    const strip = wrapper.get('[data-test="stat-strip"]');
+
+    expect(strip.attributes("data-order")).toBe("regressed,improved,unchanged,uncompared,total");
+    expect(wrapper.get('[data-test="ai-experiment-count-regressed"]').attributes("data-icon")).toBe(
+      "trending-down",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-count-improved"]').attributes("data-icon")).toBe(
+      "trending-up",
+    );
+    // Total summarises rather than filters: no share bar, and it never rings.
+    expect(wrapper.get('[data-test="ai-experiment-count-total"]').attributes("data-bar")).toBe("");
+  });
+
+  it("clears the filter from Total without selecting it", async () => {
+    const wrapper = mountPanel();
+    const strip = () => wrapper.get('[data-test="stat-strip"]');
+    expect(strip().attributes("data-selected")).toBe("");
+
+    await wrapper.get('[data-test="ai-experiment-count-regressed"]').trigger("click");
+    expect(strip().attributes("data-selected")).toBe("regressed");
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+
+    await wrapper.get('[data-test="ai-experiment-count-total"]').trigger("click");
+    expect(strip().attributes("data-selected")).toBe("");
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
+  });
+
+  it("filters rows to the picked bucket and back", async () => {
+    const wrapper = mountPanel();
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
+
+    await wrapper.get('[data-test="ai-experiment-count-regressed"]').trigger("click");
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+
+    // Re-picking the active tile clears the filter rather than trapping the user.
+    await wrapper.get('[data-test="ai-experiment-count-regressed"]').trigger("click");
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
+  });
+
+  it("offers fixed threshold steps and asks the page to reload on a change", async () => {
+    const wrapper = mountPanel();
+    const select = wrapper.get('[data-test="ai-experiment-comparison-threshold"]');
+
+    expect(select.findAll("option").map((o) => o.text())).toEqual(["0.02", "0.05", "0.10", "0.15"]);
+
+    await select.setValue("0.15");
+    expect(wrapper.emitted("apply-threshold")?.[0]).toEqual([0.15]);
+  });
+
+  it("keeps an off-ladder server threshold selectable", () => {
+    const wrapper = mountPanel({ threshold: 0.5 });
+
+    expect(
+      wrapper
+        .get('[data-test="ai-experiment-comparison-threshold"]')
+        .findAll("option")
+        .map((o) => o.text()),
+    ).toEqual(["0.02", "0.05", "0.10", "0.15", "0.50"]);
+  });
+
+  it("opens the row from a click anywhere on it, with no action button", async () => {
+    const wrapper = mountPanel();
+    expect(wrapper.find('[data-test="ai-experiment-comparison-inspect"]').exists()).toBe(false);
+
+    await wrapper.findAll('[data-test="row"]')[0].trigger("click");
+
+    // The second argument is the FILTERED order, so the drawer pages through
+    // what the user is actually looking at.
+    expect(wrapper.emitted("inspect")?.[0]).toEqual([comparison.rows[0], comparison.rows]);
   });
 });

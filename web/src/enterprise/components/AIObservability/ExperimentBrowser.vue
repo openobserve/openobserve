@@ -18,23 +18,29 @@
         :placeholder="t('aiObservability.experiments.nameSearchPlaceholder')"
         data-test="ai-experiment-name-search"
       />
-      <OButton
-        size="sm"
-        variant="outline"
-        :disabled="!comparison.eligible"
-        data-test="ai-experiment-compare"
-        @click="openComparison"
-      >
-        {{ t("aiObservability.experiments.compare") }}
-      </OButton>
-    </div>
-
-    <div
-      v-if="comparisonReason"
-      class="border-warning text-text-secondary rounded-default border px-3 py-2 text-sm"
-      data-test="ai-experiment-comparison-reason"
-    >
-      {{ comparisonReason }}
+      <!-- The counter is ALWAYS rendered and always the same length, so it
+           teaches the two-experiment rule up front without the layout moving as
+           the selection changes. The tooltip carries the rarer reasons. -->
+      <div class="flex items-center gap-2">
+        <span
+          class="text-text-secondary text-xs whitespace-nowrap"
+          data-test="ai-experiment-selection-count"
+        >
+          {{ t("aiObservability.experiments.selectionCount", { count: selectedIds.length }) }}
+        </span>
+        <OTooltip :content="comparisonReason" :disabled="comparison.eligible">
+          <OButton
+            size="sm"
+            variant="outline"
+            :disabled="!comparison.eligible"
+            :aria-description="comparisonReason"
+            data-test="ai-experiment-compare"
+            @click="openComparison"
+          >
+            {{ t("aiObservability.experiments.compare") }}
+          </OButton>
+        </OTooltip>
+      </div>
     </div>
 
     <div
@@ -100,6 +106,7 @@
         :persist-columns="true"
         table-id="ai-experiments-rows"
         :selection="compact ? 'none' : 'multiple'"
+        :show-select-all="false"
         :selected-ids="selectedIds"
         :is-row-selectable="canSelectRow"
         width="100%"
@@ -182,6 +189,8 @@ import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -199,7 +208,7 @@ import {
   type ComparisonIneligibilityReason,
   writeExperimentBaselines,
 } from "@/enterprise/views/AIObservability/experimentDiscovery";
-import { aiExperimentsRoute } from "@/enterprise/views/AIObservability/experimentRoutes";
+import { aiExperimentCompareRoute } from "@/enterprise/views/AIObservability/experimentRoutes";
 
 const props = withDefaults(
   defineProps<{
@@ -230,7 +239,6 @@ const nameSearch = ref(props.syncUrl ? String(route.query.experiment ?? "") : ""
 const baselineByDataset = ref(readExperimentBaselines(props.orgId));
 const selectedIds = ref<string[]>([]);
 const collapsedGroups = ref<string[]>([]);
-const rejectedComparisonReason = ref("");
 
 function isGroupRow(row: TreeRow): row is DatasetRow {
   return (row as DatasetRow).isGroup === true;
@@ -351,11 +359,11 @@ const selectedExperiments = computed(() =>
   props.experiments.filter(({ id }) => selectedIds.value.includes(id)),
 );
 const comparison = computed(() => comparisonEligibility(selectedExperiments.value));
-const comparisonReason = computed(() =>
-  selectedIds.value.length || rejectedComparisonReason.value
-    ? rejectedComparisonReason.value || translateComparisonReason(comparison.value.reason)
-    : "",
-);
+/** Why Compare is disabled. Always available, so the tooltip can explain it. */
+const comparisonReason = computed(() => {
+  const reason = comparison.value.reason;
+  return reason ? translateComparisonReason(reason) : raw("");
+});
 
 watch(
   () => props.orgId,
@@ -434,8 +442,11 @@ function scoreCell(experiment: LlmExperiment, scorerName: string): string {
   return top ? `${top.value} × ${top.count}` : "—";
 }
 
-function translateComparisonReason(reason: ComparisonIneligibilityReason | null) {
-  if (!reason) return "";
+function rejectComparison(reason: ComparisonIneligibilityReason) {
+  toast({ variant: "warning", message: translateComparisonReason(reason) });
+}
+
+function translateComparisonReason(reason: ComparisonIneligibilityReason) {
   return t(`aiObservability.experiments.comparisonReasons.${reason}`);
 }
 
@@ -452,7 +463,6 @@ function setBaseline(experiment: LlmExperiment) {
   baselineByDataset.value = { ...baselineByDataset.value, [experiment.datasetId]: experiment.id };
   writeExperimentBaselines(props.orgId, baselineByDataset.value);
   selectedIds.value = [experiment.id];
-  rejectedComparisonReason.value = "";
 }
 
 function comparisonDisabled(experiment: LlmExperiment) {
@@ -464,7 +474,14 @@ function comparisonDisabled(experiment: LlmExperiment) {
   );
 }
 
+const COMPARISON_LIMIT = 2;
+
 function canSelectRow(row: LlmExperiment) {
+  // An already-picked row stays selectable so it can be unpicked; everything
+  // else is closed once two are chosen, so the cap is visible rather than a
+  // checkbox that silently refuses to tick.
+  if (selectedIds.value.includes(row.id)) return true;
+  if (selectedIds.value.length >= COMPARISON_LIMIT) return false;
   return !comparisonDisabled(row);
 }
 
@@ -485,9 +502,12 @@ function toggleComparison(experiment: LlmExperiment) {
   if (selectedIds.value.includes(experiment.id)) {
     selectedIds.value = selectedIds.value.filter((id) => id !== experiment.id);
   } else if (comparisonDisabled(experiment)) {
-    rejectedComparisonReason.value = translateComparisonReason("different_dataset");
+    rejectComparison("different_dataset");
     return;
-  } else if (selectedIds.value.length < 2) {
+  } else if (selectedIds.value.length >= COMPARISON_LIMIT) {
+    rejectComparison("select_only_two");
+    return;
+  } else {
     const baselineId = baselineByDataset.value[experiment.datasetId];
     const baselineCanSeed =
       baselineId &&
@@ -497,7 +517,6 @@ function toggleComparison(experiment: LlmExperiment) {
       ? [baselineId, experiment.id]
       : [...selectedIds.value, experiment.id];
   }
-  rejectedComparisonReason.value = "";
 }
 
 function openComparison() {
@@ -509,13 +528,6 @@ function openComparison() {
     selectedExperiments.value[0];
   const candidate = selectedExperiments.value.find(({ id }) => id !== baseline.id);
   if (!candidate) return;
-  router.push(
-    aiExperimentsRoute(props.orgId, {
-      query: route.query,
-      datasetId,
-      baselineId: baseline.id,
-      candidateId: candidate.id,
-    }),
-  );
+  router.push(aiExperimentCompareRoute(props.orgId, baseline.id, candidate.id));
 }
 </script>

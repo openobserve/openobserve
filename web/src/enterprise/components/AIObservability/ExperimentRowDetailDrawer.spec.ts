@@ -80,7 +80,7 @@ function mountDrawer() {
       stubs: {
         ODrawer: {
           props: ["open", "title", "subTitle"],
-          template: '<section v-if="open"><slot /></section>',
+          template: '<section v-if="open"><slot /><slot name="footer" /></section>',
         },
         OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
         OTag: { template: "<span><slot /></span>" },
@@ -102,8 +102,9 @@ describe("ExperimentRowDetailDrawer", () => {
   it("emits row navigation, failed-slot retry, and trace navigation", async () => {
     const wrapper = mountDrawer();
 
+    // The stepper is icon-only now, so target it by hook rather than by label.
+    await wrapper.get('[data-test="ai-experiment-row-previous"]').trigger("click");
     const buttons = wrapper.findAll("button");
-    await buttons.find((button) => button.text().includes("Previous Row"))?.trigger("click");
     await buttons.find((button) => button.text().includes("Retry Failed Slot"))?.trigger("click");
     await buttons.find((button) => button.text().includes("View Trace"))?.trigger("click");
 
