@@ -180,6 +180,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :ready="selectedEntry ? entryReady(selectedEntry) : false"
       @install="onInstall"
     />
+
+    <LibraryInstallDialog
+      v-model:open="installOpen"
+      :entries="visibleEntries"
+      :seed="installSeed"
+    />
   </div>
 </template>
 
@@ -192,6 +198,7 @@ import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import LibraryCard from "@/components/alertLibrary/LibraryCard.vue";
 import LibraryDrawer from "@/components/alertLibrary/LibraryDrawer.vue";
 import LibraryEmptyState from "@/components/alertLibrary/LibraryEmptyState.vue";
+import LibraryInstallDialog from "@/components/alertLibrary/LibraryInstallDialog.vue";
 import LibraryRail from "@/components/alertLibrary/LibraryRail.vue";
 import {
   categoryLabel,
@@ -209,11 +216,10 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import type { AlertLibraryEntry, StreamsByType } from "@/types/alertLibrary";
+import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types/alertLibrary";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 
 /** Where the alerts are authored. Not the serving URL — that is a constant. */
@@ -236,6 +242,9 @@ const search = ref("");
 /** Kept after close so the drawer can animate out with its content intact. */
 const selectedEntry = ref<AlertLibraryEntry | null>(null);
 const drawerOpen = ref(false);
+
+const installOpen = ref(false);
+const installSeed = ref<{ entry: AlertLibraryEntry; file: AlertLibraryFile } | null>(null);
 
 const streamsByType = ref<StreamsByType>({});
 const streamsPending = ref(true);
@@ -433,11 +442,14 @@ const openEntry = (entry: AlertLibraryEntry) => {
 };
 
 /**
- * Phase 4 owns the wizard. Saying so is better than a dead button: the drawer
- * has already tuned the file, and this is the only thing left to answer.
+ * The drawer hands over the file it already tuned; the wizard answers the rest.
+ * Closing the drawer keeps one overlay on screen at a time — the wizard offers
+ * the whole visible set, so the single-alert view behind it is finished.
  */
-const onInstall = () => {
-  toast({ variant: "info", message: t("alert_library.drawer.installHint") });
+const onInstall = (payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }) => {
+  installSeed.value = payload;
+  drawerOpen.value = false;
+  installOpen.value = true;
 };
 
 const openContribute = () => {
