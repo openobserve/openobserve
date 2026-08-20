@@ -396,4 +396,49 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
 
     testLogger.info('===== Content Template E2E test COMPLETE =====');
   });
+
+  // ══ REGRESSION TESTS FOR OPEN DEFECTS (#2471) ══════════════════════════════
+  // Both assert the CORRECT behaviour and therefore fail on today's build.
+  // Skipped rather than left red, since neither defect is P0/blocking.
+  // Un-skip as each issue closes — do not soften the assertion.
+
+  test.skip('B8 · a content template can be selected for an email destination [#2471 B8]', {
+    tag: ['@contentTemplates', '@email', '@regression', '@P1', '@all'],
+  }, async ({ page }) => {
+    // BLOCKED BY #2471 (B8): the Webhook/Email type tabs in AddTemplate.vue sit
+    // inside the v-else branch, so they render only in the legacy Custom editor.
+    // Content mode — the default for new templates — always saves type: http, and
+    // an email destination filters its dropdown to type === "email". Net effect:
+    // the better email renderer is unreachable from the UI, which is what makes
+    // the plain-text defect (B3) unavoidable.
+    await page.goto(`${process.env['ZO_BASE_URL']}/web/alert-destinations?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
+    await pm.alertDestinationsPage.expectDestinationsListTitleVisible();
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('email');
+
+    const options = await pm.alertDestinationsPage.getTemplateOptionsForEmail();
+    testLogger.info('templates offered to an email destination', { options });
+    expect(options.length, 'an email destination must be able to use content templates')
+      .toBeGreaterThan(1);
+  });
+
+  // BLOCKED BY #2471 (B1): resolve.rs builds the rows collection from
+  // spec.rows.max / columns / format but never reads spec.rows.enabled, so the
+  // "Show matching rows" switch is inert and matched log rows are always
+  // embedded. The frontend is not at fault — the editor stores the flag
+  // correctly; only the renderer ignores it.
+  //
+  // Verification shape (see the issue for the full manual reproduction):
+  //   1. author a content template with rows.enabled = false
+  //   2. confirm the STORED spec really has rows.enabled: false
+  //   3. bind it to a destination + alert, fire, capture the payload
+  //   4. assert the payload carries no rows
+  //
+  // Not yet implemented as a runnable test — a hardcoded failing assertion
+  // here would still fail once #2471 is fixed, which reads as "still broken"
+  // when it means the opposite.
+  test.fixme('B1 · rows disabled in a content template are not embedded [#2471 B1]', {
+    tag: ['@contentTemplates', '@delivery', '@regression', '@P1', '@all'],
+  }, async () => {});
 });
