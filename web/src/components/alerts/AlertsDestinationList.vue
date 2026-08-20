@@ -22,8 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alert_destinations.header')"
       title-data-test="alert-destinations-list-title"
       icon="location-on"
-      :subtitle="t('alert_destinations.subtitle')"
     >
+      <!-- Fixed-width, subtitle-free title so the peer tabs anchor at the same
+           x on all four alerting pages — see AlertList.vue for the rationale. -->
+      <template #title>
+        <span class="inline-block w-52 truncate">{{ t("alert_destinations.header") }}</span>
+      </template>
       <!-- Peer tabs across the four alerting siblings; the routes stay flat. -->
       <template #header-tabs>
         <AlertSectionTabs />

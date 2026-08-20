@@ -22,11 +22,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
-      :subtitle="t('alerts.subtitle')"
       icon="shield-alert-outline"
     >
       <!-- Peer tabs across the four alerting siblings. The routes stay flat;
-           this is presentation, not nesting. -->
+           this is presentation, not nesting.
+           No subtitle, and a fixed-width title: the title block is shrink-0 and
+           sizes to its content, so a per-page subtitle (or just a longer title)
+           moved the tab strip horizontally on every navigation. Peer tabs must
+           sit at the same x on all four pages or clicking one makes the row
+           jump under the cursor. -->
+      <template #title>
+        <span class="inline-block w-52 truncate">{{ t("alerts.header") }}</span>
+      </template>
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
