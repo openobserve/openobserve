@@ -3,7 +3,7 @@
 > The same ground traced as one request path, frontend to backend, is in
 > [api-cache-workflow.md](./api-cache-workflow.md).
 
-**Companion to** [api-caching-audit.md](./api-caching-audit.md) (the design) and
+**Companion to** [query-authoring-guide.md](./query-authoring-guide.md) (how to add one), [api-caching-audit.md](./api-caching-audit.md) (the design) and
 [api-cache-architecture.md](./api-cache-architecture.md) (the call flow — which
 file calls what, and where the payload goes).
 
@@ -86,8 +86,8 @@ Implemented in `purgeOrgQueries` / `purgeAllQueries` (`queryClient.ts`).
 
 ## 2. Migrated — currently cached
 
-63 cached reads are declared with `defineQuery`, each in the service file that
-owns its URL,
+63 cached reads are declared with `queryOptions()` in `<domain>.queries.ts`,
+beside the transport module that owns their URLs,
 plus the two pre-existing IndexedDB caches now folded into the same purge path.
 
 ### App shell
@@ -350,7 +350,7 @@ lists behind one service.
 | 57  | Score config versions | `GET /api/{org}/score_configs/{id}/versions` | T3       | memory  |
 
 Writes (`create` / `update` / `delete` / `activate` / `pause` / `manual_eval`)
-become `useOrgMutation` with a prefix invalidate. `scorers/test` and
+are `mutationOptions()` declaring `meta.invalidates` with a prefix key. `scorers/test` and
 `llm_judge/output_schema` are POST previews — never cache.
 
 **AI Observability** — `src/enterprise/{views,components}/AIObservability`
@@ -400,7 +400,7 @@ Per audit §5.9. These are not "to be migrated"; they must stay uncached.
 | Stream Explorer table                                            | `search.search` (SQL)                      | Same — it is a search, not a list.                                                                                                       |
 | RUM error tracking / performance                                 | dashboard-backed `search.search`           | Same.                                                                                                                                    |
 | SSE / AI chat streams                                            | `ai_chat.*`                                | Streaming.                                                                                                                               |
-| Ingestion, login, file upload                                    | `POST`/`PUT`/`DELETE`                      | One-shot, side-effecting. Use `useOrgMutation` — invalidate, never cache.                                                                |
+| Ingestion, login, file upload                                    | `POST`/`PUT`/`DELETE`                      | One-shot, side-effecting. Use `mutationOptions` — invalidate, never cache.                                                                |
 | Short URL resolve, `verify_identifier`, billing hosted-page URLs | one-shot                                   | Single-use tokens/URLs.                                                                                                                  |
 
 ---
@@ -424,23 +424,53 @@ They must pass `persist: "none"`.
 
 ## 6. Adding a new one
 
+Three files per domain, all siblings in `services/`.
+
 ```ts
-// services/<domain>.ts — below the URL builders it calls
-export const thingQuery = defineQuery<[], Thing[]>({
-  key: ["things", "list"], // → ["org", <org>, "things", "list"]
-  fetch: async (org) => (await thingService.list(org)).data?.list ?? [],
-  // no staleTime: the client default is what a list wants
-  persist: "none", // only if it carries a secret
-});
+// services/<domain>.querykeys.ts — identity, dependency-free
+export const thingKeys = {
+  all: (org: string) => orgKey(org, "things"), // the invalidation scope
+  list: (org: string) => orgKey(org, "things", "list"),
+};
 ```
 
-Then in the page: `thingQuery.get(org)` for the mount path,
-`thingQuery.refresh(org)` behind a refresh button, and
-`thingQuery.invalidate(org)` after every write.
+```ts
+// services/<domain>.queries.ts — the declaration
+export const thingsQuery = (org: string) =>
+  queryOptions({
+    queryKey: thingKeys.list(org),
+    queryFn: async (): Promise<Thing[]> => (await thingService.list(org)).data?.list ?? [],
+    // no staleTime: the client default is what a list wants
+  });
 
-Loaders take a `force` flag — mount stays cached, refresh and post-write reloads
-pass `true`. Never bind a loader straight to a template event
-(`@click="getX"`): the event object lands in `force`.
+export const deleteThingMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (id: string) => thingService.delete(org, id),
+    meta: { invalidates: [thingKeys.all(org)] },
+  });
+```
+
+Then in the page:
+
+```ts
+const q = useQuery(() => Object.assign(thingsQuery(org.value), { enabled: !!org.value }));
+const rows = computed(() => q.data.value ?? []);
+const loading = q.isLoading;   // cold read in flight → skeleton
+const fetching = q.isFetching; // any request → refresh spinner
+
+const del = useMutation(() => deleteThingMutation(org.value));
+```
+
+The component never names a cache. A write invalidates its declared scope, and
+every mounted query on that scope repaints itself.
+
+**`Object.assign`, not a spread.** `queryOptions()` brands its `queryKey` with
+the result type; copying into a fresh object literal drops the brand and `data`
+silently degrades to `unknown`.
+
+Outside a component — route guards, Vuex actions, plain utils — read the *same*
+object imperatively: `queryClient.fetchQuery(thingsQuery(org))`, or `fetchInto`
+when you have to drive refs a component already owns.
 
 ---
 
@@ -453,7 +483,7 @@ The conventions are written down in two places, and the difference matters:
 | `.claude/rules/fe-data-fetching.md`                       | Rules are auto-loaded into every session, so this is what actually enforces the convention on new code. Untracked mirror. |
 | `.claude/skills/ui-architect/references/data-fetching.md` | The canonical, tracked copy, reached from the `ui-architect` skill. `data-fetching-inventory.md` beside it is this file.  |
 
-Both carry: the layer table, the decision tree below, the `defineQuery` template
+Both carry: the layer table, the decision tree below, the declaration template
 from §6, the `force` convention and the `@click="getX"` trap, "invalidate by
 prefix, never re-call the loader", and the never-cache / never-persist lists from
 §4 and §5.
@@ -463,7 +493,7 @@ prefix, never re-call the loader", and the never-cache / never-persist lists fro
 ```
 New endpoint
 ├─ Not a GET, or streaming, or a single-use URL? ──────► no cache.
-│                                                        useOrgMutation for writes.
+│                                                        mutationOptions for writes.
 └─ GET, reused across surfaces or across visits?
    ├─ Immutable for the session (config, license, built-ins)? ──► T0  localStorage
    ├─ Org configuration (streams, folders, functions)?         ──► T1  localStorage
@@ -569,18 +599,27 @@ out every time. Do not read "no flicker" as "cached".
 
 ### How to close a gap in (d)
 
-The query exists, so it is the §6 conversion plus a `load()` call:
+The query exists, so it is the §6 conversion — mount `useQuery` and derive the
+rows:
 
 ```ts
-await templatesQuery.load({ org, apply: applyRows, loading });
+const q = useQuery(() => Object.assign(templatesQuery(org.value), { enabled: !!org.value }));
+const rows = computed(() => shape(q.data.value ?? []));
 ```
 
-Two things to check before converting a page:
+Four things to check before converting a page:
 
 1. **Does the response handler have side effects?** Opening a dialog, firing a
    second request, minting a row id. If so, split the pure row mapping out and
    leave the effects on the fresh pass — `AlertList` and `User` are the worked
-   examples. If it cannot be split, use `peek()` to skip the spinner instead,
-   and accept that a cold surface still waits.
+   examples. If it cannot be split, drive the effects from a
+   `watch` on `query.data` and keep the mapping in a `computed`.
 2. **Is the row identity stable?** A row keyed by `getUUID()` cannot be painted
    twice. Give it an identity derived from the entity first.
+3. **Is the shaping pure?** A shaping function that *mutates* the rows it is
+   handed cannot feed a `computed` off the cache — it would rewrite the cached
+   entry in place. Make it pure first; `PipelinesList` is the worked example.
+4. **Does the page own state seeded from the response?** Filter bounds, a
+   per-row `selected` flag. Either preserve it when the query repaints
+   (`BuiltInPatternsTab`) or gate the query behind an `enabled` flag so it does
+   not fire before the component has finished initialising (`Nodes`).

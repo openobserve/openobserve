@@ -1,6 +1,6 @@
 # How a request travels — frontend to backend, and where the cache sits
 
-**Companion to** [api-cache-architecture.md](./api-cache-architecture.md) (what
+**Companion to** [query-authoring-guide.md](./query-authoring-guide.md) (how to add one), [api-cache-architecture.md](./api-cache-architecture.md) (what
 each layer owns) and [api-cache-inventory.md](./api-cache-inventory.md) (what is
 cached, and what is not).
 
@@ -15,17 +15,17 @@ data comes from_ — or why a screen showed something stale — start here.
 ```
   ┌────────────────────────────────────────────────────────────────────────┐
   │ 1  COMPONENT                       views/… · components/…              │
-  │    A loader decides WHEN to read, and with what arguments.             │
-  │      await pipelinesQuery.load({ org, apply, loading })                │
+  │    Subscribes; it does not fetch. The rows ARE the query.              │
+  │      const q = useQuery(() => pipelinesQuery(org))                     │
+  │      const rows = computed(() => q.data.value ?? [])                   │
   └───────────────────────────────┬────────────────────────────────────────┘
                                   │
   ┌───────────────────────────────▼────────────────────────────────────────┐
-  │ 2  QUERY DECLARATION               services/<domain>.ts                │
-  │    defineQuery binds four things to one endpoint:                      │
-  │      key    → identity     ["org", org, "pipelines", "list"]           │
-  │      fetch  → how to call it and how to shape the response             │
-  │      staleTime / persister → TanStack options, defaulted by the client │
-  │      scope  → what a write invalidates                                 │
+  │ 2  QUERY DECLARATION       services/<domain>.queries.ts                │
+  │    A plain `queryOptions()` object — no wrapper type:                  │
+  │      queryKey  → identity, from <domain>.querykeys.ts                  │
+  │      queryFn   → how to call it and how to shape the response          │
+  │      staleTime / gcTime / persister → TanStack options as-is           │
   └───────────────────────────────┬────────────────────────────────────────┘
                                   │
   ┌───────────────────────────────▼────────────────────────────────────────┐
@@ -36,7 +36,8 @@ data comes from_ — or why a screen showed something stale — start here.
                                   │  only on miss or stale
   ┌───────────────────────────────▼────────────────────────────────────────┐
   │ 4  SERVICE (URL builder)           services/<domain>.ts                │
-  │    Same file as step 2, above the declaration. Builds the path.        │
+  │    A SEPARATE module from step 2 — that is what lets `vi.mock` reach   │
+  │    the queryFn. Builds the path.                                       │
   │      http().get(`/api/${org}/pipelines`)                               │
   └───────────────────────────────┬────────────────────────────────────────┘
                                   │
@@ -72,22 +73,31 @@ button, poll tick. The loader picks a **member**, and the member encodes intent:
 | ----------- | ------------------------------------------------------------ |
 | `get()`     | I need one settled value (route guard, write path)           |
 | `load()`    | Paint a list: applies what is cached, then the server's copy |
-| `refresh()` | The user asked, or I just wrote — go to the server           |
-| `peek()`    | Is there anything to show? (no request)                      |
+| `useQuery(opts)`                          | Subscribe: repaints on any invalidation      |
+| `queryClient.fetchQuery(opts)`            | One-off read outside a component             |
+| `fetchQuery({ ...opts, staleTime: 0 })`   | The user asked — go to the server            |
+| `queryClient.getQueryData(key)`           | Is there anything to show? (no request)      |
 
 ### 2 · Declaration — _what_ the read is
 
 ```ts
-export const pipelinesQuery = defineQuery<[], Pipeline[]>({
-  key: ["pipelines", "list"],
-  fetch: async (org) => (await pipelines.getPipelines(org)).data?.list ?? [],
-  scope: ["pipelines"],
-});
+// services/pipelines.querykeys.ts
+export const pipelineKeys = {
+  all: (org: string) => orgKey(org, "pipelines"), // the invalidation scope
+  list: (org: string) => orgKey(org, "pipelines", "list"),
+};
+
+// services/pipelines.queries.ts
+export const pipelinesQuery = (org: string) =>
+  queryOptions({
+    queryKey: pipelineKeys.list(org),
+    queryFn: async (): Promise<Pipeline[]> =>
+      (await pipelines.getPipelines(org)).data?.list ?? [],
+  });
 ```
 
-`key` is prefixed with `["org", orgId]` by `defineQuery` — every key in the app
-is org-rooted, which is what makes the purges in §6 possible and what stops one
-tenant's data ever being served to another.
+`orgKey` roots every key at `["org", orgId, …]` — that is what makes the purges
+in §6 possible and what stops one tenant's data ever being served to another.
 
 ### 3 · Cache — _whether to ask at all_
 
@@ -173,18 +183,20 @@ next read follows §3.
 
 ```
   AddFunction.vue
-        │  jsTransformService.create(org, payload)     ← normal service call
-        │
-        │  functionsQuery.invalidate(org)              ← mark the scope stale
+        │  saveFunction.mutateAsync(payload)          ← knows nothing about caches
+        ▼
+  services/jstransform.queries.ts
+        │  meta: { invalidates: [functionKeys.all(org)] }
+        ▼
+  query/queryClient.ts   MutationCache.onSuccess  ← reads meta, once, centrally
         ▼
   every key under ["org", org, "functions", …] is stale
-        │
         ▼
-  the next read from anywhere goes to the server
+  every MOUNTED useQuery on that scope refetches itself
 ```
 
-Invalidation is by **prefix**, not exact key: `scope` covers the list, any
-filtered variant, and whatever key is added next.
+Invalidation is by **prefix**, not exact key: a domain's `all` key covers the
+list, any filtered variant, and whatever key is added next.
 
 Two rules that follow:
 

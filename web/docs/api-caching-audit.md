@@ -1,5 +1,15 @@
 # API & Caching Audit — TanStack Query Migration Plan
 
+> **HISTORICAL — superseded.** This is the original design study, written
+> before the caching layer was built. It describes an intermediate design
+> (`defineQuery`, `useOrgQuery`, `useOrgMutation`, tier names) that no longer
+> exists in the codebase: the implementation now uses TanStack's own
+> `queryOptions` / `mutationOptions` directly, with no wrapper types.
+> Kept for the reasoning behind what to cache and what never to cache —
+> those conclusions still hold. For how the code actually works today see
+> [api-cache-architecture.md](./api-cache-architecture.md) and
+> [query-authoring-guide.md](./query-authoring-guide.md).
+
 **Scope:** `web/` (Vue 3 + TS SPA)
 **Date:** 2026-08-05
 **Status:** Proposal / audit. No code changed by this document.
