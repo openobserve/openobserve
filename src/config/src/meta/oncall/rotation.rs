@@ -45,39 +45,24 @@ use utoipa::ToSchema;
 /// "which slot" has an answer for every rotation that has ever existed — the
 /// ones written before slots were a concept are the team's primary, and reading
 /// them as anything else would change what stored data means.
-pub const DEFAULT_SLOT: &str = "primary";
-
-/// The name the auto-staffed rotation gives its derived second position.
+/// The name the system gives a team's first rotation.
 ///
-/// A convention rather than an enum — a slot is any string an operator likes —
-/// but the default has to pick one, and this is the word every escalation
-/// policy and every screen already uses.
-pub const SECONDARY_SLOT: &str = "secondary";
+/// A *name*, not a keyword: nothing in resolution treats it specially, and a
+/// team may rename or delete it. It replaced `DEFAULT_SLOT`, which was a
+/// keyword — every rotation that did not name a slot silently meant that one,
+/// and six escalation targets existed to say "that one" in different ways.
+pub const DEFAULT_ROTATION_NAME: &str = "Primary";
 
-/// The longest slot name that will be stored. A slot is a label on a screen and
-/// a key in a ladder, not a place to put a sentence.
-pub const MAX_SLOT_CHARS: usize = 64;
-
-pub(crate) fn default_slot() -> String {
-    DEFAULT_SLOT.to_string()
-}
-
-fn is_default_slot(slot: &str) -> bool {
-    same_slot(slot, DEFAULT_SLOT)
-}
-
-/// Whether two slot names mean the same slot.
+/// The name the system gives the second rotation, when one is asked for.
 ///
-/// Case-insensitive for the same reason member emails are: `Secondary` typed
-/// into the schedule editor and `secondary` typed into the ladder are one slot
-/// to everybody except a byte comparison, and the failure that produces is a
-/// rung that resolves to nobody with no visible cause.
-pub fn same_slot(a: &str, b: &str) -> bool {
-    a.trim().eq_ignore_ascii_case(b.trim())
-}
+/// Also just a name. The rotation it labels is entirely ordinary: same roster,
+/// same cadence, anchor one shift behind. Nothing derives it and nothing links
+/// the two — see `Rotation::offset_from`.
+pub const SECONDARY_ROTATION_NAME: &str = "Secondary";
 
-/// Microseconds in one hour — shift lengths are stored in micros to match the
-/// scheduler's unit (`config::utils::time::now_micros`).
+/// The longest a rotation's name may be.
+pub const MAX_ROTATION_NAME_CHARS: usize = 64;
+
 pub const MICROS_PER_MINUTE: i64 = 60_000_000;
 pub const MICROS_PER_HOUR: i64 = 60 * MICROS_PER_MINUTE;
 pub const MICROS_PER_DAY: i64 = 24 * MICROS_PER_HOUR;
@@ -148,28 +133,11 @@ impl TimeWindow {
 
 /// One level's rotation within a schedule.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Rotation {
-    /// What this rotation is called. Rotations used to be identified by the
-    /// escalation level they filled, which forced one rotation per level; they
-    /// are now just named shifts, and the ladder decides who it pages.
-    #[serde(default = "default_rotation_name")]
+pub struct ShiftRule {
+    /// What this rule is called on the calendar. "APAC business hours",
+    /// "Weekend", "Base rotation".
+    #[serde(default = "default_rule_name")]
     pub name: String,
-    /// Which independently-resolved position this rotation staffs.
-    ///
-    /// Rotations sharing a slot are **layers**: priority, restrictions and
-    /// validity windows decide which of them is in force, exactly as before.
-    /// Rotations in different slots do not compete at all — both resolve, at
-    /// the same instant, to different people. That is what makes a secondary a
-    /// separate pool rather than next week's primary, and it is why the slot is
-    /// a property of the rotation rather than of the ladder: the ladder names a
-    /// slot, but the slot has to exist whether or not any rung mentions it.
-    ///
-    /// Absent from the wire when it is the default, so every rotation written
-    /// before slots existed serialises back byte-for-byte as it was stored —
-    /// which is what makes "nothing preset-specific is stored" (§C.3) still
-    /// true, and what stops an upgrade from rewriting every schedule row.
-    #[serde(default = "default_slot", skip_serializing_if = "is_default_slot")]
-    pub slot: String,
     /// Participants in handover order. Emails, because email is the login and
     /// therefore the one identifier every user is guaranteed to have.
     pub members: Vec<String>,
@@ -180,204 +148,118 @@ pub struct Rotation {
     /// Shifts before this instant resolve too — the sequence extends
     /// backwards — so an anchor set in the future is not an error, it just
     /// means the cycle is counted from there.
+    ///
+    /// This is also the whole of the "secondary" mechanism. Two rotations with
+    /// the same roster and anchors one shift apart can never resolve to the
+    /// same person, and that is *data*, not a rule: nothing at resolution time
+    /// knows the two are related, and dragging one anchor breaks the pairing on
+    /// purpose. It replaced `secondary_offset`, which computed the second
+    /// person from the first's roster and so produced a position that existed
+    /// whether or not anybody staffed it.
     pub anchor_micros: i64,
-    /// Higher wins when two rotations both apply at the same instant.
+    /// Higher wins when two rules in the same rotation both apply at an
+    /// instant.
     ///
     /// Explicit rather than positional: PagerDuty orders layers by their
     /// position in a list, which means reordering the UI silently changes who
     /// gets paged. A number you can read is worth the extra field.
     #[serde(default)]
     pub priority: i32,
-    /// When this rotation applies. Empty means always — the catch-all every
-    /// follow-the-sun setup needs underneath the restricted layers.
+    /// When this rule applies. Empty means always — the catch-all every
+    /// follow-the-sun setup needs underneath the restricted rules.
     #[serde(default)]
     pub restrictions: Vec<TimeWindow>,
-    /// The layer is not in effect before this instant. `None` means "since
+    /// The rule is not in effect before this instant. `None` means "since
     /// forever".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub starts_at: Option<i64>,
-    /// The layer is not in effect at or after this instant. `None` means
+    /// The rule is not in effect at or after this instant. `None` means
     /// "until further notice".
     ///
-    /// This is how a layer is **retired** (`architecture/02` §3b). Until it
-    /// existed the only way to stop a layer was to delete it, which threw away
-    /// the record of who had been covering those hours — so "the weekend
-    /// rotation ended in March" was not a thing the schedule could say.
-    /// Exclusive, like every other boundary here: the end instant already
-    /// belongs to whatever takes over.
+    /// This is how a rule is **retired** (`architecture/02` §3b). Until it
+    /// existed the only way to stop one was to delete it, which threw away
+    /// the record of who had been covering those hours. Exclusive, like every
+    /// other boundary here: the end instant already belongs to whatever takes
+    /// over.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ends_at: Option<i64>,
-    /// How many handovers after the person on shift the **derived secondary**
-    /// sits.
-    ///
-    /// A team has one member list. The secondary is derived from it rather
-    /// than staffed separately, which is why there is no second list to keep
-    /// in sync; slots are the opt-in upgrade for a genuinely different pool.
-    ///
-    /// **The default is `1`: the secondary is the person who takes over next.**
-    ///
-    /// It was briefly half the roster, on the argument that an offset of one
-    /// makes this week's secondary next week's primary — a permanent pairing
-    /// of the same two people. That argument is real and it lost to a bigger
-    /// one. Half a roster produces a secondary **nobody can derive**: the
-    /// calendar names the next shift holder, the ladder names somebody else,
-    /// both are correct, and a responder asking "who backs me up?" has to open
-    /// a second screen to find out. It also picks the person with the *least*
-    /// recent context — on call three weeks ago, and not again for three more.
-    ///
-    /// One is predictable, matches what the calendar already shows, and is
-    /// explainable in six words. A default's first duty is to be understood.
-    /// Teams that want real separation set this field; the lockstep they are
-    /// avoiding is a preference, not a correctness property.
-    ///
-    /// **Absent means derived, not stored.** A rotation that never writes this
-    /// keeps serialising byte-for-byte while still tracking a roster that
-    /// grows, and the resolution stays a pure function of
-    /// (rotation, instant, absences).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub secondary_offset: Option<u32>,
-
-    /// The slot this rotation's **derived** second position staffs, if it is a
-    /// slot at all.
-    ///
-    /// One roster, two positions: `slot` is filled by whoever is on shift, and
-    /// this one by whoever sits [`Rotation::resolved_secondary_offset`]
-    /// handovers ahead. They are distinct **by construction**, because the
-    /// offset is at least one — which is the guarantee two independent
-    /// rotations in two slots cannot make. Nothing cross-checks those, so the
-    /// same person can hold both at once and the ladder pages them twice.
-    ///
-    /// Declaring it is what makes the position *addressable*: `slots()` reports
-    /// it, so a cover can name it, `on_call_in_slot` resolves it, and a rung can
-    /// page it. Undeclared, the same person is still computed — as
-    /// `next_on_call` — but there is nothing to write a cover against, which is
-    /// the whole of the complaint this field answers.
-    ///
-    /// Absent is exactly the behaviour before this existed, and it is skipped on
-    /// the wire, so every schedule stored without it round-trips unchanged.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub secondary_slot: Option<String>,
-
-    /// Where this rotation came from. `Some("default")` marks the one the
-    /// system staffed when the team first had members.
-    ///
-    /// Exists because auto-staffing costs a screen the signal it used to read
-    /// absence with: a team with no schedule row and a team with a rotation
-    /// nobody chose look identical once one is always written. The marker lets
-    /// a UI say "default rotation — everyone in turn, customise" instead of
-    /// implying somebody designed it.
-    ///
-    /// Cleared by any edit: once a human has touched it, it is theirs.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source: Option<String>,
 }
 
 /// The value [`Rotation::source`] carries for a rotation nobody chose.
 pub const SOURCE_DEFAULT: &str = "default";
 
-/// How far ahead of the person on shift the derived secondary sits, when the
-/// rotation has not said.
-///
-/// **One.** The secondary is whoever takes over next — the person the calendar
-/// already shows in the next cell.
-///
-/// This was `max(1, len/2)` for two days, on the argument that an offset of one
-/// pairs the same two people forever. Replaced after watching somebody read the
-/// product: on a five-person team the calendar said the next holder was one
-/// person and the ladder's second rung said another, both correct, and the only
-/// way to learn who would actually be woken second was to open a different tab.
-/// A rule that requires a second screen to answer "who backs me up" is worse
-/// than a rule that pairs people predictably.
-///
-/// It also chose badly on the merits: half a roster picks whoever was on call
-/// longest ago and is furthest from being on call again — the least context,
-/// not the most.
-///
-/// `len` is unused and kept in the signature because the offset is a property
-/// of the *rule*, not of the roster, and every call site already has it — a
-/// future rule that does depend on size should not have to change them all.
-/// Teams wanting real separation set [`Rotation::secondary_offset`]; what they
-/// are avoiding is a preference, not a correctness property.
-pub fn default_secondary_offset(_len: usize) -> u32 {
-    1
+/// Why a shift rule was rejected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ShiftRuleError {
+    NoMembers,
+    NonPositiveShift(i64),
+    /// A person appears twice in the same rule, which would silently double
+    /// their share of the on-call load.
+    DuplicateMember(String),
+    /// A rule with no name cannot be told apart from another on a calendar,
+    /// which is the only place two of them are ever seen together.
+    NoName,
+    /// A validity window that ends before it starts is in effect at no instant
+    /// at all, so the rule would silently never apply.
+    EmptyValidityWindow { starts_at: i64, ends_at: i64 },
+}
+
+impl std::fmt::Display for ShiftRuleError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoMembers => f.write_str("a shift rule must have at least one member"),
+            Self::NonPositiveShift(v) => {
+                write!(f, "shift length must be positive, got {v} micros")
+            }
+            Self::DuplicateMember(m) => write!(f, "duplicate member `{m}` in one shift rule"),
+            Self::NoName => f.write_str("a shift rule must have a name"),
+            Self::EmptyValidityWindow { starts_at, ends_at } => write!(
+                f,
+                "shift rule ends at {ends_at} but starts at {starts_at}, so it applies at no instant"
+            ),
+        }
+    }
 }
 
 /// Why a rotation was rejected.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RotationError {
-    NoMembers,
-    NonPositiveShift(i64),
-    /// A person appears twice in the same rotation, which would silently
-    /// double their share of the on-call load.
-    DuplicateMember(String),
-    /// A rotation with no name cannot be told apart from another on a
-    /// calendar, which is the only place two of them are ever seen together.
-    NoName,
-    /// A validity window that ends before it starts is in effect at no instant
-    /// at all, so the layer would silently never apply.
-    EmptyValidityWindow { starts_at: i64, ends_at: i64 },
-    /// A rotation with a blank or over-long slot. Blank is not the default —
-    /// the default is applied when the field is *absent*, so a field present
-    /// and empty is somebody clearing a box, and a rotation nothing can name is
-    /// a rotation no rung can page.
-    BadSlot(String),
-    /// An explicit secondary offset of zero, which would make the secondary
-    /// the primary and page the same person on two rungs.
-    ///
-    /// Only *explicit* zero is refused. An offset larger than the roster is
-    /// not an error, because a roster can shrink under a stored offset and
-    /// failing validation would take the whole rotation out of service —
-    /// turning a stale number into a coverage gap. That case is clamped at
-    /// resolution instead. Zero cannot arrive that way; it can only be typed.
-    ZeroSecondaryOffset,
-    /// A rotation named its own slot as the one its derived position staffs.
-    ///
-    /// Two people, one place: the slot would resolve to whoever is on shift
-    /// *and* to whoever is an offset ahead, and a rung naming it would page it
-    /// twice. Refused rather than resolved by precedence, because there is no
-    /// reading of it that the author could have meant.
-    SecondarySlotIsItsOwn(String),
+    /// A rotation with no name. Levels of an escalation policy point at a
+    /// rotation, and a page that says "you are on call in ``" tells a woken
+    /// engineer nothing.
+    NoName(String),
+    /// A rotation with no shift rules puts nobody on call, ever. It is the one
+    /// state that looks configured on a calendar and pages no one.
+    NoShiftRules,
+    /// One of its rules is bad; the rule says which.
+    Rule(ShiftRuleError),
 }
 
 impl std::fmt::Display for RotationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoMembers => f.write_str("rotation must have at least one member"),
-            Self::NonPositiveShift(v) => {
-                write!(f, "shift length must be positive, got {v} micros")
+            Self::NoName(s) if s.trim().is_empty() => {
+                f.write_str("a rotation must have a name — a level pages it by name")
             }
-            Self::DuplicateMember(m) => write!(f, "duplicate rotation member `{m}`"),
-            Self::NoName => f.write_str("rotation must have a name"),
-            Self::EmptyValidityWindow { starts_at, ends_at } => write!(
+            Self::NoName(s) => write!(
                 f,
-                "rotation ends at {ends_at} but starts at {starts_at}, so it applies at no instant"
+                "rotation name `{s}` is longer than the {MAX_ROTATION_NAME_CHARS} characters a name may have"
             ),
-            Self::BadSlot(s) if s.trim().is_empty() => {
-                f.write_str("a rotation's slot cannot be blank")
-            }
-            Self::BadSlot(s) => write!(
-                f,
-                "slot `{s}` is longer than the {MAX_SLOT_CHARS} characters a slot name may have"
+            Self::NoShiftRules => f.write_str(
+                "a rotation with no shift rules puts nobody on call; give it at least one",
             ),
-            Self::ZeroSecondaryOffset => f.write_str(
-                "a secondary offset of 0 would make the secondary the person already on call; leave it unset for the default of 1 — the person who takes over next — or set a larger number to put more of the roster between them",
-            ),
-            Self::SecondarySlotIsItsOwn(s) => write!(
-                f,
-                "rotation staffs slot `{s}` and also names it as its secondary, so the slot would resolve to two people at once; give the secondary its own name",
-            ),
+            Self::Rule(e) => write!(f, "{e}"),
         }
     }
 }
 
 impl std::error::Error for RotationError {}
 
-impl Rotation {
-    /// A weekly rotation handing over at `anchor_micros`, in the default slot.
+impl ShiftRule {
+    /// A weekly rule handing over at `anchor_micros`.
     pub fn weekly(name: impl Into<String>, members: Vec<String>, anchor_micros: i64) -> Self {
         Self {
             name: name.into(),
-            slot: default_slot(),
             members,
             shift_micros: MICROS_PER_WEEK,
             anchor_micros,
@@ -385,60 +267,24 @@ impl Rotation {
             restrictions: Vec::new(),
             starts_at: None,
             ends_at: None,
-            secondary_offset: None,
-            secondary_slot: None,
-            source: None,
         }
     }
 
-    /// The same rotation, staffing a named slot.
-    pub fn in_slot(mut self, slot: impl Into<String>) -> Self {
-        self.slot = slot.into();
-        self
-    }
-
-    /// The same rotation with an explicit derived-secondary offset. `1` is the
-    /// shadow-then-lead shape.
-    pub fn with_secondary_offset(mut self, offset: u32) -> Self {
-        self.secondary_offset = Some(offset);
-        self
-    }
-
-    /// The same rotation, with its derived second position declared as a slot
-    /// of its own — one roster filling two places.
-    pub fn deriving(mut self, slot: impl Into<String>) -> Self {
-        self.secondary_slot = Some(slot.into());
-        self
-    }
-
-    /// The same rotation, marked as the one the system staffed rather than one
-    /// somebody chose.
-    pub fn from_default(mut self) -> Self {
-        self.source = Some(SOURCE_DEFAULT.to_string());
-        self
-    }
-
-    /// The offset this rotation actually resolves its secondary with.
+    /// The same rule, shifted `shifts` handovers earlier.
     ///
-    /// Clamped into `1..=len-1` rather than validated, for the reason
-    /// [`RotationError::ZeroSecondaryOffset`] gives: a roster that shrinks
-    /// under a stored offset must keep paging somebody. `len - 1` is the
-    /// furthest usable value — one more wraps onto the primary, and a
-    /// secondary who is the primary is not an escalation.
-    ///
-    /// Deterministic in the rotation alone: same members, same answer, on
-    /// every node and after any number of replays.
-    pub fn resolved_secondary_offset(&self) -> u32 {
-        let len = self.members.len();
-        let requested = self
-            .secondary_offset
-            .unwrap_or_else(|| default_secondary_offset(len));
-        requested.clamp(1, (len.saturating_sub(1) as u32).max(1))
-    }
-
-    /// Whether this rotation staffs `slot`.
-    pub fn is_in_slot(&self, slot: &str) -> bool {
-        same_slot(&self.slot, slot)
+    /// **This is the whole "secondary" mechanism**, and it is deliberately a
+    /// plain constructor rather than anything the resolver knows about. A
+    /// rotation built with `offset_from(primary, 1)` holds the person who takes
+    /// over next, for as long as nobody edits either — and when somebody does,
+    /// the two drift and a `config-risks` warning says so, rather than a hidden
+    /// rule quietly keeping them in step.
+    pub fn offset_from(other: &ShiftRule, shifts: i64) -> Self {
+        Self {
+            anchor_micros: other
+                .anchor_micros
+                .saturating_sub(shifts.saturating_mul(other.shift_micros)),
+            ..other.clone()
+        }
     }
 
     /// Whether the layer itself is live at `at`, ignoring its restrictions.
@@ -464,43 +310,26 @@ impl Rotation {
                 || self.restrictions.iter().any(|w| w.contains(at_micros, tz)))
     }
 
-    pub fn validate(&self) -> Result<(), RotationError> {
+    pub fn validate(&self) -> Result<(), ShiftRuleError> {
         if self.name.trim().is_empty() {
-            return Err(RotationError::NoName);
-        }
-        if self.slot.trim().is_empty() || self.slot.chars().count() > MAX_SLOT_CHARS {
-            return Err(RotationError::BadSlot(self.slot.clone()));
+            return Err(ShiftRuleError::NoName);
         }
         if self.members.is_empty() {
-            return Err(RotationError::NoMembers);
+            return Err(ShiftRuleError::NoMembers);
         }
         if self.shift_micros <= 0 {
-            return Err(RotationError::NonPositiveShift(self.shift_micros));
-        }
-        if self.secondary_offset == Some(0) {
-            return Err(RotationError::ZeroSecondaryOffset);
-        }
-        if let Some(derived) = &self.secondary_slot {
-            if derived.trim().is_empty() || derived.chars().count() > MAX_SLOT_CHARS {
-                return Err(RotationError::BadSlot(derived.clone()));
-            }
-            // Staffing both positions of one slot from one roster would put two
-            // different people in the same place and let the ladder page the
-            // slot twice, which is the failure this field exists to prevent.
-            if same_slot(derived, &self.slot) {
-                return Err(RotationError::SecondarySlotIsItsOwn(derived.clone()));
-            }
+            return Err(ShiftRuleError::NonPositiveShift(self.shift_micros));
         }
         let mut seen = std::collections::HashSet::with_capacity(self.members.len());
         for m in &self.members {
             if !seen.insert(m.to_ascii_lowercase()) {
-                return Err(RotationError::DuplicateMember(m.clone()));
+                return Err(ShiftRuleError::DuplicateMember(m.clone()));
             }
         }
         if let (Some(starts_at), Some(ends_at)) = (self.starts_at, self.ends_at)
             && ends_at <= starts_at
         {
-            return Err(RotationError::EmptyValidityWindow { starts_at, ends_at });
+            return Err(ShiftRuleError::EmptyValidityWindow { starts_at, ends_at });
         }
         Ok(())
     }
@@ -704,45 +533,32 @@ fn from_local_micros(local: i64, tz: chrono_tz::Tz) -> Option<i64> {
     }
 }
 
-/// Everyone on call for a team at an instant, one entry per staffed level.
+/// Who one rotation puts on call at an instant.
+///
+/// One per rotation, and a rotation is the only thing that produces one — the
+/// previous shape had an entry per *slot*, where a slot could exist because
+/// something derived it rather than because anybody staffed it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct OnCallSlot {
-    /// Which slot this staffs — `primary`, `secondary`, or whatever the team
-    /// named one. One entry per slot in force, so a team running a senior pool
-    /// behind a junior one gets two, resolved independently and at the same
-    /// instant.
-    #[serde(default = "default_slot")]
-    pub slot: String,
-    /// The rotation that produced this.
-    pub rotation: String,
+pub struct OnCallPosition {
+    /// The rotation's id. What a level of the escalation policy points at.
+    pub rotation_id: String,
+    /// The rotation's name, for a human reading a page or a calendar.
+    pub rotation_name: String,
+    /// Which shift rule inside it produced this answer.
+    pub rule: String,
     pub user_email: String,
-    /// Who it hands over to. `None` when the rotation has one member, because
-    /// then there is nobody else and saying otherwise would be a lie.
+    /// Who takes over at the next handover.
+    ///
+    /// **Display only.** Nothing pages this: it is the calendar's "up next",
+    /// and it used to double as the secondary, which is precisely how one team
+    /// got two different people both correctly labelled "the secondary".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_user_email: Option<String>,
-    /// How many handovers along the rotation `next_user_email` was found.
-    ///
-    /// Present so a screen can say "derived from the rotation, +5" instead of
-    /// naming somebody and leaving the reader to work out why them. Absent
-    /// when there is no next, and absent for a slot staffed by a cover over no
-    /// rotation, because then there is no rotation for the number to describe.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_offset: Option<u32>,
-    /// The override that put this person on call, if one did.
-    ///
-    /// Present so a page — and the schedule screen — can say *why* somebody
-    /// who is not on the rotation is holding the pager. Without it a cover
-    /// looks identical to a rotation somebody edited by hand.
+    /// Set when a cover, rather than a shift rule, put this person here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub override_id: Option<String>,
 }
 
-fn default_rotation_name() -> String {
-    "Rotation".to_string()
-}
-
-/// What the resolved schedule calls a slot an override produced when no layer
-/// was in force underneath it — a cover over a coverage gap.
 pub const OVERRIDE_ROTATION_NAME: &str = "Override";
 
 /// One person taking a bounded slice of somebody else's on-call.
@@ -756,15 +572,13 @@ pub struct ScheduleOverride {
     pub id: String,
     pub org_id: String,
     pub team_id: String,
-    /// Which slot is being covered. `None` is the default slot, which is what
-    /// every override written before slots existed meant.
+    /// Which rotation is being covered.
     ///
-    /// A cover has to name a slot for the same reason a rung does: without one,
-    /// arranging cover for the primary would silently put the same person in
-    /// the secondary as well, and the ladder would page them twice and call the
-    /// second one an escalation.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub slot: Option<String>,
+    /// A cover names a rotation for the same reason a level does: a cover is
+    /// "stand in for this position", and a position is a rotation. Covering two
+    /// of them is two covers, said out loud, rather than one cover that
+    /// silently lands the same person in both.
+    pub rotation_id: String,
     /// Who is actually holding the pager for this window.
     pub user_email: String,
     /// Inclusive.
@@ -783,12 +597,9 @@ pub struct ScheduleOverride {
 }
 
 impl ScheduleOverride {
-    /// Which slot this cover stands over. An absent one means the default.
-    pub fn slot(&self) -> &str {
-        match self.slot.as_deref() {
-            Some(s) if !s.trim().is_empty() => s,
-            _ => DEFAULT_SLOT,
-        }
+    /// Whether this cover stands over `rotation_id`.
+    pub fn is_for(&self, rotation_id: &str) -> bool {
+        self.rotation_id == rotation_id
     }
 
     /// Whether this override is the one in force at `at`.
@@ -873,538 +684,334 @@ pub fn is_unavailable(unavailability: &[Unavailability], user_email: &str, at: i
 ///
 /// This is `architecture/02` §5's rule — "latest `created_at` wins for the
 /// overlapping interval" — stated once, here, so nothing else has to decide it.
-pub fn covering_override(overrides: &[ScheduleOverride], at: i64) -> Option<&ScheduleOverride> {
-    covering_override_in_slot(overrides, DEFAULT_SLOT, at)
-}
-
-/// The override in force over one slot at `at`.
+/// The override in force over one rotation at `at`.
 ///
-/// Covers do not cross slots: arranging cover for the primary says nothing
-/// about who backs them up, and letting one cover claim every slot at once
-/// would collapse a two-pool team into one person for the length of the window.
-pub fn covering_override_in_slot<'a>(
+/// Covers do not cross rotations: arranging cover for the primary says nothing
+/// about who backs them up, and letting one cover claim every position at once
+/// would collapse a two-rotation team into one person for the length of the
+/// window.
+pub fn covering_override_for<'a>(
     overrides: &'a [ScheduleOverride],
-    slot: &str,
+    rotation_id: &str,
     at: i64,
 ) -> Option<&'a ScheduleOverride> {
     overrides
         .iter()
-        .filter(|o| o.covers(at) && same_slot(o.slot(), slot))
+        .filter(|o| o.covers(at) && o.is_for(rotation_id))
         .max_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.id.cmp(&b.id)))
 }
 
-/// Every slot a schedule staffs, the default one first and the rest in the
-/// order they appear.
+pub fn covering_override<'a>(
+    overrides: &'a [ScheduleOverride],
+    rotation_id: &str,
+    at: i64,
+) -> Option<&'a ScheduleOverride> {
+    covering_override_for(overrides, rotation_id, at)
+}
+
+fn default_rule_name() -> String {
+    "On-call rotation".to_string()
+}
+
+/// A named position, and the only thing in this system that puts a person on
+/// call.
 ///
-/// The default leads because it is the one a screen reads first and the one
-/// every rung means when it does not say; the rest keep the stored order so
-/// that reordering the array in the editor is the only thing that reorders the
-/// calendar.
-pub fn slots(rotations: &[Rotation]) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    for r in rotations.iter().filter(|r| r.validate().is_ok()) {
-        if !out.iter().any(|s| same_slot(s, &r.slot)) {
-            out.push(r.slot.clone());
+/// This is Zenduty's *schedule* and incident.io's *rota*. It resolves to
+/// **exactly one person** at any instant — several people on call means several
+/// rotations, and that is what a level of the escalation policy is for.
+///
+/// It replaced a `slot: String` field on what is now [`ShiftRule`]. The
+/// difference is not spelling. A slot was a name that *anything* could claim,
+/// including a rule that merely declared it derived one, so a position could
+/// exist without a roster behind it — and when a team then staffed it properly,
+/// the two sources disagreed at the first instant the explicit one did not
+/// apply. A rotation exists because a row exists. Delete it and the position is
+/// gone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct Rotation {
+    pub id: String,
+    /// What a level of the escalation policy names it, and what a page calls
+    /// it. Renameable — levels store the id, so a typo fix cannot move who gets
+    /// paged.
+    pub name: String,
+    /// The stack. Highest priority whose restrictions match at `at` wins, and
+    /// exactly one of them does.
+    ///
+    /// Follow-the-sun is several rules **here**, in one rotation — not several
+    /// rotations. Two rotations are two people on call; three regional rules
+    /// are one person on call across three timezones' working hours.
+    #[serde(default)]
+    pub shift_rules: Vec<ShiftRule>,
+    /// Where this rotation came from. `Some("default")` marks one the system
+    /// staffed when the team was created.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+}
+
+impl Rotation {
+    /// A rotation with one weekly rule — the simple case, and what team
+    /// creation writes.
+    pub fn weekly(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        members: Vec<String>,
+        anchor_micros: i64,
+    ) -> Self {
+        let name = name.into();
+        Self {
+            id: id.into(),
+            shift_rules: vec![ShiftRule::weekly(name.clone(), members, anchor_micros)],
+            name,
+            source: None,
         }
     }
-    // Declared derived positions, after the slots something staffs directly —
-    // a rotation that fills a slot itself outranks one that derives it, and
-    // ordering them second is what makes that true without a special case at
-    // every call site.
-    //
-    // Only when the roster can actually fill it: a one-person rotation has no
-    // next, so declaring the slot would manufacture a permanent coverage gap
-    // out of a team that is fine.
-    for r in rotations.iter().filter(|r| r.validate().is_ok()) {
-        if let Some(derived) = &r.secondary_slot
-            && r.members.len() >= 2
-            && !out.iter().any(|s| same_slot(s, derived))
-        {
-            out.push(derived.clone());
+
+    /// The same roster and cadence as `other`, every rule shifted `shifts`
+    /// handovers earlier.
+    ///
+    /// **This is what "create a Secondary" means, in full.** The result is an
+    /// ordinary rotation: no link is stored, nothing at resolution time knows
+    /// the two are related, and editing either is allowed. Two rotations built
+    /// this way cannot resolve to the same person while the roster holds two or
+    /// more people — and if somebody edits one roster and not the other, the
+    /// collision is *reported* by `colliding_rotations` rather than prevented by
+    /// a hidden rule.
+    ///
+    /// The mechanism it replaced computed the second person from the first's
+    /// roster at resolution time, so the position existed whether or not
+    /// anybody staffed it.
+    pub fn offset_from(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        other: &Rotation,
+        shifts: i64,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            shift_rules: other
+                .shift_rules
+                .iter()
+                .map(|r| ShiftRule::offset_from(r, shifts))
+                .collect(),
+            source: other.source.clone(),
         }
     }
-    // And the implicit one, last: anything staffed directly or declared
-    // explicitly has already claimed its name, so this only ever adds
-    // `secondary` to a team that has not spoken about it — which is most teams.
-    if !out.iter().any(|s| same_slot(s, SECONDARY_SLOT))
-        && rotations
+
+    pub fn validate(&self) -> Result<(), RotationError> {
+        if self.name.trim().is_empty() || self.name.chars().count() > MAX_ROTATION_NAME_CHARS {
+            return Err(RotationError::NoName(self.name.clone()));
+        }
+        if self.shift_rules.is_empty() {
+            return Err(RotationError::NoShiftRules);
+        }
+        for rule in &self.shift_rules {
+            rule.validate().map_err(RotationError::Rule)?;
+        }
+        Ok(())
+    }
+
+    /// The shift rule in force at `at`.
+    ///
+    /// Only rules inside their validity window are considered — a retired rule
+    /// is not a rule — and then the highest priority among those whose
+    /// restrictions match wins; ties break on the more specific rule (one WITH
+    /// restrictions beats the catch-all), then on anchor order so the answer is
+    /// stable across nodes. That last tiebreak matters more than it looks: two
+    /// equally-specific rules is a configuration mistake, but it must still
+    /// resolve the same way everywhere rather than depending on row order.
+    pub fn winning_rule(&self, at: i64, tz: chrono_tz::Tz) -> Option<&ShiftRule> {
+        self.shift_rules
             .iter()
-            .any(Rotation::derives_secondary_implicitly)
-    {
-        out.push(SECONDARY_SLOT.to_string());
+            .filter(|r| r.validate().is_ok() && r.applies_at(at, tz))
+            .max_by(|a, b| {
+                a.priority
+                    .cmp(&b.priority)
+                    .then_with(|| a.restrictions.len().cmp(&b.restrictions.len()))
+                    .then_with(|| b.anchor_micros.cmp(&a.anchor_micros))
+            })
     }
-    if let Some(pos) = out.iter().position(|s| same_slot(s, DEFAULT_SLOT))
-        && pos > 0
-    {
-        let default = out.remove(pos);
-        out.insert(0, default);
+
+    /// Who holds this rotation at `at`.
+    ///
+    /// **A cover outranks every rule, and outranks an absence.** Somebody who
+    /// claims a window has said out loud that they will take it, and the product
+    /// must not decide it knows better because their leave calendar disagrees —
+    /// the commonest reason for the two to overlap is precisely that they cut a
+    /// holiday short to cover.
+    ///
+    /// `None` is a coverage gap, reported by the sweep, never a silently
+    /// dropped page.
+    pub fn on_call(
+        &self,
+        overrides: &[ScheduleOverride],
+        unavailability: &[Unavailability],
+        at: i64,
+        tz: chrono_tz::Tz,
+    ) -> Option<String> {
+        if let Some(ov) = covering_override_for(overrides, &self.id, at) {
+            return Some(ov.user_email.clone());
+        }
+        self.winning_rule(at, tz)?
+            .available_member_at(at, tz, unavailability)
+            .map(str::to_string)
     }
-    out
-}
 
-/// The rotation in force for one level at `at`.
-///
-/// Only layers inside their validity window are considered — a retired layer
-/// is not a layer — and then the highest priority among those whose
-/// restrictions match wins; ties break on the more specific rotation (one WITH
-/// restrictions beats the catch-all), then on anchor order so the answer is
-/// stable across nodes. That last tiebreak
-/// matters more than it looks: two equally-specific layers is a configuration
-/// mistake, but it must still resolve the same way everywhere rather than
-/// depending on row order.
-pub fn winning_rotation(
-    rotations: &[Rotation],
-    at: i64,
-    tz: chrono_tz::Tz,
-) -> Option<&Rotation> {
-    winning_rotation_in_slot(rotations, DEFAULT_SLOT, at, tz)
-}
+    /// Who takes over at the next handover. **Display only** — see
+    /// [`OnCallPosition::next_user_email`].
+    pub fn next_holder(
+        &self,
+        unavailability: &[Unavailability],
+        at: i64,
+        tz: chrono_tz::Tz,
+    ) -> Option<String> {
+        let rule = self.winning_rule(at, tz)?;
+        let next_at = rule.next_handover(at, tz)?;
+        rule.available_member_at(next_at, tz, unavailability)
+            .map(str::to_string)
+    }
 
-/// The rotation in force for one **slot** at `at`.
-///
-/// Layering is a within-slot question and this is where that is enforced: the
-/// candidates are filtered to the slot first, and the priority/restriction
-/// contest is run over those alone. A follow-the-sun team whose layers all sit
-/// in the default slot therefore resolves exactly as it did before slots
-/// existed — the filter admits all of them — while a secondary slot beside it
-/// runs its own, separate contest at the same instant.
-pub fn winning_rotation_in_slot<'a>(
-    rotations: &'a [Rotation],
-    slot: &str,
-    at: i64,
-    tz: chrono_tz::Tz,
-) -> Option<&'a Rotation> {
-    rotations
-        .iter()
-        .filter(|r| r.is_in_slot(slot) && r.validate().is_ok() && r.applies_at(at, tz))
-        .max_by(|a, b| {
-            a.priority
-                .cmp(&b.priority)
-                .then_with(|| a.restrictions.len().cmp(&b.restrictions.len()))
-                .then_with(|| b.anchor_micros.cmp(&a.anchor_micros))
+    /// Everyone on the rotation's winning rule, on shift or not.
+    ///
+    /// The covering person is appended when they are not already on the roster.
+    /// This is a broadcast, and a broadcast that leaves out the one person
+    /// actually holding the pager is not one. The covered engineer is *not*
+    /// removed for the same reason: they are still on the team, and shrinking
+    /// it to arrange a night off is how a page reaches an empty room.
+    ///
+    /// The **away** are removed, and that is a different judgement: a cover is a
+    /// night off from a shift, an absence is not being there at all. When it
+    /// empties the level the ladder advances immediately, and `WholeTeam` — the
+    /// level below this one in every shipped ladder — ignores absence entirely,
+    /// so a page still has somewhere to go.
+    pub fn everyone(
+        &self,
+        overrides: &[ScheduleOverride],
+        unavailability: &[Unavailability],
+        at: i64,
+        tz: chrono_tz::Tz,
+    ) -> Vec<String> {
+        let mut out: Vec<String> = self
+            .winning_rule(at, tz)
+            .map(|r| r.members.clone())
+            .unwrap_or_default();
+        if let Some(ov) = covering_override_for(overrides, &self.id, at)
+            && !out.iter().any(|m| m.eq_ignore_ascii_case(&ov.user_email))
+        {
+            out.push(ov.user_email.clone());
+        }
+        out.retain(|m| !is_unavailable(unavailability, m, at));
+        out
+    }
+
+    /// The rotation's answer at `at`, as the calendar and the page both read it.
+    pub fn position_at(
+        &self,
+        overrides: &[ScheduleOverride],
+        unavailability: &[Unavailability],
+        at: i64,
+        tz: chrono_tz::Tz,
+    ) -> Option<OnCallPosition> {
+        let cover = covering_override_for(overrides, &self.id, at);
+        let rule = self.winning_rule(at, tz);
+        let user_email = match cover {
+            Some(ov) => ov.user_email.clone(),
+            None => rule?
+                .available_member_at(at, tz, unavailability)
+                .map(str::to_string)?,
+        };
+        Some(OnCallPosition {
+            rotation_id: self.id.clone(),
+            rotation_name: self.name.clone(),
+            rule: rule
+                .map(|r| r.name.clone())
+                .unwrap_or_else(|| OVERRIDE_ROTATION_NAME.to_string()),
+            user_email,
+            next_user_email: self.next_holder(unavailability, at, tz),
+            override_id: cover.map(|o| o.id.clone()),
         })
+    }
 }
 
-/// Who is on call at `at`, one slot per rotation in force.
+/// Who is on call across a team, one entry per rotation.
 ///
-/// Rotations that fail validation are skipped rather than defaulted, so a
-/// broken one shows up as nobody on call — which is visible — instead of
-/// silently paging the wrong person.
-///
-/// Step 1 of §3b's resolution is the override, so it is step 1 here: a cover
-/// standing over a coverage gap still staffs the slot, and the slot names the
-/// rotation underneath it when there is one so the screen can say what the
-/// override displaced.
+/// A rotation that resolves to nobody is **absent** from the result rather than
+/// present-and-empty: that is a coverage gap, and the sweep is what reports it.
 pub fn resolve_on_call(
     rotations: &[Rotation],
     overrides: &[ScheduleOverride],
     unavailability: &[Unavailability],
     at: i64,
     tz: chrono_tz::Tz,
-) -> Vec<OnCallSlot> {
-    let mut names = slots(rotations);
-    // A cover can staff a slot that has no rotation underneath it at all —
-    // somebody taking the pager for a weekend the schedule does not cover. That
-    // slot has to appear, or the one person actually holding it is invisible.
-    for ov in overrides.iter().filter(|o| o.covers(at)) {
-        if !names.iter().any(|s| same_slot(s, ov.slot())) {
-            names.push(ov.slot().to_string());
-        }
-    }
-    names
-        .into_iter()
-        .filter_map(|slot| {
-            let winner = winning_rotation_in_slot(rotations, &slot, at, tz);
-            let next = next_on_call_in_slot(rotations, overrides, unavailability, &slot, at, tz);
-            // Only the rotation can say how far along the roster the next
-            // person is, so a slot held by a cover over no rotation reports no
-            // offset rather than an invented one.
-            let next_offset = next
-                .is_some()
-                .then(|| winner.map(Rotation::resolved_secondary_offset))
-                .flatten();
-            if let Some(ov) = covering_override_in_slot(overrides, &slot, at) {
-                return Some(OnCallSlot {
-                    rotation: winner
-                        .map(|r| r.name.clone())
-                        .unwrap_or_else(|| OVERRIDE_ROTATION_NAME.to_string()),
-                    user_email: ov.user_email.clone(),
-                    next_user_email: next,
-                    next_offset,
-                    override_id: Some(ov.id.clone()),
-                    slot,
-                });
-            }
-            // A slot nothing staffs directly may still be a *declared derived*
-            // position, and this is the read `/on-call` is built from.
-            //
-            // It was missed when derived slots landed: `slots()` reported the
-            // name and `on_call_in_slot` resolved it, but this function asked
-            // `winning_rotation_in_slot` — which only matches a rotation's own
-            // slot — and `let r = winner?` dropped the entry on the floor. So
-            // the slot existed everywhere except the one place a person looks,
-            // and a team was told "nobody backs this rotation up" while a cover
-            // written into that same slot appeared correctly, because the
-            // override arm above matches by name and returns before this point.
-            let (rotation_name, holder) = match winner {
-                Some(r) => (
-                    r.name.clone(),
-                    r.available_member_at(at, tz, unavailability)?.to_string(),
-                ),
-                None => {
-                    let owner = deriving_rotation(rotations, &slot, at, tz)?;
-                    (
-                        owner.name.clone(),
-                        derived_holder(rotations, overrides, unavailability, &slot, at, tz)?,
-                    )
-                }
-            };
-            Some(OnCallSlot {
-                rotation: rotation_name,
-                user_email: holder,
-                next_user_email: next,
-                next_offset,
-                override_id: None,
-                slot,
-            })
-        })
+) -> Vec<OnCallPosition> {
+    rotations
+        .iter()
+        .filter(|r| r.validate().is_ok())
+        .filter_map(|r| r.position_at(overrides, unavailability, at, tz))
         .collect()
 }
 
-/// The person on call at `at` in the default slot.
+/// Every person a team currently has on call, across every rotation, deduped.
 ///
-/// An override beats every layer, including a layer somebody set to the
-/// highest priority in the schedule. That is the whole point of a cover: it is
-/// the last word, and it is the reason it does not need an approval workflow.
-pub fn on_call_now(
-    rotations: &[Rotation],
-    overrides: &[ScheduleOverride],
-    unavailability: &[Unavailability],
-    at: i64,
-    tz: chrono_tz::Tz,
-) -> Option<String> {
-    on_call_in_slot(rotations, overrides, unavailability, DEFAULT_SLOT, at, tz)
-}
-
-/// The person on call at `at` in one slot.
-///
-/// **An override outranks an absence.** Somebody who claims a window has said
-/// out loud that they will take it, and the product must not decide it knows
-/// better because their leave calendar disagrees — the commonest reason for the
-/// two to overlap is precisely that they cut a holiday short to cover. An
-/// absence is a default about who *should* be given a shift; a cover is a
-/// statement about who *has* one.
-pub fn on_call_in_slot(
-    rotations: &[Rotation],
-    overrides: &[ScheduleOverride],
-    unavailability: &[Unavailability],
-    slot: &str,
-    at: i64,
-    tz: chrono_tz::Tz,
-) -> Option<String> {
-    if let Some(ov) = covering_override_in_slot(overrides, slot, at) {
-        return Some(ov.user_email.clone());
-    }
-    if let Some(r) = winning_rotation_in_slot(rotations, slot, at, tz) {
-        return r
-            .available_member_at(at, tz, unavailability)
-            .map(str::to_string);
-    }
-    // Nothing staffs this slot directly. It may still be a *declared derived*
-    // position — one roster filling two places — in which case the answer is
-    // the person an offset ahead on the rotation that declared it.
-    //
-    // Deliberately after the direct lookup, so a real rotation always wins:
-    // declaring a derived slot must never quietly displace one somebody
-    // staffed on purpose.
-    derived_holder(rotations, overrides, unavailability, slot, at, tz)
-}
-
-/// The person filling a slot that some rotation *derives* rather than staffs.
-///
-/// Delegates to [`next_on_call_in_slot`] against the declaring rotation's own
-/// slot, so this position inherits every exclusion that one already makes: the
-/// coverer of the primary cannot also be the secondary, and away members are
-/// walked past rather than paged on a beach.
-fn derived_holder(
-    rotations: &[Rotation],
-    overrides: &[ScheduleOverride],
-    unavailability: &[Unavailability],
-    slot: &str,
-    at: i64,
-    tz: chrono_tz::Tz,
-) -> Option<String> {
-    let owner = deriving_rotation(rotations, slot, at, tz)?;
-    next_on_call_in_slot(rotations, overrides, unavailability, &owner.slot, at, tz)
-}
-
-/// The rotation that declares `slot` as its derived second position, if any.
-///
-/// Split out because two callers need it and they must not disagree: whether a
-/// derived slot resolves at all, and what `resolve_on_call` calls the rotation
-/// behind it. They did disagree once — see the note on [`resolve_on_call`].
-impl Rotation {
-    /// Whether this rotation staffs a **secondary** position without anybody
-    /// having said so.
-    ///
-    /// One roster with two or more people always has a "who is after the person
-    /// on call" — the calendar draws it. Requiring a field to be *written*
-    /// before that position could be covered is what left teams created before
-    /// the field existed, or by any client that does not set it, with a
-    /// secondary they could see and could not act on: `POST .../overrides
-    /// {"slot":"secondary"}` was refused because `slots()` never reported it.
-    ///
-    /// Deriving it implicitly removes the timing problem entirely — there is no
-    /// marker to backfill, no member-add to wait for, and no "automatic, but
-    /// only for teams created after Tuesday".
-    ///
-    /// Only from the **default** slot: a rotation that already staffs some other
-    /// named position is somebody's design, and inventing a second position off
-    /// it would be inventing a pool nobody asked for.
-    pub fn derives_secondary_implicitly(&self) -> bool {
-        self.secondary_slot.is_none()
-            && self.members.len() >= 2
-            && self.is_in_slot(DEFAULT_SLOT)
-            && self.validate().is_ok()
-    }
-}
-
-fn deriving_rotation<'a>(
-    rotations: &'a [Rotation],
-    slot: &str,
-    at: i64,
-    tz: chrono_tz::Tz,
-) -> Option<&'a Rotation> {
-    let declared = rotations.iter().find(|r| {
-        r.secondary_slot
-            .as_deref()
-            .is_some_and(|d| same_slot(d, slot))
-            && r.validate().is_ok()
-            && r.applies_at(at, tz)
-    });
-    if declared.is_some() {
-        return declared;
-    }
-    // The implicit case: nobody wrote the field, and the default slot's winner
-    // has somebody after them. Resolved from whichever primary-slot rotation is
-    // winning at `at`, so a follow-the-sun schedule derives its secondary from
-    // the layer actually on duty rather than from whichever happens to be first
-    // in the list.
-    if !same_slot(slot, SECONDARY_SLOT) {
-        return None;
-    }
-    winning_rotation_in_slot(rotations, DEFAULT_SLOT, at, tz)
-        .filter(|r| r.derives_secondary_implicitly())
-}
-
-/// The person the rotation in force hands over to next.
-///
-/// `None` for a single-member rotation: there is no next, and returning the
-/// same person would page them twice and call it an escalation.
-///
-/// An override does not change who the *rotation* hands over to — it takes a
-/// slot, it does not reorder the roster — with one exception: the next must
-/// never be the person already covering. Otherwise a two-person rotation with
-/// a cover on it would page the same engineer on rung one and rung two, and
-/// call the second one an escalation. When the roster's next is the coverer,
-/// the one after them is used.
-/// It stays a **within-slot** question once slots exist: `NextOnCall` is the
-/// person this slot's rotation hands over to next, not the person holding some
-/// other slot. Reading it as "whoever staffs the secondary slot" would have
-/// rewritten every stored ladder the moment a team added a second slot —
-/// silently, and in the direction of paging somebody who had never agreed to
-/// be second. A rung that wants the other pool says so, by naming it.
-pub fn next_on_call(
-    rotations: &[Rotation],
-    overrides: &[ScheduleOverride],
-    unavailability: &[Unavailability],
-    at: i64,
-    tz: chrono_tz::Tz,
-) -> Option<String> {
-    next_on_call_in_slot(
-        rotations,
-        overrides,
-        unavailability,
-        DEFAULT_SLOT,
-        at,
-        tz,
-    )
-}
-
-/// The person one slot's rotation hands over to next.
-///
-/// Skips the covering engineer (they already hold rung one) and skips anybody
-/// away — the second rung is no better a place to wake somebody on a beach than
-/// the first.
-///
-/// # How the offset and the absence skip compose
-///
-/// Two rules meet here and the order they are applied in is the whole of the
-/// behaviour.
-///
-/// 1. **The offset is measured from the roster, not from the primary.** The
-///    secondary is the member `offset` handovers along the rotation's own
-///    handover order — position `offset` in [`Rotation::order_at`] — which is
-///    where they would be if nobody were away at all.
-/// 2. **The absence skip only moves the away person's own turn.** Applied to
-///    the primary it advances `held_by`; applied to the secondary it advances
-///    past whoever is out. Neither drags the other along.
-///
-/// Taking `max(held_by + 1, offset)` as the starting position is what stops
-/// the **double-skip**: an absent member at the front of the order advances
-/// the primary, and if that advance were also added to the offset the pair
-/// would jump two positions between them and the secondary of a team with one
-/// person on holiday would be a different person every week. It is not — with
-/// `[a b c d e f]` and offset 3, `a` away moves the primary from `a` to `b`
-/// and leaves the secondary at `d`, exactly where it was.
-///
-/// The `max` earns its keep at small offsets, where the two rules collide: on
-/// offset 1 with `a` away, position 1 *is* the primary, so the walk starts at
-/// `held_by + 1` and the secondary is the next person after them. The
-/// secondary is never the primary, whichever rule would have put them there.
-pub fn next_on_call_in_slot(
-    rotations: &[Rotation],
-    overrides: &[ScheduleOverride],
-    unavailability: &[Unavailability],
-    slot: &str,
-    at: i64,
-    tz: chrono_tz::Tz,
-) -> Option<String> {
-    let r = winning_rotation_in_slot(rotations, slot, at, tz)?;
-    if r.members.len() < 2 {
-        return None;
-    }
-    let order = r.order_at(at, tz);
-    // Where the roster's own handover order has actually got to. Normally the
-    // person on shift; one further along for each consecutive member at the
-    // front who is away. A cover does NOT move it — a coverer takes a slot, it
-    // does not reorder the roster — which is why this is computed from the
-    // rotation alone and the cover is only excluded below.
-    let held_by = order
-        .iter()
-        .position(|m| !is_unavailable(unavailability, m, at))?;
-    let from = (held_by + 1).max(r.resolved_secondary_offset() as usize);
-    let covering =
-        covering_override_in_slot(overrides, slot, at).map(|o| o.user_email.to_ascii_lowercase());
-    let eligible = |candidate: &str| {
-        covering.as_deref() != Some(candidate.to_ascii_lowercase().as_str())
-            && !is_unavailable(unavailability, candidate, at)
-    };
-    // Bounded by the rotation length: walking further would wrap back onto
-    // somebody already considered.
-    //
-    // The fallback is the pre-offset rule, and it is a coverage decision, not
-    // a tidiness one. If everybody from the offset onwards is away or is the
-    // coverer, the alternative is to report no secondary at all — a second
-    // rung that pages nobody while somebody who could take it is sitting one
-    // position after the primary. Separation is a preference; reaching a human
-    // is not.
-    order
-        .iter()
-        .skip(from)
-        .find(|c| eligible(c))
-        .or_else(|| order.iter().skip(held_by + 1).find(|c| eligible(c)))
-        .map(|c| c.to_string())
-}
-
-/// Everyone in force **across every slot**, on shift or not.
-///
-/// Once a team runs a senior pool behind a junior one, "everyone on the
-/// schedule" that means only the junior pool is a broadcast of last resort with
-/// half the room left out. So it is the union, slot by slot, deduplicated, in
-/// slot order — which for a team with one slot is byte-for-byte the answer it
-/// gave before slots existed. The one rung that widens is the last one, and
-/// widening the last rung can add a person, never remove one.
-///
-/// A rung that means one pool says so with `EveryoneInSlot`.
-pub fn everyone_on_schedule(
+/// Used by the "who would this page reach" reads, not by any level: a level
+/// names one rotation.
+pub fn everyone_on_call(
     rotations: &[Rotation],
     overrides: &[ScheduleOverride],
     unavailability: &[Unavailability],
     at: i64,
     tz: chrono_tz::Tz,
 ) -> Vec<String> {
-    let mut names = slots(rotations);
-    for ov in overrides.iter().filter(|o| o.covers(at)) {
-        if !names.iter().any(|s| same_slot(s, ov.slot())) {
-            names.push(ov.slot().to_string());
-        }
-    }
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
-    for slot in names {
-        for m in everyone_in_slot(rotations, overrides, unavailability, &slot, at, tz) {
-            if seen.insert(m.to_ascii_lowercase()) {
-                out.push(m);
-            }
+    for p in resolve_on_call(rotations, overrides, unavailability, at, tz) {
+        if seen.insert(p.user_email.to_ascii_lowercase()) {
+            out.push(p.user_email);
         }
     }
     out
 }
 
-/// Everyone in one slot's rotation in force, on shift or not.
+/// Rotations that resolve to the **same person** at `at`.
 ///
-/// The covering person is appended when they are not already on the roster.
-/// This list is the broadcast of last resort (§7's level 3), and a last resort
-/// that leaves out the one person actually holding the pager is not one. The
-/// covered engineer is *not* removed for the same reason: they are still on the
-/// team, and shrinking the final rung to arrange a night off is how a page
-/// reaches an empty room.
+/// This is the check that replaces the old derived-secondary guarantee. That
+/// guarantee was structural — an offset of at least one could not collide — and
+/// it bought its safety by making the second position uneditable. Two ordinary
+/// rotations *can* collide, so the product says so instead:
 ///
-/// The **away** are removed, and that is a different judgement from the one
-/// above: a cover is a night off from a shift, an absence is not being there at
-/// all, and a broadcast that wakes somebody in another timezone on annual leave
-/// is the failure this feature exists to stop. When it empties the rung the
-/// ladder advances immediately and the team's coverage gap is already being
-/// reported a week ahead by the sweep — and `WholeTeam`, which is the rung
-/// below this one in every shipped ladder, ignores absence entirely, so a page
-/// still has somewhere to go.
-pub fn everyone_in_slot(
-    rotations: &[Rotation],
+/// > ⚠ Ana is on call in both Primary and Secondary from Tue 25 Aug.
+///
+/// Reporting beats preventing here, because it catches every cause — a roster
+/// edited on one side, an anchor dragged, a cover placed on both — where a
+/// stored link between two rotations would only ever have caught the first.
+pub fn colliding_rotations<'a>(
+    rotations: &'a [Rotation],
     overrides: &[ScheduleOverride],
     unavailability: &[Unavailability],
-    slot: &str,
     at: i64,
     tz: chrono_tz::Tz,
-) -> Vec<String> {
-    let mut members: Vec<String> = winning_rotation_in_slot(rotations, slot, at, tz)
-        .map(|r| {
-            r.members
-                .iter()
-                .filter(|m| !is_unavailable(unavailability, m, at))
-                .cloned()
-                .collect()
-        })
-        .unwrap_or_default();
-    if let Some(ov) = covering_override_in_slot(overrides, slot, at)
-        && !members
-            .iter()
-            .any(|m| m.eq_ignore_ascii_case(&ov.user_email))
-    {
-        members.push(ov.user_email.clone());
+) -> Vec<(String, Vec<&'a Rotation>)> {
+    let mut by_person: Vec<(String, Vec<&Rotation>)> = Vec::new();
+    for r in rotations.iter().filter(|r| r.validate().is_ok()) {
+        let Some(who) = r.on_call(overrides, unavailability, at, tz) else {
+            continue;
+        };
+        let key = who.to_ascii_lowercase();
+        match by_person.iter_mut().find(|(p, _)| *p == key) {
+            Some((_, rs)) => rs.push(r),
+            None => by_person.push((key, vec![r])),
+        }
     }
-    members
+    by_person.retain(|(_, rs)| rs.len() > 1);
+    by_person
 }
-
-// ── The resolved schedule ────────────────────────────────────────────────────
-//
-// `architecture/02` §3b: "Layers are an input. What a human needs to see is the
-// resolved result." Point-in-time resolution answers "who is on call now";
-// nobody can answer "who is on call at 3 AM on Sunday" from it without running
-// the precedence rules in their head, which is exactly what the layer model
-// was supposed to stop them doing.
-//
-// So: one function that walks a window and returns the sequence of holders,
-// overrides applied, gaps included rather than omitted. Computed on read, never
-// materialised, so it cannot drift from the layers that produced it.
 
 /// One stretch of time with one answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct CoverageSegment {
-    /// Which slot this stretch resolves. A grid is drawn one slot at a time —
-    /// two rows, not one row with two answers in it.
-    #[serde(default = "default_slot")]
-    pub slot: String,
+    /// Which rotation this stretch resolves. A grid is drawn one rotation at a
+    /// time — two rows, not one row with two answers in it.
+    pub rotation_id: String,
     /// Inclusive.
     pub from: i64,
     /// Exclusive.
@@ -1490,34 +1097,9 @@ const MAX_HANDOVERS_PER_ROTATION: usize = MAX_GRID_SEGMENTS;
 /// answer is constant by construction, so it is resolved once and adjacent
 /// stretches with the same answer are merged.
 pub fn resolve_window(
-    rotations: &[Rotation],
+    rotation: &Rotation,
     overrides: &[ScheduleOverride],
     unavailability: &[Unavailability],
-    from: i64,
-    to: i64,
-    tz: chrono_tz::Tz,
-) -> Result<Vec<CoverageSegment>, GridError> {
-    resolve_window_in_slot(
-        rotations,
-        overrides,
-        unavailability,
-        DEFAULT_SLOT,
-        from,
-        to,
-        tz,
-    )
-}
-
-/// The resolved holder of one slot across `[from, to)`.
-///
-/// One slot at a time rather than all of them interleaved: a grid with two
-/// answers in the same row is not a grid, and the caller that wants both draws
-/// two rows. [`slots`] says which to ask for.
-pub fn resolve_window_in_slot(
-    rotations: &[Rotation],
-    overrides: &[ScheduleOverride],
-    unavailability: &[Unavailability],
-    slot: &str,
     from: i64,
     to: i64,
     tz: chrono_tz::Tz,
@@ -1533,22 +1115,22 @@ pub fn resolve_window_in_slot(
         });
     }
 
-    let marks = candidate_boundaries(rotations, overrides, unavailability, slot, from, to, tz);
+    let marks = candidate_boundaries(rotation, overrides, unavailability, from, to, tz);
     let mut segments: Vec<CoverageSegment> = Vec::new();
     for (i, &start) in marks.iter().enumerate() {
         let end = marks.get(i + 1).copied().unwrap_or(to);
         if end <= start {
             continue;
         }
-        let (user_email, rotation, override_id) =
-            holder_at(rotations, overrides, unavailability, slot, start, tz);
+        let (user_email, rule, override_id) =
+            holder_at(rotation, overrides, unavailability, start, tz);
         match segments.last_mut() {
             // Two candidates that resolve the same way were not really a
-            // boundary — a restriction edge on a layer that was losing anyway,
+            // boundary — a restriction edge on a rule that was losing anyway,
             // most often. Merging keeps the grid readable.
             Some(last)
                 if last.user_email == user_email
-                    && last.rotation == rotation
+                    && last.rotation == rule
                     && last.override_id == override_id =>
             {
                 last.to = end;
@@ -1560,11 +1142,11 @@ pub fn resolve_window_in_slot(
                     });
                 }
                 segments.push(CoverageSegment {
-                    slot: slot.to_string(),
+                    rotation_id: rotation.id.clone(),
                     from: start,
                     to: end,
                     user_email,
-                    rotation,
+                    rotation: rule,
                     override_id,
                 });
             }
@@ -1573,17 +1155,20 @@ pub fn resolve_window_in_slot(
     Ok(segments)
 }
 
-/// Who holds one slot's pager at `at`, and what put them there.
+/// Who holds this rotation's pager at `at`, and what put them there.
+///
+/// The `deriving_rotation` arm that used to sit here is gone with the thing it
+/// served: a position with no rule of its own now simply has no holder, which
+/// is a gap, which is true.
 fn holder_at(
-    rotations: &[Rotation],
+    rotation: &Rotation,
     overrides: &[ScheduleOverride],
     unavailability: &[Unavailability],
-    slot: &str,
     at: i64,
     tz: chrono_tz::Tz,
 ) -> (Option<String>, Option<String>, Option<String>) {
-    let winner = winning_rotation_in_slot(rotations, slot, at, tz);
-    if let Some(ov) = covering_override_in_slot(overrides, slot, at) {
+    let winner = rotation.winning_rule(at, tz);
+    if let Some(ov) = covering_override_for(overrides, &rotation.id, at) {
         return (
             Some(ov.user_email.clone()),
             winner.map(|r| r.name.clone()),
@@ -1594,30 +1179,17 @@ fn holder_at(
         r.available_member_at(at, tz, unavailability)
             .map(|m| (r.name.clone(), m.to_string()))
     }) {
-        Some((rotation, member)) => (Some(member), Some(rotation), None),
-        // Same omission as `resolve_on_call` had, in the read the *calendar* is
-        // built from: a declared derived slot has no rotation of its own, so
-        // asking only `winning_rotation_in_slot` drew every segment of it as a
-        // gap. A row of empty cells is a strong claim — "nobody has this" — and
-        // it was false.
-        None => match deriving_rotation(rotations, slot, at, tz) {
-            Some(owner) => (
-                derived_holder(rotations, overrides, unavailability, slot, at, tz),
-                Some(owner.name.clone()),
-                None,
-            ),
-            None => (None, None, None),
-        },
+        Some((rule, member)) => (Some(member), Some(rule), None),
+        None => (None, None, None),
     }
 }
 
 /// Every instant in `[from, to)` at which the answer could change, sorted and
 /// deduplicated, always beginning with `from`.
 fn candidate_boundaries(
-    rotations: &[Rotation],
+    rotation: &Rotation,
     overrides: &[ScheduleOverride],
     unavailability: &[Unavailability],
-    slot: &str,
     from: i64,
     to: i64,
     tz: chrono_tz::Tz,
@@ -1630,7 +1202,7 @@ fn candidate_boundaries(
     };
 
     for ov in overrides {
-        if !ov.overlaps(from, to) || !same_slot(ov.slot(), slot) {
+        if !ov.overlaps(from, to) || !ov.is_for(&rotation.id) {
             continue;
         }
         push(ov.start_at, &mut marks);
@@ -1649,8 +1221,8 @@ fn candidate_boundaries(
         push(u.end_at, &mut marks);
     }
 
-    for r in rotations {
-        if r.validate().is_err() || !r.is_in_slot(slot) {
+    for r in &rotation.shift_rules {
+        if r.validate().is_err() {
             continue;
         }
         if let Some(s) = r.starts_at {
@@ -1686,7 +1258,7 @@ fn candidate_boundaries(
 /// same reason handovers are (§9): "09:00" is a wall-clock fact, and a day
 /// that gains or loses an hour must still have its window open at 09:00.
 fn restriction_boundaries(
-    r: &Rotation,
+    r: &ShiftRule,
     from: i64,
     to: i64,
     tz: chrono_tz::Tz,
@@ -1733,8 +1305,12 @@ fn restriction_boundaries(
 /// One shift a rotation's own order would give to somebody who is away.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct AwayShift {
-    pub slot: String,
+    /// Which rotation would hand it over.
+    pub rotation_id: String,
+    /// Its name, for the sentence a human reads.
     pub rotation: String,
+    /// Which shift rule inside it.
+    pub rule: String,
     /// Who the handover order names.
     pub user_email: String,
     /// The stretch of their shift that lands inside the absence. Inclusive.
@@ -1772,53 +1348,62 @@ pub fn away_assignments(
     if to <= from || limit == 0 || unavailability.is_empty() {
         return out;
     }
-    for r in rotations.iter().filter(|r| r.validate().is_ok()) {
-        let mut cursor = from;
-        for _ in 0..MAX_HANDOVERS_PER_ROTATION {
-            if cursor >= to || out.len() >= limit {
-                break;
-            }
-            let Some(shift_end) = r.next_handover(cursor, tz) else {
-                break;
-            };
-            let (start, end) = (cursor.max(from), shift_end.min(to));
-            // Monotonic by construction (see `shift_index`); the guard is here
-            // so a pathological zone cannot pin the loop on one instant.
-            if shift_end <= cursor {
-                break;
-            }
-            cursor = shift_end;
-            if end <= start {
+    for rotation in rotations.iter().filter(|r| r.validate().is_ok()) {
+        for r in &rotation.shift_rules {
+            if r.validate().is_err() {
                 continue;
             }
-            let Some(holder) = r.member_at(start, tz) else {
-                continue;
-            };
-            for u in unavailability
-                .iter()
-                .filter(|u| u.is(holder) && u.overlaps(start, end))
-            {
-                let (overlap_from, overlap_to) = (u.start_at.max(start), u.end_at.min(end));
-                // In force here? A layer that is losing the slot at this
-                // instant is not handing anybody anything.
-                if winning_rotation_in_slot(rotations, &r.slot, overlap_from, tz)
-                    .is_none_or(|w| w.name != r.name || w.slot != r.slot)
-                {
-                    continue;
-                }
-                if out.len() >= limit {
+            let mut cursor = from;
+            for _ in 0..MAX_HANDOVERS_PER_ROTATION {
+                if cursor >= to || out.len() >= limit {
                     break;
                 }
-                out.push(AwayShift {
-                    slot: r.slot.clone(),
-                    rotation: r.name.clone(),
-                    user_email: holder.to_string(),
-                    from: overlap_from,
-                    to: overlap_to,
-                    covered_by: r
-                        .available_member_at(overlap_from, tz, unavailability)
-                        .map(str::to_string),
-                });
+                let Some(shift_end) = r.next_handover(cursor, tz) else {
+                    break;
+                };
+                let (start, end) = (cursor.max(from), shift_end.min(to));
+                // Monotonic by construction (see `shift_index`); the guard is
+                // here so a pathological zone cannot pin the loop on one
+                // instant.
+                if shift_end <= cursor {
+                    break;
+                }
+                cursor = shift_end;
+                if end <= start {
+                    continue;
+                }
+                let Some(holder) = r.member_at(start, tz) else {
+                    continue;
+                };
+                for u in unavailability
+                    .iter()
+                    .filter(|u| u.is(holder) && u.overlaps(start, end))
+                {
+                    let (overlap_from, overlap_to) = (u.start_at.max(start), u.end_at.min(end));
+                    // In force here? A rule that is losing to a higher-priority
+                    // one at this instant is not handing anybody anything, and
+                    // warning about it would train people to ignore the warning.
+                    if rotation
+                        .winning_rule(overlap_from, tz)
+                        .is_none_or(|w| w.name != r.name)
+                    {
+                        continue;
+                    }
+                    if out.len() >= limit {
+                        break;
+                    }
+                    out.push(AwayShift {
+                        rotation_id: rotation.id.clone(),
+                        rotation: rotation.name.clone(),
+                        rule: r.name.clone(),
+                        user_email: holder.to_string(),
+                        from: overlap_from,
+                        to: overlap_to,
+                        covered_by: r
+                            .available_member_at(overlap_from, tz, unavailability)
+                            .map(str::to_string),
+                    });
+                }
             }
         }
     }
@@ -1827,8 +1412,8 @@ pub fn away_assignments(
     out.sort_by(|a, b| {
         a.from
             .cmp(&b.from)
-            .then_with(|| a.slot.cmp(&b.slot))
             .then_with(|| a.rotation.cmp(&b.rotation))
+            .then_with(|| a.rule.cmp(&b.rule))
             .then_with(|| a.user_email.cmp(&b.user_email))
     });
     out
@@ -1842,8 +1427,21 @@ mod tests {
     /// The zone the plain-rotation tests use; DST cases name their own.
     const TZ: chrono_tz::Tz = chrono_tz::UTC;
 
-    fn weekly(members: &[&str]) -> Rotation {
+    /// A bare shift rule. Most of this suite is about the shift maths — index,
+    /// handover boundary, DST — which lives on the rule, not on the rotation
+    /// that holds it.
+    fn weekly(members: &[&str]) -> ShiftRule {
+        ShiftRule::weekly(
+            "Primary",
+            members.iter().map(|s| s.to_string()).collect(),
+            ANCHOR,
+        )
+    }
+
+    /// A rotation with one rule, for the tests that are about a *position*.
+    fn rota(id: &str, members: &[&str]) -> Rotation {
         Rotation::weekly(
+            id,
             "Primary",
             members.iter().map(|s| s.to_string()).collect(),
             ANCHOR,

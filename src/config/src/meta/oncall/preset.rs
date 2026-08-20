@@ -24,7 +24,7 @@
 //! centrally is that the UI, the API and the demo harness generate the *same*
 //! thing rather than three slightly different things.
 //!
-//! Everything here is pure: `(inputs, timezone, anchor) -> Vec<Rotation>`. No
+//! Everything here is pure: `(inputs, timezone, anchor) -> Vec<ShiftRule>`. No
 //! clock is read and nothing is written, which is what lets the no-coverage-gap
 //! property below be a test rather than a hope.
 //!
@@ -51,7 +51,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::rotation::{DEFAULT_SLOT, MICROS_PER_DAY, MICROS_PER_WEEK, Rotation, TimeWindow};
+use super::rotation::{MICROS_PER_DAY, MICROS_PER_WEEK, ShiftRule, TimeWindow};
 
 /// Priority given to every restricted layer a preset generates.
 ///
@@ -438,8 +438,12 @@ impl PresetSpec {
 ///
 /// Pure: the timezone decides where the weekly handover falls on the local
 /// calendar and nothing else, the anchor is passed in rather than read from a
-/// clock, and the result is an ordinary `Vec<Rotation>` that
-/// `PUT /schedule` would have accepted verbatim.
+/// clock, and the result is the `Vec<ShiftRule>` of **one** rotation.
+///
+/// One rotation, deliberately. Every preset shape is a set of rules over a
+/// single position — follow-the-sun is one person on call across three
+/// timezones' working hours, not three people at once. A second *position* is a
+/// second rotation, and that is a decision only the team can make.
 ///
 /// Validation happens here rather than in a separate call the caller could
 /// forget: there is one way in, and it either refuses or returns something the
@@ -449,7 +453,7 @@ pub fn build(
     tz: chrono_tz::Tz,
     anchor_micros: i64,
     handover_micros: i64,
-) -> Result<Vec<Rotation>, PresetError> {
+) -> Result<Vec<ShiftRule>, PresetError> {
     validate(spec, handover_micros)?;
     // Handovers are a wall-clock fact, so the cycle starts at the top of a
     // local week rather than at whatever instant the request happened to
@@ -459,31 +463,21 @@ pub fn build(
     let anchor = week_start(anchor_micros, tz);
 
     let layer = |name: String, members: &[String], priority: i32, restrictions: Vec<TimeWindow>| {
-        Rotation {
+        ShiftRule {
             name,
-            // Every preset shape is a set of layers over one position, so they
-            // all land in the default slot. A second slot is a second pool of
-            // people, which is a decision only the team can make.
-            slot: DEFAULT_SLOT.to_string(),
             members: members.to_vec(),
             shift_micros: handover_micros,
             anchor_micros: anchor,
             priority,
             restrictions,
-            // Presets are layers over one position, so none of them derives a
-            // second slot, and a preset is a deliberate choice rather than a
-            // default the system staffed.
-            secondary_slot: None,
-            source: None,
             starts_at: None,
             ends_at: None,
-            secondary_offset: None,
         }
     };
 
     Ok(match spec {
         PresetSpec::FollowTheSun { groups, catch_all } => {
-            let mut out: Vec<Rotation> = groups
+            let mut out: Vec<ShiftRule> = groups
                 .iter()
                 .map(|g| {
                     layer(

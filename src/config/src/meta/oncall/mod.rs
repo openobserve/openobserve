@@ -63,14 +63,13 @@ pub use response::{
     dependents_all_clear, flap_note, next_ladder_run, page_decision, upstream_recovery,
 };
 pub use rotation::{
-    AwayShift, CoverageSegment, DEFAULT_SLOT, GridError, MAX_AWAY_SHIFTS, MAX_GRID_MICROS,
-    MAX_GRID_SEGMENTS, MAX_SLOT_CHARS, MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE,
-    SECONDARY_SLOT, SOURCE_DEFAULT,
-    MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallSlot, Rotation, RotationError, ScheduleOverride,
-    TimeWindow, Unavailability, away_assignments, covering_override, covering_override_in_slot,
-    everyone_in_slot, everyone_on_schedule, is_unavailable, next_on_call, next_on_call_in_slot,
-    on_call_in_slot, on_call_now, resolve_on_call, resolve_window, resolve_window_in_slot,
-    same_slot, slots, winning_rotation, winning_rotation_in_slot,
+    AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, GridError, MAX_AWAY_SHIFTS, MAX_GRID_MICROS,
+    MAX_GRID_SEGMENTS, MAX_ROTATION_NAME_CHARS, MICROS_PER_DAY, MICROS_PER_HOUR,
+    MICROS_PER_MINUTE, MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallPosition, Rotation,
+    RotationError, SECONDARY_ROTATION_NAME, SOURCE_DEFAULT, ScheduleOverride, ShiftRule,
+    ShiftRuleError, TimeWindow, Unavailability, away_assignments, colliding_rotations,
+    covering_override, covering_override_for, everyone_on_call, is_unavailable, resolve_on_call,
+    resolve_window,
 };
 pub use routing::{
     ContextTeam, OwnershipError, OwnershipRule, Routed, RoutingConfig, RoutingDecision,

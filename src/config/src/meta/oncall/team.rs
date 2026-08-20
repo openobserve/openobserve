@@ -24,10 +24,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::rotation::{
-    AwayShift, CoverageSegment, DEFAULT_SLOT, GridError, MAX_AWAY_SHIFTS, OnCallSlot, Rotation,
-    ScheduleOverride, Unavailability, away_assignments, everyone_in_slot, everyone_on_schedule,
-    next_on_call, next_on_call_in_slot, on_call_in_slot, on_call_now, resolve_on_call,
-    resolve_window, resolve_window_in_slot, same_slot, slots,
+    AwayShift, ShiftRule, CoverageSegment, DEFAULT_ROTATION_NAME, GridError, MAX_AWAY_SHIFTS, OnCallPosition,
+    Rotation, ScheduleOverride, Unavailability, away_assignments, colliding_rotations,
+    everyone_on_call, resolve_on_call, resolve_window,
 };
 
 /// A group of people who can be paged together.
@@ -147,28 +146,41 @@ pub enum MemberPlacement {
 /// automatic.
 pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement {
     let email = user_email.trim().to_ascii_lowercase();
-    if rotations
-        .iter()
-        .any(|r| r.members.iter().any(|m| m.trim().to_ascii_lowercase() == email))
-    {
+    let names = |r: &Rotation| {
+        r.shift_rules
+            .iter()
+            .any(|s| s.members.iter().any(|m| m.trim().to_ascii_lowercase() == email))
+    };
+    if rotations.iter().any(names) {
         return MemberPlacement::AlreadyOnRotation;
     }
+    // Every rotation that is still on the shipped shape — one unrestricted
+    // rule — gets the joiner appended. All of them, not just the first: a team
+    // created with Primary and Secondary has two, and adding somebody to one
+    // pool and not the other is how the two drift into a collision.
+    let simple = |r: &Rotation| {
+        matches!(r.shift_rules.as_slice(), [only] if only.restrictions.is_empty() && only.priority == 0)
+    };
     match rotations {
         [] => MemberPlacement::NoRotationYet,
-        // The slot check is not redundant with the count: a team whose single
-        // rotation staffs `secondary` has deliberately left the primary empty,
-        // and quietly adding a joiner to the backup pool is not what somebody
-        // pressing "add member" meant.
-        [only]
-            if only.restrictions.is_empty()
-                && only.priority == 0
-                && only.is_in_slot(super::rotation::DEFAULT_SLOT) =>
-        {
-            let mut appended = only.clone();
-            appended.members.push(email);
+        _ if rotations.iter().all(simple) => {
+            let appended: Vec<Rotation> = rotations
+                .iter()
+                .map(|r| {
+                    let mut next = r.clone();
+                    if let Some(rule) = next.shift_rules.first_mut() {
+                        rule.members.push(email.clone());
+                    }
+                    next
+                })
+                .collect();
             MemberPlacement::Appended {
-                rotation: only.name.clone(),
-                rotations: vec![appended],
+                rotation: rotations
+                    .iter()
+                    .map(|r| r.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                rotations: appended,
             }
         }
         _ => MemberPlacement::NeedsManualPlacement,
@@ -219,6 +231,9 @@ pub enum TeamError {
     /// specific, so which one wins would be arbitrary.
     AmbiguousRotations,
     InvalidRotation(super::rotation::RotationError),
+    /// Two rotations sharing an id. A level points at one, so the policy would
+    /// be ambiguous about which position it pages.
+    DuplicateRotationId(String),
 }
 
 /// How many instants one coverage sweep will probe for a single schedule.
@@ -237,22 +252,50 @@ impl Schedule {
         self.timezone.parse().unwrap_or(chrono_tz::UTC)
     }
 
-    /// Every slot this schedule staffs, the default first.
-    pub fn slots(&self) -> Vec<String> {
-        slots(&self.rotations)
-    }
-
-    /// Whether this schedule staffs more than the default slot. The question
-    /// the header asks before it decides whether "secondary" is a real position
-    /// or the next index in one cycle.
-    pub fn has_named_slots(&self) -> bool {
+    /// This team's rotations, in stored order.
+    ///
+    /// Replaced `slots()`, which reported names from three sources — rotations
+    /// that staffed a slot, rotations that *declared* they derived one, and an
+    /// implicit append for teams that had said nothing. Two of those three
+    /// produced positions with no roster behind them.
+    pub fn rotation_names(&self) -> Vec<String> {
         self.rotations
             .iter()
-            .any(|r| !same_slot(&r.slot, DEFAULT_SLOT))
+            .filter(|r| r.validate().is_ok())
+            .map(|r| r.name.clone())
+            .collect()
     }
 
-    /// Everyone on call at `at`, one entry per slot in force.
-    pub fn on_call_at(&self, at: i64) -> Vec<OnCallSlot> {
+    /// A rotation by id. What a level of the escalation policy resolves with.
+    pub fn rotation(&self, rotation_id: &str) -> Option<&Rotation> {
+        self.rotations.iter().find(|r| r.id == rotation_id)
+    }
+
+    /// Whether this team staffs more than one position.
+    pub fn has_several_rotations(&self) -> bool {
+        self.rotations
+            .iter()
+            .filter(|r| r.validate().is_ok())
+            .count()
+            > 1
+    }
+
+    /// The rotation a team's first level pages when nothing says otherwise:
+    /// the one named [`DEFAULT_ROTATION_NAME`], or failing that the first that
+    /// validates.
+    ///
+    /// A *fallback for reads*, not a resolution rule. Levels store an id; this
+    /// exists so a screen with nothing selected yet has something to show.
+    pub fn primary_rotation(&self) -> Option<&Rotation> {
+        self.rotations
+            .iter()
+            .filter(|r| r.validate().is_ok())
+            .find(|r| r.name.eq_ignore_ascii_case(DEFAULT_ROTATION_NAME))
+            .or_else(|| self.rotations.iter().find(|r| r.validate().is_ok()))
+    }
+
+    /// Everyone on call at `at`, one entry per rotation.
+    pub fn on_call_at(&self, at: i64) -> Vec<OnCallPosition> {
         resolve_on_call(
             &self.rotations,
             &self.overrides,
@@ -262,9 +305,22 @@ impl Schedule {
         )
     }
 
-    /// The person on call at `at` in the default slot.
-    pub fn on_call_now(&self, at: i64) -> Option<String> {
-        on_call_now(
+    /// The person on call at `at` in one rotation.
+    pub fn on_call_in(&self, rotation_id: &str, at: i64) -> Option<String> {
+        self.rotation(rotation_id)?
+            .on_call(&self.overrides, &self.unavailability, at, self.tz())
+    }
+
+    /// Everyone on one rotation at `at`, on shift or not.
+    pub fn everyone_in(&self, rotation_id: &str, at: i64) -> Vec<String> {
+        self.rotation(rotation_id)
+            .map(|r| r.everyone(&self.overrides, &self.unavailability, at, self.tz()))
+            .unwrap_or_default()
+    }
+
+    /// Everybody this team currently has on call, across every rotation.
+    pub fn everyone_on_call(&self, at: i64) -> Vec<String> {
+        everyone_on_call(
             &self.rotations,
             &self.overrides,
             &self.unavailability,
@@ -273,22 +329,10 @@ impl Schedule {
         )
     }
 
-    /// The person on call at `at` in a named slot.
-    pub fn on_call_in_slot(&self, slot: &str, at: i64) -> Option<String> {
-        on_call_in_slot(
-            &self.rotations,
-            &self.overrides,
-            &self.unavailability,
-            slot,
-            at,
-            self.tz(),
-        )
-    }
-
-    /// Who the default slot's rotation hands over to next — what a "secondary"
-    /// is for a team that has not staffed a second slot.
-    pub fn next_on_call(&self, at: i64) -> Option<String> {
-        next_on_call(
+    /// Rotations that resolve to the same person at `at` — one pager, two
+    /// positions. Reported, not prevented; see [`colliding_rotations`].
+    pub fn collisions_at(&self, at: i64) -> Vec<(String, Vec<&Rotation>)> {
+        colliding_rotations(
             &self.rotations,
             &self.overrides,
             &self.unavailability,
@@ -297,70 +341,21 @@ impl Schedule {
         )
     }
 
-    /// Who one slot's rotation hands over to next.
-    pub fn next_on_call_in_slot(&self, slot: &str, at: i64) -> Option<String> {
-        next_on_call_in_slot(
-            &self.rotations,
-            &self.overrides,
-            &self.unavailability,
-            slot,
-            at,
-            self.tz(),
-        )
-    }
-
-    /// Everyone in force across every slot, on shift or not.
-    pub fn everyone_on_schedule(&self, at: i64) -> Vec<String> {
-        everyone_on_schedule(
-            &self.rotations,
-            &self.overrides,
-            &self.unavailability,
-            at,
-            self.tz(),
-        )
-    }
-
-    /// Everyone in force in one slot, on shift or not.
-    pub fn everyone_in_slot(&self, slot: &str, at: i64) -> Vec<String> {
-        everyone_in_slot(
-            &self.rotations,
-            &self.overrides,
-            &self.unavailability,
-            slot,
-            at,
-            self.tz(),
-        )
-    }
-
-    /// The resolved schedule across `[from, to)` — §3b's "final schedule",
-    /// which is what a human reads instead of the layer maths.
+    /// One rotation's resolved schedule across `[from, to)` — §3b's "final
+    /// schedule", which is what a human reads instead of the rule maths.
     pub fn resolved_window(
         &self,
+        rotation_id: &str,
         from: i64,
         to: i64,
     ) -> Result<Vec<CoverageSegment>, GridError> {
+        let Some(rotation) = self.rotation(rotation_id) else {
+            return Ok(Vec::new());
+        };
         resolve_window(
-            &self.rotations,
+            rotation,
             &self.overrides,
             &self.unavailability,
-            from,
-            to,
-            self.tz(),
-        )
-    }
-
-    /// One slot's resolved schedule across `[from, to)`.
-    pub fn resolved_window_in_slot(
-        &self,
-        slot: &str,
-        from: i64,
-        to: i64,
-    ) -> Result<Vec<CoverageSegment>, GridError> {
-        resolve_window_in_slot(
-            &self.rotations,
-            &self.overrides,
-            &self.unavailability,
-            slot,
             from,
             to,
             self.tz(),
@@ -384,22 +379,31 @@ impl Schedule {
 
     /// Whether a page would reach anybody at all.
     ///
-    /// The **default slot** is the question, because that is what the first
-    /// rung of every shipped ladder pages: a team whose secondary is staffed
-    /// and whose primary is not still wakes nobody when the alert fires. A
-    /// half-staffed slot further down shows up as its own risk rather than
-    /// changing what "covered" means, so adding a slot can never turn a covered
-    /// team into an uncovered one.
+    /// The **primary** rotation is the question, because that is what the first
+    /// level of every shipped ladder pages: a team whose secondary is staffed
+    /// and whose primary is not still wakes nobody when the alert fires. An
+    /// unstaffed rotation further down shows up as its own risk rather than
+    /// changing what "covered" means, so adding a rotation can never turn a
+    /// covered team into an uncovered one.
     pub fn is_staffed(&self, at: i64) -> bool {
-        self.on_call_now(at).is_some()
+        self.primary_rotation()
+            .and_then(|r| r.on_call(&self.overrides, &self.unavailability, at, self.tz()))
+            .is_some()
     }
 
-    /// Slots that resolve to nobody at `at`, ignoring the default one — which
+    /// Rotations that resolve to nobody at `at`, ignoring the primary — which
     /// [`Schedule::is_staffed`] already answers for.
-    pub fn unstaffed_slots(&self, at: i64) -> Vec<String> {
-        self.slots()
-            .into_iter()
-            .filter(|s| !same_slot(s, DEFAULT_SLOT) && self.on_call_in_slot(s, at).is_none())
+    pub fn unstaffed_rotations(&self, at: i64) -> Vec<String> {
+        let primary = self.primary_rotation().map(|r| r.id.clone());
+        self.rotations
+            .iter()
+            .filter(|r| r.validate().is_ok())
+            .filter(|r| Some(&r.id) != primary.as_ref())
+            .filter(|r| {
+                r.on_call(&self.overrides, &self.unavailability, at, self.tz())
+                    .is_none()
+            })
+            .map(|r| r.name.clone())
             .collect()
     }
 
@@ -442,6 +446,7 @@ impl Schedule {
         let tz = self.tz();
         self.rotations
             .iter()
+            .filter_map(|r| r.winning_rule(at, tz))
             .filter_map(|r| r.next_handover(at, tz))
             .min()
     }
@@ -479,7 +484,9 @@ impl Schedule {
     pub fn names_member(&self, user_email: &str) -> bool {
         let email = user_email.trim().to_ascii_lowercase();
         let is = |m: &str| m.trim().to_ascii_lowercase() == email;
-        self.rotations.iter().any(|r| r.members.iter().any(|m| is(m)))
+        self.rotations
+            .iter()
+            .any(|r| r.shift_rules.iter().any(|s| s.members.iter().any(|m| is(m))))
             || self.overrides.iter().any(|o| is(&o.user_email))
             || self.unavailability.iter().any(|u| is(&u.user_email))
     }
@@ -491,21 +498,35 @@ impl Schedule {
         let mut changed = false;
 
         for rotation in &self.rotations {
-            let kept: Vec<String> = rotation
-                .members
-                .iter()
-                .filter(|m| m.trim().to_ascii_lowercase() != email)
-                .cloned()
-                .collect();
-            if kept.len() != rotation.members.len() {
-                changed = true;
+            let mut kept_rules = Vec::with_capacity(rotation.shift_rules.len());
+            for rule in &rotation.shift_rules {
+                let kept: Vec<String> = rule
+                    .members
+                    .iter()
+                    .filter(|m| m.trim().to_ascii_lowercase() != email)
+                    .cloned()
+                    .collect();
+                if kept.len() != rule.members.len() {
+                    changed = true;
+                }
+                // A rule nobody is on is not a rule. Dropping it beats keeping
+                // it with an empty roster, which fails validation and would
+                // make the team's next schedule edit fail for a reason nobody
+                // could see.
+                if kept.is_empty() {
+                    continue;
+                }
+                kept_rules.push(ShiftRule {
+                    members: kept,
+                    ..rule.clone()
+                });
             }
-            if kept.is_empty() {
+            if kept_rules.is_empty() {
                 emptied_rotations.push(rotation.name.clone());
                 continue;
             }
             rotations.push(Rotation {
-                members: kept,
+                shift_rules: kept_rules,
                 ..rotation.clone()
             });
         }
@@ -519,24 +540,27 @@ impl Schedule {
     }
 
     pub fn validate(&self) -> Result<(), TeamError> {
-        let mut seen = std::collections::HashSet::new();
-        for r in &self.rotations {
-            r.validate().map_err(TeamError::InvalidRotation)?;
-            // Several rotations is follow-the-sun. What cannot be allowed is
-            // two at the same priority with the same restrictions, where
-            // neither is more specific and the winner would be arbitrary.
+        let mut seen_ids = std::collections::HashSet::new();
+        for rotation in &self.rotations {
+            rotation.validate().map_err(TeamError::InvalidRotation)?;
+            // Levels point at an id, so two rotations sharing one would make a
+            // policy ambiguous about which position it pages.
+            if !seen_ids.insert(rotation.id.trim().to_ascii_lowercase()) {
+                return Err(TeamError::DuplicateRotationId(rotation.id.clone()));
+            }
+            // Several rules in one rotation is follow-the-sun. What cannot be
+            // allowed is two at the same priority with the same restrictions,
+            // where neither is more specific and the winner would be arbitrary.
             //
-            // Scoped to the slot, because two rotations that never compete
-            // cannot be ambiguous: a primary and a secondary covering the same
-            // hours at the same priority is the *point* of slots, and the
-            // pre-slot key would have refused to save one.
-            let key = (
-                r.slot.trim().to_ascii_lowercase(),
-                r.priority,
-                r.restrictions.clone(),
-            );
-            if !seen.insert(key) {
-                return Err(TeamError::AmbiguousRotations);
+            // Scoped to the rotation, because rules in *different* rotations
+            // never compete: a primary and a secondary covering the same hours
+            // at the same priority is the whole point of having two.
+            let mut seen = std::collections::HashSet::new();
+            for rule in &rotation.shift_rules {
+                let key = (rule.priority, rule.restrictions.clone());
+                if !seen.insert(key) {
+                    return Err(TeamError::AmbiguousRotations);
+                }
             }
         }
         Ok(())
@@ -560,6 +584,10 @@ impl std::fmt::Display for TeamError {
                 "two rotations apply at the same time with equal priority and restrictions",
             ),
             Self::InvalidRotation(e) => write!(f, "invalid rotation: {e}"),
+            Self::DuplicateRotationId(id) => write!(
+                f,
+                "two rotations share the id `{id}`, so a level naming it would be ambiguous"
+            ),
         }
     }
 }

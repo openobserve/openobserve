@@ -579,23 +579,28 @@ impl EscalationPolicy {
     ///
     /// | | t=0 | 5 min | 15 min | 30 min | 60 min |
     /// |---|---|---|---|---|---|
-    /// | P1 | primary + secondary + L1 | L1 | L2 | L3 | L4 |
-    /// | P2 | primary | secondary | L1 | L2 | L3 |
-    /// | P3 | primary | — | secondary | L1 | L2 |
+    /// | P1 | primary **+** secondary | whole team | whole team | whole team | whole team |
+    /// | P2 | primary | secondary | whole team | whole team | — |
+    /// | P3 | primary | — | secondary | whole team | — |
     /// | P4, P5 | nobody, ever | | | | |
     ///
     /// **P1 is parallel.** Everyone who can fix a critical outage is paged at
     /// once; §2 says so in as many words ("no 5-minute delays between primary
     /// and secondary"), and staggering them buys nothing but minutes.
     ///
-    /// The one place the ladder cannot follow the doc literally is the depth
-    /// of L2–L4. The doc gives each escalation level its own rotation slot;
-    /// this model deliberately has no per-level rotations ([`EscalationTarget`]
-    /// explains why), so the widest reach it can express is the whole team.
-    /// The later rungs therefore re-page the whole team rather than reaching
-    /// someone new — which is still the right thing for a P1 nobody has
-    /// acknowledged in an hour, and is exactly the cell a team edits once it
-    /// staffs a second rotation.
+    /// **The secondary is a rotation, not a derivation.** This function used to
+    /// build it from `NextOnCall` — one handover further along the *primary's*
+    /// roster — on the argument that "one rotation is enough to be pageable, so
+    /// a secondary needs no second schedule to staff". That argument was wrong
+    /// in a way that took a live team to see: the position then existed whether
+    /// or not anybody staffed it, so a team that *did* staff it had two answers
+    /// for one chair and got a different person at the weekend. A level now
+    /// names a rotation by id, and `secondary` here is `None` for a team that
+    /// only has one.
+    ///
+    /// The depth beyond the secondary is still the whole team, and that is now
+    /// a *choice* rather than a limit: a team with an "Engineering" rotation can
+    /// point 15 min at it, which the previous model could not express at all.
     ///
     /// P4 and P5 page nobody at all: they are recorded and shown in the
     /// product, and the agent still investigates them.
@@ -608,15 +613,20 @@ impl EscalationPolicy {
         id: impl Into<String>,
         org_id: impl Into<String>,
         team_id: impl Into<String>,
+        primary_rotation_id: impl Into<String>,
+        secondary_rotation_id: Option<String>,
     ) -> Self {
         use AlertPriority::*;
         let m = MICROS_PER_MINUTE;
-        // One rotation is enough to be pageable. The ladder walks it — on call
-        // now, then whoever it hands over to next, then everybody on that
-        // rotation — so a "secondary" needs no second schedule to staff.
-        let primary = || vec![EscalationTarget::OnCallNow];
-        let secondary = || vec![EscalationTarget::NextOnCall];
-        let l1 = || vec![EscalationTarget::EveryoneOnSchedule];
+        let primary_id = primary_rotation_id.into();
+        let primary = || vec![EscalationTarget::rotation(primary_id.clone())];
+        // A team with one rotation has no secondary rung at all, rather than a
+        // rung that quietly resolves to the person already being paged.
+        let secondary = || {
+            secondary_rotation_id
+                .as_ref()
+                .map(|r| vec![EscalationTarget::rotation(r.clone())])
+        };
         let deeper = || vec![EscalationTarget::WholeTeam];
         Self {
             id: id.into(),
@@ -634,14 +644,12 @@ impl EscalationPolicy {
                 PriorityRung {
                     priority: P1,
                     steps: vec![
-                        // §2: primary, secondary and L1 together, immediately.
+                        // §2: primary and secondary together, immediately. Not
+                        // two steps five minutes apart — a P1 that waits to
+                        // wake the backup has spent the minutes that mattered.
                         LadderStep::new(
                             0,
-                            vec![
-                                EscalationTarget::OnCallNow,
-                                EscalationTarget::NextOnCall,
-                                EscalationTarget::EveryoneOnSchedule,
-                            ],
+                            primary().into_iter().chain(secondary().unwrap_or_default()).collect(),
                         ),
                         LadderStep::new(5 * m, deeper()),
                         LadderStep::new(15 * m, deeper()),
@@ -652,23 +660,29 @@ impl EscalationPolicy {
                 },
                 PriorityRung {
                     priority: P2,
-                    steps: vec![
-                        LadderStep::new(0, primary()),
-                        LadderStep::new(5 * m, secondary()),
-                        LadderStep::new(15 * m, l1()),
-                        LadderStep::new(30 * m, deeper()),
-                        LadderStep::new(60 * m, deeper()),
-                    ],
+                    // A team with one rotation skips the secondary step rather
+                    // than filling it with the person already on the pager.
+                    steps: [
+                        Some(LadderStep::new(0, primary())),
+                        secondary().map(|s| LadderStep::new(5 * m, s)),
+                        Some(LadderStep::new(15 * m, deeper())),
+                        Some(LadderStep::new(30 * m, deeper())),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
                     channels: vec![Channel::Email],
                 },
                 PriorityRung {
                     priority: P3,
-                    steps: vec![
-                        LadderStep::new(0, primary()),
-                        LadderStep::new(15 * m, secondary()),
-                        LadderStep::new(30 * m, l1()),
-                        LadderStep::new(60 * m, deeper()),
-                    ],
+                    steps: [
+                        Some(LadderStep::new(0, primary())),
+                        secondary().map(|s| LadderStep::new(15 * m, s)),
+                        Some(LadderStep::new(30 * m, deeper())),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
                     channels: vec![Channel::Email],
                 },
                 // P4 and P5 are recorded and investigated, never paged.
