@@ -112,6 +112,31 @@ pub fn resolve_stream_names_with_type(sql: &str) -> Result<Vec<TableReference>, 
     Ok(tables)
 }
 
+/// Top-level (outer, for CTEs) WHERE of a query as a string; "" if none/unparseable.
+pub fn extract_where_clause(sql: &str) -> String {
+    let dialect = PostgreSqlDialect {};
+    let Ok(statements) = Parser::parse_sql(&dialect, sql) else {
+        return String::new();
+    };
+    for statement in statements {
+        if let Statement::Query(query) = statement {
+            if let Some(where_clause) = where_from_set_expr(query.body.as_ref()) {
+                return where_clause;
+            }
+        }
+    }
+    String::new()
+}
+
+/// WHERE of a query body, unwrapping parenthesized SELECT; None for UNION/set-ops.
+fn where_from_set_expr(body: &SetExpr) -> Option<String> {
+    match body {
+        SetExpr::Select(select) => select.selection.as_ref().map(|e| e.to_string()),
+        SetExpr::Query(query) => where_from_set_expr(query.body.as_ref()),
+        _ => None,
+    }
+}
+
 pub trait TableReferenceExt {
     fn stream_type(&self) -> String;
     fn stream_name(&self) -> String;
@@ -165,6 +190,59 @@ mod tests {
         assert_eq!(r.stream_name(), "mystream");
         assert_eq!(r.stream_type(), "");
         assert!(!r.has_stream_type());
+    }
+
+    #[test]
+    fn test_extract_where_clause() {
+        // Basic WHERE is returned without the leading keyword.
+        assert_eq!(
+            extract_where_clause("SELECT a FROM t WHERE level = 'error' AND status = 500"),
+            "level = 'error' AND status = 500",
+        );
+
+        // No WHERE → empty string.
+        assert_eq!(extract_where_clause("SELECT a FROM t GROUP BY a"), "");
+
+        // Unparseable input → empty string, never a panic.
+        assert_eq!(extract_where_clause("not a query"), "");
+
+        // The OUTER WHERE of a CTE query is returned (not the CTE's inner WHERE).
+        assert_eq!(
+            extract_where_clause(
+                "WITH c AS (SELECT id FROM t WHERE inner_flag = 1) \
+                 SELECT id FROM c WHERE outer_flag = 2",
+            ),
+            "outer_flag = 2",
+        );
+
+        // JOIN: the JOIN is in FROM, so the full WHERE (both stream aliases) is returned.
+        assert_eq!(
+            extract_where_clause(
+                "SELECT a.svc, b.region FROM stream_a a \
+                 JOIN stream_b b ON a.id = b.id WHERE a.env = 'prod' AND b.tier = 'gold'",
+            ),
+            "a.env = 'prod' AND b.tier = 'gold'",
+        );
+
+        // Subquery in WHERE is rendered verbatim, subquery included.
+        assert_eq!(
+            extract_where_clause("SELECT a FROM t WHERE id IN (SELECT id FROM u WHERE x = 1)"),
+            "id IN (SELECT id FROM u WHERE x = 1)",
+        );
+
+        // Parenthesized top-level SELECT is unwrapped to its WHERE.
+        assert_eq!(
+            extract_where_clause("(SELECT a FROM t WHERE flag = 1)"),
+            "flag = 1",
+        );
+
+        // UNION has one WHERE per branch → no single clause, empty string.
+        assert_eq!(
+            extract_where_clause(
+                "SELECT a FROM t WHERE x = 1 UNION SELECT a FROM u WHERE y = 2",
+            ),
+            "",
+        );
     }
 
     #[test]

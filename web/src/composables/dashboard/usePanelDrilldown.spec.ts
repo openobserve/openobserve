@@ -204,10 +204,14 @@ describe("usePanelDrilldown", () => {
   });
 
   // ── Table cell → Logs drilldown ──────────────────────────────────────────
-  // The drillable-columns watcher parses SQL via a dynamically-imported parser,
-  // so give the microtasks a few turns to settle before asserting.
-  const flush = async () => {
-    for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+  // The drillable-columns watcher parses SQL via a dynamically-imported parser.
+  // Under parallel test load that import can take longer than a few microtask
+  // turns, so poll the result rather than fixing a turn count (avoids flakiness).
+  const flush = async (ready?: () => boolean) => {
+    for (let i = 0; i < 50; i++) {
+      await new Promise((r) => setTimeout(r, 2));
+      if (ready?.()) return;
+    }
   };
 
   const makeTableDeps = (query: string) => {
@@ -254,5 +258,40 @@ describe("usePanelDrilldown", () => {
     expect(svc.streamName).toBe("stream_a");
     expect(region.streamName).toBe("stream_b");
     expect(svc.isJoin).toBe(true);
+  });
+
+  it("scopes a join's WHERE to the drilled stream, dropping other-stream conditions", async () => {
+    const deps = makeTableDeps(
+      "select a.svc as svc, b.region as region, count(*) as cnt " +
+        "from stream_a a join stream_b b on a.id = b.id " +
+        "where a.env = 'prod' and b.tier = 'gold' group by svc, region",
+    );
+    const api = usePanelDrilldown(deps as any);
+    await flush();
+
+    // Drilling stream_a keeps a.env (alias stripped) and drops b.tier.
+    const svc = api.getCellDrilldownField(0, "svc");
+    expect(svc.baseWhere).toContain("env");
+    expect(svc.baseWhere).toContain("'prod'");
+    expect(svc.baseWhere).not.toContain("tier");
+
+    // Drilling stream_b keeps b.tier and drops a.env.
+    const region = api.getCellDrilldownField(0, "region");
+    expect(region.baseWhere).toContain("tier");
+    expect(region.baseWhere).not.toContain("env");
+  });
+
+  it("captures the backend-parsed WHERE from result_schema into panelBaseWhere", async () => {
+    resultSchemaMock.mockResolvedValue({
+      data: {
+        where_clause: "level = 'error'",
+        cross_links: { stream_links: [], org_links: [] },
+      },
+    });
+    const deps = makeDeps();
+    const api = usePanelDrilldown(deps as any);
+    await flush();
+
+    expect(api.panelBaseWhere.value).toBe("level = 'error'");
   });
 });

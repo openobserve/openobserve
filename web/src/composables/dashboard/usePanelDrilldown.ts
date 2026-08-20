@@ -75,6 +75,9 @@ export function usePanelDrilldown({
   // Cross-linking: store cross-links from result_schema response
   const crossLinksData: any = ref({ stream_links: [], org_links: [] });
 
+  // Panel query's WHERE, parsed by the backend (result_schema); "" falls back to client extraction.
+  const panelBaseWhere = ref("");
+
   const drilldownArray: any = ref([]);
 
   // need to save click event params, to open drilldown
@@ -254,8 +257,7 @@ export function usePanelDrilldown({
     return whereClause;
   };
 
-  // ── Table cell → Logs drilldown ──
-  // Drillable = a plain column_ref (aggregates aren't valid in a WHERE clause).
+  // Table cell → Logs drilldown: drillable = a plain column_ref (aggregates invalid in WHERE).
   const cellDrilldownFields: any = ref(new Map());
   const cellDrilldownByQuery: any = ref(new Map());
   // SELECT * / dynamic-columns tables: every column id is drillable (see wildcard branch).
@@ -269,6 +271,74 @@ export function usePanelDrilldown({
   const isSelectStar = (ast: any): boolean =>
     Array.isArray(ast?.columns) &&
     ast.columns.some((col: any) => col?.expr?.column === "*" || col?.expr?.type === "star");
+
+  // Flatten a WHERE tree's top-level AND chain into individual conjuncts.
+  const flattenAndConjuncts = (node: any, out: any[]) => {
+    if (node?.type === "binary_expr" && node.operator === "AND") {
+      flattenAndConjuncts(node.left, out);
+      flattenAndConjuncts(node.right, out);
+    } else if (node) {
+      out.push(node);
+    }
+  };
+
+  // Every table alias a sub-expression references (via its column_refs); "" = unqualified.
+  const collectRefAliases = (node: any, out: Set<string>) => {
+    if (!node || typeof node !== "object") return;
+    if (node.type === "column_ref") {
+      out.add(node.table ?? "");
+      return;
+    }
+    for (const key of Object.keys(node)) {
+      const child = node[key];
+      if (Array.isArray(child)) child.forEach((c: any) => collectRefAliases(c, out));
+      else if (child && typeof child === "object") collectRefAliases(child, out);
+    }
+  };
+
+  // Deep-clone a sub-expression with every column_ref's table qualifier removed.
+  const stripTableQualifiers = (node: any): any => {
+    if (Array.isArray(node)) return node.map(stripTableQualifiers);
+    if (!node || typeof node !== "object") return node;
+    const copy: any = {};
+    for (const key of Object.keys(node)) copy[key] = stripTableQualifiers(node[key]);
+    if (copy.type === "column_ref") copy.table = null;
+    return copy;
+  };
+
+  // Single-stream WHERE from a join's WHERE: keep only the drilled stream's AND-conjuncts, strip aliases.
+  const whereForStream = (whereAst: any, aliases: Set<string>): string => {
+    if (!whereAst || !parser) return "";
+    const conjuncts: any[] = [];
+    flattenAndConjuncts(whereAst, conjuncts);
+    const kept = conjuncts.filter((c: any) => {
+      const refs = new Set<string>();
+      collectRefAliases(c, refs);
+      return [...refs].every((a) => a === "" || aliases.has(a));
+    });
+    if (!kept.length) return "";
+    let combined = kept[0];
+    for (let i = 1; i < kept.length; i++) {
+      combined = { type: "binary_expr", operator: "AND", left: combined, right: kept[i] };
+    }
+    const stripped = stripTableQualifiers(combined);
+    try {
+      if (typeof parser.exprToSQL === "function") {
+        const s = parser.exprToSQL(stripped);
+        return s ? String(s).replace(/`/g, '"') : "";
+      }
+      const dummySql = parser.sqlify({
+        type: "select",
+        columns: [{ expr: { type: "column_ref", table: null, column: "*" }, as: null }],
+        from: [{ db: null, table: "dummy", as: null }],
+        where: stripped,
+      });
+      const m = dummySql.match(/\bWHERE\b\s+([\s\S]+)$/i);
+      return m ? m[1].replace(/`/g, '"') : "";
+    } catch {
+      return "";
+    }
+  };
 
   const computeCellDrilldownFields = async () => {
     const map = new Map<string, any>();
@@ -324,12 +394,19 @@ export function usePanelDrilldown({
         const resolvedStream = field.streamAlias
           ? (aliasToStream.get(field.streamAlias) ?? streamName)
           : streamName;
+        const baseWhere = isJoin
+          ? whereForStream(
+              ast.where,
+              new Set([field.streamAlias, resolvedStream].filter(Boolean) as string[]),
+            )
+          : "";
         const entry = {
           column: field.column,
           streamName: resolvedStream,
           streamType,
           query: executedQuery,
           isJoin,
+          baseWhere,
         };
         map.set(field.alias, entry);
         perQuery.set(field.alias, entry);
@@ -1184,6 +1261,7 @@ export function usePanelDrilldown({
         panelSchema.value?.queryType === "promql"
       ) {
         crossLinksData.value = { stream_links: [], org_links: [] };
+        panelBaseWhere.value = "";
         return;
       }
       try {
@@ -1214,8 +1292,10 @@ export function usePanelDrilldown({
           stream_links: [],
           org_links: [],
         };
+        panelBaseWhere.value = response.data?.where_clause ?? "";
       } catch {
         crossLinksData.value = { stream_links: [], org_links: [] };
+        panelBaseWhere.value = "";
       }
     },
     { immediate: true },
@@ -1232,11 +1312,10 @@ export function usePanelDrilldown({
     intervalMicro,
     drilldownColumnAliases,
     drilldownAllColumns,
-    // Per-column drilldown target ({ column, streamName, streamType, query, isJoin }),
-    // join-aware. Looks up the clicked row's OWN query first (multi-query tables that
-    // share an alias), then falls back to the flat any-query map.
+    // Per-column drilldown target, join-aware: the row's own query first, then any query.
     getCellDrilldownField: (queryIndex: number, alias: string) =>
       cellDrilldownByQuery.value.get(queryIndex)?.get(alias) ??
       cellDrilldownFields.value.get(alias),
+    panelBaseWhere,
   };
 }

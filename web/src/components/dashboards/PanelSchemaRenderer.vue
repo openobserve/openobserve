@@ -1543,6 +1543,7 @@ export default defineComponent({
       drilldownColumnAliases,
       drilldownAllColumns,
       getCellDrilldownField,
+      panelBaseWhere,
     } = usePanelDrilldown({
       panelSchema,
       variablesData,
@@ -1769,7 +1770,12 @@ export default defineComponent({
       const streamType =
         cell?.streamType ?? query?.fields?.stream_type ?? query?.stream_type ?? "logs";
       const realField = cell?.column ?? resolveAliasToColumn(alias, query, executedSql);
-      const baseWhere = cell?.isJoin ? "" : extractPanelWhere(executedSql);
+      // Joins: gate's per-stream WHERE. Single-stream: backend WHERE (result_schema), else client.
+      const baseWhere = cell?.isJoin
+        ? (cell.baseWhere ?? "")
+        : qi === 0 && panelBaseWhere.value
+          ? panelBaseWhere.value
+          : extractPanelWhere(executedSql);
 
       const metaStartµs = Number(metadata.value?.queries?.[qi]?.startTime ?? 0);
       const metaEndµs = Number(metadata.value?.queries?.[qi]?.endTime ?? 0);

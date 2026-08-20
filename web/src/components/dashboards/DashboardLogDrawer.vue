@@ -107,8 +107,7 @@ function cellWhere(): string {
   if (typeof v === "number") return `${props.field} = ${v}`;
   return `${props.field} = '${escSql(v)}'`;
 }
-// Cell predicate AND-combined with the panel's own filter so the drilldown
-// matches the scoped data the panel actually shows.
+// Cell predicate AND-combined with the panel's own filter to match its scoped data.
 function effectiveWhere(): string {
   const cell = cellWhere();
   return props.baseWhere ? `(${props.baseWhere}) AND ${cell}` : cell;
