@@ -65,9 +65,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="warning"
             dense
             icon="warning"
-            :content="t('alert_library.install.destinationsLoadFailed')"
             data-test="alert-library-install-destinations-failed"
-          />
+          >
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-sm">{{ t("alert_library.install.destinationsLoadFailed") }}</span>
+              <OButton
+                variant="outline"
+                size="sm"
+                icon-left="refresh"
+                :loading="isLoadingDestinations"
+                data-test="alert-library-install-destinations-retry"
+                @click="loadDestinations()"
+              >
+                {{ t("alert_library.install.retry") }}
+              </OButton>
+            </div>
+          </OBanner>
 
           <template v-if="destinationMode === 'existing'">
             <OSelect
@@ -252,13 +265,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OCheckbox
                 :model-value="isSelected(entry.id)"
                 size="sm"
+                :label="raw(entry.title)"
+                class="min-w-0 flex-1"
                 :data-test="`alert-library-install-alert-${entry.id}`"
                 @update:model-value="toggleEntry(entry.id, $event)"
               />
-              <div class="min-w-0 flex-1">
-                <div class="text-text-heading truncate text-sm">{{ entry.title }}</div>
-                <div class="text-text-secondary truncate text-xs">{{ entry.id }}</div>
-              </div>
+              <span class="text-text-secondary hidden shrink-0 truncate text-xs sm:inline">{{
+                entry.id
+              }}</span>
               <OTag
                 type="severity"
                 size="xs"
@@ -279,7 +293,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex flex-col gap-3 pt-2" data-test="alert-library-install-folder-step">
           <p class="text-text-secondary text-sm">{{ t("alert_library.install.folderIntro") }}</p>
+          <OSkeleton
+            v-if="foldersLoading"
+            type="rect"
+            class="rounded-default h-9 w-full"
+            data-test="alert-library-install-folder-loading"
+          />
           <SelectFolderDropDown
+            v-else
             :active-folder-id="folderId"
             type="alerts"
             @folder-selected="onFolderSelected"
@@ -452,6 +473,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -482,12 +504,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void;
   /**
-   * What this run actually created. Alerts created behind a dialog are
-   * invisible on the list underneath it until something says they exist —
-   * ImportAlert emits `update:alerts` for the same reason. Failures are
-   * excluded: nothing was created for those.
+   * Library ENTRY ids (`<pack>/<name>`) this run installed — not alert ids, and
+   * not a list-refresh signal.
+   *
+   * Phase 5 uses it to mark those entries as installed in the gallery without
+   * re-reading provenance off the server: the run already knows what it just
+   * created. Failures are excluded; nothing was created for those.
    */
-  (e: "installed", payload: { folderId: string; ids: string[] }): void;
+  (e: "installed", payload: { entryIds: string[] }): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -521,6 +545,7 @@ const createName = ref("");
 const credentials = ref<Record<string, unknown>>({});
 const credentialErrors = ref<Record<string, I18nText>>({});
 const isCreatingDestination = ref(false);
+const isLoadingDestinations = ref(false);
 const isTesting = ref(false);
 const testMessage = ref<I18nText | "">("");
 const testPassed = ref(false);
@@ -529,6 +554,7 @@ const testPassed = ref(false);
 const selectedIds = ref<string[]>([]);
 const folderId = ref("default");
 const folderName = ref("");
+const foldersLoading = ref(false);
 const tuneEnabled = ref(false);
 const tuneFrequency = ref(DEFAULT_TUNABLES.frequency);
 const tuneSilence = ref(DEFAULT_TUNABLES.silence);
@@ -630,7 +656,9 @@ const reset = () => {
   sessionToken += 1;
   step.value = 1;
   isCreatingDestination.value = false;
+  isLoadingDestinations.value = false;
   isTesting.value = false;
+  foldersLoading.value = false;
   existingDestinations.value = [];
   destinationsFailed.value = false;
   destinationMode.value = "existing";
@@ -675,6 +703,7 @@ let sessionToken = 0;
 
 const loadDestinations = async () => {
   const token = ++destinationsToken;
+  isLoadingDestinations.value = true;
   let names: string[] = [];
   let failed = false;
   try {
@@ -698,8 +727,13 @@ const loadDestinations = async () => {
 
   destinationsFailed.value = failed;
   existingDestinations.value = names;
-  // Nothing to pick means the picker is a dead end; open on creation instead.
-  if (names.length === 0) destinationMode.value = "create";
+  isLoadingDestinations.value = false;
+  // Only an EMPTY list means the picker is a dead end. A failed request says
+  // nothing about how many destinations the org has, and forcing create mode on
+  // it strands the user: the way back is hidden exactly when the list is empty,
+  // so an org with fifty destinations and one flaky GET could only create a
+  // duplicate or abandon the wizard.
+  if (!failed && names.length === 0) destinationMode.value = "create";
 };
 
 watch(
@@ -715,11 +749,16 @@ watch(
 // The folder picker reads the store and only refreshes itself on `onActivated`,
 // which a dialog never fires. Fetch when the step is reached.
 watch(step, (value) => {
-  if (value === 3) {
-    void getFoldersListByType(store, "alerts").catch(() => {
+  if (value !== 3) return;
+  const token = sessionToken;
+  foldersLoading.value = true;
+  void getFoldersListByType(store, "alerts")
+    .catch(() => {
       // The picker still offers "default", which is a valid folder.
+    })
+    .finally(() => {
+      if (token === sessionToken) foldersLoading.value = false;
     });
-  }
 });
 
 const onOpenChange = (value: boolean) => {
@@ -807,9 +846,12 @@ const createAndUse = async (): Promise<boolean> => {
     if (token !== sessionToken) return false;
 
     chosenDestination.value = name;
-    destinationMode.value = "existing";
     await loadDestinations();
-    return token === sessionToken;
+    if (token !== sessionToken) return false;
+    // We just created one, so the picker is never a dead end from here —
+    // whatever the reload managed to return.
+    destinationMode.value = "existing";
+    return true;
   } catch (error) {
     if (token !== sessionToken) return false;
     toast({
@@ -910,15 +952,14 @@ const install = async (ids: string[]) => {
   // `hasRun` and toast a result for a run that never happened.
   if (batch.length === 0) return;
 
-  const existing = new Map(results.value.map((result) => [result.id, result]));
-  results.value = roster.value.map(
-    (entry) =>
-      (ids.includes(entry.id) ? undefined : existing.get(entry.id)) ?? {
-        id: entry.id,
-        title: raw(entry.title),
-        status: "pending" as const,
-      },
-  );
+  // Rows in this batch restart at pending; rows outside it keep the verdict the
+  // earlier pass gave them.
+  const previous = new Map(results.value.map((result) => [result.id, result]));
+  results.value = roster.value.map((entry) => {
+    const carried = previous.get(entry.id);
+    if (!ids.includes(entry.id) && carried) return carried;
+    return { id: entry.id, title: raw(entry.title), status: "pending" as const };
+  });
 
   isInstalling.value = true;
   hasRun.value = true;
@@ -966,7 +1007,7 @@ const install = async (ids: string[]) => {
   }
 
   if (installedNow.length > 0) {
-    emit("installed", { folderId: folderId.value, ids: installedNow });
+    emit("installed", { entryIds: installedNow });
   }
 
   const failed = failedIds.value.length;

@@ -22,8 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   severity) and the STAT STRIP filters (ready / needs data / all). Mixing them
   overflowed the rail and pushed a facet group below the fold.
 
-  Read-only in this phase. Install arrives with the drawer and wizard, so there
-  is no selection UI here — a checkbox that leads nowhere is worse than none.
+  No bulk selection in the GALLERY. Install is entered per-alert from the
+  drawer, and the wizard it opens offers the whole visible set from there — so
+  a second selection model here would be a checkbox competing with that one.
 -->
 <template>
   <div data-test="alert-library-page" class="flex h-full flex-col">
@@ -181,8 +182,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @install="onInstall"
     />
 
-    <!-- `installed` is deliberately unlistened here: Phase 5 consumes it to
-         mark entries as installed. Do not delete it as dead code. -->
+    <!-- `installed` is deliberately unlistened here: Phase 5 consumes it to mark
+         gallery entries as installed. Do not delete it as dead code. -->
     <LibraryInstallDialog
       :open="installOpen"
       :entries="visibleEntries"

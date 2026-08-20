@@ -178,6 +178,11 @@ export function buildInstallPayload(input: InstallPayloadInput): Record<string, 
   // which no customer org has, and the alert API rejects an unknown name.
   payload.destinations = [destination];
 
+  // Phase 5 input, recorded here because this is where the promise is made:
+  // `context_attributes` is USER-EDITABLE — the alert form renders it as
+  // add/removable KV rows — so these two keys can be edited away after install.
+  // Detection must treat their absence as "unknown", never as "not from the
+  // library". The `pack:` tag below is equally editable.
   payload.context_attributes = {
     ...stringValuedOnly(asRecord(payload.context_attributes)),
     library_id: entry.id,

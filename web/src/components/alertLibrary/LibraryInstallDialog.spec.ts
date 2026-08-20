@@ -342,16 +342,66 @@ describe("LibraryInstallDialog", () => {
       ).toBeUndefined();
     });
 
-    it("falls back to creating one when the destination list cannot be read", async () => {
-      // A restricted role 403s here. Reporting an empty picker as "you have no
-      // destinations" would be a different, false claim.
-      mocks.listDestinations.mockRejectedValue({ response: { status: 403 } });
+    it("does not mistake a failed request for an org with no destinations", async () => {
+      // A transient GET failure says nothing about how many destinations exist.
+      // Forcing create mode on it TRAPS the user: the way back out is hidden
+      // exactly when the list is empty, and Back is hidden on step 1 — so an
+      // org with fifty destinations could only create a duplicate or quit.
+      mocks.listDestinations.mockRejectedValue({ response: { status: 500 } });
       const wrapper = await mountDialog();
 
       expect(wrapper.find('[data-test="alert-library-install-destinations-failed"]').exists()).toBe(
         true,
       );
-      expect(wrapper.find('[data-test="prebuilt-selector"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="prebuilt-selector"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-install-destination"]').exists()).toBe(true);
+    });
+
+    it("offers a retry that recovers the list", async () => {
+      mocks.listDestinations.mockRejectedValue({ response: { status: 500 } });
+      const wrapper = await mountDialog();
+
+      mocks.listDestinations.mockResolvedValue({ data: [{ name: "ops-slack" }] });
+      await click(wrapper, "alert-library-install-destinations-retry");
+
+      expect(wrapper.find('[data-test="alert-library-install-destinations-failed"]').exists()).toBe(
+        false,
+      );
+      expect(
+        wrapper.find('[data-test="alert-library-install-destination"]').attributes("data-options"),
+      ).toBe("ops-slack");
+    });
+
+    it("does not re-create the destination when the reload after creating it fails", async () => {
+      // The reload is not the create. Flipping back to create mode on its
+      // failure — while `chosenDestination` already holds the new name — meant
+      // Back then Next ran createDestination a second time, with the same name.
+      mocks.listDestinations.mockResolvedValueOnce({ data: [] });
+      const wrapper = await mountDialog();
+
+      wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).vm.$emit("select", "slack");
+      await flushPromises();
+      await wrapper
+        .find('[data-test="alert-library-install-destination-name"]')
+        .setValue("library-slack");
+      await wrapper
+        .find('[data-test="alert-library-install-credential-webhookUrl"]')
+        .setValue("https://hooks.slack.com/services/T/B/X");
+
+      // Succeeds but comes back empty — the backend has not caught up with the
+      // create yet. A failed reload is covered by the test above; THIS is the
+      // case that flips mode back to "create" while the name is already chosen.
+      mocks.listDestinations.mockResolvedValue({ data: [] });
+      await click(wrapper, "alert-library-install-next");
+
+      expect(mocks.createDestination).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="alert-library-install-alerts-step"]').exists()).toBe(true);
+
+      await click(wrapper, "alert-library-install-back");
+      expect(wrapper.find('[data-test="prebuilt-selector"]').exists()).toBe(false);
+
+      await click(wrapper, "alert-library-install-next");
+      expect(mocks.createDestination).toHaveBeenCalledTimes(1);
     });
 
     it("sends a test notification before committing to the destination", async () => {
@@ -1002,10 +1052,9 @@ describe("LibraryInstallDialog", () => {
       await drain(releases);
     });
 
-    it("announces what was installed so the alert list can refresh", async () => {
-      // ImportAlert emits `update:alerts` for the same reason: alerts created
-      // behind a dialog are invisible on the list underneath it until something
-      // says they exist. Failures are excluded — nothing was created for those.
+    it("announces which library entries it installed, for Phase 5 to mark", async () => {
+      // Library ENTRY ids, not alert ids — the gallery keys its tiles by these.
+      // Failures are excluded; nothing was created for those.
       mocks.createAlert
         .mockResolvedValueOnce({ data: {} })
         .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
@@ -1017,9 +1066,8 @@ describe("LibraryInstallDialog", () => {
 
       const installed = wrapper.emitted("installed");
       expect(installed).toHaveLength(1);
-      expect(installed?.[0]?.[0]).toMatchObject({
-        folderId: "default",
-        ids: ["k8s/pod-oom-killed", "k8s/cert-expiring"],
+      expect(installed?.[0]?.[0]).toEqual({
+        entryIds: ["k8s/pod-oom-killed", "k8s/cert-expiring"],
       });
     });
 
@@ -1228,7 +1276,7 @@ describe("LibraryInstallDialog", () => {
     const installed = wrapper.emitted("installed");
     expect(installed).toHaveLength(2);
     // A consumer adding these up must not count the first pass twice.
-    expect(installed?.[1]?.[0]).toMatchObject({ ids: ["k8s/node-disk-pressure"] });
+    expect(installed?.[1]?.[0]).toEqual({ entryIds: ["k8s/node-disk-pressure"] });
   });
 
   it("starts from the first step again when reopened", async () => {
@@ -1305,6 +1353,34 @@ describe("LibraryInstallDialog", () => {
       wrapper?.unmount();
       wrapper = null;
       document.body.innerHTML = "";
+    });
+
+    it("gives every alert checkbox an accessible name", async () => {
+      // OCheckbox names itself from `label` alone. Without it a screen-reader
+      // user hears "checkbox, unchecked" once per alert with no way to tell
+      // which one they are about to install.
+      const checkboxStubs = { ...realStubs } as Record<string, unknown>;
+      checkboxStubs.ODialog = ODialogStub;
+      delete checkboxStubs.OCheckbox;
+
+      wrapper = mount(LibraryInstallDialog, {
+        props: {
+          open: true,
+          entries: entries(),
+          seed: { entry: seedEntry(), file: libraryFile("pod-oom-killed") },
+        },
+        global: { plugins: [i18n, store], stubs: checkboxStubs },
+      });
+      await flushPromises();
+
+      const select = wrapper.find('[data-test="alert-library-install-destination"]');
+      await select.setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+
+      const row = wrapper.find('[data-test="alert-library-install-alert-k8s/pod-oom-killed"]');
+      expect(row.exists()).toBe(true);
+      expect(row.text()).toContain("Pod OOM Killed");
+      expect(row.find('[role="checkbox"]').exists()).toBe(true);
     });
 
     it("takes the close button away while creates are in flight", async () => {
