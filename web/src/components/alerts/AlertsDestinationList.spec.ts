@@ -67,6 +67,13 @@ import router from "@/test/unit/helpers/router";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 
+const cellValue = (columns: any[], id: string, row: any) => {
+  const col = columns.find((c) => c.id === id);
+  if (col?.accessorFn) return col.accessorFn(row);
+  if (col?.accessorKey) return row[col.accessorKey];
+  return "";
+};
+
 const OTableStub = {
   name: "OTable",
   props: {
@@ -77,6 +84,14 @@ const OTableStub = {
     selection: { default: "none" },
   },
   emits: ["update:selected-ids"],
+  methods: {
+    urlOf(row: any) {
+      return cellValue(this.columns, "url", row);
+    },
+    methodOf(row: any) {
+      return cellValue(this.columns, "method", row);
+    },
+  },
   template: `
     <div data-test="o-table-stub">
       <slot name="toolbar" />
@@ -84,6 +99,12 @@ const OTableStub = {
       <slot name="actions" />
       <slot name="bottom" :totalRows="data ? data.length : 0" />
       <template v-for="row in data" :key="row.name">
+        <div :data-test="'destination-url-' + row.name">
+          <slot name="cell-url" :row="row">{{ urlOf(row) }}</slot>
+        </div>
+        <div :data-test="'destination-method-' + row.name">
+          <slot name="cell-method" :row="row">{{ methodOf(row) }}</slot>
+        </div>
         <slot name="cell-type" :row="row" />
         <slot name="cell-actions" :row="row" />
       </template>
@@ -461,6 +482,48 @@ describe("AlertsDestinationList", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.find('[data-test="destination-import"]').exists()).toBe(true);
+    });
+  });
+
+  // Email destinations persist recipients in emails[], not url. The URL
+  // column must show those recipients; Method is an HTTP field and stays blank.
+  describe("email destination URL and method cells", () => {
+    const emailDest = makeDestination(4, {
+      name: "email-ops",
+      type: "email",
+      url: "",
+      method: "post",
+      emails: ["alerts@example.com", "oncall@example.com"],
+    });
+
+    beforeEach(async () => {
+      (destinationService.list as any).mockResolvedValue({
+        data: [makeDestination(1), emailDest],
+      });
+      wrapper = mountComponent();
+      await flushPromises();
+    });
+
+    it("renders email recipients in the URL cell instead of an empty URL", () => {
+      const urlCell = wrapper!.find('[data-test="destination-url-email-ops"]');
+      expect(urlCell.exists()).toBe(true);
+      expect(urlCell.text()).toBe("alerts@example.com, oncall@example.com");
+    });
+
+    it("does not render a meaningless post method for email destinations", () => {
+      const methodCell = wrapper!.find('[data-test="destination-method-email-ops"]');
+      expect(methodCell.exists()).toBe(true);
+      expect(methodCell.text().toLowerCase()).not.toBe("post");
+      expect(methodCell.text().trim()).toBe("");
+    });
+
+    it("still renders URL and method for HTTP destinations", () => {
+      expect(wrapper!.find('[data-test="destination-url-destination-1"]').text()).toBe(
+        "https://example.com/hook-1",
+      );
+      expect(wrapper!.find('[data-test="destination-method-destination-1"]').text()).toBe(
+        "POST",
+      );
     });
   });
 });
