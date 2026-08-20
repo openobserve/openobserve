@@ -50,6 +50,39 @@ const stubs = {
     props: ["value"],
     template: `<time :datetime="String(value)">{{ value }}</time>`,
   },
+  // Mirrors the real shape: an outer table of dataset rows whose #expansion
+  // slot renders the nested experiments table (which owns the selection gutter).
+  OTable: {
+    props: ["data", "columns", "selection", "selectedIds", "isRowSelectable", "showHeader"],
+    emits: ["update:selectedIds"],
+    methods: {
+      toggle(row, checked) {
+        const next = checked
+          ? [...(this.selectedIds ?? []), row.id]
+          : (this.selectedIds ?? []).filter((id) => id !== row.id);
+        this.$emit("update:selectedIds", next);
+      },
+    },
+    template: `<table><tbody>
+      <template v-for="row in data" :key="row.id">
+        <tr>
+          <td v-if="selection === 'multiple'">
+            <input
+              type="checkbox"
+              :data-test="'ai-experiment-select-' + row.id"
+              :checked="(selectedIds ?? []).includes(row.id)"
+              :disabled="isRowSelectable ? !isRowSelectable(row) : false"
+              @change="toggle(row, $event.target.checked)"
+            />
+          </td>
+          <td v-for="col in columns" :key="col.id" :data-test="'cell-' + col.id + '-' + row.id">
+            <slot :name="'cell-' + col.id" :row="row">{{ col.accessorFn ? col.accessorFn(row) : row[col.accessorKey] }}</slot>
+          </td>
+        </tr>
+        <tr v-if="$slots.expansion"><td><slot name="expansion" :row="row" /></td></tr>
+      </template>
+    </tbody></table>`,
+  },
 };
 
 beforeEach(() => {
@@ -120,9 +153,7 @@ describe("ExperimentBrowser", () => {
       global: { stubs },
     });
 
-    const candidateCheckbox = wrapper
-      .get('[data-test="ai-experiment-row-new"]')
-      .get('input[type="checkbox"]');
+    const candidateCheckbox = wrapper.get('[data-test="ai-experiment-select-new"]');
     await candidateCheckbox.setValue(true);
 
     expect(
@@ -163,7 +194,7 @@ describe("ExperimentBrowser", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it("renders boolean and categorical aggregate evidence instead of an empty score label", () => {
+  it("gives each scorer its own column instead of one joined score label", () => {
     const row = experiment("scored", "dataset-a", 1);
     const wrapper = mount(ExperimentBrowser, {
       props: {
@@ -185,10 +216,8 @@ describe("ExperimentBrowser", () => {
       global: { stubs },
     });
 
-    const text = wrapper.get('[data-test="ai-experiment-row-scored"]').text();
-    expect(text).toContain("aiObservability.experiments.booleanScoreSummary");
-    expect(text).toContain("aiObservability.experiments.categoricalScoreSummary");
-    expect(text).not.toContain("aiObservability.experiments.noScores");
+    expect(wrapper.get('[data-test="cell-score:approved-scored"]').text()).toBe("100% true");
+    expect(wrapper.get('[data-test="cell-score:label-scored"]').text()).toBe("good × 1");
   });
 
   it("disables cross-dataset comparison after one selection", async () => {

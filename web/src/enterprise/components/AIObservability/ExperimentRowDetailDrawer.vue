@@ -6,7 +6,7 @@
     side="right"
     size="xl"
     bleed
-    :title="raw(detail?.logicalId ?? 'Experiment row')"
+    :title="raw(detail?.logicalId) || t('aiObservability.experiments.rowDetail.fallbackTitle')"
     :sub-title="snapshotLabel"
     data-test="ai-experiment-row-detail"
     @update:open="$emit('update:open', $event)"
@@ -20,10 +20,15 @@
           data-test="ai-experiment-row-previous"
           @click="navigate(detail.navigation.previousRowId)"
         >
-          {{ raw("Previous row") }}
+          {{ t("aiObservability.experiments.rowDetail.previousRow") }}
         </OButton>
         <span class="text-text-secondary text-xs">
-          {{ raw(`Row ${detail.navigation.rowIndex + 1} of ${detail.navigation.totalRows}`) }}
+          {{
+            t("aiObservability.experiments.rowDetail.rowPosition", {
+              index: detail.navigation.rowIndex + 1,
+              total: detail.navigation.totalRows,
+            })
+          }}
         </span>
         <OButton
           size="sm"
@@ -32,141 +37,225 @@
           data-test="ai-experiment-row-next"
           @click="navigate(detail.navigation.nextRowId)"
         >
-          {{ raw("Next row") }}
+          {{ t("aiObservability.experiments.rowDetail.nextRow") }}
         </OButton>
       </header>
 
       <div class="min-h-0 flex-1 space-y-5 overflow-auto px-5 py-4">
-        <section class="grid gap-3 md:grid-cols-2">
-          <EvidenceCard
-            :label="raw('Input')"
-            :value="detail.input"
+        <!-- Full-width stacked sections, matching DatasetItemDetail so an item
+             reads the same in the dataset and in an experiment row. -->
+        <section class="flex flex-col gap-1.5">
+          <div class="flex min-h-8 items-center justify-between gap-2">
+            <h4 class="text-compact text-text-heading m-0 font-semibold">
+              {{ t("aiObservability.experiments.rowDetail.input") }}
+            </h4>
+            <OButton
+              variant="outline"
+              size="sm"
+              :disabled="!hasContent(detail.input)"
+              data-test="ai-experiment-row-copy-input"
+              @click="copyContent(detail.input, 'input')"
+            >
+              <OIcon name="content-copy" size="xs" />
+            </OButton>
+          </div>
+          <div
+            class="border-border-default bg-code-bg rounded-default text-text-body h-40 overflow-auto border px-3 py-2 text-xs wrap-break-word whitespace-pre-wrap"
             data-test="ai-experiment-row-input"
-          />
-          <EvidenceCard
-            :label="raw('Expected output')"
-            :value="detail.expectedOutput"
-            :empty-label="raw('Not provided')"
+          >
+            <div
+              v-if="!hasContent(detail.input)"
+              class="text-text-secondary p-8 text-center text-sm italic"
+            >
+              {{ t("aiObservability.experiments.rowDetail.noDataAvailable") }}
+            </div>
+            <LLMContentRenderer
+              v-else-if="isPlainText(detail.input)"
+              :content="detail.input as string"
+              content-type="input"
+              view-mode="formatted"
+            />
+            <pre v-else class="m-0 font-mono text-xs break-words whitespace-pre-wrap">{{
+              pretty(detail.input)
+            }}</pre>
+          </div>
+        </section>
+
+        <section class="flex flex-col gap-1.5">
+          <div class="flex min-h-8 items-center justify-between gap-2">
+            <h4 class="text-compact text-text-heading m-0 font-semibold">
+              {{ t("aiObservability.experiments.rowDetail.expectedOutput") }}
+            </h4>
+            <OButton
+              variant="outline"
+              size="sm"
+              :disabled="!hasContent(detail.expectedOutput)"
+              data-test="ai-experiment-row-copy-expected"
+              @click="copyContent(detail.expectedOutput, 'output')"
+            >
+              <OIcon name="content-copy" size="xs" />
+            </OButton>
+          </div>
+          <div
+            class="border-border-default bg-code-bg rounded-default text-text-body h-40 overflow-auto border px-3 py-2 text-xs wrap-break-word whitespace-pre-wrap"
             data-test="ai-experiment-row-expected-output"
-          />
+          >
+            <div
+              v-if="!hasContent(detail.expectedOutput)"
+              class="text-text-secondary p-8 text-center text-sm italic"
+            >
+              {{ t("aiObservability.experiments.rowDetail.noDataAvailable") }}
+            </div>
+            <LLMContentRenderer
+              v-else-if="isPlainText(detail.expectedOutput)"
+              :content="detail.expectedOutput as string"
+              content-type="output"
+              view-mode="formatted"
+            />
+            <pre v-else class="m-0 font-mono text-xs break-words whitespace-pre-wrap">{{
+              pretty(detail.expectedOutput)
+            }}</pre>
+          </div>
         </section>
 
         <section>
-          <h3 class="text-text-primary mb-2 text-sm font-semibold">{{ raw("Trials") }}</h3>
-          <div class="flex gap-2 overflow-x-auto" role="tablist">
-            <OButton
+          <h3 class="text-text-heading mb-2 text-sm font-semibold">
+            {{
+              hasMultipleTrials
+                ? t("aiObservability.experiments.rowDetail.trials")
+                : t("aiObservability.experiments.rowDetail.execution")
+            }}
+          </h3>
+          <!-- A segmented control, not buttons: selecting a trial is a view
+               switch, so it must not look like a primary action. -->
+          <OToggleGroup v-if="hasMultipleTrials" v-model="activeTrialIndex" type="single">
+            <OToggleGroupItem
               v-for="trial in detail.trials"
               :key="trial.trialIndex"
-              size="sm"
-              :variant="trial.trialIndex === activeTrialIndex ? 'primary' : 'outline'"
-              role="tab"
-              :aria-selected="trial.trialIndex === activeTrialIndex"
+              :value="trial.trialIndex"
               :data-test="`ai-experiment-row-trial-${trial.trialIndex}`"
-              @click="activeTrialIndex = trial.trialIndex"
             >
-              {{ raw(`Trial ${trial.trialIndex + 1}`) }}
-            </OButton>
-          </div>
+              {{
+                t("aiObservability.experiments.rowDetail.trial", { index: trial.trialIndex + 1 })
+              }}
+            </OToggleGroupItem>
+          </OToggleGroup>
 
-          <div v-if="activeTrial" class="border-border-default mt-3 space-y-3 rounded border p-3">
+          <div
+            v-if="activeTrial"
+            class="border-border-default rounded-default mt-3 space-y-3 border p-3"
+          >
             <div class="flex items-center justify-between gap-2">
-              <OTag size="sm">{{ activeTrial.taskStatus }}</OTag>
-              <OButton
-                v-if="activeTrial.taskStatus === 'error'"
-                size="sm"
-                variant="primary"
-                :disabled="retrying"
-                data-test="ai-experiment-row-retry"
-                @click="$emit('retry', activeTrial)"
-              >
-                {{ raw("Retry failed slot") }}
-              </OButton>
+              <OTag size="sm" :variant="statusVariant(activeTrial.taskStatus, 'eval').variant">
+                {{ statusVariant(activeTrial.taskStatus, "eval").label }}
+              </OTag>
+              <div class="flex items-center gap-2">
+                <OButton
+                  v-if="activeTrial.execution?.traceId"
+                  size="sm"
+                  variant="outline"
+                  data-test="ai-experiment-row-trace"
+                  @click="$emit('trace', activeTrial.execution)"
+                >
+                  {{ t("aiObservability.experiments.rowDetail.viewTrace") }}
+                </OButton>
+                <OButton
+                  v-if="activeTrial.taskStatus === 'error'"
+                  size="sm"
+                  variant="outline"
+                  :disabled="retrying"
+                  data-test="ai-experiment-row-retry"
+                  @click="$emit('retry', activeTrial)"
+                >
+                  {{ t("aiObservability.experiments.rowDetail.retryFailedSlot") }}
+                </OButton>
+              </div>
             </div>
-            <EvidenceCard
-              v-if="activeTrial.execution?.output != null"
-              :label="raw('Output')"
-              :value="activeTrial.execution?.output"
-            />
+
+            <section v-if="activeTrial.execution?.output != null" class="flex flex-col gap-1.5">
+              <div class="flex min-h-8 items-center justify-between gap-2">
+                <h4 class="text-compact text-text-heading m-0 font-semibold">
+                  {{ t("aiObservability.experiments.rowDetail.output") }}
+                </h4>
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  :disabled="!hasContent(activeTrial.execution.output)"
+                  data-test="ai-experiment-row-copy-output"
+                  @click="copyContent(activeTrial.execution.output, 'output')"
+                >
+                  <OIcon name="content-copy" size="xs" />
+                </OButton>
+              </div>
+              <div
+                class="border-border-default bg-code-bg rounded-default text-text-body h-40 overflow-auto border px-3 py-2 text-xs wrap-break-word whitespace-pre-wrap"
+                data-test="ai-experiment-row-output"
+              >
+                <LLMContentRenderer
+                  v-if="isPlainText(activeTrial.execution.output)"
+                  :content="activeTrial.execution.output as string"
+                  content-type="output"
+                  view-mode="formatted"
+                />
+                <pre v-else class="m-0 font-mono text-xs break-words whitespace-pre-wrap">{{
+                  pretty(activeTrial.execution.output)
+                }}</pre>
+              </div>
+            </section>
+
             <p v-if="activeTrial.execution?.errorMessage" class="text-negative text-sm">
-              {{ activeTrial.execution.errorMessage }}
+              {{ raw(activeTrial.execution.errorMessage) }}
             </p>
-            <dl class="text-text-secondary grid grid-cols-2 gap-x-4 gap-y-2 text-xs md:grid-cols-3">
-              <ExecutionFact
-                label="Latency"
-                :value="milliseconds(activeTrial.execution?.latencyMs)"
-              />
-              <ExecutionFact
-                label="Input tokens"
-                :value="numberValue(activeTrial.execution?.tokensIn)"
-              />
-              <ExecutionFact
-                label="Output tokens"
-                :value="numberValue(activeTrial.execution?.tokensOut)"
-              />
-              <ExecutionFact label="Cost" :value="costValue(activeTrial.execution?.cost)" />
-              <ExecutionFact
-                label="Task fingerprint"
-                :value="activeTrial.execution?.taskFingerprint ?? '—'"
-              />
-            </dl>
-            <OButton
-              v-if="activeTrial.execution?.traceId"
-              size="sm"
-              variant="outline"
-              data-test="ai-experiment-row-trace"
-              @click="$emit('trace', activeTrial.execution)"
+
+            <div
+              class="text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+              data-test="ai-experiment-row-execution-facts"
             >
-              {{ raw("View trace") }}
-            </OButton>
+              <span>
+                {{ t("aiObservability.experiments.rowDetail.latency") }}
+                <span class="text-text-body">{{
+                  raw(milliseconds(activeTrial.execution?.latencyMs))
+                }}</span>
+              </span>
+              <span>
+                {{ t("aiObservability.experiments.rowDetail.inputTokens") }}
+                <span class="text-text-body">{{
+                  raw(numberValue(activeTrial.execution?.tokensIn))
+                }}</span>
+              </span>
+              <span>
+                {{ t("aiObservability.experiments.rowDetail.outputTokens") }}
+                <span class="text-text-body">{{
+                  raw(numberValue(activeTrial.execution?.tokensOut))
+                }}</span>
+              </span>
+              <span>
+                {{ t("aiObservability.experiments.rowDetail.cost") }}
+                <span class="text-text-body">{{
+                  raw(costValue(activeTrial.execution?.cost))
+                }}</span>
+              </span>
+            </div>
           </div>
         </section>
 
         <section>
-          <h3 class="text-text-primary mb-2 text-sm font-semibold">{{ raw("Score matrix") }}</h3>
-          <div class="border-border-default overflow-x-auto rounded border">
-            <table class="w-full text-left text-xs" data-test="ai-experiment-row-score-matrix">
-              <thead class="bg-code-bg text-text-secondary">
-                <tr>
-                  <th class="p-2">{{ raw("Dimension") }}</th>
-                  <th v-for="trial in detail.trials" :key="trial.trialIndex" class="p-2">
-                    {{ raw(`Trial ${trial.trialIndex + 1}`) }}
-                  </th>
-                  <th class="p-2">{{ raw("Aggregate") }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="summary in detail.scoreSummaries"
-                  :key="`${summary.scorerId}:${summary.scorerVersion}`"
-                  class="border-border-default border-t align-top"
-                >
-                  <th class="p-2 font-medium">
-                    {{ raw(`${summary.scorerId} · v${summary.scorerVersion}`) }}
-                  </th>
-                  <td v-for="trial in detail.trials" :key="trial.trialIndex" class="p-2">
-                    <template v-if="scoreFor(trial, summary)">
-                      <div>{{ scoreValue(scoreFor(trial, summary)?.score) }}</div>
-                      <p
-                        v-if="scoreReasoning(scoreFor(trial, summary)?.score)"
-                        class="text-text-secondary mt-1"
-                      >
-                        {{ scoreReasoning(scoreFor(trial, summary)?.score) }}
-                      </p>
-                      <OTag
-                        v-if="isClientReported(scoreFor(trial, summary)?.score)"
-                        size="sm"
-                        class="mt-1"
-                      >
-                        {{ raw("Client reported") }}
-                      </OTag>
-                    </template>
-                    <span v-else class="text-text-secondary">—</span>
-                  </td>
-                  <td class="p-2">{{ format(summary.value) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <h3 class="text-text-heading mb-2 text-sm font-semibold">
+            {{ t("aiObservability.experiments.rowDetail.scores") }}
+          </h3>
+          <OTable
+            :data="scoreRows"
+            :columns="scoreColumns"
+            row-key="key"
+            :show-global-filter="false"
+            :fill-height="false"
+            :frame="false"
+            pagination="none"
+            :default-columns="false"
+            width="100%"
+            class="w-full"
+            data-test="ai-experiment-row-score-matrix"
+          />
         </section>
       </div>
     </div>
@@ -175,12 +264,19 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { raw } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { copyToClipboard } from "@/utils/clipboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import EvidenceCard from "./ExperimentRowEvidenceCard.vue";
-import ExecutionFact from "./ExperimentExecutionFact.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import type {
   ExperimentExecution,
   ExperimentResultSlot,
@@ -201,6 +297,8 @@ const emit = defineEmits<{
   trace: [execution: ExperimentExecution];
 }>();
 
+const { t } = useI18nTyped();
+
 const activeTrialIndex = ref(0);
 watch(
   () => props.detail?.rowId,
@@ -208,16 +306,130 @@ watch(
   { immediate: true },
 );
 
+const hasMultipleTrials = computed(() => (props.detail?.trials.length ?? 0) > 1);
+
 const activeTrial = computed(() =>
   props.detail?.trials.find((trial) => trial.trialIndex === activeTrialIndex.value),
 );
+
 const snapshotLabel = computed(() =>
-  raw(
-    props.detail
-      ? `${props.detail.snapshot.datasetId} · snapshot v${props.detail.snapshot.datasetVersion}`
-      : "Pinned snapshot",
-  ),
+  props.detail
+    ? t("aiObservability.experiments.rowDetail.snapshot", {
+        version: props.detail.snapshot.datasetVersion,
+      })
+    : raw(""),
 );
+
+/** The score records are the only place a scorer's display name exists. */
+const scorerNames = computed<Record<string, string>>(() => {
+  const names: Record<string, string> = {};
+  for (const trial of props.detail?.trials ?? []) {
+    for (const entry of trial.scores) {
+      const record = entry.score as Record<string, unknown> | undefined;
+      const id = String(record?.scorer_id ?? record?.scorerId ?? entry.scorerId ?? "");
+      const name = String(record?.name ?? "");
+      if (id && name && !names[id]) names[id] = name;
+    }
+  }
+  return names;
+});
+
+const scoreColumns = computed<OTableColumnDef[]>(() => [
+  {
+    id: "scorer",
+    header: t("aiObservability.experiments.rowDetail.scorer"),
+    accessorKey: "scorer",
+    sortable: false,
+    minSize: 160,
+    meta: { align: "left" as const, flex: true, isName: true },
+  },
+  ...(hasMultipleTrials.value
+    ? (props.detail?.trials ?? []).map((trial) => ({
+        id: `trial-${trial.trialIndex}`,
+        header: t("aiObservability.experiments.rowDetail.trial", { index: trial.trialIndex + 1 }),
+        accessorKey: `trial-${trial.trialIndex}`,
+        sortable: false,
+        size: 120,
+        meta: { align: "left" as const },
+      }))
+    : []),
+  {
+    id: "aggregate",
+    header: hasMultipleTrials.value
+      ? t("aiObservability.experiments.rowDetail.aggregate")
+      : t("aiObservability.experiments.rowDetail.score"),
+    accessorKey: "aggregate",
+    sortable: false,
+    size: 120,
+    meta: { align: "left" as const },
+  },
+]);
+
+const scoreRows = computed(() =>
+  (props.detail?.scoreSummaries ?? []).map((summary) => {
+    const row: Record<string, string> = {
+      key: `${summary.scorerId}:${summary.scorerVersion}`,
+      scorer: scorerNames.value[summary.scorerId] ?? summary.scorerId,
+      aggregate: format(summary.value),
+    };
+    for (const trial of props.detail?.trials ?? []) {
+      row[`trial-${trial.trialIndex}`] = scoreValue(scoreFor(trial, summary)?.score);
+    }
+    return row;
+  }),
+);
+
+// Same emptiness rules and copy behaviour as TraceDetailsSidebar.
+function hasContent(content: unknown): boolean {
+  if (content === null || content === undefined) return false;
+  if (typeof content === "string") {
+    const trimmed = content.trim();
+    if (trimmed === "" || trimmed.toLowerCase() === "null") return false;
+  }
+  if (Array.isArray(content) && content.length === 0) return false;
+  if (typeof content === "object" && !Array.isArray(content) && Object.keys(content).length === 0) {
+    return false;
+  }
+  const stringified = JSON.stringify(content);
+  return !(stringified === "null" || stringified === "{}" || stringified === "[]");
+}
+
+function copyContent(content: unknown, type: "input" | "output") {
+  try {
+    const text =
+      typeof content === "string" ? content : content ? JSON.stringify(content, null, 2) : "";
+    copyToClipboard(text, t, {
+      successMessage: t("aiObservability.experiments.rowDetail.copied", {
+        type: type === "input" ? "Input" : "Output",
+      }),
+      errorMessage: t("aiObservability.experiments.rowDetail.copyFailed"),
+    });
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.experiments.rowDetail.copyFailed") });
+  }
+}
+
+function isPlainText(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  try {
+    JSON.parse(value);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function pretty(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      return value;
+    }
+  }
+  return JSON.stringify(value, null, 2);
+}
 
 function navigate(rowId: string | null) {
   if (rowId) emit("navigate", rowId);
@@ -234,15 +446,6 @@ function scoreValue(score: Record<string, unknown> | null | undefined) {
   return String(
     score.value_numeric ?? score.value_categorical ?? score.value_boolean ?? score.status ?? "—",
   );
-}
-
-function scoreReasoning(score: Record<string, unknown> | null | undefined) {
-  return typeof score?.reasoning === "string" ? score.reasoning : "";
-}
-
-function isClientReported(score: Record<string, unknown> | null | undefined) {
-  const origin = String(score?.origin_source_type ?? score?.originSourceType ?? "");
-  return origin === "remote" || origin === "feedback";
 }
 
 function format(value: unknown) {

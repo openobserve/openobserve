@@ -799,6 +799,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-experiments": {
+    illustration: "query",
+    variant: "create",
+    titleKey: "emptyState.noExperiments.title",
+    descriptionKey: "emptyState.noExperiments.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noExperiments.action",
+        descriptionKey: "emptyState.noExperiments.actionDesc",
+      },
+    ],
+  },
   "no-eval-jobs": {
     illustration: "schedule",
     variant: "create",
@@ -882,6 +896,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-regex-patterns": "emptyState.nouns.regexPatterns",
   "no-scorers": "emptyState.nouns.scorers",
   "no-eval-jobs": "emptyState.nouns.evalJobs",
+  "no-experiments": "emptyState.nouns.experiments",
   "no-score-configs": "emptyState.nouns.scoreConfigs",
   "no-pipeline-history": "emptyState.nouns.pipelineHistory",
   "no-synthetic-monitors": "emptyState.nouns.monitors",

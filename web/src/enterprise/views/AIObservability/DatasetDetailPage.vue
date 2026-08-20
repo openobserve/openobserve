@@ -179,7 +179,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :details="experimentDetails"
           :fixed-dataset-id="datasetId"
           compact
-          @select="openExperiment"
           @open-filtered="openExperiments"
         />
       </div>
@@ -456,15 +455,6 @@ async function refreshExperiments() {
 
 function openExperiments() {
   router.push(aiExperimentsRoute(orgId.value, { datasetId: datasetId.value }));
-}
-
-function openExperiment(experimentId: string) {
-  router.push(
-    aiExperimentsRoute(orgId.value, {
-      datasetId: datasetId.value,
-      selectedId: experimentId,
-    }),
-  );
 }
 
 function onPageChange(page: number) {

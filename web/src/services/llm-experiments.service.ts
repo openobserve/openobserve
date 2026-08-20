@@ -94,6 +94,8 @@ export interface ExperimentApplicability {
 export interface LlmExperiment extends ExperimentCreatePayload {
   id: string;
   orgId: string;
+  /** Resolved server-side from the pinned dataset; null when it was deleted. */
+  datasetName: string | null;
   scorers: PinnedExperimentScorer[];
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
   statusReason: string | null;
@@ -146,6 +148,20 @@ export interface ExperimentRowDetail {
   scoreSummaries: ExperimentScoreSummary[];
 }
 
+export interface ExperimentRowDispersion {
+  rowId: string;
+  logicalId: string;
+  /** Highest normalized spread across this row's trials; null when not computed. */
+  maxNormalized: number | null;
+  high: boolean;
+  outlierTrialIndex: number | null;
+}
+
+export interface ExperimentDispersionSummary {
+  highDispersionRowCount: number;
+  threshold: number;
+}
+
 export interface ExperimentResults {
   executions: ExperimentExecution[];
   scores: Record<string, unknown>[];
@@ -156,6 +172,8 @@ export interface ExperimentResults {
   skipSummary?: ExperimentSkipSummary;
   scoreSummaries?: ExperimentScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary;
+  rowDispersions?: ExperimentRowDispersion[];
+  dispersionSummary?: ExperimentDispersionSummary;
 }
 
 export interface ExperimentResultScore {
@@ -213,12 +231,7 @@ export interface ExperimentScoreSummary {
 }
 
 export type ExperimentComparisonBucket =
-  | "regressed"
-  | "improved"
-  | "unchanged"
-  | "inconclusive"
-  | "new"
-  | "missing";
+  "regressed" | "improved" | "unchanged" | "inconclusive" | "new" | "missing";
 
 export type ExperimentComparisonAssignment =
   | "regressed"
@@ -383,6 +396,7 @@ function normalizeExperiment(input: any): LlmExperiment {
     name: input.name,
     description: input.description ?? null,
     datasetId: value(input, "datasetId", "dataset_id", ""),
+    datasetName: value(input, "datasetName", "dataset_name", null),
     datasetVersion: Number(value(input, "datasetVersion", "dataset_version", 0)),
     datasetFilter: value(input, "datasetFilter", "dataset_filter", null),
     task: input.task,
@@ -404,13 +418,31 @@ function normalizeExperiment(input: any): LlmExperiment {
   };
 }
 
+function numberOrNull(input: unknown): number | null {
+  return input === null || input === undefined || input === "" ? null : Number(input);
+}
+
 function normalizeResults(input: any): ExperimentResults {
   const taskProgress = value<any>(input, "taskProgress", "task_progress", {});
   const scoringProgress = value<any>(input, "scoringProgress", "scoring_progress", {});
   const skipSummary = value<any>(input, "skipSummary", "skip_summary", {});
   const pagination = value<any>(input, "pagination", "pagination", {});
   const aggregateSummary = value<any>(input, "aggregateSummary", "aggregate_summary", {});
+  const dispersionSummary = value<any>(input, "dispersionSummary", "dispersion_summary", {});
   return {
+    rowDispersions: value<any[]>(input, "rowDispersions", "row_dispersions", []).map((row) => ({
+      rowId: String(value(row, "rowId", "row_id", "")),
+      logicalId: String(value(row, "logicalId", "logical_id", "")),
+      maxNormalized: numberOrNull(value(row, "maxNormalized", "max_normalized", null)),
+      high: Boolean(row?.high),
+      outlierTrialIndex: numberOrNull(value(row, "outlierTrialIndex", "outlier_trial_index", null)),
+    })),
+    dispersionSummary: {
+      highDispersionRowCount: Number(
+        value(dispersionSummary, "highDispersionRowCount", "high_dispersion_row_count", 0),
+      ),
+      threshold: Number(value(dispersionSummary, "threshold", "threshold", 0)),
+    },
     executions: (input?.executions ?? []).map(normalizeExecution),
     scores: Array.isArray(input?.scores) ? input.scores : [],
     slots: value<any[]>(input, "slots", "slots", []).map(normalizeResultSlot),

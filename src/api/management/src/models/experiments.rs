@@ -670,6 +670,9 @@ pub struct ExperimentResponseBody {
     pub name: String,
     pub description: Option<String>,
     pub dataset_id: String,
+    /// Resolved from the Dataset the experiment pinned, so callers do not have
+    /// to fetch the Dataset list just to label a run. None when it was deleted.
+    pub dataset_name: Option<String>,
     pub dataset_version: i64,
     pub dataset_filter: Option<DatasetSnapshotFilterBody>,
     pub task: ExperimentTaskBody,
@@ -687,6 +690,15 @@ pub struct ExperimentResponseBody {
     pub created_at: i64,
 }
 
+impl ExperimentResponseBody {
+    /// The conversion is sync, so the Dataset name is filled in by the handler
+    /// that has already loaded it.
+    pub fn with_dataset_name(mut self, dataset_name: Option<String>) -> Self {
+        self.dataset_name = dataset_name;
+        self
+    }
+}
+
 impl From<Experiment> for ExperimentResponseBody {
     fn from(value: Experiment) -> Self {
         Self {
@@ -695,6 +707,7 @@ impl From<Experiment> for ExperimentResponseBody {
             name: value.name,
             description: value.description,
             dataset_id: value.dataset_id,
+            dataset_name: None,
             dataset_version: value.dataset_version,
             dataset_filter: value.dataset_filter.map(Into::into),
             task: value.task.into(),

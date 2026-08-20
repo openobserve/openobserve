@@ -3,7 +3,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { nextTick, reactive } from "vue";
+import { reactive } from "vue";
 import type { ExperimentDetail } from "@/services/llm-experiments.service";
 import { makeExperiment, makeExperimentDetail } from "./experimentTestFixtures";
 
@@ -86,6 +86,36 @@ beforeEach(() => {
   getExperimentRow.mockReset();
 });
 
+describe("ExperimentsPage empty state", () => {
+  it("renders the no-experiments preset and creates from it", async () => {
+    const service = (await import("@/services/llm-experiments.service")).default;
+    (service.list as any).mockResolvedValueOnce([]);
+    route.query = {};
+
+    const wrapper = mount(ExperimentsPage, {
+      global: {
+        stubs: {
+          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
+          ExperimentBrowser: true,
+          OEmptyState: {
+            props: ["preset"],
+            template: `<div data-test="ai-experiments-empty" :data-preset="preset"
+              @click="$emit('action')"></div>`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    const empty = wrapper.find('[data-test="ai-experiments-empty"]');
+    expect(empty.exists()).toBe(true);
+    expect(empty.attributes("data-preset")).toBe("no-experiments");
+
+    await empty.trigger("click");
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "aiExperimentCreate" }));
+  });
+});
+
 describe("ExperimentsPage navigation", () => {
   it("loads the deep-linked comparison and fetches each side with its retained row ID", async () => {
     const comparisonRow = {
@@ -159,317 +189,5 @@ describe("ExperimentsPage navigation", () => {
     await flushPromises();
     expect(getExperimentRow).toHaveBeenNthCalledWith(1, "acme", "one", "old-row");
     expect(getExperimentRow).toHaveBeenNthCalledWith(2, "acme", "two", "new-row");
-  });
-
-  it("shows skip tiers, typed status, and scorer sample counts", async () => {
-    const row = experiment("one");
-    details.set(
-      "one",
-      makeExperimentDetail(row, {
-        preview: {
-          ...makeExperimentDetail(row).preview,
-          applicability: {
-            fullySkippedRowCount: 1,
-            partiallySkippedRowCount: 1,
-            fullySkippedSlotCount: 1,
-            partiallySkippedSlotCount: 1,
-            eligibleTaskSlotCount: 1,
-            eligibleScoringDimensionCount: 1,
-            scorerApplicability: [],
-          },
-        },
-        results: {
-          executions: [
-            {
-              experimentId: row.id,
-              itemLogicalId: "case-1",
-              rowId: "row-1",
-              trialIndex: 0,
-              status: "skipped",
-              skipReason: "no_reference",
-              output: null,
-              errorMessage: null,
-              latencyMs: null,
-              tokensIn: null,
-              tokensOut: null,
-              cost: null,
-              traceId: null,
-              timestamp: 1,
-            },
-          ],
-          scores: [
-            {
-              id: "score-reference",
-              name: "reference-quality",
-              status: "skipped",
-              skip_reason: "no_reference",
-            },
-            {
-              id: "score-trace",
-              name: "trace-quality",
-              status: "skipped",
-              skip_reason: "no_trace",
-            },
-          ],
-          slots: [
-            {
-              rowId: "row-1",
-              logicalId: "case-1",
-              trialIndex: 0,
-              input: null,
-              expectedOutput: null,
-              taskStatus: "skipped",
-              execution: {
-                experimentId: row.id,
-                itemLogicalId: "case-1",
-                rowId: "row-1",
-                trialIndex: 0,
-                status: "skipped",
-                skipReason: "no_reference",
-                output: null,
-                errorMessage: null,
-                latencyMs: null,
-                tokensIn: null,
-                tokensOut: null,
-                cost: null,
-                traceId: null,
-                timestamp: 1,
-              },
-              scores: [
-                {
-                  scorerId: "reference-quality",
-                  scorerVersion: 1,
-                  status: "skipped",
-                  score: {
-                    name: "reference-quality",
-                    status: "skipped",
-                    skip_reason: "no_reference",
-                  },
-                },
-                {
-                  scorerId: "trace-quality",
-                  scorerVersion: 1,
-                  status: "skipped",
-                  score: {
-                    name: "trace-quality",
-                    status: "skipped",
-                    skip_reason: "no_trace",
-                  },
-                },
-              ],
-            },
-          ],
-          taskProgress: { completed: 0, total: 1, skipped: 1 },
-          scoringProgress: { completed: 0, total: 1, skipped: 1 },
-          skipSummary: {
-            fullySkippedSlots: 1,
-            partiallySkippedSlots: 0,
-            skippedDimensions: 1,
-            noReferenceDimensions: 1,
-            noTraceDimensions: 0,
-          },
-          scoreSummaries: [
-            {
-              scorerId: "quality",
-              scorerVersion: 2,
-              sampleCount: 0,
-              errorCount: 0,
-              pendingCount: 0,
-              noReferenceCount: 1,
-              noTraceCount: 1,
-              skippedCount: 2,
-              value: { kind: "numeric", mean: 0.75 },
-            },
-          ],
-          aggregateSummary: {
-            p50LatencyMs: 12,
-            totalCost: 0.002,
-            incomplete: true,
-            incompleteTaskSlots: 1,
-            incompleteScoreDimensions: 1,
-          },
-        },
-      }),
-    );
-    const wrapper = mount(ExperimentsPage, {
-      global: {
-        stubs: {
-          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
-          ExperimentBrowser: true,
-          OButton: true,
-          OTag: { template: `<span><slot /></span>` },
-          OInput: true,
-          OTextarea: true,
-          OSelect: true,
-        },
-      },
-    });
-    await flushPromises();
-
-    expect(wrapper.findAll("progress")).toHaveLength(2);
-    expect(wrapper.findAll('[data-test="ai-experiment-result-slot"]')).toHaveLength(1);
-    expect(wrapper.get('[data-test="ai-experiment-progress-summary"]').text()).toContain(
-      "aiObservability.experiments.taskProgress",
-    );
-    expect(wrapper.get('[data-test="ai-experiment-results"]').text()).toContain("no_reference");
-    const results = wrapper.get('[data-test="ai-experiment-results"]').text();
-    expect(results).toContain("reference-quality: skipped (no_reference)");
-    expect(results).toContain("trace-quality: skipped (no_trace)");
-    expect(wrapper.get('[data-test="ai-experiment-score-summaries"]').text()).toContain(
-      "quality · v2: 0 samples, 1 no reference, 1 no trace",
-    );
-    expect(wrapper.text()).toContain('"mean": 0.75');
-  });
-
-  it("updates the selected detail when Back/Forward changes the deep link", async () => {
-    const wrapper = mount(ExperimentsPage, {
-      global: {
-        stubs: {
-          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
-          ExperimentBrowser: true,
-          OButton: true,
-          OTag: true,
-          OInput: true,
-          OTextarea: true,
-          OSelect: true,
-        },
-      },
-    });
-    await flushPromises();
-    expect(wrapper.get('[data-test="ai-experiment-detail-preview"]').text()).toContain(
-      "Experiment one",
-    );
-
-    route.query = { selected: "two" };
-    await nextTick();
-    await flushPromises();
-    expect(wrapper.get('[data-test="ai-experiment-detail-preview"]').text()).toContain(
-      "Experiment two",
-    );
-
-    route.query = {};
-    await nextTick();
-    expect(wrapper.find('[data-test="ai-experiment-detail-preview"]').exists()).toBe(false);
-    expect(replace).not.toHaveBeenCalled();
-  });
-
-  it("shows and invokes only the lifecycle action allowed by the current state", async () => {
-    const running = makeExperiment({ id: "one", name: "Experiment one", status: "running" });
-    details.set("one", makeExperimentDetail(running));
-    cancelExperiment.mockResolvedValue({
-      ...running,
-      status: "cancelled",
-      statusReason: "user_cancelled",
-      lifecycleVersion: 1,
-      completedAt: 1_800_000_000_100,
-    });
-    const wrapper = mount(ExperimentsPage, {
-      global: {
-        stubs: {
-          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
-          ExperimentBrowser: true,
-          OButton: {
-            template: `<button v-bind="$attrs"><slot /></button>`,
-          },
-          OTag: true,
-          OInput: true,
-          OTextarea: true,
-          OSelect: true,
-        },
-      },
-    });
-    await flushPromises();
-
-    expect(wrapper.find('[data-test="ai-experiment-cancel"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="ai-experiment-retry"]').exists()).toBe(false);
-    await wrapper.get('[data-test="ai-experiment-cancel"]').trigger("click");
-    await flushPromises();
-    expect(cancelExperiment).toHaveBeenCalledWith("acme", "one");
-    expect(cancelExperiment).toHaveBeenCalledTimes(1);
-    expect(wrapper.find('[data-test="ai-experiment-cancel"]').exists()).toBe(false);
-
-    const failed = makeExperiment({
-      ...running,
-      status: "failed",
-      statusReason: "deadline_exceeded",
-      lifecycleVersion: 2,
-    });
-    details.set("one", makeExperimentDetail(failed));
-    retryExperiment.mockResolvedValue({
-      ...failed,
-      status: "running",
-      statusReason: null,
-      lifecycleVersion: 3,
-      retryCount: 1,
-      completedAt: null,
-    });
-    wrapper.unmount();
-    route.query = { selected: "one" };
-    const retryWrapper = mount(ExperimentsPage, {
-      global: {
-        stubs: {
-          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
-          ExperimentBrowser: true,
-          OButton: {
-            template: `<button v-bind="$attrs"><slot /></button>`,
-          },
-          OTag: true,
-          OInput: true,
-          OTextarea: true,
-          OSelect: true,
-        },
-      },
-    });
-    await flushPromises();
-
-    expect(retryWrapper.find('[data-test="ai-experiment-retry"]').exists()).toBe(true);
-    expect(retryWrapper.find('[data-test="ai-experiment-cancel"]').exists()).toBe(false);
-    await retryWrapper.get('[data-test="ai-experiment-retry"]').trigger("click");
-    await flushPromises();
-    expect(retryExperiment).toHaveBeenCalledWith("acme", "one");
-    expect(retryExperiment).toHaveBeenCalledTimes(1);
-    expect(retryWrapper.find('[data-test="ai-experiment-retry"]').exists()).toBe(false);
-
-    const cancelled = makeExperiment({
-      ...running,
-      status: "cancelled",
-      statusReason: "user_cancelled",
-      lifecycleVersion: 4,
-    });
-    const cloned = makeExperiment({
-      ...cancelled,
-      id: "clone-one",
-      name: "Experiment one (copy)",
-      status: "pending",
-      statusReason: null,
-      lifecycleVersion: 0,
-      retryCount: 0,
-    });
-    details.set("one", makeExperimentDetail(cancelled));
-    details.set("clone-one", makeExperimentDetail(cloned));
-    cloneExperiment.mockResolvedValue(cloned);
-    retryWrapper.unmount();
-    route.query = { selected: "one" };
-    const cloneWrapper = mount(ExperimentsPage, {
-      global: {
-        stubs: {
-          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
-          ExperimentBrowser: true,
-          OButton: { template: `<button v-bind="$attrs"><slot /></button>` },
-          OTag: true,
-          OInput: true,
-          OTextarea: true,
-          OSelect: true,
-        },
-      },
-    });
-    await flushPromises();
-
-    expect(cloneWrapper.find('[data-test="ai-experiment-clone"]').exists()).toBe(true);
-    await cloneWrapper.get('[data-test="ai-experiment-clone"]').trigger("click");
-    await flushPromises();
-    expect(cloneExperiment).toHaveBeenCalledWith("acme", "one");
-    expect(cloneExperiment).toHaveBeenCalledTimes(1);
-    expect(cloneWrapper.text()).toContain("Experiment one (copy)");
   });
 });
