@@ -143,86 +143,86 @@ watch(flatEmojis, (list) => {
        renders no element of its own, so this span is what the badge positions
        against. -->
   <span class="relative inline-flex">
-  <OPopover
-    v-model:open="open"
-    side="bottom"
-    align="start"
-    :z-index="popoverZIndex"
-    content-class="w-72 p-2"
-  >
-    <template #trigger>
-      <button
-        type="button"
-        :disabled="disabled"
-        :aria-label="ariaLabel ?? t('components.emojiPicker.chooseIcon')"
-        data-test="emoji-picker-trigger"
-        :class="[
-          'rounded-default ring-offset-surface-base inline-flex shrink-0 items-center justify-center border leading-none transition-colors outline-none',
-          'focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1',
-          triggerClasses[size],
-          modelValue
-            ? 'border-border-default bg-surface-base hover:bg-surface-subtle-hover'
-            : 'border-border-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading border-dashed',
-          disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
-        ]"
-      >
-        <OGlyph v-if="modelValue" :token="modelValue" :size="size === 'sm' ? 'md' : 'lg'" />
-        <OIcon v-else name="add" size="sm" />
-      </button>
-    </template>
-
-    <div class="flex flex-col gap-2">
-      <OSearchInput
-        v-model="query"
-        size="sm"
-        :placeholder="t('components.emojiPicker.searchPlaceholder')"
-        data-test="emoji-picker-search"
-      />
-
-      <div
-        ref="gridRef"
-        class="-mx-1 flex max-h-64 flex-col gap-2 overflow-y-auto px-1 py-1"
-        @keydown="onGridKeydown"
-      >
-        <div v-for="group in visibleGroups" :key="group.id" class="flex flex-col gap-1">
-          <span class="text-text-secondary text-2xs px-0.5 font-medium">
-            {{ t(group.labelKey) }}
-          </span>
-          <div class="grid grid-cols-7 justify-items-center gap-1">
-            <button
-              v-for="option in group.emojis"
-              :key="option.token"
-              type="button"
-              data-emoji-cell
-              :data-test="`emoji-picker-option-${option.keywords[0]}`"
-              :tabindex="indexOf(option) === activeIndex ? 0 : -1"
-              :aria-label="option.keywords[0]"
-              :aria-pressed="option.token === modelValue"
-              :class="[
-                'rounded-default ring-offset-surface-base inline-flex h-8 w-8 cursor-pointer items-center justify-center text-lg leading-none transition-colors outline-none',
-                'focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1',
-                option.token === modelValue
-                  ? 'bg-surface-accent-active ring-accent ring-1'
-                  : 'hover:bg-surface-subtle-hover',
-              ]"
-              @click="choose(option.token)"
-              @focus="activeIndex = indexOf(option)"
-            >
-              <OGlyph :token="option.token" size="md" />
-            </button>
-          </div>
-        </div>
-
-        <p
-          v-if="!visibleGroups.length"
-          class="text-text-secondary px-0.5 py-4 text-center text-xs"
-          data-test="emoji-picker-empty"
+    <OPopover
+      v-model:open="open"
+      side="bottom"
+      align="start"
+      :z-index="popoverZIndex"
+      content-class="w-72 p-2"
+    >
+      <template #trigger>
+        <button
+          type="button"
+          :disabled="disabled"
+          :aria-label="ariaLabel ?? t('components.emojiPicker.chooseIcon')"
+          data-test="emoji-picker-trigger"
+          :class="[
+            'rounded-default ring-offset-surface-base inline-flex shrink-0 items-center justify-center border leading-none transition-colors outline-none',
+            'focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1',
+            triggerClasses[size],
+            modelValue
+              ? 'border-border-default bg-surface-base hover:bg-surface-subtle-hover'
+              : 'border-border-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading border-dashed',
+            disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+          ]"
         >
-          {{ t("components.emojiPicker.noResults") }}
-        </p>
+          <OGlyph v-if="modelValue" :token="modelValue" :size="size === 'sm' ? 'md' : 'lg'" />
+          <OIcon v-else name="add" size="sm" />
+        </button>
+      </template>
+
+      <div class="flex flex-col gap-2">
+        <OSearchInput
+          v-model="query"
+          size="sm"
+          :placeholder="t('components.emojiPicker.searchPlaceholder')"
+          data-test="emoji-picker-search"
+        />
+
+        <div
+          ref="gridRef"
+          class="-mx-1 flex max-h-64 flex-col gap-2 overflow-y-auto px-1 py-1"
+          @keydown="onGridKeydown"
+        >
+          <div v-for="group in visibleGroups" :key="group.id" class="flex flex-col gap-1">
+            <span class="text-text-secondary text-2xs px-0.5 font-medium">
+              {{ t(group.labelKey) }}
+            </span>
+            <div class="grid grid-cols-7 justify-items-center gap-1">
+              <button
+                v-for="option in group.emojis"
+                :key="option.token"
+                type="button"
+                data-emoji-cell
+                :data-test="`emoji-picker-option-${option.keywords[0]}`"
+                :tabindex="indexOf(option) === activeIndex ? 0 : -1"
+                :aria-label="option.keywords[0]"
+                :aria-pressed="option.token === modelValue"
+                :class="[
+                  'rounded-default ring-offset-surface-base inline-flex h-8 w-8 cursor-pointer items-center justify-center text-lg leading-none transition-colors outline-none',
+                  'focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1',
+                  option.token === modelValue
+                    ? 'bg-surface-accent-active ring-accent ring-1'
+                    : 'hover:bg-surface-subtle-hover',
+                ]"
+                @click="choose(option.token)"
+                @focus="activeIndex = indexOf(option)"
+              >
+                <OGlyph :token="option.token" size="md" />
+              </button>
+            </div>
+          </div>
+
+          <p
+            v-if="!visibleGroups.length"
+            class="text-text-secondary px-0.5 py-4 text-center text-xs"
+            data-test="emoji-picker-empty"
+          >
+            {{ t("components.emojiPicker.noResults") }}
+          </p>
+        </div>
       </div>
-    </div>
-  </OPopover>
+    </OPopover>
 
     <button
       v-if="modelValue && !disabled"

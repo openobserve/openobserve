@@ -78,9 +78,7 @@ describe("emojiCatalog", () => {
   // covers the second case, since "o2:ai-…" also starts with "o2:".
   it("should offer every allowlisted AI integration in the picker", () => {
     const offered = new Set(ALL_EMOJIS.map((option) => option.token));
-    const unreachable = AI_GLYPH_SLUGS.filter(
-      (slug) => !offered.has(`${AI_GLYPH_PREFIX}${slug}`),
-    );
+    const unreachable = AI_GLYPH_SLUGS.filter((slug) => !offered.has(`${AI_GLYPH_PREFIX}${slug}`));
     expect(unreachable).toEqual([]);
   });
 

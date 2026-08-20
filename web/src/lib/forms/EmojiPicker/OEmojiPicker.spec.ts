@@ -86,14 +86,14 @@ describe("OEmojiPicker", () => {
     const clear = panelQuery<HTMLButtonElement>('[data-test="emoji-picker-clear"]');
     expect(clear).not.toBeNull();
     // Panel never opened, so the grid must not be in the document.
-    expect(panelQuery('[data-emoji-cell]')).toBeNull();
+    expect(panelQuery("[data-emoji-cell]")).toBeNull();
 
     clear!.click();
     await nextTick();
     expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([null]);
     expect(wrapper.emitted("select")?.[0]).toEqual([null]);
     // It is a sibling of PopoverTrigger, so clearing must not open the picker.
-    expect(panelQuery('[data-emoji-cell]')).toBeNull();
+    expect(panelQuery("[data-emoji-cell]")).toBeNull();
   });
 
   it("should show no clear control while there is nothing to clear", () => {
