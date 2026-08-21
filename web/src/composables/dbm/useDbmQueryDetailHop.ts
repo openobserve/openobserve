@@ -49,10 +49,7 @@ import type { ComputedRef, Ref } from "vue";
 import { setDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
 import type { DbmRange } from "@/composables/dbm/useDbmScope";
 import type { QueryStatsRow } from "@/services/db_monitoring";
-import {
-  DBM_ORIGIN_QUERY_KEY,
-  type DbmQueryDetailOrigin,
-} from "@/utils/dbm/queryDetailOrigin";
+import { DBM_ORIGIN_QUERY_KEY, type DbmQueryDetailOrigin } from "@/utils/dbm/queryDetailOrigin";
 
 /** What a page hands over per hop. */
 export interface DbmQueryDetailHopOptions {

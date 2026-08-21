@@ -177,10 +177,9 @@ describe("a named query that missed its scope keeps the page", () => {
   });
 
   it("says so inline instead of replacing the page", () => {
-    expect(
-      template,
-      "a scope miss needs a note the reader can act on",
-    ).toContain('data-test="dbm-detail-scope-missed"');
+    expect(template, "a scope miss needs a note the reader can act on").toContain(
+      'data-test="dbm-detail-scope-missed"',
+    );
     const noteAt = template.indexOf('data-test="dbm-detail-scope-missed"');
     const noteTag = template.slice(template.lastIndexOf("<", noteAt), noteAt);
     expect(noteTag, "the note belongs to the scope-miss state").toMatch(/v-if="scopeMissedQuery"/);
