@@ -30,6 +30,7 @@ import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 import { parseSearchError } from "@/utils/query/searchError";
+import { PANEL_KEY_IGNORED_PATHS, normalizeVariablesForCache } from "@/composables/query/panelKey";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -123,6 +124,7 @@ export const usePanelDataLoader = (
     folderId?.value,
     dashboardId?.value,
     panelSchema.value.id,
+    store.state.selectedOrganization?.identifier ?? "",
   );
 
   const state = reactive({
@@ -738,7 +740,7 @@ export const usePanelDataLoader = (
   });
 
   const restoreFromCache: () => Promise<boolean> = async () => {
-    const cache = await getPanelCache();
+    const cache = await getPanelCache(getCacheKey());
 
     if (!cache) {
       log("usePanelDataLoader: panelcache: cache is not there");
@@ -751,13 +753,7 @@ export const usePanelDataLoader = (
 
     let isRestoredFromCache = false;
 
-    const keysToIgnore = [
-      "panelSchema.version",
-      "panelSchema.layout",
-      "panelSchema.htmlContent",
-      "panelSchema.markdownContent",
-      "panelSchema.customChartResult", // Ignore computed result field
-    ];
+    const keysToIgnore = PANEL_KEY_IGNORED_PATHS;
 
     log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey);
     log("usePanelDataLoader: panelcache: omit(getCacheKey())", omit(getCacheKey(), keysToIgnore));
@@ -765,22 +761,6 @@ export const usePanelDataLoader = (
       "usePanelDataLoader: panelcache: omit(tempPanelCacheKey))",
       omit(tempPanelCacheKey, keysToIgnore),
     );
-
-    // Helper function to normalize variables data for cache comparison
-    // Removes runtime-only fields that don't affect query results
-    const normalizeVariablesForCache = (variables: any[]) => {
-      if (!variables || !Array.isArray(variables)) return variables;
-      return variables.map((v) => ({
-        name: v.name,
-        type: v.type,
-        value: v.value,
-        scope: v.scope,
-        multiSelect: v.multiSelect,
-        query_data: v.query_data,
-        // Exclude: options, isLoading, isVariableLoadingPending, isVariablePartialLoaded
-        // These are runtime state and don't affect the query result
-      }));
-    };
 
     const currentCacheKey = omit(getCacheKey(), keysToIgnore);
     // tempPanelCacheKey is untyped (from the panel cache), so mirror the

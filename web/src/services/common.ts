@@ -34,3 +34,10 @@ const common = {
 };
 
 export default common;
+
+export interface Folder {
+  folderId: string;
+  name: string;
+  description?: string;
+  [extra: string]: unknown;
+}

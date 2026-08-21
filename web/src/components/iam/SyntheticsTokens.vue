@@ -92,9 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="synthetics-tokens-refresh-btn"
-              @click="fetchTokens"
+              @click="refreshTokens"
             >
               <OTooltip
                 side="bottom"
@@ -269,7 +269,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, computed, defineComponent, onBeforeMount } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import {
+  createAgentTokenMutation,
+  rotateAgentTokenMutation,
+  setAgentTokenEnabledMutation,
+} from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { agentTokensQuery } from "@/services/synthetics.queries";
+import { ref, computed, defineComponent, onBeforeMount , watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -329,8 +338,21 @@ export default defineComponent({
 
     const createTokenSchema = makeCreateTokenSchema(t);
 
-    const tokens = ref<AgentToken[]>([]);
-    const loading = ref(false);
+    const orgIdForList = useOrgId();
+    const tokensList = useQuery(() =>
+      Object.assign(agentTokensQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    // The table is the query, not a copy of it: a token write invalidates the
+    // scope and these rows repaint with no wiring here.
+    const tokens = computed(() => {
+      const data = tokensList.data.value;
+      return (data as any)?.tokens ?? [];
+    });
+    const loading = tokensList.isPending;
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = tokensList.isFetching;
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
@@ -418,23 +440,26 @@ export default defineComponent({
       },
     ];
 
-    const fetchTokens = async () => {
-      loading.value = true;
-      try {
-        const res = await syntheticsService.listAgentTokens(
-          store.state.selectedOrganization.identifier,
-        );
-        tokens.value = res.data.tokens ?? [];
-      } catch (e: any) {
-        toast({
-          variant: "error",
-          message: e.response?.data?.message || t("synthetics.tokens.fetchError"),
-          timeout: 5000,
-        });
-      } finally {
-        loading.value = false;
-      }
+    // The query owns its failure now, so this reports it once per error however
+    // the read was triggered.
+    watch(tokensList.error, (e: any) => {
+      if (!e) return;
+      toast({
+        variant: "error",
+        message: e.response?.data?.message || t("synthetics.tokens.fetchError"),
+        timeout: 5000,
+      });
+    });
+
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself.
+    const fetchTokens = async (force = false) => {
+      if (force) await tokensList.refetch();
     };
+
+    // Named handler: binding fetchTokens straight to @click puts the DOM event
+    // in `force`, and without it the button is a no-op while the entry is fresh.
+    const refreshTokens = () => fetchTokens(true);
 
     const reveal = (name: string, token: string) => {
       revealedToken.value = { name, token };
@@ -444,10 +469,7 @@ export default defineComponent({
     const createToken = async (value: CreateTokenForm) => {
       loading.value = true;
       try {
-        const res = await syntheticsService.createAgentToken(
-          store.state.selectedOrganization.identifier,
-          value.name.trim(),
-        );
+        const res = await createAgentToken.mutateAsync(value.name.trim());
         showCreateForm.value = false;
         reveal(res.data.name, res.data.token);
         await fetchTokens();
@@ -463,12 +485,17 @@ export default defineComponent({
       }
     };
 
+    const orgIdForWrites = useOrgId();
+    const createAgentToken = useMutation(() => createAgentTokenMutation(orgIdForWrites.value));
+    const rotateAgentToken = useMutation(() => rotateAgentTokenMutation(orgIdForWrites.value));
+    const setAgentTokenEnabled = useMutation(() =>
+      setAgentTokenEnabledMutation(orgIdForWrites.value),
+    );
+
     const rotateDefault = async () => {
       loading.value = true;
       try {
-        const res = await syntheticsService.rotateAgentToken(
-          store.state.selectedOrganization.identifier,
-        );
+        const res = await rotateAgentToken.mutateAsync(undefined);
         reveal(res.data.name, res.data.token);
         await fetchTokens();
         toast({ variant: "success", message: t("synthetics.tokens.rotateSuccess"), timeout: 4000 });
@@ -486,11 +513,7 @@ export default defineComponent({
     const toggleEnabled = async (name: string, enabled: boolean) => {
       loading.value = true;
       try {
-        await syntheticsService.setAgentTokenEnabled(
-          store.state.selectedOrganization.identifier,
-          name,
-          enabled,
-        );
+        await setAgentTokenEnabled.mutateAsync({ name, enabled });
         await fetchTokens();
         toast({
           variant: "success",
@@ -549,7 +572,7 @@ export default defineComponent({
       {
         id: "syntheticsTokensRefresh",
         handler: () => {
-          if (!isInputFocused()) fetchTokens();
+          if (!isInputFocused()) refreshTokens();
         },
       },
       {
@@ -564,6 +587,7 @@ export default defineComponent({
       t,
       tokens,
       loading,
+      fetching,
       filterQuery,
       columns,
       showCreateForm,
@@ -572,6 +596,7 @@ export default defineComponent({
       installCommand,
       copyCommand,
       fetchTokens,
+      refreshTokens,
       createToken,
       createTokenSchema,
       createTokenDefaults,

@@ -97,9 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="template-list-refresh-btn"
-              @click="getTemplates"
+              @click="refreshTemplates"
             >
               <OTooltip
                 side="bottom"
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <DependencyUsageCell
               :graph="depGraph"
               :focus="{ kind: 'template', name: row.name }"
-              @deleted="getTemplates"
+              @deleted="refreshTemplates"
             />
           </template>
           <template v-if="selectedTemplates.length > 0" #bottom>
@@ -239,11 +239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :template="editingTemplate"
         :is-clone="cloningTemplate"
         @cancel:hideform="toggleTemplateEditor"
-        @get:templates="getTemplates"
+        @get:templates="refreshTemplates"
       />
     </div>
     <div v-else class="min-h-0 flex-1">
-      <ImportTemplate :templates="templates" @update:templates="getTemplates" />
+      <ImportTemplate :templates="templates" @update:templates="refreshTemplates" />
     </div>
 
     <ConfirmDialog
@@ -264,6 +264,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
+import { templatesQuery } from "@/services/alert_templates.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { templateKeys } from "@/services/alert_templates.querykeys";
 import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -382,27 +385,47 @@ watch(
 );
 
 const loading = ref(false);
-const getTemplates = () => {
-  const dismiss = toast({
-    variant: "loading",
-    message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
-    timeout: 0,
-  });
+// Request in flight with rows still on screen — the refresh button's spinner.
+// `loading` is the skeleton, for a cold read only.
+const fetching = ref(false);
+// Bound to refresh / post-write reloads: always reaches the server.
+const refreshTemplates = () => getTemplates(true);
 
-  loading.value = true;
-  templateService
-    .list({
-      org_identifier: store.state.selectedOrganization.identifier,
-    })
-    .then((res) => {
-      resultTotal.value = res.data.length;
-      templates.value = res.data;
-      // Any template add/edit/delete lands here on refresh — drop the shared
-      // dependency-graph cache and rebuild it so the "Used by" counts (and the
-      // impact dialog) reflect the change.
-      invalidateDependencyGraphCache();
-      loadDepGraph(store.state.selectedOrganization.identifier);
-      updateRoute();
+const getTemplates = (force = false) => {
+  const org = store.state.selectedOrganization.identifier;
+  // Only a cold read spins and toasts — the rows stay put on a refresh.
+  const warm = queryClient.getQueryData(templateKeys.list(org)) !== undefined;
+  const dismiss = warm
+    ? () => {}
+    : toast({
+        variant: "loading",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
+        timeout: 0,
+      });
+
+  const options = templatesQuery(org);
+  const applyRows = (list: any[]) => {
+    resultTotal.value = list.length;
+    templates.value = list;
+    updateRoute();
+  };
+  const cached = queryClient.getQueryData<any[]>(options.queryKey);
+  if (cached !== undefined) applyRows(cached);
+  loading.value = cached === undefined;
+  fetching.value = true;
+
+  // TODO: fold into `useQuery` when this list drops its imperative refresh.
+  return queryClient
+    .fetchQuery(force ? { ...options, staleTime: 0 } : options)
+    .then((list: any[]) => {
+      applyRows(list);
+      // Kept out of `apply`, which runs again for the cached paint: rebuilding
+      // the graph is three more list calls. Only a forced read can have changed
+      // it — every add/edit/delete reloads with force — so a plain mount leaves
+      // the graph's own cache to answer, and the "Used by" counts still follow
+      // every write.
+      if (force) invalidateDependencyGraphCache();
+      loadDepGraph(org);
     })
     .catch((err) => {
       dismiss();
@@ -416,6 +439,7 @@ const getTemplates = () => {
     .finally(() => {
       dismiss();
       loading.value = false;
+      fetching.value = false;
     });
 };
 const updateRoute = () => {
@@ -509,7 +533,14 @@ const deleteTemplate = () => {
           }),
         });
 
-        getTemplates();
+        // Drop the row from the cache first so it disappears now, not when the
+        // refetch lands. The forced reload matters as much: this query
+        // persists, so without it the deleted template would come back on a
+        // browser reload, hydrated from localStorage.
+        const deletedName = confirmDelete.value.data.name;
+        queryClient.setQueriesData({ queryKey: templateKeys.all(store.state.selectedOrganization.identifier) }, (list: any) =>
+          Array.isArray(list) ? list.filter((tpl: any) => tpl.name !== deletedName) : list);
+        getTemplates(true);
       })
       .catch((err) => {
         if (err.response.data.code === 409) {
@@ -640,7 +671,8 @@ const bulkDeleteTemplates = () => {
 
       selectedTemplates.value = [];
       confirmBulkDelete.value = false;
-      getTemplates();
+      // Forced: a cached reload would bring the deleted templates back.
+      getTemplates(true);
     })
     .catch((err: any) => {
       const errorMessage =
@@ -669,7 +701,7 @@ useShortcuts([
   {
     id: "alertTemplatesRefresh",
     handler: () => {
-      if (!isInputFocused()) getTemplates();
+      if (!isInputFocused()) refreshTemplates();
     },
   },
   {

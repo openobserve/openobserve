@@ -245,6 +245,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
+import { aiUsageQuery } from "@/services/billings.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onMounted, watch, computed, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -418,7 +420,7 @@ export default defineComponent({
       if (config.isCloud !== "true") return;
       const orgId = store.state.selectedOrganization.identifier;
       try {
-        aiUsage.value = (await BillingService.get_ai_usage(orgId)).data;
+        aiUsage.value = await queryClient.fetchQuery(aiUsageQuery(orgId));
       } catch {
         aiUsage.value = null;
       }

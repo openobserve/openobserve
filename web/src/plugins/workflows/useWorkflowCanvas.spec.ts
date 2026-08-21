@@ -23,9 +23,12 @@ import i18nInstance from "@/locales";
 
 const t = (i18nInstance.global as any).t;
 
-vi.mock("@/services/workflows", () => ({
-  default: { getWorkflowRun: vi.fn(), testWorkflow: vi.fn() },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { getWorkflowRun: vi.fn(), testWorkflow: vi.fn() },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: (p: string) => p,

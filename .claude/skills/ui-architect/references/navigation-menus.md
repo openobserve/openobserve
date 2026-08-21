@@ -30,22 +30,22 @@ grouping layer then reshapes into three visual shapes:
    (Home, Logs, Metrics, Traces, Alerts, Incidents, Actions, AI, IAM,
    Management).
 2. **Rail group with a hover flyout** — one tile that navigates to a primary page
-   on click *and* reveals a submenu of related pages on hover (currently **Data**
+   on click _and_ reveals a submenu of related pages on hover (currently **Data**
    → Streams/Pipelines/Functions/Enrichment/Ingestion, and **Dashboards** →
    Dashboards/Reports).
-3. **In-page section sub-nav (`SectionRail`)** — a secondary left sidebar *inside*
+3. **In-page section sub-nav (`SectionRail`)** — a secondary left sidebar _inside_
    a page that switches between sub-sections via `<router-view>` (used by
    **Settings/Management** and **IAM**).
 
 These are produced by three files — learn which one owns each surface:
 
-| Surface | Owner file |
-| --- | --- |
-| Flat top-level list (the rail items) | `web/src/layouts/MainLayout.vue` → `linksList` ref |
-| Reshaping flat list → groups + flyouts | `web/src/lib/core/Navbar/navGroups.ts` → `NAV_GROUPS` |
-| Settings sub-nav | `web/src/components/settings/index.vue` → `settingsItems` |
-| IAM sub-nav | `web/src/views/IdentityAccessManagement.vue` → sections array |
-| Routes (by domain) | the router composables in [§1](#1-register-the-route) |
+| Surface                                | Owner file                                                    |
+| -------------------------------------- | ------------------------------------------------------------- |
+| Flat top-level list (the rail items)   | `web/src/layouts/MainLayout.vue` → `linksList` ref            |
+| Reshaping flat list → groups + flyouts | `web/src/lib/core/Navbar/navGroups.ts` → `NAV_GROUPS`         |
+| Settings sub-nav                       | `web/src/components/settings/index.vue` → `settingsItems`     |
+| IAM sub-nav                            | `web/src/views/IdentityAccessManagement.vue` → sections array |
+| Routes (by domain)                     | the router composables in [§1](#1-register-the-route)         |
 
 > The rail renderer is `web/src/lib/core/Navbar/ONavbar.vue` (+ `ONavGroup.vue` in
 > the same folder, and `MenuLink.vue` at `web/src/components/MenuLink.vue`) and the
@@ -58,14 +58,14 @@ These are produced by three files — learn which one owns each surface:
 ## Deciding where a new page goes
 
 Same spatial grammar as the dialog/drawer/page decision — match the surface to
-what the page *is*:
+what the page _is_:
 
-| The page is… | Put it… | Edit |
-| --- | --- | --- |
-| A top-level product area (its own concern, reached often) | a **plain rail item** | `MainLayout.vue` `linksList` + a route |
-| One of several related data destinations | a **flyout child** under an existing rail group | `navGroups.ts` `NAV_GROUPS` + a route |
-| An admin / configuration screen | a **sub-page under Settings** | `settings/index.vue` `settingsItems` + a route |
-| An access-control screen | a **sub-page under IAM** | `IdentityAccessManagement.vue` + a route |
+| The page is…                                              | Put it…                                         | Edit                                           |
+| --------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------- |
+| A top-level product area (its own concern, reached often) | a **plain rail item**                           | `MainLayout.vue` `linksList` + a route         |
+| One of several related data destinations                  | a **flyout child** under an existing rail group | `navGroups.ts` `NAV_GROUPS` + a route          |
+| An admin / configuration screen                           | a **sub-page under Settings**                   | `settings/index.vue` `settingsItems` + a route |
+| An access-control screen                                  | a **sub-page under IAM**                        | `IdentityAccessManagement.vue` + a route       |
 
 A new page **always** needs step 1 (a route). It then needs **exactly one** of
 2a / 2b / 2c to be reachable from navigation. Don't register it in two surfaces.
@@ -79,13 +79,13 @@ Routes are split by domain across composables, merged in
 and installs the global `beforeEach` that sets `document.title` from
 `meta.title`). Add your route to the composable that owns its domain:
 
-| Domain | Composable file | Owns |
-| --- | --- | --- |
-| Core product (logs, metrics, traces, dashboards, streams, alerts, pipeline…) | `web/src/composables/shared/router.ts` (`useRoutes()` → `homeChildRoutes`) | most in-app pages |
-| Settings / Management | `web/src/composables/shared/useManagementRoutes.ts` | `/settings/*` |
-| IAM | `web/src/composables/shared/useEnterpriseRoutes.ts` | `/iam/*`, incidents, actions |
-| Ingestion | `web/src/composables/shared/useIngestionRoutes.ts` | `/ingestion/*` |
-| Cloud/enterprise-only (AI, billings, marketplace) | `web/src/enterprise/composables/router.ts` (`useEnvRoutes()`) | env-specific pages |
+| Domain                                                                       | Composable file                                                            | Owns                         |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------- |
+| Core product (logs, metrics, traces, dashboards, streams, alerts, pipeline…) | `web/src/composables/shared/router.ts` (`useRoutes()` → `homeChildRoutes`) | most in-app pages            |
+| Settings / Management                                                        | `web/src/composables/shared/useManagementRoutes.ts`                        | `/settings/*`                |
+| IAM                                                                          | `web/src/composables/shared/useEnterpriseRoutes.ts`                        | `/iam/*`, incidents, actions |
+| Ingestion                                                                    | `web/src/composables/shared/useIngestionRoutes.ts`                         | `/ingestion/*`               |
+| Cloud/enterprise-only (AI, billings, marketplace)                            | `web/src/enterprise/composables/router.ts` (`useEnvRoutes()`)              | env-specific pages           |
 
 **Route shape** (from `shared/router.ts`):
 
@@ -120,11 +120,11 @@ is a `NavItem`:
 
 ```ts
 interface NavItem {
-  title: string;    // display label — pass t("menu.xxx") (translated at build time)
-  icon: string;     // OIcon registry name
-  link: string;     // route path — navigation + active-state matching
-  name: string;     // route name — ordering, gating, hasRoute checks
-  exact?: boolean;  // only "home" uses this
+  title: string; // display label — pass t("menu.xxx") (translated at build time)
+  icon: string; // OIcon registry name
+  link: string; // route path — navigation + active-state matching
+  name: string; // route name — ordering, gating, hasRoute checks
+  exact?: boolean; // only "home" uses this
   display?: boolean; // per-item show/hide (e.g. admin-only)
   hide?: boolean;
   badge?: number;
@@ -179,9 +179,10 @@ setting `visible` to the same predicate the route uses.
 `SectionRail` pattern (users, service accounts, tokens, groups, roles, quota, …).
 
 **To add a Settings sub-page:**
+
 1. Add a route child in `useManagementRoutes.ts` (IAM → `useEnterpriseRoutes.ts`).
 2. Add an item to `settingsItems` with `key / label / description / icon / to /
-   group` (+ `visible` if gated).
+group` (+ `visible` if gated).
 3. Add the `settings.*` i18n keys.
 
 Settings is intentionally a **plain rail link** (no hover flyout) — its in-page
@@ -228,10 +229,11 @@ and gate — so the two never disagree. Edit only this one file to move an item.
 
 ## 3. Cloud / enterprise / RBAC gating (mandatory)
 
-Every new nav entry must decide *where it shows*. There are two gating inputs:
+Every new nav entry must decide _where it shows_. There are two gating inputs:
 
 **Build-time flags** — `web/src/aws-exports.ts` default export `config`, string
 `"true"`/`"false"`:
+
 - `config.isCloud` (`VITE_OPENOBSERVE_CLOUD`)
 - `config.isEnterprise` (`VITE_OPENOBSERVE_ENTERPRISE`)
 - `config.showLLMUI` (`VITE_OPENOBSERVE_LLM_UI`)
@@ -249,9 +251,11 @@ Every new nav entry must decide *where it shows*. There are two gating inputs:
 
 - Enterprise **or** cloud + a runtime flag (most common):
   ```js
-  const isFeatureEnabled = computed(() =>
-    (config.isEnterprise == "true" || config.isCloud == "true") &&
-    Boolean(store.state.zoConfig?.online_evals_enabled));
+  const isFeatureEnabled = computed(
+    () =>
+      (config.isEnterprise == "true" || config.isCloud == "true") &&
+      Boolean(store.state.zoConfig?.online_evals_enabled),
+  );
   ```
 - Enterprise only: `config.isEnterprise == "true"`
 - Cloud only: `config.isCloud == "true"`
@@ -259,12 +263,12 @@ Every new nav entry must decide *where it shows*. There are two gating inputs:
 
 **How each surface applies the gate:**
 
-| Surface | Mechanism |
-| --- | --- |
-| Rail top-level item | splice into `linksList` from a computed gate; `filterMenus()` also drops any `name` listed in `zoConfig.custom_hide_menus`, or with `hide`/`display:false` |
-| Route | conditional `push`/guarded block in the composable (e.g. `useManagementRoutes.ts` pushes enterprise-only routes only when `isEnterprise`), or a `beforeEnter` redirect |
-| Flyout child | a `gate` key resolved by `GATE_PREDICATES` in `navGroups.ts` (e.g. `rbac`, `enterprise`, `enterpriseMeta`, `storage`, `streamPipelines`) |
-| SectionRail sub-page | a `visible:` expression on the item (e.g. `visible: isEnt && meta`) |
+| Surface              | Mechanism                                                                                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rail top-level item  | splice into `linksList` from a computed gate; `filterMenus()` also drops any `name` listed in `zoConfig.custom_hide_menus`, or with `hide`/`display:false`             |
+| Route                | conditional `push`/guarded block in the composable (e.g. `useManagementRoutes.ts` pushes enterprise-only routes only when `isEnterprise`), or a `beforeEnter` redirect |
+| Flyout child         | a `gate` key resolved by `GATE_PREDICATES` in `navGroups.ts` (e.g. `rbac`, `enterprise`, `enterpriseMeta`, `storage`, `streamPipelines`)                               |
+| SectionRail sub-page | a `visible:` expression on the item (e.g. `visible: isEnt && meta`)                                                                                                    |
 
 **Keep the three in sync.** A flyout `gate`, the route's push condition, and the
 page's SectionRail `visible` must express the **same** rule — otherwise the rail
@@ -288,6 +292,7 @@ strings in `navGroups.ts` (flyout children may also use feature namespaces like
 ## Add-a-page checklists
 
 **New top-level rail item**
+
 - [ ] Route added to the right composable ([§1](#1-register-the-route)), lazy
       `component`, `meta.title`.
 - [ ] `NavItem` in `MainLayout.vue` `linksList` (spliced from a computed gate if
@@ -297,18 +302,21 @@ strings in `navGroups.ts` (flyout children may also use feature namespaces like
       hideable via config, `name` respected by `custom_hide_menus`.
 
 **New Settings / IAM sub-page**
+
 - [ ] Route child in `useManagementRoutes.ts` (IAM → `useEnterpriseRoutes.ts`).
 - [ ] Item in `settingsItems` / IAM sections: `key / label / description / icon /
-      to / group` (+ `visible` if gated).
+  to / group` (+ `visible` if gated).
 - [ ] i18n keys added.
 - [ ] Not also added to `navGroups.ts` (Settings/IAM are plain rail links).
 
 **New flyout child under Data / Dashboards**
+
 - [ ] Route `name` exists.
 - [ ] `SubnavChild` in the `NAV_GROUPS` entry (`titleKey / icon / name /
-      requires` + `gate` if gated), mirroring the page's own SectionRail.
+  requires` + `gate` if gated), mirroring the page's own SectionRail.
 
 **Every case**
+
 - [ ] Reachable from exactly **one** nav surface.
 - [ ] Gate expressed identically across route + nav entry (+ SectionRail
       `visible` / flyout `gate`).

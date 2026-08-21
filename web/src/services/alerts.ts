@@ -315,3 +315,16 @@ const alerts = {
 };
 
 export default alerts;
+
+export interface AlertHistoryQuery {
+  // string | number because the callers build these differently and the wrapper
+  // must not change what any of them sends.
+  start_time: string | number;
+  end_time: string | number;
+  from: string | number;
+  size: string | number;
+  alert_id?: string;
+  sort_by?: string;
+  sort_order?: string;
+  [extra: string]: unknown;
+}

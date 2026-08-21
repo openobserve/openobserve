@@ -16,16 +16,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 
-vi.mock("@/services/alerts", () => ({
-  default: {
-    get_by_alert_id: vi.fn(),
-    list_groups: vi.fn(),
-    list_group_transitions: vi.fn(),
-    getHistory: vi.fn(),
-    getCompositeReferences: vi.fn(),
-    getCompositeTimeline: vi.fn(),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_by_alert_id: vi.fn(),
+      list_groups: vi.fn(),
+      list_group_transitions: vi.fn(),
+      getHistory: vi.fn(),
+      getCompositeReferences: vi.fn(),
+      getCompositeTimeline: vi.fn(),
+    },
+  });
+});
 
 // The view reads its identity from the route; a hermetic route beats standing
 // up the whole app router with its guards.

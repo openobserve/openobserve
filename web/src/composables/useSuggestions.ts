@@ -1,3 +1,5 @@
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
@@ -8,7 +10,7 @@ import {
   buildFieldEntry,
 } from "@/utils/query/sqlCompletion";
 import { mergeServerFunctions } from "@/utils/query/serverFunctions";
-import queryFunctions, { type ServerQueryFunction } from "@/services/query_functions";
+import { type ServerQueryFunction } from "@/services/query_functions";
 
 const useSqlSuggestions = () => {
   // Both lists come from the shared catalog (web/src/utils/query/sqlCompletion.ts).
@@ -99,13 +101,15 @@ const useSqlSuggestions = () => {
     requestSeq += 1;
     const seq = requestSeq;
 
-    inFlight = queryFunctions
-      .list(org)
-      .then((res: any) => {
+    // Cached: reopening the editor for the same org inside the tier's staleTime
+    // costs nothing. The org/sequence guards below still matter — they cover a
+    // fast org switch, which the cache key alone would not sequence.
+    inFlight = queryClient.fetchQuery(queryFunctionsQuery(org))
+      .then((list: any[]) => {
         // Discard if the org changed, or if the catalog was superseded while we
         // were waiting (setServerFunctions, or a newer request).
         if (fetchedOrg !== org || seq !== requestSeq) return;
-        serverFunctions.value = Array.isArray(res?.data?.list) ? res.data.list : [];
+        serverFunctions.value = Array.isArray(list) ? list : [];
       })
       .catch(() => {
         // The local catalog is still perfectly usable; a failed lookup must not

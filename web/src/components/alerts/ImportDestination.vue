@@ -295,11 +295,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, ref, computed, reactive, onMounted } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import destinationService from "@/services/alert_destination";
 import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -788,10 +790,15 @@ export default defineComponent({
       return true;
     };
 
+    const orgIdForWrites = useOrgId();
+    const createDestinationWrite = useMutation(() =>
+      saveDestinationMutation(orgIdForWrites.value, () => false),
+    );
+
     const createDestination = async (input: any, index: number) => {
       try {
-        await destinationService.create({
-          org_identifier: store.state.selectedOrganization.identifier,
+        // Was: invalidate, then create — the refetch raced the write.
+        await createDestinationWrite.mutateAsync({
           destination_name: input.name,
           data: input,
         });

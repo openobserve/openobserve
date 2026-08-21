@@ -36,18 +36,21 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    create: vi.fn(async (data: any) => ({
-      status: 200,
-      data: { data: { id: "1", name: data.name, identifier: "org-1" } },
-    })),
-    rename_organization: vi.fn(async (_id: any, name: string) => ({
-      status: 200,
-      data: { data: { id: "1", name, identifier: "org-1" } },
-    })),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(async (data: any) => ({
+        status: 200,
+        data: { data: { id: "1", name: data.name, identifier: "org-1" } },
+      })),
+      rename_organization: vi.fn(async (_id: any, name: string) => ({
+        status: 200,
+        data: { data: { id: "1", name, identifier: "org-1" } },
+      })),
+    },
+  });
+});
 
 const orgService = (await import("@/services/organizations")).default;
 

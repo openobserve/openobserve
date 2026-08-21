@@ -23,12 +23,15 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 
 // Mock the destination service
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+  });
+});
 
 // Mock zincutils with deterministic UUIDs
 let uuidCounter = 0;

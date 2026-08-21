@@ -47,7 +47,10 @@ vi.mock("@/composables/useFunctions", () => ({
   default: () => ({ getAllFunctions: vi.fn().mockResolvedValue({ functions: [] }) }),
 }));
 
-vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { search: vi.fn() } });
+});
 
 vi.mock("@/composables/useParser", () => ({
   default: () => ({
@@ -77,38 +80,44 @@ vi.mock("@/utils/zincutils", async () => {
 // Toast returns a dismiss fn (loading toast). No-op in tests.
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn(() => vi.fn()) }));
 
-vi.mock("@/services/alerts", () => ({
-  default: {
-    create_by_alert_id: vi.fn(() =>
-      Promise.resolve({ data: { code: 200, message: "Alert saved" } }),
-    ),
-    update_by_alert_id: vi.fn(() => Promise.resolve({ data: { success: true } })),
-    generate_sql: vi.fn(() => Promise.resolve({ data: { sql: "SELECT * FROM test" } })),
-    validateComposite: vi.fn(() =>
-      Promise.resolve({
-        data: {
-          valid: true,
-          canonical_expression: "({id-a} && {id-b})",
-          children: [],
-          warnings: [],
-          errors: [],
-          result: true,
-          result_level: "critical",
-        },
-      }),
-    ),
-    listByFolderId: vi.fn(() => Promise.resolve({ data: { list: [] } })),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create_by_alert_id: vi.fn(() =>
+        Promise.resolve({ data: { code: 200, message: "Alert saved" } }),
+      ),
+      update_by_alert_id: vi.fn(() => Promise.resolve({ data: { success: true } })),
+      generate_sql: vi.fn(() => Promise.resolve({ data: { sql: "SELECT * FROM test" } })),
+      validateComposite: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            valid: true,
+            canonical_expression: "({id-a} && {id-b})",
+            children: [],
+            warnings: [],
+            errors: [],
+            result: true,
+            result_level: "critical",
+          },
+        }),
+      ),
+      listByFolderId: vi.fn(() => Promise.resolve({ data: { list: [] } })),
+    },
+  });
+});
 
-vi.mock("@/services/anomaly_detection", () => ({
-  default: {
-    get: vi.fn(),
-    create: vi.fn(() => Promise.resolve({ data: { id: "anom-1" } })),
-    update: vi.fn(() => Promise.resolve({ data: { id: "anom-1" } })),
-    triggerTraining: vi.fn(() => Promise.resolve({})),
-  },
-}));
+vi.mock("@/services/anomaly_detection", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(),
+      create: vi.fn(() => Promise.resolve({ data: { id: "anom-1" } })),
+      update: vi.fn(() => Promise.resolve({ data: { id: "anom-1" } })),
+      triggerTraining: vi.fn(() => Promise.resolve({})),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));

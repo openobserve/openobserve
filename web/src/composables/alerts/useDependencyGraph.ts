@@ -28,9 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // the relation) so it stays unit-testable; the view owns positioning + rendering.
 
 import { ref } from "vue";
-import alertsService from "@/services/alerts";
-import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
+import { alertDependenciesQuery } from "@/services/alerts.queries";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { templatesQuery } from "@/services/alert_templates.queries";
+import { queryClient } from "@/composables/query/queryClient";
 
 export type DepNodeKind = "template" | "destination" | "alert";
 
@@ -428,42 +429,15 @@ export function useDependencyGraph() {
     loading.value = true;
     error.value = null;
     try {
-      const [alertsRes, destinationsRes, templatesRes] = await Promise.all([
-        // v2 list (no folder = every folder). The v1 GET /api/{org}/alerts is not
-        // registered in all builds (404), and only v2's item DTO carries the
-        // destinations/template fields we cross-reference.
-        // NB: this route does NOT paginate — the service never forwards page_num/
-        // page_size, so it returns the org's full alert list. That's intentional: a
-        // complete graph needs every alert. The leading 1/0 are placeholder args for
-        // the shared signature, not a real bound; the per-org cache above keeps this
-        // full fetch from repeating on every popover open. The trailing `true` opts
-        // in to destinations/template, which the backend omits from the default path.
-        alertsService.listByFolderId(
-          1,
-          0,
-          "name",
-          false,
-          "",
-          org,
-          undefined,
-          undefined,
-          undefined,
-          true,
-        ),
-        destinationService.list({
-          page_num: 1,
-          page_size: 100000,
-          sort_by: "name",
-          desc: false,
-          org_identifier: org,
-          module: "alert",
-        }),
-        templateService.list({ org_identifier: org }),
+      // All three reads go through the query cache, so the graph reuses whatever
+      // the page it was opened from already fetched. Calling the destination
+      // service directly here used to download the destination list a second
+      // time on the destinations page's own refresh.
+      const [alerts, destinations, templates] = await Promise.all([
+        queryClient.fetchQuery(alertDependenciesQuery(org)),
+        queryClient.fetchQuery(destinationsQuery(org, "alert")),
+        queryClient.fetchQuery(templatesQuery(org)),
       ]);
-
-      const alerts = alertsRes.data?.list ?? alertsRes.data ?? [];
-      const destinations = destinationsRes.data ?? [];
-      const templates = templatesRes.data ?? [];
 
       graph.value = buildGraph(alerts, destinations, templates);
       graphCache = { org, graph: graph.value, at: Date.now() };

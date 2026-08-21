@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { actionsQuery } from "@/services/action_scripts.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { useStore } from "vuex";
-import actionService from "@/services/action_scripts";
 import config from "@/aws-exports";
 import { computed } from "vue";
 
@@ -28,19 +29,17 @@ const useActions = () => {
     );
   });
 
-  const getAllActions = async () => {
+  const getAllActions = async (force = false): Promise<any[]> => {
     try {
-      if (!isActionsEnabled.value) return Promise.resolve([]);
+      if (!isActionsEnabled.value) return [];
 
-      return await actionService
-        .list(store.state.selectedOrganization.identifier)
-        .then((res: any) => {
-          store.dispatch("setActions", res.data);
-          return;
-        })
-        .catch((e: any) => {
-          throw new Error(e.message);
-        });
+      // Cached: this runs on every Logs entry alongside the functions list.
+      // `force` is for the Actions page's refresh and its post-write reloads.
+      const org = store.state.selectedOrganization.identifier;
+      const data = force ? await queryClient.fetchQuery({ ...actionsQuery(org), staleTime: 0 }) : await queryClient.fetchQuery(actionsQuery(org));
+      // Bridge for consumers still reading `organizationData.actions`.
+      store.dispatch("setActions", data);
+      return (data as any[]) ?? [];
     } catch (e: any) {
       throw new Error(e.message);
     }

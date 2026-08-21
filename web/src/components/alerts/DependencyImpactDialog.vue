@@ -251,6 +251,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { alertKeys } from "@/services/alerts.querykeys";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { templateKeys } from "@/services/alert_templates.querykeys";
 import { computed, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -444,6 +448,23 @@ const performDelete = async () => {
     } else {
       return;
     }
+
+    // This dialog deletes across all three domains, so it is the only place that
+    // reaches every one of their caches — `deleted` reloads just the list it was
+    // opened from. Removed as well as invalidated: the row is gone, and a merely
+    // stale entry can still be served to the next reader.
+    const deletedFrom =
+      n.kind === "destination"
+        ? destinationKeys.all(org_identifier)
+        : n.kind === "template"
+          ? templateKeys.all(org_identifier)
+          : alertKeys.all(org_identifier);
+    // Picking a *scope* rather than a query object: the keys module is the seam
+    // that makes this polymorphic drop possible without importing three
+    // transports.
+    void queryClient.invalidateQueries({ queryKey: deletedFrom });
+    queryClient.removeQueries({ queryKey: deletedFrom, type: "inactive" });
+
     invalidateDependencyGraphCache();
     toast({ variant: "success", message: t("alert_dependencies.deletedToast", { name: n.name }) });
     emit("deleted");

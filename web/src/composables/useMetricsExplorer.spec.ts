@@ -36,9 +36,12 @@ const { mockFieldValues } = vi.hoisted(() => ({
   mockFieldValues: vi.fn(),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: { fieldValues: mockFieldValues },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { fieldValues: mockFieldValues },
+  });
+});
 
 import useMetricsExplorer from "./useMetricsExplorer";
 

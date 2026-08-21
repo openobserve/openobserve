@@ -288,7 +288,7 @@ const store = createStore({
       state.organizationData.folders = payload;
     },
     setFoldersByType(state, payload) {
-      // Mirrors the real store: merge per type, never replace the whole map.
+      // Mirrors the real store: merge so one type's fetch cannot drop the others.
       state.organizationData.foldersByType = {
         ...state.organizationData.foldersByType,
         ...payload,

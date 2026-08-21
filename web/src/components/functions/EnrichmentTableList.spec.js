@@ -13,11 +13,14 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 // Mock the stream service
-vi.mock("@/services/stream", () => ({
-  default: {
-    delete: vi.fn(() => Promise.resolve({ data: { code: 200 } })),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      delete: vi.fn(() => Promise.resolve({ data: { code: 200 } })),
+    },
+  });
+});
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
@@ -27,11 +30,14 @@ vi.mock("@/services/segment_analytics", () => ({
 }));
 
 // Mock jstransform service
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    get_all_enrichment_table_statuses: vi.fn(() => Promise.resolve({ data: {} })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_all_enrichment_table_statuses: vi.fn(() => Promise.resolve({ data: {} })),
+    },
+  });
+});
 
 // Mock toast
 const mockToast = vi.fn(() => vi.fn());
@@ -355,7 +361,10 @@ describe("EnrichmentTableList Component", () => {
     it("refreshes list after form submission", async () => {
       await wrapper.vm.refreshList();
       expect(wrapper.vm.showAddJSTransformDialog).toBe(false);
-      expect(mockResetStreamType).toHaveBeenCalledWith("enrichment_tables");
+      // No resetStreamType: it dropped the cached list, so the table had
+      // nothing to show and fell back to the skeleton. The forced getStreams
+      // below is what actually reaches the server.
+      expect(mockResetStreamType).not.toHaveBeenCalled();
       expect(mockGetStreams).toHaveBeenCalledWith("enrichment_tables", false, false, true);
     });
   });

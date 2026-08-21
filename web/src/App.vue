@@ -19,16 +19,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OToastProvider />
   <ConfirmDialogProvider />
   <CreateAlertDialogProvider />
+  <component :is="QueryDevtools" v-if="QueryDevtools" />
 </template>
 
 <script lang="ts">
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { onMounted, watch } from "vue";
+import { defineAsyncComponent, onMounted, watch } from "vue";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
+
+// Query cache inspector — dev builds only; the branch is eliminated in a
+// production build so neither the component nor its chunk ships.
+const QueryDevtools = import.meta.env.DEV
+  ? defineAsyncComponent(() =>
+      import("@tanstack/vue-query-devtools").then((m) => m.VueQueryDevtools),
+    )
+  : null;
 
 export default {
   components: { OToastProvider, ConfirmDialogProvider, CreateAlertDialogProvider },
@@ -74,6 +83,7 @@ export default {
 
     return {
       store,
+      QueryDevtools,
     };
   },
 };

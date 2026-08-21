@@ -409,8 +409,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch } from "vue";
-import { computed } from "vue";
+import { saveActionMutation } from "@/services/action_scripts.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { ref, nextTick, onMounted, watch, computed, onBeforeMount } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import {
@@ -419,7 +421,6 @@ import {
   isAboveMinRefreshInterval,
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import actions from "@/services/action_scripts";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -518,6 +519,9 @@ const frequencyTabs = [
 const store = useStore();
 
 const isEditingActionScript = ref(false);
+
+const orgIdForWrites = useOrgId();
+const saveActionWrite = useMutation(() => saveActionMutation(orgIdForWrites.value));
 
 const isFetchingActionScript = ref(false);
 
@@ -823,9 +827,6 @@ const saveActionScript = async (value: EditScriptForm) => {
     (form as FormData).append("id", formData.value.id);
   }
 
-  const updateAction =
-    isEditingActionScript.value && !value.codeZip ? actions.update : actions.create;
-
   const dismiss = toast({
     variant: "loading",
     message: t("toastMessages.actionScripts.pleaseWait"),
@@ -833,7 +834,13 @@ const saveActionScript = async (value: EditScriptForm) => {
   });
   const actionId: string = (router.currentRoute.value.query?.id || "") as string;
 
-  return updateAction(store.state.selectedOrganization.identifier, actionId, form)
+  // A new code zip forces a create even in edit mode — that rule stays here.
+  return saveActionWrite
+    .mutateAsync({
+      actionId,
+      form,
+      isUpdate: isEditingActionScript.value && !value.codeZip,
+    })
     .then(() => {
       toast({
         variant: "success",

@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loadingState"
+              :loading="isRefreshing"
               data-test="log-stream-refresh-stats-btn"
               @click="refreshStreams"
             >
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="addStreamDialog.show"
       :is-in-pipeline="false"
       @close="addStreamDialog.show = false"
-      @streamAdded="getLogStream"
+      @streamAdded="refreshStreams"
     />
 
     <ODialog
@@ -375,7 +375,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref } from "vue";
+import { streamPageQuery } from "@/services/stream.queries";
+import { streamKeys } from "@/services/stream.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -388,7 +392,6 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem, StatTrend } from "@/lib/data/StatStrip/OStatStrip.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import streamService from "../services/stream";
-import organizationsService from "../services/organizations";
 import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -398,7 +401,6 @@ import { getImageURL, verifyOrganizationStatus, formatSizeFromMB } from "../util
 import config from "@/aws-exports";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
-import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -450,6 +452,9 @@ export default defineComponent({
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("logs");
     const loadingState = ref(true);
+    // A refresh with rows already on screen: the button spins, the table does not
+    // go back to a skeleton.
+    const isRefreshing = ref(false);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
     const streamActiveTab = ref("logs");
@@ -467,7 +472,7 @@ export default defineComponent({
     );
 
     const streamTabs: never[] = [];
-    const { removeStream, getStream, getPaginatedStreams, addNewStreams } = useStreams(t);
+    const { removeStream, getStream, addNewStreams } = useStreams(t);
 
     // Stats are absent until the ingester has flushed a stream, so "no number
     // yet" renders as a muted em dash rather than a misleading "0 MB".
@@ -647,64 +652,77 @@ export default defineComponent({
     //   },
     // );
 
+    // Rows only — the one-time side effects below run on the fresh result, so
+    // a cached paint never re-opens the schema dialog or re-warms the next page.
+    const applyStreams = (res: any) => {
+      resultTotal.value = res.list.length;
+      totalCount.value = res.total;
+      logStream.value = [];
+
+      logStream.value.push(
+        ...res.list.map((data: any) => {
+          // Raw numbers on the row (not pre-formatted strings): the columns
+          // format for display, while the magnitude bars and the liveness
+          // rail need the real values. `stats` is per-row — a stream without
+          // it must read null, never the previous row's numbers.
+          const stats = data.stats ?? {};
+          return {
+            _rowKey: `${data.name}-${data.stream_type}`,
+            name: data.name,
+            doc_num: stats.doc_num ?? null,
+            storage_size: stats.storage_size ?? null,
+            compressed_size: stats.compressed_size ?? null,
+            index_size: stats.index_size ?? null,
+            // Microsecond epoch of the newest record — the liveness signal.
+            doc_time_max: stats.doc_time_max ?? null,
+            storage_type: data.storage_type,
+            actions: "action buttons",
+            schema: data.schema ? data.schema : [],
+            stream_type: data.stream_type,
+          };
+        }),
+      );
+      duplicateStreamList.value = [...logStream.value];
+    };
+
     const getLogStream = (_refresh?: boolean) => {
       if (store.state.selectedOrganization != null) {
-        loadingState.value = true;
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
-        const dismiss = toast({
-          variant: "loading",
-          message: t("toastMessages.views.pleaseWaitWhileLoadingStreams"),
-          timeout: 0,
-        });
-        logStream.value = [];
-
         const offset = (currentPage.value - 1) * pageSize.value;
-        let streamResponse;
-        // if(selectedStreamType.value == "all") {
-        //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
-        // } else {
-        streamResponse = getPaginatedStreams(
-          selectedStreamType.value || "",
-          false,
-          false,
-          offset < 0 ? 0 : offset,
-          pageSize.value,
-          filterQuery.value,
-          sortBy.value,
-          sortOrder.value === "asc",
-        );
-        // }
+        const org = store.state.selectedOrganization.identifier;
+        const type = selectedStreamType.value || "";
+        const params = {
+          offset: offset < 0 ? 0 : offset,
+          limit: pageSize.value,
+          keyword: filterQuery.value,
+          sort: sortBy.value,
+          asc: sortOrder.value === "asc",
+        };
+
+        // Stale-while-revalidate: the rows already on screen stay put while the
+        // page revalidates, so only a cold cache spins and toasts.
+        // Paint what is cached first even on a manual refresh — replacing the
+        // table with a skeleton throws away rows the user is still reading.
+        const cachedPage = queryClient.getQueryData(streamKeys.page(org, type, params));
+        const painted = cachedPage !== undefined;
+        if (painted) applyStreams(cachedPage);
+        isRefreshing.value = true;
+        const streamResponse = _refresh
+          ? queryClient.fetchQuery({ ...streamPageQuery(org, type, params), staleTime: 0 })
+          : queryClient.fetchQuery(streamPageQuery(org, type, params));
+
+        loadingState.value = !painted;
+        const dismiss = painted
+          ? () => {}
+          : toast({
+              variant: "loading",
+              message: t("toastMessages.views.pleaseWaitWhileLoadingStreams"),
+              timeout: 0,
+            });
 
         streamResponse
           .then((res: any) => {
-            logStream.value = [];
-            resultTotal.value = res.list.length;
-            totalCount.value = res.total;
-
-            logStream.value.push(
-              ...res.list.map((data: any) => {
-                // Raw numbers on the row (not pre-formatted strings): the columns
-                // format for display, while the magnitude bars and the liveness
-                // rail need the real values. `stats` is per-row — a stream without
-                // it must read null, never the previous row's numbers.
-                const stats = data.stats ?? {};
-                return {
-                  _rowKey: `${data.name}-${data.stream_type}`,
-                  name: data.name,
-                  doc_num: stats.doc_num ?? null,
-                  storage_size: stats.storage_size ?? null,
-                  compressed_size: stats.compressed_size ?? null,
-                  index_size: stats.index_size ?? null,
-                  // Microsecond epoch of the newest record — the liveness signal.
-                  doc_time_max: stats.doc_time_max ?? null,
-                  storage_type: data.storage_type,
-                  actions: "action buttons",
-                  schema: data.schema ? data.schema : [],
-                  stream_type: data.stream_type,
-                };
-              }),
-            );
-            duplicateStreamList.value = [...logStream.value];
+            applyStreams(res);
 
             logStream.value.forEach((element: any) => {
               if (element.name == router.currentRoute.value.query.dialog) {
@@ -714,6 +732,14 @@ export default defineComponent({
             loadingState.value = false;
 
             addNewStreams(selectedStreamType.value, res.list);
+
+            // Warm the next page so paging forward is a cache hit.
+            if (params.offset + params.limit < res.total) {
+              queryClient.prefetchQuery(streamPageQuery(org, type, {
+                ...params,
+                offset: params.offset + params.limit,
+              }));
+            }
 
             dismiss();
           })
@@ -729,6 +755,7 @@ export default defineComponent({
           })
           .finally(() => {
             loadingState.value = false;
+            isRefreshing.value = false;
             dismiss();
           });
       }
@@ -803,10 +830,10 @@ export default defineComponent({
     const getStreamSummary = () => {
       if (!store.state.selectedOrganization?.identifier) return;
       summaryLoading.value = true;
-      organizationsService
-        .get_organization_summary(store.state.selectedOrganization.identifier)
-        .then((res: any) => {
-          streamSummary.value = res.data?.streams ?? null;
+      queryClient
+        .fetchQuery(orgSummaryQuery(store.state.selectedOrganization.identifier))
+        .then((data: any) => {
+          streamSummary.value = data?.streams ?? null;
         })
         .catch(() => {
           // Silent: the strip is context, not the page's payload. Tiles fall back
@@ -936,6 +963,20 @@ export default defineComponent({
       resultTotal.value = logStream.value.length;
 
       selectedIds.value = [];
+
+      // Prune every cached page, not just the one on screen: navigation is
+      // cache-first, so a page still holding the deleted row would paint it
+      // again — and inside staleTime nothing would refetch to correct it.
+      queryClient.setQueriesData({ queryKey: streamKeys.all(store.state.selectedOrganization.identifier) }, (page: any) => {
+        if (!page?.list) return page;
+        const list = page.list.filter((s: any) => !removedKeys.has(`${s.name}-${s.stream_type}`));
+        if (list.length === page.list.length) return page;
+        return {
+          ...page,
+          list,
+          total: Math.max(0, (page.total ?? 0) - (page.list.length - list.length)),
+        };
+      });
 
       items.forEach((stream) => {
         removeStream(stream.name, stream.stream_type);
@@ -1115,7 +1156,9 @@ export default defineComponent({
 
     const onChangeStreamFilter = (value: string) => {
       selectedStreamType.value = value;
-      getLogStream(true);
+      // The type is part of the cache key, so switching back to a type already
+      // loaded is a cache hit — no forced refetch.
+      getLogStream();
       // logStream.value = filterData(
       //   duplicateStreamList.value,
       //   filterQuery.value.toLowerCase(),
@@ -1177,17 +1220,18 @@ export default defineComponent({
       }
     };
 
-    const onPaginationChange = async (params: { page: number; size: number }) => {
+    // No reload here: `watch([currentPage, pageSize, sortBy, sortOrder])` above
+    // already loads on these writes, so calling it again would put two identical
+    // requests behind one page or sort change.
+    const onPaginationChange = (params: { page: number; size: number }) => {
       currentPage.value = params.page;
       pageSize.value = params.size;
-      await getLogStream();
     };
 
-    const onSortChange = async (params: { column: string; order: "asc" | "desc" }) => {
+    const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
       sortBy.value = params.column;
       sortOrder.value = params.order;
       currentPage.value = 1;
-      await getLogStream();
     };
 
     const filterLogStreamByTab = (tab: string) => {
@@ -1265,6 +1309,7 @@ export default defineComponent({
       streamsEmptyActions,
       onStreamsEmptyStateAction,
       loadingState,
+      isRefreshing,
       isDeleting,
       searchKeyword,
       deleteAssociatedAlertsPipelines,

@@ -40,11 +40,14 @@ import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
 
 // vi.mock must be hoisted — declared before component import
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
+    },
+  });
+});
 
 // The stored-value lookup the field-value resolver ends at. Stubbed so the
 // resolver tests can assert the composite key it was asked for without an

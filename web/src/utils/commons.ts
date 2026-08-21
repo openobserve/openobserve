@@ -15,12 +15,20 @@
 
 //Dashboard Manipulation Functions
 
+import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import { foldersQuery } from "@/services/common.queries";
+import { dashboardKeys } from "@/services/dashboards.querykeys";
+import { folderKeys } from "@/services/common.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { fetchInto } from "@/composables/query/fetchInto";
+import { dropPanelCache } from "@/composables/dashboard/usePanelCache";
 import dashboardService from "../services/dashboards";
 import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
 import type { TranslateFn } from "@/types/i18n";
+import type { Ref } from "vue";
 
 let moment: any;
 let momentInitialized = false;
@@ -118,23 +126,8 @@ export function getConsumableDateTime(dateObj: any) {
 //get all dashboards by folderId
 //api call
 //save to store
-export const getAllDashboards = async (store: any, folderId: any) => {
-  //call only if we have folderId
-  if (!folderId) return;
-  // api call
-  const res = await dashboardService.list(
-    0,
-    1000,
-    "name",
-    false,
-    "",
-    store.state.selectedOrganization.identifier,
-    folderId,
-    //adding empty string to avoid undefined error as we have added title param in api
-    "",
-  );
-
-  const migratedDashboards = res.data.dashboards.map((dashboard: any) => ({
+const applyDashboards = (store: any, folderId: any, dashboards: any[]) => {
+  const migratedDashboards = dashboards.map((dashboard: any) => ({
     dashboard: {
       version: dashboard.version,
       folderId: dashboard.folder_id,
@@ -149,43 +142,76 @@ export const getAllDashboards = async (store: any, folderId: any) => {
     hash: dashboard.hash.toString(),
   }));
 
+  const sorted = migratedDashboards
+    .map((dashboard: any) => dashboard.dashboard)
+    .sort((a: any, b: any) => b.created.localeCompare(a.created));
+
   // save to store
   store.dispatch("setAllDashboardList", {
     ...store.state.organizationData.allDashboardList,
-    [folderId]: migratedDashboards
-      .map((dashboard: any) => dashboard.dashboard)
-      .sort((a: any, b: any) => b.created.localeCompare(a.created)),
+    [folderId]: sorted,
   });
+
+  // Returned as well as stored: Dashboards.vue assigns the result straight to
+  // its table rows.
+  return sorted;
 };
-export const getFoldersListByType = async (store: any, type: any) => {
-  let folders = (
-    await commonService.list_Folders(store.state.selectedOrganization.identifier, type)
-  ).data.list;
 
-  // get default folder and append it to top
-  let defaultFolder = folders.find((it: any) => it.folderId == "default");
-  folders = folders.filter((it: any) => it.folderId != "default");
+export const getAllDashboards = async (store: any, folderId: any, force = false) => {
+  //call only if we have folderId
+  if (!folderId) return;
+  const org = store.state.selectedOrganization.identifier;
+  // Reads the query cache; `force` is for post-mutation reloads, which must
+  // reach the server.
+  const dashboards = force
+    ? await queryClient.fetchQuery({ ...dashboardsByFolderQuery(org, folderId), staleTime: 0 })
+    : await queryClient.fetchQuery(dashboardsByFolderQuery(org, folderId));
 
-  if (!defaultFolder) {
-    defaultFolder = {
-      name: "default",
-      folderId: "default",
-      description: "default",
-    };
+  return applyDashboards(store, folderId, dashboards);
+};
+
+/**
+ * Read a folder's dashboards into the page.
+ *
+ * Wraps the query's own `load` so the mapping and the Vuex bridge happen once,
+ * here. The extra step over a plain `load` is the fallback: when the query
+ * entry has been evicted but the store still holds the folder, that copy paints
+ * rather than the table going empty while the request runs.
+ */
+export const loadDashboardsByFolderId = (
+  store: any,
+  folderId: any,
+  opts: { apply: (rows: any[]) => void; loading?: Ref<boolean> },
+) => {
+  const org = store.state.selectedOrganization.identifier;
+  const fallback =
+    queryClient.getQueryData(dashboardKeys.byFolder(org, folderId)) === undefined
+      ? store.state.organizationData.allDashboardList[String(folderId)]
+      : undefined;
+  if (fallback) {
+    opts.apply(fallback);
+    if (opts.loading) opts.loading.value = false;
   }
 
-  store.dispatch("setFoldersByType", {
-    [type]: [defaultFolder, ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name))],
-  });
+  return fetchInto(dashboardsByFolderQuery(org, folderId), { apply: (list: any[]) => opts.apply(applyDashboards(store, folderId, list)), ...(fallback ? {} : { loading: opts.loading }) });
+};
+export const getFoldersListByType = async (store: any, type: any) => {
+  // Reads the query cache: within the tier's staleTime a remount is a cache hit
+  // instead of a request, and concurrent callers share one in-flight fetch.
+  const folders = await queryClient.fetchQuery(foldersQuery(store.state.selectedOrganization.identifier, type));
+
+  // Bridge for consumers still reading Vuex directly. Deleted with the last one.
+  store.dispatch("setFoldersByType", { [type]: folders });
 
   return store.state.organizationData.foldersByType[type];
 };
 
 //get all dashboards by folderId if not there then call api else return from store
 export const getAllDashboardsByFolderId = async (store: any, folderId: any) => {
-  if (!store.state.organizationData.allDashboardList[folderId]) {
-    await getAllDashboards(store, folderId);
-  }
+  // No Vuex short-circuit: that made the store a second cache layer that never
+  // revalidated, so a folder fetched once stayed frozen for the session. The
+  // query's own staleTime governs instead.
+  await getAllDashboards(store, folderId);
   return store.state.organizationData.allDashboardList[folderId];
 };
 
@@ -401,6 +427,15 @@ export const deletePanel = async (
     currentDashboard,
     folderId,
   );
+
+  // The panel is gone, so its cached results are unreachable — without this they
+  // sit in IndexedDB until the 24 h TTL or the record cap reclaims them.
+  await dropPanelCache(
+    store.state.selectedOrganization.identifier,
+    folderId,
+    dashboardId,
+    panelId,
+  );
 };
 
 export const updateVariable = async (
@@ -514,7 +549,7 @@ export const updateDashboard = async (
   );
 
   await retrieveAndStoreDashboardData(store, dashboardId, folderId, apiResponse);
-  await getAllDashboards(store, folderId);
+  await getAllDashboards(store, folderId, true);
 
   return res;
 };
@@ -630,6 +665,27 @@ const generateUniquePanelId = (existingIds: Set<string>): string => {
   return id;
 };
 
+/**
+ * Drop deleted ids from the *query* cache entry for a folder.
+ *
+ * The Vuex copy is a bridge; the list paints from the query cache, and a cached
+ * paint happens before any refetch. Pruning only Vuex left the deleted rows to
+ * flash back on the next visit — and inside the tier's staleTime the refetch
+ * that would have corrected them never went out at all.
+ *
+ * The cached entry holds the raw API shape, so ids are `dashboard_id`.
+ */
+const pruneDashboardQueryCache = (store: any, folderId: string, ids: string[]) => {
+  const org = store.state.selectedOrganization?.identifier;
+  if (!org) return;
+  const cached = queryClient.getQueryData(dashboardKeys.byFolder(org, folderId));
+  if (!Array.isArray(cached)) return;
+  const remaining = cached.filter((d: any) => !ids.includes(d.dashboard_id ?? d.dashboardId));
+  if (remaining.length !== cached.length) {
+    queryClient.setQueryData(dashboardKeys.byFolder(org, folderId), remaining);
+  }
+};
+
 // Fix duplicate panel layout ids (layout.i). layout.i is a numeric grid-slot
 // id scoped to a tab, so dedupe per-tab and continue from the tab's max i.
 const fixDuplicateLayoutIds = (dashboardJson: any): boolean => {
@@ -690,6 +746,8 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
     });
   }
 
+  pruneDashboardQueryCache(store, folderId, [dashboardId]);
+
   const allDashboardData = store.state.organizationData.allDashboardData;
 
   if (allDashboardData[dashboardId]) {
@@ -725,6 +783,8 @@ export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, st
   let changed = false;
 
   idsByFolder.forEach((ids, folderId) => {
+    pruneDashboardQueryCache(store, folderId, ids);
+
     const cached = next[folderId];
     if (!Array.isArray(cached)) return; // folder never fetched — nothing stale
     const remaining = cached.filter((dashboard: any) => !ids.includes(dashboard.dashboardId));
@@ -894,26 +954,15 @@ export const movePanelToAnotherTab = async (
   );
 };
 
+/**
+ * Legacy `organizationData.folders` list. Same endpoint and same ordering as
+ * `getFoldersListByType(store, "dashboards")`, so it shares that query key —
+ * loading the dashboards page no longer issues the request twice.
+ */
 export const getFoldersList = async (store: any) => {
-  let folders = (await dashboardService.list_Folders(store.state.selectedOrganization.identifier))
-    .data.list;
+  const folders = await queryClient.fetchQuery(foldersQuery(store.state.selectedOrganization.identifier, "dashboards"));
 
-  // get default folder and append it to top
-  let defaultFolder = folders.find((it: any) => it.folderId == "default");
-  folders = folders.filter((it: any) => it.folderId != "default");
-
-  if (!defaultFolder) {
-    defaultFolder = {
-      name: "default",
-      folderId: "default",
-      description: "default",
-    };
-  }
-
-  store.dispatch("setFolders", [
-    defaultFolder,
-    ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
-  ]);
+  store.dispatch("setFolders", folders);
 
   return store.state.organizationData.folders;
 };
@@ -923,11 +972,16 @@ export const deleteFolderById = async (store: any, folderId: any) => {
   await getFoldersList(store);
 };
 
-const refreshFolderLists = (store: any, type: any) =>
-  Promise.all([
+const refreshFolderLists = async (store: any, type: any) => {
+  // The list just changed on the server, so drop the cached copy first —
+  // `getFoldersListByType` reads the query cache and would otherwise return the
+  // still-fresh pre-mutation entry.
+  await queryClient.invalidateQueries({ queryKey: folderKeys.all(store.state.selectedOrganization.identifier) });
+  return Promise.all([
     getFoldersListByType(store, type),
     ...(type === "dashboards" ? [getFoldersList(store)] : []),
   ]);
+};
 
 export const deleteFolderByIdByType = async (store: any, folderId: any, type: any) => {
   await commonService.delete_Folder(store.state.selectedOrganization.identifier, type, folderId);
@@ -939,7 +993,7 @@ export const createFolder = async (store: any, data: any) => {
     store.state.selectedOrganization.identifier,
     data,
   );
-  await Promise.all([getFoldersList(store), getFoldersListByType(store, "dashboards")]);
+  await refreshFolderLists(store, "dashboards");
   return newFolder;
 };
 
@@ -955,7 +1009,7 @@ export const createFolderByType = async (store: any, data: any, type: any) => {
 
 export const updateFolder = async (store: any, folderId: any, data: any) => {
   await dashboardService.edit_Folder(store.state.selectedOrganization.identifier, folderId, data);
-  await Promise.all([getFoldersList(store), getFoldersListByType(store, "dashboards")]);
+  await refreshFolderLists(store, "dashboards");
 };
 
 export const updateFolderByType = async (store: any, folderId: any, data: any, type: any) => {
@@ -987,8 +1041,8 @@ export const moveDashboardToAnotherFolder = async (
   );
 
   //update both folders dashboard
-  await getAllDashboards(store, to);
-  await getAllDashboards(store, from);
+  await getAllDashboards(store, to, true);
+  await getAllDashboards(store, from, true);
 };
 
 export const moveModuleToAnotherFolder = async (

@@ -71,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="action-scripts-list-refresh-btn"
-              @click="getActionScripts"
+              @click="refreshActionScripts"
             >
               <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="actionsRefresh" />
             </OButton>
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :isUpdated="isUpdated"
           @update:list="refreshList"
           @cancel:hideform="hideForm"
-          @get-action-scripts="getActionScripts"
+          @get-action-scripts="refreshActionScripts"
         />
       </div>
     </template>
@@ -241,6 +241,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { actionKeys } from "@/services/action_scripts.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -263,6 +265,7 @@ import type { Alert } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
+
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -344,6 +347,9 @@ export default defineComponent({
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const loading = ref(false);
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
     const isSubmitting = ref(false);
     const resultTotal = ref<number>(0);
     const filterQuery = ref("");
@@ -460,15 +466,24 @@ export default defineComponent({
     const destinations = ref([0]);
     const templates = ref([0]);
 
-    const getActionScripts = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.actionScripts.pleaseWaitWhileLoadingActions"),
-        timeout: 0,
-      });
+    // Bound to refresh / post-write reloads: always reaches the server.
+    const refreshActionScripts = () => getActionScripts(true);
 
-      loading.value = true;
-      getAllActions()
+    const getActionScripts = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Only a cold read spins and toasts — the rows stay put on a refresh.
+      const warm = queryClient.getQueryData(actionKeys.list(org)) !== undefined;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.actionScripts.pleaseWaitWhileLoadingActions"),
+            timeout: 0,
+          });
+
+      loading.value = !warm;
+      fetching.value = true;
+      getAllActions(force)
         .then(() => {
           resultTotal.value = store.state.organizationData.actions.length;
           alerts.value = store.state.organizationData.actions.map((alert: any) => {
@@ -529,6 +544,7 @@ export default defineComponent({
         })
         .finally(() => {
           loading.value = false;
+          fetching.value = false;
         });
     };
 
@@ -784,7 +800,7 @@ export default defineComponent({
       {
         id: "actionsRefresh",
         handler: () => {
-          if (!isInputFocused()) getActionScripts();
+          if (!isInputFocused()) refreshActionScripts();
         },
       },
     ]);
@@ -824,6 +840,8 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       loading,
+      fetching,
+      refreshActionScripts,
       isSubmitting,
       filterQuery,
       filterData,

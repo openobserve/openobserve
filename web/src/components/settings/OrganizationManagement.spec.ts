@@ -57,16 +57,19 @@ vi.mock("@/services/org_storage", () => ({
 }));
 
 // ── Mock organizations service ──
-vi.mock("@/services/organizations", () => ({
-  default: {
-    get_admin_org: vi.fn(),
-    extend_trial_period: vi.fn(),
-    create_external_contract: vi.fn(),
-    extend_external_contract: vi.fn(),
-    revoke_external_contract: vi.fn(),
-    set_ai_usage_limit: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_admin_org: vi.fn(),
+      extend_trial_period: vi.fn(),
+      create_external_contract: vi.fn(),
+      extend_external_contract: vi.fn(),
+      revoke_external_contract: vi.fn(),
+      set_ai_usage_limit: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   timestampToTimezoneDate: vi.fn((timestamp) => {

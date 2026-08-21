@@ -503,6 +503,7 @@ and each domain has its own reference below.
 
 | Decision | The rule | Detail |
 | --- | --- | --- |
+| Fetching data for a page | Never call a service from a component. Declare a `queryOptions()` in `services/<domain>.queries.ts` and `useQuery` it — never a bare `staleTime` at a call site. | [references/data-fetching.md](references/data-fetching.md) · [inventory](references/data-fetching-inventory.md) |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
 | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
@@ -554,6 +555,13 @@ Run this in your head before writing template markup, and again before
 considering the UI done:
 
 - [ ] Page/module header is `OPageHeader` (not a hand-built header bar).
+- [ ] Any data the page reads is a `queryOptions()` in
+      `services/<domain>.queries.ts`, consumed with `useQuery` — not a service
+      call with a hand-rolled `loading` ref. Durations come from
+      `cachePolicy.ts`, never a bare number. Writes are `mutationOptions()`
+      declaring `meta.invalidates`; a component never calls `invalidateQueries`
+      itself. Anything carrying a token or key material omits the `persister`.
+      See [references/data-fetching.md](references/data-fetching.md).
 - [ ] Every interactive control is an O2 component if one exists in
       `web/src/lib` — no bare HTML controls or third-party primitives with an O2 equivalent.
 - [ ] A self-contained/repeated UI element with no matching component was

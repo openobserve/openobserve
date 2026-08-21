@@ -19,6 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // Create/edit view for protocol checks (http/tcp/tls/ssh) — single configure
 // page, no journey step. Mirrors CreateBrowserTest's data fetching and save
 // flow; the per-type request card is slotted into CheckConfigure.
+import { saveMonitorMutation } from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch, type Component } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
@@ -39,7 +44,6 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
-import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -62,6 +66,8 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
+const orgIdForWrites = useOrgId();
+const saveMonitor = useMutation(() => saveMonitorMutation(orgIdForWrites.value));
 
 // Private locations are served by agents deployed inside the customer's network,
 // the one enterprise part of synthetics. Gated on its own /config flag so an OSS
@@ -194,8 +200,7 @@ watch(
 async function fetchLocations() {
   locationsLoading.value = true;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getLocations(org);
+    const res = await syntheticsService.getLocations(orgIdForWrites.value);
     // Protocol checks run from public locations and protocol-capable private
     // agents. Hide disabled locations, and hide private locations whose live
     // agents are browser-only (a browser agent can't run an HTTP/TCP/… check) —
@@ -233,24 +238,17 @@ async function openAgentSetup(locationId?: string) {
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getAgentSetup(org);
+    const res = await syntheticsService.getAgentSetup(orgIdForWrites.value);
     agentSetup.value = (res.data ?? null) as AgentSetup | null;
   } catch {
     agentSetup.value = null;
   }
 }
 
-async function fetchDestinations() {
+async function loadDestinations() {
   try {
-    const res = await destinationService.list({
-      org_identifier: store.state.selectedOrganization.identifier,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-    });
-    destinations.value = (res.data ?? []).map((d: any) => d.name as string);
+    const list = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier));
+    destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
   }
@@ -284,7 +282,7 @@ async function loadForEdit(id: string) {
 onMounted(() => {
   fetchFolders();
   fetchLocations();
-  fetchDestinations();
+  loadDestinations();
 
   if (props.editId) {
     loadForEdit(props.editId).catch(console.error);
@@ -335,14 +333,17 @@ async function saveCheck() {
     timeout: 0,
   });
   try {
-    const org = store.state.selectedOrganization.identifier;
     const payload = buildCreateProtocolCheckPayload(check.value);
     if (props.editId) {
-      await syntheticsService.update(org, props.editId, payload, check.value.folder);
+      await saveMonitor.mutateAsync({
+        id: props.editId,
+        payload,
+        folderId: check.value.folder,
+      });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
     } else {
-      await syntheticsService.create(org, payload, check.value.folder);
+      await saveMonitor.mutateAsync({ payload, folderId: check.value.folder });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
@@ -400,7 +401,7 @@ async function saveCheck() {
           :validation-errors="validationErrors"
           :allow-private-locations="privateLocationsEnabled"
           class="w-full!"
-          @refresh:destinations="fetchDestinations"
+          @refresh:destinations="loadDestinations"
           @update:check="onConfigureUpdate"
           @new-location="openAgentSetup()"
           @add-agent="(id: string) => openAgentSetup(id)"

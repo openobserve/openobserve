@@ -57,13 +57,11 @@
 </template>
 
 <script setup lang="ts">
+import { evalJobsQuery } from "@/services/online-evals.service.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import onlineEvalsService, {
-  type EvalJob,
-  type EvalTargetScope,
-  type ManualEvalJobResult,
-} from "@/services/online-evals.service";
+import onlineEvalsService, { type EvalJob, type EvalTargetScope, type ManualEvalJobResult } from "@/services/online-evals.service";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -137,7 +135,7 @@ async function loadJobs(): Promise<void> {
   loadedJobs.value = [];
   form.reset({ jobId: "" });
   try {
-    loadedJobs.value = await onlineEvalsService.jobs.list(props.orgId);
+    loadedJobs.value = await queryClient.fetchQuery(evalJobsQuery(props.orgId));
     if (compatibleJobs.value.length === 1) {
       form.setFieldValue("jobId", compatibleJobs.value[0].id);
     }

@@ -18,25 +18,28 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/alerts", () => ({
-  default: {
-    getOrganizationDeduplicationConfig: vi.fn().mockResolvedValue({
-      data: {
-        enabled: true,
-        alert_dedup_enabled: false,
-        alert_fingerprint_groups: [],
-        time_window_minutes: 30,
-      },
-    }),
-    setOrganizationDeduplicationConfig: vi.fn().mockResolvedValue({ data: {} }),
-    getSemanticGroups: vi.fn().mockResolvedValue({
-      data: [
-        { id: "group1", display: "Group 1", fields: ["host"], normalize: false },
-        { id: "group2", display: "Group 2", fields: ["service"], normalize: false },
-      ],
-    }),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getOrganizationDeduplicationConfig: vi.fn().mockResolvedValue({
+        data: {
+          enabled: true,
+          alert_dedup_enabled: false,
+          alert_fingerprint_groups: [],
+          time_window_minutes: 30,
+        },
+      }),
+      setOrganizationDeduplicationConfig: vi.fn().mockResolvedValue({ data: {} }),
+      getSemanticGroups: vi.fn().mockResolvedValue({
+        data: [
+          { id: "group1", display: "Group 1", fields: ["host"], normalize: false },
+          { id: "group2", display: "Group 2", fields: ["service"], normalize: false },
+        ],
+      }),
+    },
+  });
+});
 
 import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import alertsService from "@/services/alerts";

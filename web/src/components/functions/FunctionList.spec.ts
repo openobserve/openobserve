@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { queryClient } from "@/composables/query/queryClient";
+import { functionKeys } from "@/services/jstransform.querykeys";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import FunctionList from "./FunctionList.vue";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
@@ -28,7 +31,11 @@ const { mockJsTransformList, mockJsTransformDelete, mockBulkDelete, mockGetAssoc
     mockGetAssociatedPipelines: vi.fn(),
   }));
 
-vi.mock("../../services/jstransform", () => ({
+// A plain module mock. The query declarations live in `jstransform.queries.ts`
+// and reach the transport through a normal import, so this replacement is what
+// their queryFn calls — no overlay helper, and nothing left pointing at the real
+// endpoint.
+vi.mock("@/services/jstransform", () => ({
   default: {
     list: mockJsTransformList,
     delete: mockJsTransformDelete,
@@ -147,6 +154,11 @@ describe("FunctionList", () => {
     it("badges each function with its language and keeps the name intact", async () => {
       const wrapper = mountList();
       await flushPromises();
+      // OTable holds its skeleton for MIN_SKELETON_MS (50ms) after loading
+      // clears, so the row cells — and the badges in them — do not exist until
+      // that hold releases. A real wait is the only way past a real timer.
+      await new Promise((r) => setTimeout(r, 80));
+      await nextTick();
 
       // fixture: func1 + func2 are VRL (transType 0), js_func is JS (transType 1)
       const js = wrapper.findAll('[data-test="function-list-type-badge-js"]');
@@ -677,14 +689,12 @@ describe("FunctionList", () => {
       expect(vm.showAddJSTransformDialog).toBe(false);
     });
 
-    it("should refresh list and hide form when refreshList is called", async () => {
+    it("should hide form when refreshList is called", async () => {
       const wrapper = mount(FunctionList, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
 
       await flushPromises();
-      vi.clearAllMocks();
-      mockJsTransformList.mockResolvedValue(mockFunctionData);
 
       const vm = wrapper.vm as any;
       vm.showAddJSTransformDialog = true;
@@ -692,6 +702,24 @@ describe("FunctionList", () => {
 
       await flushPromises();
       expect(vm.showAddJSTransformDialog).toBe(false);
+    });
+
+    // `refreshList` used to re-call the list endpoint itself. It no longer does:
+    // the write invalidates the scope and the mounted query reloads. This is the
+    // assertion that replaces it — and unlike the old one it fails if a key stops
+    // matching the scope the writes declare.
+    it("should reload the list when the functions scope is invalidated", async () => {
+      mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+      vi.clearAllMocks();
+      mockJsTransformList.mockResolvedValue(mockFunctionData);
+
+      await queryClient.invalidateQueries({ queryKey: functionKeys.all("test-org") });
+      await flushPromises();
+
       expect(mockJsTransformList).toHaveBeenCalled();
     });
   });

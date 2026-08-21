@@ -59,9 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="icon-sm"
             icon-left="refresh"
-            :loading="loading"
+            :loading="fetching"
             data-test="ai-queues-refresh-btn"
-            @click="refresh"
+            @click="refreshQueues"
           >
             <OTooltip side="bottom" :content="t('common.refresh')" />
           </OButton>
@@ -342,6 +342,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useQuery } from "@tanstack/vue-query";
+import { llmQueuesQuery } from "@/services/llm-queues.service.queries";
 import { computed, onMounted, ref } from "vue";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -366,11 +368,7 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
-import llmQueuesService, {
-  type LlmQueue,
-  type LlmQueueBinding,
-  type LlmScoreConfigOption,
-} from "@/services/llm-queues.service";
+import llmQueuesService, { type LlmQueue, type LlmQueueBinding, type LlmScoreConfigOption } from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import { makeQueueFormSchema, type QueueForm, type QueueBoundConfig } from "./QueueForm.schema";
 
@@ -386,8 +384,16 @@ const router = useRouter();
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const orgQuery = computed(() => ({ org_identifier: orgId.value }));
 
-const queues = ref<LlmQueue[]>([]);
-const loading = ref(false);
+const queuesList = useQuery(() =>
+  Object.assign(llmQueuesQuery(orgId.value), { enabled: !!orgId.value }),
+);
+
+// The list is the query, not a copy of it: a write that invalidates the scope
+// repaints these rows with no wiring here.
+const queues = computed<LlmQueue[]>(() => (queuesList.data.value ?? []) as LlmQueue[]);
+const loading = queuesList.isPending;
+// Request in flight with rows still on screen — the refresh control's spinner.
+const fetching = queuesList.isFetching;
 const search = ref("");
 
 const numberedRows = useNumberedRows(queues);
@@ -494,14 +500,17 @@ const columns = computed<OTableColumnDef[]>(() => [
 // reviewedCount/totalCount on the row) and the Score Config catalog (1 request
 // + 1 `/versions` request PER config), which is drawer-only and now loads on
 // first open.
-async function refresh() {
+// Named handler: binding refresh straight to @click puts the MouseEvent in
+// `force`.
+const refreshQueues = () => refresh(true);
+
+async function refresh(force = true) {
   if (!orgId.value) return;
-  loading.value = true;
   try {
     // ONE request: the list row now carries targetDatasetName and the review
     // counts, so nothing else is needed to render the table. The Score Config
     // and Dataset catalogs are create-drawer concerns and load on first open.
-    queues.value = await llmQueuesService.list(orgId.value);
+    if (force) await queuesList.refetch();
     // Org-wide catalogs, so a manual refresh invalidates them; the next drawer
     // open re-fetches.
     optionsLoaded.value = false;
@@ -684,5 +693,7 @@ async function save(values: QueueForm) {
   }
 }
 
-onMounted(refresh);
+// Explicitly false: onMounted passes no argument, so `refresh` would fall back
+// to its force default and every visit would bypass the cache.
+onMounted(() => refresh(false));
 </script>

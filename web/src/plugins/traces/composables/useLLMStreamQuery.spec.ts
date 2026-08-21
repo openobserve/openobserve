@@ -30,9 +30,12 @@ vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({ state: mockStoreState })),
 }));
 
-vi.mock("@/services/search", () => ({
-  default: { search: mockSearch },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { search: mockSearch },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   generateTraceContext: vi.fn(() => ({ traceId: "trace-fixed-id" })),

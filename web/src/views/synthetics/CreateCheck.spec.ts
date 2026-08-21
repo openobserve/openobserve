@@ -29,7 +29,10 @@ vi.mock("vue-router", () => ({
   RouterLink: { name: "RouterLinkStub", template: "<a><slot /></a>" },
 }));
 
-vi.mock("vuex", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which needs the real
+// `createStore` — a wholesale vuex mock leaves it undefined at import time.
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       timezone: "UTC",
@@ -39,20 +42,23 @@ vi.mock("vuex", () => ({
 }));
 
 // syntheticsService mock — get() is called in edit mode
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    list: vi.fn(),
-    delete: vi.fn(),
-    enable: vi.fn(),
-    run: vi.fn(),
-    getRuns: vi.fn(),
-    getRun: vi.fn(),
-    getLocations: vi.fn(),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      list: vi.fn(),
+      delete: vi.fn(),
+      enable: vi.fn(),
+      run: vi.fn(),
+      getRuns: vi.fn(),
+      getRun: vi.fn(),
+      getLocations: vi.fn(),
+    },
+  });
+});
 
 // ── After mocks are hoisted, import the component ──────────────────────────
 

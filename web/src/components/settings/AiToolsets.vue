@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="ai-toolsets-list-refresh-btn"
-              @click="getData"
+              @click="refreshData"
             >
               <OTooltip
                 side="bottom"
@@ -130,6 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { aiToolsetsQuery } from "@/services/ai_toolsets.queries";
+import { aiToolsetKeys } from "@/services/ai_toolsets.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, computed, watch, onMounted, onUpdated, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -145,9 +148,9 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
-import aiToolsetsService from "@/services/ai_toolsets";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import aiToolsetsService from "@/services/ai_toolsets";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -170,6 +173,9 @@ export default defineComponent({
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
     const loading = ref(false);
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
     const filterQuery = ref("");
 
     const columns: OTableColumnDef[] = [
@@ -243,27 +249,55 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Data loading
     // -----------------------------------------------------------------------
-    const getData = () => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("common.loading"),
-        timeout: 0,
-      });
+    // Bound to refresh / "list changed" events: always hits the server.
+    const refreshData = () => getData(true);
 
-      aiToolsetsService
-        .list(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          const items = res.data?.toolsets ?? [];
-          tabledata.value = items.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            kind: item.kind,
-            description: item.description || "",
-          }));
-          resultTotal.value = tabledata.value.length;
+    const applyToolsets = (items: any[]) => {
+      tabledata.value = items.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        kind: item.kind,
+        description: item.description || "",
+      }));
+      resultTotal.value = tabledata.value.length;
+    };
+
+    const getData = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Only a cold cache spins and toasts — `load` paints whatever is already
+      // in hand, then swaps in the server's answer.
+      // Not gated on `force`: a manual refresh keeps its rows too, and only
+      // the toast is suppressed when there is already something on screen.
+      const options = aiToolsetsQuery(org);
+      const cached = queryClient.getQueryData<any[]>(options.queryKey);
+      const painted = cached !== undefined;
+      if (painted) applyToolsets(cached as any[]);
+
+      loading.value = !painted;
+      fetching.value = true;
+      // TODO: fold into `useQuery` — this call site drives its own flags because
+      // the surrounding refresh/toast flow is imperative.
+      const source = queryClient
+        .fetchQuery(force ? { ...options, staleTime: 0 } : options)
+        .then((data) => {
+          applyToolsets(data);
+          return data;
         })
-        .catch((err) => {
+        .finally(() => {
+          loading.value = false;
+          fetching.value = false;
+        });
+
+      const dismiss = painted
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("common.loading"),
+            timeout: 0,
+          });
+
+      source
+        .catch((err: any) => {
           if (err?.status !== 403) {
             toast({
               variant: "error",
@@ -275,7 +309,6 @@ export default defineComponent({
           }
         })
         .finally(() => {
-          loading.value = false;
           dismiss();
         });
     };
@@ -308,7 +341,7 @@ export default defineComponent({
       {
         id: "aiToolsetsRefresh",
         handler: () => {
-          if (!isInputFocused()) getData();
+          if (!isInputFocused()) getData(true);
         },
       },
     ]);
@@ -337,7 +370,7 @@ export default defineComponent({
 
     const hideAddDialog = async () => {
       showAddDialog.value = false;
-      await getData();
+      await getData(true);
       router.push({
         name: "aiToolsets",
         query: { org_identifier: store.state.selectedOrganization.identifier },
@@ -369,7 +402,11 @@ export default defineComponent({
         .delete(store.state.selectedOrganization.identifier, row.id)
         .then(() => {
           toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
-          getData();
+          // Drop the row from the cache first so it disappears now, not when
+          // the refetch lands; the forced reload re-persists the list.
+          queryClient.setQueriesData({ queryKey: aiToolsetKeys.all(store.state.selectedOrganization.identifier) }, (list: any) =>
+            Array.isArray(list) ? list.filter((tool: any) => tool.id !== row.id) : list);
+          getData(true);
         })
         .catch((err) => {
           if (err?.status !== 403) {
@@ -388,9 +425,11 @@ export default defineComponent({
     };
 
     return {
+      refreshData,
       t,
       store,
       loading,
+      fetching,
       tabledata,
       columns,
       showAddDialog,

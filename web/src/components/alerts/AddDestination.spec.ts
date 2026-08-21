@@ -34,13 +34,16 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
 }));
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    create: vi.fn().mockResolvedValue({ data: { code: 200 } }),
-    update: vi.fn().mockResolvedValue({ data: { code: 200 } }),
-    test: vi.fn().mockResolvedValue({ data: { code: 200 } }),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+      update: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+      test: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+    },
+  });
+});
 
 vi.mock("@/services/users", () => ({
   default: {

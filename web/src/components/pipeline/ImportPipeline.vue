@@ -405,13 +405,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import pipelinesService from "../../services/pipelines";
 import useStreams from "@/composables/useStreams";
-import destinationService from "@/services/alert_destination";
 import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
@@ -648,17 +649,8 @@ export default defineComponent({
     };
 
     const getAlertDestinations = async () => {
-      const destinations = await destinationService.list({
-        page_num: 1,
-        page_size: 100000,
-        sort_by: "name",
-        desc: false,
-        org_identifier: store.state.selectedOrganization.identifier,
-        module: "alert",
-      });
-      alertDestinations.value = destinations.data.map((dest: any) => {
-        return dest.name;
-      });
+      const destinations = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "alert"));
+      alertDestinations.value = destinations.map((dest: any) => dest.name);
     };
 
     const importJson = async ({ jsonStr: jsonString }: any) => {

@@ -14,18 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Service mocks must be hoisted
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/alert_templates", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -528,7 +534,9 @@ describe("PipelinesDestinationList", () => {
       (destinationService.list as any).mockResolvedValue({
         data: [makeDestination(1), makeDestination(2)],
       });
-      await (wrapper.vm as any).getDestinations();
+      // The mount already warmed the cache, so the new mock is only reached by
+      // a forced reload — the same thing the refresh button does.
+      await (wrapper.vm as any).getDestinations(true);
       await flushPromises();
       expect((wrapper.vm as any).destinations).toHaveLength(2);
     });

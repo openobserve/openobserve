@@ -259,6 +259,57 @@ export const evictExpired = async (): Promise<number> => {
 };
 
 /**
+ * Delete every record belonging to one org.
+ *
+ * Keys are "org|streamType|streamName|fieldName", so one org's records are a
+ * contiguous range — a bounded cursor, not a full-store scan. Called on org
+ * switch and logout: field values are user-visible data from the previous
+ * tenant and must not survive either.
+ */
+export const clearOrg = async (org: string): Promise<number> => {
+  if (!org) return 0;
+  let db: IDBDatabase;
+  try {
+    db = await openDB();
+  } catch {
+    return 0;
+  }
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const prefix = `${org}|`;
+    // Every key with this prefix sorts between `prefix` and `prefix + ￿`.
+    const range = IDBKeyRange.bound(prefix, prefix + "￿", false, false);
+    let deleted = 0;
+    const req = tx.objectStore(STORE_NAME).openCursor(range);
+    req.onsuccess = (e) => {
+      const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        cursor.delete();
+        deleted++;
+        cursor.continue();
+      } else resolve(deleted);
+    };
+    req.onerror = () => resolve(deleted);
+  });
+};
+
+/** Drop every record, for logout. */
+export const clearAll = async (): Promise<void> => {
+  let db: IDBDatabase;
+  try {
+    db = await openDB();
+  } catch {
+    return;
+  }
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const req = tx.objectStore(STORE_NAME).clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => resolve();
+  });
+};
+
+/**
  * Trim total record count to maxFields — evict least-recently-used fields first.
  * Called opportunistically alongside evictExpired (~5% of searches).
  *
