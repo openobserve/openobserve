@@ -13,11 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Metrics sidecar index support.
+//!
+//! This crate owns the indexed metrics file layout, `.midx` encoding and
+//! decoding, PromQL matcher pruning, and the process-wide row-selection cache.
+
 mod cache;
+pub mod layout;
 mod pruner;
 mod reader;
+mod writer;
 
-pub(super) use pruner::search;
+pub use layout::{
+    METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
+};
+pub use pruner::search;
+pub use writer::MetricsIndexWriter;
 
 #[cfg(test)]
 mod tests {
@@ -29,13 +40,11 @@ mod tests {
         ipc::writer::FileWriter as ArrowFileWriter,
     };
     use bytes::Bytes;
-    use config::{
-        TIMESTAMP_COL_NAME,
-        meta::promql::{VALUE_LABEL, layout::METRICS_INDEX_ROW_COUNT},
-    };
+    use config::{TIMESTAMP_COL_NAME, meta::promql::VALUE_LABEL};
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::{
+        METRICS_INDEX_ROW_COUNT,
         pruner::{create_physical_filter, metrics_index_labels},
         reader::{MetricsIndexData, decode_metrics_index, evaluate_metrics_index},
     };

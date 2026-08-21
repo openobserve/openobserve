@@ -18,13 +18,11 @@
 use std::borrow::Cow;
 
 use config::{
-    meta::{
-        promql::layout::MetricsFileLayout,
-        stream::{FileKey, FileListDeleted, FileMeta},
-    },
+    meta::stream::{FileKey, FileListDeleted, FileMeta},
     utils::inverted_index::to_tantivy_name,
 };
 use infra::{file_list as infra_file_list, storage};
+use metrics_index::MetricsFileLayout;
 
 // Batch size for deleting files from file_list_deleted table
 const BATCH_SIZE: i64 = 10000;

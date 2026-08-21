@@ -23,10 +23,7 @@ use config::{
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
-use datafusion::{
-    error::{DataFusionError, Result},
-    sql::TableReference,
-};
+use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 use infra::{
     cache::file_data,
@@ -37,12 +34,11 @@ use promql_parser::label::Matchers;
 use search::{
     datafusion::exec::register_metrics_table,
     file_cache::{cache_files, calc_target_partitions},
-    types::QueryParams,
 };
 use search_service::match_source;
 use tracing::Instrument;
 
-use crate::search::grpc::{Context, metrics_index};
+use crate::search::grpc::Context;
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
@@ -194,23 +190,12 @@ pub(crate) async fn create_context(
 
     let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 
-    let query = Arc::new(QueryParams {
-        trace_id: trace_id.to_string(),
-        org_id: org_id.to_string(),
-        stream: TableReference::from(stream_name),
-        stream_type: StreamType::Metrics,
-        stream_name: stream_name.to_string(),
-        time_range,
-        work_group: None,
-        use_inverted_index: false,
-    });
-
     // Prune indexed metrics files through their `.midx` metrics indexes: matching
     // physical rows are attached to each FileKey before the metrics table is
     // built. Files of any other layout (legacy or not yet finalized hours) are
     // scanned in full; the PromQL matchers are always applied by the query.
     match metrics_index::search(
-        query.as_ref(),
+        trace_id,
         &mut files,
         schema.as_ref(),
         &matchers,

@@ -36,7 +36,6 @@ use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 use tokio::sync::mpsc;
 
-mod metrics_index;
 mod storage;
 mod wal;
 

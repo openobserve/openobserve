@@ -18,7 +18,7 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use config::{
     FileFormat, get_config,
-    meta::{promql::layout::MetricsFileLayout, stream::FileMeta},
+    meta::stream::FileMeta,
     utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
 };
 use datafusion::{
@@ -28,6 +28,7 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
+use metrics_index::MetricsFileLayout;
 use parquet::{
     arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter},
     file::metadata::KeyValue,
@@ -52,7 +53,6 @@ use crate::datafusion::{
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
 mod metrics;
-mod metrics_index;
 pub mod mode;
 
 pub use mode::{MergeMode, MergeOutput};

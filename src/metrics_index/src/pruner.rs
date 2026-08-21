@@ -22,7 +22,7 @@ use arrow::datatypes::Schema;
 use config::{
     PARQUET_MAX_ROW_GROUP_SIZE,
     meta::{
-        promql::{is_metrics_hash_excluded_label, layout::MetricsFileLayout},
+        promql::is_metrics_hash_excluded_label,
         stream::{FileKey, FileSelection},
     },
 };
@@ -35,10 +35,10 @@ use datafusion::{
 };
 use futures::{StreamExt, stream};
 use promql_parser::label::Matchers;
-use search::types::QueryParams;
 
-use super::{
+use crate::{
     cache::METRICS_INDEX_SELECTION_CACHE,
+    layout::MetricsFileLayout,
     reader::{evaluate_metrics_index, load_metrics_index_file},
 };
 
@@ -51,8 +51,8 @@ use super::{
 /// a Parquet access plan. Files of any other layout are left untouched, in
 /// place, for a full scan. `Ok(None)` means no file or matcher was eligible and
 /// nothing was changed.
-pub(in crate::search::grpc) async fn search(
-    query: &QueryParams,
+pub async fn search(
+    trace_id: &str,
     files: &mut Vec<FileKey>,
     table_schema: &Schema,
     matchers: &Matchers,
@@ -78,7 +78,7 @@ pub(in crate::search::grpc) async fn search(
         let Some(sidecar_path) = MetricsFileLayout::metrics_index_path(&file.key) else {
             log::warn!(
                 "[trace_id {}] promql->metrics-index: indexed file {} has no metrics-index path, leaving the file unpruned",
-                query.trace_id,
+                trace_id,
                 file.key,
             );
             continue;
@@ -86,7 +86,7 @@ pub(in crate::search::grpc) async fn search(
         let Ok(expected_rows) = usize::try_from(file.meta.records) else {
             log::warn!(
                 "[trace_id {}] promql->metrics-index: invalid record count {} for {}, leaving the file unpruned",
-                query.trace_id,
+                trace_id,
                 file.meta.records,
                 file.key,
             );
@@ -169,7 +169,7 @@ pub(in crate::search::grpc) async fn search(
                 failed_files += 1;
                 log::warn!(
                     "[trace_id {}] promql->metrics-index: failed to prune {data_path}, leaving the file for a full scan: {error}",
-                    query.trace_id,
+                    trace_id,
                 );
             }
         }
@@ -203,7 +203,7 @@ pub(in crate::search::grpc) async fn search(
     let took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {}] promql->metrics-index: selected {selected_ranges} ranges across {selected_files}/{} files, {failed_files} sidecars failed and were left for a full scan, {other_files} files without a usable sidecar left for a full scan, selection cache hits: {cache_hits}, took: {took} ms",
-        query.trace_id,
+        trace_id,
         indexed_file_count,
     );
     Ok(Some(took))

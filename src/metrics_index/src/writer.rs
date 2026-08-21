@@ -24,10 +24,10 @@ use arrow::{
         writer::{FileWriter as ArrowFileWriter, IpcWriteOptions},
     },
 };
-use config::meta::promql::{
-    HASH_LABEL, is_metrics_hash_excluded_label, layout::METRICS_INDEX_ROW_COUNT,
-};
+use config::meta::promql::{HASH_LABEL, is_metrics_hash_excluded_label};
 use datafusion::error::{DataFusionError, Result};
+
+use crate::layout::METRICS_INDEX_ROW_COUNT;
 
 /// Writer for an indexed metrics file's `.midx` metrics index. Every row
 /// describes one contiguous metrics series run in the data file: its row count plus the
@@ -43,7 +43,7 @@ use datafusion::error::{DataFusionError, Result};
 /// file built alongside.
 ///
 /// [`finish`]: MetricsIndexWriter::finish
-pub(super) struct MetricsIndexWriter {
+pub struct MetricsIndexWriter {
     schema: Arc<Schema>,
     hash_index: usize,
     label_indices: Vec<usize>,
@@ -51,7 +51,7 @@ pub(super) struct MetricsIndexWriter {
 }
 
 impl MetricsIndexWriter {
-    pub(super) fn try_new(source_schema: &Arc<Schema>) -> Result<Self> {
+    pub fn try_new(source_schema: &Arc<Schema>) -> Result<Self> {
         let hash_index = source_schema.index_of(HASH_LABEL).map_err(|e| {
             DataFusionError::Plan(format!("indexed metrics layout requires {HASH_LABEL}: {e}"))
         })?;
@@ -83,7 +83,7 @@ impl MetricsIndexWriter {
     }
 
     /// Record the metrics series runs of one hash-ordered batch.
-    pub(super) fn write(&mut self, batch: &RecordBatch) -> Result<()> {
+    pub fn write(&mut self, batch: &RecordBatch) -> Result<()> {
         let hashes = batch
             .column(self.hash_index)
             .as_any()
@@ -127,7 +127,7 @@ impl MetricsIndexWriter {
         Ok(())
     }
 
-    pub(super) fn finish(self) -> Result<Vec<u8>> {
+    pub fn finish(self) -> Result<Vec<u8>> {
         let batch = concat_batches(&self.schema, &self.pending_batches)?;
         let options =
             IpcWriteOptions::default().try_with_compression(Some(CompressionType::ZSTD))?;
@@ -205,7 +205,7 @@ mod tests {
         );
 
         let counts = batch
-            .column_by_name(config::meta::promql::layout::METRICS_INDEX_ROW_COUNT)
+            .column_by_name(METRICS_INDEX_ROW_COUNT)
             .unwrap()
             .as_any()
             .downcast_ref::<UInt32Array>()

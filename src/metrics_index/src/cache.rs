@@ -20,6 +20,7 @@ use std::{
 
 use hashlink::LruCache;
 
+/// Process-wide upper bound for cached physical row-range selections.
 const METRICS_INDEX_SELECTION_CACHE_MAX_BYTES: usize = 256 * 1024 * 1024;
 
 pub(super) static METRICS_INDEX_SELECTION_CACHE: LazyLock<Mutex<MetricsIndexSelectionCache>> =

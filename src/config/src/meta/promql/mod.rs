@@ -66,7 +66,6 @@ where
 }
 
 pub mod grpc;
-pub mod layout;
 pub mod value;
 
 pub const NAME_LABEL: &str = "__name__";

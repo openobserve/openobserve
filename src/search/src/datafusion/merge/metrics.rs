@@ -19,18 +19,15 @@ use arrow::{
     array::{Array, Int64Array, RecordBatch},
     compute::{max, min},
 };
-use config::{
-    TIMESTAMP_COL_NAME,
-    meta::{promql::layout::MetricsFileLayout, stream::FileMeta},
-    utils::parquet::new_parquet_writer,
-};
+use config::{TIMESTAMP_COL_NAME, meta::stream::FileMeta, utils::parquet::new_parquet_writer};
 use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
+use metrics_index::{MetricsFileLayout, MetricsIndexWriter};
 use parquet::arrow::AsyncArrowWriter;
 
-use super::{MergedFile, append_metadata, metrics_index::MetricsIndexWriter};
+use super::{MergedFile, append_metadata};
 
 /// Write a globally hash-sorted metrics stream into size-bounded files.
 /// Rotation happens between input record batches. File and row-group

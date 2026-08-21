@@ -18,9 +18,10 @@
 //! in its name, and the names of the `.midx` metrics-index columns.
 
 use arrow_schema::{DataType, Schema};
-
-use super::HASH_LABEL;
-use crate::{FileFormat, meta::stream::StreamType};
+use config::{
+    FileFormat, get_config,
+    meta::{promql::HASH_LABEL, stream::StreamType},
+};
 
 pub const METRICS_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
 
@@ -40,7 +41,7 @@ pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
     if stream_type != StreamType::Metrics {
         return false;
     }
-    let cfg = crate::get_config();
+    let cfg = get_config();
     cfg.compact.metrics_index_enabled
         && cfg.common.file_format.for_stream(stream_type) == FileFormat::Parquet
 }
@@ -142,7 +143,7 @@ impl MetricsFileLayout {
 
 #[cfg(test)]
 mod metrics_file_layout_tests {
-    use FileFormat;
+    use config::FileFormat;
 
     use super::*;
 

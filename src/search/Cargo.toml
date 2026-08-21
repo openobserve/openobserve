@@ -35,6 +35,7 @@ itertools.workspace = true
 log.workspace = true
 md5.workspace = true
 memchr.workspace = true
+metrics_index.workspace = true
 object_store.workspace = true
 transform.workspace = true
 vector-enrichment.workspace = true

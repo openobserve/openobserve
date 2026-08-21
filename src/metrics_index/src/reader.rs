@@ -20,11 +20,12 @@ use arrow::{
     datatypes::SchemaRef,
     ipc::reader::FileReaderBuilder as ArrowFileReaderBuilder,
 };
-use config::meta::promql::layout::METRICS_INDEX_ROW_COUNT;
 use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::PhysicalExpr,
 };
+
+use crate::layout::METRICS_INDEX_ROW_COUNT;
 
 pub(super) struct MetricsIndexData {
     pub(super) schema: SchemaRef,

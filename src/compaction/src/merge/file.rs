@@ -19,10 +19,7 @@ use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use bytes::Bytes;
 use config::{
     FileFormat, get_config, ider, is_local_disk_storage,
-    meta::{
-        promql::layout::MetricsFileLayout,
-        stream::{FileKey, FileMeta, StorageType, StreamType},
-    },
+    meta::stream::{FileKey, FileMeta, StorageType, StreamType},
     metrics,
     utils::{parquet::read_schema_from_bytes, schema_ext::SchemaExt},
 };
@@ -37,6 +34,7 @@ use infra::{
     },
     storage,
 };
+use metrics_index::MetricsFileLayout;
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,

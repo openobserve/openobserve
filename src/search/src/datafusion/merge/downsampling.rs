@@ -19,7 +19,7 @@ use arrow::array::{Int64Array, RecordBatch};
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL, layout::MetricsFileLayout},
+        promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
         stream::FileMeta,
     },
     utils::parquet::new_parquet_writer,
@@ -28,6 +28,7 @@ use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
+use metrics_index::MetricsFileLayout;
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
