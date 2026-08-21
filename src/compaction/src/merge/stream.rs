@@ -17,15 +17,13 @@ use ::datafusion::arrow::datatypes::Schema;
 use chrono::{DateTime, TimeZone, Utc};
 use config::{
     get_config,
-    meta::{
-        promql::layout::MetricsFileLayout,
-        stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
-    },
+    meta::stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
     metrics,
     utils::time::hour_micros,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{file_list as infra_file_list, schema::get_partition_time_level};
+use metrics_index::MetricsFileLayout;
 use search::datafusion::merge::MergeMode;
 use search_service::file_list;
 use tokio::{

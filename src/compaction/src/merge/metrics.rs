@@ -17,7 +17,8 @@
 //! every file is indexed, the late files alone while fragmentation is low,
 //! else the whole hour.
 
-use config::meta::{promql::layout::MetricsFileLayout, stream::FileKey};
+use config::meta::stream::FileKey;
+use metrics_index::MetricsFileLayout;
 
 /// Indexed `indexed-v1-*` files a closed hour may hold beyond the ideal
 /// `total_size / max_file_size` before the whole hour is rewritten.
