@@ -21,11 +21,13 @@ vectorscan = ["search/vectorscan", "search_service/vectorscan"]
 [dependencies]
 arrow.workspace = true
 async-trait.workspace = true
+bytes.workspace = true
 config.workspace = true
 datafusion.workspace = true
 db.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
+hashlink.workspace = true
 infra.workspace = true
 itertools.workspace = true
 log.workspace = true
@@ -44,3 +46,6 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 usage_reporting.workspace = true
 utoipa.workspace = true
+
+[dev-dependencies]
+regex.workspace = true

@@ -21,7 +21,7 @@ use arrow::{
 };
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{promql::tsid_layout::MetricsFileLayout, stream::FileMeta},
+    meta::{promql::layout::MetricsFileLayout, stream::FileMeta},
     utils::parquet::new_parquet_writer,
 };
 use datafusion::{
@@ -34,7 +34,7 @@ use super::{MergedFile, append_metadata};
 
 /// Write a globally hash-sorted metrics stream into size-bounded files.
 /// Rotation happens between input record batches. File and row-group
-/// boundaries deliberately remain independent of TSID boundaries.
+/// boundaries deliberately remain independent of metrics series boundaries.
 pub(super) async fn write_files(
     schema: &Arc<Schema>,
     bloom_filter_fields: &[String],
@@ -45,11 +45,11 @@ pub(super) async fn write_files(
 ) -> Result<Vec<MergedFile>> {
     let timestamp_index = schema.index_of(TIMESTAMP_COL_NAME).map_err(|e| {
         DataFusionError::Plan(format!(
-            "TSID-major layout requires {TIMESTAMP_COL_NAME}: {e}"
+            "indexed metrics layout requires {TIMESTAMP_COL_NAME}: {e}"
         ))
     })?;
     let max_file_size = i64::try_from(max_file_size).unwrap_or(i64::MAX).max(1);
-    let mut active: Option<ActiveSizeTsidWriter> = None;
+    let mut active: Option<ActiveIndexedMetricsWriter> = None;
     let mut files: Vec<MergedFile> = Vec::new();
 
     while let Some(batch) = rx.recv().await {
@@ -63,7 +63,7 @@ pub(super) async fn write_files(
             files.push(full.finish(metadata, max_file_size).await?);
         }
         let writer = active.get_or_insert_with(|| {
-            ActiveSizeTsidWriter::new(schema, bloom_filter_fields, metadata, timestamp_index)
+            ActiveIndexedMetricsWriter::new(schema, bloom_filter_fields, metadata, timestamp_index)
         });
         writer.write(&batch).await?;
     }
@@ -76,7 +76,7 @@ pub(super) async fn write_files(
     }
     if files.is_empty() {
         return Err(DataFusionError::Execution(
-            "TSID-major merge produced no rows".to_string(),
+            "indexed metrics merge produced no rows".to_string(),
         ));
     }
 
@@ -84,13 +84,13 @@ pub(super) async fn write_files(
 }
 
 /// One output file in progress: the Parquet writer and the running file meta.
-struct ActiveSizeTsidWriter {
+struct ActiveIndexedMetricsWriter {
     writer: AsyncArrowWriter<Vec<u8>>,
     file_meta: FileMeta,
     timestamp_index: usize,
 }
 
-impl ActiveSizeTsidWriter {
+impl ActiveIndexedMetricsWriter {
     fn new(
         schema: &Arc<Schema>,
         bloom_filter_fields: &[String],
@@ -123,7 +123,7 @@ impl ActiveSizeTsidWriter {
             .downcast_ref::<Int64Array>()
             .ok_or_else(|| {
                 DataFusionError::Plan(format!(
-                    "TSID-major layout requires Int64 {TIMESTAMP_COL_NAME}"
+                    "indexed metrics layout requires Int64 {TIMESTAMP_COL_NAME}"
                 ))
             })?;
         let meta = &mut self.file_meta;
@@ -157,7 +157,7 @@ impl ActiveSizeTsidWriter {
         Ok(MergedFile {
             buf,
             meta: file_meta,
-            layout: MetricsFileLayout::TsidMajor,
+            layout: MetricsFileLayout::Indexed,
         })
     }
 }
@@ -181,7 +181,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_size_split_tsid_major_rotates_at_batch_boundary() {
+    async fn test_size_split_metrics_rotates_at_batch_boundary() {
         let schema = Arc::new(Schema::new(vec![
             Field::new(HASH_LABEL, DataType::UInt64, false),
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
@@ -254,7 +254,7 @@ mod tests {
             vec![150, 150, 100]
         );
         assert!(files.iter().all(|f| {
-            f.layout == MetricsFileLayout::TsidMajor
+            f.layout == MetricsFileLayout::Indexed
                 && f.meta.original_size < max_file_size as i64
                 && f.meta.compressed_size == f.buf.len() as i64
         }));
