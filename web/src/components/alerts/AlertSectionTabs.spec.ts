@@ -45,7 +45,7 @@ describe("AlertSectionTabs", () => {
     // work. The rail's Reliability flyout lists the same four in this order.
     const wrapper = mountTabs();
     const labels = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
-    expect(labels).toEqual(["All Alerts", "Destinations", "Templates", "Library"]);
+    expect(labels).toEqual(["All Alerts", "Destinations", "Destination Templates", "Library"]);
   });
 
   it("marks the tab for the current route active", async () => {
