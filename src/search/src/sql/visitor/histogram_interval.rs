@@ -87,6 +87,7 @@ macro_rules! intervals {
 
     (@unit h) => { chrono::Duration::hours };
     (@unit m) => { chrono::Duration::minutes };
+    (@unit s) => { chrono::Duration::seconds };
 }
 
 pub fn generate_histogram_interval(time_range: (i64, i64)) -> &'static str {
@@ -106,7 +107,7 @@ pub fn generate_histogram_interval(time_range: (i64, i64)) -> &'static str {
         (h, 2, "1 minute"),
         (h, 1, "30 second"),
         (m, 30, "15 second"),
-        (m, 15, "10 second"),
+        (s, 10, "10 second"),
     ];
 
     for (time, interval) in INTERVALS.iter() {
@@ -114,7 +115,12 @@ pub fn generate_histogram_interval(time_range: (i64, i64)) -> &'static str {
             return interval;
         }
     }
-    "10 second"
+    // Ranges narrower than one 10s bucket drop to 1s buckets: a bucket wider
+    // than the whole range makes the scan-start snap (histogram_bucket_start)
+    // pull in up to 10s of data from before the range, so bucket counts dwarf
+    // the range total (#13896). With 1s buckets the snap widens the scan by
+    // less than a second (zero for whole-second range starts).
+    "1 second"
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
@@ -526,10 +532,24 @@ mod tests {
         assert_eq!(generate_histogram_interval((0, 24 * 31 * hour)), "12 hour");
         // > 24*28h but <= 24*30h → "6 hour"
         assert_eq!(generate_histogram_interval((0, 24 * 29 * hour)), "6 hour");
-        // duration < 15 min → falls through all checks → "10 second"
+        // 10s <= duration < 30 min → "10 second"
         assert_eq!(generate_histogram_interval((0, 10 * minute)), "10 second");
         // duration >= 30 min → "15 second"
         assert_eq!(generate_histogram_interval((0, 31 * minute)), "15 second");
+    }
+
+    #[test]
+    fn test_generate_histogram_interval_narrow_range() {
+        let second = 1_000_000_i64;
+        // a range narrower than the 10s floor drops to 1s buckets so the
+        // scan-start snap cannot widen the query past the range (#13896)
+        assert_eq!(generate_histogram_interval((0, second)), "1 second");
+        assert_eq!(
+            generate_histogram_interval((0, 10 * second - 1)),
+            "1 second"
+        );
+        // at exactly 10s the historical floor is kept
+        assert_eq!(generate_histogram_interval((0, 10 * second)), "10 second");
     }
 
     #[test]
