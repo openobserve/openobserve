@@ -723,6 +723,32 @@ export interface PreviewRung {
   resolves_to_nobody: boolean;
 }
 
+/**
+ * The L0 agent's part in one priority's ladder, as the preview reports it.
+ *
+ * `mode` arrives **already resolved for this priority** — the server applies
+ * the P1 invariant (always `parallel`) and the pages-nobody rule (P4/P5 →
+ * `only`) before answering. Never re-derive it from `policy.l0.mode`: two
+ * places deciding what P1 means is how they come to disagree.
+ */
+export interface PreviewL0 {
+  mode: L0Mode;
+  /** Seconds a `gate` holds the first rung for. */
+  triage_budget_seconds: number;
+  /**
+   * The deployment has an agent reachable. False means **draw no L0 step at
+   * all**, whatever the policy says — a `gate` with nothing to gate on does
+   * not hold the page, it pages immediately, and a hold drawn there reads as
+   * configured and is wrong.
+   */
+  available: boolean;
+  /** A finished sentence — render it rather than composing one. */
+  summary: string;
+  allow_suppress: boolean;
+  allow_promotion: boolean;
+  allow_downgrade: boolean;
+}
+
 export interface EscalationPreview {
   team_id: string;
   team_name: string;
@@ -741,6 +767,12 @@ export interface EscalationPreview {
   cross_team_moves: string[];
   /** True when no rung would reach a single person — the loudest finding. */
   reaches_nobody: boolean;
+  /**
+   * Optional because the endpoint gained it 2026-08-21 (D-58) and a build
+   * talking to an older server gets nothing — which reads the same as a
+   * deployment with no agent: no L0 step.
+   */
+  l0?: PreviewL0 | null;
 }
 
 /**

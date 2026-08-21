@@ -47,77 +47,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OInnerLoading v-if="loading" showing />
 
-    <p
-      v-else-if="!preview || !preview.pages_anyone"
-      class="text-status-error-text text-sm"
-      data-test="oncall-ladder-silent"
-    >
-      {{ t("oncall.ladderPriorityPagesNobody", { priority: raw(selected) }) }}
-    </p>
-
-    <OTimeline v-else data-test="oncall-ladder-rungs">
-      <OTimelineItem
-        v-for="rung in preview.rungs"
-        :key="rung.after_micros"
-        :label="delayLabel(rung.after_micros)"
-        :title="raw(saidTargets(rung.targets))"
-        :subtitle="resolvesTo(rung)"
-        variant="muted"
-        :data-test="`oncall-ladder-rung-${rung.after_micros}`"
+    <template v-else>
+      <!-- L0 rides above the rail rather than on it: the agent starts when the
+         record opens, so it is not a rung with a delay of its own. The server's
+         sentence carries whether anything waits — for `parallel` nothing does. -->
+      <span
+        v-if="l0"
+        class="border-border-default bg-surface-subtle rounded-surface flex flex-wrap items-baseline gap-x-2 gap-y-1 border p-3"
+        :data-test="`oncall-ladder-l0-${l0.mode}`"
       >
-        <!-- Only when something is wrong, and as a badge: the server's reason
+        <OTag variant="primary-soft" size="sm">{{ l0ModeLabel }}</OTag>
+        <span class="text-text-secondary text-xs">{{ raw(l0.summary) }}</span>
+      </span>
+
+      <p
+        v-if="!preview || !preview.pages_anyone"
+        class="text-status-error-text text-sm"
+        data-test="oncall-ladder-silent"
+      >
+        {{ t("oncall.ladderPriorityPagesNobody", { priority: raw(selected) }) }}
+      </p>
+
+      <OTimeline v-else data-test="oncall-ladder-rungs">
+        <OTimelineItem
+          v-for="rung in preview.rungs"
+          :key="rung.after_micros"
+          :label="delayLabel(rung.after_micros)"
+          :title="raw(saidTargets(rung.targets))"
+          :subtitle="resolvesTo(rung)"
+          variant="muted"
+          :data-test="`oncall-ladder-rung-${rung.after_micros}`"
+        >
+          <!-- Only when something is wrong, and as a badge: the server's reason
              is a full sentence, which is a paragraph on a rail. The sentence
              itself is one hover away, so nothing is hidden. -->
-        <OTag
-          v-if="problems[rung.after_micros]"
-          variant="error-soft"
-          size="sm"
-          class="mt-1"
-          :data-test="`oncall-ladder-rung-problem-${rung.after_micros}`"
-        >
-          {{ problems[rung.after_micros]?.label }}
-          <OTooltip
-            v-if="problems[rung.after_micros]?.tip"
-            side="bottom"
-            :content="problems[rung.after_micros]?.tip ?? undefined"
-          />
-        </OTag>
-      </OTimelineItem>
-
-      <!-- The ending is a rung of the same rail: it is when the ladder runs
-           out, which is the fact the delays above are read against. -->
-      <OTimelineItem
-        :label="t('oncall.ladderEnd')"
-        :title="endTitle"
-        variant="muted"
-        data-test="oncall-ladder-ends"
-      >
-        <span class="flex flex-wrap items-baseline gap-x-2">
-          <!-- The server's own sentence — never our guess at what a policy ends with. -->
-          <span class="text-text-secondary text-xs">{{ raw(preview.ends_with) }}</span>
-          <OButton
-            variant="ghost-primary"
-            size="xs"
-            data-test="oncall-ladder-add-rung"
-            @click="emit('edit')"
+          <OTag
+            v-if="problems[rung.after_micros]"
+            variant="error-soft"
+            size="sm"
+            class="mt-1"
+            :data-test="`oncall-ladder-rung-problem-${rung.after_micros}`"
           >
-            {{ t("oncall.ladderAddRung") }}
-          </OButton>
-        </span>
+            {{ problems[rung.after_micros]?.label }}
+            <OTooltip
+              v-if="problems[rung.after_micros]?.tip"
+              side="bottom"
+              :content="problems[rung.after_micros]?.tip ?? undefined"
+            />
+          </OTag>
+        </OTimelineItem>
 
-        <!-- How a page can leave this team at all. Both sentences are the
+        <!-- The ending is a rung of the same rail: it is when the ladder runs
+           out, which is the fact the delays above are read against. -->
+        <OTimelineItem
+          :label="t('oncall.ladderEnd')"
+          :title="endTitle"
+          variant="muted"
+          data-test="oncall-ladder-ends"
+        >
+          <span class="flex flex-wrap items-baseline gap-x-2">
+            <!-- The server's own sentence — never our guess at what a policy ends with. -->
+            <span class="text-text-secondary text-xs">{{ raw(preview.ends_with) }}</span>
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              data-test="oncall-ladder-add-rung"
+              @click="emit('edit')"
+            >
+              {{ t("oncall.ladderAddRung") }}
+            </OButton>
+          </span>
+
+          <!-- How a page can leave this team at all. Both sentences are the
              server's: "escalate to a sibling" is not a thing, and wording it
              that way would tell somebody they still hold a page they gave away. -->
-        <span
-          v-for="(move, index) in preview.cross_team_moves"
-          :key="index"
-          class="text-text-secondary block text-xs"
-          :data-test="`oncall-ladder-move-${index}`"
-        >
-          {{ raw(move) }}
-        </span>
-      </OTimelineItem>
-    </OTimeline>
+          <span
+            v-for="(move, index) in preview.cross_team_moves"
+            :key="index"
+            class="text-text-secondary block text-xs"
+            :data-test="`oncall-ladder-move-${index}`"
+          >
+            {{ raw(move) }}
+          </span>
+        </OTimelineItem>
+      </OTimeline>
+    </template>
   </div>
 </template>
 
@@ -152,7 +166,13 @@ const props = withDefaults(
     preview?: EscalationPreview | null;
     loading?: boolean;
   }>(),
-  { priorities: () => [], policy: null, selected: "P1", preview: null, loading: false },
+  {
+    priorities: () => [],
+    policy: null,
+    selected: "P1",
+    preview: null,
+    loading: false,
+  },
 );
 
 const emit = defineEmits<{ (e: "update:selected", priority: string): void; (e: "edit"): void }>();
@@ -271,6 +291,29 @@ const endTitle = computed<I18nText>(() =>
     ? t("oncall.ladderEndsHandsOff")
     : t("oncall.ladderEndsStops"),
 );
+
+/// The preview's own L0 block, or nothing at all. Two ways to get nothing, and
+/// both mean the same thing on screen: an older server that does not send the
+/// field, and `available: false` — a deployment with no agent reachable does
+/// not hold a page, whatever mode the policy stores.
+const l0 = computed(() => {
+  const block = props.preview?.l0;
+  return block?.available ? block : null;
+});
+
+/// `mode` is read as the server resolved it FOR THIS PRIORITY. The P1
+/// invariant and the P4/P5 rule are already applied, so nothing here consults
+/// `policy.l0` — one place decides what a priority's mode is.
+const l0ModeLabel = computed<I18nText>(() => {
+  switch (l0.value?.mode) {
+    case "gate":
+      return t("oncall.ladderL0Gate");
+    case "only":
+      return t("oncall.ladderL0Only");
+    default:
+      return t("oncall.ladderL0Parallel");
+  }
+});
 
 /// Kept so the template reads the prop rather than reaching through `props`.
 const preview = computed(() => props.preview);

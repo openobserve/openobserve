@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import type {
   EscalationPreview,
   OnCallPolicy,
+  PreviewL0,
   PreviewRecipient,
   TeamRungSummary,
 } from "@/ts/interfaces/oncall";
@@ -49,6 +50,17 @@ const person = (over: Partial<PreviewRecipient> = {}): PreviewRecipient => ({
   reason: "you are on call",
   would_a_page_land: true,
   deliverable_channels: ["email"],
+  ...over,
+});
+
+const l0 = (over: Partial<PreviewL0> = {}): PreviewL0 => ({
+  mode: "gate",
+  triage_budget_seconds: 90,
+  available: true,
+  summary: "The AI SRE triages first. The first level is held for up to 90s.",
+  allow_suppress: false,
+  allow_promotion: true,
+  allow_downgrade: true,
   ...over,
 });
 
@@ -89,7 +101,10 @@ const sharedPolicy = {
   rungs: [
     {
       priority: 1 as const,
-      steps: [...oneStep, { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "whole_team" as const }] }],
+      steps: [
+        ...oneStep,
+        { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "whole_team" as const }] },
+      ],
       channels: ["email" as const],
     },
     { priority: 2 as const, steps: oneStep, channels: ["email" as const] },
@@ -107,7 +122,12 @@ function preview(over: Partial<EscalationPreview> = {}): EscalationPreview {
     pages_anyone: true,
     channels: ["email"],
     rungs: [
-      { after_micros: 0, targets: ["the on-call"], recipients: [person()], resolves_to_nobody: false },
+      {
+        after_micros: 0,
+        targets: ["the on-call"],
+        recipients: [person()],
+        resolves_to_nobody: false,
+      },
     ],
     ends_with: "escalation ends",
     cross_team_moves: [],
@@ -419,7 +439,10 @@ describe("OnCallEscalationLadder", () => {
   });
 
   it("says so when the selected priority pages nobody", () => {
-    const wrapper = render({ selected: "P4", preview: preview({ pages_anyone: false, rungs: [] }) });
+    const wrapper = render({
+      selected: "P4",
+      preview: preview({ pages_anyone: false, rungs: [] }),
+    });
     expect(wrapper.find('[data-test="oncall-ladder-silent"]').exists()).toBe(true);
   });
 
@@ -428,5 +451,60 @@ describe("OnCallEscalationLadder", () => {
     await wrapper.find('[data-test="oncall-ladder-add-rung"]').trigger("click");
 
     expect(wrapper.emitted("edit")).toHaveLength(1);
+  });
+
+  /// On a gated priority the rail's first rung is NOT what fires at 0m — the
+  /// page is held for the budget first. Drawing the rungs alone showed a
+  /// timeline that is not the one that runs.
+  it("draws the L0 step with the server's own sentence", () => {
+    const wrapper = render({ preview: preview({ l0: l0() }) });
+    const step = wrapper.find('[data-test="oncall-ladder-l0-gate"]');
+
+    expect(step.exists()).toBe(true);
+    expect(step.text()).toContain("Held for triage");
+    expect(step.text()).toContain("held for up to 90s");
+  });
+
+  /// The deployment's answer beats the policy's: a gate with no agent
+  /// reachable does not hold the page, it pages immediately, and a hold drawn
+  /// there reads as configured and is wrong.
+  it("draws no L0 step when no agent is available, whatever the mode says", () => {
+    const wrapper = render({ preview: preview({ l0: l0({ available: false }) }) });
+
+    expect(wrapper.find('[data-test="oncall-ladder-l0-gate"]').exists()).toBe(false);
+  });
+
+  /// An older server does not send the field at all, which reads the same as a
+  /// deployment with no agent.
+  it("draws no L0 step when the preview does not carry one", () => {
+    const wrapper = render();
+
+    expect(wrapper.find('[data-test="oncall-ladder-l0-gate"]').exists()).toBe(false);
+  });
+
+  /// `mode` arrives resolved for this priority — the P1 invariant is already
+  /// applied server-side. Two places deciding what P1 means is how they come
+  /// to disagree, so a policy saying otherwise must not win here.
+  it("reads the mode off the preview, never off the stored policy", () => {
+    const gatedPolicy = {
+      ...sharedPolicy,
+      l0: {
+        mode: { P1: "gate", P2: "gate", P3: "gate", P4: "only" },
+        triage_budget_seconds: 90,
+        allow_promotion: true,
+        max_promotion_steps: 1,
+        allow_downgrade: true,
+        allow_suppress: false,
+      },
+    };
+    const wrapper = render({
+      policy: gatedPolicy,
+      preview: preview({ l0: l0({ mode: "parallel" }) }),
+    });
+
+    expect(wrapper.find('[data-test="oncall-ladder-l0-parallel"]').text()).toContain(
+      "Triaged alongside",
+    );
+    expect(wrapper.find('[data-test="oncall-ladder-l0-gate"]').exists()).toBe(false);
   });
 });
