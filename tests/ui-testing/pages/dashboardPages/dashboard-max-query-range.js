@@ -42,13 +42,95 @@ export default class DashboardMaxQueryRange {
       { orgId, streamName, payload }
     );
 
-    if (result.status === 200) {
-      testLogger.info("Max query range set via API", { hours, stream: streamName });
-    } else {
-      testLogger.warn("Failed to set max query range via API", { result });
+    // Fail loudly. Swallowing a non-200 left the stream unrestricted, and every
+    // downstream assertion then failed as "warning icon not visible" — blaming the
+    // panel rather than the setup call that actually broke. A setup failure must
+    // not be able to masquerade as a product bug.
+    if (result.status !== 200) {
+      throw new Error(
+        `setMaxQueryRange(${hours}) failed for stream "${streamName}": ` +
+          `HTTP ${result.status} — ${String(result.body).slice(0, 300)}`
+      );
     }
+    testLogger.info("Max query range set via API", { hours, stream: streamName });
 
-    await this.page.waitForTimeout(1000);
+    // Read the setting back rather than sleeping 1s and hoping it propagated.
+    await this.waitForMaxQueryRangeApplied(hours, streamName);
+  }
+
+  /**
+   * Poll the stream schema until `max_query_range` actually reports `hours`.
+   *
+   * The PUT returning 200 only means the write was accepted; the tests then
+   * immediately assert on UI driven by that setting, so this closes the gap
+   * deterministically instead of with a fixed sleep that is simultaneously too
+   * long on an idle machine and too short under parallel load.
+   *
+   * @param {number} hours
+   * @param {string} [streamName]
+   */
+  async waitForMaxQueryRangeApplied(hours, streamName = DEFAULT_STREAM) {
+    const orgId = process.env.ORGNAME || "default";
+
+    await expect
+      .poll(
+        async () =>
+          this.page.evaluate(
+            async ({ orgId, streamName, hours }) => {
+              const r = await fetch(
+                `/api/${orgId}/streams/${streamName}/schema?type=logs`,
+                { headers: { Accept: "application/json" } }
+              );
+              // A stream that does not exist yet cannot be carrying a
+              // restriction, so treat that as already-reset rather than failing
+              // the afterEach cleanup on a test that never got as far as
+              // ingesting.
+              if (!r.ok) return hours === 0 ? 0 : null;
+              const body = await r.json();
+              return body?.settings?.max_query_range ?? null;
+            },
+            { orgId, streamName, hours }
+          ),
+        {
+          timeout: 15000,
+          intervals: [200, 400, 800, 1500, 3000],
+          message: `stream "${streamName}" never reported max_query_range=${hours}`,
+        }
+      )
+      .toBe(hours);
+  }
+
+  /**
+   * Wait until the stream is queryable after ingestion.
+   *
+   * Replaces the fixed 2s sleep the spec used to run after ingestion(): the
+   * ingest -> queryable delay is load-dependent, so a constant wait is the wrong
+   * shape for it in both directions.
+   *
+   * @param {string} [streamName]
+   */
+  async waitForStreamReady(streamName = DEFAULT_STREAM) {
+    const orgId = process.env.ORGNAME || "default";
+    await expect
+      .poll(
+        async () =>
+          this.page.evaluate(
+            async ({ orgId, streamName }) => {
+              const r = await fetch(
+                `/api/${orgId}/streams/${streamName}/schema?type=logs`,
+                { headers: { Accept: "application/json" } }
+              );
+              return r.ok;
+            },
+            { orgId, streamName }
+          ),
+        {
+          timeout: 30000,
+          intervals: [300, 600, 1200, 2000],
+          message: `stream "${streamName}" did not become queryable after ingestion`,
+        }
+      )
+      .toBe(true);
   }
 
   /**
@@ -113,10 +195,24 @@ export default class DashboardMaxQueryRange {
    * @param {number} n - number of distinct search responses to wait for
    * @returns {Promise<void>}
    */
-  createNSearchResponsesPromise(n) {
+  createNSearchResponsesPromise(n, timeout = 45000) {
     const orgName = process.env.ORGNAME || "default";
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let remaining = n;
+
+      // Without this the promise could never settle: if even one panel's search
+      // did not fire, the await sat there until the whole test timed out, and the
+      // report blamed the test rather than saying how many responses were missing.
+      const timer = setTimeout(() => {
+        this.page.off("response", handler);
+        reject(
+          new Error(
+            `Expected ${n} search responses, but only ${n - remaining} arrived ` +
+              `within ${timeout}ms`
+          )
+        );
+      }, timeout);
+
       const handler = (response) => {
         if (
           response.url().includes(`/api/${orgName}/`) &&
@@ -126,6 +222,7 @@ export default class DashboardMaxQueryRange {
         ) {
           remaining--;
           if (remaining === 0) {
+            clearTimeout(timer);
             this.page.off("response", handler);
             resolve();
           }

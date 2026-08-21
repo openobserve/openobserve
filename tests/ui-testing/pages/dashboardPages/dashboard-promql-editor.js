@@ -33,8 +33,24 @@ export default class DashboardPromQLEditor {
 
   // ----- Query type mode toggles -----------------------------------------
 
-  async isPromqlAvailable() {
-    return this.promqlQueryTypeBtn.isVisible().catch(() => false);
+  /**
+   * Whether this build exposes the PromQL query-type toggle.
+   *
+   * Must WAIT, not sample. `locator.isVisible()` resolves immediately against
+   * the current DOM (and its `timeout` option is documented as ignored), while
+   * this button only renders once selectStreamType("metrics") has settled — so
+   * the old point-in-time check reported "PromQL unavailable" purely because it
+   * asked too early. Callers turn that into `test.skip()`, so a race quietly
+   * removed tests from the run and the suite still reported green: 2 of the 4
+   * PromQL-suggestion tests were skipped this way on alpha, where the toggle is
+   * definitely present. A genuine absence (non-enterprise build) still skips,
+   * just after actually waiting for it.
+   */
+  async isPromqlAvailable(timeout = 15000) {
+    return this.promqlQueryTypeBtn
+      .waitFor({ state: "visible", timeout })
+      .then(() => true)
+      .catch(() => false);
   }
 
   async switchToPromql() {
@@ -54,8 +70,11 @@ export default class DashboardPromQLEditor {
   }
 
   async discardPanelIfVisible() {
+    // Same reason as isPromqlAvailable: isVisible() ignores `timeout` and does
+    // not wait, so this could miss a discard button that was about to render.
     const visible = await this.discardPanelBtn
-      .isVisible({ timeout: 2000 })
+      .waitFor({ state: "visible", timeout: 2000 })
+      .then(() => true)
       .catch(() => false);
     if (visible) {
       await this.discardPanelBtn.click().catch(() => {});
