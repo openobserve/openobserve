@@ -62,6 +62,10 @@ const detail: ExperimentRowDetail = {
     {
       scorerId: "quality",
       scorerVersion: 3,
+      name: "quality",
+      scoreConfigId: "quality-config",
+      scoreConfigName: "quality",
+      scoreConfigVersion: 1,
       sampleCount: 1,
       errorCount: 0,
       pendingCount: 0,
@@ -73,9 +77,9 @@ const detail: ExperimentRowDetail = {
   ],
 };
 
-function mountDrawer() {
+function mountDrawer(rowDetail: ExperimentRowDetail = detail) {
   return mount(ExperimentRowDetailDrawer, {
-    props: { open: true, detail },
+    props: { open: true, detail: rowDetail },
     global: {
       stubs: {
         ODrawer: {
@@ -90,12 +94,57 @@ function mountDrawer() {
 }
 
 describe("ExperimentRowDetailDrawer", () => {
+  it("uses score-dimension terminology and API names for a running single trial", () => {
+    const dimensionId = "7493173168283058177";
+    const running = {
+      ...detail,
+      trials: [
+        {
+          ...detail.trials[0],
+          taskStatus: "in_progress" as const,
+          execution: null,
+          scores: [
+            {
+              scorerId: dimensionId,
+              scorerVersion: 1,
+              status: "pending" as const,
+              score: null,
+            },
+          ],
+        },
+      ],
+      scoreSummaries: [
+        {
+          ...detail.scoreSummaries[0],
+          scorerId: dimensionId,
+          scorerVersion: 1,
+          name: "answer_relevance",
+          scoreConfigId: "answer-relevance-config",
+          scoreConfigName: "answer_relevance",
+          scoreConfigVersion: 1,
+          sampleCount: 0,
+          pendingCount: 1,
+          value: null,
+        },
+      ],
+    } as ExperimentRowDetail;
+
+    const wrapper = mountDrawer(running);
+    const headers = wrapper.findAll("thead th").map((header) => header.text());
+
+    expect(headers).toEqual(["Dimension", "Trial 1"]);
+    expect(wrapper.text()).toContain("answer_relevance");
+    expect(wrapper.text()).not.toContain(dimensionId);
+  });
+
   it("renders frozen evidence, execution facts, and scores", () => {
     const wrapper = mountDrawer();
 
     expect(wrapper.text()).toContain("When?");
     expect(wrapper.text()).toContain("Tomorrow");
     expect(wrapper.text()).toContain("provider timeout");
+    expect(wrapper.text()).toContain("0.500");
+    expect(wrapper.text()).not.toContain('{"kind":"numeric"');
     expect(wrapper.text()).toContain("Row 2 of 3");
   });
 

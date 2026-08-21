@@ -140,7 +140,12 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ContentBox from "./ExperimentRowContentBox.vue";
 import ExperimentRowNav from "./ExperimentRowNav.vue";
-import { dimensionLabel, formatNumber, signedNumber } from "./experimentRowContent";
+import {
+  dimensionIdentity,
+  dimensionLabel,
+  formatNumber,
+  signedNumber,
+} from "./experimentRowContent";
 import type {
   ExperimentComparisonRow,
   ExperimentRowDetail,
@@ -154,14 +159,13 @@ const props = withDefaults(
     candidateId: string;
     baseline: ExperimentRowDetail | null;
     candidate: ExperimentRowDetail | null;
-    scorerNames?: Record<string, string>;
     /** 1-based position within the rows the panel is currently showing. */
     index?: number;
     total?: number;
     hasPrevious?: boolean;
     hasNext?: boolean;
   }>(),
-  { scorerNames: () => ({}), index: 0, total: 0, hasPrevious: false, hasNext: false },
+  { index: 0, total: 0, hasPrevious: false, hasNext: false },
 );
 
 defineEmits<{ "update:open": [open: boolean]; step: [direction: -1 | 1] }>();
@@ -230,8 +234,8 @@ const scoreColumns = computed<OTableColumnDef<(typeof scoreRows.value)[number]>[
 
 const scoreRows = computed(() =>
   (props.row?.dimensions ?? []).map((dimension) => ({
-    key: `${dimension.kind}:${dimension.name}`,
-    dimension: dimensionLabel(dimension, props.scorerNames),
+    key: dimensionIdentity(dimension),
+    dimension: dimensionLabel(dimension),
     baseline: dimension.baseline === null ? raw("—") : raw(formatNumber(dimension.baseline)),
     candidate: dimension.candidate === null ? raw("—") : raw(formatNumber(dimension.candidate)),
     delta: dimension.delta,

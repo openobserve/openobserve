@@ -3,6 +3,45 @@
 import type { ExperimentResultSlot } from "@/services/llm-experiments.service";
 import type { ExperimentExecution } from "@/services/llm-experiments.service";
 
+const EMPTY_SCORE = "—";
+
+/** Render one successful typed Score without leaking its storage envelope. */
+export function experimentScoreValue(score: Record<string, unknown> | null | undefined): string {
+  if (!score) return EMPTY_SCORE;
+  const numeric = score.value_numeric ?? score.valueNumeric;
+  if (typeof numeric === "number" && Number.isFinite(numeric)) return numeric.toFixed(3);
+  const categorical = score.value_categorical ?? score.valueCategorical;
+  if (typeof categorical === "string" && categorical.length) return categorical;
+  const boolean = score.value_boolean ?? score.valueBoolean;
+  if (typeof boolean === "boolean") return String(boolean);
+  return EMPTY_SCORE;
+}
+
+/** Render a type-aware Score aggregate as a compact value rather than JSON. */
+export function experimentScoreSummaryValue(value: unknown): string {
+  if (value === null || value === undefined) return EMPTY_SCORE;
+  if (typeof value !== "object" || Array.isArray(value)) return String(value);
+  const aggregate = value as Record<string, unknown>;
+  if (aggregate.kind === "numeric" && typeof aggregate.mean === "number") {
+    return aggregate.mean.toFixed(3);
+  }
+  if (aggregate.kind === "boolean") {
+    const trueCount = Number(aggregate.trueCount ?? aggregate.true_count ?? 0);
+    const falseCount = Number(aggregate.falseCount ?? aggregate.false_count ?? 0);
+    return `true × ${trueCount} · false × ${falseCount}`;
+  }
+  if (aggregate.kind === "categorical") {
+    const counts = aggregate.counts;
+    if (counts && typeof counts === "object" && !Array.isArray(counts)) {
+      return Object.entries(counts as Record<string, unknown>)
+        .sort((left, right) => Number(right[1]) - Number(left[1]))
+        .map(([category, count]) => `${category} × ${Number(count)}`)
+        .join(" · ");
+    }
+  }
+  return EMPTY_SCORE;
+}
+
 export type ExperimentResultStatusFilter = "all" | "ok" | "no_reference" | "no_trace" | "error";
 
 export function experimentResultSlotStatus(slot: ExperimentResultSlot): string {

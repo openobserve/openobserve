@@ -2,8 +2,8 @@
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-test="ai-experiment-comparison">
-    <!-- A fixed tile set: cost and latency are one each, and the scorer tiles
-         summarise ALL scorers in constant space, so ten scorers still fit. -->
+    <!-- A fixed tile set: cost and latency are one each, and the score-dimension
+         tiles summarise every configured dimension in constant space. -->
     <KpiCardRow v-if="tiles.length" class="px-page-edge shrink-0 py-2.5">
       <KpiCard
         v-for="tile in tiles"
@@ -139,7 +139,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { dimensionLabel } from "./experimentRowContent";
+import { dimensionIdentity, dimensionLabel } from "./experimentRowContent";
 import type {
   ExperimentComparison,
   ExperimentComparisonBucket,
@@ -147,14 +147,7 @@ import type {
   ExperimentComparisonRow,
 } from "@/services/llm-experiments.service";
 
-const props = withDefaults(
-  defineProps<{
-    comparison: ExperimentComparison;
-    /** Scorer ID → display name, resolved by the page from the Scorers API. */
-    scorerNames?: Record<string, string>;
-  }>(),
-  { scorerNames: () => ({}) },
-);
+const props = defineProps<{ comparison: ExperimentComparison }>();
 const emit = defineEmits<{
   inspect: [row: ExperimentComparisonRow, siblings: ExperimentComparisonRow[]];
   "apply-threshold": [threshold: number];
@@ -268,14 +261,14 @@ const scoreDimensions = computed(() =>
   props.comparison.dimensions.filter((dimension) => dimension.kind === "score"),
 );
 
-const regressedScorerCount = computed(
+const regressedDimensionCount = computed(
   () => scoreDimensions.value.filter((dimension) => dimension.assignment === "regressed").length,
 );
 
-// `orientedDelta` is a fraction of the configured range for some scorers and raw
+// `orientedDelta` is a fraction of the configured range for some dimensions and raw
 // units for others, so ranking across both would compare unlike numbers. Rank
 // inside the normalized set whenever there is one.
-const weakestScorer = computed(() => {
+const weakestDimension = computed(() => {
   const ranked = scoreDimensions.value.filter((dimension) => dimension.orientedDelta !== null);
   if (!ranked.length) return null;
   const normalized = ranked.filter((dimension) => dimension.normalized);
@@ -332,31 +325,31 @@ function intrinsicTile(kind: "cost" | "latency", label: I18nText, dataTest: stri
 const tiles = computed<Tile[]>(() => {
   const list: Tile[] = [];
 
-  // Quality leads: the scorers are what the run is judged on. Cost sits last.
+  // Quality leads: score dimensions are what the run is judged on. Cost sits last.
   if (scoreDimensions.value.length) {
     const total = scoreDimensions.value.length;
     list.push({
-      key: "scorers-regressed",
-      label: t("aiObservability.experiments.comparePage.panel.tileScorersRegressed"),
+      key: "score-dimensions-regressed",
+      label: t("aiObservability.experiments.comparePage.panel.tileScoreDimensionsRegressed"),
       icon: "error-outline",
-      primary: raw(String(regressedScorerCount.value)),
-      caption: t("aiObservability.experiments.comparePage.panel.ofScorers", { total }),
-      dataTest: "ai-experiment-tile-scorers-regressed",
+      primary: raw(String(regressedDimensionCount.value)),
+      caption: t("aiObservability.experiments.comparePage.panel.ofScoreDimensions", { total }),
+      dataTest: "ai-experiment-tile-score-dimensions-regressed",
     });
 
-    const weakest = weakestScorer.value;
+    const weakest = weakestDimension.value;
     list.push({
-      key: "weakest-scorer",
-      label: t("aiObservability.experiments.comparePage.panel.tileWeakestScorer"),
+      key: "weakest-score-dimension",
+      label: t("aiObservability.experiments.comparePage.panel.tileWeakestScoreDimension"),
       icon: "trending-down",
-      primary: weakest ? dimensionLabel(weakest, props.scorerNames) : raw("—"),
+      primary: weakest ? dimensionLabel(weakest) : raw("—"),
       delta: weakest
         ? { label: signed(weakest.orientedDelta), variant: deltaVariant(weakest) }
         : undefined,
       caption: weakest
         ? undefined
-        : t("aiObservability.experiments.comparePage.panel.noScorerMoved"),
-      dataTest: "ai-experiment-tile-weakest-scorer",
+        : t("aiObservability.experiments.comparePage.panel.noScoreDimensionMoved"),
+      dataTest: "ai-experiment-tile-weakest-score-dimension",
     });
   }
 
@@ -435,13 +428,13 @@ const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>((
   },
   ...props.comparison.dimensions.map((dimension) => ({
     id: dimensionColumnId(dimension),
-    header: dimensionLabel(dimension, props.scorerNames),
+    header: dimensionLabel(dimension),
     accessorKey: dimensionColumnId(dimension),
   })),
 ]);
 
 function dimensionColumnId(dimension: ExperimentComparisonDimension) {
-  return `dimension:${dimension.kind}:${dimension.name}`;
+  return `dimension:${dimensionIdentity(dimension)}`;
 }
 
 function dimensionSlot(dimension: ExperimentComparisonDimension) {
@@ -449,9 +442,8 @@ function dimensionSlot(dimension: ExperimentComparisonDimension) {
 }
 
 function rowDimension(row: ExperimentComparisonRow, dimension: ExperimentComparisonDimension) {
-  return row.dimensions.find(
-    (candidate) => candidate.name === dimension.name && candidate.kind === dimension.kind,
-  );
+  const identity = dimensionIdentity(dimension);
+  return row.dimensions.find((candidate) => dimensionIdentity(candidate) === identity);
 }
 
 /** Trailing zeros carry no information — `34.0000` is just `34`. */

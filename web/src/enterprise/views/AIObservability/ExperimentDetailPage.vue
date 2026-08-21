@@ -125,7 +125,6 @@
           :columns="columns"
           row-key="slotKey"
           :loading="loading"
-          show-index
           :show-global-filter="false"
           :default-columns="false"
           :enable-column-resize="true"
@@ -141,6 +140,17 @@
           @update:current-page="onPageChange"
           @row-click="openRow"
         >
+          <template #cell-slotStatus="{ row }: { row: any }">
+            <div class="flex items-center justify-center">
+              <OStatusDot
+                :state="taskStatusDotState(row.taskStatus)"
+                :label="statusVariant(row.taskStatus, 'eval').label"
+                size="md"
+                :data-test="`ai-experiment-slot-status-${row.slotKey}`"
+              />
+            </div>
+          </template>
+
           <template #cell-input="{ row }: { row: any }">
             <span class="text-text-secondary truncate">{{ raw(row.input) }}</span>
           </template>
@@ -189,6 +199,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OStatusDot from "@/lib/core/StatusDot/OStatusDot.vue";
+import type { StatusDotState } from "@/lib/core/StatusDot/OStatusDot.types";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
@@ -201,7 +213,7 @@ import llmExperimentsService, {
 } from "@/services/llm-experiments.service";
 import ExperimentRowDetailDrawer from "@/enterprise/components/AIObservability/ExperimentRowDetailDrawer.vue";
 import { aiExperimentsRoute } from "./experimentRoutes";
-import { openExperimentTrace } from "./experimentResults";
+import { experimentScoreValue, openExperimentTrace } from "./experimentResults";
 
 defineOptions({ name: "AIExperimentDetailPage" });
 
@@ -232,8 +244,8 @@ const totalSlots = computed(() => detail.value?.results.pagination?.totalSlots ?
  *  two score columns exactly like the dataset grouping on the list page. */
 const scorerIds = computed(() => (detail.value?.preview.pinnedScorers ?? []).map((s) => s.id));
 
-/** Only the score records carry the scorer's display name — pinnedScorers and
- *  score_summaries are id-only — so build the lookup from them. */
+/** Score summaries carry the pinned Score Config name even before the first
+ *  Score exists. Completed Score records remain a compatibility fallback. */
 const scorerNames = computed<Record<string, string>>(() => {
   const names: Record<string, string> = {};
   const record = (raw: Record<string, unknown> | undefined) => {
@@ -241,6 +253,12 @@ const scorerNames = computed<Record<string, string>>(() => {
     const name = String(raw?.name ?? "");
     if (id && name && !names[id]) names[id] = name;
   };
+  for (const summary of detail.value?.results.scoreSummaries ?? []) {
+    const name = summary.scoreConfigName || summary.name;
+    if (summary.scorerId && name && !names[summary.scorerId]) {
+      names[summary.scorerId] = name;
+    }
+  }
   for (const score of detail.value?.results.scores ?? []) record(score);
   for (const slot of slots.value) {
     for (const entry of slot.scores) record(entry.score as Record<string, unknown> | undefined);
@@ -253,8 +271,7 @@ const visibleSlots = computed(() =>
     const scores: Record<string, string> = {};
     for (const id of scorerIds.value) {
       const entry = slot.scores.find((s) => s.scorerId === id);
-      const value = (entry?.score as Record<string, unknown> | undefined)?.value_numeric;
-      scores[`score:${id}`] = typeof value === "number" ? value.toFixed(3) : "—";
+      scores[`score:${id}`] = entry?.status === "success" ? experimentScoreValue(entry.score) : "—";
     }
     return {
       ...slot,
@@ -364,6 +381,14 @@ const metricCards = computed<MetricCard[]>(() => {
 
 const columns = computed<OTableColumnDef[]>(() => [
   {
+    id: "slotStatus",
+    header: raw(""),
+    accessorKey: "taskStatus",
+    sortable: false,
+    size: 48,
+    meta: { align: "center" as const },
+  },
+  {
     id: "input",
     header: t("aiObservability.experiments.detail.columns.input"),
     accessorKey: "input",
@@ -398,6 +423,21 @@ const columns = computed<OTableColumnDef[]>(() => [
     meta: { align: "left" as const },
   },
 ]);
+
+function taskStatusDotState(status: ExperimentResultSlot["taskStatus"]): StatusDotState {
+  switch (status) {
+    case "in_progress":
+      return "active";
+    case "ok":
+      return "success";
+    case "skipped":
+      return "warning";
+    case "error":
+      return "error";
+    default:
+      return "pending";
+  }
+}
 
 async function refresh() {
   if (!orgId.value || !experimentId.value) return;

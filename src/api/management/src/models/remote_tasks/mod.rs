@@ -730,6 +730,9 @@ pub struct TestRunRowResultBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub http_status: Option<u16>,
     pub latency_ms: i64,
+    /// Attempts the registered retry policy took. A bench runs the same policy
+    /// a real Slot would, so this is how a reader sees a retried sample.
+    pub attempts: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -749,6 +752,7 @@ impl From<openobserve_core::llm_evaluations::remote_tasks::bench::BenchRowResult
             raw_response: result.raw_response,
             http_status: result.http_status,
             latency_ms: result.latency_ms,
+            attempts: result.attempts,
             error: result.error,
         }
     }

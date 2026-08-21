@@ -7,6 +7,7 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 - [OBadge](#obadge)
 - [OTag](#otag)
 - [ODimensionChip](#odimensionchip)
+- [OStatusDot](#ostatusdot)
 - [OCard](#ocard)
 - [OCardSection](#ocardsection)
 - [OCardActions](#ocardactions)
@@ -96,6 +97,26 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 <ODimensionChip dim-key="k8s-cluster" key-label="cluster" :value="clusterName" tooltip />
 ```
 **Family:** Composes `OTag` + `OTooltip`. Standalone at the call site.
+
+---
+
+### OStatusDot
+**Import:** `@/lib/core/StatusDot/OStatusDot.vue`
+**Use when:** A dense table or compact control needs a dot-only lifecycle signal with an accessible label.
+**Don't use for:** A visible status label — use `OTag`. Do not use colour alone without the required `label`.
+**Key props:**
+- `state` (`pending` | `active` | `success` | `warning` | `error`, required) — semantic colour; `active` also uses reduced-motion-safe breathing.
+- `label` (`I18nText`, required) — exposed as the accessible label.
+- `size` (`sm` | `md`, default `sm`).
+- `dataTest` (string, default `status-dot`).
+
+**Slots:** none
+**Emits:** none
+**Example:**
+```vue
+<OStatusDot state="active" :label="t('jobs.inProgress')" />
+```
+**Family:** Standalone.
 
 ---
 

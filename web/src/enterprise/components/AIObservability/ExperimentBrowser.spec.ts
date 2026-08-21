@@ -217,6 +217,35 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.get('[data-test="cell-score:label-scored"]').text()).toBe("good × 1");
   });
 
+  it("keeps score columns scoped to their dataset group", () => {
+    const first = experiment("first", "dataset-a", 1);
+    const second = experiment("second", "dataset-b", 2);
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [first, second],
+        datasets: [
+          { id: "dataset-a", name: "Dataset A" },
+          { id: "dataset-b", name: "Dataset B" },
+        ] as any,
+        details: {
+          first: makeExperimentDetail(first, {
+            results: { executions: [], scores: [{ name: "quality", value_numeric: 0.8 }] },
+          }),
+          second: makeExperimentDetail(second, {
+            results: { executions: [], scores: [{ name: "safety", value_boolean: true }] },
+          }),
+        },
+      },
+      global: { stubs },
+    });
+
+    expect(wrapper.find('[data-test="cell-score:safety-first"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="cell-score:quality-second"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="cell-score:quality-first"]').text()).toBe("0.800");
+    expect(wrapper.get('[data-test="cell-score:safety-second"]').text()).toBe("100% true");
+  });
+
   it("caps comparison at two rows", async () => {
     const wrapper = mount(ExperimentBrowser, {
       props: {

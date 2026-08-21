@@ -37,9 +37,10 @@ use crate::{
             ExperimentDispersionSummaryBody, ExperimentPreviewQuery, ExperimentPreviewResponseBody,
             ExperimentResponseBody, ExperimentResultPaginationBody, ExperimentResultsResponseBody,
             ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
-            ExperimentRowSnapshotBody, ExperimentSlotPageQuery, ExperimentSlotPageResponseBody,
-            ListExperimentsResponseBody, RetryExperimentSlotRequestBody,
-            SubmitExperimentRecordsRequestBody, SubmitExperimentRecordsResponseBody,
+            ExperimentRowSnapshotBody, ExperimentScoreSummaryBody, ExperimentSlotPageQuery,
+            ExperimentSlotPageResponseBody, ListExperimentsResponseBody,
+            RetryExperimentSlotRequestBody, SubmitExperimentRecordsRequestBody,
+            SubmitExperimentRecordsResponseBody,
         },
     },
 };
@@ -67,6 +68,11 @@ fn experiment_error_response(error: ExperimentError) -> Response {
         | ExperimentError::InvalidLifecycleTransition { .. }
         | ExperimentError::BaselineNotEligible(_)
         | ExperimentError::ConcurrentLifecycleUpdate => MetaHttpResponse::conflict(error),
+        // The plan is valid and permitted; it is only waiting to be
+        // acknowledged, which is a precondition rather than a conflict.
+        ExperimentError::CostConfirmationRequired { .. } => {
+            MetaHttpResponse::precondition_failed(error)
+        }
         error => MetaHttpResponse::bad_request(error.to_string()),
     }
 }
@@ -117,6 +123,40 @@ fn validate_comparison_dataset(
         return Err("Experiments must use the same Dataset");
     }
     Ok(())
+}
+
+fn score_summary_bodies(
+    summaries: Vec<experiment_results::ExperimentScoreSummary>,
+    scorer_definitions: &[infra::table::scorers::Scorer],
+    score_configs: &[infra::table::score_configs::ScoreConfig],
+) -> Vec<ExperimentScoreSummaryBody> {
+    summaries
+        .into_iter()
+        .map(|summary| {
+            let scorer = scorer_definitions.iter().find(|scorer| {
+                scorer.entity_id == summary.scorer_id && scorer.version == summary.scorer_version
+            });
+            let score_config_id = scorer.and_then(|scorer| scorer.produces_score_config_id.clone());
+            let score_config_version =
+                scorer.and_then(|scorer| scorer.produces_score_config_version);
+            let score_config_name = score_config_id.as_deref().and_then(|entity_id| {
+                score_configs
+                    .iter()
+                    .find(|config| config.entity_id == entity_id)
+                    .map(|config| config.name.clone())
+            });
+            let name = score_config_name
+                .clone()
+                .or_else(|| scorer.map(|scorer| scorer.name.clone()))
+                .unwrap_or_else(|| "Unknown dimension".to_string());
+            let mut body = ExperimentScoreSummaryBody::from(summary);
+            body.name = name;
+            body.score_config_id = score_config_id;
+            body.score_config_name = score_config_name;
+            body.score_config_version = score_config_version;
+            body
+        })
+        .collect()
 }
 
 /// Scoring Status of one Experiment, derived from the same evidence and the
@@ -207,6 +247,7 @@ pub async fn preview_experiment(
         (status = 200, body = inline(CreateExperimentResponseBody)),
         (status = 400, description = "Invalid Experiment definition", body = ()),
         (status = 409, description = "Idempotency conflict", body = ()),
+        (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
     ),
 )]
 pub async fn create_experiment(
@@ -346,6 +387,15 @@ pub async fn get_experiment(
         }
     };
     let spans = NormalizationSpans::from_configs(&score_configs);
+    let scorer_definitions = match experiments::scorer_definitions(&org_id, &experiment).await {
+        Ok(definitions) => definitions,
+        Err(error) => {
+            log::error!(
+                "[Experiment] failed to load Scorer definitions for {experiment_id}: {error}"
+            );
+            return MetaHttpResponse::internal_error("Failed to load Experiment results");
+        }
+    };
     let results = match openobserve_core::llm_evaluations::experiment_runner::results_page(
         &experiment,
         result_page,
@@ -420,11 +470,11 @@ pub async fn get_experiment(
                 ),
                 scoring_progress: summary.scoring_progress.into(),
                 skip_summary: summary.skip_summary.into(),
-                score_summaries: summary
-                    .score_summaries
-                    .into_iter()
-                    .map(Into::into)
-                    .collect(),
+                score_summaries: score_summary_bodies(
+                    summary.score_summaries,
+                    &scorer_definitions,
+                    &score_configs,
+                ),
                 client_score_summaries: summary
                     .client_score_summaries
                     .into_iter()
@@ -653,6 +703,13 @@ pub async fn get_experiment_row(
             return MetaHttpResponse::internal_error("Failed to load Experiment row");
         }
     };
+    let scorer_definitions = match experiments::scorer_definitions(&org_id, &experiment).await {
+        Ok(definitions) => definitions,
+        Err(error) => {
+            log::error!("[Experiment] failed to load Scorer definitions for row {row_id}: {error}");
+            return MetaHttpResponse::internal_error("Failed to load Experiment row");
+        }
+    };
     let dispersion = experiment_dispersion::row_dispersions(
         &experiments::row_keys(&row.slots),
         &row.scores,
@@ -689,7 +746,7 @@ pub async fn get_experiment_row(
             .into_iter()
             .map(Into::into)
             .collect(),
-        score_summaries: score_summaries.into_iter().map(Into::into).collect(),
+        score_summaries: score_summary_bodies(score_summaries, &scorer_definitions, &score_configs),
         client_score_summaries: client_score_summaries.into_iter().map(Into::into).collect(),
         dispersion,
         outlier_trial_index,
@@ -1085,6 +1142,64 @@ pub async fn finalize_experiment(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn score_summary_uses_the_pinned_score_config_name_before_scores_exist() {
+        let summaries = vec![experiment_results::ExperimentScoreSummary {
+            scorer_id: "scorer-entity".to_string(),
+            scorer_version: 2,
+            sample_count: 0,
+            error_count: 0,
+            pending_count: 1,
+            no_reference_count: 0,
+            no_trace_count: 0,
+            skipped_count: 0,
+            value: None,
+        }];
+        let scorer_definitions = vec![infra::table::scorers::Scorer {
+            id: "scorer-row".to_string(),
+            org_id: "acme".to_string(),
+            entity_id: "scorer-entity".to_string(),
+            name: "Internal scorer name".to_string(),
+            version: 2,
+            scorer_type: infra::table::scorers::ScorerType::LlmJudge,
+            description: None,
+            produces_score_config_id: Some("config-entity".to_string()),
+            produces_score_config_version: Some(3),
+            template: String::new(),
+            output_schema: None,
+            params: serde_json::json!({}),
+            is_active: true,
+            created_at: 0,
+            updated_at: 0,
+        }];
+        let score_configs = vec![infra::table::score_configs::ScoreConfig {
+            id: "config-row".to_string(),
+            org_id: "acme".to_string(),
+            entity_id: "config-entity".to_string(),
+            name: "answer_relevance".to_string(),
+            version: 3,
+            data_type: infra::table::score_configs::ScoreConfigDataType::Numeric,
+            description: None,
+            numeric_range: None,
+            categories: None,
+            healthy_threshold: None,
+            is_active: true,
+            created_at: 0,
+            updated_at: 0,
+        }];
+
+        let bodies = score_summary_bodies(summaries, &scorer_definitions, &score_configs);
+
+        assert_eq!(bodies[0].name, "answer_relevance");
+        assert_eq!(bodies[0].score_config_id.as_deref(), Some("config-entity"));
+        assert_eq!(
+            bodies[0].score_config_name.as_deref(),
+            Some("answer_relevance")
+        );
+        assert_eq!(bodies[0].score_config_version, Some(3));
+        assert_eq!(bodies[0].pending_count, 1);
+    }
 
     #[test]
     fn row_and_retry_visibility_accept_exact_or_org_wildcard_and_reject_other_objects() {

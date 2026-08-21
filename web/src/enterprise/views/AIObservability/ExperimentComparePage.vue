@@ -102,7 +102,6 @@
       <ExperimentComparisonPanel
         v-else-if="comparison"
         :comparison="comparison"
-        :scorer-names="scorerNames"
         @apply-threshold="applyThreshold"
         @inspect="inspectRow"
       />
@@ -122,7 +121,6 @@
       :candidate-id="comparison?.candidateId ?? ''"
       :baseline="baselineRow"
       :candidate="candidateRow"
-      :scorer-names="scorerNames"
       :index="rowIndex + 1"
       :total="siblingRows.length"
       :has-previous="rowIndex > 0"
@@ -148,7 +146,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ExperimentComparisonPanel from "@/enterprise/components/AIObservability/ExperimentComparisonPanel.vue";
 import ExperimentComparisonRowDrawer from "@/enterprise/components/AIObservability/ExperimentComparisonRowDrawer.vue";
-import onlineEvalsService from "@/services/online-evals.service";
 import llmExperimentsService, {
   type ExperimentComparison,
   type ExperimentComparisonRow,
@@ -177,7 +174,6 @@ const siblingRows = ref<ExperimentComparisonRow[]>([]);
 const baselineRow = ref<ExperimentRowDetail | null>(null);
 const candidateRow = ref<ExperimentRowDetail | null>(null);
 const experiments = ref<LlmExperiment[]>([]);
-const scorerNames = ref<Record<string, string>>({});
 const optionsLoading = ref(false);
 
 const backTarget = computed(() => ({
@@ -232,23 +228,6 @@ const baselineOptions = computed(() =>
 const candidateOptions = computed(() =>
   sideOptions.value.filter(({ value }) => value !== baselineId.value),
 );
-
-// The comparison names its score dimensions by scorer ID; only the Scorers API
-// carries the display name, so resolve it once for the page.
-async function loadScorerNames() {
-  if (!orgId.value) return;
-  try {
-    const scorers = await onlineEvalsService.scorers.list(orgId.value);
-    scorerNames.value = Object.fromEntries(
-      scorers
-        .filter((scorer) => scorer.id && scorer.name)
-        .map((scorer) => [scorer.id, scorer.name]),
-    );
-  } catch {
-    // A missing name is survivable — the column falls back to the raw ID.
-    scorerNames.value = {};
-  }
-}
 
 async function loadExperiments() {
   if (!orgId.value) return;
@@ -354,13 +333,6 @@ async function inspectRow(row: ExperimentComparisonRow, siblings?: ExperimentCom
   }
 }
 
-watch(
-  orgId,
-  () => {
-    void loadExperiments();
-    void loadScorerNames();
-  },
-  { immediate: true },
-);
+watch(orgId, () => void loadExperiments(), { immediate: true });
 watch([orgId, baselineId, candidateId], () => loadComparison(), { immediate: true });
 </script>

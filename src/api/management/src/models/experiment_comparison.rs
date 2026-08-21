@@ -53,6 +53,9 @@ pub enum ExperimentComparisonAssignmentBody {
 pub struct ExperimentComparisonDimensionBody {
     pub name: String,
     pub kind: ExperimentComparisonDimensionKindBody,
+    pub score_config_id: Option<String>,
+    pub score_config_name: Option<String>,
+    pub score_config_version: Option<String>,
     pub baseline: Option<f64>,
     pub candidate: Option<f64>,
     pub delta: Option<f64>,
@@ -104,9 +107,14 @@ pub struct ExperimentComparisonCountsBody {
 pub struct ExperimentComparisonSummaryDimensionBody {
     pub name: String,
     pub kind: ExperimentComparisonDimensionKindBody,
+    pub score_config_id: Option<String>,
+    pub score_config_name: Option<String>,
+    pub score_config_version: Option<String>,
     pub baseline: Option<f64>,
     pub candidate: Option<f64>,
     pub delta: Option<f64>,
+    /// Aggregate change in the better direction over comparable rows.
+    pub oriented_delta: Option<f64>,
     pub gating: bool,
     pub normalized: bool,
     pub baseline_sample_count: u64,
@@ -180,6 +188,9 @@ impl From<domain::ExperimentComparisonDimension> for ExperimentComparisonDimensi
         Self {
             name: value.name,
             kind: value.kind.into(),
+            score_config_id: value.score_config_id,
+            score_config_name: value.score_config_name,
+            score_config_version: value.score_config_version,
             baseline: value.baseline,
             candidate: value.candidate,
             delta: value.delta,
@@ -225,9 +236,13 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
                 .map(|dimension| ExperimentComparisonSummaryDimensionBody {
                     name: dimension.name,
                     kind: dimension.kind.into(),
+                    score_config_id: dimension.score_config_id,
+                    score_config_name: dimension.score_config_name,
+                    score_config_version: dimension.score_config_version,
                     baseline: dimension.baseline,
                     candidate: dimension.candidate,
                     delta: dimension.delta,
+                    oriented_delta: dimension.oriented_delta,
                     gating: dimension.gating,
                     normalized: dimension.normalized,
                     baseline_sample_count: dimension.baseline_sample_count,

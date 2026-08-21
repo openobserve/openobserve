@@ -3,7 +3,7 @@
 // Content helpers shared by the two experiment row drawers, so a row reads the
 // same whether it is opened from a single run or from a comparison.
 
-import { raw, type I18nText } from "@/types/i18n";
+import { gt, raw, type I18nText } from "@/types/i18n";
 import type { ExperimentComparisonDimension } from "@/services/llm-experiments.service";
 
 /** Treats blank strings, the literal "null", and empty containers as absent. */
@@ -44,20 +44,29 @@ export function pretty(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-/**
- * The server names a score dimension `"<scorerId> · v<version>"`. Only the ID
- * half can be resolved against the Scorers API, so split it off, keep the
- * version, and fall back to the server's string when the scorer is unknown.
- */
 export function dimensionLabel(
-  dimension: Pick<ExperimentComparisonDimension, "name" | "kind">,
-  scorerNames: Record<string, string>,
+  dimension: Pick<
+    ExperimentComparisonDimension,
+    "name" | "kind" | "scoreConfigName" | "scoreConfigVersion"
+  >,
 ): I18nText {
   if (dimension.kind !== "score") return raw(dimension.name);
-  const [scorerId, version] = dimension.name.split(" · ");
-  const name = scorerNames[scorerId];
-  if (!name) return raw(dimension.name);
-  return raw(version ? `${name} · ${version}` : name);
+  if (!dimension.scoreConfigName) {
+    return gt("aiObservability.experiments.comparePage.panel.unknownScoreDimension");
+  }
+  const version = dimension.scoreConfigVersion?.replace(/^v/i, "");
+  return raw(version ? `${dimension.scoreConfigName} · v${version}` : dimension.scoreConfigName);
+}
+
+export function dimensionIdentity(
+  dimension: Pick<
+    ExperimentComparisonDimension,
+    "name" | "kind" | "scoreConfigId" | "scoreConfigVersion"
+  >,
+): string {
+  return [dimension.kind, dimension.name, dimension.scoreConfigId, dimension.scoreConfigVersion]
+    .map((part) => part ?? "")
+    .join(":");
 }
 
 /** Trailing zeros carry no information — `34.0000` is just `34`. */

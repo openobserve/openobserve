@@ -3,10 +3,32 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ExperimentResultSlot } from "@/services/llm-experiments.service";
 import {
+  experimentScoreSummaryValue,
+  experimentScoreValue,
   experimentTraceLocation,
   filterExperimentResultSlots,
   openExperimentTrace,
 } from "./experimentResults";
+
+describe("experiment score formatting", () => {
+  it("renders every typed score value, including false", () => {
+    expect(experimentScoreValue({ value_numeric: 0.718418 })).toBe("0.718");
+    expect(experimentScoreValue({ value_boolean: true })).toBe("true");
+    expect(experimentScoreValue({ value_boolean: false })).toBe("false");
+    expect(experimentScoreValue({ value_categorical: "safe" })).toBe("safe");
+    expect(experimentScoreValue(null)).toBe("—");
+  });
+
+  it("renders aggregates without exposing their JSON envelope", () => {
+    expect(experimentScoreSummaryValue({ kind: "numeric", mean: 0.718418 })).toBe("0.718");
+    expect(experimentScoreSummaryValue({ kind: "boolean", trueCount: 3, falseCount: 2 })).toBe(
+      "true × 3 · false × 2",
+    );
+    expect(experimentScoreSummaryValue({ kind: "categorical", counts: { good: 2, poor: 1 } })).toBe(
+      "good × 2 · poor × 1",
+    );
+  });
+});
 
 function slot(overrides: Partial<ExperimentResultSlot>): ExperimentResultSlot {
   return {

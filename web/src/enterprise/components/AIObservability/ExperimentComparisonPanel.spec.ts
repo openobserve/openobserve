@@ -27,6 +27,9 @@ const comparison: ExperimentComparison = {
     {
       name: "quality",
       kind: "score",
+      scoreConfigId: "score-quality",
+      scoreConfigName: "quality",
+      scoreConfigVersion: "1",
       baseline: 0.8,
       candidate: 0.7,
       delta: -0.1,
@@ -38,13 +41,16 @@ const comparison: ExperimentComparison = {
       comparableRowCount: 2,
       baselineOnlyRowCount: 1,
       candidateOnlyRowCount: 0,
-      assignment: "unchanged",
+      assignment: "regressed",
     },
     // Latency rises, which is WORSE — the raw delta is positive but the oriented
     // one is negative. Guards the tint from following the wrong number.
     {
       name: "latency_ms",
       kind: "latency",
+      scoreConfigId: null,
+      scoreConfigName: null,
+      scoreConfigVersion: null,
       baseline: 3,
       candidate: 34,
       delta: 31,
@@ -118,12 +124,9 @@ const stubs = {
   },
 };
 
-function mountPanel(
-  override: Partial<ExperimentComparison> = {},
-  scorerNames: Record<string, string> = {},
-) {
+function mountPanel(override: Partial<ExperimentComparison> = {}) {
   return mount(ExperimentComparisonPanel, {
-    props: { comparison: { ...comparison, ...override }, scorerNames },
+    props: { comparison: { ...comparison, ...override } },
     ...stubs,
   });
 }
@@ -165,32 +168,39 @@ describe("ExperimentComparisonPanel", () => {
       .filter((name) => !/-(delta|warning|unit)$/.test(name ?? ""));
 
     expect(order).toEqual([
-      "ai-experiment-tile-scorers-regressed",
-      "ai-experiment-tile-weakest-scorer",
+      "ai-experiment-tile-score-dimensions-regressed",
+      "ai-experiment-tile-weakest-score-dimension",
       "ai-experiment-tile-latency",
       "ai-experiment-tile-cost",
     ]);
   });
 
-  it("labels a scorer by name, keeping its version, and falls back to the raw ID", () => {
+  it("labels a score dimension from comparison metadata and never exposes its raw ID", () => {
     const scored = {
       dimensions: [
-        { ...comparison.dimensions[0], name: "749570578629158502 · v1" },
-        { ...comparison.dimensions[0], name: "unknown-id · v2" },
+        {
+          ...comparison.dimensions[0],
+          name: "749570578629158502 · v1",
+          scoreConfigId: "749570578629158502",
+          scoreConfigName: "answer_quality",
+          scoreConfigVersion: "1",
+        },
       ],
     };
 
-    // The server names score dimensions by ID; only the Scorers API has the name.
-    const named = mountPanel(scored, { "749570578629158502": "answer_quality" });
-    expect(named.get('[data-test="ai-experiment-tile-weakest-scorer"]').text()).toContain(
+    const named = mountPanel(scored);
+    expect(named.get('[data-test="ai-experiment-tile-weakest-score-dimension"]').text()).toContain(
       "answer_quality · v1",
     );
 
-    // An unresolvable ID keeps the server's string rather than showing nothing.
-    const unresolved = mountPanel(scored, {});
-    expect(unresolved.get('[data-test="ai-experiment-tile-weakest-scorer"]').text()).toContain(
-      "749570578629158502 · v1",
+    const unresolved = mountPanel({
+      dimensions: [{ ...scored.dimensions[0], scoreConfigName: null }],
+    });
+    const unresolvedTile = unresolved.get(
+      '[data-test="ai-experiment-tile-weakest-score-dimension"]',
     );
+    expect(unresolvedTile.text()).toContain("Unknown score dimension");
+    expect(unresolvedTile.text()).not.toContain("749570578629158502");
   });
 
   it("carries the detail page's icons and value formatting", () => {
@@ -204,7 +214,9 @@ describe("ExperimentComparisonPanel", () => {
       "payments",
     );
     expect(
-      wrapper.get('[data-test="ai-experiment-tile-scorers-regressed"]').attributes("data-icon"),
+      wrapper
+        .get('[data-test="ai-experiment-tile-score-dimensions-regressed"]')
+        .attributes("data-icon"),
     ).toBe("error-outline");
 
     // Assert the unit SPAN, not the tile text — the label is "Latency (ms)", so
@@ -243,28 +255,39 @@ describe("ExperimentComparisonPanel", () => {
     expect(latency.text()).toContain("Mean per row, over trials");
   });
 
-  it("summarises every scorer in a fixed number of tiles", () => {
+  it("summarises every score dimension in a fixed number of tiles", () => {
     const wrapper = mountPanel({
       dimensions: [
         ...comparison.dimensions,
         {
           ...comparison.dimensions[0],
           name: "grounded",
+          scoreConfigId: "score-grounded",
+          scoreConfigName: "grounded",
           assignment: "regressed",
           orientedDelta: -0.4,
         },
-        { ...comparison.dimensions[0], name: "tone", assignment: "regressed", orientedDelta: -0.2 },
+        {
+          ...comparison.dimensions[0],
+          name: "tone",
+          scoreConfigId: "score-tone",
+          scoreConfigName: "tone",
+          assignment: "regressed",
+          orientedDelta: -0.2,
+        },
       ],
     });
 
-    // 3 scorers, 2 of them regressed — one tile regardless of how many there are.
-    expect(wrapper.get('[data-test="ai-experiment-tile-scorers-regressed"]').text()).toContain("2");
-    expect(wrapper.get('[data-test="ai-experiment-tile-scorers-regressed"]').text()).toContain(
-      "of 3 scored",
-    );
+    // Three dimensions regressed — one tile regardless of how many there are.
+    expect(
+      wrapper.get('[data-test="ai-experiment-tile-score-dimensions-regressed"]').text(),
+    ).toContain("3");
+    expect(
+      wrapper.get('[data-test="ai-experiment-tile-score-dimensions-regressed"]').text(),
+    ).toContain("of 3 aggregate score dimensions");
 
     // The weakest is the most negative ORIENTED delta, not the most negative raw one.
-    const weakest = wrapper.get('[data-test="ai-experiment-tile-weakest-scorer"]');
+    const weakest = wrapper.get('[data-test="ai-experiment-tile-weakest-score-dimension"]');
     expect(weakest.text()).toContain("grounded");
     expect(weakest.text()).toContain("-0.4");
   });

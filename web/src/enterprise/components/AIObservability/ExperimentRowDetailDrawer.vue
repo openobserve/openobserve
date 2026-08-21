@@ -261,6 +261,10 @@ import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import ExperimentRowNav from "./ExperimentRowNav.vue";
+import {
+  experimentScoreSummaryValue,
+  experimentScoreValue,
+} from "@/enterprise/views/AIObservability/experimentResults";
 import type {
   ExperimentExecution,
   ExperimentResultSlot,
@@ -320,44 +324,50 @@ const scorerNames = computed<Record<string, string>>(() => {
 
 const scoreColumns = computed<OTableColumnDef[]>(() => [
   {
-    id: "scorer",
-    header: t("aiObservability.experiments.rowDetail.scorer"),
-    accessorKey: "scorer",
+    id: "dimension",
+    header: t("aiObservability.experiments.rowDetail.dimension"),
+    accessorKey: "dimension",
     sortable: false,
     minSize: 160,
     meta: { align: "left" as const, flex: true, isName: true },
   },
-  ...(hasMultipleTrials.value
-    ? (props.detail?.trials ?? []).map((trial) => ({
-        id: `trial-${trial.trialIndex}`,
-        header: t("aiObservability.experiments.rowDetail.trial", { index: trial.trialIndex + 1 }),
-        accessorKey: `trial-${trial.trialIndex}`,
-        sortable: false,
-        size: 120,
-        meta: { align: "left" as const },
-      }))
-    : []),
-  {
-    id: "aggregate",
-    header: hasMultipleTrials.value
-      ? t("aiObservability.experiments.rowDetail.aggregate")
-      : t("aiObservability.experiments.rowDetail.score"),
-    accessorKey: "aggregate",
+  ...(props.detail?.trials ?? []).map((trial) => ({
+    id: `trial-${trial.trialIndex}`,
+    header: t("aiObservability.experiments.rowDetail.trial", { index: trial.trialIndex + 1 }),
+    accessorKey: `trial-${trial.trialIndex}`,
     sortable: false,
     size: 120,
     meta: { align: "left" as const },
-  },
+  })),
+  ...(hasMultipleTrials.value
+    ? [
+        {
+          id: "aggregate",
+          header: t("aiObservability.experiments.rowDetail.aggregate"),
+          accessorKey: "aggregate",
+          sortable: false,
+          size: 120,
+          meta: { align: "left" as const },
+        },
+      ]
+    : []),
 ]);
 
 const scoreRows = computed(() =>
   (props.detail?.scoreSummaries ?? []).map((summary) => {
     const row: Record<string, string> = {
       key: `${summary.scorerId}:${summary.scorerVersion}`,
-      scorer: scorerNames.value[summary.scorerId] ?? summary.scorerId,
-      aggregate: format(summary.value),
+      dimension:
+        summary.scoreConfigName ||
+        summary.name ||
+        scorerNames.value[summary.scorerId] ||
+        t("aiObservability.experiments.rowDetail.unknownDimension"),
+      aggregate: experimentScoreSummaryValue(summary.value),
     };
     for (const trial of props.detail?.trials ?? []) {
-      row[`trial-${trial.trialIndex}`] = scoreValue(scoreFor(trial, summary)?.score);
+      const result = scoreFor(trial, summary);
+      row[`trial-${trial.trialIndex}`] =
+        result?.status === "success" ? experimentScoreValue(result.score) : "—";
     }
     return row;
   }),
@@ -425,17 +435,6 @@ function scoreFor(trial: ExperimentResultSlot, summary: ExperimentScoreSummary) 
   );
 }
 
-function scoreValue(score: Record<string, unknown> | null | undefined) {
-  if (!score) return "—";
-  return String(
-    score.value_numeric ?? score.value_categorical ?? score.value_boolean ?? score.status ?? "—",
-  );
-}
-
-function format(value: unknown) {
-  if (value === null || value === undefined) return "—";
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
 const milliseconds = (value: number | null | undefined) => (value == null ? "—" : `${value} ms`);
 const numberValue = (value: number | null | undefined) => (value == null ? "—" : String(value));
 const costValue = (value: number | null | undefined) =>
