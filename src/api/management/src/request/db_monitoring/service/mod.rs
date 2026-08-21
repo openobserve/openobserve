@@ -108,4 +108,8 @@ pub(crate) use server_queries::*;
 pub(crate) use server_samples::*;
 #[cfg(test)]
 pub(crate) use source::*;
+// Unlike blocking/deadlocks -- which keep RawBlockingFallback/RawDeadlockFallback
+// ungated because build_dbm_events_sql names them -- table_health exports nothing
+// outside its enterprise gate, so on OSS this re-export is empty.
+#[cfg(feature = "enterprise")]
 pub(crate) use table_health::*;
