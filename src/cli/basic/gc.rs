@@ -156,12 +156,16 @@ async fn gc_stream(
 
     let lifecycle_end = now - Duration::try_days(retention_days).unwrap();
 
-    // data dir + derived index dir (see retention::generate_local_dirs)
-    let prefixes = [
+    // data dir + derived index dirs (see retention::generate_local_dirs)
+    let mut prefixes = vec![
         format!("files/{org_id}/{stream_type}/{stream_name}/"),
         format!("files/{org_id}/index/{stream_name}_{stream_type}/"),
         format!("files/{org_id}/bloom/{stream_name}_{stream_type}/"),
     ];
+    if stream_type == config::meta::stream::StreamType::Metrics {
+        // Metrics index (`.midx`)
+        prefixes.push(format!("files/{org_id}/midx/{stream_name}/"));
+    }
     let mut total_dirs = 0usize;
     let mut total_files = 0usize;
     for prefix in prefixes {

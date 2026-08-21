@@ -163,11 +163,11 @@ pub async fn get_announcements(Path(org_id): Path<String>) -> Response {
             }
         };
 
-        return MetaHttpResponse::json(AnnouncementsResponse {
+        MetaHttpResponse::json(AnnouncementsResponse {
             banners: announcements::resolve_for_org(&config, &org_id, now),
             now,
             next_boundary: next_boundary_for_org(&config, &org_id, now),
-        });
+        })
     }
 
     // An OSS build has no banners to serve. Answering with an empty set rather

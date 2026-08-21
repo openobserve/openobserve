@@ -29,12 +29,10 @@ use arrow_schema::Schema;
 use config::meta::promql::DownsamplingRule;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
-    meta::{
-        promql::layout::{MetricsFileLayout, metrics_index_stream},
-        stream::{FileKey, StreamType},
-    },
+    meta::stream::{FileKey, StreamType},
     utils::util::is_trace_time_index_stream,
 };
+use metrics_index::{MetricsFileLayout, metrics_index_stream};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 
