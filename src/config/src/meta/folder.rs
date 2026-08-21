@@ -24,6 +24,10 @@ pub struct Folder {
     pub folder_id: String,
     pub name: String,
     pub description: String,
+    /// Icon token shown beside the folder name — either a Unicode emoji
+    /// ("🚀") or a registry reference ("o2:redis"). Stored opaquely; the
+    /// backend never interprets it. `None` means the folder has no icon.
+    pub icon: Option<String>,
 }
 
 impl MemorySize for Folder {
@@ -32,6 +36,7 @@ impl MemorySize for Folder {
             + self.folder_id.mem_size()
             + self.name.mem_size()
             + self.description.mem_size()
+            + self.icon.mem_size()
     }
 }
 
@@ -70,6 +75,7 @@ mod tests {
             folder_id: "id1".to_string(),
             name: "My Folder".to_string(),
             description: "desc".to_string(),
+            icon: None,
         };
         let b = a.clone();
         assert_eq!(a, b);
@@ -86,6 +92,7 @@ mod tests {
             folder_id: "abc".to_string(),
             name: "n".to_string(),
             description: "d".to_string(),
+            icon: Some("o2:redis".to_string()),
         };
         assert!(f.mem_size() >= std::mem::size_of::<Folder>());
     }

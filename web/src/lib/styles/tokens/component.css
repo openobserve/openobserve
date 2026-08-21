@@ -861,6 +861,12 @@
   /* Shared hover + surface accent — real formula owned by semantic.css
      (theme-accent tinted); --color-surface-accent is an alias of it. */
   --color-surface-accent: var(--color-interactive-hover-bg);
+
+  /* OGlyph plate — the backing behind a full-colour brand logo. Transparent on
+     light, where the marks already read; dark.css turns it into a light chip so
+     near-black logos (GitHub, Kafka, Helm) stay legible on a dark surface. A
+     token rather than a `dark:` class so the theme owns the decision. */
+  --color-glyph-plate: transparent;
 }
 
 /* Ingestion empty-state card icon accents (EmptyStateIngestionCard `iconVariant`).
@@ -1273,6 +1279,9 @@
   --color-ingest-tint-purple: var(--color-ingest-tint-purple);
   --color-ingest-tint-amber: var(--color-ingest-tint-amber);
   --color-ingest-tint-orange: var(--color-ingest-tint-orange);
+
+  /* OGlyph plate */
+  --color-glyph-plate: var(--color-glyph-plate);
 
   /* Separator */
   --spacing-separator: var(--spacing-separator);
