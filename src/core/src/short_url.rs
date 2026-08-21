@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use anyhow::anyhow;
 use chrono::Utc;
 use config::{get_config, utils::md5};
-use infra::{
-    errors::{DbError, Error},
-    table::short_urls::ShortUrlRecord,
-};
+use infra::table::short_urls::ShortUrlRecord;
 
 use crate::db;
 
@@ -40,14 +38,14 @@ pub fn construct_short_url(org_id: &str, short_id: &str) -> String {
     )
 }
 
+/// Returns `false` when a row with the same short id already exists.
 async fn store_short_url(
     org_id: &str,
     short_id: &str,
     original_url: &str,
-) -> Result<String, anyhow::Error> {
+) -> Result<bool, anyhow::Error> {
     let entry = ShortUrlRecord::new(short_id, original_url, org_id);
-    db::short_url::set(short_id, entry).await?;
-    Ok(construct_short_url(org_id, short_id))
+    db::short_url::set(short_id, entry).await
 }
 
 fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
@@ -62,31 +60,32 @@ fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
 
 /// Shortens the given original URL and stores it in the database
 pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
-    let mut short_id = generate_short_id(original_url, None);
+    let short_id = generate_short_id(original_url, None);
 
+    // fast path for already-shortened urls: cache only, no db read
+    if db::short_url::get_cached(&short_id, org_id).is_some_and(|url| url == original_url) {
+        return Ok(construct_short_url(org_id, &short_id));
+    }
+
+    // insert first (ON CONFLICT DO NOTHING): most urls are previously unseen,
+    // so a lookup before insert would be a wasted db call
+    if store_short_url(org_id, &short_id, original_url).await? {
+        return Ok(construct_short_url(org_id, &short_id));
+    }
+
+    // conflict: either the same url was already stored, or the short id
+    // belongs to a different url (hash collision or another org's row)
     if let Ok(existing_url) = db::short_url::get(&short_id, org_id).await
         && existing_url == original_url
     {
         return Ok(construct_short_url(org_id, &short_id));
     }
-
-    let result = store_short_url(org_id, &short_id, original_url).await;
-    match result {
-        Ok(url) => Ok(url),
-        Err(e) => {
-            if let Some(infra_error) = e.downcast_ref::<Error>() {
-                match infra_error {
-                    Error::DbError(DbError::UniqueViolation) => {
-                        let timestamp = Utc::now().timestamp_micros();
-                        short_id = generate_short_id(original_url, Some(timestamp));
-                        store_short_url(org_id, &short_id, original_url).await
-                    }
-                    _ => Err(e),
-                }
-            } else {
-                Err(e)
-            }
-        }
+    let timestamp = Utc::now().timestamp_micros();
+    let short_id = generate_short_id(original_url, Some(timestamp));
+    if store_short_url(org_id, &short_id, original_url).await? {
+        Ok(construct_short_url(org_id, &short_id))
+    } else {
+        Err(anyhow!("Short URL id collision for {short_id}"))
     }
 }
 
