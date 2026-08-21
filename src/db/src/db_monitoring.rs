@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Database Monitoring rollup offsets (design `docs/___databsepages/dbm-design-doc.md` §5, D3).
+//! Database Monitoring rollup offsets (design `db-monitoring/dbm-design-doc.md` §5, D3).
 //!
 //! PER-`(org, stream)` offsets — a deliberate deviation from the sibling
 //! `service_graph` store's single global key: combined with the DBM job's

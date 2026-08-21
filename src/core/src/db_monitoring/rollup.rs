@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Database Monitoring rollup: the Phase-2 `_o2_db_stats` writer
-//! (design: `docs/___databsepages/dbm-design-doc.md` §5).
+//! (design: `db-monitoring/dbm-design-doc.md` §5).
 //!
 //! A dedicated windowed job — structurally the service-graph processor, but
 //! with no enterprise cfg, since unlike parts of the read API in `api.rs` this

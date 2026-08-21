@@ -12,11 +12,11 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//! Database Monitoring read API — HTTP handlers (design: `docs/___databsepages/dbm-design-doc.md`
+//! Database Monitoring read API — HTTP handlers (design: `db-monitoring/dbm-design-doc.md`
 //! §6 routes + §5.4/D4 hybrid live tail).
 //!
 //! GET handlers structurally modeled on the service-graph read API
-//! (`../service_graph/api.rs`): fixed SQL over the `_o2_db_stats` summary
+//! (`src/core/src/traces/service_graph/api.rs`): fixed SQL over the `_o2_db_stats` summary
 //! stream via `crate::search::search`, read as `StreamType::Logs`.
 //!
 //! Most of them carry no `#[cfg]` and serve both builds. Three do not:

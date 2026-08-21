@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Database Monitoring ingest enrichment (design: `docs/___databsepages/dbm-design-doc.md` §3;
+//! Database Monitoring ingest enrichment (design: `db-monitoring/dbm-design-doc.md` §3;
 //! test approach:
-//! `docs/___databsepages/plans-and-specs/2026-08-07-dbm-phase1-test-approach-design.md` §2).
+//! `db-monitoring/plans-and-specs/2026-08-07-dbm-phase1-test-approach-design.md` §2).
 //!
 //! For CLIENT/PRODUCER spans carrying OTel `db.*` attributes, [`enrich`] derives a canonical,
 //! dual-semconv-resolved identity plus a stable query fingerprint and returns the flattened
