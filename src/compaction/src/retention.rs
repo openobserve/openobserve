@@ -682,7 +682,7 @@ fn generate_local_dirs(
         if day_path.exists() {
             dirs_to_delete.push(day_path.to_path_buf());
         }
-        // TSID-major metrics series index (`.midx`)
+        // Metrics index (`.midx`)
         if stream_type == StreamType::Metrics {
             let day_dir = format!(
                 "{}files/{org_id}/midx/{stream_name}/{}",

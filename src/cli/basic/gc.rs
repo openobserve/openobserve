@@ -163,7 +163,7 @@ async fn gc_stream(
         format!("files/{org_id}/bloom/{stream_name}_{stream_type}/"),
     ];
     if stream_type == config::meta::stream::StreamType::Metrics {
-        // TSID-major metrics series index (`.midx`)
+        // Metrics index (`.midx`)
         prefixes.push(format!("files/{org_id}/midx/{stream_name}/"));
     }
     let mut total_dirs = 0usize;

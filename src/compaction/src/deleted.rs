@@ -19,7 +19,7 @@ use std::borrow::Cow;
 
 use config::{
     meta::{
-        promql::tsid_layout::MetricsFileLayout,
+        promql::metrics_layout::MetricsFileLayout,
         stream::{FileKey, FileListDeleted, FileMeta},
     },
     utils::inverted_index::to_tantivy_name,
@@ -79,8 +79,8 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
             .flatten()
     })
     .await?;
-    delete_from_storage("TSID series index", &files, |file| {
-        MetricsFileLayout::series_index_path(&file.file).map(Cow::Owned)
+    delete_from_storage("metrics index", &files, |file| {
+        MetricsFileLayout::metrics_index_path(&file.file).map(Cow::Owned)
     })
     .await?;
     delete_from_storage("flattened", &files, |file| {

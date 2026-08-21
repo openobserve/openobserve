@@ -44,7 +44,7 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             continue;
         };
         let field_type = field.data_type().clone();
-        // dictionary-encoded label columns (the `.midx` series index) compare
+        // dictionary-encoded label columns (the `.midx` metrics index) compare
         // and cast by their value type
         let value_type = match &field_type {
             DataType::Dictionary(_, value_type) => value_type.as_ref().clone(),

@@ -20,7 +20,7 @@ use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_config,
     meta::{
         promql::{
-            DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL, tsid_layout::MetricsFileLayout,
+            DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL, metrics_layout::MetricsFileLayout,
         },
         stream::FileMeta,
     },
@@ -78,7 +78,7 @@ pub(super) async fn write_files(
             buf,
             meta,
             layout: MetricsFileLayout::Legacy,
-            series_index: None,
+            metrics_index: None,
         })
         .collect())
 }

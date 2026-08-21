@@ -30,7 +30,7 @@ use config::meta::promql::DownsamplingRule;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::tsid_layout::{MetricsFileLayout, metrics_tsid_major_stream},
+        promql::metrics_layout::{MetricsFileLayout, metrics_index_stream},
         stream::{FileKey, StreamType},
     },
     utils::util::is_trace_time_index_stream,
@@ -56,13 +56,13 @@ pub enum MergeMode {
     /// as a whole.
     #[cfg(feature = "enterprise")]
     Downsampling(DownsamplingRule),
-    /// TSID-major metrics stream, hour still open: the ingester and the
-    /// incremental compactor merges write one `tsid-sorted-*` Parquet file
+    /// Metrics index stream, hour still open: the ingester and the incremental
+    /// compactor merges write one `metrics-hash-sorted-v1-*` Parquet file
     /// ordered by `(__hash__, _timestamp)`.
-    HashSorted,
-    /// TSID-major metrics stream, closed hour: the whole hour merges into
-    /// size-split `tsid-major-v3-*` files in the same order.
-    TsidMajor,
+    MetricsHashSorted,
+    /// Metrics index stream, closed hour: the whole hour merges into
+    /// size-split `metrics-indexed-v1-*` files in the same order.
+    MetricsIndexed,
 }
 
 impl MergeMode {
@@ -85,11 +85,11 @@ impl MergeMode {
         {
             return Self::Downsampling(rule.clone());
         }
-        if metrics_tsid_major_stream(stream_type, schema) {
+        if metrics_index_stream(stream_type, schema) {
             return if finalize {
-                Self::TsidMajor
+                Self::MetricsIndexed
             } else {
-                Self::HashSorted
+                Self::MetricsHashSorted
             };
         }
         Self::for_stream(stream_type, stream_name)
@@ -97,8 +97,8 @@ impl MergeMode {
 
     /// Mode for the ingester movers: never downsamples, never finalizes.
     pub fn for_ingester(stream_type: StreamType, stream_name: &str, schema: &Schema) -> Self {
-        if metrics_tsid_major_stream(stream_type, schema) {
-            return Self::HashSorted;
+        if metrics_index_stream(stream_type, schema) {
+            return Self::MetricsHashSorted;
         }
         Self::for_stream(stream_type, stream_name)
     }
@@ -111,9 +111,9 @@ impl MergeMode {
         }
     }
 
-    /// True for the TSID-major hour-end merge.
-    pub fn is_tsid_major(&self) -> bool {
-        matches!(self, Self::TsidMajor)
+    /// True for the indexed metrics hour-end merge.
+    pub fn is_metrics_indexed(&self) -> bool {
+        matches!(self, Self::MetricsIndexed)
     }
 
     /// True when the whole hour must be merged as one batch — every file of
@@ -123,7 +123,7 @@ impl MergeMode {
         match self {
             #[cfg(feature = "enterprise")]
             Self::Downsampling(_) => true,
-            Self::TsidMajor => true,
+            Self::MetricsIndexed => true,
             _ => false,
         }
     }
@@ -131,7 +131,7 @@ impl MergeMode {
     /// Row order the merge writes.
     pub fn output_sort_order(&self) -> FileSortOrder {
         match self {
-            Self::HashSorted | Self::TsidMajor => FileSortOrder::HashTimestampAsc,
+            Self::MetricsHashSorted | Self::MetricsIndexed => FileSortOrder::HashTimestampAsc,
             _ => FileSortOrder::TimestampDesc,
         }
     }
@@ -139,8 +139,8 @@ impl MergeMode {
     /// Layout of the file(s) the merge writes.
     pub fn file_layout(&self) -> MetricsFileLayout {
         match self {
-            Self::HashSorted => MetricsFileLayout::HashSorted,
-            Self::TsidMajor => MetricsFileLayout::TsidMajor,
+            Self::MetricsHashSorted => MetricsFileLayout::HashSorted,
+            Self::MetricsIndexed => MetricsFileLayout::Indexed,
             _ => MetricsFileLayout::Legacy,
         }
     }
@@ -157,11 +157,11 @@ impl MergeMode {
             .filter(|f| MetricsFileLayout::of(&f.key).is_hash_ordered())
             .count();
         match self {
-            Self::HashSorted | Self::TsidMajor if hash_ordered == files.len() => {
+            Self::MetricsHashSorted | Self::MetricsIndexed if hash_ordered == files.len() => {
                 FileSortOrder::HashTimestampAsc
             }
             _ if hash_ordered > 0 => FileSortOrder::None,
-            Self::HashSorted | Self::TsidMajor => FileSortOrder::None,
+            Self::MetricsHashSorted | Self::MetricsIndexed => FileSortOrder::None,
             _ => FileSortOrder::TimestampDesc,
         }
     }
@@ -188,7 +188,7 @@ impl MergeMode {
             Self::Downsampling(rule) => {
                 super::downsampling::generate_downsampling_sql(schema, rule)
             }
-            Self::HashSorted | Self::TsidMajor => format!(
+            Self::MetricsHashSorted | Self::MetricsIndexed => format!(
                 "SELECT * FROM tbl ORDER BY {}",
                 FileSortOrder::HashTimestampAsc
                     .order_by_clause()
@@ -206,8 +206,8 @@ impl fmt::Display for MergeMode {
             Self::FileList => write!(f, "file_list"),
             #[cfg(feature = "enterprise")]
             Self::Downsampling(rule) => write!(f, "downsampling(step={}s)", rule.step),
-            Self::HashSorted => write!(f, "hash_sorted"),
-            Self::TsidMajor => write!(f, "tsid_major"),
+            Self::MetricsHashSorted => write!(f, "metrics_hash_sorted"),
+            Self::MetricsIndexed => write!(f, "metrics_indexed"),
         }
     }
 }
@@ -278,19 +278,19 @@ mod tests {
             MergeMode::FileList
         ));
         assert!(!MergeMode::Classic.merges_whole_batch());
-        assert!(MergeMode::TsidMajor.merges_whole_batch());
-        assert!(!MergeMode::HashSorted.merges_whole_batch());
+        assert!(MergeMode::MetricsIndexed.merges_whole_batch());
+        assert!(!MergeMode::MetricsHashSorted.merges_whole_batch());
         assert_eq!(
             MergeMode::Classic.input_sort_order(&[]),
             FileSortOrder::TimestampDesc
         );
         assert_eq!(MergeMode::Classic.file_layout(), MetricsFileLayout::Legacy);
         assert_eq!(
-            MergeMode::HashSorted.file_layout(),
+            MergeMode::MetricsHashSorted.file_layout(),
             MetricsFileLayout::HashSorted
         );
         assert_eq!(
-            MergeMode::TsidMajor.output_sort_order(),
+            MergeMode::MetricsIndexed.output_sort_order(),
             FileSortOrder::HashTimestampAsc
         );
     }
@@ -298,12 +298,13 @@ mod tests {
     #[test]
     fn input_sort_order_by_file_layout() {
         let legacy = FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/1.parquet");
-        let sorted =
-            FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/tsid-sorted-2.parquet");
+        let sorted = FileKey::from_file_name(
+            "files/o/metrics/m/2026/08/18/10/metrics-hash-sorted-v1-2.parquet",
+        );
         let major =
-            FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/tsid-major-v3-3.parquet");
+            FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/metrics-indexed-v1-3.parquet");
         // all inputs hash ordered: the hash modes merge them pre-sorted
-        for mode in [MergeMode::HashSorted, MergeMode::TsidMajor] {
+        for mode in [MergeMode::MetricsHashSorted, MergeMode::MetricsIndexed] {
             assert_eq!(
                 mode.input_sort_order(std::slice::from_ref(&sorted)),
                 FileSortOrder::HashTimestampAsc
@@ -378,7 +379,7 @@ mod tests {
             "SELECT * FROM tbl ORDER BY min_ts DESC"
         );
         assert_eq!(
-            MergeMode::TsidMajor.sql(&without_session),
+            MergeMode::MetricsIndexed.sql(&without_session),
             "SELECT * FROM tbl ORDER BY __hash__ ASC, _timestamp ASC"
         );
         assert!(

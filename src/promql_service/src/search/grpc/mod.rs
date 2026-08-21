@@ -36,8 +36,8 @@ use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 use tokio::sync::mpsc;
 
+mod metrics_index;
 mod storage;
-mod tsid_series_index;
 mod wal;
 
 type Context = (SessionContext, Arc<Schema>, ScanStats, bool);

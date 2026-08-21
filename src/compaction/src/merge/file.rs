@@ -20,7 +20,7 @@ use bytes::Bytes;
 use config::{
     FileFormat, get_config, ider, is_local_disk_storage,
     meta::{
-        promql::tsid_layout::MetricsFileLayout,
+        promql::metrics_layout::MetricsFileLayout,
         stream::{FileKey, FileMeta, StorageType, StreamType},
     },
     metrics,
@@ -298,7 +298,7 @@ pub async fn merge_files(
         buf,
         meta: mut new_file_meta,
         layout,
-        series_index,
+        metrics_index,
     } in merged_files
     {
         new_file_meta.compressed_size = buf.len() as i64;
@@ -330,23 +330,23 @@ pub async fn merge_files(
             storage::put(&account, &new_file_key, buf.clone()).await?;
         }
 
-        // TSID-major files own a `.midx` series index; it is not tracked in
+        // Indexed metrics files own a `.midx` metrics index; it is not tracked in
         // file_list and is deleted together with the data file
-        if let Some(series_index) = series_index {
-            let series_index_key =
-                MetricsFileLayout::series_index_path(&new_file_key).ok_or_else(|| {
-                    anyhow::anyhow!("TSID series index for a non TSID-major file: {new_file_key}")
+        if let Some(metrics_index) = metrics_index {
+            let metrics_index_key = MetricsFileLayout::metrics_index_path(&new_file_key)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("metrics index for a non-indexed metrics file: {new_file_key}")
                 })?;
-            let series_index = Bytes::from(series_index);
+            let metrics_index = Bytes::from(metrics_index);
             if compliance {
-                storage::put_with_compliance(&account, &series_index_key, series_index.clone())
+                storage::put_with_compliance(&account, &metrics_index_key, metrics_index.clone())
                     .await?;
             } else {
-                storage::put(&account, &series_index_key, series_index.clone()).await?;
+                storage::put(&account, &metrics_index_key, metrics_index.clone()).await?;
             }
             log::debug!(
-                "[COMPACTOR:WORKER:{thread_id}] wrote TSID series index {series_index_key}, size: {}",
-                series_index.len()
+                "[COMPACTOR:WORKER:{thread_id}] wrote metrics index {metrics_index_key}, size: {}",
+                metrics_index.len()
             );
         }
 

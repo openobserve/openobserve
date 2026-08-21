@@ -42,7 +42,7 @@ use search::{
 use search_service::match_source;
 use tracing::Instrument;
 
-use crate::search::grpc::{Context, tsid_series_index};
+use crate::search::grpc::{Context, metrics_index};
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
@@ -205,11 +205,11 @@ pub(crate) async fn create_context(
         use_inverted_index: false,
     });
 
-    // Prune the TSID-major files through their `.midx` series indexes: matching
+    // Prune indexed metrics files through their `.midx` metrics indexes: matching
     // physical rows are attached to each FileKey before the metrics table is
     // built. Files of any other layout (legacy or not yet finalized hours) are
     // scanned in full; the PromQL matchers are always applied by the query.
-    match tsid_series_index::search(
+    match metrics_index::search(
         query.as_ref(),
         &mut files,
         schema.as_ref(),
@@ -223,13 +223,13 @@ pub(crate) async fn create_context(
         }
         Err(error) => {
             log::warn!(
-                "[trace_id {trace_id}] promql->search->storage: TSID series-index query failed, falling back to a full scan: {error}"
+                "[trace_id {trace_id}] promql->search->storage: metrics-index query failed, falling back to a full scan: {error}"
             );
         }
     };
 
     log::info!(
-        "[trace_id {trace_id}] promql->search->storage: after TSID series-index pruning, files {}, scan_size {}, compressed_size {}, index took: {} ms",
+        "[trace_id {trace_id}] promql->search->storage: after metrics-index pruning, files {}, scan_size {}, compressed_size {}, index took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
         scan_stats.compressed_size,
