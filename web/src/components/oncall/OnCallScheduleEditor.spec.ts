@@ -347,6 +347,58 @@ describe("OnCallScheduleEditor", () => {
 
     expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(false);
   });
+
+  /// `addRotation` pushes the row into the draft before anybody has filled it
+  /// in, and the ✕, Esc and the backdrop close through `v-model:open` without
+  /// passing Cancel. The abandoned row stayed in the draft and then failed the
+  /// NEXT save — naming a rotation that was no longer on screen, and blocking
+  /// a rotation somebody had just filled in correctly.
+  it("does not let a rotation abandoned through the drawer's ✕ block the next save", async () => {
+    const wrapper = render({ schedule: null });
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
+    await flushPromises();
+    wrapper.findComponent({ name: "ODrawer" }).vm.$emit("update:open", false);
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(0);
+
+    await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
+    await flushPromises();
+    await wrapper
+      .findComponent('[data-test="oncall-schedule-members-0"]')
+      .vm.$emit("update:modelValue", ["ana@o2.ai"]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+    await flushPromises();
+
+    expect(service.setSchedule).toHaveBeenCalledTimes(1);
+    expect((service.setSchedule.mock.calls[0][0] as any).data.rotations).toHaveLength(1);
+  });
+
+  /// Closing is not undo. A rotation that already exists is edited in the
+  /// draft the bulk Save writes, so dismissing the drawer keeps the change —
+  /// only the row nobody has finished adding is discarded.
+  it("keeps edits to an existing rotation when the drawer is dismissed", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await flushPromises();
+    await openRotation(wrapper);
+
+    await wrapper
+      .findComponent('[data-test="oncall-schedule-members-0"]')
+      .vm.$emit("update:modelValue", ["ana@o2.ai", "bob@o2.ai"]);
+    await flushPromises();
+
+    wrapper.findComponent({ name: "ODrawer" }).vm.$emit("update:open", false);
+    await flushPromises();
+
+    const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].shift_rules[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
+  });
+
   /// A layer's *when* was the half the editor could not express: a
   /// follow-the-sun setup was preset-or-API only, and a rotation the API had
   /// restricted rendered here as though it applied always.

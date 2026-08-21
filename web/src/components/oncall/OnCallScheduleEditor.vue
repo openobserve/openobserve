@@ -968,14 +968,36 @@ function duplicateRotation(id: string) {
   editRotation(copy);
 }
 
-/// Cancel must also discard. In the bulk editor an abandoned draft stays
-/// visible and Cancel/Save deal with it; drawer-only has no such surface, so a
-/// half-added rotation would silently linger and reappear on the next open.
+/// Cancel closes; the watcher below discards. Routing every dismissal through
+/// one place is the point.
 function cancelDrawer() {
   editing.value = false;
-  active.value = null;
-  if (props.drawerOnly) reset();
 }
+
+/// EVERY way out of the drawer has to discard an unfinished rotation, not just
+/// the Cancel button. `addRotation` pushes the row into `draft` before anybody
+/// has filled it in, and the ✕, Esc and the backdrop all close through
+/// `v-model:open` without passing Cancel — so an abandoned row stayed in the
+/// draft and failed the NEXT save, naming a rotation that was no longer on
+/// screen ("`Primary` has nobody in it"). The save is all-or-nothing at the
+/// server, so one ghost blocks every rotation after it.
+///
+/// A save clears `isNew` before it closes, so the rotation it just stored is
+/// not read as abandoned here.
+watch(editing, (isOpen) => {
+  if (isOpen) return;
+  const abandoned = isNew.value ? active.value : null;
+  isNew.value = false;
+  active.value = null;
+  // In the bulk editor an abandoned draft is visible in the table and
+  // Cancel/Save deal with it; drawer-only has no such surface, so the whole
+  // draft goes back to what is stored rather than lingering until the next open.
+  if (props.drawerOnly) {
+    reset();
+    return;
+  }
+  if (abandoned) draft.value = draft.value.filter((r) => r !== abandoned);
+});
 
 /// Deletion is a save: the drawer is the only surface, so there is no separate
 /// "now press Save" step to forget.
@@ -1009,6 +1031,9 @@ async function save() {
       data: { timezone: props.timezone, rotations },
     });
     toast({ variant: "success", message: t("oncall.scheduleSaved") });
+    // Stored, so no longer new — the close watcher would otherwise read this
+    // rotation as abandoned and drop it straight back out of the draft.
+    isNew.value = false;
     // Close BEFORE the parent refetches. `reset` rebuilds `draft` from the new
     // props, which detaches `active` from it — leaving the drawer open over an
     // object nothing reads, so every further keystroke went nowhere.
