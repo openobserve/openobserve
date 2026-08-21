@@ -21,6 +21,7 @@ import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { folderKeys } from "@/services/common.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
+import { dropPanelCache } from "@/composables/dashboard/usePanelCache";
 import dashboardService from "../services/dashboards";
 import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
@@ -425,6 +426,15 @@ export const deletePanel = async (
     dashboardId,
     currentDashboard,
     folderId,
+  );
+
+  // The panel is gone, so its cached results are unreachable — without this they
+  // sit in IndexedDB until the 24 h TTL or the record cap reclaims them.
+  await dropPanelCache(
+    store.state.selectedOrganization.identifier,
+    folderId,
+    dashboardId,
+    panelId,
   );
 };
 

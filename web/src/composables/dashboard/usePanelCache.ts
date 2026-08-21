@@ -41,7 +41,8 @@
 import { toRaw } from "vue";
 import { hashKey } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
-import { idbPersister } from "@/composables/query/persisters";
+import { idbPersister, IDB_PREFIX } from "@/composables/query/persisters";
+import { cacheRemoveByPrefix } from "@/composables/query/idbStorage";
 import { LONG_GC_TIME } from "@/composables/query/cachePolicy";
 import { panelKeyDigest } from "@/composables/query/panelKey";
 import { panelKeys } from "./panel.querykeys";
@@ -258,4 +259,29 @@ export const usePanelCache = (
     savePanelCache,
     getPanelCache,
   };
+};
+
+/**
+ * Drop every cached result for one panel — all of its variable digests, in
+ * memory and on disk. Called when the panel itself is deleted: otherwise its
+ * payload sits in IndexedDB until the 24 h TTL or the record cap reclaims it.
+ */
+export const dropPanelCache = async (
+  org: string,
+  folderId: string,
+  dashboardId: string,
+  panelId: string,
+): Promise<void> => {
+  try {
+    // One panel owns one entry per variable digest, and the digest is the key's
+    // last segment — so drop the segment and match everything under it.
+    const panelPrefix = panelKeys.result(org, folderId, dashboardId, panelId, "").slice(0, -1);
+    queryClient.removeQueries({ queryKey: panelPrefix });
+    // The persister keys by the query HASH, not the array, so the disk prefix is
+    // that hash with its closing bracket swapped for the separator.
+    const hashPrefix = hashKey(panelPrefix).replace(/\]$/, ",");
+    await cacheRemoveByPrefix(`${IDB_PREFIX}-${hashPrefix}`);
+  } catch (error) {
+    console.error("Error dropping panel cache:", error);
+  }
 };
