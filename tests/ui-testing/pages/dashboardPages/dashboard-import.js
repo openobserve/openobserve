@@ -1,6 +1,8 @@
 //Dashboard Import Page Object
 //Methods: Import dashboard, import button, input files, delete imported dashboard
 import { expect } from "@playwright/test";
+import fs from "fs";
+import path from "path";
 
 export default class DashboardImport {
   constructor(page) {
@@ -59,13 +61,33 @@ export default class DashboardImport {
   //Import dashboard button on dashboard page
   async clickImportDashboard() {
     await this.importButton.waitFor({ state: "visible", timeout: 15000 });
-    await this.importButton.click();
-    // Import button is now a dropdown — click the "Custom" option
-    const customOption = this.page.locator('[data-test="dashboard-import-custom"]');
-    await customOption.waitFor({ state: "visible", timeout: 10000 });
-    await customOption.click();
-    await this.page.locator('[data-test="tab-import_json_file"]').waitFor({ state: "visible", timeout: 10000 });
-    await this.inputFile.waitFor({ state: "attached", timeout: 10000 });
+
+    const customOption = this.page.locator(
+      '[data-test="dashboard-import-custom"]'
+    );
+    const fileTab = this.page.locator('[data-test="tab-import_json_file"]');
+
+    // "Custom" runs router.push("/dashboards/import"), so tab-import_json_file
+    // only exists once ImportDashboard.vue has mounted on the new route. The
+    // previous version never checked that the route actually changed: a dropdown
+    // click swallowed by the list re-rendering behind it (folders/dashboards are
+    // still settling at this point) left us on the list with no error, and the
+    // wait then burned its full 10s against a tab that was never going to render.
+    // That is exactly how "should import the dashboard" and the URL-import test
+    // failed on alpha. Assert the navigation, and re-open the menu if it was lost.
+    await expect(async () => {
+      if (!this.page.url().includes("/dashboards/import")) {
+        if (!(await customOption.isVisible().catch(() => false))) {
+          await this.importButton.click();
+        }
+        await customOption.waitFor({ state: "visible", timeout: 10000 });
+        await customOption.click();
+        await this.page.waitForURL(/\/dashboards\/import/, { timeout: 15000 });
+      }
+      await fileTab.waitFor({ state: "visible", timeout: 15000 });
+    }).toPass({ timeout: 60000, intervals: [500, 1000, 2000] });
+
+    await this.inputFile.waitFor({ state: "attached", timeout: 15000 });
   }
 
   //click import button
@@ -81,7 +103,20 @@ export default class DashboardImport {
   }
 
   // Import dashboard file
-  async uploadDashboardFile(fileContentPath) {
+  /**
+   * Upload a dashboard JSON for import.
+   *
+   * @param {string} fileContentPath - path to the fixture, relative to CWD
+   * @param {object} [options]
+   * @param {string} [options.title] - override the JSON's `title` before upload.
+   *   Several tests import the SAME fixture while the file runs in parallel mode,
+   *   so they all produced a dashboard called "Cloudfront to OpenObserve" at once
+   *   — and both expectImportedDashboardVisible() and deleteImportedDashboard()
+   *   resolve their row with `.first()`, so one test could assert on, or delete,
+   *   another test's dashboard. Giving each run its own title removes the overlap
+   *   without touching the shared fixture on disk.
+   */
+  async uploadDashboardFile(fileContentPath, { title } = {}) {
     const fileTab = this.page.locator('[data-test="tab-import_json_file"]');
     try {
       await fileTab.waitFor({ state: "visible", timeout: 10000 });
@@ -95,11 +130,25 @@ export default class DashboardImport {
     // `attached` (not visible) since setInputFiles works on hidden inputs.
     await this.inputFile.waitFor({ state: "attached", timeout: 20000 });
 
+    // When a title override is requested, upload an in-memory copy rather than
+    // the fixture path, so the file on disk is never mutated.
+    let payload = fileContentPath;
+    if (title !== undefined) {
+      const absolutePath = path.resolve(process.cwd(), fileContentPath);
+      const json = JSON.parse(fs.readFileSync(absolutePath, "utf-8"));
+      json.title = title;
+      payload = {
+        name: path.basename(absolutePath),
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify(json, null, 2)),
+      };
+    }
+
     // Retry file upload
     let retries = 3;
     while (retries > 0) {
       try {
-        await this.inputFile.setInputFiles(fileContentPath, { timeout: 10000 });
+        await this.inputFile.setInputFiles(payload, { timeout: 10000 });
         break;
       } catch (error) {
         retries--;
