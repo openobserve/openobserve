@@ -24,9 +24,8 @@ use arrow::{
         writer::{FileWriter as ArrowFileWriter, IpcWriteOptions},
     },
 };
-use config::{
-    TIMESTAMP_COL_NAME,
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL, layout::METRICS_INDEX_ROW_COUNT},
+use config::meta::promql::{
+    HASH_LABEL, is_metrics_hash_excluded_label, layout::METRICS_INDEX_ROW_COUNT,
 };
 use datafusion::error::{DataFusionError, Result};
 
@@ -61,11 +60,7 @@ impl MetricsIndexWriter {
             .iter()
             .enumerate()
             .filter_map(|(index, field)| {
-                (!matches!(
-                    field.name().as_str(),
-                    TIMESTAMP_COL_NAME | VALUE_LABEL | EXEMPLARS_LABEL | HASH_LABEL
-                ))
-                .then_some(index)
+                (!is_metrics_hash_excluded_label(field.name())).then_some(index)
             })
             .collect::<Vec<_>>();
 
@@ -158,9 +153,10 @@ mod tests {
     fn test_metrics_index_records_exact_parquet_ranges() {
         let schema = Arc::new(Schema::new(vec![
             Field::new(HASH_LABEL, DataType::UInt64, false),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(config::meta::promql::VALUE_LABEL, DataType::Float64, false),
             Field::new("path", DataType::Utf8View, true),
+            Field::new("trace_id", DataType::Utf8View, true),
         ]));
         let batch1 = RecordBatch::try_new(
             Arc::clone(&schema),
@@ -169,6 +165,9 @@ mod tests {
                 Arc::new(Int64Array::from(vec![10, 20, 10])),
                 Arc::new(Float64Array::from(vec![1.0, 2.0, 3.0])),
                 Arc::new(StringViewArray::from(vec!["a", "a", "b"])),
+                // Same hash, different excluded label: the sidecar must not
+                // snapshot this column and use it to reject the whole run.
+                Arc::new(StringViewArray::from(vec!["trace-a", "trace-b", "trace-c"])),
             ],
         )
         .unwrap();
@@ -179,6 +178,7 @@ mod tests {
                 Arc::new(Int64Array::from(vec![20, 10])),
                 Arc::new(Float64Array::from(vec![4.0, 5.0])),
                 Arc::new(StringViewArray::from(vec!["b", "c"])),
+                Arc::new(StringViewArray::from(vec!["trace-d", "trace-e"])),
             ],
         )
         .unwrap();
@@ -197,6 +197,7 @@ mod tests {
         assert_eq!(batches.len(), 1);
         let batch = &batches[0];
         assert!(batch.schema().field_with_name(HASH_LABEL).is_err());
+        assert!(batch.schema().field_with_name("trace_id").is_err());
         assert_eq!(batch.num_columns(), 2);
         assert_eq!(
             batch.schema().field_with_name("path").unwrap().data_type(),

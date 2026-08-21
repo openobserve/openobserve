@@ -48,6 +48,7 @@ mod tests {
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("instance", DataType::Utf8View, true),
             Field::new("path", DataType::Utf8View, true),
+            Field::new("trace_id", DataType::Utf8View, true),
             Field::new(VALUE_LABEL, DataType::Float64, false),
         ]);
         let matchers = Matchers::new(vec![
@@ -56,6 +57,7 @@ mod tests {
             Matcher::new(MatchOp::NotEqual, VALUE_LABEL, "1"),
             Matcher::new(MatchOp::Equal, "missing_label", "x"),
             Matcher::new(MatchOp::NotEqual, "instance", "i1"),
+            Matcher::new(MatchOp::Equal, "trace_id", "trace-b"),
         ]);
         assert_eq!(
             metrics_index_labels(&schema, &matchers),
@@ -64,6 +66,10 @@ mod tests {
 
         let only_value = Matchers::new(vec![Matcher::new(MatchOp::Equal, VALUE_LABEL, "1")]);
         assert_eq!(metrics_index_labels(&schema, &only_value), None);
+
+        let only_hash_excluded =
+            Matchers::new(vec![Matcher::new(MatchOp::Equal, "trace_id", "trace-b")]);
+        assert_eq!(metrics_index_labels(&schema, &only_hash_excluded), None);
     }
 
     #[test]

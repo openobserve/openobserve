@@ -20,9 +20,9 @@ use std::{
 
 use arrow::datatypes::Schema;
 use config::{
-    PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
+    PARQUET_MAX_ROW_GROUP_SIZE,
     meta::{
-        promql::{EXEMPLARS_LABEL, VALUE_LABEL, layout::MetricsFileLayout},
+        promql::{is_metrics_hash_excluded_label, layout::MetricsFileLayout},
         stream::{FileKey, FileSelection},
     },
 };
@@ -189,10 +189,8 @@ pub(super) fn metrics_index_labels(
 ) -> Option<Vec<String>> {
     let mut labels: Vec<String> = Vec::new();
     for matcher in &matchers.matchers {
-        if matches!(
-            matcher.name.as_str(),
-            TIMESTAMP_COL_NAME | VALUE_LABEL | EXEMPLARS_LABEL
-        ) || table_schema.field_with_name(&matcher.name).is_err()
+        if is_metrics_hash_excluded_label(&matcher.name)
+            || table_schema.field_with_name(&matcher.name).is_err()
         {
             continue;
         }
