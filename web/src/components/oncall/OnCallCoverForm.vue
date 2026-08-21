@@ -91,16 +91,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-cover-who"
       />
 
-      <!-- Only when there is a choice to make. A single-slot team has one
+      <!-- Only when there is a choice to make. A one-rotation team has one
            rotation, and a select with one option is a question with one
            answer. -->
       <OFormSelect
-        v-if="slotOptions.length > 1"
-        name="slot"
-        :label="t('oncall.coverSlot')"
-        :options="slotOptions"
-        :help-text="t('oncall.coverSlotHint')"
-        data-test="oncall-cover-slot"
+        v-if="rotationOptions.length > 1"
+        name="rotation_id"
+        :label="t('oncall.coverRotation')"
+        :options="rotationOptions"
+        :help-text="t('oncall.coverRotationHint')"
+        data-test="oncall-cover-rotation"
       />
 
       <!-- Presets first, because they are the answer almost every time. -->
@@ -152,10 +152,24 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { OnCallTeamMember } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, MICROS_PER_DAY, MICROS_PER_HOUR, sameSlot } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY, MICROS_PER_HOUR } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { Shift as UpcomingShift } from "@/utils/oncall";
+import type { Rotation } from "@/ts/interfaces/oncall";
+import type { Shift } from "@/utils/oncall";
+
+/**
+ * One swappable week, and which rotation's week it is.
+ *
+ * A `Shift` alone cannot say: the roster and the cadence live on a shift RULE,
+ * and a swap is written against the position the rule staffs. Two rotations
+ * hand over at the same instant, so without the id a primary week and a
+ * secondary week collapse onto one entry in the picker.
+ */
+export interface UpcomingShift extends Shift {
+  rotationId: string;
+  rotationName: string;
+}
 import { formatInZone } from "@/utils/oncall";
 import { makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
 
@@ -168,7 +182,7 @@ import { makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
  */
 interface OnCallCoverFormValues extends Record<string, unknown> {
   user_email: string;
-  slot: string;
+  rotation_id: string;
   window?: DateTimeRangeValue;
 }
 
@@ -196,11 +210,14 @@ const props = withDefaults(
      */
     shifts?: UpcomingShift[];
     /**
-     * The slots this team staffs, in display order. One slot needs no picker —
-     * a cover means the only rotation there is. Two do: a cover written with
-     * no slot lands on the default one and evicts whoever held it.
+     * The rotations this team staffs, in schedule order. One needs no picker —
+     * a cover means the only position there is. Two do: a cover written with no
+     * rotation lands on the primary and evicts whoever held it.
+     *
+     * A rotation the team does not have is refused by the server rather than
+     * stored, because a cover over a position nothing staffs pages nobody.
      */
-    slots?: string[];
+    rotations?: Rotation[];
   }>(),
   {
     open: false,
@@ -212,7 +229,7 @@ const props = withDefaults(
     gap: null,
     defaultUser: "",
     shifts: () => [],
-    slots: () => [],
+    rotations: () => [],
   },
 );
 
@@ -220,7 +237,7 @@ const emit = defineEmits<{
   (e: "update:open", open: boolean): void;
   (
     e: "save",
-    value: { user_email: string; start_at: number; end_at: number; slot?: string },
+    value: { user_email: string; start_at: number; end_at: number; rotation_id?: string },
   ): void;
   /**
    * Two covers, one each way — the caller writes both and owns what happens if
@@ -229,8 +246,20 @@ const emit = defineEmits<{
   (
     e: "swap",
     value: {
-      first: { user_email: string; start_at: number; end_at: number; slot?: string; covering_for?: string };
-      second: { user_email: string; start_at: number; end_at: number; slot?: string; covering_for?: string };
+      first: {
+        user_email: string;
+        start_at: number;
+        end_at: number;
+        rotation_id?: string;
+        covering_for?: string;
+      };
+      second: {
+        user_email: string;
+        start_at: number;
+        end_at: number;
+        rotation_id?: string;
+        covering_for?: string;
+      };
     },
   ): void;
 }>();
@@ -300,7 +329,7 @@ const form = useOForm<OnCallCoverFormValues>({
 function initialValues(): OnCallCoverFormValues {
   return {
     user_email: prefilledUser.value,
-    slot: props.slots[0] ?? DEFAULT_SLOT,
+    rotation_id: props.rotations[0]?.id ?? "",
     window: props.gap ? { from: props.gap.from, to: props.gap.to } : undefined,
   };
 }
@@ -377,27 +406,29 @@ const summary = computed<I18nText | "">(() => {
 
 /// Keyed by instant, not by index: the list is recomputed from `now` every time
 /// the dialog opens, and an index would silently point at a different week.
-const shiftKey = (shift: UpcomingShift) => `${shift.slot ?? DEFAULT_SLOT}:${shift.startMicros}`;
+const shiftKey = (shift: UpcomingShift) => `${shift.rotationId}:${shift.startMicros}`;
 
-/// Keyed by slot AND instant: two slots hand over at the same moment, so the
-/// instant alone collapses a primary week and a secondary week onto one entry.
+/// Keyed by ROTATION and instant: two rotations hand over at the same moment,
+/// so the instant alone collapses a primary week and a secondary week onto one
+/// entry.
 const shiftByKey = computed(() => {
   const map = new Map<string, UpcomingShift>();
   for (const shift of props.shifts) map.set(shiftKey(shift), shift);
   return map;
 });
 
-const slotOptions = computed(() =>
-  props.slots.map((slot) => ({ label: raw(slot), value: slot })),
+const rotationOptions = computed(() =>
+  props.rotations.map((rotation) => ({ label: raw(rotation.name), value: rotation.id })),
 );
 
-/// The slot rides the label whenever the team staffs more than one: two weeks
-/// with the same dates and different pools are otherwise indistinguishable in
-/// the picker, and picking the wrong one writes a cover on the wrong rotation.
+/// The rotation rides the label whenever the team staffs more than one: two
+/// weeks with the same dates and different positions are otherwise
+/// indistinguishable in the picker, and picking the wrong one writes a cover on
+/// the wrong rotation.
 const shiftLabel = (shift: UpcomingShift): I18nText =>
-  t(props.slots.length > 1 ? "oncall.swapShiftOptionInSlot" : "oncall.swapShiftOption", {
+  t(props.rotations.length > 1 ? "oncall.swapShiftOptionInRotation" : "oncall.swapShiftOption", {
     name: raw(shift.member),
-    slot: raw(shift.slot ?? DEFAULT_SLOT),
+    rotation: raw(shift.rotationName),
     range: raw(
       `${formatInZone(shift.startMicros, props.timezone, {
         weekday: "short",
@@ -426,9 +457,10 @@ const swapProblem = computed<I18nText | "">(() => {
   const pair = swapPair.value;
   if (!pair) return "";
   if (shiftKey(pair.first) === shiftKey(pair.second)) return t("oncall.swapSameShift");
-  // Trading across slots is not a swap: it moves the pager between two pools
-  // that are on call at the same time, leaving one of them staffed twice.
-  if (!sameSlot(pair.first.slot, pair.second.slot)) return t("oncall.swapCrossSlot");
+  // Trading across rotations is not a swap: it moves the pager between two
+  // positions that are on call at the same time, leaving one of them staffed
+  // twice and the other with a gap.
+  if (pair.first.rotationId !== pair.second.rotationId) return t("oncall.swapCrossRotation");
   // Trading a week with yourself writes two covers that change nothing.
   if (pair.first.member === pair.second.member) return t("oncall.swapSamePerson");
   return "";
@@ -462,21 +494,21 @@ function submitSwap() {
   const pair = swapPair.value;
   if (!pair || swapProblem.value) return;
   emit("swap", {
-    // Each cover names the person taking the OTHER one's shift, and lands in
-    // the slot that shift belongs to — a cover with no slot goes to the
-    // default one, which on a two-slot team evicts the primary holder.
+    // Each cover names the person taking the OTHER one's shift, and lands on
+    // the rotation that shift belongs to — a cover with no rotation goes to the
+    // primary, which on a two-rotation team evicts whoever held it.
     first: {
       user_email: pair.second.member,
       start_at: pair.first.startMicros,
       end_at: pair.first.endMicros,
-      slot: pair.first.slot,
+      rotation_id: pair.first.rotationId,
       covering_for: pair.first.member,
     },
     second: {
       user_email: pair.first.member,
       start_at: pair.second.startMicros,
       end_at: pair.second.endMicros,
-      slot: pair.second.slot,
+      rotation_id: pair.second.rotationId,
       covering_for: pair.second.member,
     },
   });
@@ -500,7 +532,7 @@ function onSubmit(value: OnCallCoverFormValues) {
     user_email: String(value.user_email ?? ""),
     start_at: window.from,
     end_at: window.to,
-    slot: String(value.slot ?? "") || undefined,
+    rotation_id: String(value.rotation_id ?? "") || undefined,
   });
 }
 </script>

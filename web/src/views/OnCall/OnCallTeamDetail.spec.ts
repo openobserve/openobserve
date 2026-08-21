@@ -89,6 +89,22 @@ function render() {
   return mount(OnCallTeamDetail, { global: { plugins: [i18n, store], stubs } });
 }
 
+/// A rotation with one ordinary rule — what almost every team has. The id is
+/// the handle: a level stores it, a lane keys on it, and a delete is written
+/// against it, because two rotations may share a name.
+const rotation = (id: string, name: string) => ({
+  id,
+  name,
+  shift_rules: [
+    {
+      name,
+      members: ["ana@o2.ai"],
+      shift_micros: 604_800_000_000,
+      anchor_micros: 0,
+    },
+  ],
+});
+
 describe("OnCallTeamDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -574,18 +590,25 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
 
       const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
-      expect(editor.props("intent")).toEqual({ mode: "edit", name: "Primary" });
+      expect(editor.props("intent")).toEqual({ mode: "edit", id: "Primary" });
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
     });
 
     /// Until the lane menu carried it, a rotation could be created and never
     /// removed: the only delete control lived in the bulk table, which
     /// `drawer-only` — the mode this tab has always used — does not render.
+    /// The lane emits the rotation's ID; the prompt has to name it. Two
+    /// rotations in one team routinely differ by one word, and deleting the
+    /// wrong one silently stops paging — but a name cannot key the delete,
+    /// because two of them may share it.
     it("deletes a rotation by saving the schedule without it", async () => {
       service.setSchedule.mockResolvedValue({ data: {} });
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as any);
       const wrapper = await openSchedule();
 
-      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "Primary");
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
       await flushPromises();
 
       // BY TITLE, not `findComponent`: the presets dialog mounts a ConfirmDialog
@@ -768,14 +791,6 @@ describe("OnCallTeamDetail", () => {
   /// drew a secondary lane it could never fill, then said so. The data was
   /// there the whole time; nothing asked for it.
   describe("the resolved timeline", () => {
-    const rotation = (slot: string, name: string) => ({
-      name,
-      slot,
-      members: ["ana@o2.ai"],
-      shift_micros: 604_800_000_000,
-      anchor_micros: 0,
-    });
-
     /// The timeline owns the visible range and the fetch follows it, so
     /// nothing is asked for until it has said which week it is showing.
     async function showWeek(wrapper: any) {
@@ -787,11 +802,14 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
     }
 
-    it("asks once per staffed slot", async () => {
+    /// The endpoint resolves ONE rotation per call, so a team with two needs
+    /// two — asking once got primary segments only, and every other rotation
+    /// was drawn a lane it could never fill.
+    it("asks once per rotation", async () => {
       service.getSchedule.mockResolvedValue({
         data: {
           timezone: "UTC",
-          rotations: [rotation("primary", "Primary"), rotation("secondary", "Backup")],
+          rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
         },
       } as any);
 
@@ -799,19 +817,19 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
       await showWeek(wrapper);
 
-      const asked = service.resolvedSchedule.mock.calls.map((call: any) => call[0].slot);
-      expect(asked).toContain("primary");
-      expect(asked).toContain("secondary");
+      const asked = service.resolvedSchedule.mock.calls.map((call: any) => call[0].rotation_id);
+      expect(asked).toContain("rot_primary");
+      expect(asked).toContain("rot_backup");
     });
 
-    /// The default slot may answer without echoing its own name, and a lane
-    /// keyed on an absent field matches nothing.
-    it("stamps the slot it asked for onto the segments that come back", async () => {
+    /// The primary may answer without echoing its own id, and a lane keyed on
+    /// an absent field matches nothing.
+    it("stamps the rotation it asked for onto the segments that come back", async () => {
       service.getSchedule.mockResolvedValue({
-        data: { timezone: "UTC", rotations: [rotation("secondary", "Backup")] },
+        data: { timezone: "UTC", rotations: [rotation("rot_backup", "Backup")] },
       } as any);
       service.resolvedSchedule.mockResolvedValue({
-        data: [{ from: 0, to: 1, rotation: "Backup", user_email: "ana@o2.ai" }],
+        data: [{ from: 0, to: 1, rotation: "Base", user_email: "ana@o2.ai" }],
       } as any);
 
       const wrapper = render();
@@ -821,18 +839,22 @@ describe("OnCallTeamDetail", () => {
       const drawn = wrapper
         .findComponent({ name: "OnCallScheduleTimeline" })
         .props("segments") as any[];
-      expect(drawn[0].slot).toBe("secondary");
+      expect(drawn[0].rotation_id).toBe("rot_backup");
     });
 
-    /// A team with no schedule still has a primary to ask about.
-    it("falls back to the default slot when nothing is staffed", async () => {
+    /// **A team with no rotations has no position to be unstaffed.** It answers
+    /// `[]` rather than one long gap, so asking at all spends a call to learn
+    /// nothing — and the old fallback asked about a "primary" slot that no
+    /// longer exists as a keyword.
+    it("asks nothing at all when the team has no rotations", async () => {
       const wrapper = render();
       await flushPromises();
       await showWeek(wrapper);
 
-      expect(service.resolvedSchedule).toHaveBeenCalledWith(
-        expect.objectContaining({ slot: "primary" }),
-      );
+      expect(service.resolvedSchedule).not.toHaveBeenCalled();
+      expect(
+        wrapper.findComponent({ name: "OnCallScheduleTimeline" }).props("segments"),
+      ).toEqual([]);
     });
   });
 });

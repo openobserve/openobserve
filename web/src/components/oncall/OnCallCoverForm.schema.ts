@@ -31,9 +31,10 @@ export const makeOnCallCoverSchema = (t: TranslateFn, now: () => number = () => 
   z
     .object({
       user_email: z.string().min(1, t("oncall.coverWhoRequired")),
-      // Which rotation the cover lands on. Absent means the default slot,
-      // which is what every cover meant before slots existed.
-      slot: z.string().optional(),
+      // Which rotation the cover lands on, by id. Absent means the team's
+      // primary — which on a multi-rotation team evicts whoever held it, so the
+      // form fills it in rather than letting it default silently.
+      rotation_id: z.string().optional(),
       // What OFormDateTimeRange carries: micros, matching every other instant
       // on this API, alongside the picker's own `type`/`period` bookkeeping.
       window: z.object(

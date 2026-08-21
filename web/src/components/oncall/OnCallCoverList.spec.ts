@@ -203,20 +203,25 @@ describe("OnCallCoverList", () => {
     });
   });
 
-  /// The slot chip answers "which rotation is this standing over", which is
-  /// not a question a one-slot team can ask.
-  it("names the slot only where the team staffs more than one", async () => {
+  /// The chip answers "which rotation is this standing over", which is not a
+  /// question a one-rotation team can ask. It shows the rotation's NAME from
+  /// its stored id — printing the id would be an identifier nobody can look up.
+  it("names the rotation only where the team staffs more than one", async () => {
     service.listOverrides.mockResolvedValue({
-      data: [cover({ slot: "secondary" })],
+      data: [cover({ rotation_id: "rot_secondary" })],
     } as any);
 
-    const one = render({ slots: ["primary"] });
+    const rotations = [
+      { id: "rot_primary", name: "Primary", shift_rules: [] },
+      { id: "rot_secondary", name: "Secondary", shift_rules: [] },
+    ];
+    const one = render({ rotations: [rotations[0]] });
     await flushPromises();
-    expect(one.text()).not.toContain("secondary");
+    expect(one.text()).not.toContain("Secondary");
 
-    const two = render({ slots: ["primary", "secondary"] });
+    const two = render({ rotations });
     await flushPromises();
-    expect(two.text()).toContain("secondary");
+    expect(two.text()).toContain("Secondary");
   });
 
   /// A cover list that cannot load is not worth an error over the calendar it

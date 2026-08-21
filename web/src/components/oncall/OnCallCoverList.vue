@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Which rotation it stands over. Only when the team staffs more
                than one — otherwise it is the answer to a question nobody on
                this team can ask. -->
-          <OTag v-if="slots.length > 1" variant="default-soft" size="xs">
-            {{ raw(row.slot ?? DEFAULT_SLOT) }}
+          <OTag v-if="rotations.length > 1" variant="default-soft" size="xs">
+            {{ rotationName(row.rotation_id) }}
           </OTag>
         </span>
       </template>
@@ -131,8 +131,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import oncallService from "@/services/oncall";
-import type { Override } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT } from "@/ts/interfaces/oncall";
+import type { Override, Rotation } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatInZone } from "@/utils/oncall";
 
@@ -146,15 +145,26 @@ const props = withDefaults(
      * half-specified window rather than quietly answering the unfiltered list.
      */
     window?: { from: number; to: number } | null;
-    /** Staffed slots, so the slot chip appears only where there is a choice. */
-    slots?: string[];
+    /**
+     * The team's rotations, so the chip naming one appears only where there is
+     * a choice — and so an id can be shown as the name somebody recognises.
+     */
+    rotations?: Rotation[];
   }>(),
-  { timezone: "UTC", window: null, slots: () => [] },
+  { timezone: "UTC", window: null, rotations: () => [] },
 );
 
 const emit = defineEmits<{ changed: [] }>();
 
 const { t } = useI18nTyped();
+
+/// A cover stores the rotation's **id**; the chip has to show the name. An
+/// unknown id is a rotation the team has deleted since — worth saying rather
+/// than printing an identifier nobody can look up.
+function rotationName(rotationId: string) {
+  const found = props.rotations.find((rotation) => rotation.id === rotationId);
+  return found ? raw(found.name) : t("oncall.coverRotationGone");
+}
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 

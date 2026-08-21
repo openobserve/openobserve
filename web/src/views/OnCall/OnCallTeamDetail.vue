@@ -275,7 +275,7 @@
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
               :window="scheduleWindow"
-              :slots="teamSlots"
+              :rotations="teamRotations"
               @changed="fetchSegments"
             />
 
@@ -340,7 +340,7 @@
               :priority="selectedPriorityNumber"
               :team-id="teamId"
               :policy="policy"
-              :slots="teamSlots"
+              :rotations="teamRotations"
               @saved="onPolicySaved"
             />
           </OContent>
@@ -378,7 +378,7 @@
       :gap="coverGap"
       :default-user="coverDefaultUser"
       :shifts="swappableShifts"
-      :slots="teamSlots"
+      :rotations="teamRotations"
       @save="saveCover"
       @swap="saveSwap"
     />
@@ -403,6 +403,7 @@ import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
 import OnCallScheduleAnswer from "@/components/oncall/OnCallScheduleAnswer.vue";
 import OnCallCoverList from "@/components/oncall/OnCallCoverList.vue";
+import type { UpcomingShift } from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallSchedulePresets from "@/components/oncall/OnCallSchedulePresets.vue";
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
@@ -435,9 +436,9 @@ import type {
   TeamReachability,
   ScheduleEditorIntent,
 } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, MICROS_PER_DAY, sameSlot, staffedSlots } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone, isOnCallUnavailable, upcomingShifts, winningRotation } from "@/utils/oncall";
+import { formatInZone, isOnCallUnavailable, upcomingShifts, winningRule } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -836,19 +837,16 @@ async function fetchSegments() {
 
 /// The gap the chart offered to fill pre-fills the window, so the common case
 /// is choosing a person and pressing save.
-/// The pool a secondary rotation staffs. Lower-cased at the comparison, so it
-/// does not depend on somebody spelling it the way the ladder does.
-const SECONDARY_SLOT = "secondary";
-
 /// "Assign secondary" is one button with two meanings, and the difference is
 /// whether the team already has a secondary rotation to put people INTO. Both
 /// land on the same drawer, which is the point: the reader asked to staff the
 /// secondary, not to learn how this team models one.
 function onAssignSecondary() {
-  const existing = (schedule.value?.rotations ?? []).find((rotation) =>
-    sameSlot(rotation.slot, SECONDARY_SLOT),
-  );
-  openScheduleEditor(existing ? { mode: "edit", name: existing.name } : { mode: "new" });
+  // A SECOND rotation, not one spelled "secondary". The old lookup asked for a
+  // slot literally named that, so a team whose second position was called
+  // anything else was offered a create it did not need.
+  const existing = (schedule.value?.rotations ?? [])[1];
+  openScheduleEditor(existing ? { mode: "edit", id: existing.id } : { mode: "new" });
 }
 
 /// Deleting a rotation is a schedule save with one layer removed — there is no
@@ -939,22 +937,30 @@ const SWAPPABLE_SHIFTS = 8;
 /// only `rotation.slot` left the calendar asking for `?slot=primary` alone and
 /// the cover picker hidden, on every team that had never hand-built a second
 /// rotation.
-const teamSlots = computed(() => staffedSlots(schedule.value?.rotations ?? []));
+/// The team's rotations, in schedule order. Every surface that used to ask
+/// "which slots does this team staff" asks this instead — a slot could exist
+/// because something derived it, and a rotation cannot.
+const teamRotations = computed(() => schedule.value?.rotations ?? []);
 
-const swappableShifts = computed(() => {
+/// The weeks a swap can trade, one run per rotation.
+///
+/// Taken from the rotation's WINNING shift rule: that is the roster actually on
+/// duty, and it is the only sequence a cover can be written against. A rule
+/// that is out of force at `now` has no upcoming weeks to trade, and offering
+/// them would write covers over a position that rule does not staff.
+const swappableShifts = computed<UpcomingShift[]>(() => {
   const rotations = schedule.value?.rotations ?? [];
   if (!rotations.length) return [];
   const now = Date.now() * 1000;
   const zone = schedule.value?.timezone || team.value?.timezone || "UTC";
-  // `rotation.slot` only, deliberately — NOT `staffedSlots`. A swap trades two
-  // shifts on a roster, and a DERIVED secondary has no shift sequence of its
-  // own: it is the same roster read an offset further along. Offering its
-  // "weeks" would write covers against a position the rotation cannot move.
-  const slots = [...new Set(rotations.map((r) => r.slot ?? DEFAULT_SLOT))];
-  return slots.flatMap((slot) => {
-    const inSlot = rotations.filter((r) => sameSlot(r.slot, slot));
-    const current = winningRotation(inSlot, now, zone);
-    return current ? upcomingShifts(current, now, SWAPPABLE_SHIFTS) : [];
+  return rotations.flatMap((rotation) => {
+    const rule = winningRule(rotation, now, zone);
+    if (!rule) return [];
+    return upcomingShifts(rule, now, SWAPPABLE_SHIFTS).map((shift) => ({
+      ...shift,
+      rotationId: rotation.id,
+      rotationName: rotation.name,
+    }));
   });
 });
 
@@ -969,7 +975,7 @@ type SwapCover = {
   user_email: string;
   start_at: number;
   end_at: number;
-  slot?: string;
+  rotation_id?: string;
   covering_for?: string;
 };
 
@@ -1037,7 +1043,7 @@ async function saveCover(value: {
   user_email: string;
   start_at: number;
   end_at: number;
-  slot?: string;
+  rotation_id?: string;
 }) {
   coverSaving.value = true;
   try {
@@ -1053,8 +1059,10 @@ async function saveCover(value: {
     toast({ variant: "success", message: coverSavedMessage(value) });
     await refreshCoverage();
   } catch (err: any) {
-    // A 409 is the server saying somebody already covers that window — worth
-    // the reader seeing verbatim, since it names them.
+    // Two of the server's sentences are worth showing verbatim, and both name
+    // the thing that is wrong: a 409 says who already covers that window, and
+    // a 400 says the team has no such rotation — a cover over a position
+    // nothing staffs would page nobody.
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),

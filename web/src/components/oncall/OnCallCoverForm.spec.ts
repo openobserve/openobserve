@@ -21,7 +21,7 @@ import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import i18n from "@/locales";
 import { MICROS_PER_DAY, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
-import type { Shift } from "@/utils/oncall";
+import type { UpcomingShift } from "./OnCallCoverForm.vue";
 
 const FROM = 1_700_000_000_000_000;
 
@@ -134,17 +134,26 @@ const stubs = {
   },
 };
 
-function shift(member: string, index: number): Shift {
+function shift(member: string, index: number): UpcomingShift {
   return {
     member,
     startMicros: FROM + index * MICROS_PER_WEEK,
     endMicros: FROM + (index + 1) * MICROS_PER_WEEK,
+    // Every swappable week belongs to a rotation: a swap is written against the
+    // position the shift rule staffs, and two rotations hand over at the same
+    // instant, so the instant alone cannot say which week was picked.
+    rotationId: "rot_primary",
+    rotationName: "Primary",
   };
 }
 
-const SHIFTS: Shift[] = [shift("ana@o2.ai", 0), shift("bo@o2.ai", 1), shift("ana@o2.ai", 2)];
+const SHIFTS: UpcomingShift[] = [
+  shift("ana@o2.ai", 0),
+  shift("bo@o2.ai", 1),
+  shift("ana@o2.ai", 2),
+];
 
-function render(shifts: Shift[] = SHIFTS) {
+function render(shifts: UpcomingShift[] = SHIFTS) {
   return mount(OnCallCoverForm, {
     props: {
       open: true,
@@ -239,13 +248,13 @@ describe("OnCallCoverForm — swapping", () => {
     });
   });
 
-  /// A cover with no slot lands on the default one. On a two-slot team that is
+  /// A cover with no rotation lands on the primary. On a two-rotation team that is
   /// not "the rotation being traded" — it is the primary, whose holder the
   /// swap then silently evicts.
-  it("writes each cover into the slot its shift came from", async () => {
+  it("writes each cover onto the rotation its shift came from", async () => {
     const wrapper = render([
-      { ...shift("ana@o2.ai", 0), slot: "secondary" },
-      { ...shift("bo@o2.ai", 1), slot: "secondary" },
+      { ...shift("ana@o2.ai", 0), rotationId: "rot_secondary", rotationName: "Secondary" },
+      { ...shift("bo@o2.ai", 1), rotationId: "rot_secondary", rotationName: "Secondary" },
     ]);
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0);
@@ -253,16 +262,16 @@ describe("OnCallCoverForm — swapping", () => {
     await wrapper.find('[data-test="dialog-primary"]').trigger("click");
 
     const swap = wrapper.emitted("swap")?.[0]?.[0] as any;
-    expect(swap.first.slot).toBe("secondary");
-    expect(swap.second.slot).toBe("secondary");
+    expect(swap.first.rotation_id).toBe("rot_secondary");
+    expect(swap.second.rotation_id).toBe("rot_secondary");
   });
 
   /// Slots do not compete — both are on call at the same instant — so trading
   /// across them staffs one pool twice instead of exchanging anything.
-  it("refuses a swap across two slots", async () => {
+  it("refuses a swap across two rotations", async () => {
     const wrapper = render([
-      { ...shift("ana@o2.ai", 0), slot: "primary" },
-      { ...shift("bo@o2.ai", 1), slot: "secondary" },
+      { ...shift("ana@o2.ai", 0), rotationId: "rot_primary", rotationName: "Primary" },
+      { ...shift("bo@o2.ai", 1), rotationId: "rot_secondary", rotationName: "Secondary" },
     ]);
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0);
@@ -397,7 +406,7 @@ describe("OnCallCoverForm — taking a cover", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     await flushPromises();
     return wrapper.emitted("save")?.[0]?.[0] as
-      | { user_email: string; start_at: number; end_at: number; slot?: string }
+      | { user_email: string; start_at: number; end_at: number; rotation_id?: string }
       | undefined;
   }
 
