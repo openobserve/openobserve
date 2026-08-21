@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::VALUE_LABEL,
+        promql::{NAME_LABEL, VALUE_LABEL},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
@@ -304,8 +304,12 @@ fn convert_matchers_to_index_condition(
     let mut index_condition = IndexCondition::default();
     let mut is_full_convert = true;
     for mat in matchers.matchers.iter() {
+        // `__name__` already picked the stream; the stored column may hold the
+        // pre-`format_stream_name` metric name, so an index filter on it would
+        // wrongly prune every file.
         if mat.name == TIMESTAMP_COL_NAME
             || mat.name == VALUE_LABEL
+            || mat.name == NAME_LABEL
             || !index_fields.contains(&mat.name)
             || schema.field_with_name(&mat.name).is_err()
         {
