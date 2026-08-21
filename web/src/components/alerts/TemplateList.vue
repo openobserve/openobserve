@@ -439,6 +439,7 @@ const getTemplates = (force = false) => {
     .finally(() => {
       dismiss();
       loading.value = false;
+      fetching.value = false;
     });
 };
 const updateRoute = () => {

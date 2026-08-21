@@ -385,6 +385,7 @@ export default defineComponent({
         .finally(() => {
           dismiss();
           loading.value = false;
+          fetching.value = false;
         });
     };
     const getTemplates = () => {
