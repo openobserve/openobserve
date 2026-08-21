@@ -357,6 +357,7 @@
               v-model:selected="selectedPriority"
               :priorities="overview?.rungs ?? []"
               :policy="policy"
+              :rotations="teamRotations"
               :preview="preview"
               :loading="previewLoading"
               @edit="editingPolicy = true"

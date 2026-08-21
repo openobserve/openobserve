@@ -23,6 +23,7 @@ import type {
   OnCallPolicy,
   PreviewL0,
   PreviewRecipient,
+  Rotation,
   TeamRungSummary,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_MINUTE } from "@/ts/interfaces/oncall";
@@ -52,6 +53,14 @@ const person = (over: Partial<PreviewRecipient> = {}): PreviewRecipient => ({
   deliverable_channels: ["email"],
   ...over,
 });
+
+const rotation: Rotation = {
+  id: "rot_1",
+  name: "Primary",
+  shift_rules: [
+    { name: "Base", members: ["ana@o2.ai"], shift_micros: MICROS_PER_MINUTE, anchor_micros: 0 },
+  ],
+};
 
 const l0 = (over: Partial<PreviewL0> = {}): PreviewL0 => ({
   mode: "gate",
@@ -506,5 +515,45 @@ describe("OnCallEscalationLadder", () => {
       "Triaged alongside",
     );
     expect(wrapper.find('[data-test="oncall-ladder-l0-gate"]').exists()).toBe(false);
+  });
+
+  /// A policy minted at create_team, before the team had members, took the
+  /// whole-team fallback and nothing revisited it. Rotations plus an
+  /// all-whole_team ladder is only ever that bug.
+  it("names the stale default ladder when every level pages the whole team", () => {
+    const wholeTeam = {
+      ...sharedPolicy,
+      rungs: sharedPolicy.rungs.map((rung) => ({
+        ...rung,
+        steps: [{ after_micros: 0, targets: [{ kind: "whole_team" as const }] }],
+      })),
+    };
+    const wrapper = render({ policy: wholeTeam, rotations: [rotation] });
+
+    expect(wrapper.find('[data-test="oncall-ladder-stale-default"]').text()).toContain(
+      "created before they existed",
+    );
+  });
+
+  /// A team with no rotations has nobody but "everyone" to page, so the same
+  /// ladder is the only correct one and naming it a bug would be wrong.
+  it("says nothing about a whole-team ladder on a team with no rotations", () => {
+    const wholeTeam = {
+      ...sharedPolicy,
+      rungs: sharedPolicy.rungs.map((rung) => ({
+        ...rung,
+        steps: [{ after_micros: 0, targets: [{ kind: "whole_team" as const }] }],
+      })),
+    };
+    const wrapper = render({ policy: wholeTeam, rotations: [] });
+
+    expect(wrapper.find('[data-test="oncall-ladder-stale-default"]').exists()).toBe(false);
+  });
+
+  /// One level naming a rotation means the adoption ran.
+  it("says nothing when a level already names a rotation", () => {
+    const wrapper = render({ policy: sharedPolicy, rotations: [rotation] });
+
+    expect(wrapper.find('[data-test="oncall-ladder-stale-default"]').exists()).toBe(false);
   });
 });

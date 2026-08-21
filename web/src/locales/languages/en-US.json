@@ -13460,6 +13460,8 @@
     "ladderL0Gate": "Held for triage",
     "ladderL0Parallel": "Triaged alongside",
     "ladderL0Only": "Triaged, nobody paged",
+    "ladderStaleDefaultTag": "Ladder never learned the rotations",
+    "ladderStaleDefaultHint": "Every level pages the whole team, but this team has rotations \u2014 the ladder was created before they existed. Adding or removing a member re-runs the default, or edit the ladder once by hand.",
     "ladderEndsStops": "Escalation stops",
     "ladderEndsHandsOff": "The page hands off",
     "reachShortNoSmtp": "email only · no SMTP transport",

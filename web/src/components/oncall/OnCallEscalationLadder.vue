@@ -48,6 +48,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OInnerLoading v-if="loading" showing />
 
     <template v-else>
+      <!-- Every level of every priority aimed at the whole team, on a team that
+         HAS rotations, is only ever one thing: a policy minted before the team
+         had members, so before there were rotation ids for a level to name. -->
+      <span
+        v-if="staleDefaultLadder"
+        class="border-border-default bg-surface-subtle rounded-surface flex flex-wrap items-baseline gap-x-2 gap-y-1 border p-3"
+        data-test="oncall-ladder-stale-default"
+      >
+        <OTag variant="warning-soft" size="sm">{{ t("oncall.ladderStaleDefaultTag") }}</OTag>
+        <span class="text-text-secondary text-xs">{{ t("oncall.ladderStaleDefaultHint") }}</span>
+      </span>
+
       <!-- L0 rides above the rail rather than on it: the agent starts when the
          record opens, so it is not a rung with a delay of its own. The server's
          sentence carries whether anything waits — for `parallel` nothing does. -->
@@ -149,6 +161,7 @@ import type {
   EscalationPreview,
   OnCallPolicy,
   PreviewRung,
+  Rotation,
   TeamRungSummary,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
@@ -162,6 +175,9 @@ const props = withDefaults(
     priorities?: TeamRungSummary[];
     /** The stored policy, read only to tell which priorities share a ladder. */
     policy?: OnCallPolicy | null;
+    /** The team's rotations — read only to tell the stale default apart from
+     *  a team that genuinely has nobody but "everyone". */
+    rotations?: Rotation[];
     selected?: string;
     preview?: EscalationPreview | null;
     loading?: boolean;
@@ -169,6 +185,7 @@ const props = withDefaults(
   {
     priorities: () => [],
     policy: null,
+    rotations: () => [],
     selected: "P1",
     preview: null,
     loading: false,
@@ -313,6 +330,17 @@ const l0ModeLabel = computed<I18nText>(() => {
     default:
       return t("oncall.ladderL0Parallel");
   }
+});
+
+/// A team's policy is minted at create_team — before it has members, so before
+/// it has rotations, so before there are ids for a level to name. It took the
+/// whole-team fallback and, on a row created before 2026-08-21, nothing
+/// revisited it. Rotations plus an all-whole_team ladder is only ever that.
+const staleDefaultLadder = computed(() => {
+  if (!props.rotations.length) return false;
+  const steps = (props.policy?.rungs ?? []).flatMap((rung) => rung.steps);
+  if (!steps.length) return false;
+  return steps.every((step) => step.targets.every((target) => target.kind === "whole_team"));
 });
 
 /// Kept so the template reads the prop rather than reaching through `props`.
