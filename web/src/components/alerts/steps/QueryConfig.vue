@@ -2578,9 +2578,17 @@ export default defineComponent({
      * NEITHER option selected — which looks broken and hides the alert's
      * actual (simple) behaviour. Writing the explicit `false` costs nothing:
      * the API skips serializing it, so this never turns into a stored change.
+     *
+     * A saved Simple SQL alert reads `null` here instead of `undefined`: it
+     * saves with `aggregation: null` (alertPayload.ts, no picker means
+     * nothing to keep), and TanStack Form's path getter short-circuits to
+     * `null` — not `undefined` — the moment it walks through a `null`
+     * intermediate (`aggregation`), before it ever reaches `multi_alert`.
+     * `=== undefined` alone misses that case and leaves the radio unset.
      */
     const normalizeMultiAlertFlag = () => {
-      if (fv("query_condition.aggregation.multi_alert") === undefined) {
+      const current = fv("query_condition.aggregation.multi_alert");
+      if (current === undefined || current === null) {
         setFV("query_condition.aggregation.multi_alert", false);
       }
     };
