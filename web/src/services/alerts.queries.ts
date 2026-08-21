@@ -43,6 +43,32 @@ export const alertsListQuery = (
     refetchOnWindowFocus: true,
   });
 
+/**
+ * The dependency graph's alert read: every folder, with the destination and
+ * template refs the default path omits. Cached so the graph shares one entry
+ * across the alert, destination and template pages instead of re-downloading
+ * the org's full alert list per page.
+ */
+export const alertDependenciesQuery = (org: string) =>
+  queryOptions({
+    queryKey: alertKeys.dependencies(org),
+    queryFn: async (): Promise<any[]> => {
+      const res = await alerts.listByFolderId(
+        1,
+        0,
+        "name",
+        false,
+        "",
+        org,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
+      return res.data?.list ?? res.data ?? [];
+    },
+  });
+
 export const alertDetailQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: alertKeys.detail(org, id),

@@ -34,6 +34,8 @@ export const alertKeys = {
         })
       : orgKey(org, "alerts", "list", folderId, alertType || "all"),
   detail: (org: string, id: string) => orgKey(org, "alerts", "detail", id),
+  /** Every folder's alerts with their destination/template refs — the dep graph. */
+  dependencies: (org: string) => orgKey(org, "alerts", "dependencies"),
   historyAll: (org: string) => orgKey(org, "alerts", "history"),
   history: (org: string, query: AlertHistoryQuery) =>
     orgKey(
