@@ -46,7 +46,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Cancel runs stuck waiting for an EKS runner
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           # Comma-separated workflow file names to police (all use eks-openobserve-* runners).
           # Release workflows are intentionally excluded — a stuck release build is left for a human.
