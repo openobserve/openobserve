@@ -207,7 +207,7 @@ async fn read_queries_window(
     let limit = q
         .limit
         .unwrap_or(DEFAULT_QUERIES_LIMIT)
-        .min(MAX_QUERIES_LIMIT);
+        .clamp(1, MAX_QUERIES_LIMIT);
     hits.truncate(limit);
 
     let freshness = Freshness {
