@@ -164,13 +164,51 @@ describe("groupNavLinks", () => {
     expect(reliability?.item.link).toBe("/alerts");
     expect(reliability?.children.map((c) => c.name)).toEqual([
       "alertList",
-      "sloList",
-      "incidentList",
-      "alertLibrary",
       "alertDestinations",
       "alertTemplates",
+      "alertLibrary",
+      "sloList",
+      "incidentList",
       "alertSources",
     ]);
+  });
+
+  it("orders the alerting children exactly as their peer tabs, under one header", () => {
+    // The four alerting pages carry a tab strip in the same order. The flyout
+    // and that strip are the same navigation seen twice, so a different order
+    // in each makes the rail feel like a different place from the page.
+    const entries = groupNavLinks([link("home"), link("alertList")]);
+    const reliability = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "reliability",
+    );
+    const alerting = reliability?.children.filter((c) => c.categoryKey === "menu.alerts");
+    expect(alerting?.map((c) => c.name)).toEqual([
+      "alertList",
+      "alertDestinations",
+      "alertTemplates",
+      "alertLibrary",
+    ]);
+    // The header is a key, not a literal: the rail ships in 15 locales and a
+    // raw English string here would be the only untranslated thing in it.
+    expect(alerting?.every((c) => c.categoryKey === "menu.alerts")).toBe(true);
+  });
+
+  it("leaves SLOs, Incidents and Sources outside the Alerts header", () => {
+    // They are Reliability's other concerns, not alerting configuration —
+    // filing them under an "Alerts" heading would misfile them.
+    const entries = groupNavLinks([
+      link("home"),
+      link("alertList"),
+      link("sloList"),
+      link("incidentList"),
+    ]);
+    const reliability = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "reliability",
+    );
+    const outside = reliability?.children.filter((c) => !c.categoryKey).map((c) => c.name);
+    expect(outside).toEqual(["sloList", "incidentList", "alertSources"]);
   });
 
   it("drops Incidents from Reliability on OSS (no incidents route)", () => {
@@ -182,10 +220,10 @@ describe("groupNavLinks", () => {
     );
     expect(reliability?.children.map((c) => c.name)).toEqual([
       "alertList",
-      "sloList",
-      "alertLibrary",
       "alertDestinations",
       "alertTemplates",
+      "alertLibrary",
+      "sloList",
     ]);
   });
 
@@ -198,9 +236,9 @@ describe("groupNavLinks", () => {
     );
     expect(reliability?.children.map((c) => c.name)).toEqual([
       "alertList",
-      "alertLibrary",
       "alertDestinations",
       "alertTemplates",
+      "alertLibrary",
     ]);
   });
 

@@ -45,7 +45,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, type LocationQueryRaw } from "vue-router";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import config from "@/aws-exports";
@@ -124,19 +124,24 @@ const visibleChildren = computed(() =>
 // changes (mirrors the sub-page's grouped section nav). Items with no category
 // render flat (e.g. the Data group).
 type Row =
-  | { kind: "header"; key: string; label: string }
-  | { kind: "item"; key: string; child: SubnavChild };
+  | { kind: "header"; key: string; labelKey: I18nKey }
+  | { kind: "item"; key: string; child: SubnavChild; spaced?: boolean };
 const flyoutRows = computed<Row[]>(() => {
   const rows: Row[] = [];
-  let lastCat: string | undefined;
+  let lastCat: I18nKey | undefined;
   for (const child of visibleChildren.value) {
-    if (child.category && child.category !== lastCat) {
-      rows.push({ kind: "header", key: `h-${child.category}`, label: child.category });
-      lastCat = child.category;
-    } else if (!child.category) {
+    // An item that LEAVES a headed run needs a gap, or it reads as the last
+    // member of that run: a header owns everything below it until something
+    // says otherwise, and at the same indent nothing else does.
+    let spaced = false;
+    if (child.categoryKey && child.categoryKey !== lastCat) {
+      rows.push({ kind: "header", key: `h-${child.categoryKey}`, labelKey: child.categoryKey });
+      lastCat = child.categoryKey;
+    } else if (!child.categoryKey) {
+      spaced = lastCat !== undefined;
       lastCat = undefined;
     }
-    rows.push({ kind: "item", key: `i-${child.name}-${child.tab ?? ""}`, child });
+    rows.push({ kind: "item", key: `i-${child.name}-${child.tab ?? ""}`, child, spaced });
   }
   return rows;
 });
@@ -442,8 +447,9 @@ function onChildMouseenter(event: MouseEvent) {
             v-if="row.kind === 'header'"
             class="text-2xs text-tabs-inactive-text px-3 pb-1 font-medium"
             :class="rowIndex === 0 ? 'pt-2' : 'pt-4'"
+            :data-test="`nav-group-section-${row.key}`"
           >
-            {{ row.label }}
+            {{ t(row.labelKey) }}
           </div>
           <router-link
             v-else
@@ -453,6 +459,9 @@ function onChildMouseenter(event: MouseEvent) {
             class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2"
             :class="[
               flyoutTextClass,
+              // Matches the pt-4 a header gets, so leaving a run and starting
+              // one look like the same size of break.
+              row.spaced ? 'mt-3' : '',
               isChildActive(row.child)
                 ? 'bg-select-item-selected-bg font-medium'
                 : 'hover:bg-dropdown-item-hover-bg',

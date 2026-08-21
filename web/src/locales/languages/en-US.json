@@ -7405,9 +7405,9 @@
     "impactDestination": "Used by {alerts}"
   },
   "alert_library": {
-    "header": "Alert Library",
+    "header": "Alerts Library",
     "subtitle": "Curated, ready-to-install alerts, matched against the data you already ingest",
-    "sectionTab": "Library",
+    "sectionTab": "Alerts Library",
     "contribute": "Contribute on GitHub",
     "searchPlaceholder": "Search by name, description or stream",
     "searchLabel": "Search the alert library",

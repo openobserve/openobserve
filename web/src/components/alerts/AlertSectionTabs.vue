@@ -77,12 +77,6 @@ const sections = computed<Section[]>(() => {
       to: { name: "alertList", query },
     },
     {
-      key: "alertLibrary",
-      label: t("alert_library.sectionTab"),
-      icon: "menu-book",
-      to: { name: "alertLibrary", query },
-    },
-    {
       key: "alertDestinations",
       label: t("alert_destinations.sectionTab"),
       icon: "location-on",
@@ -93,6 +87,14 @@ const sections = computed<Section[]>(() => {
       label: t("alert_templates.header"),
       icon: "description",
       to: { name: "alertTemplates", query },
+    },
+    // Last: the catalog is where you go once to fetch an alert, not where you
+    // work. The rail's Reliability flyout lists these four in this same order.
+    {
+      key: "alertLibrary",
+      label: t("alert_library.sectionTab"),
+      icon: "menu-book",
+      to: { name: "alertLibrary", query },
     },
   ];
 });

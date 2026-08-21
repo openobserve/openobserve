@@ -41,9 +41,11 @@ describe("AlertSectionTabs", () => {
   });
 
   it("renders the four sibling sections in workflow order", () => {
+    // Library last: it is where you go once to fetch an alert, not where you
+    // work. The rail's Reliability flyout lists the same four in this order.
     const wrapper = mountTabs();
     const labels = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
-    expect(labels).toEqual(["Alerts", "Library", "Destinations", "Templates"]);
+    expect(labels).toEqual(["Alerts", "Destinations", "Templates", "Alerts Library"]);
   });
 
   it("marks the tab for the current route active", async () => {
