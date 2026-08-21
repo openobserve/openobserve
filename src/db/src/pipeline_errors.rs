@@ -33,16 +33,18 @@ pub async fn upsert(
     timestamp: i64,
     error_data: &PipelineError,
 ) -> Result<(), infra::errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = infra::table::get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // Serialize node_errors to JSON
+    // Serialize node_errors to JSON before taking the write lock
     let node_errors_json = if !error_data.node_errors.is_empty() {
         Some(serde_json::to_value(&error_data.node_errors)?)
     } else {
         None
     };
+
+    // make sure only one client is writing to the database(only for sqlite);
+    // taken before the existence check so the read-modify-write is serialized
+    let _lock = infra::table::get_lock().await;
 
     // Check if record exists
     let existing = PipelineLastErrors::find_by_id(pipeline_id)
@@ -130,13 +132,32 @@ pub async fn batch_upsert(
     // Collapse repeats and fix the row order so concurrently flushing nodes can't deadlock
     let errors = dedup_and_sort(errors);
 
+    // Serialize node_errors to JSON before taking the write lock: pure CPU
+    // work has no business inside the serialized critical section
+    let mut errors_json = Vec::with_capacity(errors.len());
+    for (pipeline_id, pipeline_name, org_id, timestamp, error_data) in errors {
+        let node_errors_json = if !error_data.node_errors.is_empty() {
+            Some(serde_json::to_value(&error_data.node_errors)?)
+        } else {
+            None
+        };
+        errors_json.push((
+            pipeline_id,
+            pipeline_name,
+            org_id,
+            timestamp,
+            error_data,
+            node_errors_json,
+        ));
+    }
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = infra::table::get_lock().await;
     let txn = client.begin().await?;
 
     // Collect all pipeline_ids to check which exist
-    let pipeline_ids: Vec<&str> = errors.iter().map(|(id, ..)| id.as_str()).collect();
+    let pipeline_ids: Vec<&str> = errors_json.iter().map(|(id, ..)| id.as_str()).collect();
 
     let existing_records = PipelineLastErrors::find()
         .filter(pipeline_last_errors::Column::PipelineId.is_in(pipeline_ids))
@@ -152,14 +173,8 @@ pub async fn batch_upsert(
 
     let now = now_micros();
 
-    for (pipeline_id, pipeline_name, org_id, timestamp, error_data) in errors {
-        // Serialize node_errors to JSON
-        let node_errors_json = if !error_data.node_errors.is_empty() {
-            Some(serde_json::to_value(&error_data.node_errors)?)
-        } else {
-            None
-        };
-
+    for (pipeline_id, pipeline_name, org_id, timestamp, error_data, node_errors_json) in errors_json
+    {
         if let Some(existing) = existing_map.get(&pipeline_id) {
             // Check if error content has actually changed
             let error_changed = existing.error_summary != error_data.error

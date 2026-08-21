@@ -27,8 +27,14 @@ use crate::{
 /// Upserts: if the row exists, adds delta to usage_count; otherwise inserts with
 /// usage_count = delta. Uses sea_orm's on_conflict for atomic upserts.
 pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), sea_orm::DbErr> {
+    if records.is_empty() {
+        return Ok(());
+    }
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = super::get_lock().await;
+    // one transaction for the whole batch so the write lock is held for a
+    // single commit instead of one autocommit round-trip per record
+    let txn = db.begin().await?;
     let now = config::utils::time::now_micros();
 
     for (org_id, feature, delta) in records {
@@ -58,9 +64,10 @@ pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), 
                 .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
                 .to_owned(),
             )
-            .exec(db)
+            .exec(&txn)
             .await?;
     }
+    txn.commit().await?;
     Ok(())
 }
 

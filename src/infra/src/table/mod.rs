@@ -143,6 +143,14 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
 
 /// Acquires a lock on the SQLite client if SQLite is configured as the meta store.
 ///
+/// The guard wraps one process-wide, non-reentrant mutex serializing every
+/// SQLite write (raw meta-store puts, the coordinator, scheduler backends, and
+/// all ORM table writers). Acquire it at most once per call chain: the function
+/// that owns the write or transaction takes it; helpers that receive an open
+/// transaction must not. Drop the guard before calling anything that acquires
+/// it internally (coordinator emits, `db::scheduler` calls, other table write
+/// functions) — a nested acquisition deadlocks the process.
+///
 /// # Returns
 /// - `Some(MutexGuard)` if SQLite is configured
 /// - `None` if a different store is configured

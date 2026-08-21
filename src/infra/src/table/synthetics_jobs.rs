@@ -284,7 +284,8 @@ pub async fn lease_batch<C: ConnectionTrait>(
     let limit = limit.clamp(1, MAX_LEASE_BATCH);
 
     // make sure only one client is writing to the database(only for sqlite).
-    // One lock across all three steps — the guard drops at fn end.
+    // One lock across the candidate pick and the claim; released before the
+    // read-back, which only reads rows pinned by our own stamp.
     let _lock = get_lock().await;
 
     // Step 1: pick candidate IDs.
@@ -341,6 +342,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
         .filter(Column::Status.eq(0i32))
         .exec(conn)
         .await?;
+    drop(_lock);
 
     // Step 3: return ONLY the rows THIS call actually won — pinned by our
     // (claimed_by, claimed_at) stamp. A racing agent that lost the guard above
