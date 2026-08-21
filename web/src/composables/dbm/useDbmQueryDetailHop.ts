@@ -33,6 +33,11 @@
  *     strip read to send the reader back where they came from rather than to
  *     Top queries.
  *
+ *     The origin sits LAST and under its own key. It used to travel as `from`,
+ *     which the scope one line above also writes as an absolute window's start
+ *     bound — so the marker overwrote the bound and the reader's chosen window
+ *     was silently replaced by the default. `from_tab` cannot collide with it.
+ *
  * Deliberately NOT covering the deadlocks "which service ran this" hop: it
  * pushes from a participant inside an expanded row and sends no seed at all,
  * because a deadlock event knows a fingerprint but not the statement's stats.
@@ -44,6 +49,10 @@ import type { ComputedRef, Ref } from "vue";
 import { setDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
 import type { DbmRange } from "@/composables/dbm/useDbmScope";
 import type { QueryStatsRow } from "@/services/db_monitoring";
+import {
+  DBM_ORIGIN_QUERY_KEY,
+  type DbmQueryDetailOrigin,
+} from "@/utils/dbm/queryDetailOrigin";
 
 /** What a page hands over per hop. */
 export interface DbmQueryDetailHopOptions {
@@ -65,8 +74,12 @@ export interface DbmQueryDetailHopOptions {
   /**
    * Where the reader came from. The detail page's back affordance honours it,
    * so an activity reader is not handed back to Top queries.
+   *
+   * Travels under its OWN key (`from_tab`), never `from` — that name belongs
+   * to the absolute window's start bound, and the two used to overwrite each
+   * other. See `utils/dbm/queryDetailOrigin`.
    */
-  from?: string;
+  from?: DbmQueryDetailOrigin;
 }
 
 export interface DbmQueryDetailHopContext {
@@ -97,7 +110,7 @@ export const useDbmQueryDetailHop = (context: DbmQueryDetailHopContext) => {
           org_identifier: context.route.query.org_identifier ?? context.org.value,
           ...context.queryParams.value,
           ...target,
-          ...(from ? { from } : {}),
+          ...(from ? { [DBM_ORIGIN_QUERY_KEY]: from } : {}),
         },
       })
       .catch(() => {});

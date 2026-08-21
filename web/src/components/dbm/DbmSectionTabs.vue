@@ -104,6 +104,11 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { badgeCount, countVantage, type DbmCountClaim } from "@/utils/dbm/format";
+import {
+  DBM_ORIGIN_QUERY_KEY,
+  DBM_QUERY_DETAIL_ORIGINS,
+  readDbmQueryDetailOrigin,
+} from "@/utils/dbm/queryDetailOrigin";
 
 /**
  * A badge count is either a plain number (no cap to report) or a
@@ -186,19 +191,24 @@ const ROUTE_TO_TAB: Record<string, string> = {
 
 /**
  * The detail route can be entered from four tabs, and the highlight must
- * follow the one the reader actually came from (`?from=`, set by the origin
- * page) — an Activity reader drilling into a session must not see Top queries
- * light up. Values outside this set (absent, stale, hand-edited) fall back to
- * the static map's `queries`, the detail page's natural parent.
+ * follow the one the reader actually came from (`?from_tab=`, set by the
+ * origin page) — an Activity reader drilling into a session must not see Top
+ * queries light up. Values outside the set (absent, stale, hand-edited) fall
+ * back to the static map's `queries`, the detail page's natural parent.
+ *
+ * The origins themselves live in `utils/dbm/queryDetailOrigin`, with the URL
+ * key: the marker and the absolute window's start bound both used to be
+ * spelled `from`, and reading it here off the raw query is how this strip
+ * would start lighting a tab from a timestamp again.
  */
-const DETAIL_ORIGIN_TABS = new Set(["queries", "activity", "samples", "deadlocks"]);
+const DETAIL_ORIGIN_TABS = new Set<string>(DBM_QUERY_DETAIL_ORIGINS);
 
 /**
- * The origins that can light a tab HERE. On OSS, `deadlocks` is dropped:
- * `?from=deadlocks` would otherwise light a tab that is simultaneously
- * disabled — a state OTab does not model — and it cannot be a real origin
- * anyway, because the deadlocks page is unreachable on that build. The
- * fallback below then lands on Top queries, the detail page's natural parent.
+ * The origins that can light a tab HERE. On OSS, `deadlocks` is dropped: it
+ * would otherwise light a tab that is simultaneously disabled — a state OTab
+ * does not model — and it cannot be a real origin anyway, because the
+ * deadlocks page is unreachable on that build. The fallback below then lands
+ * on Top queries, the detail page's natural parent.
  */
 const activeOriginTabs = computed(() =>
   isEnterprise.value
@@ -208,8 +218,8 @@ const activeOriginTabs = computed(() =>
 
 const activeTab = computed(() => {
   if (route.name === "dbmQueryDetail") {
-    const from = String(route.query.from ?? "");
-    if (activeOriginTabs.value.has(from)) return from;
+    const origin = readDbmQueryDetailOrigin(route.query);
+    if (origin && activeOriginTabs.value.has(origin)) return origin;
   }
   return ROUTE_TO_TAB[route.name as string] ?? "overview";
 });
@@ -283,16 +293,27 @@ const queriesVantageLabel = computed<I18nText | undefined>(() => {
 
 /**
  * Everything the user has set — filters, search, time range — rides along, so
- * the tabs read as views of ONE scope. `fingerprint`, `stream` and `from` are
- * dropped: the first two identify a single query on the detail page and mean
- * nothing on a list, and `from` records which tab opened the detail page —
+ * the tabs read as views of ONE scope. `fingerprint`, `stream` and the origin
+ * marker are dropped: the first two identify a single query on the detail page
+ * and mean nothing on a list, and the marker records which tab opened it —
  * carrying any of them would put a stale detail-page key in a table's URL.
+ *
+ * `from` is deliberately NOT dropped. It is the absolute window's start bound,
+ * and while the origin marker shared that name this destructure discarded it —
+ * so leaving the detail page on an absolute window silently reset every list
+ * to the default relative one.
  */
 const carriedQuery = computed(() => {
-  const { fingerprint, stream, from, tab, ...rest } = route.query;
+  const {
+    fingerprint,
+    stream,
+    [DBM_ORIGIN_QUERY_KEY]: origin,
+    tab,
+    ...rest
+  } = route.query;
   void fingerprint;
   void stream;
-  void from;
+  void origin;
   // `tab` is the DETAIL page's own in-page tab. It names nothing on a list, and
   // carrying it would put a stale detail-page key in every table's URL.
   void tab;

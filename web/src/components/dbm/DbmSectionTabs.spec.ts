@@ -18,6 +18,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
 
+import { DBM_ORIGIN_QUERY_KEY } from "@/utils/dbm/queryDetailOrigin";
+
 import DbmSectionTabs from "./DbmSectionTabs.vue";
 
 const push = vi.fn(() => Promise.resolve());
@@ -93,33 +95,52 @@ describe("DbmSectionTabs", () => {
     });
 
     /**
-     * Four tabs can open the detail page, and the origin travels as `?from=`.
-     * An Activity reader drilling into a session must see Activity stay lit —
-     * lighting Top queries strands them on a tab they never stood on.
+     * Four tabs can open the detail page, and the origin travels as
+     * `?from_tab=` — never `?from=`, which is the absolute window's start
+     * bound. An Activity reader drilling into a session must see Activity stay
+     * lit; lighting Top queries strands them on a tab they never stood on.
      */
     it.each([
       ["activity", "activity"],
       ["samples", "samples"],
       ["deadlocks", "deadlocks"],
       ["queries", "queries"],
-    ])("lights %s on the detail route when from=%s", (from, tabKey) => {
+    ])("lights %s on the detail route when the origin is %s", (origin, tabKey) => {
       expect(
-        mountAt("dbmQueryDetail", { from }).findComponent({ name: "OTabs" }).props("modelValue"),
+        mountAt("dbmQueryDetail", { [DBM_ORIGIN_QUERY_KEY]: origin })
+          .findComponent({ name: "OTabs" })
+          .props("modelValue"),
       ).toBe(tabKey);
     });
 
     /** A stale or hand-edited origin must not light a tab that cannot open the detail page. */
     it("falls back to Top queries on the detail route for an unknown origin", () => {
       expect(
-        mountAt("dbmQueryDetail", { from: "overview" })
+        mountAt("dbmQueryDetail", { [DBM_ORIGIN_QUERY_KEY]: "overview" })
           .findComponent({ name: "OTabs" })
           .props("modelValue"),
       ).toBe("queries");
     });
 
-    /** `from` is a detail-page key; a list tab's URL must not inherit it. */
+    /**
+     * A window bound is NOT an origin. While the two shared the `from` key a
+     * detail page opened on an absolute window lit whichever tab the
+     * timestamp failed to match — and, worse, the bound was read as a tab.
+     */
+    it("does not read an absolute window's start bound as an origin", () => {
+      expect(
+        mountAt("dbmQueryDetail", { from: "1700000000000000", to: "1700003600000000" })
+          .findComponent({ name: "OTabs" })
+          .props("modelValue"),
+      ).toBe("queries");
+    });
+
+    /** The origin is a detail-page key; a list tab's URL must not inherit it. */
     it("drops the origin marker when switching to a list tab", async () => {
-      const wrapper = mountAt("dbmQueryDetail", { from: "activity", range: "360" });
+      const wrapper = mountAt("dbmQueryDetail", {
+        [DBM_ORIGIN_QUERY_KEY]: "activity",
+        range: "360",
+      });
       await selectTab(wrapper, "overview");
       expect(push).toHaveBeenCalledWith({
         name: "dbmDatabases",
@@ -485,14 +506,14 @@ describe("DbmSectionTabs", () => {
 
     /**
      * A disabled tab that is simultaneously ACTIVE is a state OTab does not
-     * model. `?from=deadlocks` on the detail route would produce exactly that
+     * model. A `deadlocks` origin on the detail route would produce exactly that
      * on OSS, so the origin is not honoured there and the highlight falls back
      * to Top queries — the detail page's natural parent.
      */
     it("does not light the disabled deadlocks tab from a detail-page origin on OSS", () => {
       mockConfig.isEnterprise = "false";
       expect(
-        mountAt("dbmQueryDetail", { from: "deadlocks" })
+        mountAt("dbmQueryDetail", { [DBM_ORIGIN_QUERY_KEY]: "deadlocks" })
           .findComponent({ name: "OTabs" })
           .props("modelValue"),
       ).toBe("queries");
@@ -502,7 +523,7 @@ describe("DbmSectionTabs", () => {
     it("still lights deadlocks from a detail-page origin on enterprise", () => {
       mockConfig.isEnterprise = "true";
       expect(
-        mountAt("dbmQueryDetail", { from: "deadlocks" })
+        mountAt("dbmQueryDetail", { [DBM_ORIGIN_QUERY_KEY]: "deadlocks" })
           .findComponent({ name: "OTabs" })
           .props("modelValue"),
       ).toBe("deadlocks");

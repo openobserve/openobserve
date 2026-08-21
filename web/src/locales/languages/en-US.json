@@ -15240,6 +15240,15 @@
         "callersHint": "Which parts of your application ran this query, and individual slow runs you can open as a trace.",
         "callersLocked": "Individual runs come from tracing. Nothing traced this query in this time range."
       },
+      "notFound": {
+        "title": "This query isn't in this organization",
+        "description": "The address names a query {org} hasn't run in the range you're looking at. If you just switched organizations, it belongs to the one you left.",
+        "descriptionNoOrg": "The address names a query this organization hasn't run in the range you're looking at. If you just switched organizations, it belongs to the one you left.",
+        "scopeHint": "Nothing matched it in this organization, time range, and scope. If the address came from another engine or instance, clear those filters or return to the list.",
+        "missingTitle": "No query selected",
+        "missingDescription": "This page describes one query, and the address doesn't name one. If you just switched organizations, the query you were reading belongs to the one you left.",
+        "action": "Browse this organization's queries"
+      },
       "backToQueries": "Back to top queries",
       "backToActivity": "Back to activity",
       "backToSamples": "Back to slowest calls",

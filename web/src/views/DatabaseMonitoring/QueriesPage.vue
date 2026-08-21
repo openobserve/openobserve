@@ -2172,6 +2172,12 @@ const openQueryDetail = (row: QueryRow, tab?: string) => {
       namespace: row.db_namespace,
       ...(tab ? { tab } : {}),
     },
+    // The origin, which this hop used to omit — leaving the detail page's back
+    // affordance on its `queries` fallback. It landed in the right place by
+    // luck, and stopped doing so the moment the fallback was reached for any
+    // other reason. The most travelled hop into the page states its origin
+    // like the other three.
+    from: "queries",
   });
 };
 
