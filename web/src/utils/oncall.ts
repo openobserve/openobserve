@@ -26,16 +26,17 @@ import type {
   L0Policy,
   ResponseState,
   Rotation,
+  ShiftRule,
   TimeWindow,
   OnCallResponse,
   OnCallResponseEvent,
   OnCallResponseGroup,
-  OnCallSlot,
+  OnCallPosition,
   PreviewRung,
   PriorityRung,
   PromoteSeverity,
 } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, PROMOTE_SEVERITIES, sameSlot } from "@/ts/interfaces/oncall";
+import { PROMOTE_SEVERITIES } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
@@ -43,16 +44,20 @@ import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
 
 /**
- * Who holds `rotation` at `atMicros`.
+ * Who holds `rule` at `atMicros`.
  *
- * Mirrors `Rotation::member_at`: floor division so instants before the anchor
+ * Mirrors `ShiftRule::member_at`: floor division so instants before the anchor
  * resolve backwards instead of collapsing onto shift 0, and an exclusive upper
  * bound so the handover instant belongs to the incoming person. Returning
- * `null` for an unusable rotation is deliberate — an unstaffed level has to
- * read as a coverage gap, never as a silently chosen fallback.
+ * `null` for an unusable rule is deliberate — an unstaffed level has to read as
+ * a coverage gap, never as a silently chosen fallback.
+ *
+ * Takes a **shift rule**, not a rotation: the roster and the cadence moved down
+ * a level when rotations became named objects, and a rotation with several
+ * rules has no single roster to ask about.
  */
-export function memberAt(rotation: Rotation, atMicros: number): string | null {
-  const { members, shift_micros: shift, anchor_micros: anchor } = rotation;
+export function memberAt(rule: ShiftRule, atMicros: number): string | null {
+  const { members, shift_micros: shift, anchor_micros: anchor } = rule;
   if (!members?.length || !shift || shift <= 0) return null;
   const index = Math.floor((atMicros - anchor) / shift);
   // JS `%` keeps the sign of the dividend, so a pre-anchor index needs the
@@ -62,9 +67,9 @@ export function memberAt(rotation: Rotation, atMicros: number): string | null {
 }
 
 /** Instant the shift containing `atMicros` ends, i.e. the next handover. */
-export function nextHandover(rotation: Rotation, atMicros: number): number | null {
-  const { shift_micros: shift, anchor_micros: anchor } = rotation;
-  if (!rotation.members?.length || !shift || shift <= 0) return null;
+export function nextHandover(rule: ShiftRule, atMicros: number): number | null {
+  const { shift_micros: shift, anchor_micros: anchor } = rule;
+  if (!rule.members?.length || !shift || shift <= 0) return null;
   return anchor + (Math.floor((atMicros - anchor) / shift) + 1) * shift;
 }
 
@@ -73,24 +78,20 @@ export interface Shift {
   startMicros: number;
   endMicros: number;
   member: string;
-  /** Which slot's rotation this shift belongs to. Absent means the default. */
-  slot?: string;
+  /** Which shift rule produced this turn, by name. */
+  rule?: string;
 }
 
 /**
- * The next `count` shifts of a rotation, starting with the one containing
+ * The next `count` shifts of a shift rule, starting with the one containing
  * `fromMicros`.
  *
  * A schedule is only comprehensible when you can see who it puts on call, so
  * this exists to render the answer rather than the configuration. Pure, so the
  * boundary arithmetic is testable without mounting anything.
  */
-export function upcomingShifts(
-  rotation: Rotation,
-  fromMicros: number,
-  count: number,
-): Shift[] {
-  const { shift_micros: shift, anchor_micros: anchor, members } = rotation;
+export function upcomingShifts(rule: ShiftRule, fromMicros: number, count: number): Shift[] {
+  const { shift_micros: shift, anchor_micros: anchor, members } = rule;
   if (!members?.length || !shift || shift <= 0 || count <= 0) return [];
 
   const firstIndex = Math.floor((fromMicros - anchor) / shift);
@@ -103,10 +104,26 @@ export function upcomingShifts(
       startMicros,
       endMicros: startMicros + shift,
       member: members[wrapped],
-      slot: rotation.slot,
+      rule: rule.name,
     });
   }
   return shifts;
+}
+
+/** Every person named by any rule of a rotation, de-duplicated, in rule order. */
+export function rotationMembers(rotation: Rotation): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const rule of rotation.shift_rules ?? []) {
+    for (const member of rule.members ?? []) {
+      const key = member.trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        out.push(member);
+      }
+    }
+  }
+  return out;
 }
 
 /** Shift presets offered in the schedule editor, in micros. */
@@ -122,18 +139,18 @@ export interface CalendarBand {
 }
 
 /**
- * Shifts of one rotation, clipped to a visible window.
+ * Shifts of one shift rule, clipped to a visible window.
  *
  * Clipped rather than whole so a band never runs past the edge of the chart:
  * a week view of a fortnightly rotation would otherwise draw one band four
  * times too wide and push everything else off screen.
  */
 export function shiftBands(
-  rotation: Rotation,
+  rule: ShiftRule,
   windowStart: number,
   windowEnd: number,
 ): CalendarBand[] {
-  const { shift_micros: shift, anchor_micros: anchor, members } = rotation;
+  const { shift_micros: shift, anchor_micros: anchor, members } = rule;
   const span = windowEnd - windowStart;
   if (!members?.length || !shift || shift <= 0 || span <= 0) return [];
 
@@ -152,7 +169,7 @@ export function shiftBands(
     const clippedStart = Math.max(start, windowStart);
     const clippedEnd = Math.min(end, windowEnd);
     bands.push({
-      user_email: memberAt(rotation, start) ?? "",
+      user_email: memberAt(rule, start) ?? "",
       startMicros: clippedStart,
       endMicros: clippedEnd,
       offset: (clippedStart - windowStart) / span,
@@ -324,15 +341,22 @@ export function isSnoozed(
  * What a target reads as in the policy editor and on a page.
  *
  * Mirrors `EscalationTarget::describe` so the same rung says the same thing
- * on screen and in the email.
+ * on screen and in the email — which is the whole point of naming the rotation
+ * rather than a role word. `rotationName` resolves the stored id; `null` means
+ * the team has deleted that rotation, which is worth saying rather than hiding
+ * behind an id nobody can look up.
  */
 export function describeTarget(
   target: EscalationTarget,
   t: (k: I18nKey, params?: Record<string, unknown>) => string,
+  rotationName?: string | null,
 ): string {
   if (target.kind === "user") return target.email;
-  if ("slot" in target) return t(`oncall.target_${target.kind}`, { slot: target.slot });
-  return t(`oncall.target_${target.kind}`);
+  if (target.kind === "whole_team") return t("oncall.target_whole_team");
+  if (!rotationName) return t("oncall.target_rotation_deleted");
+  return target.mode === "all"
+    ? t("oncall.target_rotation_all", { rotation: rotationName })
+    : t("oncall.target_rotation_on_call", { rotation: rotationName });
 }
 
 /**
@@ -386,27 +410,27 @@ export function speakTarget(
 ): string {
   const said = rendered.trim();
   const fixed: Record<string, I18nKey> = {
-    "the on-call": "oncall.target_on_call_now",
-    "the secondary": "oncall.target_next_on_call",
-    // Retired by `26111bd135`; still on the wire from an older engine.
-    "the next on-call": "oncall.target_next_on_call",
-    "everyone on the rotation": "oncall.target_everyone_on_schedule",
     "the whole team": "oncall.target_whole_team",
+    "a rotation that no longer exists": "oncall.target_rotation_deleted",
+    // Retired with the slot model; still on the wire from an older engine, and
+    // a mixed-version deployment would otherwise put two vocabularies on one
+    // tab. None of them can be said any more precisely than "the on-call",
+    // because the derivation they named no longer exists to point at.
+    "the on-call": "oncall.target_rotation_legacy",
+    "the secondary": "oncall.target_rotation_legacy",
+    "the next on-call": "oncall.target_rotation_legacy",
+    "everyone on the rotation": "oncall.target_rotation_legacy",
   };
   const exact = fixed[said.toLowerCase()];
   if (exact) return t(exact);
 
-  const slotted: [RegExp, I18nKey][] = [
-    // The retired form first: "the next X on-call" also matches the pattern
-    // below it, and would come back as the wrong target.
-    [/^the next (.+) on-call$/i, "oncall.target_next_on_call_in_slot"],
-    [/^the (.+) secondary$/i, "oncall.target_next_on_call_in_slot"],
-    [/^the (.+) on-call$/i, "oncall.target_on_call_in_slot"],
-    [/^everyone on the (.+) rotation$/i, "oncall.target_everyone_in_slot"],
+  const named: [RegExp, I18nKey][] = [
+    [/^whoever is on call in (.+)$/i, "oncall.target_rotation_on_call"],
+    [/^everyone on (.+)$/i, "oncall.target_rotation_all"],
   ];
-  for (const [pattern, key] of slotted) {
+  for (const [pattern, key] of named) {
     const match = said.match(pattern);
-    if (match) return t(key, { slot: match[1] });
+    if (match) return t(key, { rotation: match[1] });
   }
   return rendered;
 }
@@ -493,9 +517,17 @@ export function rungProblem(
  *
  * The only coverage question left. There used to be six slots to leave empty,
  * so a correctly configured team warned about four of them forever.
+ *
+ * True when **any** rotation is staffed: a team whose secondary has a gap is
+ * still reachable, and reporting it as unstaffed would cry wolf on every
+ * restricted rotation outside its hours.
  */
-export function isStaffed(rotations: Rotation[], atMicros: number): boolean {
-  return rotations.some((r) => memberAt(r, atMicros) !== null);
+export function isStaffed(
+  rotations: Rotation[],
+  atMicros: number,
+  timezone: string,
+): boolean {
+  return rotations.some((rotation) => resolveHolder(rotation, atMicros, timezone).member !== null);
 }
 
 /**
@@ -734,34 +766,35 @@ export function windowContains(
 }
 
 /**
- * Whether `rotation` is in force at `atMicros`.
+ * Whether `rule` is in force at `atMicros`.
  *
- * Ports `Rotation::applies_at`. Windows are ORed: "weekday mornings or weekend
+ * Ports `ShiftRule::applies_at`. Windows are ORed: "weekday mornings or weekend
  * afternoons" is two windows and matching either is enough. No windows means
  * always — the catch-all every follow-the-sun setup needs underneath.
  */
-export function rotationAppliesAt(
-  rotation: Rotation,
-  atMicros: number,
-  timezone: string,
-): boolean {
-  const windows = rotation.restrictions ?? [];
+export function ruleAppliesAt(rule: ShiftRule, atMicros: number, timezone: string): boolean {
+  if (rule.starts_at != null && atMicros < rule.starts_at) return false;
+  if (rule.ends_at != null && atMicros >= rule.ends_at) return false;
+  const windows = rule.restrictions ?? [];
   return windows.length === 0 || windows.some((w) => windowContains(w, atMicros, timezone));
 }
 
 /**
- * Whether a rotation is usable at all. Ports `Rotation::validate`.
+ * Whether a shift rule is usable at all. Ports `ShiftRule::validate`.
  *
- * An invalid rotation resolves to NOBODY rather than to `members[0]`, so a
- * broken one shows up as a coverage gap — which is visible — instead of
- * silently paging a person the schedule never selected.
+ * An invalid rule resolves to NOBODY rather than to `members[0]`, so a broken
+ * one shows up as a coverage gap — which is visible — instead of silently
+ * paging a person the schedule never selected.
  */
-export function isRotationValid(rotation: Rotation): boolean {
-  if (!rotation.name?.trim()) return false;
-  if (!rotation.members?.length) return false;
-  if (!rotation.shift_micros || rotation.shift_micros <= 0) return false;
+export function isShiftRuleValid(rule: ShiftRule): boolean {
+  if (!rule.name?.trim()) return false;
+  if (!rule.members?.length) return false;
+  if (!rule.shift_micros || rule.shift_micros <= 0) return false;
+  if (rule.starts_at != null && rule.ends_at != null && rule.ends_at <= rule.starts_at) {
+    return false;
+  }
   const seen = new Set<string>();
-  for (const member of rotation.members) {
+  for (const member of rule.members) {
     const key = member.toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
@@ -770,34 +803,52 @@ export function isRotationValid(rotation: Rotation): boolean {
 }
 
 /**
- * The rotation in force at `atMicros`. Ports `winning_rotation`.
+ * Whether a rotation is usable at all. Ports `Rotation::validate`.
  *
- * Ordering, highest wins: `priority`, then the MORE SPECIFIC rotation (one with
+ * A rotation with no shift rules is the one state that looks configured on a
+ * calendar and pages nobody, so it is invalid rather than merely empty.
+ */
+export function isRotationValid(rotation: Rotation): boolean {
+  if (!rotation.id?.trim()) return false;
+  if (!rotation.name?.trim()) return false;
+  if (!rotation.shift_rules?.length) return false;
+  return rotation.shift_rules.every(isShiftRuleValid);
+}
+
+/**
+ * The shift rule in force inside one rotation at `atMicros`. Ports
+ * `winning_rule`.
+ *
+ * **Selection happens within a rotation, never across them.** Two rotations are
+ * two people on call at the same instant; two shift rules are one person across
+ * different hours. Reading the old cross-rotation winner as if it were this is
+ * what let a restricted rotation silently hand its position to a derived
+ * holder at the weekend.
+ *
+ * Ordering, highest wins: `priority`, then the MORE SPECIFIC rule (one with
  * restrictions beats the catch-all, so a catch-all never shadows a layer
  * somebody deliberately restricted), then the EARLIER anchor purely so the
- * answer is stable — two equally-specific layers is a configuration mistake, but
- * it must still resolve the same way in the UI as on every server node rather
- * than depending on row order.
+ * answer is stable.
  *
  * Rust's `max_by` keeps the LAST of several equal maxima, which is why the
  * comparison below replaces on `>= 0` rather than `> 0`.
  */
-export function winningRotation(
-  rotations: Rotation[],
+export function winningRule(
+  rotation: Rotation,
   atMicros: number,
   timezone: string,
-): Rotation | null {
-  let best: Rotation | null = null;
-  for (const candidate of rotations ?? []) {
-    if (!isRotationValid(candidate)) continue;
-    if (!rotationAppliesAt(candidate, atMicros, timezone)) continue;
-    if (best === null || compareRotations(candidate, best) >= 0) best = candidate;
+): ShiftRule | null {
+  let best: ShiftRule | null = null;
+  for (const candidate of rotation.shift_rules ?? []) {
+    if (!isShiftRuleValid(candidate)) continue;
+    if (!ruleAppliesAt(candidate, atMicros, timezone)) continue;
+    if (best === null || compareShiftRules(candidate, best) >= 0) best = candidate;
   }
   return best;
 }
 
 /** Negative when `a` loses to `b`. Mirrors the Rust `max_by` comparator. */
-function compareRotations(a: Rotation, b: Rotation): number {
+function compareShiftRules(a: ShiftRule, b: ShiftRule): number {
   const byPriority = (a.priority ?? 0) - (b.priority ?? 0);
   if (byPriority !== 0) return byPriority;
   const bySpecificity = (a.restrictions?.length ?? 0) - (b.restrictions?.length ?? 0);
@@ -807,39 +858,67 @@ function compareRotations(a: Rotation, b: Rotation): number {
 }
 
 /**
- * Who is on call at `atMicros`, and under which rotation.
+ * Who one rotation puts on call at `atMicros`, and under which shift rule.
  *
- * Mirrors the engine (`resolve_on_call` / `winning_rotation`): highest priority
- * whose restriction window matches wins, ties break on the more specific
- * rotation. The screen whose entire job is "who gets paged" must not be able to
- * name a different person from the one the server will page — the previous
- * "last rotation in the array wins" was silently wrong for every team with two
- * rotations.
+ * Mirrors `Rotation::on_call`. A `null` member is a coverage gap for **that
+ * rotation** — the position simply has nobody, and nothing conjures a stand-in.
  */
 export function resolveHolder(
-  rotations: Rotation[],
+  rotation: Rotation,
   atMicros: number,
   timezone: string,
-): { member: string | null; rotation: Rotation | null } {
-  const rotation = winningRotation(rotations, atMicros, timezone);
-  if (!rotation) return { member: null, rotation: null };
-  return { member: memberAt(rotation, atMicros), rotation };
+): { member: string | null; rule: ShiftRule | null } {
+  const rule = winningRule(rotation, atMicros, timezone);
+  if (!rule) return { member: null, rule: null };
+  return { member: memberAt(rule, atMicros), rule };
 }
 
 /**
- * The person the rotation in force hands over to next, or `null`.
+ * Every rotation's holder at `atMicros`, in the shape `GET .../on-call` returns.
  *
- * `null` for a single-member rotation: there is no next, and returning the same
+ * **A rotation that resolves to nobody is omitted**, exactly as the endpoint
+ * omits it. Prefer the endpoint where one is available; this exists so a form
+ * can preview a schedule it has not saved yet.
+ */
+export function resolvePositions(
+  rotations: readonly Rotation[],
+  atMicros: number,
+  timezone: string,
+): OnCallPosition[] {
+  const out: OnCallPosition[] = [];
+  for (const rotation of rotations ?? []) {
+    const { member, rule } = resolveHolder(rotation, atMicros, timezone);
+    if (!member || !rule) continue;
+    out.push({
+      rotation_id: rotation.id,
+      rotation_name: rotation.name,
+      rule: rule.name,
+      user_email: member,
+      next_user_email: resolveNextHolder(rotation, atMicros, timezone),
+    });
+  }
+  return out;
+}
+
+/**
+ * The person this rotation hands over to next, or `null`.
+ *
+ * **Display only** — the calendar's "up next". Nothing pages it, and it must
+ * never be rendered as a position: it used to double as the secondary, which is
+ * exactly how one team got two different people both correctly labelled "the
+ * secondary".
+ *
+ * `null` for a single-member rule: there is no next, and returning the same
  * person would page them twice and call the second one an escalation.
  */
 export function resolveNextHolder(
-  rotations: Rotation[],
+  rotation: Rotation,
   atMicros: number,
   timezone: string,
 ): string | null {
-  const rotation = winningRotation(rotations, atMicros, timezone);
-  if (!rotation || rotation.members.length < 2) return null;
-  const { members, shift_micros: shift, anchor_micros: anchor } = rotation;
+  const rule = winningRule(rotation, atMicros, timezone);
+  if (!rule || rule.members.length < 2) return null;
+  const { members, shift_micros: shift, anchor_micros: anchor } = rule;
   const index = Math.floor((atMicros - anchor) / shift) + 1;
   const wrapped = ((index % members.length) + members.length) % members.length;
   return members[wrapped] ?? null;
@@ -1069,64 +1148,68 @@ export interface ResolvedRung {
   people: string[];
   /** The rung names the whole team, which is a group rather than a list. */
   wholeTeam: boolean;
-  /** Slots the rung pages EVERYONE in — groups, like wholeTeam, not lists.
-   *  The client only knows who is on shift, not a pool's full roster. */
+  /** Rotations the rung pages EVERYONE on, by name — groups, like wholeTeam,
+   *  not lists. The client only knows who is on shift, not a rotation's full
+   *  roster across all its shift rules. */
   pools: string[];
+  /** Rotations this rung names that the team no longer has, by id. Each one is
+   *  a level that pages nobody, which the ladder skips in silence — surface it
+   *  rather than resolving to an empty rung that looks merely uncovered. */
+  missingRotations: string[];
 }
 
 /**
- * What a priority's ladder would actually do, against the rotation in force.
+ * What a priority's ladder would actually do, against the rotations in force.
  *
- * The editor lets somebody build a ladder out of target KINDS, which is not
- * the question they have — that is "who does this wake, and when". A kind that
- * resolves to nobody (a `next_on_call` on a one-person rotation, an
- * `on_call_now` with a coverage gap) is the failure worth seeing before it is
- * saved, so it resolves to an empty `people` rather than being dropped.
+ * The editor lets somebody build a ladder out of targets, which is not the
+ * question they have — that is "who does this wake, and when". A target that
+ * resolves to nobody (a rotation with a coverage gap) is the failure worth
+ * seeing before it is saved, so it resolves to an empty `people` rather than
+ * being dropped.
+ *
+ * `positions` is `GET .../on-call`. A rotation that resolves to nobody is
+ * **absent** from it, so a target naming a rotation that is present in the
+ * team's schedule but missing here is a gap — while one naming an id the
+ * schedule has never heard of is a dangling level, reported separately.
  */
-export function resolveLadder(rung: PriorityRung, slots: OnCallSlot[]): ResolvedRung[] {
-  /// The unsuffixed targets mean the DEFAULT slot. Reading them as "every
-  /// slot" listed two people for a rung that pages one, the day a team
-  /// staffed a secondary.
-  const inSlot = (name: string) => slots.filter((s) => sameSlot(s.slot, name));
-  const holders = (entries: OnCallSlot[]) => entries.map((s) => s.user_email).filter(Boolean);
-  const nexts = (entries: OnCallSlot[]) =>
-    entries.map((s) => s.next_user_email).filter((e): e is string => !!e);
-  const defaults = inSlot(DEFAULT_SLOT);
+export function resolveLadder(
+  rung: PriorityRung,
+  positions: OnCallPosition[],
+  rotations: readonly Rotation[] = [],
+): ResolvedRung[] {
+  const byId = new Map(positions.map((p) => [p.rotation_id, p]));
+  const known = new Map(rotations.map((r) => [r.id, r]));
 
   return [...rung.steps]
     .sort((a, b) => a.after_micros - b.after_micros)
     .map((step) => {
       const people: string[] = [];
       const pools: string[] = [];
+      const missingRotations: string[] = [];
       let wholeTeam = false;
       // Tolerates a step with no targets: this runs during render, so a
       // malformed rung must read as "reaches nobody" rather than take the
       // whole policy editor down.
       for (const target of step.targets ?? []) {
         switch (target.kind) {
-          case "on_call_now":
-            people.push(...holders(defaults));
+          case "rotation": {
+            const rotation = known.get(target.rotation_id);
+            if (rotations.length && !rotation) {
+              missingRotations.push(target.rotation_id);
+              break;
+            }
+            // A rotation's full roster is not knowable from who is on shift —
+            // several shift rules may staff it at other hours — so `all`
+            // renders as a group. Mislabelling it with one name would read as
+            // "pages one person".
+            if (target.mode === "all") {
+              pools.push(rotation?.name ?? target.rotation_id);
+              break;
+            }
+            const holder = byId.get(target.rotation_id)?.user_email;
+            if (holder) people.push(holder);
             break;
-          case "next_on_call":
-            people.push(...nexts(defaults));
-            break;
-          // The union across slots, per the spec: it is the last resort, and
-          // one that leaves out the senior pool is half a room.
-          case "everyone_on_schedule":
-            people.push(...holders(slots), ...nexts(slots));
-            break;
-          case "on_call_in_slot":
-            people.push(...holders(inSlot(target.slot)));
-            break;
-          case "next_on_call_in_slot":
-            people.push(...nexts(inSlot(target.slot)));
-            break;
-          // A pool's full roster is not knowable from who is on shift, so it
-          // renders as a group — mislabelling it with one name would read as
-          // "pages one person".
-          case "everyone_in_slot":
-            pools.push(target.slot);
-            break;
+          }
           case "user":
             people.push(target.email);
             break;
@@ -1142,6 +1225,7 @@ export function resolveLadder(rung: PriorityRung, slots: OnCallSlot[]): Resolved
         people: [...new Set(people)],
         wholeTeam,
         pools: [...new Set(pools)],
+        missingRotations: [...new Set(missingRotations)],
       };
     });
 }

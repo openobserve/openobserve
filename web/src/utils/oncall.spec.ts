@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { EscalationLevel, Rotation, TimeWindow } from "@/ts/interfaces/oncall";
+import type { EscalationLevel, Rotation, ShiftRule, TimeWindow } from "@/ts/interfaces/oncall";
 import {
   MICROS_PER_DAY,
   MICROS_PER_HOUR,
@@ -38,6 +38,7 @@ import {
   speakTarget,
   speakTargetsInSentence,
   isRotationValid,
+  isShiftRuleValid,
   isSnoozed,
   isStaffed,
   isUnresolved,
@@ -54,7 +55,8 @@ import {
   resolveHolder,
   resolveLadder,
   resolveNextHolder,
-  rotationAppliesAt,
+  resolvePositions,
+  ruleAppliesAt,
   routingReasonOf,
   rungProblem,
   shiftBands,
@@ -275,30 +277,61 @@ describe("groupBySubject", () => {
 });
 
 describe("isStaffed", () => {
-  const rotation = (members: string[]) => ({
+  const rotation = (members: string[]): Rotation => ({
+    id: "rot_primary",
     name: "Primary",
-    members,
-    shift_micros: 604_800_000_000,
-    anchor_micros: 0,
+    shift_rules: [
+      { name: "Base", members, shift_micros: 604_800_000_000, anchor_micros: 0 },
+    ],
   });
 
   /// The only coverage question left. There used to be six slots to leave
   /// empty, so a correctly configured team warned about four of them forever.
   it("asks only whether a page would reach anybody", () => {
-    expect(isStaffed([rotation(["ana@o2.ai"])], 0)).toBe(true);
-    expect(isStaffed([rotation([])], 0)).toBe(false);
-    expect(isStaffed([], 0)).toBe(false);
+    expect(isStaffed([rotation(["ana@o2.ai"])], 0, "UTC")).toBe(true);
+    expect(isStaffed([rotation([])], 0, "UTC")).toBe(false);
+    expect(isStaffed([], 0, "UTC")).toBe(false);
+  });
+
+  /// A rotation with no shift rules is the one state that looks configured on a
+  /// calendar and pages nobody.
+  it("reports a rotation with no shift rules as unstaffed", () => {
+    expect(isStaffed([{ id: "rot_a", name: "Primary", shift_rules: [] }], 0, "UTC")).toBe(false);
+  });
+
+  /// Two rotations are two positions. One with a gap does not make the team
+  /// unreachable — the other still pages.
+  it("is true when any one rotation is staffed", () => {
+    expect(
+      isStaffed([rotation([]), rotation(["ana@o2.ai"])], 0, "UTC"),
+    ).toBe(true);
   });
 });
 
 describe("describeTarget", () => {
-  const t = ((k: string) => k) as any;
+  const t = ((k: string, params?: Record<string, unknown>) =>
+    params?.rotation ? `${k}:${params.rotation}` : k) as any;
 
-  /// A person target reads as the person; the rest read as their role.
-  it("names the person for a user target and the role otherwise", () => {
+  /// A person target reads as the person; a rotation target NAMES the rotation,
+  /// which is the point of the rework — "the secondary" was a role word that two
+  /// screens resolved differently and both were right.
+  it("names the person for a user target and the rotation for a rotation target", () => {
     expect(describeTarget({ kind: "user", email: "ana@o2.ai" }, t)).toBe("ana@o2.ai");
-    expect(describeTarget({ kind: "on_call_now" }, t)).toBe("oncall.target_on_call_now");
-    expect(describeTarget({ kind: "next_on_call" }, t)).toBe("oncall.target_next_on_call");
+    expect(describeTarget({ kind: "whole_team" }, t)).toBe("oncall.target_whole_team");
+    expect(describeTarget({ kind: "rotation", rotation_id: "rot_a" }, t, "Primary")).toBe(
+      "oncall.target_rotation_on_call:Primary",
+    );
+    expect(
+      describeTarget({ kind: "rotation", rotation_id: "rot_a", mode: "all" }, t, "Primary"),
+    ).toBe("oncall.target_rotation_all:Primary");
+  });
+
+  /// A level pointing at a deleted rotation pages nobody and the ladder skips
+  /// it. Saying so beats printing an id nobody can look up.
+  it("says a rotation is gone rather than printing its id", () => {
+    expect(describeTarget({ kind: "rotation", rotation_id: "rot_gone" }, t, null)).toBe(
+      "oncall.target_rotation_deleted",
+    );
   });
 });
 
@@ -306,31 +339,35 @@ describe("describeTarget", () => {
 /// i18n for the same enum, one click apart, so a rung read as two concepts.
 describe("speakTarget", () => {
   const t = ((k: string, params?: Record<string, unknown>) =>
-    params?.slot ? `${k}:${params.slot}` : k) as any;
+    params?.rotation ? `${k}:${params.rotation}` : k) as any;
 
   it("says the engine's current wording in the product's keys", () => {
-    expect(speakTarget("the on-call", t)).toBe("oncall.target_on_call_now");
-    expect(speakTarget("the secondary", t)).toBe("oncall.target_next_on_call");
-    expect(speakTarget("everyone on the rotation", t)).toBe("oncall.target_everyone_on_schedule");
+    expect(speakTarget("whoever is on call in Primary", t)).toBe(
+      "oncall.target_rotation_on_call:Primary",
+    );
+    expect(speakTarget("everyone on Database", t)).toBe("oncall.target_rotation_all:Database");
     expect(speakTarget("the whole team", t)).toBe("oncall.target_whole_team");
+    expect(speakTarget("a rotation that no longer exists", t)).toBe(
+      "oncall.target_rotation_deleted",
+    );
   });
 
-  /// An engine older than this bundle still sends the retired phrasing, and a
+  /// An engine older than this bundle still sends the slot-era phrasing, and a
   /// mixed-version deployment would otherwise put both vocabularies on one tab.
-  it("maps the retired wording onto the same key", () => {
-    expect(speakTarget("the next on-call", t)).toBe("oncall.target_next_on_call");
-    expect(speakTarget("the next database on-call", t)).toBe(
-      "oncall.target_next_on_call_in_slot:database",
-    );
+  /// None of them can be said any more precisely, because the derivation they
+  /// named no longer exists to point at.
+  it("maps the retired slot wording onto one honest key", () => {
+    expect(speakTarget("the on-call", t)).toBe("oncall.target_rotation_legacy");
+    expect(speakTarget("the secondary", t)).toBe("oncall.target_rotation_legacy");
+    expect(speakTarget("the next on-call", t)).toBe("oncall.target_rotation_legacy");
+    expect(speakTarget("everyone on the rotation", t)).toBe("oncall.target_rotation_legacy");
   });
 
-  it("carries the slot through", () => {
-    expect(speakTarget("the database on-call", t)).toBe("oncall.target_on_call_in_slot:database");
-    expect(speakTarget("the database secondary", t)).toBe(
-      "oncall.target_next_on_call_in_slot:database",
-    );
-    expect(speakTarget("everyone on the database rotation", t)).toBe(
-      "oncall.target_everyone_in_slot:database",
+  /// A rotation name is free text and may contain anything, including the words
+  /// the fixed table matches on.
+  it("carries a multi-word rotation name through", () => {
+    expect(speakTarget("whoever is on call in Platform 24/7", t)).toBe(
+      "oncall.target_rotation_on_call:Platform 24/7",
     );
   });
 
@@ -346,8 +383,8 @@ describe("speakTarget", () => {
   /// identifier the reader is expected to already know.
   it("unquotes the term inside a sentence the engine wrote", () => {
     expect(
-      speakTargetsInSentence("rotation `Primary` has one member, so `the next on-call` resolves", t),
-    ).toBe("rotation `Primary` has one member, so oncall.target_next_on_call resolves");
+      speakTargetsInSentence("rotation `Primary` has one member, so `the whole team` resolves", t),
+    ).toBe("rotation `Primary` has one member, so oncall.target_whole_team resolves");
   });
 });
 
@@ -575,12 +612,17 @@ function window(days: number[], start: number, end: number): TimeWindow {
   return { days, start_minute: start, end_minute: end };
 }
 
+/**
+ * One layer of a rotation. This used to build a whole `Rotation`, which is
+ * precisely the confusion the rework removed: layering happens *inside* a
+ * position, and two positions never compete.
+ */
 function layer(
   name: string,
   members: string[],
   priority: number,
   restrictions: TimeWindow[],
-): Rotation {
+): ShiftRule {
   return {
     name,
     members,
@@ -589,6 +631,11 @@ function layer(
     priority,
     restrictions,
   };
+}
+
+/** One named position holding the given rules. Follow-the-sun is ONE of these. */
+function rota(name: string, rules: ShiftRule[]): Rotation {
+  return { id: `rot_${name.toLowerCase()}`, name, shift_rules: rules };
 }
 
 describe("windowContains", () => {
@@ -643,23 +690,31 @@ describe("windowContains", () => {
   });
 });
 
-describe("rotationAppliesAt", () => {
+describe("ruleAppliesAt", () => {
   it("applies always when there are no restrictions", () => {
     const r = layer("Base", ["ana@o2.ai"], 0, []);
-    expect(rotationAppliesAt(r, local(IST, 2026, 8, 15, 3, 0), IST)).toBe(true);
+    expect(ruleAppliesAt(r, local(IST, 2026, 8, 15, 3, 0), IST)).toBe(true);
   });
 
-  // A rotation stored before the layers feature carries neither field; it must
-  // read as unrestricted rather than as never applying.
+  // A rule carrying neither field must read as unrestricted rather than as
+  // never applying.
   it("treats absent priority/restrictions as the unrestricted catch-all", () => {
-    const legacy: Rotation = {
+    const bare: ShiftRule = {
       name: "Base",
       members: ["ana@o2.ai"],
       shift_micros: MICROS_PER_WEEK,
       anchor_micros: ANCHOR,
     };
-    expect(rotationAppliesAt(legacy, ANCHOR, IST)).toBe(true);
-    expect(resolveHolder([legacy], ANCHOR, IST).member).toBe("ana@o2.ai");
+    expect(ruleAppliesAt(bare, ANCHOR, IST)).toBe(true);
+    expect(resolveHolder(rota("Primary", [bare]), ANCHOR, IST).member).toBe("ana@o2.ai");
+  });
+
+  // A retired rule is out of force without being deleted, which is how the
+  // record of who covered those hours survives.
+  it("respects a validity window", () => {
+    const retired: ShiftRule = { ...layer("Base", ["ana@o2.ai"], 0, []), ends_at: ANCHOR };
+    expect(ruleAppliesAt(retired, ANCHOR - 1, IST)).toBe(true);
+    expect(ruleAppliesAt(retired, ANCHOR, IST)).toBe(false);
   });
 
   // "Weekday mornings or weekend afternoons" is two windows; matching either is
@@ -673,37 +728,53 @@ describe("rotationAppliesAt", () => {
       window([0, 1, 2, 3, 4], 9 * 60, 12 * 60),
       window([5, 6], 13 * 60, 18 * 60),
     ]);
-    expect(rotationAppliesAt(r, at, IST)).toBe(expected);
+    expect(ruleAppliesAt(r, at, IST)).toBe(expected);
   });
 });
 
-describe("isRotationValid", () => {
+describe("isShiftRuleValid", () => {
   const base = () => layer("Base", ["ana@o2.ai", "bob@o2.ai"], 0, []);
 
   it.each([
-    ["a usable rotation", base(), true],
+    ["a usable rule", base(), true],
     ["no members", { ...base(), members: [] }, false],
     ["a zero shift", { ...base(), shift_micros: 0 }, false],
     ["a negative shift", { ...base(), shift_micros: -1 }, false],
     ["a blank name", { ...base(), name: "  " }, false],
     ["a case-insensitive duplicate member", { ...base(), members: ["ana@o2.ai", "ANA@o2.ai"] }, false],
-  ])("%s → %s", (_name, rotation, expected) => {
-    expect(isRotationValid(rotation as Rotation)).toBe(expected);
+    ["a validity window that ends before it starts", { ...base(), starts_at: 2, ends_at: 1 }, false],
+  ])("%s → %s", (_name, rule, expected) => {
+    expect(isShiftRuleValid(rule as ShiftRule)).toBe(expected);
+  });
+});
+
+describe("isRotationValid", () => {
+  it("needs an id, a name and at least one rule", () => {
+    const rule = layer("Base", ["ana@o2.ai"], 0, []);
+    expect(isRotationValid(rota("Primary", [rule]))).toBe(true);
+    expect(isRotationValid({ id: "", name: "Primary", shift_rules: [rule] })).toBe(false);
+    expect(isRotationValid({ id: "rot_a", name: " ", shift_rules: [rule] })).toBe(false);
+  });
+
+  // The one state that looks configured on a calendar and pages nobody.
+  it("rejects a rotation with no shift rules", () => {
+    expect(isRotationValid({ id: "rot_a", name: "Primary", shift_rules: [] })).toBe(false);
   });
 });
 
 describe("resolveHolder", () => {
-  // Follow-the-sun: a restricted layer covers its hours, the unrestricted
-  // catch-all covers everything nobody claimed.
+  // Follow-the-sun: several rules in ONE rotation. A restricted rule covers its
+  // hours, the unrestricted catch-all covers everything nobody claimed. Two
+  // rotations would be two people on call at once, which is a different thing.
   it.each([
     ["office hours", local(IST, 2026, 8, 10, 11, 0), "india@o2.ai"],
     ["the middle of the night", local(IST, 2026, 8, 10, 23, 0), "catchall@o2.ai"],
-  ])("a restricted layer wins inside its window and yields outside: %s", (_n, at, expected) => {
-    const rotations = [
+  ])("a restricted rule wins inside its window and yields outside: %s", (_n, at, expected) => {
+    const rotation = rota("Primary", [
       layer("Base", ["catchall@o2.ai"], 0, []),
       layer("India", ["india@o2.ai"], 10, [window([0, 1, 2, 3, 4], 9 * 60, 17 * 60)]),
-    ];
-    expect(resolveHolder(rotations, at, IST).member).toBe(expected);
+    ]);
+    expect(resolveHolder(rotation, at, IST).member).toBe(expected);
   });
 
   it.each([
@@ -711,14 +782,14 @@ describe("resolveHolder", () => {
     [16, "emea@o2.ai"],
     [23, "amer@o2.ai"],
     [3, "amer@o2.ai"],
-  ])("three restricted layers over one catch-all resolve at %ih to %s", (hour, expected) => {
-    const rotations = [
+  ])("three restricted rules over one catch-all resolve at %ih to %s", (hour, expected) => {
+    const rotation = rota("Platform", [
       layer("Base", ["catchall@o2.ai"], 0, []),
       layer("APAC", ["apac@o2.ai"], 10, [window([], 6 * 60, 14 * 60)]),
       layer("EMEA", ["emea@o2.ai"], 10, [window([], 14 * 60, 22 * 60)]),
       layer("AMER", ["amer@o2.ai"], 10, [window([], 22 * 60, 6 * 60)]),
-    ];
-    expect(resolveHolder(rotations, local(IST, 2026, 8, 10, hour, 0), IST).member).toBe(expected);
+    ]);
+    expect(resolveHolder(rotation, local(IST, 2026, 8, 10, hour, 0), IST).member).toBe(expected);
   });
 
   // Priority is explicit, not positional. Reordering the list — which the old
@@ -729,76 +800,118 @@ describe("resolveHolder", () => {
     const high = layer("High", ["high@o2.ai"], 5, [window([], 0, 1440)]);
     const at = local(IST, 2026, 8, 10, 12, 0);
 
-    expect(resolveHolder([low, high], at, IST).member).toBe("high@o2.ai");
-    expect(resolveHolder([high, low], at, IST).member).toBe("high@o2.ai");
+    expect(resolveHolder(rota("P", [low, high]), at, IST).member).toBe("high@o2.ai");
+    expect(resolveHolder(rota("P", [high, low]), at, IST).member).toBe("high@o2.ai");
   });
 
-  // At equal priority the MORE SPECIFIC rotation wins, so a catch-all never
-  // shadows a layer somebody deliberately restricted.
-  it("breaks an equal-priority tie toward the restricted layer", () => {
-    const rotations = [
+  // At equal priority the MORE SPECIFIC rule wins, so a catch-all never shadows
+  // a layer somebody deliberately restricted.
+  it("breaks an equal-priority tie toward the restricted rule", () => {
+    const rules = [
       layer("Base", ["catchall@o2.ai"], 0, []),
       layer("Office", ["office@o2.ai"], 0, [window([], 9 * 60, 17 * 60)]),
     ];
     const at = local(IST, 2026, 8, 10, 12, 0);
-    expect(resolveHolder(rotations, at, IST).member).toBe("office@o2.ai");
-    expect(resolveHolder([...rotations].reverse(), at, IST).member).toBe("office@o2.ai");
+    expect(resolveHolder(rota("P", rules), at, IST).member).toBe("office@o2.ai");
+    expect(resolveHolder(rota("P", [...rules].reverse()), at, IST).member).toBe("office@o2.ai");
   });
 
-  // A moment no layer covers is a coverage GAP, not a silent fallback to
-  // somebody else's rotation.
-  it("resolves to nobody when no layer applies", () => {
-    const rotations = [
-      layer("Office", ["office@o2.ai"], 0, [window([0, 1, 2, 3, 4], 9 * 60, 17 * 60)]),
-    ];
+  /// **The defect that started the rework.** A rotation restricted to weekdays
+  /// has NOBODY at the weekend. It used to silently revert to a derived holder
+  /// — a different person from the one the ladder named, and both were right.
+  it("leaves a gap at the weekend rather than conjuring a stand-in", () => {
+    const rotation = rota("Secondary", [
+      layer("Weekdays", ["office@o2.ai"], 0, [window([0, 1, 2, 3, 4], 9 * 60, 17 * 60)]),
+    ]);
     const saturday = local(IST, 2026, 8, 15, 12, 0);
-    expect(resolveHolder(rotations, saturday, IST)).toEqual({ member: null, rotation: null });
+    expect(resolveHolder(rotation, saturday, IST)).toEqual({ member: null, rule: null });
   });
 
-  // An unusable rotation must staff nobody rather than defaulting to members[0],
+  // An unusable rule must staff nobody rather than defaulting to members[0],
   // which would page a person the schedule never selected.
   it.each([
     ["no members", layer("Base", [], 0, [])],
     ["a zero shift", { ...layer("Base", ["ana@o2.ai"], 0, []), shift_micros: 0 }],
     ["a blank name", { ...layer("Base", ["ana@o2.ai"], 0, []), name: "" }],
-  ])("a broken rotation (%s) staffs nobody", (_name, rotation) => {
-    expect(resolveHolder([rotation as Rotation], ANCHOR, IST).member).toBeNull();
+  ])("a broken rule (%s) staffs nobody", (_name, rule) => {
+    expect(resolveHolder(rota("P", [rule as ShiftRule]), ANCHOR, IST).member).toBeNull();
   });
 
-  it("names the rotation that decided, so the UI can say why", () => {
-    const office = layer("Office", ["office@o2.ai"], 0, [window([], 9 * 60, 17 * 60)]);
-    const rotations = [layer("Base", ["catchall@o2.ai"], 0, []), office];
-    const resolved = resolveHolder(rotations, local(IST, 2026, 8, 10, 12, 0), IST);
-    expect(resolved.rotation?.name).toBe("Office");
+  it("names the rule that decided, so the UI can say why", () => {
+    const rotation = rota("Primary", [
+      layer("Base", ["catchall@o2.ai"], 0, []),
+      layer("Office", ["office@o2.ai"], 0, [window([], 9 * 60, 17 * 60)]),
+    ]);
+    const resolved = resolveHolder(rotation, local(IST, 2026, 8, 10, 12, 0), IST);
+    expect(resolved.rule?.name).toBe("Office");
   });
 
-  it("walks the winning rotation's own handover order", () => {
-    const rotations = [layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, [])];
-    expect(resolveHolder(rotations, ANCHOR, IST).member).toBe("ana@o2.ai");
-    expect(resolveHolder(rotations, ANCHOR + MICROS_PER_WEEK, IST).member).toBe("bob@o2.ai");
+  it("walks the winning rule's own handover order", () => {
+    const rotation = rota("Primary", [layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, [])]);
+    expect(resolveHolder(rotation, ANCHOR, IST).member).toBe("ana@o2.ai");
+    expect(resolveHolder(rotation, ANCHOR + MICROS_PER_WEEK, IST).member).toBe("bob@o2.ai");
+  });
+});
+
+describe("resolvePositions", () => {
+  const roster = ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"];
+
+  /// The default that replaced the derived-secondary hack: two ordinary
+  /// rotations, same roster, the second anchored one shift behind. They cannot
+  /// resolve to the same person, and that is *data* rather than a hidden rule.
+  it("gives one entry per rotation, and the pair never collides", () => {
+    const primary = rota("Primary", [layer("Base", roster, 0, [])]);
+    const secondary: Rotation = {
+      id: "rot_secondary",
+      name: "Secondary",
+      shift_rules: [{ ...layer("Base", roster, 0, []), anchor_micros: ANCHOR - MICROS_PER_WEEK }],
+    };
+
+    const positions = resolvePositions([primary, secondary], ANCHOR, IST);
+    expect(positions).toHaveLength(2);
+    expect(positions[0]).toMatchObject({ rotation_name: "Primary", user_email: "ana@o2.ai" });
+    expect(positions[1]).toMatchObject({ rotation_name: "Secondary", user_email: "bob@o2.ai" });
+  });
+
+  /// A rotation that resolves to nobody is ABSENT, not present with a null
+  /// holder — which is what makes a coverage gap visible instead of rendering
+  /// as an empty row that reads like an unnamed person.
+  it("omits a rotation that resolves to nobody", () => {
+    const staffed = rota("Primary", [layer("Base", ["ana@o2.ai"], 0, [])]);
+    const empty = rota("Secondary", [
+      layer("Weekdays", ["office@o2.ai"], 0, [window([0, 1, 2, 3, 4], 9 * 60, 17 * 60)]),
+    ]);
+    const saturday = local(IST, 2026, 8, 15, 12, 0);
+
+    const positions = resolvePositions([staffed, empty], saturday, IST);
+    expect(positions.map((p) => p.rotation_name)).toEqual(["Primary"]);
+  });
+
+  it("answers nothing for a team with no rotations", () => {
+    expect(resolvePositions([], ANCHOR, IST)).toEqual([]);
   });
 });
 
 describe("resolveNextHolder", () => {
-  it("is the winning rotation's next member", () => {
-    const rotations = [layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, [])];
-    expect(resolveNextHolder(rotations, ANCHOR, IST)).toBe("bob@o2.ai");
-    expect(resolveNextHolder(rotations, ANCHOR + MICROS_PER_WEEK, IST)).toBe("cara@o2.ai");
+  it("is the winning rule's next member", () => {
+    const rotation = rota("Primary", [layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, [])]);
+    expect(resolveNextHolder(rotation, ANCHOR, IST)).toBe("bob@o2.ai");
+    expect(resolveNextHolder(rotation, ANCHOR + MICROS_PER_WEEK, IST)).toBe("cara@o2.ai");
   });
 
   it("wraps, so the last member hands back to the first", () => {
-    const rotations = [layer("Base", ["ana@o2.ai", "bob@o2.ai"], 0, [])];
-    expect(resolveNextHolder(rotations, ANCHOR + MICROS_PER_WEEK, IST)).toBe("ana@o2.ai");
+    const rotation = rota("Primary", [layer("Base", ["ana@o2.ai", "bob@o2.ai"], 0, [])]);
+    expect(resolveNextHolder(rotation, ANCHOR + MICROS_PER_WEEK, IST)).toBe("ana@o2.ai");
   });
 
   // Returning the same person would page them twice and call the second one an
   // escalation.
   it("is null for a one-person rotation", () => {
-    expect(resolveNextHolder([layer("Base", ["ana@o2.ai"], 0, [])], ANCHOR, IST)).toBeNull();
+    expect(resolveNextHolder(rota("P", [layer("Base", ["ana@o2.ai"], 0, [])]), ANCHOR, IST)).toBeNull();
   });
 
   it("is null when nobody is on call", () => {
-    expect(resolveNextHolder([], ANCHOR, IST)).toBeNull();
+    expect(resolveNextHolder(rota("P", []), ANCHOR, IST)).toBeNull();
   });
 });
 
@@ -1035,68 +1148,99 @@ describe("parseRoutingReason", () => {
 });
 
 describe("resolveLadder", () => {
-  const slots = [
-    { rotation: "Weekdays", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" },
+  const positions = [
+    {
+      rotation_id: "rot_primary",
+      rotation_name: "Primary",
+      rule: "Weekdays",
+      user_email: "ana@o2.ai",
+      next_user_email: "bob@o2.ai",
+    },
+  ] as any[];
+  const rotations = [
+    { id: "rot_primary", name: "Primary", shift_rules: [] },
+    { id: "rot_secondary", name: "Secondary", shift_rules: [] },
   ] as any[];
   const rung = (targets: any[], after = 0) =>
     ({ priority: 1, channels: [], steps: [{ after_micros: after, targets }] }) as any;
 
-  it("names who is on call now", () => {
-    expect(resolveLadder(rung([{ kind: "on_call_now" }]), slots)[0].people).toEqual([
-      "ana@o2.ai",
-    ]);
+  it("names who is on call in the rotation the level points at", () => {
+    expect(
+      resolveLadder(rung([{ kind: "rotation", rotation_id: "rot_primary" }]), positions)[0].people,
+    ).toEqual(["ana@o2.ai"]);
   });
 
-  it("names who the rotation hands over to", () => {
-    expect(resolveLadder(rung([{ kind: "next_on_call" }]), slots)[0].people).toEqual([
-      "bob@o2.ai",
-    ]);
+  /// A rotation that resolves to nobody is ABSENT from `on-call`, so a level
+  /// naming it reaches nobody — the failure worth catching before a save.
+  it("resolves to nobody when that rotation has a coverage gap", () => {
+    expect(
+      resolveLadder(rung([{ kind: "rotation", rotation_id: "rot_secondary" }]), positions)[0]
+        .people,
+    ).toEqual([]);
   });
 
-  /// The failure worth catching before a save: a `next_on_call` rung on a
-  /// one-person rotation wakes nobody, and the editor showed it as configured.
-  it("resolves to nobody when the rotation has no next person", () => {
-    const solo = [{ rotation: "Solo", user_email: "ana@o2.ai", next_user_email: null }] as any[];
-    expect(resolveLadder(rung([{ kind: "next_on_call" }]), solo)[0].people).toEqual([]);
-  });
-
-  /// B12: a rung naming a slot rendered as "reaches nobody" because the
-  /// switch had no arm for it — a correct ladder reading as a broken one.
-  it("resolves a slot-naming rung against that slot", () => {
+  /// Two rotations named on one step fire together — the only way a level pages
+  /// more than one person now.
+  it("pages both when a step names two rotations", () => {
     const two = [
-      { slot: "primary", rotation: "P", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" },
-      { slot: "secondary", rotation: "S", user_email: "cy@o2.ai", next_user_email: "dee@o2.ai" },
+      ...positions,
+      {
+        rotation_id: "rot_secondary",
+        rotation_name: "Secondary",
+        rule: "Weekdays",
+        user_email: "cy@o2.ai",
+        next_user_email: "dee@o2.ai",
+      },
     ] as any[];
     expect(
-      resolveLadder(rung([{ kind: "on_call_in_slot", slot: "secondary" }]), two)[0].people,
-    ).toEqual(["cy@o2.ai"]);
-    expect(
-      resolveLadder(rung([{ kind: "next_on_call_in_slot", slot: "secondary" }]), two)[0].people,
-    ).toEqual(["dee@o2.ai"]);
-    const everyone = resolveLadder(rung([{ kind: "everyone_in_slot", slot: "secondary" }]), two)[0];
-    expect(everyone.pools).toEqual(["secondary"]);
-    expect(everyone.people).toEqual([]);
+      resolveLadder(
+        rung([
+          { kind: "rotation", rotation_id: "rot_primary" },
+          { kind: "rotation", rotation_id: "rot_secondary" },
+        ]),
+        two,
+      )[0].people,
+    ).toEqual(["ana@o2.ai", "cy@o2.ai"]);
   });
 
-  /// The unsuffixed targets mean the DEFAULT slot. Reading them as "every
-  /// slot" listed the secondary under a rung that pages the primary.
-  it("keeps on_call_now meaning the default slot when a secondary is staffed", () => {
-    const two = [
-      { slot: "primary", rotation: "P", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" },
-      { slot: "secondary", rotation: "S", user_email: "cy@o2.ai", next_user_email: "dee@o2.ai" },
-    ] as any[];
-    expect(resolveLadder(rung([{ kind: "on_call_now" }]), two)[0].people).toEqual(["ana@o2.ai"]);
-    // everyone_on_schedule stays the union — the last resort is the whole room.
-    expect(resolveLadder(rung([{ kind: "everyone_on_schedule" }]), two)[0].people).toEqual([
-      "ana@o2.ai",
-      "cy@o2.ai",
-      "bob@o2.ai",
-      "dee@o2.ai",
-    ]);
+  /// `mode: "all"` is a group: a rotation's full roster spans every shift rule,
+  /// and only one of them is on shift. Naming one person would read as "pages
+  /// one person".
+  it("keeps mode all as a group named after the rotation", () => {
+    const step = resolveLadder(
+      rung([{ kind: "rotation", rotation_id: "rot_primary", mode: "all" }]),
+      positions,
+      rotations,
+    )[0];
+    expect(step.pools).toEqual(["Primary"]);
+    expect(step.people).toEqual([]);
+  });
+
+  /// **`next_user_email` is display-only.** It used to double as the secondary,
+  /// which is exactly how one team got two different people both correctly
+  /// labelled "the secondary". Nothing in a ladder may reach it.
+  it("never pages the up-next person", () => {
+    const step = resolveLadder(
+      rung([{ kind: "rotation", rotation_id: "rot_primary" }]),
+      positions,
+    )[0];
+    expect(step.people).not.toContain("bob@o2.ai");
+  });
+
+  /// A level pointing at a deleted rotation advanced in silence. It is reported
+  /// rather than resolving to an empty rung that merely looks uncovered.
+  it("reports a level naming a rotation the team does not have", () => {
+    const step = resolveLadder(
+      rung([{ kind: "rotation", rotation_id: "rot_gone" }]),
+      positions,
+      rotations,
+    )[0];
+    expect(step.missingRotations).toEqual(["rot_gone"]);
+    expect(step.people).toEqual([]);
   });
 
   it("keeps the whole team as a group rather than a list", () => {
-    const step = resolveLadder(rung([{ kind: "whole_team" }]), slots)[0];
+    const step = resolveLadder(rung([{ kind: "whole_team" }]), positions)[0];
     expect(step.wholeTeam).toBe(true);
     expect(step.people).toEqual([]);
   });
@@ -1104,8 +1248,11 @@ describe("resolveLadder", () => {
   // Paging one person twice for one rung is noise, and the engine dedupes too.
   it("names somebody once even when two targets both reach them", () => {
     const step = resolveLadder(
-      rung([{ kind: "on_call_now" }, { kind: "user", email: "ana@o2.ai" }]),
-      slots,
+      rung([
+        { kind: "rotation", rotation_id: "rot_primary" },
+        { kind: "user", email: "ana@o2.ai" },
+      ]),
+      positions,
     )[0];
     expect(step.people).toEqual(["ana@o2.ai"]);
   });
@@ -1113,7 +1260,7 @@ describe("resolveLadder", () => {
   // Runs during render, so a malformed rung must not take the editor down.
   it("survives a step with no targets at all", () => {
     const r = { priority: 1, channels: [], steps: [{ after_micros: 0 }] } as any;
-    expect(resolveLadder(r, slots)[0]).toMatchObject({ people: [], wholeTeam: false });
+    expect(resolveLadder(r, positions)[0]).toMatchObject({ people: [], wholeTeam: false });
   });
 
   // The ladder is read top to bottom, so it must be ordered by delay whatever
@@ -1127,7 +1274,7 @@ describe("resolveLadder", () => {
         { after_micros: 0, targets: [{ kind: "on_call_now" }] },
       ],
     } as any;
-    expect(resolveLadder(r, slots).map((s) => s.afterMicros)).toEqual([0, 600]);
+    expect(resolveLadder(r, positions).map((s) => s.afterMicros)).toEqual([0, 600]);
   });
 });
 

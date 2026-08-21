@@ -29,7 +29,7 @@ import type {
   OnCallResponseEvent,
   OnCallSchedule,
   PresetDescriptor,
-  OnCallSlot,
+  OnCallPosition,
   OnCallTeam,
   OnCallTeamMember,
   L0Policy,
@@ -183,7 +183,7 @@ const oncall = {
     team_id: string;
     at?: number;
   }) =>
-    http().get<OnCallSlot[]>(
+    http().get<OnCallPosition[]>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/on-call`,
       at === undefined ? undefined : { params: { at } },
     ),
@@ -800,9 +800,15 @@ const oncall = {
     /// the plural form with a 422. `end_at` is exclusive, so a cover ending
     /// exactly when the next begins does not overlap it.
     data: {
-      /** Which rotation slot is covered. Absent means the default one — which
-       *  on a two-slot team silently evicts whoever held `primary`. */
-      slot?: string;
+      /**
+       * Which rotation is covered — an **id or a name**, both accepted. Absent
+       * means the team's primary, which on a multi-rotation team silently
+       * evicts whoever held it.
+       *
+       * A rotation the team does not have is refused with a 400 rather than
+       * stored: a cover over a position nothing staffs would page nobody.
+       */
+      rotation_id?: string;
       user_email: string;
       start_at: number;
       end_at: number;
@@ -914,7 +920,7 @@ const oncall = {
     team_id,
     from,
     to,
-    slot,
+    rotation_id,
   }: {
     org_identifier: string;
     team_id: string;
@@ -922,15 +928,18 @@ const oncall = {
     from: number;
     to: number;
     /**
-     * Which slot to resolve. The endpoint answers for ONE at a time and
-     * defaults to the default slot, so a two-slot team needs a call each —
-     * without this the secondary lane was drawn and never filled.
+     * Which rotation to resolve. The endpoint answers for ONE at a time and
+     * defaults to the team's primary, so drawing a second rotation's lane means
+     * a second call — without this the secondary lane was drawn and never
+     * filled.
+     *
+     * A team with no rotations answers `[]`, not one long gap segment.
      */
-    slot?: string;
+    rotation_id?: string;
   }) =>
     http().get<ResolvedSegment[]>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/resolved-schedule`,
-      { params: slot ? { from, to, slot } : { from, to } },
+      { params: rotation_id ? { from, to, rotation_id } : { from, to } },
     ),
 
   /// Everything the team header needs, in one call: membership, coverage, the

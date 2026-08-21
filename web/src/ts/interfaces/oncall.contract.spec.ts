@@ -49,6 +49,7 @@ import type {
   PolicyFinalAction,
   PresetInputKind,
   ResolutionCause,
+  RotationMode,
   ResponderRole,
   ResponseEventKind,
   ResponseState,
@@ -152,10 +153,12 @@ const SUBJECT_TYPES = [
 const _c5: Complete<SubjectType, typeof SUBJECT_TYPES> = true;
 
 const ESCALATION_TARGET_KINDS = [
-  "on_call_now", "next_on_call", "everyone_on_schedule", "user", "whole_team",
-  "on_call_in_slot", "next_on_call_in_slot", "everyone_in_slot",
+  "rotation", "user", "whole_team",
 ] as const satisfies readonly EscalationTargetKind[];
 const _c6: Complete<EscalationTargetKind, typeof ESCALATION_TARGET_KINDS> = true;
+
+const ROTATION_MODES = ["on_call", "all"] as const satisfies readonly RotationMode[];
+const _c11: Complete<RotationMode, typeof ROTATION_MODES> = true;
 
 const FINAL_ACTIONS = [
   "stop", "notify_default_team",
@@ -172,12 +175,12 @@ const _c9: Complete<RoutingDecisionKind, typeof ROUTING_DECISION_KINDS> = true;
 
 const PRESET_INPUT_KINDS = [
   "group", "group_list", "day_of_week", "day_list", "minute_of_day",
-  "timezone", "duration_micros", "text", "member_list",
+  "timezone", "duration_micros", "timestamp_micros", "text", "member_list",
 ] as const satisfies readonly PresetInputKind[];
 const _c10: Complete<PresetInputKind, typeof PRESET_INPUT_KINDS> = true;
 
 const _causes: Complete<ResolutionCause, typeof RESOLUTION_CAUSES> = true;
-void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _causes];
+void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _causes];
 
 /** Rust enum name → the TS mirror it must equal. */
 const MIRRORED: Record<string, readonly string[]> = {
@@ -187,6 +190,7 @@ const MIRRORED: Record<string, readonly string[]> = {
   ResponderRole: RESPONDER_ROLES,
   SubjectType: SUBJECT_TYPES,
   EscalationTarget: ESCALATION_TARGET_KINDS,
+  RotationMode: ROTATION_MODES,
   FinalAction: FINAL_ACTIONS,
   L0Mode: L0_MODES,
   RoutingDecision: ROUTING_DECISION_KINDS,

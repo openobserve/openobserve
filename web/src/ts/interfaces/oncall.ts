@@ -17,70 +17,56 @@
 // API emits — nothing is renamed on the way in.
 
 /**
- * Who a rung of the ladder pages.
+ * Who a level of the ladder pages.
  *
- * Replaces a fixed six-slot vocabulary in which every slot needed a rotation
- * of its own. A "secondary" is not a slot anybody staffs — it is the ladder
- * walking the same rotation, which is what `next_on_call` is.
+ * Three kinds, down from eight. Six of the old ones existed only to name a
+ * slot or to describe a derivation — `next_on_call` computed a second person
+ * from the first's roster, so a position existed whether or not anybody
+ * staffed it. Nothing here conjures a person: if a level resolves to somebody,
+ * a shift rule put them there.
  */
-export type EscalationTargetKind =
-  | "on_call_now"
-  | "next_on_call"
-  | "everyone_on_schedule"
-  | "user"
-  | "whole_team"
-  /** The three slot-naming targets. The unsuffixed three keep meaning the
-   *  DEFAULT slot — every stored policy row holds `{"kind":"on_call_now"}`
-   *  and it has to keep meaning the primary. */
-  | "on_call_in_slot"
-  | "next_on_call_in_slot"
-  | "everyone_in_slot";
+export type EscalationTargetKind = "rotation" | "user" | "whole_team";
 
-/** The kinds that carry a slot name. */
-export type SlotTargetKind = "on_call_in_slot" | "next_on_call_in_slot" | "everyone_in_slot";
+/**
+ * How much of a rotation a level pages.
+ *
+ * This is why three kinds are enough — "everyone in this rotation" is a mode,
+ * not a fourth kind.
+ */
+export type RotationMode =
+  /** The one person the rotation puts on call at that instant. */
+  | "on_call"
+  /** Everyone on the rotation's winning shift rule, on shift or not. */
+  | "all";
 
 export type EscalationTarget =
-  | { kind: Exclude<EscalationTargetKind, "user" | SlotTargetKind> }
+  | {
+      kind: "rotation";
+      /** The rotation's **id**, never its name — a rotation is renameable and
+       *  a stored policy must not start paging a different position because
+       *  somebody fixed a typo on a calendar. */
+      rotation_id: string;
+      /** Omitted from the wire when it is `on_call`, so a level written
+       *  without it round-trips unchanged. Never send `"on_call"` explicitly. */
+      mode?: RotationMode;
+    }
   | { kind: "user"; email: string }
-  | { kind: SlotTargetKind; slot: string };
+  | { kind: "whole_team" };
 
 /**
  * Offered in the target picker, in the order they are listed.
  *
- * The unsuffixed three come first because they are what a single-slot team
- * means. The slot-naming three are offered only where there is a second slot to
- * name — see `SLOT_TARGET_KINDS`. Leaving them out entirely meant that from
- * 2026-08-18, when every ≥2-person rotation gained a secondary slot, no rung
- * could page it.
+ * Three radio options: pick a rotation, pick people, or pick the whole team.
+ * Several targets in one step fire together — that is now the **only** way to
+ * page more than one person.
  */
-export const TARGET_KINDS: EscalationTargetKind[] = [
-  "on_call_now",
-  "next_on_call",
-  "everyone_on_schedule",
-  "user",
-  "whole_team",
-  "on_call_in_slot",
-  "next_on_call_in_slot",
-  "everyone_in_slot",
-];
+export const TARGET_KINDS: EscalationTargetKind[] = ["rotation", "user", "whole_team"];
 
-/**
- * The kinds that need a slot named before they mean anything.
- *
- * They are hidden on a team that staffs one slot: there, *"the primary
- * on-call"* and *"whoever is on call"* are the same person said two ways, and
- * offering both is how a picker teaches somebody a distinction that does not
- * exist yet.
- */
-export const SLOT_TARGET_KINDS: readonly SlotTargetKind[] = [
-  "on_call_in_slot",
-  "next_on_call_in_slot",
-  "everyone_in_slot",
-];
-
-/** Does this kind carry a `slot`? Narrows, so the caller can read `.slot`. */
-export function isSlotTarget(kind: EscalationTargetKind): kind is SlotTargetKind {
-  return (SLOT_TARGET_KINDS as readonly string[]).includes(kind);
+/** Does this kind carry a `rotation_id`? Narrows, so the caller can read it. */
+export function isRotationTarget(
+  target: EscalationTarget,
+): target is Extract<EscalationTarget, { kind: "rotation" }> {
+  return target.kind === "rotation";
 }
 
 /** Serialized as the integer 1–5, matching `alerts.priority`. */
@@ -191,87 +177,101 @@ export interface TimeWindow {
  * through means one click lands on that rotation's form instead of on a bulk
  * editor the user then has to navigate a second time.
  *
- * `name` is a rotation's stored name — data, not display text.
+ * `id` is a rotation's stored id — data, not display text. It was the name
+ * until rotations became renameable objects; a name is no longer a stable
+ * handle for one.
  */
 export type ScheduleEditorIntent =
   | { mode: "new" }
-  | { mode: "edit"; name: string }
-  | { mode: "duplicate"; name: string };
+  | { mode: "edit"; id: string }
+  | { mode: "duplicate"; id: string };
 
-export interface Rotation {
-  /** What this rotation is called — a label for a shift, not a rung of the
-   *  ladder. Two rotations in different slots may share a name. */
+/**
+ * One layer inside a rotation — a roster, a cadence, and when it applies.
+ *
+ * This is what a `Rotation` used to be. It became a rule *inside* one when
+ * rotations turned into named objects: follow-the-sun is several rules in
+ * **one** rotation, because three regional rules are one person on call across
+ * three timezones' working hours — not three people on call at once.
+ */
+export interface ShiftRule {
+  /** What this rule is called on the calendar. "APAC business hours",
+   *  "Weekend", "Base rotation". */
   name: string;
-  /**
-   * Which slot this rotation staffs. Absent means {@link DEFAULT_SLOT}.
-   *
-   * Rotations **sharing** a slot are layers and compete by priority and
-   * restriction. Rotations in **different** slots do not compete at all: both
-   * resolve, at the same instant, each with its own members and handover day.
-   * That is what makes a secondary a separate pool rather than next week's
-   * primary.
-   */
-  slot?: string;
   /** Participants in handover order. */
   members: string[];
-  /**
-   * How far down the cycle the derived secondary sits.
-   *
-   * **Absent means derived, and the derived value is `1`** — the secondary is
-   * whoever takes over next, the person the calendar already shows in the next
-   * cell. It was `max(1, len/2)` for two days and was replaced on 2026-08-18,
-   * because a secondary nobody can derive means the calendar's "next" and the
-   * ladder's second rung name two different people and both are right.
-   *
-   * `0` is refused with a 400 — it would make the secondary the person already
-   * on call. Larger than the roster is clamped silently, so a shrinking team
-   * never takes its own rotation out of service.
-   */
-  secondary_offset?: number;
-  /**
-   * The slot this rotation's **derived** second position staffs.
-   *
-   * One roster, two positions: `slot` is held by whoever is on shift, and this
-   * one by whoever sits `secondary_offset` handovers ahead. Declaring it is
-   * what makes that position *addressable* — a cover can name it, a rung can
-   * page it, and `GET .../on-call` reports it as a slot of its own. Undeclared,
-   * the same person is still computed (as `next_on_call`) but there is nothing
-   * to write a cover against.
-   *
-   * **A rotation with a derived secondary has TWO slots while carrying one
-   * `slot` value.** Anything asking "which slots does this team staff" has to
-   * read both fields — see `staffedSlots`.
-   */
-  secondary_slot?: string;
   /** Shift length in microseconds. */
   shift_micros: number;
-  /** Instant `members[0]`'s first shift begins, in microseconds. */
+  /**
+   * Instant `members[0]`'s first shift begins, in microseconds.
+   *
+   * This is also the whole of the "secondary" mechanism. Two rotations with the
+   * same roster and anchors one shift apart can never resolve to the same
+   * person — and that is *data*, not a rule: nothing at resolution time knows
+   * the two are related, and dragging one anchor breaks the pairing on purpose.
+   * It replaced `secondary_offset`, which computed the second person from the
+   * first's roster and so produced a position that existed whether or not
+   * anybody staffed it.
+   */
   anchor_micros: number;
-  /// Higher wins when two rotations both apply. Without a distinct value the
-  /// server rejects the whole save as ambiguous, which used to take the
-  /// working rotation down with the new one.
+  /// Higher wins when two rules in the same rotation both apply. Explicit
+  /// rather than positional, so reordering the list cannot silently change who
+  /// gets paged.
   priority?: number;
-  /// When this rotation applies. Empty means always — the catch-all every
+  /// When this rule applies. Empty means always — the catch-all every
   /// follow-the-sun setup needs underneath the restricted ones.
   restrictions?: TimeWindow[];
   /**
-   * The layer is not in effect before this instant. Absent means "since
+   * The rule is not in effect before this instant. Absent means "since
    * forever".
    */
   starts_at?: number;
   /**
-   * The layer is not in effect at or after this instant. Absent means "until
+   * The rule is not in effect at or after this instant. Absent means "until
    * further notice".
    *
-   * **This is how a layer is retired.** Deleting it is the only substitute and
+   * **This is how a rule is retired.** Deleting it is the only substitute and
    * it throws away exactly the record this field exists to keep — "the weekend
-   * rotation ran until March" stops being something the schedule can say.
+   * rule ran until March" stops being something the schedule can say.
    * Exclusive, like every other boundary here.
    */
   ends_at?: number;
+}
+
+/**
+ * A named position on a team, and the only thing that puts a person on call.
+ *
+ * Zenduty's *schedule*, incident.io's *rota*. It replaced a `slot` string that
+ * grouped rotations into positions, plus a *derived* secondary computed from
+ * the primary's roster — two sources for one position, which disagreed the
+ * moment they could.
+ *
+ * **Two rotations = two people on call. Two shift rules = one person, different
+ * hours.** That sentence is the whole model.
+ */
+export interface Rotation {
   /**
-   * Where this rotation came from. `"default"` marks the one the backend
-   * staffed when the team first had members — whole roster, weekly, 24×7.
+   * Stable handle. Unique within the team, and what an escalation level stores.
+   *
+   * Required on write. A level points at this rather than at `name` so that
+   * renaming a rotation cannot move who gets paged.
+   */
+  id: string;
+  /** What a level of the escalation policy names it, and what a page calls it.
+   *  Renameable, precisely because levels store the id. */
+  name: string;
+  /**
+   * The stack. Highest priority whose restrictions match wins, and exactly one
+   * of them does.
+   *
+   * Must be non-empty: a rotation with no shift rules puts nobody on call ever,
+   * and it is the one state that looks configured on a calendar and pages no
+   * one.
+   */
+  shift_rules: ShiftRule[];
+  /**
+   * Where this rotation came from. `"default"` marks one the system staffed
+   * when the team was created — whole roster, weekly, 24×7.
    *
    * It exists because auto-staffing costs a screen the signal it used to read
    * absence with: `GET .../schedule` no longer returns `null` for a new team,
@@ -374,63 +374,58 @@ export interface Unavailability {
 }
 
 /**
- * The slot a rotation, cover or ladder rung belongs to. Absent means
- * {@link DEFAULT_SLOT} — every rotation written before slots existed is the
- * team's primary, and reading it any other way would silently rewire a stored
- * ladder the day somebody added a second pool.
+ * The name the system gives a team's first rotation.
  *
- * Slots resolve **independently and at the same time**: two slots are two
- * answers to "who is on call", not two candidates for one answer. Layering —
- * priority, restrictions, validity windows — happens *within* a slot.
+ * A *name*, not a keyword: nothing in resolution treats it specially, and a
+ * team may rename or delete it. It replaced `DEFAULT_SLOT`, which **was** a
+ * keyword — every rotation that did not name a slot silently meant that one,
+ * and six escalation targets existed to say "that one" in different ways.
  */
-export const DEFAULT_SLOT = "primary";
-
-/** Server-side comparison is case- and whitespace-insensitive; match it. */
-export function sameSlot(a: string | null | undefined, b: string | null | undefined): boolean {
-  return (a ?? DEFAULT_SLOT).trim().toLowerCase() === (b ?? DEFAULT_SLOT).trim().toLowerCase();
-}
+export const DEFAULT_ROTATION_NAME = "Primary";
 
 /**
- * Every slot a set of rotations staffs, in the order they first appear.
+ * The name the system gives the second rotation, when one is asked for.
  *
- * **A rotation can staff two.** `slot` is held by whoever is on shift;
- * `secondary_slot` — when declared — is held by whoever sits
- * `secondary_offset` handovers ahead, off the same roster. Reading only `slot`
- * therefore misses the secondary of every team whose rotation the backend
- * auto-staffed, which since 2026-08-17 is every team with two or more members.
- *
- * What that cost while it was wrong: the calendar drew no secondary lane
- * (`resolved-schedule` was only ever asked for `?slot=primary`), and the cover
- * dialog's slot picker never appeared, so a cover meant for the secondary
- * landed on the primary and evicted whoever was on call.
+ * Also just a name. The rotation it labels is entirely ordinary: same roster,
+ * same cadence, anchor one shift behind. Nothing derives it and nothing links
+ * the two — if somebody edits one roster and not the other they drift, and the
+ * `two_rotations_resolve_to_one_person` risk is how the user finds out.
  */
-export function staffedSlots(rotations: readonly Rotation[]): string[] {
-  const seen = new Map<string, string>();
-  const remember = (slot: string) => {
-    const key = slot.trim().toLowerCase();
-    if (!seen.has(key)) seen.set(key, slot);
-  };
-  for (const rotation of rotations) {
-    remember(rotation.slot ?? DEFAULT_SLOT);
-    if (rotation.secondary_slot) remember(rotation.secondary_slot);
-  }
-  return [...seen.values()];
-}
+export const SECONDARY_ROTATION_NAME = "Secondary";
 
-export interface OnCallSlot {
-  /** Absent means the default slot. See {@link DEFAULT_SLOT}. */
-  slot?: string | null;
-  /** The rotation that produced this. */
-  rotation: string;
+/** The longest a rotation's name may be, server-side. */
+export const MAX_ROTATION_NAME_CHARS = 64;
+
+/**
+ * Who one rotation puts on call at an instant.
+ *
+ * One per rotation, and a rotation is the only thing that produces one. The
+ * previous shape had an entry per *slot*, where a slot could exist because
+ * something derived it rather than because anybody staffed it.
+ *
+ * **A rotation that resolves to nobody is absent from the array**, not present
+ * with a null holder — that is a coverage gap, and a screen that renders one
+ * row per response entry will simply not draw it.
+ */
+export interface OnCallPosition {
+  /** The rotation's id. What a level of the escalation policy points at. */
+  rotation_id: string;
+  /** The rotation's name, for a human reading a page or a calendar. */
+  rotation_name: string;
+  /** Which shift rule inside it produced this answer. */
+  rule: string;
   user_email: string;
-  /** Who it hands over to — **within this slot**, not the next slot. Absent
-   *  for a one-person rotation. */
-  next_user_email?: string | null;
   /**
-   * How far down the cycle `next_user_email` sits, so the screen can say "+5"
-   * rather than leaving the reader to wonder why that person.
+   * Who takes over at the next handover.
+   *
+   * **Display only.** Nothing pages this: it is the calendar's "up next". It
+   * used to double as the secondary, which is precisely how one team got two
+   * different people both correctly labelled "the secondary" — never render it
+   * as a position, and never offer it as a page target.
    */
-  next_offset?: number | null;
+  next_user_email?: string | null;
+  /** Set when a cover, rather than a shift rule, put this person here. */
+  override_id?: string | null;
 }
 
 export interface LadderStep {
@@ -647,10 +642,16 @@ export interface ConfigRisk {
   priority?: string | null;
   user_email?: string | null;
   rotation?: string | null;
-  /** Which slot the finding is about, where it is about one. */
+  /** Which rotation the finding is about, by name, where it is about one. */
   slot?: string | null;
   rung_micros?: number | null;
-  /** Micros — when the gap starts. */
+  /**
+   * Micros — when the finding first bites.
+   *
+   * **Render it.** On `two_rotations_resolve_to_one_person` it looks up to
+   * three weeks ahead, and a warning about something happening in September is
+   * only actionable if it says September.
+   */
   at?: number | null;
   rule_id?: string | null;
   /** The ownership rule's dimensions, as the rule itself spells them. */
@@ -666,6 +667,23 @@ export interface ConfigRisks {
   total: number;
   risks: ConfigRisk[];
 }
+
+/**
+ * A level points at a rotation the team does not have, so it pages nobody and
+ * the ladder skips it in silence. Carries `priority`. Severity `high`.
+ *
+ * Renamed from `slot_pages_nobody`.
+ */
+export const RISK_LEVEL_PAGES_NOBODY = "level_names_a_rotation_that_does_not_exist";
+
+/**
+ * Two rotations put the same person on call at the same instant, so one person
+ * holds two positions and a level paging both would page them twice.
+ *
+ * Carries `user_email`, `rotation` and — the part worth rendering — `at`.
+ * Severity `medium`. Renamed from `slots_can_collide`.
+ */
+export const RISK_ROTATIONS_COLLIDE = "two_rotations_resolve_to_one_person";
 
 /**
  * `GET /oncall/teams/{id}/escalation-preview`. A dry run: who this priority
@@ -773,14 +791,18 @@ export interface TeamOverview {
  */
 export interface ResolvedSegment {
   /**
-   * Which slot this span resolves. Absent means the default slot.
+   * Which rotation this span resolves. Absent means the team's primary.
    *
-   * **The endpoint answers for one slot at a time.** A team with a staffed
-   * `secondary` gets no `secondary` segments back, so a lane drawn for one and
-   * filled from these will be empty — which is why the timeline says so rather
-   * than rendering a blank week that reads as "nobody".
+   * **The endpoint answers for one rotation at a time.** Segments for a second
+   * rotation come from a second call with its `rotation_id` — a lane drawn for
+   * one rotation and filled from another's segments will be empty, which is why
+   * the timeline says so rather than rendering a blank week that reads as
+   * "nobody".
+   *
+   * A team with **no rotations at all** gets `[]` back, not one long gap
+   * segment: there is no position to be unstaffed.
    */
-  slot?: string | null;
+  rotation_id?: string | null;
   /** Micros. */
   from: number;
   /** Micros. */
@@ -1083,8 +1105,6 @@ export interface HandoffSuggestion {
   reason: string;
 }
 
-export type OnCallSlotRole = "primary" | "secondary";
-
 /** One shift the signed-in user is on. */
 /**
  * One of the caller's teams, and whether they are on call for it.
@@ -1253,8 +1273,15 @@ export interface Override {
   id: string;
   org_id: string;
   team_id: string;
-  /** Which rotation this cover stands over. Absent means {@link DEFAULT_SLOT}. */
-  slot?: string | null;
+  /**
+   * Which rotation this cover stands over. Always present on read.
+   *
+   * A cover names a rotation for the same reason a level does: a cover is
+   * "stand in for this position", and a position is a rotation. Covering two of
+   * them is two covers, said out loud, rather than one cover that silently
+   * lands the same person in both.
+   */
+  rotation_id: string;
   user_email: string;
   /** Micros. */
   start_at: number;
