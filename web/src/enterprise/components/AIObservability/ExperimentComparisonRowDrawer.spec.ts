@@ -67,6 +67,9 @@ const row = {
     {
       name: "749570578629158502 · v1",
       kind: "score" as const,
+      scoreConfigId: "749570578629158502",
+      scoreConfigName: "correctness",
+      scoreConfigVersion: "1",
       baseline: 0.92,
       candidate: 0.59,
       delta: -0.33,
@@ -144,8 +147,8 @@ describe("ExperimentComparisonRowDrawer", () => {
     );
   });
 
-  it("tabulates each dimension with its delta, named by scorer", () => {
-    const wrapper = mountDrawer({ scorerNames: { "749570578629158502": "correctness" } });
+  it("tabulates each dimension with its delta, named by score config", () => {
+    const wrapper = mountDrawer();
     const scores = wrapper.get('[data-test="score-row"]').text();
 
     expect(scores).toContain("correctness · v1");

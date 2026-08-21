@@ -207,6 +207,23 @@ impl HttpResponse {
             .into_response()
     }
 
+    /// Send a PreconditionFailed (412) response in json format and associate
+    /// the provided error as `error` field.
+    ///
+    /// Used where the request is well-formed and permitted, but a condition the
+    /// caller must acknowledge has not been met yet — a cost estimate above the
+    /// warning threshold, for instance.
+    pub fn precondition_failed(error: impl ToString) -> Response {
+        (
+            StatusCode::PRECONDITION_FAILED,
+            Json(Self::error(
+                StatusCode::PRECONDITION_FAILED,
+                error.to_string(),
+            )),
+        )
+            .into_response()
+    }
+
     /// Send a NotFound response in json format and associate the
     /// provided error as `error` field.
     pub fn not_found(error: impl ToString) -> Response {

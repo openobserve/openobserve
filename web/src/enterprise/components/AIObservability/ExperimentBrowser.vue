@@ -93,7 +93,7 @@
       <OTable
         v-if="isGroupExpanded(group.id)"
         :data="group.children"
-        :columns="columns"
+        :columns="buildColumns(group.children)"
         row-key="id"
         show-index
         :show-global-filter="false"
@@ -343,9 +343,6 @@ const datasetRows = computed<DatasetRow[]>(() =>
     children: group.experiments,
   })),
 );
-// One table means one column set, so the scorer columns are the union across
-// every visible dataset; a scorer that does not apply to a row shows "—".
-const columns = computed(() => buildColumns(groups.value.flatMap((g) => g.experiments)));
 const groups = computed(() =>
   groupExperiments(
     props.experiments,

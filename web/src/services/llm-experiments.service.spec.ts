@@ -2,7 +2,10 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import http from "./http";
-import llmExperimentsService from "./llm-experiments.service";
+import llmExperimentsService, {
+  normalizeExperimentComparison,
+  normalizeExperimentRowDetail,
+} from "./llm-experiments.service";
 
 vi.mock("./http", () => {
   const mockClient = { get: vi.fn(), post: vi.fn() };
@@ -33,5 +36,89 @@ describe("llm-experiments compare()", () => {
 
     await llmExperimentsService.compare("acme", "base", "cand", 0);
     expect(mockClient.get.mock.calls[1][1].params.threshold).toBe(0);
+  });
+});
+
+describe("normalizeExperimentComparison()", () => {
+  it("normalizes score-config metadata and aggregate oriented deltas", () => {
+    const dimension = {
+      name: "internal-producer-id · v1",
+      kind: "score",
+      score_config_id: "config-1",
+      score_config_name: "answer_quality",
+      score_config_version: "3",
+      baseline: 0.8,
+      candidate: 0.6,
+      delta: -0.2,
+      oriented_delta: -0.2,
+      gating: true,
+      normalized: true,
+      baseline_sample_count: 1,
+      candidate_sample_count: 1,
+      assignment: "regressed",
+    };
+    const normalized = normalizeExperimentComparison({
+      baseline_id: "base",
+      candidate_id: "candidate",
+      dataset_id: "dataset",
+      threshold: 0.05,
+      assignment_rule: "Any regression wins",
+      counts: {},
+      dimensions: [
+        {
+          ...dimension,
+          comparable_row_count: 1,
+          baseline_only_row_count: 0,
+          candidate_only_row_count: 0,
+        },
+      ],
+      rows: [
+        {
+          logical_id: "row-1",
+          bucket: "regressed",
+          dimensions: [dimension],
+        },
+      ],
+    });
+
+    expect(normalized.dimensions[0]).toMatchObject({
+      scoreConfigId: "config-1",
+      scoreConfigName: "answer_quality",
+      scoreConfigVersion: "3",
+      orientedDelta: -0.2,
+      assignment: "regressed",
+    });
+    expect(normalized.rows[0].dimensions[0]).toMatchObject({
+      scoreConfigName: "answer_quality",
+      orientedDelta: -0.2,
+    });
+  });
+});
+
+describe("normalizeExperimentRowDetail()", () => {
+  it("keeps score-dimension metadata for pending rows", () => {
+    const normalized = normalizeExperimentRowDetail({
+      score_summaries: [
+        {
+          scorer_id: "scorer-1",
+          scorer_version: 2,
+          name: "answer_relevance",
+          score_config_id: "config-1",
+          score_config_name: "answer_relevance",
+          score_config_version: 3,
+          pending_count: 1,
+        },
+      ],
+    });
+
+    expect(normalized.scoreSummaries[0]).toMatchObject({
+      scorerId: "scorer-1",
+      scorerVersion: 2,
+      name: "answer_relevance",
+      scoreConfigId: "config-1",
+      scoreConfigName: "answer_relevance",
+      scoreConfigVersion: 3,
+      pendingCount: 1,
+    });
   });
 });

@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 
 use openobserve_core::llm_evaluations::{
     datasets::{DatasetItemSource, DatasetSnapshotFilter},
+    experiment_cost::ExperimentCostEstimate,
     experiment_dispersion::{DimensionDispersion, RowDispersion},
     experiment_evidence::{ExperimentApplicabilityPreview, ExperimentScorerApplicabilityPreview},
     experiment_ingest::{
@@ -253,11 +254,23 @@ pub struct CreateExperimentRequestBody {
     pub dataset_filter: Option<DatasetSnapshotFilterBody>,
     pub task: ExperimentTaskBody,
     pub scorers: Vec<ExperimentScorerRefBody>,
+    /// Trials per Dataset Case. Omitted means one, which is the contract's
+    /// default and the only value a caller who has not thought about
+    /// dispersion should get.
+    #[serde(default = "default_trial_count")]
     pub trial_count: u32,
     #[serde(default)]
     pub metadata: Option<Value>,
     #[serde(default)]
     pub idempotency_key: Option<String>,
+    /// Acknowledges a cost estimate above the organization's warning
+    /// threshold. Without it, such a request is refused with `412`.
+    #[serde(default)]
+    pub confirm_cost_estimate: bool,
+}
+
+const fn default_trial_count() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
@@ -293,6 +306,7 @@ impl From<CreateExperimentRequestBody> for CreateExperiment {
             trial_count: value.trial_count,
             metadata: value.metadata,
             idempotency_key: value.idempotency_key,
+            confirm_cost_estimate: value.confirm_cost_estimate,
         }
     }
 }
@@ -569,6 +583,69 @@ pub struct ExperimentPreviewResponseBody {
     pub pinned_scorers: Vec<PinnedExperimentScorerBody>,
     pub applicability: ExperimentApplicabilityPreviewBody,
     pub sample_slots: Vec<ExperimentSlotBody>,
+    /// Order-of-magnitude cost of running this plan, and whether creating it
+    /// requires `confirmCostEstimate`.
+    pub cost_estimate: Option<ExperimentCostEstimateBody>,
+}
+
+/// One priced call shape in the estimate: a pinned Scorer, or the Task itself
+/// when the platform is the one calling a model.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentCostDimensionBody {
+    pub scorer_id: Option<String>,
+    pub scorer_version: Option<i32>,
+    pub model: Option<String>,
+    pub call_count: u64,
+    pub input_tokens_per_call: i64,
+    pub output_tokens_per_call: i64,
+    /// Absent when no price is known for this model.
+    pub estimated_cost: Option<f64>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentCostEstimateBody {
+    pub slot_count: u64,
+    pub currency: String,
+    pub dimensions: Vec<ExperimentCostDimensionBody>,
+    /// Sum of the dimensions that could be priced. Absent when none could.
+    pub estimated_cost: Option<f64>,
+    /// Whether the Task side is included. `false` for Remote and SDK Tasks,
+    /// which run in the customer's own environment.
+    pub task_cost_estimated: bool,
+    /// At least one dimension had no known price, so the total is a floor.
+    pub incomplete: bool,
+    pub warning_threshold: f64,
+    /// Creation of this plan requires `confirmCostEstimate: true`.
+    pub confirmation_required: bool,
+}
+
+impl From<ExperimentCostEstimate> for ExperimentCostEstimateBody {
+    fn from(value: ExperimentCostEstimate) -> Self {
+        Self {
+            slot_count: value.slot_count,
+            currency: value.currency.to_string(),
+            dimensions: value
+                .dimensions
+                .into_iter()
+                .map(|dimension| ExperimentCostDimensionBody {
+                    scorer_id: dimension.scorer_id,
+                    scorer_version: dimension.scorer_version,
+                    model: dimension.model,
+                    call_count: dimension.call_count,
+                    input_tokens_per_call: dimension.input_tokens_per_call,
+                    output_tokens_per_call: dimension.output_tokens_per_call,
+                    estimated_cost: dimension.estimated_cost,
+                })
+                .collect(),
+            estimated_cost: value.estimated_cost,
+            task_cost_estimated: value.task_cost_estimated,
+            incomplete: value.incomplete,
+            warning_threshold: value.warning_threshold,
+            confirmation_required: value.confirmation_required,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -602,6 +679,11 @@ pub struct ExperimentApplicabilityPreviewBody {
     pub partially_skipped_row_count: u64,
     pub fully_skipped_slot_count: u64,
     pub partially_skipped_slot_count: u64,
+    /// Every pinned Slot, which is what Task progress counts against: a Slot
+    /// runs whether or not a Scorer can judge it.
+    pub total_slot_count: u64,
+    /// Slots with at least one applicable Score Dimension — a scoring-side
+    /// figure for the applicability preview, not a Task denominator.
     pub eligible_task_slot_count: u64,
     pub eligible_scoring_dimension_count: u64,
     pub scorer_applicability: Vec<ExperimentScorerApplicabilityBody>,
@@ -614,6 +696,7 @@ impl From<ExperimentApplicabilityPreview> for ExperimentApplicabilityPreviewBody
             partially_skipped_row_count: value.partially_skipped_row_count,
             fully_skipped_slot_count: value.fully_skipped_slot_count,
             partially_skipped_slot_count: value.partially_skipped_slot_count,
+            total_slot_count: value.total_slot_count,
             eligible_task_slot_count: value.eligible_task_slot_count,
             eligible_scoring_dimension_count: value.eligible_scoring_dimension_count,
             scorer_applicability: value
@@ -636,6 +719,7 @@ impl From<ExperimentPreview> for ExperimentPreviewResponseBody {
             pinned_scorers: value.pinned_scorers.into_iter().map(Into::into).collect(),
             applicability: value.applicability.into(),
             sample_slots: value.sample_slots.into_iter().map(Into::into).collect(),
+            cost_estimate: value.cost_estimate.map(Into::into),
         }
     }
 }
@@ -959,6 +1043,12 @@ pub struct ExperimentSkipSummaryBody {
 pub struct ExperimentScoreSummaryBody {
     pub scorer_id: String,
     pub scorer_version: i32,
+    /// User-facing dimension label. This is the Score Config name when the
+    /// Scorer declares one, otherwise the Scorer name.
+    pub name: String,
+    pub score_config_id: Option<String>,
+    pub score_config_name: Option<String>,
+    pub score_config_version: Option<i32>,
     pub sample_count: u64,
     pub error_count: u64,
     pub pending_count: u64,
@@ -1078,8 +1168,12 @@ impl From<ExperimentSkipSummary> for ExperimentSkipSummaryBody {
 impl From<ExperimentScoreSummary> for ExperimentScoreSummaryBody {
     fn from(value: ExperimentScoreSummary) -> Self {
         Self {
+            name: value.scorer_id.clone(),
             scorer_id: value.scorer_id,
             scorer_version: value.scorer_version,
+            score_config_id: None,
+            score_config_name: None,
+            score_config_version: None,
             sample_count: value.sample_count,
             error_count: value.error_count,
             pending_count: value.pending_count,

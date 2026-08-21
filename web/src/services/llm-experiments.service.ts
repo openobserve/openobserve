@@ -221,6 +221,10 @@ export interface ExperimentSkipSummary {
 export interface ExperimentScoreSummary {
   scorerId: string;
   scorerVersion: number;
+  name: string;
+  scoreConfigId: string | null;
+  scoreConfigName: string | null;
+  scoreConfigVersion: number | null;
   sampleCount: number;
   errorCount: number;
   pendingCount: number;
@@ -245,6 +249,9 @@ export type ExperimentComparisonAssignment =
 export interface ExperimentComparisonDimension {
   name: string;
   kind: "score" | "cost" | "latency";
+  scoreConfigId: string | null;
+  scoreConfigName: string | null;
+  scoreConfigVersion: string | null;
   baseline: number | null;
   candidate: number | null;
   delta: number | null;
@@ -524,6 +531,12 @@ function normalizeScoreSummary(summary: any): ExperimentScoreSummary {
   return {
     scorerId: value(summary, "scorerId", "scorer_id", ""),
     scorerVersion: Number(value(summary, "scorerVersion", "scorer_version", 0)),
+    name: String(summary?.name ?? ""),
+    scoreConfigId: value(summary, "scoreConfigId", "score_config_id", null),
+    scoreConfigName: value(summary, "scoreConfigName", "score_config_name", null),
+    scoreConfigVersion: numberOrNull(
+      value(summary, "scoreConfigVersion", "score_config_version", null),
+    ),
     sampleCount: Number(value(summary, "sampleCount", "sample_count", 0)),
     errorCount: Number(value(summary, "errorCount", "error_count", 0)),
     pendingCount: Number(value(summary, "pendingCount", "pending_count", 0)),
@@ -561,9 +574,20 @@ export function normalizeExperimentRowDetail(input: any): ExperimentRowDetail {
 }
 
 function normalizeComparisonDimension(input: any): ExperimentComparisonDimension {
+  const scoreConfigId = value<unknown>(input, "scoreConfigId", "score_config_id", null);
+  const scoreConfigName = value<unknown>(input, "scoreConfigName", "score_config_name", null);
+  const scoreConfigVersion = value<unknown>(
+    input,
+    "scoreConfigVersion",
+    "score_config_version",
+    null,
+  );
   return {
     name: String(input?.name ?? ""),
     kind: input?.kind,
+    scoreConfigId: scoreConfigId === null ? null : String(scoreConfigId),
+    scoreConfigName: scoreConfigName === null ? null : String(scoreConfigName),
+    scoreConfigVersion: scoreConfigVersion === null ? null : String(scoreConfigVersion),
     baseline: value(input, "baseline", "baseline", null),
     candidate: value(input, "candidate", "candidate", null),
     delta: value(input, "delta", "delta", null),
