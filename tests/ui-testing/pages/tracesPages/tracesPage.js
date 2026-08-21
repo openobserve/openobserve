@@ -1684,6 +1684,25 @@ export class TracesPage {
   }
 
   /**
+   * Asserts arrival at the trace-details view for a specific trace id, after the
+   * logs "View Trace" action navigates there. Asserts the URL carries the
+   * `traces/trace-details` route AND the resolved `trace_id` query param, then
+   * confirms the view is actually fetching/rendering via the tree container or
+   * the loading spinner (a bare URL match can pass on a missing trace).
+   * @param {string} traceId - 32-char hex trace id expected in the URL.
+   * @returns {Promise<void>}
+   */
+  async expectTraceDetailsResolved(traceId) {
+    await expect(this.page).toHaveURL(/traces\/trace-details/, { timeout: 30000 });
+    await expect(this.page).toHaveURL(new RegExp(`trace_id=${traceId}`), { timeout: 10000 });
+
+    const arrival = this.page.locator(
+      '[data-test="trace-details-tree-container"], [data-test="trace-details-loading-spinner"]'
+    );
+    await expect(arrival.first()).toBeVisible({ timeout: 20000 });
+  }
+
+  /**
    * Check if trace was successfully clicked and UI responded
    * This is a more lenient check that verifies the click worked
    * @returns {Promise<boolean>}

@@ -1,0 +1,7 @@
+[
+  { "title": "should navigate to trace details from the expanded log row View Trace action", "action": "new", "verifies": "expanded-row JsonPreview shows the View Trace button and clicking it routes to traces/trace-details for the matching trace_id and renders the trace" },
+  { "title": "should navigate to trace details from the row-detail drawer View Trace action", "action": "new", "verifies": "the drawer-header View Trace button navigates to traces/trace-details for the same trace (DetailTable no-payload emit path)" },
+  { "title": "should hide the View Trace action when the record has no trace_id", "action": "new", "verifies": "neither the expanded-row nor drawer View Trace button renders when the record lacks a truthy trace_id" },
+  { "title": "should render the traces-stream picker with a default stream selected in the detail drawer", "action": "new", "verifies": "the drawer traces-stream picker renders with a non-empty default (first traces stream) selection" },
+  { "title": "should navigate without crashing when the trace_id does not resolve to a real trace", "action": "new", "verifies": "a log whose trace_id has no matching trace still routes to traces/trace-details and renders its empty/no-result state without crashing" }
+]

@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/viewTrace.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/searchPatterns.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logstable.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/tracesSearch.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_location": "tests/ui-testing/ci-matrix/ci_matrix.json -> testfolder \"Logs-Features\" -> run_files",
+  "rationale": "No existing spec exercises the logs->trace jump (View Trace action). searchPatterns.spec.js is the closest Logs-Features sibling (matches the tag/shard and ingest-in-beforeAll pattern) but covers pattern clustering, not the View Trace gate or navigation. traceDetails.spec.js asserts trace-details arrival from the Traces page, not from a log record. The feature is a distinct logs capability with its own gating logic (trace_id field, traces-stream list, hiddenMenus, service_streams_enabled) and a brand-new composable, so it warrants its own spec at the run-context spec_path. Must be registered under Logs-Features (playwright_group from run-context) since a new spec file is not picked up automatically."
+}

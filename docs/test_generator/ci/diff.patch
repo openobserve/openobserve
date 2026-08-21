@@ -1,0 +1,2060 @@
+===== COMPLETE LIST OF CHANGED FILES (25 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+web/src/composables/useLogs/useViewTraceAction.spec.ts
+web/src/composables/useLogs/useViewTraceAction.ts
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/plugins/logs/DetailTable.spec.ts
+web/src/plugins/logs/DetailTable.vue
+web/src/plugins/logs/JsonPreview.spec.ts
+web/src/plugins/logs/JsonPreview.vue
+web/src/plugins/traces/TraceDetails.vue
+web/src/plugins/traces/TraceTree.spec.ts
+web/src/plugins/traces/TraceTree.vue
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index 22baccd736a..2f2c0071888 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -14312,6 +14312,7 @@
+     "unknownService": "30dbef66f0d96ed5",
+     "viewFilters": "6fae22556dc2d946",
+     "viewLogs": "e087f046dc3cda9a",
++    "viewLogsUnavailable": "e2468fc4f70cc910",
+     "waterfall": "6b53bc225e0aae1d"
+   },
+   "user": {
+diff --git a/web/src/composables/useLogs/useViewTraceAction.spec.ts b/web/src/composables/useLogs/useViewTraceAction.spec.ts
+new file mode 100644
+index 00000000000..908ed95216c
+--- /dev/null
++++ b/web/src/composables/useLogs/useViewTraceAction.spec.ts
+@@ -0,0 +1,521 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
++import { flushPromises } from "@vue/test-utils";
++import { gt } from "@/types/i18n";
++
++const { mockGetStreams } = vi.hoisted(() => ({
++  mockGetStreams: vi.fn(),
++}));
++
++vi.mock("@/composables/useStreams", () => ({
++  default: () => ({
++    getStreams: mockGetStreams,
++  }),
++}));
++
++// The composable resolves the store itself, so the whole vuex module is mocked
++// and `mockStore.state` is re-seeded per test rather than mutated across tests.
++const mockStore: any = { state: {} };
++
++vi.mock("vuex", () => ({
++  useStore: () => mockStore,
++}));
++
++import useViewTraceAction from "./useViewTraceAction";
++
++const TRACE_ID_FIELD = "trace_id";
++
++/** A log record that carries the configured trace id field. */
++const recordWithTraceId = { [TRACE_ID_FIELD]: "abc-123", message: "hello" };
++
++/** A log record from a stream that never emits a trace id. */
++const recordWithoutTraceId = { message: "hello" };
++
++/** Fresh search state per test — the real one is shared module state. */
++const makeSearchObj = (selectedTraceStream = "") => ({
++  meta: { selectedTraceStream },
++});
++
++describe("useViewTraceAction", () => {
++  let searchObj: ReturnType<typeof makeSearchObj>;
++
++  beforeEach(() => {
++    vi.clearAllMocks();
++
++    mockStore.state = {
++      // `false` is the only value that enables the action — see the gate tests.
++      zoConfig: { service_streams_enabled: false },
++      hiddenMenus: [],
++      organizationData: {
++        organizationSettings: { trace_id_field_name: TRACE_ID_FIELD },
++      },
++    };
++
++    mockGetStreams.mockResolvedValue({
++      list: [{ name: "trace-stream1" }, { name: "trace-stream2" }],
++    });
++
++    searchObj = makeSearchObj();
++  });
++
++  afterEach(() => {
++    vi.restoreAllMocks();
++  });
++
++  describe("initial state", () => {
++    it("starts with no streams, nothing loading and the button hidden", () => {
++      const action = useViewTraceAction(gt, searchObj);
++
++      expect(action.tracesStreams.value).toEqual([]);
++      expect(action.filteredTracesStreamOptions.value).toEqual([]);
++      expect(action.isTracesStreamsLoading.value).toBe(false);
++      expect(action.showViewTraceBtn.value).toBe(false);
++    });
++
++    it("does not fetch streams until the action is evaluated", () => {
++      useViewTraceAction(gt, searchObj);
++
++      expect(mockGetStreams).not.toHaveBeenCalled();
++    });
++
++    it("gives each caller its own refs so JsonPreview and DetailTable do not share state", () => {
++      const first = useViewTraceAction(gt, searchObj);
++      const second = useViewTraceAction(gt, searchObj);
++
++      first.tracesStreams.value = ["only-mine"];
++
++      expect(second.tracesStreams.value).toEqual([]);
++    });
++  });
++
++  describe("setViewTraceBtn — gate", () => {
++    it("shows the button when the menu is visible, service streams are off and the record has a trace id", async () => {
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeTruthy();
++    });
++
++    it("hides the button when the traces menu is hidden", async () => {
++      mockStore.state.hiddenMenus = new Set(["traces"]);
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++
++    it("hides the button when service streams are enabled", async () => {
++      mockStore.state.zoConfig.service_streams_enabled = true;
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++
++    it("treats service streams as enabled when the flag is missing entirely", async () => {
++      mockStore.state.zoConfig = {};
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++
++    it("hides the button when the record has no trace id field", async () => {
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithoutTraceId);
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++
++    it("hides the button when the record's trace id is an empty string", async () => {
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn({ [TRACE_ID_FIELD]: "" });
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++
++    it("hides the button when the org has no trace id field configured", async () => {
++      mockStore.state.organizationData.organizationSettings = {};
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++
++    it("re-evaluates on every call, so the button can go from shown to hidden", async () => {
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++      expect(showViewTraceBtn.value).toBeTruthy();
++
++      setViewTraceBtn(recordWithoutTraceId);
++      await flushPromises();
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++  });
++
++  describe("setViewTraceBtn — missing record (row-detail drawer regression)", () => {
++    it.each([
++      ["null", null],
++      ["undefined", undefined],
++      ["an empty object", {}],
++    ])("does not throw and hides the button when the record is %s", async (_label, record) => {
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      expect(() => setViewTraceBtn(record)).not.toThrow();
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++      expect(mockGetStreams).not.toHaveBeenCalled();
++    });
++
++    it("does not throw when the org settings are not loaded yet", async () => {
++      mockStore.state.organizationData = {};
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      expect(() => setViewTraceBtn(recordWithTraceId)).not.toThrow();
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++  });
++
++  describe("setViewTraceBtn — hiddenMenus shape", () => {
++    // `hiddenMenus` is seeded as an array by the store and only replaced with a
++    // Set by MainLayout, so both shapes reach this code. Calling `.has` on the
++    // array shape used to crash the drawer.
++    it("hides the button when hiddenMenus is a Set containing 'traces'", async () => {
++      mockStore.state.hiddenMenus = new Set(["traces"]);
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++
++    it("shows the button when hiddenMenus is a Set without 'traces'", async () => {
++      mockStore.state.hiddenMenus = new Set(["metrics"]);
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeTruthy();
++    });
++
++    it("hides the button when hiddenMenus is an Array containing 'traces'", async () => {
++      mockStore.state.hiddenMenus = ["traces"];
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      expect(() => setViewTraceBtn(recordWithTraceId)).not.toThrow();
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeFalsy();
++    });
++
++    it("shows the button when hiddenMenus is an Array without 'traces'", async () => {
++      mockStore.state.hiddenMenus = ["metrics"];
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      expect(() => setViewTraceBtn(recordWithTraceId)).not.toThrow();
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeTruthy();
++    });
++
++    it("shows the button when hiddenMenus is undefined", async () => {
++      mockStore.state.hiddenMenus = undefined;
++      const { setViewTraceBtn, showViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      expect(() => setViewTraceBtn(recordWithTraceId)).not.toThrow();
++      await flushPromises();
++
++      expect(showViewTraceBtn.value).toBeTruthy();
++    });
++  });
++
++  describe("setViewTraceBtn — lazy stream loading", () => {
++    it("fetches the traces streams the first time the button is shown", async () => {
++      const { setViewTraceBtn, filteredTracesStreamOptions } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(mockGetStreams).toHaveBeenCalledTimes(1);
++      expect(mockGetStreams).toHaveBeenCalledWith("traces", false);
++      expect(filteredTracesStreamOptions.value).toEqual(["trace-stream1", "trace-stream2"]);
++    });
++
++    it("does not refetch once the options are populated", async () => {
++      const { setViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++      expect(mockGetStreams).toHaveBeenCalledTimes(1);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(mockGetStreams).toHaveBeenCalledTimes(1);
++    });
++
++    it("does not fetch when the gate fails, even with empty options", async () => {
++      mockStore.state.hiddenMenus = new Set(["traces"]);
++      const { setViewTraceBtn } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(mockGetStreams).not.toHaveBeenCalled();
++    });
++
++    it("does not refetch for an org whose stream list came back empty", async () => {
++      // The guard latches on a *completed* fetch rather than on
++      // `filteredTracesStreamOptions.length`. An org with no traces streams
++      // leaves that array empty forever, so the old check re-fetched on every
++      // record; this is the case that regressed.
++      mockGetStreams.mockResolvedValue({ list: [] });
++      const { setViewTraceBtn, filteredTracesStreamOptions } = useViewTraceAction(gt, searchObj);
++
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++      setViewTraceBtn(recordWithTraceId);
++      await flushPromises();
++
++      expect(mockGetStreams).toHaveBeenCalledTimes(1);
++      expect(filteredTracesStreamOptions.value).toEqual([]);
++    });
++  });
++
++  describe("getTracesStreams", () => {
++    it("maps the response list to stream names", async () => {
++      const { getTracesStreams, tracesStreams } = useViewTraceAction(gt, searchObj);
++
++      await getTracesStreams();
++      await flushPromises();
++
++      expect(mockGetStreams).toHaveBeenCalledWith("traces", false);
++      expect(tracesStreams.value).toEqual(["trace-stream1", "trace-stream2"]);
++    });
++
++    it("copies the names into the filter options without sharing the array reference", async () => {
++      const { getTracesStreams, tracesStreams, filteredTracesStreamOptions } = useViewTraceAction(
++        gt,
++        searchObj,
++      );
++
++      await getTracesStreams();
++      await flushPromises();
++
++      expect(filteredTracesStreamOptions.value).toEqual(tracesStreams.value);
++      expect(filteredTracesStreamOptions.value).not.toBe(tracesStreams.value);
++    });
++
++    it("raises the loading flag while fetching and clears it once resolved", async () => {
++      const { getTracesStreams, isTracesStreamsLoading } = useViewTraceAction(gt, searchObj);
++
++      // The call awaits the fetch internally, so the flag is only observable
++      // as true before the returned promise settles.
++      const pending = getTracesStreams();
++      expect(isTracesStreamsLoading.value).toBe(true);
++
++      await pending;
++      expect(isTracesStreamsLoading.value).toBe(false);
++    });
++
++    it("selects the first stream when nothing is selected yet", async () => {
++      const { getTracesStreams } = useViewTraceAction(gt, searchObj);
++
++      await getTracesStreams();
++      await flushPromises();
++
++      expect(searchObj.meta.selectedTraceStream).toBe("trace-stream1");
++    });
++
++    it("keeps an existing selection instead of overwriting it", async () => {
++      searchObj = makeSearchObj("already-chosen-stream");
++      const { getTracesStreams } = useViewTraceAction(gt, searchObj);
++
++      await getTracesStreams();
++      await flushPromises();
++
++      expect(searchObj.meta.selectedTraceStream).toBe("already-chosen-stream");
++    });
++
++    it("handles an empty stream list without throwing", async () => {
++      mockGetStreams.mockResolvedValue({ list: [] });
++      const { getTracesStreams, tracesStreams, filteredTracesStreamOptions } = useViewTraceAction(
++        gt,
++        searchObj,
++      );
++
++      await getTracesStreams();
++      await flushPromises();
++
++      expect(tracesStreams.value).toEqual([]);
++      expect(filteredTracesStreamOptions.value).toEqual([]);
++      // Nothing to select, so the existing (empty) selection is left alone.
++      // Assigning `undefined` here used to make the *next* call throw on
++      // `selectedTraceStream.length`.
++      expect(searchObj.meta.selectedTraceStream).toBe("");
++    });
++
++    it("does not throw and leaves loading false when the fetch rejects", async () => {
++      mockGetStreams.mockRejectedValue(new Error("Fetch failed"));
++      const { getTracesStreams, isTracesStreamsLoading, tracesStreams } = useViewTraceAction(
++        gt,
++        searchObj,
++      );
++
++      await expect(getTracesStreams()).resolves.toBeUndefined();
++      await flushPromises();
++
++      expect(isTracesStreamsLoading.value).toBe(false);
++      expect(tracesStreams.value).toEqual([]);
++      expect(searchObj.meta.selectedTraceStream).toBe("");
++    });
++
++    it("does not throw when getStreams throws synchronously", async () => {
++      mockGetStreams.mockImplementation(() => {
++        throw new Error("boom");
++      });
++      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
++      const { getTracesStreams, isTracesStreamsLoading } = useViewTraceAction(gt, searchObj);
++
++      await expect(getTracesStreams()).resolves.toBeUndefined();
++
++      expect(isTracesStreamsLoading.value).toBe(false);
++      expect(consoleError).toHaveBeenCalledWith("Failed to get traces streams", expect.any(Error));
++    });
++  });
++
++  describe("filterStreamFn", () => {
++    const seedStreams = (streams: string[]) => {
++      const action = useViewTraceAction(gt, searchObj);
++      action.tracesStreams.value = streams;
++      return action;
++    };
++
++    it("keeps only the streams matching the term", () => {
++      const { filterStreamFn, filteredTracesStreamOptions } = seedStreams([
++        "trace-stream1",
++        "trace-stream2",
++        "other-stream",
++      ]);
++
++      filterStreamFn("trace");
++
++      expect(filteredTracesStreamOptions.value).toEqual(["trace-stream1", "trace-stream2"]);
++    });
++
++    it("matches case-insensitively in both directions", () => {
++      const { filterStreamFn, filteredTracesStreamOptions } = seedStreams([
++        "Trace-Stream1",
++        "trace-stream2",
++        "Other-Stream",
++      ]);
++
++      filterStreamFn("TRACE");
++
++      expect(filteredTracesStreamOptions.value).toEqual(["Trace-Stream1", "trace-stream2"]);
++    });
++
++    it("matches on a substring anywhere in the name", () => {
++      const { filterStreamFn, filteredTracesStreamOptions } = seedStreams([
++        "prod-traces",
++        "dev-logs",
++      ]);
++
++      filterStreamFn("traces");
++
++      expect(filteredTracesStreamOptions.value).toEqual(["prod-traces"]);
++    });
++
++    it("returns every stream for an empty term", () => {
++      const { filterStreamFn, filteredTracesStreamOptions } = seedStreams(["stream1", "stream2"]);
++
++      filterStreamFn("");
++
++      expect(filteredTracesStreamOptions.value).toEqual(["stream1", "stream2"]);
++    });
++
++    it("returns every stream when called with no argument", () => {
++      const { filterStreamFn, filteredTracesStreamOptions } = seedStreams(["stream1", "stream2"]);
++
++      filterStreamFn();
++
++      expect(filteredTracesStreamOptions.value).toEqual(["stream1", "stream2"]);
++    });
++
++    it("returns nothing when no stream matches", () => {
++      const { filterStreamFn, filteredTracesStreamOptions } = seedStreams(["stream1", "stream2"]);
++
++      filterStreamFn("no-such-stream");
++
++      expect(filteredTracesStreamOptions.value).toEqual([]);
++    });
++
++    it("narrows further on a second, longer term", () => {
++      const { filterStreamFn, filteredTracesStreamOptions } = seedStreams([
++        "trace-stream1",
++        "trace-stream2",
++        "other-stream",
++      ]);
++
++      filterStreamFn("trace");
++      filterStreamFn("trace-stream2");
++
++      expect(filteredTracesStreamOptions.value).toEqual(["trace-stream2"]);
++    });
++
++    it("filters against the full list, not the previously filtered one", () => {
++      const { filterStreamFn, filteredTracesStreamOptions } = seedStreams([
++        "trace-stream1",
++        "other-stream",
++      ]);
++
++      filterStreamFn("trace");
++      filterStreamFn("other");
++
++      expect(filteredTracesStreamOptions.value).toEqual(["other-stream"]);
++    });
++
++    it("returns nothing when no streams have been loaded", () => {
++      const { filterStreamFn, filteredTracesStreamOptions } = useViewTraceAction(gt, searchObj);
++
++      filterStreamFn("trace");
++
++      expect(filteredTracesStreamOptions.value).toEqual([]);
++    });
++  });
++});
+diff --git a/web/src/composables/useLogs/useViewTraceAction.ts b/web/src/composables/useLogs/useViewTraceAction.ts
+new file mode 100644
+index 00000000000..fa8a8bce916
+--- /dev/null
++++ b/web/src/composables/useLogs/useViewTraceAction.ts
+@@ -0,0 +1,116 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { ref } from "vue";
++import { useStore } from "vuex";
++import type { TranslateFn } from "@/types/i18n";
++import useStreams from "@/composables/useStreams";
++import type { SearchObject } from "@/composables/useLogs/searchState";
++
++/**
++ * State behind the "View Trace" action — the traces-stream picker and the
++ * button beside it.
++ *
++ * Lives in a composable because two components render the same action from the
++ * same rules: `JsonPreview` shows it inline under an expanded log row, and
++ * `DetailTable` shows it in the row-detail drawer's header. Copying the gate
++ * into both is how `service_streams_enabled` ended up hand-rolled in three
++ * files and drifted.
++ *
++ * Each caller gets its own refs. `searchObj` is injected rather than resolved
++ * here so the picker writes the chosen stream back to the caller's own search
++ * state — it is shared module state in the app, so the selection carries across
++ * both renderings.
++ */
++export default function useViewTraceAction(t: TranslateFn, searchObj: SearchObject) {
++  const store = useStore();
++  const { getStreams } = useStreams(t);
++
++  const tracesStreams = ref<string[]>([]);
++  const filteredTracesStreamOptions = ref<string[]>([]);
++  const isTracesStreamsLoading = ref(false);
++  // Holds the trace-id value rather than a strict boolean: the gate below ends
++  // in the record lookup, and callers only ever use it for truthiness.
++  const showViewTraceBtn = ref<string | boolean | undefined>(false);
++  // Latches once a fetch has completed, successfully or not. `filteredTraces-
++  // StreamOptions.length` cannot serve as the guard: an org with no traces
++  // streams leaves it empty forever, which would refetch on every record.
++  const hasLoadedTracesStreams = ref(false);
++
++  const getTracesStreams = async () => {
++    isTracesStreamsLoading.value = true;
++    try {
++      // Awaited inside the try so a rejection lands in the catch below instead
++      // of escaping as an unhandled rejection on a promise nobody holds.
++      const res = (await getStreams("traces", false)) as { list: { name: string }[] };
++
++      tracesStreams.value = (res?.list ?? []).map((option) => option.name);
++      filteredTracesStreamOptions.value = [...tracesStreams.value];
++
++      // Only default the selection when there is something to select —
++      // assigning `undefined` here used to make the next call throw on
++      // `selectedTraceStream.length`.
++      if (!searchObj.meta.selectedTraceStream?.length && tracesStreams.value.length)
++        searchObj.meta.selectedTraceStream = tracesStreams.value[0];
++    } catch (err: unknown) {
++      console.error("Failed to get traces streams", err);
++    } finally {
++      hasLoadedTracesStreams.value = true;
++      isTracesStreamsLoading.value = false;
++    }
++  };
++
++  /**
++   * Decide whether the action is offered for `record`, and lazily load the
++   * traces streams the picker needs the first time it is.
++   */
++  const setViewTraceBtn = (record: Record<string, unknown> | null | undefined) => {
++    // Hide view traces button when service_streams_enabled is true
++    const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
++
++    // `hiddenMenus` is seeded as an array and only replaced with a Set once
++    // MainLayout has read `custom_hide_menus`, so accept either shape rather
++    // than assuming `.has` exists.
++    const hiddenMenus: Set<string> | string[] | undefined = store.state.hiddenMenus;
++    const tracesMenuHidden = Array.isArray(hiddenMenus)
++      ? hiddenMenus.includes("traces")
++      : Boolean(hiddenMenus?.has("traces"));
++
++    showViewTraceBtn.value =
++      !tracesMenuHidden && // Check if traces menu is hidden
++      !serviceStreamsEnabled && // Hide when service streams is enabled
++      (record?.[store.state.organizationData?.organizationSettings?.trace_id_field_name] as
++        string | undefined);
++
++    if (showViewTraceBtn.value && !hasLoadedTracesStreams.value && !isTracesStreamsLoading.value)
++      getTracesStreams();
++  };
++
++  const filterStreamFn = (val: string = "") => {
++    filteredTracesStreamOptions.value = tracesStreams.value.filter((stream: string) => {
++      return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
++    });
++  };
++
++  return {
++    tracesStreams,
++    filteredTracesStreamOptions,
++    isTracesStreamsLoading,
++    showViewTraceBtn,
++    getTracesStreams,
++    setViewTraceBtn,
++    filterStreamFn,
++  };
++}
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 6632d1c9cfb..f4d91d472f3 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "In Vollansicht öffnen",
+     "viewLogs": "Protokolle anzeigen",
++    "viewLogsUnavailable": "Logs für diesen Span konnten nicht geöffnet werden.",
+     "backToLogs": "Zurück zu Logs",
+     "openInTraces": "In Traces öffnen",
+     "loadingStream": "Stream wird geladen...",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index c224ab61593..c76050b1fad 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "Open in full view",
+     "viewLogs": "View Logs",
++    "viewLogsUnavailable": "Could not open logs for this span.",
+     "backToLogs": "Back to Logs",
+     "openInTraces": "Open in Traces",
+     "loadingStream": "Loading Stream...",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 17d15f3a887..13d776eb114 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "Abrir a la vista",
+     "viewLogs": "Ver registros",
++    "viewLogsUnavailable": "No se pudieron abrir los registros para este span.",
+     "backToLogs": "Volver a los registros",
+     "openInTraces": "Abrir en Traces",
+     "loadingStream": "Cargando Stream...",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index a88e8885270..f6190281cef 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "Ouvrir en plein écran",
+     "viewLogs": "Afficher les journaux",
++    "viewLogsUnavailable": "Impossible d'ouvrir les journaux pour ce span.",
+     "backToLogs": "Retour aux journaux",
+     "openInTraces": "Ouvrir dans Traces",
+     "loadingStream": "Chargement du flux...",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index c6d3d133143..6e3d4290558 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "Apri a piena vista",
+     "viewLogs": "Visualizza i log",
++    "viewLogsUnavailable": "Impossibile aprire i log per questo span.",
+     "backToLogs": "Torna ai log",
+     "openInTraces": "Apri in Traces",
+     "loadingStream": "Caricamento dello stream...",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index 72230fd6017..a3befe34410 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "フルビューで開く",
+     "viewLogs": "ログを表示",
++    "viewLogsUnavailable": "このスパンのログを開けませんでした。",
+     "backToLogs": "ログに戻る",
+     "openInTraces": "トレースで開く",
+     "loadingStream": "ストリームをロード中...",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index de3e3ba2421..4f2ac680dc8 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "전체 화면으로 열기",
+     "viewLogs": "로그 보기",
++    "viewLogsUnavailable": "이 스팬의 로그를 열 수 없습니다.",
+     "backToLogs": "로그로 돌아가기",
+     "openInTraces": "오픈 인 트레이스",
+     "loadingStream": "스트림 로드 중...",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index 97a98845d2d..6214d3ce714 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "In volledige weergave openen",
+     "viewLogs": "Logboeken bekijken",
++    "viewLogsUnavailable": "Kan de logs voor deze span niet openen.",
+     "backToLogs": "Terug naar de logboeken",
+     "openInTraces": "Openen in Traces",
+     "loadingStream": "Stream wordt geladen...",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 7f166d62474..19e54db4d1a 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "Otwórz w pełnym widoku",
+     "viewLogs": "Pokaż logi",
++    "viewLogsUnavailable": "Nie udało się otworzyć logów dla tego spanu.",
+     "backToLogs": "Powrót do logów",
+     "openInTraces": "Otwórz w śladach",
+     "loadingStream": "Ładowanie strumienia...",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index a4c3e64892a..c7f0824dea2 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "Abrir à vista completa",
+     "viewLogs": "Exibir registros",
++    "viewLogsUnavailable": "Não foi possível abrir os logs para este span.",
+     "backToLogs": "Voltar aos registros",
+     "openInTraces": "Abrir no Traces",
+     "loadingStream": "Carregando Stream...",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index 0ceaaa65181..f57f4f01a3d 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "Открыть в полном виде",
+     "viewLogs": "Просмотр логов",
++    "viewLogsUnavailable": "Не удалось открыть логи для этого span.",
+     "backToLogs": "Назад к логам",
+     "openInTraces": "Открыть в трейсах",
+     "loadingStream": "Загрузка потока...",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index 28f78b439fd..2357cdcba0e 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "Tam görünümde aç",
+     "viewLogs": "Günlükleri Görüntüle",
++    "viewLogsUnavailable": "Bu span için günlükler açılamadı.",
+     "backToLogs": "Günlüklere Dön",
+     "openInTraces": "Traces'te aç",
+     "loadingStream": "Akış Yükleniyor...",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index a974c5468f4..0c79a63c3aa 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "Mở toàn màn hình",
+     "viewLogs": "Xem Nhật ký",
++    "viewLogsUnavailable": "Không thể mở nhật ký cho span này.",
+     "backToLogs": "Quay lại Nhật ký",
+     "openInTraces": "Mở trong Dấu vết",
+     "loadingStream": "Đang tải Luồng...",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index 2f6d01de71a..37917ad5db2 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -8885,6 +8885,7 @@
+     },
+     "openInFullView": "以全视图打开",
+     "viewLogs": "查看日志",
++    "viewLogsUnavailable": "无法打开此跨度的日志。",
+     "backToLogs": "返回日志",
+     "openInTraces": "在追踪中打开",
+     "loadingStream": "正在加载数据流...",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 220c2edbc0e..2649f9a3d5f 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -8880,6 +8880,7 @@
+     },
+     "openInFullView": "在完整檢視中開啟",
+     "viewLogs": "檢視日誌",
++    "viewLogsUnavailable": "無法開啟此 span 的日誌。",
+     "backToLogs": "返回日誌",
+     "openInTraces": "在追蹤中開啟",
+     "loadingStream": "載入串流中...",
+diff --git a/web/src/plugins/logs/DetailTable.spec.ts b/web/src/plugins/logs/DetailTable.spec.ts
+index ae545b5f935..f2fab46acb1 100644
+--- a/web/src/plugins/logs/DetailTable.spec.ts
++++ b/web/src/plugins/logs/DetailTable.spec.ts
+@@ -38,6 +38,10 @@ vi.mock("@/composables/useLogs/searchState", () => ({
+           selectedFields: ["_timestamp"],
+         },
+       },
++      meta: {
++        // The header's traces-stream picker writes the chosen stream back here.
++        selectedTraceStream: "",
++      },
+     },
+   }),
+ }));
+@@ -63,6 +67,15 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
+   toast: vi.fn(),
+ }));
+ 
++// The only I/O behind useViewTraceAction is useStreams. Stubbing it here keeps
++// the REAL useViewTraceAction in play, so the View Trace gate under test is the
++// production one rather than a re-implementation.
++const getStreams = vi.hoisted(() => vi.fn());
++
++vi.mock("@/composables/useStreams", () => ({
++  default: () => ({ getStreams }),
++}));
++
+ // Mock clipboard utils
+ vi.mock("@/utils/clipboard", async () => {
+   const actual = await vi.importActual("@/utils/clipboard");
+@@ -77,7 +90,12 @@ vi.mock("./JsonPreview.vue", () => ({
+   default: {
+     name: "JsonPreview",
+     template: "<div data-test='json-preview'><slot /></div>",
+-    props: ["value", "showCopyButton", "mode"],
++    props: {
++      value: { type: null },
++      showCopyButton: { type: Boolean, default: false },
++      mode: { type: String, default: "" },
++      hideViewTrace: { type: Boolean, default: false },
++    },
+     emits: [
+       "copy",
+       "add-field-to-table",
+@@ -135,6 +153,82 @@ describe("DetailTable Component", () => {
+     streamType: "logs",
+   };
+ 
++  // Shared mount config so extra mounts inside individual tests get exactly the
++  // same stubs as the default wrapper built in beforeEach.
++  const globalMountOptions = {
++    provide: {
++      store: store,
++    },
++    plugins: [i18n, router],
++    stubs: {
++      OTabs: {
++        template: "<div><slot /></div>",
++        props: ["modelValue"],
++        emits: ["update:modelValue"],
++      },
++      OTab: {
++        template:
++          "<div :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot /></div>",
++        props: ["name", "label"],
++        emits: ["click"],
++      },
++      OTabPanels: {
++        template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
++        props: ["modelValue"],
++      },
++      OTabPanel: {
++        template: "<div><slot /></div>",
++        props: ["name"],
++      },
++      OSwitch: {
++        template: '<div :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
++        props: ["modelValue", "label"],
++        methods: {
++          toggle() {
++            this.$emit("update:modelValue", !this.modelValue);
++          },
++        },
++        emits: ["update:modelValue"],
++      },
++      OButton: {
++        template:
++          '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>',
++        emits: ["click"],
++      },
++      ODropdown: true,
++      ODropdownItem: true,
++      ODropdownSeparator: true,
++      OSelect: {
++        template:
++          '<select class="o-select" :data-test="$attrs[\'data-test\']" @change="onChange"><option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option></select>',
++        props: ["modelValue", "options"],
++        methods: {
++          onChange(e: any) {
++            this.$emit("update:modelValue", e.target.value);
++          },
++        },
++        emits: ["update:modelValue"],
++      },
++      OIcon: {
++        template: '<div class="OIcon"><slot /></div>',
++      },
++      OSpinner: true,
++      OSeparator: true,
++      OCardSection: {
++        template: "<div><slot /></div>",
++      },
++      OLogsHighLighting: true,
++      OChunkedContent: true,
++      OTelemetryCorrelationDashboard: true,
++      OCorrelatedLogsTable: true,
++      O2AIContextAddBtn: {
++        template:
++          '<div data-test="o2ai-context-btn" @click="$emit(\'sendToAiChat\')"><slot /></div>',
++        emits: ["sendToAiChat"],
++      },
++    },
++  };
++
+   beforeEach(async () => {
+     // Clear localStorage before each test
+     window.localStorage.clear();
+@@ -147,78 +241,7 @@ describe("DetailTable Component", () => {
+     wrapper = mount(DetailTable, {
+       attachTo: "#app",
+       props: defaultProps,
+-      global: {
+-        provide: {
+-          store: store,
+-        },
+-        plugins: [i18n, router],
+-        stubs: {
+-          OTabs: {
+-            template: "<div><slot /></div>",
+-            props: ["modelValue"],
+-            emits: ["update:modelValue"],
+-          },
+-          OTab: {
+-            template:
+-              "<div :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot /></div>",
+-            props: ["name", "label"],
+-            emits: ["click"],
+-          },
+-          OTabPanels: {
+-            template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
+-            props: ["modelValue"],
+-          },
+-          OTabPanel: {
+-            template: "<div><slot /></div>",
+-            props: ["name"],
+-          },
+-          OSwitch: {
+-            template: '<div :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
+-            props: ["modelValue", "label"],
+-            methods: {
+-              toggle() {
+-                this.$emit("update:modelValue", !this.modelValue);
+-              },
+-            },
+-            emits: ["update:modelValue"],
+-          },
+-          OButton: {
+-            template:
+-              '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>',
+-          },
+-          ODropdown: true,
+-          ODropdownItem: true,
+-          ODropdownSeparator: true,
+-          OSelect: {
+-            template:
+-              '<select class="o-select" :data-test="$attrs[\'data-test\']" @change="onChange"><option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option></select>',
+-            props: ["modelValue", "options"],
+-            methods: {
+-              onChange(e: any) {
+-                this.$emit("update:modelValue", e.target.value);
+-              },
+-            },
+-            emits: ["update:modelValue"],
+-          },
+-          OIcon: {
+-            template: '<div class="OIcon"><slot /></div>',
+-          },
+-          OSpinner: true,
+-          OSeparator: true,
+-          OCardSection: {
+-            template: "<div><slot /></div>",
+-          },
+-          OLogsHighLighting: true,
+-          OChunkedContent: true,
+-          OTelemetryCorrelationDashboard: true,
+-          OCorrelatedLogsTable: true,
+-          O2AIContextAddBtn: {
+-            template:
+-              '<div data-test="o2ai-context-btn" @click="$emit(\'sendToAiChat\')"><slot /></div>',
+-            emits: ["sendToAiChat"],
+-          },
+-        },
+-      },
++      global: globalMountOptions,
+     });
+     await flushPromises();
+   });
+@@ -1002,4 +1025,168 @@ describe("DetailTable Component", () => {
+       expect(result[0].resolvedUrl).toBe("https://example.com/search?q=hello%20world%26foo%3Dbar");
+     });
+   });
++  // The "View Trace" action used to live inside JsonPreview, i.e. inside the JSON
++  // tab. It now sits in this component's header row next to the wrap toggle so it
++  // stays reachable from every tab, and JsonPreview is told to hide its own copy.
++  describe("View Trace action in the header", () => {
++    const TRACE_ID = "8a3f1c2d9b4e7a60";
++    const TRACES_STREAMS = ["default_traces", "otlp_traces"];
++
++    const SELECT = '[data-test="log-detail-view-trace-stream-select"]';
++    const BUTTON = '[data-test="log-detail-view-trace-btn"]';
++    const WRAP_TOGGLE = '[data-test="log-detail-wrap-values-toggle-btn"]';
++
++    // A record that satisfies the gate: it carries the org's trace id field.
++    const recordWithTraceId = { ...defaultProps.modelValue, trace_id: TRACE_ID };
++
++    let traceWrapper: any;
++
++    const mountDetailTable = (props: Record<string, any> = {}) =>
++      mount(DetailTable, {
++        attachTo: "#app",
++        props: { ...defaultProps, modelValue: recordWithTraceId, ...props },
++        global: globalMountOptions,
++      });
++
++    beforeEach(() => {
++      // Open the gate: traces menu visible, service streams off, trace id field known.
++      store.state.zoConfig.service_streams_enabled = false;
++      store.state.hiddenMenus = [];
++      store.state.organizationData.organizationSettings.trace_id_field_name = "trace_id";
++
++      getStreams.mockResolvedValue({
++        list: TRACES_STREAMS.map((name) => ({ name })),
++      });
++    });
++
++    afterEach(() => {
++      if (traceWrapper) {
++        traceWrapper.unmount();
++        traceWrapper = null;
++      }
++    });
++
++    it("renders the stream picker and the button when the gate passes", async () => {
++      traceWrapper = mountDetailTable();
++      await flushPromises();
++
++      const select = traceWrapper.find(SELECT);
++      expect(select.exists()).toBe(true);
++      expect(select.findAll("option").map((option: any) => option.text())).toEqual(TRACES_STREAMS);
++      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
++    });
++
++    it("writes the picked stream back to searchObj.meta.selectedTraceStream", async () => {
++      traceWrapper = mountDetailTable();
++      await flushPromises();
++
++      const select = traceWrapper.find(SELECT);
++      select.element.value = "otlp_traces";
++      await select.trigger("change");
++
++      expect(traceWrapper.vm.searchObj.meta.selectedTraceStream).toBe("otlp_traces");
++    });
++
++    it("hides the action when the record carries no trace id", async () => {
++      traceWrapper = mountDetailTable({ modelValue: defaultProps.modelValue });
++      await flushPromises();
++
++      expect(traceWrapper.find(SELECT).exists()).toBe(false);
++      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
++    });
++
++    it("hides the action when the traces menu is hidden for the org", async () => {
++      // `hiddenMenus` is seeded as an array by the store helper, not a Set.
++      store.state.hiddenMenus = ["traces"];
++
++      traceWrapper = mountDetailTable();
++      await flushPromises();
++
++      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
++    });
++
++    it("hides the action when service streams are enabled", async () => {
++      store.state.zoConfig.service_streams_enabled = true;
++
++      traceWrapper = mountDetailTable();
++      await flushPromises();
++
++      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
++    });
++
++    it("hides the action when the org has no traces streams to point at", async () => {
++      getStreams.mockResolvedValue({ list: [] });
++
++      traceWrapper = mountDetailTable();
++      await flushPromises();
++
++      // Gate is `showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)`:
++      // once loading settles with an empty list there is nothing to view a trace in.
++      expect(traceWrapper.find(SELECT).exists()).toBe(false);
++      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
++    });
++
++    it("emits view-trace when the header button is clicked", async () => {
++      traceWrapper = mountDetailTable();
++      await flushPromises();
++
++      await traceWrapper.find(BUTTON).trigger("click");
++
++      expect(traceWrapper.emitted()["view-trace"]).toHaveLength(1);
++    });
++
++    it("tells JsonPreview to hide its own copy of the action", async () => {
++      traceWrapper = mountDetailTable();
++      await flushPromises();
++
++      const jsonPreview = traceWrapper.findComponent({ name: "JsonPreview" });
++      expect(jsonPreview.exists()).toBe(true);
++      expect(jsonPreview.props("hideViewTrace")).toBe(true);
++    });
++
++    // REGRESSION: the gate must read `props.modelValue`, which exists during
++    // setup, and not `rowData`, which the async created() hook only fills a
++    // microtask later. Reading rowData left the button permanently hidden.
++    it("shows the action on the first render, before created() has filled rowData", async () => {
++      traceWrapper = mountDetailTable();
++
++      // Nothing has been awaited: created() has not resolved, so rowData is still empty.
++      expect(Object.keys(traceWrapper.vm.rowData)).toHaveLength(0);
++      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
++
++      await flushPromises();
++
++      // rowData arrives later; the action was already there and stays there.
++      expect(Object.keys(traceWrapper.vm.rowData).length).toBeGreaterThan(0);
++      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
++    });
++
++    it("re-evaluates the gate when modelValue changes to a record without a trace id", async () => {
++      traceWrapper = mountDetailTable();
++      await flushPromises();
++      expect(traceWrapper.find(BUTTON).exists()).toBe(true);
++
++      await traceWrapper.setProps({ modelValue: defaultProps.modelValue });
++      await flushPromises();
++
++      expect(traceWrapper.find(BUTTON).exists()).toBe(false);
++    });
++
++    it("keeps the action on every tab, unlike the tab-scoped wrap toggle", async () => {
++      traceWrapper = mountDetailTable();
++      await flushPromises();
++
++      expect(traceWrapper.vm.tab).toBe("json");
++      expect(traceWrapper.find(BUTTON).isVisible()).toBe(true);
++      // Contrast: the wrap toggle is `v-show="tab === 'table'"`, so it is rendered
++      // but hidden on the JSON tab.
++      expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(false);
++
++      traceWrapper.vm.tab = "table";
++      await nextTick();
++
++      expect(traceWrapper.find(BUTTON).isVisible()).toBe(true);
++      expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(true);
++    });
++  });
+ });
+diff --git a/web/src/plugins/logs/DetailTable.vue b/web/src/plugins/logs/DetailTable.vue
+index 76a9465eb89..3d9331eddf5 100644
+--- a/web/src/plugins/logs/DetailTable.vue
++++ b/web/src/plugins/logs/DetailTable.vue
+@@ -36,6 +36,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           data-test="logs-detail-ai-context-btn"
+           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
+         />
++        <!-- Lives in the header rather than inside the JSON tab so the action
++             stays reachable from every tab. JsonPreview is told to hide its own
++             copy via `hide-view-trace`. -->
++        <div
++          v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
++          class="flex shrink-0 items-center gap-2"
++        >
++          <OSelect
++            data-test="log-detail-view-trace-stream-select"
++            v-model="searchObj.meta.selectedTraceStream"
++            :options="tracesStreams"
++            class="w-40! shrink-0"
++            :loading="isTracesStreamsLoading"
++            :disabled="isTracesStreamsLoading"
++            size="sm"
++          />
++          <OButton
++            data-test="log-detail-view-trace-btn"
++            size="xs"
++            variant="outline"
++            icon-left="account-tree"
++            @click="viewTrace"
++            >{{ t("search.viewTrace") }}</OButton
++          >
++        </div>
+         <OSwitch
+           v-show="tab === 'table'"
+           data-test="log-detail-wrap-values-toggle-btn"
+@@ -69,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               show-copy-button
+               mode="sidebar"
+               hide-view-related
++              hide-view-trace
+               :highlight-query="highlightQuery"
+               :should-wrap-values="shouldWrapValues"
+               @copy="copyContentToClipboard"
+@@ -456,6 +482,7 @@ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
+ import { extractStatusFromLog } from "@/utils/logs/statusParser";
+ import { logsUtils } from "@/composables/useLogs/logsUtils";
+ import { searchState } from "@/composables/useLogs/searchState";
++import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OSelect from "@/lib/forms/Select/OSelect.vue";
+ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+@@ -600,6 +627,25 @@ export default defineComponent({
+     ]);
+     const shouldWrapValues: any = ref(true);
+     const { searchObj } = searchState();
++
++    // The View Trace action is rendered in this component's header row (not
++    // inside JsonPreview) so it stays reachable from every tab. Gate on
++    // `modelValue`, which is a prop and therefore available during setup —
++    // `rowData` is only filled by the async created() hook below.
++    const {
++      tracesStreams,
++      isTracesStreamsLoading,
++      showViewTraceBtn,
++      setViewTraceBtn: setViewTraceBtnFor,
++    } = useViewTraceAction(t, searchObj);
++
++    watch(
++      () => props.modelValue,
++      (record) => {
++        setViewTraceBtnFor(record);
++      },
++      { immediate: true },
++    );
+     const { fnParsedSQL, hasAggregation } = logsUtils();
+ 
+     // Watch for initialTab prop changes to update tab
+@@ -1040,6 +1086,9 @@ export default defineComponent({
+       searchObj,
+       multiStreamFields,
+       viewTrace,
++      tracesStreams,
++      isTracesStreamsLoading,
++      showViewTraceBtn,
+       hasAggregationQuery,
+       sendToAiChat,
+       addSearchTerm,
+diff --git a/web/src/plugins/logs/JsonPreview.spec.ts b/web/src/plugins/logs/JsonPreview.spec.ts
+index 6775a16dab9..f842e5c9497 100644
+--- a/web/src/plugins/logs/JsonPreview.spec.ts
++++ b/web/src/plugins/logs/JsonPreview.spec.ts
+@@ -1,4 +1,4 @@
+-import { mount } from "@vue/test-utils";
++import { flushPromises, mount } from "@vue/test-utils";
+ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+ import JsonPreview from "@/plugins/logs/JsonPreview.vue";
+ import i18n from "@/locales";
+@@ -1217,4 +1217,203 @@ describe("JsonPreview Component", () => {
+       expect(result).toEqual([]);
+     });
+   });
++
++  // The View Trace action is shared with DetailTable's row-detail drawer, which
++  // renders its own copy in the drawer header (hence `hideViewTrace`) and fills
++  // the previewed record in an async created() hook, so the preview mounts with
++  // an empty `value` and only receives the record later (hence the watcher).
++  describe("View Trace action visibility", () => {
++    const streamSelectSelector = '[data-test="log-search-index-list-select-stream"]';
++    const viewTraceBtnSelector = '[data-test="trace-view-logs-btn"]';
++    const recordWithTraceId = { ...mockValue, trace_id: "test-trace-id" };
++
++    let traceWrapper: any = null;
++
++    const mountPreview = (props: Record<string, any> = {}) =>
++      mount(JsonPreview, {
++        props: { value: recordWithTraceId, mode: "sidebar", ...props },
++        global: {
++          plugins: [i18n],
++          provide: { store },
++          stubs: {
++            AppTabs: true,
++            CodeQueryEditor: true,
++            ODialog: ODialogStub,
++            OButton: true,
++            ODropdown: true,
++            ODropdownItem: true,
++            ODropdownSeparator: true,
++            OSelect: true,
++            OIcon: true,
++            OInput: true,
++            OSpinner: true,
++            OTooltip: true,
++            LogsHighLighting: true,
++            ChunkedContent: true,
++            EqualIcon: true,
++            NotEqualIcon: true,
++          },
++        },
++      });
++
++    beforeEach(() => {
++      // Everything the gate needs: traces menu visible, service streams off,
++      // and traces streams available for the picker.
++      store.state.hiddenMenus = new Set();
++      store.state.zoConfig.service_streams_enabled = false;
++      mockGetStreams.mockResolvedValue({
++        list: [{ name: "trace-stream1" }, { name: "trace-stream2" }],
++      });
++    });
++
++    afterEach(() => {
++      traceWrapper?.unmount();
++      traceWrapper = null;
++    });
++
++    describe("hideViewTrace prop", () => {
++      it("should default hideViewTrace to false", () => {
++        traceWrapper = mountPreview();
++
++        expect(traceWrapper.props("hideViewTrace")).toBe(false);
++      });
++
++      it("should render the stream picker and the button when the gate passes", async () => {
++        traceWrapper = mountPreview();
++        await flushPromises();
++
++        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
++        expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
++        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
++      });
++
++      it("should hide the stream picker and the button when hideViewTrace is true", async () => {
++        traceWrapper = mountPreview({ hideViewTrace: true });
++        await flushPromises();
++
++        // The gate itself still passes — only the prop hides the action.
++        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
++        expect(traceWrapper.vm.tracesStreams.length).toBeGreaterThan(0);
++        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
++      });
++
++      it("should stay hidden with hideViewTrace even when value arrives late", async () => {
++        traceWrapper = mountPreview({ value: {}, hideViewTrace: true });
++        await flushPromises();
++
++        await traceWrapper.setProps({ value: recordWithTraceId });
++        await flushPromises();
++
++        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
++        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
++      });
++    });
++
++    describe("value watcher", () => {
++      it("should hide the action while value is still empty", async () => {
++        traceWrapper = mountPreview({ value: {} });
++        await flushPromises();
++
++        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
++        expect(mockGetStreams).not.toHaveBeenCalled();
++        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
++      });
++
++      it("should show the action once value is populated after mount", async () => {
++        traceWrapper = mountPreview({ value: {} });
++        await flushPromises();
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
++
++        await traceWrapper.setProps({ value: recordWithTraceId });
++        await flushPromises();
++
++        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
++        expect(mockGetStreams).toHaveBeenCalledWith("traces", false);
++        expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
++        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
++      });
++
++      it("should render the action while the traces streams are still loading", async () => {
++        let resolveStreams: (value: any) => void = () => {};
++        mockGetStreams.mockImplementation(
++          () =>
++            new Promise((resolve) => {
++              resolveStreams = resolve;
++            }),
++        );
++
++        traceWrapper = mountPreview({ value: {} });
++        await traceWrapper.setProps({ value: recordWithTraceId });
++        await nextTick();
++
++        // No streams have arrived yet: the loading flag alone keeps it rendered.
++        expect(traceWrapper.vm.tracesStreams).toEqual([]);
++        expect(traceWrapper.vm.isTracesStreamsLoading).toBe(true);
++        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
++
++        resolveStreams({ list: [{ name: "trace-stream1" }] });
++        await flushPromises();
++
++        expect(traceWrapper.vm.isTracesStreamsLoading).toBe(false);
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
++      });
++
++      it("should hide the action again when value is emptied", async () => {
++        traceWrapper = mountPreview();
++        await flushPromises();
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
++
++        await traceWrapper.setProps({ value: {} });
++        await flushPromises();
++
++        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
++        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
++      });
++
++      it("should hide the action when the new value carries no trace id", async () => {
++        traceWrapper = mountPreview();
++        await flushPromises();
++
++        await traceWrapper.setProps({ value: { ...mockValue } });
++        await flushPromises();
++
++        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
++      });
++
++      it("should not refetch the traces streams on every value change", async () => {
++        traceWrapper = mountPreview({ value: {} });
++        await traceWrapper.setProps({ value: recordWithTraceId });
++        await flushPromises();
++        expect(mockGetStreams).toHaveBeenCalledTimes(1);
++
++        await traceWrapper.setProps({
++          value: { ...recordWithTraceId, trace_id: "another-trace-id" },
++        });
++        await flushPromises();
++
++        expect(mockGetStreams).toHaveBeenCalledTimes(1);
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
++      });
++
++      it("should keep the action hidden when the traces menu is hidden", async () => {
++        store.state.hiddenMenus = new Set(["traces"]);
++        traceWrapper = mountPreview({ value: {} });
++
++        await traceWrapper.setProps({ value: recordWithTraceId });
++        await flushPromises();
++
++        expect(traceWrapper.vm.showViewTraceBtn).toBe(false);
++        expect(mockGetStreams).not.toHaveBeenCalled();
++        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
++      });
++    });
++  });
+ });
+diff --git a/web/src/plugins/logs/JsonPreview.vue b/web/src/plugins/logs/JsonPreview.vue
+index cb1cc63b2e1..d115d843d32 100644
+--- a/web/src/plugins/logs/JsonPreview.vue
++++ b/web/src/plugins/logs/JsonPreview.vue
+@@ -34,7 +34,9 @@
+       <!-- Stream picker and its action read as one control, sized to sit level
+            with the toolbar buttons above rather than towering over them. -->
+       <div
+-        v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
++        v-if="
++          !hideViewTrace && showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
++        "
+         class="mb-1.5 flex items-center gap-2"
+       >
+         <OSelect
+@@ -258,7 +260,6 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+ import { raw, useI18nTyped } from "@/types/i18n";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import { useRouter } from "vue-router";
+-import useStreams from "@/composables/useStreams";
+ import AppTabs from "@/components/common/AppTabs.vue";
+ import searchService from "@/services/search";
+ import { generateTraceContext } from "@/utils/zincutils";
+@@ -267,6 +268,7 @@ import config from "@/aws-exports";
+ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
+ import { searchState } from "@/composables/useLogs/searchState";
++import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
+ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+@@ -312,6 +314,12 @@ export default {
+       type: Boolean,
+       default: false,
+     },
++    // Set by DetailTable's drawer, which renders the View Trace action in its
++    // own header row instead so it stays reachable from every tab.
++    hideViewTrace: {
++      type: Boolean,
++      default: false,
++    },
+     hideSearchTermActions: {
+       type: Boolean,
+       default: false,
+@@ -356,18 +364,10 @@ export default {
+ 
+     const streamSearchValue = ref<string>("");
+ 
+-    const { getStreams } = useStreams(t);
+-
+-    const filteredTracesStreamOptions = ref([]);
+-
+     const router = useRouter();
+ 
+-    const tracesStreams = ref([]);
+-
+     const queryEditorRef = ref<any>();
+ 
+-    const isTracesStreamsLoading = ref(false);
+-
+     const typeOfRegexPattern = ref(false);
+     const regexPatternType = ref("");
+ 
+@@ -414,6 +414,20 @@ export default {
+     };
+     const { searchObj, searchAggData } = searchState();
+ 
++    // Shared with DetailTable's drawer header so both renderings of the
++    // View Trace action apply the same rules. See useViewTraceAction.
++    const {
++      tracesStreams,
++      filteredTracesStreamOptions,
++      isTracesStreamsLoading,
++      showViewTraceBtn,
++      getTracesStreams,
++      setViewTraceBtn: setViewTraceBtnFor,
++      filterStreamFn,
++    } = useViewTraceAction(t, searchObj);
++
++    const setViewTraceBtn = () => setViewTraceBtnFor(props.value);
++
+     // Cross-linking: get all matching cross-links for a field using result_schema data
+     const getCrossLinksForField = (
+       fieldName: string,
+@@ -498,7 +512,6 @@ export default {
+     };
+     let multiStreamFields: any = ref([]);
+ 
+-    const showViewTraceBtn = ref(false);
+     const showViewRelatedBtn = ref(false);
+ 
+     // Initialize service correlation composable
+@@ -532,38 +545,18 @@ export default {
+       }
+     });
+ 
+-    const getTracesStreams = async () => {
+-      isTracesStreamsLoading.value = true;
+-      try {
+-        getStreams("traces", false)
+-          .then((res: any) => {
+-            tracesStreams.value = res.list.map((option: any) => option.name);
+-            filteredTracesStreamOptions.value = JSON.parse(JSON.stringify(tracesStreams.value));
+-
+-            if (!searchObj.meta.selectedTraceStream.length)
+-              searchObj.meta.selectedTraceStream = tracesStreams.value[0];
+-          })
+-          .catch(() => Promise.reject())
+-          .finally(() => {
+-            isTracesStreamsLoading.value = false;
+-          });
+-      } catch (err: any) {
+-        isTracesStreamsLoading.value = false;
+-        console.error("Failed to get traces streams", err);
+-      }
+-    };
+-
+-    const setViewTraceBtn = () => {
+-      // Hide view traces button when service_streams_enabled is true
+-      const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
+-
+-      showViewTraceBtn.value =
+-        !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
+-        !serviceStreamsEnabled && // Hide when service streams is enabled
+-        props.value[store.state.organizationData?.organizationSettings?.trace_id_field_name];
+-
+-      if (showViewTraceBtn.value && !filteredTracesStreamOptions.value.length) getTracesStreams();
+-    };
++    // `value` can arrive after this component mounts: DetailTable fills its
++    // `rowData` in an async created() hook, so the row-detail drawer's preview
++    // mounts with `{}`. The onBeforeMount check below then ran against an empty
++    // record, left `showViewTraceBtn` false and never fetched the traces
++    // streams, so the drawer's View Trace button stayed hidden for good.
++    // Re-evaluate whenever the previewed record changes.
++    watch(
++      () => props.value,
++      () => {
++        setViewTraceBtn();
++      },
++    );
+ 
+     onBeforeMount(() => {
+       setViewTraceBtn();
+@@ -704,12 +697,6 @@ export default {
+       },
+     );
+ 
+-    const filterStreamFn = (val: any = "") => {
+-      filteredTracesStreamOptions.value = tracesStreams.value.filter((stream: any) => {
+-        return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
+-      });
+-    };
+-
+     // The previewed log rides along with the event: a listener bound by
+     // reference (`@view-trace="handler"`) otherwise receives `undefined` and
+     // throws on `log[timestamp_column]` (issue #13708). Same contract as
+diff --git a/web/src/plugins/traces/TraceDetails.vue b/web/src/plugins/traces/TraceDetails.vue
+index 11cf5f83023..977fe2e6d02 100644
+--- a/web/src/plugins/traces/TraceDetails.vue
++++ b/web/src/plugins/traces/TraceDetails.vue
+@@ -797,15 +797,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             <!-- Map View with Pattern/Span Toggle -->
+             <div v-if="activeTab === 'map'" class="flex h-full min-h-0 w-full flex-1 flex-col">
+               <!-- Chart Container -->
+-              <div class="flex min-h-0 flex-1 items-center justify-center">
+-                <div class="h-full w-full p-2.5 text-center">
+-                  <ChartRenderer
+-                    ref="chartRendererRef"
+-                    data-test="trace-details-service-map-chart"
+-                    :data="traceServiceMapChartOptions"
+-                    class="trace-chart-height h-50! min-h-50! w-full!"
+-                  />
+-                </div>
++              <div class="min-h-0 flex-1 overflow-hidden p-2.5">
++                <ChartRenderer
++                  ref="chartRendererRef"
++                  data-test="trace-details-service-map-chart"
++                  :data="traceServiceMapChartOptions"
++                  class="h-full"
++                />
+               </div>
+             </div>
+           </div>
+diff --git a/web/src/plugins/traces/TraceTree.spec.ts b/web/src/plugins/traces/TraceTree.spec.ts
+index 10865d4801f..923c01d0de3 100644
+--- a/web/src/plugins/traces/TraceTree.spec.ts
++++ b/web/src/plugins/traces/TraceTree.spec.ts
+@@ -51,14 +51,32 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
+   getSpanTechIconDataUrl: vi.fn().mockReturnValue(null),
+ }));
+ 
++// Shared, stable spies for the useTraces helpers so `viewSpanLogs` can be
++// asserted on. `searchObj` is a plain mutable object: tests flip
++// `data.traceDetails.selectedLogStreams` to drive the OSS stream guard.
++const { mockBuildQueryDetails, mockNavigateToLogs, mockToast, mockSearchObj } = vi.hoisted(() => ({
++  mockBuildQueryDetails: vi.fn(),
++  mockNavigateToLogs: vi.fn(),
++  mockToast: vi.fn(),
++  mockSearchObj: {
++    meta: { serviceColors: {} },
++    data: { traceDetails: { selectedLogStreams: [] as string[] } },
++  },
++}));
++
+ vi.mock("@/composables/useTraces", () => ({
+   default: () => ({
+-    searchObj: { meta: { serviceColors: {} } },
+-    buildQueryDetails: vi.fn(),
+-    navigateToLogs: vi.fn(),
++    searchObj: mockSearchObj,
++    buildQueryDetails: mockBuildQueryDetails,
++    navigateToLogs: mockNavigateToLogs,
+   }),
+ }));
+ 
++vi.mock("@/lib/feedback/Toast/useToast", async () => {
++  const actual = await vi.importActual<Record<string, unknown>>("@/lib/feedback/Toast/useToast");
++  return { ...actual, toast: mockToast };
++});
++
+ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+ import { mount, flushPromises } from "@vue/test-utils";
+ import i18n from "@/locales";
+@@ -66,6 +84,7 @@ import router from "@/test/unit/helpers/router";
+ import { createStore } from "vuex";
+ 
+ import TraceTree from "@/plugins/traces/TraceTree.vue";
++import config from "@/aws-exports";
+ 
+ const mockStore = createStore({
+   state: {
+@@ -1366,4 +1385,222 @@ describe("TraceTree", () => {
+       expect(badge.attributes("title")).toContain("collapse");
+     });
+   });
++
++  describe("viewSpanLogs", () => {
++    // A formatted tree node — what the `spans` prop holds: camelCase keys and
++    // microsecond timestamps. This is NOT the shape buildQueryDetails accepts.
++    const formattedSpan = {
++      spanId: "d9603ec7f76eb499",
++      operationName: "service:alerts:evaluate_scheduled",
++      serviceName: "scheduler",
++      resolvedIdentity: "scheduler",
++      spanStatus: "UNSET",
++      spanKind: "Client",
++      parentId: null,
++      hasChildSpans: false,
++      startTimeUs: 1752490492843047,
++      endTimeUs: 1752490493164419,
++      style: {
++        color: "#1ab8be",
++        backgroundColor: "#1ab8be33",
++        top: "0px",
++        left: "0px",
++      },
++      depth: 0,
++      index: 0,
++    };
++
++    // The raw API span behind it — what `spanMap` holds: snake_case keys and
++    // nanosecond timestamps. buildQueryDetails must receive THIS object.
++    const rawSpan = {
++      _timestamp: 1752490492843047,
++      start_time: 1752490492843047200,
++      end_time: 1752490493164419300,
++      duration: 321372,
++      span_id: "d9603ec7f76eb499",
++      operation_name: "service:alerts:evaluate_scheduled",
++      service_name: "scheduler",
++      span_status: "UNSET",
++      span_kind: 2,
++      parent_id: null,
++    };
++
++    // Real case: a span with no `span_id` is given a synthetic `spanId` by the
++    // formatter, so `spanMap` has no entry for it.
++    const orphanSpan = {
++      ...formattedSpan,
++      spanId: "synthetic-span-id-0",
++    };
++
++    const queryDetailsStub = {
++      stream_name: "default",
++      from: 1752490492843,
++      to: 1752490493164,
++    };
++
++    const viewLogsBtnFor = (w: any, spanId: string) =>
++      w.find(`[data-test="trace-tree-span-view-logs-btn-${spanId}"]`);
++
++    const originalIsEnterprise = config.isEnterprise;
++
++    /** Mounts the tree with a single span and a spanMap containing only rawSpan. */
++    function mountWithSpan(span: Record<string, unknown>) {
++      return mountTraceTree({
++        spans: [span],
++        spanMap: { [rawSpan.span_id]: rawSpan },
++        spanList: [rawSpan],
++      });
++    }
++
++    beforeEach(() => {
++      mockSearchObj.data.traceDetails.selectedLogStreams = [];
++      mockBuildQueryDetails.mockReturnValue(queryDetailsStub);
++    });
++
++    afterEach(() => {
++      config.isEnterprise = originalIsEnterprise;
++      mockSearchObj.data.traceDetails.selectedLogStreams = [];
++    });
++
++    describe("OSS mode (config.isEnterprise !== 'true')", () => {
++      let ossWrapper: any;
++
++      beforeEach(() => {
++        config.isEnterprise = "false";
++      });
++
++      afterEach(() => {
++        ossWrapper?.unmount();
++        ossWrapper = null;
++      });
++
++      it("should warn and skip both helpers when no logs stream is selected", async () => {
++        mockSearchObj.data.traceDetails.selectedLogStreams = [];
++        ossWrapper = mountWithSpan(formattedSpan);
++
++        await viewLogsBtnFor(ossWrapper, formattedSpan.spanId).trigger("click");
++
++        expect(mockToast).toHaveBeenCalledTimes(1);
++        expect(mockToast).toHaveBeenCalledWith({
++          variant: "warning",
++          message: "Select Logs stream first",
++        });
++        expect(mockBuildQueryDetails).not.toHaveBeenCalled();
++        expect(mockNavigateToLogs).not.toHaveBeenCalled();
++      });
++
++      it("should not emit view-correlated-logs when no logs stream is selected", async () => {
++        mockSearchObj.data.traceDetails.selectedLogStreams = [];
++        ossWrapper = mountWithSpan(formattedSpan);
++
++        await viewLogsBtnFor(ossWrapper, formattedSpan.spanId).trigger("click");
++
++        expect(ossWrapper.emitted("view-correlated-logs")).toBeFalsy();
++      });
++
++      it("should warn and skip both helpers when the span is missing from spanMap", async () => {
++        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
++        ossWrapper = mountWithSpan(orphanSpan);
++
++        await viewLogsBtnFor(ossWrapper, orphanSpan.spanId).trigger("click");
++
++        expect(mockToast).toHaveBeenCalledTimes(1);
++        expect(mockToast).toHaveBeenCalledWith({
++          variant: "warning",
++          message: "Could not open logs for this span.",
++        });
++        expect(mockBuildQueryDetails).not.toHaveBeenCalled();
++        expect(mockNavigateToLogs).not.toHaveBeenCalled();
++      });
++
++      it("should pass the RAW span from spanMap to buildQueryDetails, not the formatted node", async () => {
++        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
++        ossWrapper = mountWithSpan(formattedSpan);
++
++        await viewLogsBtnFor(ossWrapper, formattedSpan.spanId).trigger("click");
++
++        expect(mockBuildQueryDetails).toHaveBeenCalledTimes(1);
++
++        const passedSpan = mockBuildQueryDetails.mock.calls[0][0];
++        // Raw shape: snake_case keys, nanosecond timestamps.
++        expect(passedSpan).toEqual(rawSpan);
++        expect(passedSpan.span_id).toBe(rawSpan.span_id);
++        expect(passedSpan.start_time).toBe(rawSpan.start_time);
++        expect(passedSpan.end_time).toBe(rawSpan.end_time);
++        // Formatted shape must be absent — passing it produced `from=NaN&to=NaN`.
++        expect(passedSpan.spanId).toBeUndefined();
++        expect(passedSpan.startTimeUs).toBeUndefined();
++        expect(passedSpan.endTimeUs).toBeUndefined();
++        expect(mockBuildQueryDetails).not.toHaveBeenCalledWith(
++          expect.objectContaining({ spanId: formattedSpan.spanId }),
++        );
++      });
++
++      it("should navigate with the query details returned by buildQueryDetails", async () => {
++        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
++        ossWrapper = mountWithSpan(formattedSpan);
++
++        await viewLogsBtnFor(ossWrapper, formattedSpan.spanId).trigger("click");
++
++        expect(mockNavigateToLogs).toHaveBeenCalledTimes(1);
++        expect(mockNavigateToLogs).toHaveBeenCalledWith(queryDetailsStub);
++        expect(mockNavigateToLogs.mock.calls[0][0]).toBe(queryDetailsStub);
++        expect(mockToast).not.toHaveBeenCalled();
++      });
++    });
++
++    describe("Enterprise mode (config.isEnterprise === 'true')", () => {
++      let entWrapper: any;
++
++      beforeEach(() => {
++        config.isEnterprise = "true";
++      });
++
++      afterEach(() => {
++        entWrapper?.unmount();
++        entWrapper = null;
++      });
++
++      it("should emit view-correlated-logs with the original formatted span", async () => {
++        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
++        entWrapper = mountWithSpan(formattedSpan);
++
++        await viewLogsBtnFor(entWrapper, formattedSpan.spanId).trigger("click");
++
++        expect(entWrapper.emitted("view-correlated-logs")).toBeTruthy();
++        expect(entWrapper.emitted("view-correlated-logs")).toHaveLength(1);
++        expect(entWrapper.emitted("view-correlated-logs")[0][0]).toEqual(formattedSpan);
++      });
++
++      it("should never call buildQueryDetails or navigateToLogs", async () => {
++        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
++        entWrapper = mountWithSpan(formattedSpan);
++
++        await viewLogsBtnFor(entWrapper, formattedSpan.spanId).trigger("click");
++
++        expect(mockBuildQueryDetails).not.toHaveBeenCalled();
++        expect(mockNavigateToLogs).not.toHaveBeenCalled();
++      });
++
++      it("should bypass the stream guard when no logs stream is selected", async () => {
++        mockSearchObj.data.traceDetails.selectedLogStreams = [];
++        entWrapper = mountWithSpan(formattedSpan);
++
++        await viewLogsBtnFor(entWrapper, formattedSpan.spanId).trigger("click");
++
++        expect(mockToast).not.toHaveBeenCalled();
++        expect(entWrapper.emitted("view-correlated-logs")).toHaveLength(1);
++      });
++
++      it("should bypass the spanMap guard for a span missing from spanMap", async () => {
++        mockSearchObj.data.traceDetails.selectedLogStreams = ["default"];
++        entWrapper = mountWithSpan(orphanSpan);
++
++        await viewLogsBtnFor(entWrapper, orphanSpan.spanId).trigger("click");
++
++        expect(mockToast).not.toHaveBeenCalled();
++        expect(entWrapper.emitted("view-correlated-logs")[0][0]).toEqual(orphanSpan);
++      });
++    });
++  });
+ });
+diff --git a/web/src/plugins/traces/TraceTree.vue b/web/src/plugins/traces/TraceTree.vue
+index 4b958b5c62c..6fa566b6854 100644
+--- a/web/src/plugins/traces/TraceTree.vue
++++ b/web/src/plugins/traces/TraceTree.vue
+@@ -328,6 +328,7 @@ import useTheme from "@/composables/useTheme";
+ import SpanBlock from "./SpanBlock.vue";
+ import SpanKindBadge from "./components/SpanKindBadge.vue";
+ import { useI18nTyped } from "@/types/i18n";
++import { toast } from "@/lib/feedback/Toast/useToast";
+ 
+ import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
+ import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/convertTraceData";
+@@ -413,7 +414,7 @@ export default defineComponent({
+     "view-correlated-logs",
+   ],
+   setup(props, { emit }) {
+-    const { buildQueryDetails, navigateToLogs } = useTraces();
++    const { buildQueryDetails, navigateToLogs, searchObj } = useTraces();
+     const store = useStore();
+     const { isDark } = useTheme();
+ 
+@@ -524,7 +525,33 @@ export default defineComponent({
+         emit("view-correlated-logs", span);
+         return;
+       }
+-      const queryDetails = buildQueryDetails(span);
++      // OSS resolves the target stream from the header's picker. Without a
++      // selection we would navigate to `/logs?stream=`, which drops the filter
++      // and dumps an unfiltered result set on the user. The header's own View
++      // Logs button is disabled in this state; this row-level one is not, so
++      // say why instead of leaving it a silent dead end (same handling as #13722).
++      if (!searchObj.data.traceDetails.selectedLogStreams.length) {
++        toast({
++          variant: "warning",
++          message: t("search.selectLogsStreamFirst"),
++        });
++        return;
++      }
++      // `spans` are formatted nodes (camelCase, microseconds); `buildQueryDetails`
++      // reads the raw API shape (`start_time`/`end_time`, nanoseconds). Resolve the
++      // raw span the same way the rest of this component does rather than making the
++      // shared helper tolerate two shapes — passing a formatted node produced
++      // `from=NaN&to=NaN`. A span missing `span_id` gets a synthetic `spanId` that is
++      // absent from `spanMap`, so the lookup can miss.
++      const rawSpan = props.spanMap[span.spanId];
++      if (!rawSpan) {
++        toast({
++          variant: "warning",
++          message: t("traces.viewLogsUnavailable"),
++        });
++        return;
++      }
++      const queryDetails = buildQueryDetails(rawSpan);
+       navigateToLogs(queryDetails);
+     };
+ 

@@ -1,0 +1,29 @@
+{
+  "feature_slug": "view-trace",
+  "feature_title": "Logs View Trace Action",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "viewTrace.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/viewTrace.spec.js",
+  "playwright_group": "Logs-Features",
+  "source_files": [
+    "web/src/composables/useLogs/useViewTraceAction.ts",
+    "web/src/plugins/logs/DetailTable.vue",
+    "web/src/plugins/logs/JsonPreview.vue",
+    "web/src/plugins/traces/TraceTree.vue",
+    "web/src/plugins/traces/TraceDetails.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All changed file paths live under web/src/** (plugins/logs, plugins/traces, composables/useLogs, locales/languages) plus scripts/translations/. No path is under an enterprise-owned directory (enterprise/, o2_enterprise/, src/enterprise/) and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/etc.) appear in the changed paths or symbols, so this is an open-source change.",
+    "skip": "Not skipping. There is no explicit opt-out (no tests-added label, empty trigger comment), and the change is not docs/CI-only. It alters user-facing UI in web/src: the View Trace action now renders in the DetailTable row-detail drawer header and JsonPreview, and TraceTree's View Logs action gains validation toasts and a navigation fix.",
+    "e2e": "E2E is warranted. The View Trace button + traces-stream picker are real user-exercisable controls whose visibility is gated by service_streams_enabled, hiddenMenus, and the trace_id field, and the trace-tree View Logs action now surfaces warning toasts when no logs stream is selected or the raw span is missing. These flows need browser-level verification.",
+    "area": "Logs is the dominant area: the new composable lives in composables/useLogs, and the bulk of the substantive UI changes are in plugins/logs/DetailTable.vue and plugins/logs/JsonPreview.vue. The traces changes (TraceTree.vue, TraceDetails.vue) are secondary bugfixes/layout tweaks, so the spec belongs with the Logs-area siblings.",
+    "group": "The View Trace action is a feature-level logs capability (not core search), matching the Logs-Features shard where sibling feature specs like searchPatterns.spec.js live; the enterprise overlay also extends Logs-Core/Logs-Features, confirming Logs-Features is the closest existing matrix group.",
+    "existing_tests": "No Playwright E2E specs in the diff. The changed .spec.ts files (useViewTraceAction.spec.ts, DetailTable.spec.ts, JsonPreview.spec.ts, TraceTree.spec.ts) are Vitest unit tests under web/src/**, which are not E2E coverage and do not set existing_tests_in_diff."
+  }
+}

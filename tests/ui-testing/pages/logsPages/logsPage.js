@@ -506,6 +506,12 @@ export class LogsPage {
         this.logDetailPanel = '[data-test="logs-search-result-detail-dialog"], [data-test*="log-detail"]';
         this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
 
+        // ===== VIEW TRACE ACTION (useViewTraceAction) =====
+        // Inline/expanded-row action (JsonPreview) and drawer-header action (DetailTable).
+        this.viewTraceExpandedBtn = '[data-test="trace-view-logs-btn"]';
+        this.viewTraceDrawerBtn = '[data-test="log-detail-view-trace-btn"]';
+        this.viewTraceDrawerStreamSelect = '[data-test="log-detail-view-trace-stream-select"]';
+
         // ===== REGION SELECTOR (SearchBar.vue ODropdown + OTree) =====
         // Trigger button + popover menu — data-test set on ODropdown / inner menu.
         this.regionDropdownBtn = '[data-test="logs-search-bar-region-btn"]';
@@ -5682,6 +5688,78 @@ export class LogsPage {
         await this.page.locator('[data-test="o2-table-expand-0"]').click();
         // Wait for the details drawer to open — keys off the actual reveal instead of a buffer.
         await this.page.locator('[data-test="logs-search-result-detail-dialog"], [data-test="log-details-include-exclude-field-btn"], [data-test="log-details-include-field-btn"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    }
+
+    // ===== VIEW TRACE ACTION METHODS (useViewTraceAction) =====
+
+    /**
+     * Asserts the inline/expanded-row "View Trace" action is visible.
+     * The button only renders when the expanded record has a truthy trace id AND
+     * at least one traces stream exists, so its presence verifies the full gate.
+     */
+    async expectExpandedRowViewTraceVisible() {
+        await expect(this.page.locator(this.viewTraceExpandedBtn)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Expanded-row View Trace action is visible');
+    }
+
+    /**
+     * Asserts the inline/expanded-row "View Trace" action is NOT rendered.
+     */
+    async expectExpandedRowViewTraceHidden() {
+        await expect(this.page.locator(this.viewTraceExpandedBtn)).toHaveCount(0);
+        testLogger.info('Expanded-row View Trace action is hidden (no trace id)');
+    }
+
+    /**
+     * Clicks the inline/expanded-row "View Trace" button to navigate to trace details.
+     */
+    async clickExpandedRowViewTrace() {
+        await this.page.locator(this.viewTraceExpandedBtn).click();
+        testLogger.info('Clicked expanded-row View Trace button');
+    }
+
+    /**
+     * Asserts the drawer-header "View Trace" action (button + stream picker) is visible.
+     */
+    async expectDrawerViewTraceVisible() {
+        await expect(this.page.locator(this.viewTraceDrawerBtn)).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator(this.viewTraceDrawerStreamSelect)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Drawer View Trace action is visible');
+    }
+
+    /**
+     * Asserts the drawer-header "View Trace" action is NOT rendered.
+     */
+    async expectDrawerViewTraceHidden() {
+        await expect(this.page.locator(this.viewTraceDrawerBtn)).toHaveCount(0);
+        testLogger.info('Drawer View Trace action is hidden (no trace id)');
+    }
+
+    /**
+     * Clicks the drawer-header "View Trace" button to navigate to trace details.
+     */
+    async clickDrawerViewTrace() {
+        await this.page.locator(this.viewTraceDrawerBtn).click();
+        testLogger.info('Clicked drawer View Trace button');
+    }
+
+    /**
+     * Asserts the drawer-header traces-stream picker is visible. Rendered only when
+     * traces streams exist, so visibility verifies the `tracesStreams.length` gate.
+     */
+    async expectDrawerViewTraceStreamSelectVisible() {
+        await expect(this.page.locator(this.viewTraceDrawerStreamSelect)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Drawer traces-stream picker is visible');
+    }
+
+    /**
+     * Returns the currently-selected traces-stream name shown in the drawer picker.
+     * Non-empty means the default selection (first traces stream) was applied.
+     * @returns {Promise<string>}
+     */
+    async getDrawerViewTraceStreamSelectText() {
+        const text = await this.page.locator(this.viewTraceDrawerStreamSelect).innerText();
+        return (text || '').trim();
     }
 
     async addIncludeSearchTermFromLogDetails() {
