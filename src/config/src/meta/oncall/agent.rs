@@ -327,6 +327,18 @@ pub enum L0Mode {
     Only,
 }
 
+impl L0Mode {
+    /// Stable wire value. Read by the ladder screen to decide whether to draw
+    /// an L0 step above the first rung.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Parallel => "parallel",
+            Self::Gate => "gate",
+            Self::Only => "only",
+        }
+    }
+}
+
 /// Per-severity modes, exactly as the `l0_json` column spells them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct L0Modes {
