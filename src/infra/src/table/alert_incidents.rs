@@ -19,11 +19,15 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait, sea_query::LockType,
+    QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, LockType},
 };
 use svix_ksuid::KsuidLike;
 
-use super::entity::{alert_incident_alerts, alert_incidents};
+use super::{
+    entity::{alert_incident_alerts, alert_incidents},
+    get_lock,
+};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors::{self, DbError, Error},
@@ -71,6 +75,9 @@ pub async fn create(
         updated_at: Set(now),
     };
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     model
         .insert(client)
         .await
@@ -93,6 +100,9 @@ pub async fn add_alert_to_incident(
 ) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
 
     // Use transaction for atomic update
     let txn = client
@@ -165,6 +175,9 @@ pub async fn update_status(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let incident = get(org_id, id)
         .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
@@ -192,6 +205,9 @@ pub async fn update_title(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let incident = get(org_id, id)
         .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
@@ -214,6 +230,9 @@ pub async fn update_severity(
 ) -> Result<alert_incidents::Model, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
 
     let incident = get(org_id, id)
         .await?
@@ -465,6 +484,9 @@ pub async fn update_topology(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let incident = get(org_id, id)
         .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
@@ -505,6 +527,9 @@ pub async fn update_incident_metadata(
 ) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
 
     let incident = get(org_id, id)
         .await?
@@ -604,6 +629,9 @@ pub async fn upgrade_incident_group_values(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let incident = get(org_id, id)
         .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
@@ -637,41 +665,62 @@ pub async fn upgrade_incident_group_values(
 pub async fn auto_resolve_stale(
     stale_threshold_micros: i64,
 ) -> Result<(u64, Vec<(String, String)>), errors::Error> {
+    const PAGE_SIZE: u64 = 500;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
     let cutoff = now - stale_threshold_micros;
 
-    // Find all open/acknowledged incidents with last_alert_at older than threshold
-    let stale_incidents = alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let mut resolved_ids = Vec::new();
+    loop {
+        // make sure only one client is writing to the database(only for sqlite).
+        // Re-acquired per page so a large backlog doesn't monopolize the global
+        // write lock; each pass shrinks the non-resolved candidate set.
+        let _lock = get_lock().await;
 
-    let count = stale_incidents.len() as u64;
-    let mut resolved_ids = Vec::with_capacity(stale_incidents.len());
+        // Find open/acknowledged incidents with last_alert_at older than threshold
+        let stale_incidents = alert_incidents::Entity::find()
+            .filter(alert_incidents::Column::Status.ne("resolved"))
+            .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+            .limit(PAGE_SIZE)
+            .all(client)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        if stale_incidents.is_empty() {
+            break;
+        }
+        let page_full = stale_incidents.len() as u64 == PAGE_SIZE;
 
-    for incident in stale_incidents {
-        let org_id = incident.org_id.clone();
-        let incident_id = incident.id.clone();
-        let mut active: alert_incidents::ActiveModel = incident.into();
-        active.status = Set("resolved".to_string());
-        active.resolved_at = Set(Some(now));
-        active.updated_at = Set(now);
+        let page_ids: Vec<String> = stale_incidents.iter().map(|i| i.id.clone()).collect();
+        alert_incidents::Entity::update_many()
+            .col_expr(alert_incidents::Column::Status, Expr::value("resolved"))
+            .col_expr(alert_incidents::Column::ResolvedAt, Expr::value(Some(now)))
+            .col_expr(alert_incidents::Column::UpdatedAt, Expr::value(now))
+            .filter(alert_incidents::Column::Id.is_in(page_ids))
+            .filter(alert_incidents::Column::Status.ne("resolved"))
+            .exec(client)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-        if let Err(e) = active.update(client).await {
-            log::warn!("[incidents] Failed to auto-resolve incident: {}", e);
-        } else {
-            resolved_ids.push((org_id, incident_id));
+        resolved_ids.extend(
+            stale_incidents
+                .into_iter()
+                .map(|incident| (incident.org_id, incident.id)),
+        );
+        if !page_full {
+            break;
         }
     }
 
+    let count = resolved_ids.len() as u64;
     Ok((count, resolved_ids))
 }
 
 /// Deletes all alert incidents belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     alert_incidents::Entity::delete_many()
         .filter(alert_incidents::Column::OrgId.eq(org_id))

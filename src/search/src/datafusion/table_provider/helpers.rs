@@ -119,7 +119,7 @@ fn generate_parquet_access_plan(
 
 /// Build a Parquet access plan directly from sorted, non-overlapping row
 /// ranges. This avoids allocating a bitmap proportional to a high-cardinality
-/// metrics file when a series index already stores compact contiguous runs.
+/// metrics file when a metrics index already stores compact contiguous runs.
 fn generate_parquet_access_plan_from_ranges(
     file: &PartitionedFile,
     ranges: impl IntoIterator<Item = Range<usize>>,

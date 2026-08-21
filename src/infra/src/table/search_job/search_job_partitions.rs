@@ -139,7 +139,7 @@ pub async fn submit_partitions(job_id: &str, jobs: Vec<Model>) -> Result<(), err
     let status = Entity::find()
         .filter(Column::JobId.eq(job_id))
         .lock(LockType::Update)
-        .one(client)
+        .one(&tx)
         .await;
 
     match status {

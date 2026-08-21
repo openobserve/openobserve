@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::get_config;
+use config::{get_config, meta::meta_store::MetaStore};
 use migration::Migrator;
 use sea_orm_migration::MigratorTrait;
 
 use crate::{
-    db::{ORM_CLIENT_DDL, SQLITE_STORE, connect_to_orm_ddl, sqlite::CLIENT_RW},
+    db::{ORM_CLIENT_DDL, connect_to_orm_ddl, sqlite::CLIENT_RW},
     dist_lock,
 };
 
@@ -141,17 +141,26 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Acquires a lock on the SQLite client if SQLite is configured as the meta store.
+/// Acquires a lock on the SQLite client if the ORM runs on SQLite.
+///
+/// `connect_to_orm` uses the shared SQLite pool for every meta store except
+/// PostgreSQL, so the predicate here must match it — keying off
+/// `ZO_META_STORE=sqlite` alone would silently disable every lock site for
+/// other non-postgres values while the ORM still writes SQLite.
+///
+/// The guard wraps one process-wide, non-reentrant mutex serializing every
+/// SQLite write (raw meta-store puts, the coordinator, scheduler backends, and
+/// all ORM table writers). Acquire it at most once per call chain: the function
+/// that owns the write or transaction takes it; helpers that receive an open
+/// transaction must not. Drop the guard before calling anything that acquires
+/// it internally (coordinator emits, `db::scheduler` calls, other table write
+/// functions) — a nested acquisition deadlocks the process.
 ///
 /// # Returns
-/// - `Some(MutexGuard)` if SQLite is configured
-/// - `None` if a different store is configured
+/// - `Some(MutexGuard)` if the ORM runs on SQLite
+/// - `None` if PostgreSQL is configured
 pub async fn get_lock() -> Option<tokio::sync::MutexGuard<'static, sqlx::Pool<sqlx::Sqlite>>> {
-    if get_config()
-        .common
-        .meta_store
-        .eq_ignore_ascii_case(SQLITE_STORE)
-    {
+    if MetaStore::from(get_config().common.meta_store.as_str()) != MetaStore::PostgreSQL {
         Some(CLIENT_RW.lock().await)
     } else {
         None

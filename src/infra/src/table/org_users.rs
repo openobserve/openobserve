@@ -292,6 +292,9 @@ pub async fn update(
     token: &str,
     rum_token: Option<String>,
 ) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // There can be only one record with one org_id and email.
     // Hence the below updates only one record.
@@ -317,6 +320,9 @@ pub async fn update_rum_token(
     email: &str,
     rum_token: &str,
 ) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // There can be only one record with one org_id and email.
     // Hence the below updates only one record.
@@ -336,6 +342,9 @@ pub async fn update_rum_token(
 }
 
 pub async fn update_token(org_id: &str, email: &str, token: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // There can be only one record with one org_id and email.
     // Hence the below updates only one record.

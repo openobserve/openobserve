@@ -159,6 +159,9 @@ pub async fn add(job: CompactorManualJob) -> Result<(), errors::Error> {
 }
 
 pub async fn update(ksuid: &str, ended_at: i64, status: Status) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::update_many()
         .col_expr(Column::EndedAt, Expr::value(ended_at))
@@ -174,6 +177,9 @@ pub async fn update(ksuid: &str, ended_at: i64, status: Status) -> Result<(), er
 }
 
 pub async fn bulk_update(jobs: Vec<CompactorManualJob>) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let tx = client.begin().await?;
 

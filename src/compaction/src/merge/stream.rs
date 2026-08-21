@@ -13,358 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
-use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
-use bytes::Bytes;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
+use ::datafusion::arrow::datatypes::Schema;
+use chrono::{DateTime, TimeZone, Utc};
 use config::{
-    FileFormat,
-    cluster::LOCAL_NODE,
-    get_config, ider, is_local_disk_storage,
-    meta::stream::{
-        FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
-        StreamType,
+    get_config,
+    meta::{
+        promql::layout::MetricsFileLayout,
+        stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
     },
     metrics,
-    utils::{
-        parquet::read_schema_from_bytes,
-        schema_ext::SchemaExt,
-        time::{day_micros, hour_micros},
-    },
+    utils::time::hour_micros,
 };
 use hashbrown::{HashMap, HashSet};
-use infra::{
-    cache::file_data,
-    cluster::get_node_by_uuid,
-    dist_lock, file_list as infra_file_list,
-    runtime::DATAFUSION_RUNTIME,
-    schema::{
-        SchemaCache, get_partition_time_level, get_stream_setting_bloom_filter_fields,
-        get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_created_at,
-    },
-    storage,
-};
-use schema::generate_schema_for_defined_schema_fields;
-use search::datafusion::{
-    exec::TableBuilder,
-    merge::{self, MergeMode, MergeOutput, MergeParquetResult, MergedFile},
-};
+use infra::{file_list as infra_file_list, schema::get_partition_time_level};
+use search::datafusion::merge::MergeMode;
 use search_service::file_list;
-use tantivy_utils::index_builder::create_tantivy_index;
 use tokio::{
     sync::{Semaphore, mpsc},
     task::JoinHandle,
 };
 
-use super::worker::{MergeBatch, MergeSender};
-
-/// Last microsecond of the range a merge job at `offset` covers: the hour of
-/// `offset`, or the whole day for daily-partitioned streams. No file of the
-/// job can be newer, so "is the range old enough" is decided against this.
-fn job_range_end(offset: i64, partition_time_level: PartitionTimeLevel) -> i64 {
-    let offset = offset - offset % hour_micros(1);
-    if partition_time_level == PartitionTimeLevel::Daily {
-        offset - offset % day_micros(1) + day_micros(1) - 1
-    } else {
-        offset + hour_micros(1) - 1
-    }
-}
-
-/// Generate merging job by stream
-/// 1. get offset from db
-/// 2. check if other node is processing
-/// 3. create job or return
-pub async fn generate_job_by_stream(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> Result<(), anyhow::Error> {
-    // get last compacted offset
-    let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        return Ok(()); // other node is processing
-    }
-
-    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
-        let locker = dist_lock::lock(&lock_key, 0).await?;
-        // check the working node again, maybe other node locked it first
-        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
-        {
-            dist_lock::unlock(&locker).await?;
-            return Ok(()); // other node is processing
-        }
-        // set to current node
-        let ret = db::compact::files::set_offset(
-            org_id,
-            stream_type,
-            stream_name,
-            offset,
-            Some(&LOCAL_NODE.uuid.clone()),
-        )
-        .await;
-        dist_lock::unlock(&locker).await?;
-        drop(locker);
-        ret?;
-    }
-
-    // get schema
-    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_created = unwrap_stream_created_at(&schema).unwrap_or_default();
-    if offset == 0 && stream_created > 0 {
-        offset = stream_created
-    } else if offset == 0 {
-        return Ok(()); // no data
-    }
-
-    // format to hour with zero minutes, seconds
-    let offset = offset - offset % hour_micros(1);
-    if !super::is_past_hour(offset) {
-        return Ok(()); // the time is future, just wait
-    }
-
-    log::debug!(
-        "[COMPACTOR] generate_job_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
-    );
-
-    // generate merging job
-    if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
-        return Err(anyhow::anyhow!(
-            "[COMPACTOR] add file_list_jobs failed: {e}"
-        ));
-    }
-
-    // write new offset
-    let offset = offset + hour_micros(1);
-    db::compact::files::set_offset(
-        org_id,
-        stream_type,
-        stream_name,
-        offset,
-        Some(&LOCAL_NODE.uuid.clone()),
-    )
-    .await?;
-
-    Ok(())
-}
-
-/// Generate merging job by stream
-/// 1. get old data by hour
-/// 2. check if other node is processing
-/// 3. create job or return
-pub async fn generate_old_data_job_by_stream(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> Result<(), anyhow::Error> {
-    // get last compacted offset
-    let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        return Ok(()); // other node is processing
-    }
-
-    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
-        let locker = dist_lock::lock(&lock_key, 0).await?;
-        // check the working node again, maybe other node locked it first
-        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
-        {
-            dist_lock::unlock(&locker).await?;
-            return Ok(()); // other node is processing
-        }
-        // set to current node
-        let ret = db::compact::files::set_offset(
-            org_id,
-            stream_type,
-            stream_name,
-            offset,
-            Some(&LOCAL_NODE.uuid.clone()),
-        )
-        .await;
-        dist_lock::unlock(&locker).await?;
-        drop(locker);
-        ret?;
-    }
-
-    if offset == 0 {
-        return Ok(()); // no data
-    }
-
-    let cfg = get_config();
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
-        .await
-        .unwrap_or_default();
-    let mut stream_data_retention_days = cfg.compact.data_retention_days;
-    if stream_settings.data_retention > 0 {
-        stream_data_retention_days = stream_settings.data_retention;
-    }
-    if stream_data_retention_days > cfg.compact.old_data_max_days {
-        stream_data_retention_days = cfg.compact.old_data_max_days;
-    }
-    if stream_data_retention_days == 0 {
-        return Ok(()); // no need to check old data
-    }
-
-    // get old data by hour, `offset - cfg.compact.old_data_min_hours hours` as old data
-    let end_time = offset - hour_micros(cfg.compact.old_data_min_hours);
-    let start_time = end_time
-        - Duration::try_days(stream_data_retention_days)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-    let hours = infra_file_list::query_old_data_hours(
-        org_id,
-        stream_type,
-        stream_name,
-        (start_time, end_time - 1),
-    )
-    .await?;
-
-    // generate merging job
-    for hour in hours {
-        let column = hour.split('/').collect::<Vec<_>>();
-        if column.len() != 4 {
-            return Err(anyhow::anyhow!(
-                "Unexpected hour format in {hour}, Expected format YYYY/MM/DD/HH",
-            ));
-        }
-        let offset = DateTime::parse_from_rfc3339(&format!(
-            "{}-{}-{}T{}:00:00Z",
-            column[0], column[1], column[2], column[3]
-        ))?
-        .with_timezone(&Utc);
-        let offset = offset.timestamp_micros();
-        log::debug!(
-            "[COMPACTOR] generate_old_data_job_by_stream [{org_id}/{stream_type}/{stream_name}] hours: {hour}, offset: {offset}"
-        );
-        if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
-            return Err(anyhow::anyhow!(
-                "[COMPACTOR] add file_list_jobs for old data failed: {e}"
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-/// Generate downsampling job by stream and rule
-/// 1. get offset from db
-/// 2. check if other node is processing
-/// 3. create job or return
-pub async fn generate_downsampling_job_by_stream_and_rule(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    rule: (i64, i64), // offset, step
-) -> Result<(), anyhow::Error> {
-    assert!(stream_type == StreamType::Metrics);
-    // get last compacted offset
-    let (mut offset, node) =
-        db::compact::downsampling::get_offset(org_id, stream_type, stream_name, rule).await;
-    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        return Ok(()); // other node is processing
-    }
-
-    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!(
-            "/compact/downsampling/{org_id}/{stream_type}/{stream_name}/{}/{}",
-            rule.0, rule.1
-        );
-        let locker = dist_lock::lock(&lock_key, 0).await?;
-        // check the working node again, maybe other node locked it first
-        let (offset, node) =
-            db::compact::downsampling::get_offset(org_id, stream_type, stream_name, rule).await;
-        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
-        {
-            dist_lock::unlock(&locker).await?;
-            return Ok(()); // other node is processing
-        }
-        // set to current node
-        let ret = db::compact::downsampling::set_offset(
-            org_id,
-            stream_type,
-            stream_name,
-            rule,
-            offset,
-            Some(&LOCAL_NODE.uuid.clone()),
-        )
-        .await;
-        dist_lock::unlock(&locker).await?;
-        drop(locker);
-        ret?;
-    }
-
-    // get schema
-    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_created = unwrap_stream_created_at(&schema).unwrap_or_default();
-    if offset == 0 {
-        offset = stream_created
-    }
-    if offset == 0 {
-        return Ok(()); // no data
-    }
-
-    let cfg = get_config();
-    // check offset
-    let time_now: DateTime<Utc> = Utc::now();
-    let time_now_day = Utc
-        .with_ymd_and_hms(time_now.year(), time_now.month(), time_now.day(), 0, 0, 0)
-        .unwrap()
-        .timestamp_micros();
-    // must wait for at least 3 * max_file_retention_time + 1 day
-    // -- first period: the last hour local file upload to storage, write file list
-    // -- second period, the last hour file list upload to storage
-    // -- third period, we can do the merge, so, at least 3 times of
-    // -- 1 day, downsampling is in day level
-    // max_file_retention_time
-    // The job merges the hour of `offset` and decides the downsampling rule
-    // against the end of that hour (see merge_by_stream), so only enqueue it
-    // once the whole hour is older than the rule's offset; otherwise the job
-    // would run as a plain merge and the advanced offset would skip the hour.
-    let job_end_ts = job_range_end(offset, get_partition_time_level(stream_type));
-    if offset >= time_now_day
-        || time_now.timestamp_micros() - offset
-            <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
-                .unwrap()
-                .num_microseconds()
-                .unwrap()
-                * 3
-                + day_micros(1)
-        || time_now.timestamp_micros() - rule.0 * 1_000_000 < job_end_ts
-    {
-        return Ok(()); // the time is future, just wait
-    }
-
-    log::debug!(
-        "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{org_id}/{stream_type}/{stream_name}] rule: {rule:?}, offset: {offset}"
-    );
-
-    // generate downsampling job
-    if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
-        return Err(anyhow::anyhow!(
-            "[DOWNSAMPLING] add file_list_jobs failed: {e}"
-        ));
-    }
-
-    // write new offset
-    let offset = offset + day_micros(1);
-    // format to day with zero hour, minutes, seconds
-    let offset = offset - offset % day_micros(1);
-    db::compact::downsampling::set_offset(
-        org_id,
-        stream_type,
-        stream_name,
-        rule,
-        offset,
-        Some(&LOCAL_NODE.uuid.clone()),
-    )
-    .await?;
-
-    Ok(())
-}
+use super::{
+    job::job_range_end,
+    metrics::{MetricsIndexMergeScope, metrics_index_merge_scope},
+};
+use crate::worker::{MergeBatch, MergeSender};
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -407,7 +80,7 @@ pub async fn merge_by_stream(
     // groups and carry the remainder, so each file is merged into a sealed output exactly
     // once. The scheduled hour-end pass seals whatever is left.
     let offset = offset - offset % hour_micros(1);
-    let is_incremental = !super::is_past_hour(offset);
+    let is_incremental = !crate::is_past_hour(offset);
 
     // check offset
     let partition_time_level = get_partition_time_level(stream_type);
@@ -427,7 +100,13 @@ pub async fn merge_by_stream(
     // the merge only read it — from the end of the range, so a whole-hour
     // mode applies to the hour as a unit.
     let range_end_ts = job_range_end(offset, partition_time_level);
-    let mode = MergeMode::for_compactor(stream_type, stream_name, range_end_ts, !is_incremental);
+    let mode = MergeMode::for_compactor(
+        stream_type,
+        stream_name,
+        &schema,
+        range_end_ts,
+        !is_incremental,
+    );
     // a whole-hour merge needs every file of the hour, even those already
     // above the size target that a normal merge would leave alone
     let max_original_size = if mode.merges_whole_batch() {
@@ -495,6 +174,27 @@ pub async fn merge_by_stream(
 
             if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
                 return Ok(vec![]);
+            }
+            // what a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`]
+            if mode.is_metrics_indexed() {
+                match metrics_index_merge_scope(&files_with_size, cfg.compact.max_file_size) {
+                    MetricsIndexMergeScope::Skip => return Ok(vec![]),
+                    MetricsIndexMergeScope::LateFilesOnly => {
+                        files_with_size.retain(|f| {
+                            MetricsFileLayout::of(&f.key) != MetricsFileLayout::Indexed
+                        });
+                        log::debug!(
+                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] metrics_indexed late merge of {} files, indexed files untouched",
+                            files_with_size.len()
+                        );
+                    }
+                    MetricsIndexMergeScope::WholeHour => {
+                        log::debug!(
+                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] metrics_indexed fragmentation cap hit, full rewrite of {} files",
+                            files_with_size.len()
+                        );
+                    }
+                }
             }
 
             // group files need to merge
@@ -688,345 +388,6 @@ pub async fn merge_by_stream(
     Ok(())
 }
 
-// merge small files into big file, upload to storage, returns the big file key and merged files
-// params:
-// - thread_id: the id of the thread
-// - org_id: the id of the organization
-// - stream_type: the type of the stream
-// - stream_name: the name of the stream
-// - prefix: the prefix of the files
-// - files_with_size: the files to merge
-// - mode: what the merge produces (decided by the scheduler)
-// returns:
-// - new_files: the files that are merged
-// - retain_file_list: the files that are not merged
-pub async fn merge_files(
-    thread_id: usize,
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    prefix: &str,
-    files_with_size: &[FileKey],
-    mode: &MergeMode,
-) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
-    let start = std::time::Instant::now();
-    // a whole-batch mode (downsampling) merges everything it is given, even a
-    // single file; otherwise 0/1 files means nothing to do
-    let merge_whole_batch = mode.merges_whole_batch();
-    if files_with_size.len() <= 1 && !merge_whole_batch {
-        return Ok((Vec::new(), Vec::new()));
-    }
-
-    let mut new_file_size = 0;
-    let mut new_compressed_file_size = 0;
-    let mut new_file_list = Vec::new();
-    let cfg = get_config();
-    for file in files_with_size.iter() {
-        if (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
-            || new_compressed_file_size + file.meta.compressed_size
-                > cfg.compact.max_file_size as i64)
-            && !merge_whole_batch
-        {
-            break;
-        }
-        new_file_size += file.meta.original_size;
-        new_compressed_file_size += file.meta.compressed_size;
-        new_file_list.push(file.clone());
-        // metrics
-        metrics::COMPACT_MERGED_FILES
-            .with_label_values(&[org_id, stream_type.as_str()])
-            .inc();
-        metrics::COMPACT_MERGED_BYTES
-            .with_label_values(&[org_id, stream_type.as_str()])
-            .inc_by(file.meta.original_size as u64);
-    }
-    // no files need to merge
-    if new_file_list.len() <= 1 && !merge_whole_batch {
-        return Ok((Vec::new(), Vec::new()));
-    }
-
-    let retain_file_list = new_file_list.clone();
-
-    // cache parquet files
-    let deleted_files = cache_remote_files(&new_file_list).await?;
-    log::info!(
-        "[COMPACTOR:WORKER:{thread_id}] download {} parquet files, took: {} ms",
-        new_file_list.len(),
-        start.elapsed().as_millis()
-    );
-    if !deleted_files.is_empty() {
-        new_file_list.retain(|f| !deleted_files.contains(&f.key));
-    }
-    if new_file_list.len() <= 1 && !merge_whole_batch {
-        return Ok((Vec::new(), retain_file_list));
-    }
-
-    // get time range and stats for these files in a single iteration
-    let (min_ts, max_ts, total_records, new_file_size) = new_file_list.iter().fold(
-        (i64::MAX, i64::MIN, 0, 0),
-        |(min_ts, max_ts, records, size), file| {
-            (
-                min_ts.min(file.meta.min_ts),
-                max_ts.max(file.meta.max_ts),
-                records + file.meta.records,
-                size + file.meta.original_size,
-            )
-        },
-    );
-    let min_ts = if min_ts == i64::MAX { 0 } else { min_ts };
-    let max_ts = if max_ts == i64::MIN { 0 } else { max_ts };
-    let new_file_meta = FileMeta {
-        min_ts,
-        max_ts,
-        records: total_records,
-        original_size: new_file_size,
-        compressed_size: 0,
-        flattened: false,
-        index_size: 0,
-        bloom_ver: 0,
-    };
-    if new_file_meta.records == 0 {
-        return Err(anyhow::anyhow!("merge_files error: records is 0"));
-    }
-
-    // get latest version of schema
-    let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
-    let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
-    let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let (defined_schema_fields, need_original, index_original_data, index_all_values, storage_type) =
-        match stream_settings {
-            Some(s) => (
-                s.defined_schema_fields,
-                s.store_original_data,
-                s.index_original_data,
-                s.index_all_values,
-                s.storage_type,
-            ),
-            None => (Vec::new(), false, false, false, StorageType::Normal),
-        };
-    let latest_schema = if !defined_schema_fields.is_empty() {
-        let latest_schema = SchemaCache::new(latest_schema);
-        let latest_schema = generate_schema_for_defined_schema_fields(
-            stream_type,
-            &latest_schema,
-            &defined_schema_fields,
-            need_original,
-            index_original_data,
-            index_all_values,
-        );
-        latest_schema.schema().clone()
-    } else {
-        Arc::new(latest_schema)
-    };
-
-    // read schema from parquet file and group files by schema
-    let mut schemas = HashMap::new();
-    let files = new_file_list.clone();
-    let mut fi = 0;
-    for file in new_file_list.iter() {
-        fi += 1;
-        log::info!(
-            "[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}",
-            file.key
-        );
-        let buf = file_data::get(&file.account, &file.key, None).await?;
-        let file_format = FileFormat::from_extension(&file.key)
-            .ok_or_else(|| anyhow::anyhow!("invalid file format: {}", file.key))?;
-        let schema = match read_schema_from_bytes(file_format, &buf).await {
-            Ok(schema) => schema,
-            Err(e) => {
-                log::error!(
-                    "[COMPACTOR:WORKER:{thread_id}:{fi}] read schema error for file: {}, err: {e}",
-                    file.key
-                );
-                return Err(e);
-            }
-        };
-        let schema = schema.as_ref().clone().with_metadata(Default::default());
-        let schema_key = schema.hash_key();
-        if !schemas.contains_key(&schema_key) {
-            schemas.insert(schema_key.clone(), schema);
-        }
-    }
-
-    // generate the parquet schema
-    let all_fields = schemas
-        .values()
-        .flat_map(|s| s.fields().iter().map(|f| f.name().to_string()))
-        .collect::<HashSet<_>>();
-    let schema = Arc::new(latest_schema.retain(all_fields));
-
-    // generate datafusion tables
-    let trace_id = ider::generate();
-    let session = config::meta::search::Session {
-        id: trace_id.to_string(),
-        storage_type: config::meta::search::StorageType::Memory,
-        work_group: None,
-        target_partitions: 2,
-    };
-
-    let tables = match TableBuilder::new()
-        .sort_order(mode.input_sort_order())
-        .build(session, files.clone(), schema.clone())
-        .await
-    {
-        Ok(tables) => tables,
-        Err(e) => {
-            log::error!("create_parquet_table err: {e}, files: {files:?}, schema: {schema:?}");
-            return Err(DataFusionError::Plan(format!("create_parquet_table err: {e}")).into());
-        }
-    };
-
-    let merge_result = {
-        let mode = mode.clone();
-        DATAFUSION_RUNTIME
-            .spawn(async move {
-                merge::merge_parquet_files(
-                    schema,
-                    tables,
-                    &bloom_filter_fields,
-                    new_file_meta,
-                    &mode,
-                    MergeOutput::for_compactor(stream_type),
-                )
-                .await
-            })
-            .await?
-    };
-
-    // clear session data
-    search::datafusion::storage::file_list::clear(&trace_id);
-
-    let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
-    let buf = match merge_result {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("merge_parquet_files err: {e}, files: {files:?}");
-            return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}")).into());
-        }
-    };
-
-    let latest_schema_fields = latest_schema
-        .fields()
-        .iter()
-        .map(|f| f.name())
-        .collect::<HashSet<_>>();
-    let need_index = full_text_search_fields
-        .iter()
-        .chain(index_fields.iter())
-        .any(|f| latest_schema_fields.contains(f));
-    if !need_index {
-        log::debug!("skip index generation for stream: {org_id}/{stream_type}/{stream_name}");
-    }
-
-    let MergeParquetResult {
-        files: merged_files,
-        file_format,
-    } = buf;
-    // an empty result would delete the source files without a replacement
-    if merged_files.is_empty() {
-        return Err(anyhow::anyhow!(
-            "merge_parquet_files error: produced no files"
-        ));
-    }
-    let mut new_files = Vec::with_capacity(merged_files.len());
-    for MergedFile {
-        buf,
-        meta: mut new_file_meta,
-    } in merged_files
-    {
-        new_file_meta.compressed_size = buf.len() as i64;
-        if new_file_meta.compressed_size == 0 {
-            return Err(anyhow::anyhow!(
-                "merge_parquet_files error: compressed_size is 0"
-            ));
-        }
-
-        let id = ider::generate_file_name();
-        let new_file_key = format!("{prefix}/{id}{}", file_format.extension());
-
-        // upload file to storage
-        let buf = Bytes::from(buf);
-        if cfg.cache_latest_files.enabled
-            && cfg.cache_latest_files.cache_parquet
-            && cfg.cache_latest_files.download_from_node
-        {
-            infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
-            log::debug!("merge_files {new_file_key} file_data::disk::set success");
-        }
-
-        // TODO: check how compliance will interact with org storage
-        let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
-        if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
-            storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
-        } else {
-            storage::put(&account, &new_file_key, buf.clone()).await?;
-        }
-
-        if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
-            generate_inverted_index(
-                org_id,
-                &new_file_key,
-                &full_text_search_fields,
-                &index_fields,
-                &retain_file_list,
-                &mut new_file_meta,
-                latest_schema.clone(),
-                buf,
-            )
-            .await?;
-        }
-        new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
-    }
-    log::info!(
-        "[COMPACTOR:WORKER:{thread_id}] merged {} files into {} new file(s): {:?}, original_size: {}, compressed_size: {}, took: {} ms",
-        retain_file_list.len(),
-        new_files.len(),
-        new_files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
-        new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
-        new_files
-            .iter()
-            .map(|f| f.meta.compressed_size)
-            .sum::<i64>(),
-        start.elapsed().as_millis(),
-    );
-
-    Ok((new_files, retain_file_list))
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn generate_inverted_index(
-    org_id: &str,
-    new_file_key: &str,
-    fts_fields: &[String],
-    index_fields: &[String],
-    retain_file_list: &[FileKey],
-    new_file_meta: &mut FileMeta,
-    latest_schema: Arc<Schema>,
-    buf: Bytes,
-) -> Result<(), anyhow::Error> {
-    let index_size = create_tantivy_index(
-        "COMPACTOR",
-        org_id,
-        new_file_key,
-        fts_fields,
-        index_fields,
-        latest_schema, // Use stream schema to include all configured fields
-        buf,
-    )
-    .await
-    .map_err(|e| {
-        anyhow::anyhow!(
-            "create_tantivy_index_on_compactor for file: {new_file_key}, error: {e}, need delete files: {retain_file_list:?}",
-        )
-    })?;
-    new_file_meta.index_size = index_size as i64;
-
-    Ok(())
-}
-
 async fn write_file_list(
     org_id: &str,
     stream_type: StreamType,
@@ -1075,7 +436,7 @@ async fn write_file_list(
     // handle dump_stats for file_list type streams
     if success && stream_type == StreamType::Filelist && cfg.compact.file_list_dump_enabled {
         let (deleted_files, new_files): (Vec<_>, Vec<_>) = events.iter().partition(|e| e.deleted);
-        super::dump::handle_dump_stats_on_merge(&deleted_files, &new_files).await;
+        crate::dump::handle_dump_stats_on_merge(&deleted_files, &new_files).await;
     }
 
     if success {
@@ -1098,88 +459,6 @@ async fn write_file_list(
     }
 
     Ok(())
-}
-
-async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Error> {
-    let cfg = get_config();
-    let scan_size = files.iter().map(|f| f.meta.compressed_size).sum::<i64>();
-    if is_local_disk_storage()
-        || !cfg.disk_cache.enabled
-        || scan_size >= cfg.disk_cache.skip_size as i64
-    {
-        return Ok(Vec::new());
-    };
-
-    let mut tasks = Vec::with_capacity(files.len());
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
-    for file in files.iter() {
-        let file_account = file.account.to_string();
-        let file_name = file.key.to_string();
-        let file_size = file.meta.compressed_size as usize;
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
-            let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download(&file_account, &file_name, Some(file_size)).await
-            } else {
-                Ok(0)
-            };
-            // In case where the parquet file is not found or has no data, we assume that it
-            // must have been deleted by some external entity, and hence we
-            // should remove the entry from file_list table.
-            let file_name = match ret {
-                Ok(data_len) => {
-                    if data_len > 0 && data_len != file_size {
-                        log::warn!(
-                            "[COMPACT] download file {file_name} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
-                        );
-                        // skip this file for compact
-                        Some(file_name)
-                    } else {
-                        None
-                    }
-                }
-                Err(e) => {
-                    if e.to_string().to_lowercase().contains("not found")
-                        || e.to_string().to_lowercase().contains("data size is zero")
-                    {
-                        // delete file from file list
-                        log::error!("[COMPACT] found invalid file: {file_name}, will delete it");
-                        if let Err(e) =
-                            infra_file_list::delete_parquet_file(&file_account, &file_name, true)
-                                .await
-                        {
-                            log::error!("[COMPACT] delete from file_list err: {e}");
-                        }
-                        Some(file_name)
-                    } else {
-                        log::error!("[COMPACT] download file to cache err: {e}");
-                        // remove downloaded file
-                        let _ = file_data::disk::remove(&file_name).await;
-                        None
-                    }
-                }
-            };
-            drop(permit);
-            file_name
-        });
-        tasks.push(task);
-    }
-
-    let mut delete_files = Vec::new();
-    for task in tasks {
-        match task.await {
-            Ok(file) => {
-                if let Some(file) = file {
-                    delete_files.push(file);
-                }
-            }
-            Err(e) => {
-                log::error!("[COMPACTOR] load file task err: {e}");
-            }
-        }
-    }
-
-    Ok(delete_files)
 }
 
 /// sort by time range without overlapping
@@ -1216,29 +495,6 @@ mod tests {
     use config::meta::stream::{FileKey, FileMeta};
 
     use super::*;
-
-    #[test]
-    fn test_job_range_end_hourly_and_daily() {
-        // 2026-08-18 10:10:00 UTC
-        let offset = Utc
-            .with_ymd_and_hms(2026, 8, 18, 10, 10, 0)
-            .unwrap()
-            .timestamp_micros();
-        assert_eq!(
-            job_range_end(offset, PartitionTimeLevel::Hourly),
-            Utc.with_ymd_and_hms(2026, 8, 18, 11, 0, 0)
-                .unwrap()
-                .timestamp_micros()
-                - 1
-        );
-        assert_eq!(
-            job_range_end(offset, PartitionTimeLevel::Daily),
-            Utc.with_ymd_and_hms(2026, 8, 19, 0, 0, 0)
-                .unwrap()
-                .timestamp_micros()
-                - 1
-        );
-    }
 
     // Helper function to create test FileKey
     fn create_file_key(key: &str, min_ts: i64, max_ts: i64, original_size: i64) -> FileKey {
