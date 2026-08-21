@@ -147,7 +147,7 @@ describe("a failed fan-out must not blank badges that were already answered", ()
 // sessions, so a tile derived from those two arrays alone read 0 while the
 // badge beside it counted the statement lists — working data one tab away,
 // denied on the Overview. Both now consume `serverInstanceRefs`, one deduped
-// derivation over every `dbm_server`-fed member of the envelope.
+// derivation over every `_o2_dbm_server`-fed member of the envelope.
 describe("the databases fallback counts the same refs the fleet union renders", () => {
   beforeEach(() => {
     vi.clearAllMocks();

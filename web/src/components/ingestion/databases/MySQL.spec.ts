@@ -57,7 +57,7 @@ describe("mysqlCard builder", () => {
     const card = mysqlCard(SUBS, gt);
     expect(card.provider.name).toBe("MySQL");
     // Logs too: the optional Database Monitoring steps ship deadlock and
-    // blocking events into the dbm_server logs stream.
+    // blocking events into the _o2_dbm_server logs stream.
     expect(card.provider.metaBadges).toEqual(["Metrics", "Logs"]);
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -101,9 +101,9 @@ describe("mysqlCard builder", () => {
     expect(config).toContain("blocking_query");
     expect(config).toContain("my_trx_side");
     expect(config).toContain("o2_my_event");
-    expect(config).toContain("stream-name: dbm_server");
+    expect(config).toContain("stream-name: _o2_dbm_server");
     // The filter is load-bearing: filelog tails the WHOLE database log, so
-    // without it every ordinary log line lands in dbm_server too (measured:
+    // without it every ordinary log line lands in _o2_dbm_server too (measured:
     // 787 events vs 4.8M untagged rows in one hour) and the Deadlocks page
     // slows to a crawl. A processor that is defined but not listed in the
     // pipeline does nothing, so both are asserted.

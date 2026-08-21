@@ -440,7 +440,7 @@ mod tests {
     #[test]
     fn test_server_metrics_sql_joins_without_instance() {
         let sql = build_dbm_server_metrics_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "postgresql",
             Some("shop"),
             "3a74e60b4bd45cc6",
@@ -474,7 +474,7 @@ mod tests {
     #[test]
     fn test_server_metrics_sql_groups_by_instance_so_ambiguity_is_detectable() {
         let sql = build_dbm_server_metrics_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "postgresql",
             Some("shop"),
             "fp",
@@ -497,8 +497,8 @@ mod tests {
     /// (Verified live: 43k MySQL records, zero matches with the predicate.)
     #[test]
     fn test_server_metrics_sql_omits_database_predicate_when_none() {
-        let sql =
-            build_dbm_server_metrics_sql("dbm_server", "mysql", None, "fp", &all_cols()).unwrap();
+        let sql = build_dbm_server_metrics_sql("_o2_dbm_server", "mysql", None, "fp", &all_cols())
+            .unwrap();
         assert!(!sql.contains(server_vantage::O2_DBM_DATABASE));
         // The identity predicates survive: this is a narrower match, not a
         // broader one.
@@ -512,9 +512,9 @@ mod tests {
     #[test]
     fn test_server_metrics_envelope_states_attribution() {
         let rows = vec![json!({"instance": "mysql", "calls": 5})];
-        let instance_wide = server_metrics_envelope(&rows, "mysql", "dbm_server", "on", false);
+        let instance_wide = server_metrics_envelope(&rows, "mysql", "_o2_dbm_server", "on", false);
         assert_eq!(instance_wide["attribution"], "instance");
-        let scoped = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
+        let scoped = server_metrics_envelope(&rows, "postgresql", "_o2_dbm_server", "on", true);
         assert_eq!(scoped["attribution"], "database");
     }
 
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn test_server_metrics_sql_reads_only_top_query_records() {
         let sql = build_dbm_server_metrics_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "postgresql",
             Some("shop"),
             "fp",
@@ -546,7 +546,13 @@ mod tests {
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_CALLS);
         assert_eq!(
-            build_dbm_server_metrics_sql("dbm_server", "postgresql", Some("shop"), "fp", &without),
+            build_dbm_server_metrics_sql(
+                "_o2_dbm_server",
+                "postgresql",
+                Some("shop"),
+                "fp",
+                &without
+            ),
             None,
             "a stream with no calls column must skip the query, not 500 the endpoint"
         );
@@ -563,8 +569,14 @@ mod tests {
         let present = all_cols();
         assert_eq!(server_metrics_capture_state(&present), "on");
         assert!(
-            build_dbm_server_metrics_sql("dbm_server", "postgresql", Some("shop"), "fp", &present)
-                .is_some(),
+            build_dbm_server_metrics_sql(
+                "_o2_dbm_server",
+                "postgresql",
+                Some("shop"),
+                "fp",
+                &present
+            )
+            .is_some(),
             "`on` must mean the SQL builder actually runs"
         );
 
@@ -572,7 +584,13 @@ mod tests {
         without.remove(server_vantage::O2_DBM_CALLS);
         assert_eq!(server_metrics_capture_state(&without), "off");
         assert_eq!(
-            build_dbm_server_metrics_sql("dbm_server", "postgresql", Some("shop"), "fp", &without),
+            build_dbm_server_metrics_sql(
+                "_o2_dbm_server",
+                "postgresql",
+                Some("shop"),
+                "fp",
+                &without
+            ),
             None,
             "`off` must mean the SQL builder skipped — a flag that disagrees with \
              the gate misreports the pipeline"
@@ -593,10 +611,10 @@ mod tests {
             "temp_blks_read": 0i64,
             "temp_blks_written": 0i64,
         })];
-        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
+        let env = server_metrics_envelope(&rows, "postgresql", "_o2_dbm_server", "on", true);
 
         assert_eq!(env["server_metrics_capture"], json!("on"));
-        assert_eq!(env["stream"], json!("dbm_server"));
+        assert_eq!(env["stream"], json!("_o2_dbm_server"));
         assert_eq!(env["matched"], json!(true));
         assert_eq!(env["instance"], json!("postgres"));
         assert_eq!(env["calls"], json!(1200));
@@ -624,7 +642,7 @@ mod tests {
     /// instrumented client issued. The three states must be distinguishable.
     #[test]
     fn test_server_metrics_unmatched_is_distinct_from_capture_off() {
-        let unmatched = server_metrics_envelope(&[], "postgresql", "dbm_server", "on", true);
+        let unmatched = server_metrics_envelope(&[], "postgresql", "_o2_dbm_server", "on", true);
         assert_eq!(unmatched["matched"], json!(false));
         assert_eq!(
             unmatched["server_metrics_capture"],
@@ -636,7 +654,7 @@ mod tests {
             "a plain miss blames nothing: {unmatched}"
         );
 
-        let off = server_metrics_envelope(&[], "postgresql", "dbm_server", "off", true);
+        let off = server_metrics_envelope(&[], "postgresql", "_o2_dbm_server", "off", true);
         assert_eq!(off["matched"], json!(false));
         assert_eq!(
             off["server_metrics_capture"],
@@ -659,7 +677,7 @@ mod tests {
             json!({ "instance": "pg-a", "calls": 10i64, "exec_time_s": 1.0f64 }),
             json!({ "instance": "pg-b", "calls": 90i64, "exec_time_s": 9.0f64 }),
         ];
-        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
+        let env = server_metrics_envelope(&rows, "postgresql", "_o2_dbm_server", "on", true);
 
         assert_eq!(
             env["matched"],
@@ -696,10 +714,10 @@ mod tests {
     fn test_server_metrics_names_the_measurement_per_engine() {
         let rows = vec![json!({ "instance": "i", "calls": 100i64, "exec_time_s": 5.0f64 })];
 
-        let pg = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
+        let pg = server_metrics_envelope(&rows, "postgresql", "_o2_dbm_server", "on", true);
         assert_eq!(pg["exec_time_kind"], json!("execution"));
 
-        let mysql = server_metrics_envelope(&rows, "mysql", "dbm_server", "on", false);
+        let mysql = server_metrics_envelope(&rows, "mysql", "_o2_dbm_server", "on", false);
         assert_eq!(
             mysql["exec_time_kind"],
             json!("wait"),
@@ -716,7 +734,7 @@ mod tests {
     #[test]
     fn test_server_metrics_envelope_derives_no_client_server_difference() {
         let rows = vec![json!({ "instance": "i", "calls": 100i64, "exec_time_s": 5.0f64 })];
-        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
+        let env = server_metrics_envelope(&rows, "postgresql", "_o2_dbm_server", "on", true);
         for banned in [
             "network_time_s",
             "network_and_pool_wait_s",

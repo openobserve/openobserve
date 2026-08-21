@@ -69,7 +69,7 @@ describe("sqlServerCard builder", () => {
     expect(card.provider.name).toBe("SQL Server");
     // Non-AI metrics card → replaces the "Cost & Tokens Captured" hero badge.
     // Logs too: the optional Database Monitoring steps ship blocking-chain
-    // samples into the dbm_server logs stream.
+    // samples into the _o2_dbm_server logs stream.
     expect(card.provider.metaBadges).toEqual(["Metrics", "Logs"]);
     expect(card.docUrl).toBe("https://openobserve.ai/blog/monitor-sql-server-with-otel/");
     // The blog's flow: prepare → install → configure → run → verify, then the
@@ -114,9 +114,9 @@ describe("sqlServerCard builder", () => {
     expect(config).toContain("blocked_pid");
     expect(config).toContain("blocking_pid");
     expect(config).toContain("blocking_query");
-    expect(config).toContain("stream-name: dbm_server");
+    expect(config).toContain("stream-name: _o2_dbm_server");
     // The filter is load-bearing: filelog tails the WHOLE database log, so
-    // without it every ordinary log line lands in dbm_server too (measured:
+    // without it every ordinary log line lands in _o2_dbm_server too (measured:
     // 787 events vs 4.8M untagged rows in one hour) and the Deadlocks page
     // slows to a crawl. A processor that is defined but not listed in the
     // pipeline does nothing, so both are asserted.

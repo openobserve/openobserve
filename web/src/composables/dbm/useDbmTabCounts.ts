@@ -25,7 +25,7 @@
  * six tabs issued each of the six reads about six times: ~36 requests to answer
  * six questions. And a count is not cheap: measured live, `/activity` costs
  * 1880ms for the full read and 1739ms at `?size=1`, because the price is the
- * SCAN (dbm_server holds 2.77M irrelevant rows beside ~22K DBM records), not
+ * SCAN (_o2_dbm_server holds 2.77M irrelevant rows beside ~22K DBM records), not
  * the rows returned.
  *
  * That scan is now PRUNABLE, and this comment used to say it was not.
@@ -401,7 +401,7 @@ export const fetchDbmTabCounts = async (
   const sq = badges.server_queries ?? null;
   const ss = badges.server_samples ?? null;
 
-  // Every identity the server vantage names, from ALL four `dbm_server`-fed
+  // Every identity the server vantage names, from ALL four `_o2_dbm_server`-fed
   // members, deduplicated onto the fleet union's own grain. The Overview page
   // renders exactly this list as its server-known instances, and the fallback
   // `databaseCount` below is its length — one derivation, so the Databases

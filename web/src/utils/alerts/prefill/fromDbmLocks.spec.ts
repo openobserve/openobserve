@@ -20,7 +20,7 @@
  * rather than an accident of organisation. `fromDbm` alerts on the rollup of
  * CLIENT-OBSERVED spans: latency and errors as the application experienced
  * them. Blocking and deadlocks are SERVER-VANTAGE records the engine itself
- * reported, in a different stream (`dbm_server`) with a different schema. One
+ * reported, in a different stream (`_o2_dbm_server`) with a different schema. One
  * builder emitting both would have to switch stream, columns and provenance on
  * a `kind` field, and the first person to add a third kind would get the
  * pairing wrong.
@@ -88,7 +88,7 @@ describe("buildDbmLockPrefill — blocking", () => {
   });
 
   /**
-   * `o2_dbm_kind` is the discriminator that makes `dbm_server` readable: the
+   * `o2_dbm_kind` is the discriminator that makes `_o2_dbm_server` readable: the
    * one stream carries deadlocks, blocking, activity and top-query records
    * side by side. Without the predicate a "blocking" alert counts every
    * server-vantage record the collector ever wrote.

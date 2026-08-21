@@ -218,7 +218,7 @@ pub(crate) async fn read_badges_response(
         include_indexes: None,
     };
 
-    // One (auth, schema) prologue for the three dbm_server slices — they all
+    // One (auth, schema) prologue for the three _o2_dbm_server slices — they all
     // read the same default stream, so the OFGA check and the schema read need
     // not run three times. `None` merely declines to share: each slice then
     // computes its own and owns its own denial/error, exactly as before.

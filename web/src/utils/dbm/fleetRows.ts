@@ -36,7 +36,7 @@
  *    label a real database nobody could measure as one nobody uses.
  *
  * Two reads can discover a trafficless instance: the metric streams, and the
- * server-vantage `dbm_server` rows the page already holds (activity samples,
+ * server-vantage `_o2_dbm_server` rows the page already holds (activity samples,
  * blocking samples — each names the instance it was sampled on). The second
  * source is what saves the user who did all the collector setup but has no
  * APM: their instances are known ONLY to the server vantage, and without this
@@ -69,7 +69,7 @@ export interface DbmFleetInstance {
 }
 
 /**
- * An instance as a `dbm_server` row names it — identity and nothing else.
+ * An instance as a `_o2_dbm_server` row names it — identity and nothing else.
  * That is all the shape carries on purpose: the server vantage measured no
  * query figure and no metric series for the union to state, so no field
  * exists for one to be fabricated into.
@@ -80,7 +80,7 @@ export interface DbmServerInstanceRef {
 }
 
 /**
- * The distinct instances a set of `dbm_server` rows names, deduplicated onto
+ * The distinct instances a set of `_o2_dbm_server` rows names, deduplicated onto
  * the union's own identity grain.
  *
  * An ENGINE-ONLY ref — a row carrying `db_system` but no `db_instance`, which
@@ -175,7 +175,7 @@ export const unionFleetRows = (
   metricsByKey: Map<string, DbmInstanceMetricSet>,
   context: DbmMergeContext & {
     system?: string | null;
-    /** Instances `dbm_server` rows name — the second discovery source. */
+    /** Instances `_o2_dbm_server` rows name — the second discovery source. */
     serverInstances?: readonly DbmServerInstanceRef[];
   } = {},
 ): DbmFleetRow[] => {
@@ -206,7 +206,7 @@ export const unionFleetRows = (
 
   // Both non-client vantages, folded onto one identity key so an instance
   // they both report appears exactly once — with the metric set when the
-  // metrics read has one, and `null` when only a `dbm_server` row names it.
+  // metrics read has one, and `null` when only a `_o2_dbm_server` row names it.
   const discovered = new Map<string, DbmInstanceMetricSet | null>();
   for (const instance of fleetInstances(metricsByKey)) {
     discovered.set(instance.key, instance.metrics);

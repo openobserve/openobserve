@@ -323,7 +323,7 @@ pub(crate) async fn read_server_queries_body(
 //
 // **The two producers land on DIFFERENT streams by design.** The demo
 // collector routes only the kinds it knew the backend could read (deadlock /
-// explain) to `dbm_server`; the tailed database-log remainder — which is
+// explain) to `_o2_dbm_server`; the tailed database-log remainder — which is
 // where statement-duration lines live — goes to the `dbm_server_logs`
 // sibling. So when the caller names no stream, the handler reads BOTH
 // defaults and merges, rather than defaulting to one and silently losing the
@@ -372,7 +372,7 @@ mod tests {
     /// column this list truly cannot do without; `calls` is a ranking figure.
     #[test]
     fn server_queries_sql_builds_without_a_calls_column() {
-        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(false))
+        let sql = build_dbm_server_queries_sql("_o2_dbm_server", "", 50, &cols(false))
             .expect("statements without call counts are still statements");
         assert!(
             sql.contains("NULL AS calls"),
@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn server_queries_sql_still_ranks_by_calls_where_it_can() {
-        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(true)).expect("sql");
+        let sql = build_dbm_server_queries_sql("_o2_dbm_server", "", 50, &cols(true)).expect("sql");
         assert!(sql.contains("ORDER BY calls DESC"), "{sql}");
         assert!(
             sql.contains(&format!("SUM({})", server_vantage::O2_DBM_CALLS)),
@@ -400,7 +400,7 @@ mod tests {
     /// no `_timestamp` and declined. Verified `has_ts=false` before, `true` after.
     #[test]
     fn test_server_queries_sql_projects_a_timestamp_the_cache_recognizes() {
-        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(true)).expect("sql");
+        let sql = build_dbm_server_queries_sql("_o2_dbm_server", "", 50, &cols(true)).expect("sql");
         assert!(
             sql.contains("AS _timestamp"),
             "aliasing every timestamp to first_seen/last_seen hides it from the cache: {sql}"
@@ -412,7 +412,7 @@ mod tests {
         let mut without = cols(true);
         without.remove(server_vantage::O2_DBM_FINGERPRINT);
         assert_eq!(
-            build_dbm_server_queries_sql("dbm_server", "", 50, &without),
+            build_dbm_server_queries_sql("_o2_dbm_server", "", 50, &without),
             None,
             "the list is KEYED on the fingerprint — without it there is nothing to group"
         );
@@ -457,7 +457,7 @@ mod tests {
             "first_seen": 100i64,
             "last_seen": 200i64,
         })];
-        let env = server_queries_envelope(&rows, "dbm_server", "on", 50);
+        let env = server_queries_envelope(&rows, "_o2_dbm_server", "on", 50);
         let hit = &env["hits"][0];
 
         assert_eq!(hit["fingerprint"], json!("17e5b5a191ddb2f8"));
@@ -481,12 +481,12 @@ mod tests {
     /// different copy for each, so the two must not collapse.
     #[test]
     fn test_server_queries_envelope_empty_lookup_keeps_capture_state() {
-        let found_nothing = server_queries_envelope(&[], "dbm_server", "on", 50);
+        let found_nothing = server_queries_envelope(&[], "_o2_dbm_server", "on", 50);
         assert_eq!(found_nothing["total"], json!(0));
         assert_eq!(found_nothing["server_queries_capture"], json!("on"));
         assert_eq!(found_nothing["truncated"], json!(false));
 
-        let never_captured = server_queries_envelope(&[], "dbm_server", "off", 50);
+        let never_captured = server_queries_envelope(&[], "_o2_dbm_server", "off", 50);
         assert_eq!(never_captured["server_queries_capture"], json!("off"));
     }
 
@@ -501,7 +501,7 @@ mod tests {
             "calls": 10i64,
             "exec_time_s": 1.0f64,
         })];
-        let env = server_queries_envelope(&rows, "dbm_server", "on", 50);
+        let env = server_queries_envelope(&rows, "_o2_dbm_server", "on", 50);
         assert_eq!(env["hits"][0]["exec_time_kind"], json!("wait"));
     }
 
@@ -515,7 +515,7 @@ mod tests {
             "calls": 10i64,
             "exec_time_s": Value::Null,
         })];
-        let env = server_queries_envelope(&rows, "dbm_server", "on", 50);
+        let env = server_queries_envelope(&rows, "_o2_dbm_server", "on", 50);
         assert_eq!(env["hits"][0]["exec_time_s"], Value::Null);
         assert_eq!(
             env["hits"][0]["mean_exec_time_s"],

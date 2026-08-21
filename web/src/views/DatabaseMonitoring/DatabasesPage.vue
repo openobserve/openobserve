@@ -1009,7 +1009,7 @@ watch(expandedIds, () => fillOpenBreakdowns());
 /**
  * Every instance the SERVER vantage has named, read off the shell's shared
  * badge snapshot. The snapshot derives the list once, from every
- * `dbm_server`-fed member it holds — activity samples, blocking samples, and
+ * `_o2_dbm_server`-fed member it holds — activity samples, blocking samples, and
  * the zero-trace fallback's statement lists — and the fallback tab badge
  * counts the SAME list, so the tile over this table and the badge beside it
  * cannot disagree. No new request: the shell already paid for these to draw

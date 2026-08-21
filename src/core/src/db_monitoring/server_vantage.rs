@@ -1123,10 +1123,10 @@ pub fn needs_kind_index_field(settings: &mut config::meta::stream::StreamSetting
 /// Does this batch contain at least one canonicalized DBM record?
 ///
 /// The seed trigger is DATA-driven, not name-driven. The read API defaults to
-/// the `dbm_server` stream but every endpoint accepts a `stream` override, so a
+/// the `_o2_dbm_server` stream but every endpoint accepts a `stream` override, so a
 /// deployment may export the recipes anywhere; keying the seed on the literal
 /// name would miss those and would also fire on a user's own stream that merely
-/// happened to be called `dbm_server`. "Did canonicalization stamp a kind onto
+/// happened to be called `_o2_dbm_server`. "Did canonicalization stamp a kind onto
 /// anything in this batch" is the question that matters — this stream carries
 /// DBM data, so DBM reads will filter it by kind.
 ///

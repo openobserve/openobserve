@@ -298,14 +298,14 @@ describe("unionFleetRows", () => {
 //
 // The user who did all the collector setup — recipes, DB grants — but has no
 // APM has instances no application ever queried AND no metric stream may name
-// (the metrics join is off by default). Their `dbm_server` rows are the one
+// (the metrics join is off by default). Their `_o2_dbm_server` rows are the one
 // place their fleet is written down, so the union takes those identities as a
 // second discovery source. The two-vantage honesty rule holds throughout: a
 // server-known row carries identity and nothing else — no query figure, no
 // metric figure the metrics read never made.
 
 describe("unionFleetRows with server-vantage instances", () => {
-  it("adds an instance known only from dbm_server rows as a trafficless row", () => {
+  it("adds an instance known only from _o2_dbm_server rows as a trafficless row", () => {
     const rows = unionFleetRows([], new Map(), {
       serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }],
     });
@@ -343,7 +343,7 @@ describe("unionFleetRows with server-vantage instances", () => {
     expect(row.metrics?.connectionSeries).toEqual([]);
   });
 
-  it("merges an instance both the metrics read and dbm_server know into one row", () => {
+  it("merges an instance both the metrics read and _o2_dbm_server know into one row", () => {
     const rows = unionFleetRows([], new Map([["postgresql|pgprod-1", metrics()]]), {
       serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }],
     });
@@ -369,7 +369,7 @@ describe("unionFleetRows with server-vantage instances", () => {
     expect(rows[0].trafficless).toBe(false);
   });
 
-  it("adds one row however many dbm_server rows name the same instance", () => {
+  it("adds one row however many _o2_dbm_server rows name the same instance", () => {
     const rows = unionFleetRows([], new Map(), {
       serverInstances: [
         { db_system: "postgresql", db_instance: "pgprod-1" },

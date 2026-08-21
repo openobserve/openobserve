@@ -92,7 +92,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
       logo: getImageURL("images/ingestion/mysql.svg"),
       tone: "#00758F",
       // Logs too: the optional Database Monitoring steps ship deadlock and
-      // blocking events into the dbm_server logs stream.
+      // blocking events into the _o2_dbm_server logs stream.
       metaBadges: [t("common.metrics"), t("common.logs")],
     },
     steps: [
@@ -256,7 +256,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
             masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
           },
         })),
-        note: "Needs the upstream OpenTelemetry Collector Contrib from the install step, v0.148.0 or newer (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers, so it cannot run this config. Deadlock capture tails the MySQL error log on disk, so it is not available on managed MySQL (RDS, Aurora, Cloud SQL): those platforms give the collector no file to read. Blocking chains, activity samples and top queries work there normally; estimated plans need MySQL 8.0.22 or newer. ACTIVITY SAMPLES AND TOP QUERIES SHIP ON. In the config above, events: db.server.query_sample and db.server.top_query are enabled: true — the collector's own default has been off since v0.148.0, so this block is the switch, and OpenObserve reads both feeds whenever Database Monitoring is enabled (no environment variable to pair). Set either to false to trim collection cost on your database; query_sample is the high-volume one. Activity samples are high-volume and share the dbm_server stream's normal retention; if volume is a concern, set a shorter retention policy on the dbm_server stream.",
+        note: "Needs the upstream OpenTelemetry Collector Contrib from the install step, v0.148.0 or newer (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers, so it cannot run this config. Deadlock capture tails the MySQL error log on disk, so it is not available on managed MySQL (RDS, Aurora, Cloud SQL): those platforms give the collector no file to read. Blocking chains, activity samples and top queries work there normally; estimated plans need MySQL 8.0.22 or newer. ACTIVITY SAMPLES AND TOP QUERIES SHIP ON. In the config above, events: db.server.query_sample and db.server.top_query are enabled: true — the collector's own default has been off since v0.148.0, so this block is the switch, and OpenObserve reads both feeds whenever Database Monitoring is enabled (no environment variable to pair). Set either to false to trim collection cost on your database; query_sample is the high-volume one. Activity samples are high-volume and share the _o2_dbm_server stream's normal retention; if volume is a concern, set a shorter retention policy on the _o2_dbm_server stream.",
       },
       {
         id: "dbm-run",

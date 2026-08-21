@@ -29,7 +29,7 @@ async function planBearingQuery(page, { periodSeconds = 3600 } = {}) {
       data: {
         query: {
           sql:
-            "SELECT * FROM dbm_server WHERE o2_dbm_plan IS NOT NULL LIMIT 5",
+            "SELECT * FROM _o2_dbm_server WHERE o2_dbm_plan IS NOT NULL LIMIT 5",
           start_time: now - periodSeconds * 1_000_000,
           end_time: now,
           from: 0,

@@ -667,7 +667,7 @@ pub(crate) async fn read_deadlocks_body(
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
     let shared_prologue = prologue.filter(|p| p.stream == stream);
-    // Server-vantage events live in a LOGS stream (`dbm_server` by default),
+    // Server-vantage events live in a LOGS stream (`_o2_dbm_server` by default),
     // not a trace stream — the permission is checked against the type actually
     // read, or the check would consult the wrong OFGA object. A shared
     // prologue already verified exactly this check for this stream.
@@ -1056,7 +1056,7 @@ mod tests {
     #[test]
     fn test_fallback_off_emits_byte_identical_sql_to_no_fallback() {
         let with_none = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             " AND o2_dbm_engine = 'mysql'",
             50,
@@ -1066,7 +1066,7 @@ mod tests {
         // is fully canonicalized.
         let boundary_off: Option<&RawDeadlockFallback> = None;
         let steady_state = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             " AND o2_dbm_engine = 'mysql'",
             50,
@@ -1105,7 +1105,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_earliest_canonical_probe_sql_is_a_single_ascending_row() {
-        let sql = build_earliest_canonical_sql("dbm_server", "deadlock");
+        let sql = build_earliest_canonical_sql("_o2_dbm_server", "deadlock");
         assert!(sql.contains("ORDER BY _timestamp ASC"), "{sql}");
         assert!(sql.contains("LIMIT 1"), "{sql}");
         assert!(sql.contains("o2_dbm_kind = 'deadlock'"), "{sql}");
@@ -1123,7 +1123,7 @@ mod tests {
     #[test]
     fn test_raw_presence_probe_names_only_marker_columns_the_stream_has() {
         let raw = raw_cols(&["o2_pg_event"]);
-        let sql = build_raw_deadlock_presence_sql("dbm_server", &raw)
+        let sql = build_raw_deadlock_presence_sql("_o2_dbm_server", &raw)
             .expect("one marker present means one probe");
         assert!(sql.contains("o2_pg_event = 'deadlock'"), "{sql}");
         assert!(!sql.contains("o2_my_event"), "{sql}");
@@ -1132,7 +1132,7 @@ mod tests {
 
         let none = raw_cols(&[]);
         assert!(
-            build_raw_deadlock_presence_sql("dbm_server", &none).is_none(),
+            build_raw_deadlock_presence_sql("_o2_dbm_server", &none).is_none(),
             "with no marker column there is nothing to probe for"
         );
     }
@@ -1149,7 +1149,7 @@ mod tests {
     fn test_deadlock_sql_matches_both_the_canonical_and_the_raw_shape() {
         let raw = raw_cols(&["o2_pg_event", "o2_my_event", "o2_maria_event", "dl_query_1"]);
         let sql = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             "",
             50,
@@ -1190,7 +1190,7 @@ mod tests {
             "my_trx_side",
         ]);
         let sql = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             "",
             50,
@@ -1243,7 +1243,7 @@ mod tests {
             "mssql_db",
         ]);
         let sql = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             "",
             50,
@@ -1281,7 +1281,7 @@ mod tests {
     fn test_deadlock_sql_only_predicates_on_marker_columns_the_stream_has() {
         let raw = raw_cols(&["o2_my_event", "my_trx_side"]);
         let sql = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             "",
             50,
@@ -1304,14 +1304,19 @@ mod tests {
     fn test_deadlock_sql_with_no_raw_markers_present_is_the_unwidened_query() {
         let none = raw_cols(&[]);
         let widened = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             "",
             50,
             &proj(&all_cols(), Some(&none)),
         );
-        let today =
-            build_dbm_events_sql("dbm_server", "deadlock", "", 50, &proj(&all_cols(), None));
+        let today = build_dbm_events_sql(
+            "_o2_dbm_server",
+            "deadlock",
+            "",
+            50,
+            &proj(&all_cols(), None),
+        );
         assert_eq!(
             widened, today,
             "with no marker column present there is nothing to OR, and an empty \
@@ -1330,7 +1335,7 @@ mod tests {
     fn test_a_probe_no_restores_byte_identical_sql() {
         let preds = dbm_event_preds(Some("mysql"), Some("db-1"), Some("shop"), &all_cols());
         let off = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             &preds,
             50,
@@ -1365,7 +1370,7 @@ mod tests {
         // fallback ON over the SAME stream must produce a DIFFERENT query, so
         // "off" is demonstrably doing something.
         let on = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             &preds,
             50,
@@ -2091,7 +2096,7 @@ mod tests {
     #[test]
     fn test_empty_columns_would_silently_drop_every_blocking_row() {
         let sql = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "blocking",
             "",
             50,
@@ -2119,7 +2124,7 @@ mod tests {
     #[test]
     fn test_empty_columns_would_yield_content_free_deadlock_events() {
         let sql = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             "",
             50,
@@ -2148,7 +2153,13 @@ mod tests {
     /// stays in lockstep with what `from_record` deserializes.
     #[test]
     fn test_build_dbm_events_sql_projects_only_canonical_columns() {
-        let sql = build_dbm_events_sql("dbm_server", "deadlock", "", 50, &proj(&all_cols(), None));
+        let sql = build_dbm_events_sql(
+            "_o2_dbm_server",
+            "deadlock",
+            "",
+            50,
+            &proj(&all_cols(), None),
+        );
         assert!(!sql.contains("SELECT *"), "must not select every column");
         assert!(sql.starts_with("SELECT _timestamp, "));
         for field in server_vantage::ALL_DBM_FIELDS {

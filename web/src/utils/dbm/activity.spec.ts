@@ -1306,7 +1306,7 @@ describe("activityEmptyCause", () => {
   /**
    * The reason this function takes the breakdown at all: a cluster running
    * only the deadlock recipes — no session sampler in its collector config —
-   * has records in `dbm_server` (the liveness probe counts records of ANY
+   * has records in `_o2_dbm_server` (the liveness probe counts records of ANY
    * kind, so `not_collecting` comes back FALSE) while no activity row has ever
    * been written and the breakdown SQL is skipped entirely for want of the
    * columns.

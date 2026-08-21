@@ -702,7 +702,7 @@ mod tests {
         let present = all_cols();
         let raw = raw_blocking_cols(&["o2_recipe", "blocked_pid", "waiting_thread"]);
         let sql = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             server_vantage::KIND_BLOCKING,
             "",
             100,
@@ -735,7 +735,7 @@ mod tests {
     fn test_blocking_fallback_off_emits_byte_identical_sql() {
         let present = all_cols();
         let off = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             server_vantage::KIND_BLOCKING,
             " AND o2_dbm_engine = 'mysql'",
             100,

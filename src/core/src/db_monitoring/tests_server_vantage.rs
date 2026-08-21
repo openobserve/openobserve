@@ -554,7 +554,7 @@ fn mssql_blocking_survives_the_ingest_entry_point() {
 //
 // Rename a tag on any one side and the other two keep compiling, keep passing
 // their own unit tests, and canonicalization silently stops: records land in
-// `dbm_server` with raw collector fields and zero `o2_dbm_*` columns, so the
+// `_o2_dbm_server` with raw collector fields and zero `o2_dbm_*` columns, so the
 // Deadlocks / Blocked-queries pages read "collecting, but nothing here".
 //
 // Every tag set below is DISCOVERED from each file's own text, never hardcoded.
@@ -5542,7 +5542,7 @@ fn table_stats_reads_each_relation_from_its_own_record() {
 }
 
 #[cfg(feature = "enterprise")]
-/// A record pulled off the LIVE rig, verbatim: SELECTed out of the `dbm_server`
+/// A record pulled off the LIVE rig, verbatim: SELECTed out of the `_o2_dbm_server`
 /// stream while the recipe was running, so its key set is the producer's rather
 /// than one shaped like the parser.
 ///
@@ -6314,7 +6314,7 @@ fn adding_the_engine_twins_leaves_the_others_dispatching() {
 // `ALL_DBM_FIELDS` member (correctly — see
 // `apply_to_record_strips_the_event_name_it_cannot_authenticate`), then
 // `canonicalize_record` finds no arm for the tag and returns `None`. The row
-// lands in `dbm_server` carrying its raw recipe columns and NO `o2_dbm_*`, so
+// lands in `_o2_dbm_server` carrying its raw recipe columns and NO `o2_dbm_*`, so
 // every read endpoint — which projects `ALL_DBM_FIELDS` and gates on
 // `present_dbm_columns` — cannot see it. Nothing logged, nothing counted.
 //

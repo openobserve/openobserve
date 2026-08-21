@@ -543,7 +543,7 @@ export type ActivityEmptyCause = "healthy" | "not-collecting";
  * sessions were sampled even when the row list came back empty.
  *
  * That evidence is required because `not_collecting` alone cannot answer this.
- * The liveness probe counts records of ANY kind in the shared `dbm_server`
+ * The liveness probe counts records of ANY kind in the shared `_o2_dbm_server`
  * stream, so a cluster running only the deadlock recipes — with no session
  * sampler in its collector config — reports `not_collecting: false` while
  * nothing has ever sampled a session, and reading only that flag would render

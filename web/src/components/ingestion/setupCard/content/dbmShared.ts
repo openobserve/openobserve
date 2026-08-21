@@ -40,9 +40,10 @@ export const DBM_CONTRIB_VERSION = "0.158.0";
 
 /**
  * The logs stream every server-vantage recipe exports to. Must match
- * `DEFAULT_SERVER_STREAM` in api.rs — the read endpoints look here by default.
+ * `DEFAULT_SERVER_STREAM` in
+ * src/api/management/src/request/db_monitoring/service/common.rs — the read endpoints look here by default.
  */
-export const DBM_SERVER_STREAM = "dbm_server";
+export const DBM_SERVER_STREAM = "_o2_dbm_server";
 
 /**
  * Postgres blocking chains, from `pg_stat_activity` + `pg_blocking_pids()`.
@@ -140,7 +141,7 @@ const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
       - type: add
         field: attributes.o2_pg_event
         value: other
-      # IDENTITY. Without this every host reporting into dbm_server looks like
+      # IDENTITY. Without this every host reporting into _o2_dbm_server looks like
       # the same server: the read-time deadlock stitch groups on
       # (engine, instance, database), so untagged sides from two different hosts
       # could fuse into one fabricated multi-participant deadlock.
@@ -309,7 +310,7 @@ const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
       - type: add
         field: attributes.o2_my_event
         value: other
-      # IDENTITY. Without this every host reporting into dbm_server looks like
+      # IDENTITY. Without this every host reporting into _o2_dbm_server looks like
       # the same server: the read-time deadlock stitch groups on
       # (engine, instance, database), so untagged sides from two different hosts
       # could fuse into one fabricated multi-participant deadlock.
@@ -396,7 +397,7 @@ const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
       - type: add
         field: attributes.o2_maria_event
         value: other
-      # IDENTITY. Without this every host reporting into dbm_server looks like
+      # IDENTITY. Without this every host reporting into _o2_dbm_server looks like
       # the same server: the read-time deadlock stitch groups on
       # (engine, instance, database), so untagged sides from two different hosts
       # could fuse into one fabricated multi-participant deadlock.
@@ -1326,7 +1327,7 @@ ${allReceivers.join("\n")}
 processors:
   # Keep ONLY the records the Database Monitoring pages read. Load-bearing, not
   # tidiness: the filelog receivers tail the WHOLE database log, so without
-  # this every ordinary log line lands in dbm_server too and swamps the tagged
+  # this every ordinary log line lands in _o2_dbm_server too and swamps the tagged
   # rows. A record is ours if a recipe tagged it -- sqlquery rows carry
   # o2_recipe, filelog rows carry o2_pg_event / o2_my_event / o2_maria_event.
   filter/dbm:

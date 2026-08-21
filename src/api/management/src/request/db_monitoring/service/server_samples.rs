@@ -21,7 +21,7 @@ use super::{super::models::*, *};
 /// The stream the demo tailer routes the raw database-log remainder to — the
 /// sibling of [`DEFAULT_SERVER_STREAM`], and where `KIND_STATEMENT` rows land
 /// (the collector's routing sends only deadlock/explain lines to
-/// `dbm_server`; everything else in the tailed log, statement durations
+/// `_o2_dbm_server`; everything else in the tailed log, statement durations
 /// included, goes here).
 const DEFAULT_SERVER_LOGS_STREAM: &str = "dbm_server_logs";
 
@@ -431,7 +431,7 @@ mod tests {
                 "db_system": "postgresql",
             }),
         ];
-        let env = server_samples_envelope(&rows, "dbm_server,dbm_server_logs", "on", 100);
+        let env = server_samples_envelope(&rows, "_o2_dbm_server,dbm_server_logs", "on", 100);
         assert_eq!(env["total"], json!(2));
         assert_eq!(env["truncated"], json!(false));
         assert_eq!(env["server_samples_capture"], json!("on"));

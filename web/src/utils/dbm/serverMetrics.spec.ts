@@ -19,7 +19,7 @@ import i18n from "@/locales";
 import { readServerMetrics, serverMetricsTiles, type DbmServerMetrics } from "./serverMetrics";
 
 const matched = {
-  stream: "dbm_server",
+  stream: "_o2_dbm_server",
   server_metrics_capture: "on",
   exec_time_kind: "execution",
   matched: true,
@@ -72,7 +72,7 @@ describe("readServerMetrics", () => {
    */
   it("surfaces the ambiguous-instance case with its candidates", () => {
     const m = readServerMetrics({
-      stream: "dbm_server",
+      stream: "_o2_dbm_server",
       server_metrics_capture: "on",
       exec_time_kind: "execution",
       matched: false,
@@ -95,7 +95,7 @@ describe("readServerMetrics", () => {
   // rather than becoming a confident zero.
   it("keeps absent counters absent instead of coercing them to zero", () => {
     const m = readServerMetrics({
-      stream: "dbm_server",
+      stream: "_o2_dbm_server",
       server_metrics_capture: "on",
       exec_time_kind: "wait",
       matched: true,
