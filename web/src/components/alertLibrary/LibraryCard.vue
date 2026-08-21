@@ -89,19 +89,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
 
-      <!-- Unavailable: the same chip shape as the query language, in the warning
-           tone, on a row of its own — stream names run past 40 characters, and
-           squeezed beside the other chip this one would truncate to nothing,
-           naming the very thing it exists to name. -->
+      <!-- Unavailable: the same chip shape as the query language, on a row of
+           its own — stream names run past 40 characters, and squeezed beside
+           the other chip this one would truncate to nothing, naming the very
+           thing it exists to name.
+
+           The CHIP is neutral and only its icon carries the warning colour.
+           A filled amber chip was right in principle and wrong in practice:
+           959 of 1242 alerts are not ingested on a typical org, so twelve amber
+           blocks landed on every screen and the colour became the page's
+           background rather than a signal — loudest in dark mode, where the
+           warning hue sits at full chroma against near-black. One small amber
+           mark per card says the same thing and lets the text stay readable. -->
       <OTag
         v-if="!ready"
-        variant="warning-soft"
+        variant="default-soft"
         size="xs"
-        icon="sensors-off"
         class="max-w-full min-w-0 self-start"
         :title="t('alert_library.notIngestedHint', { stream: entry.stream })"
         data-test="alert-library-card-needs-data"
       >
+        <template #icon>
+          <OIcon
+            name="sensors-off"
+            size="xs"
+            class="text-badge-warning-soft-text shrink-0"
+            data-test="alert-library-card-needs-data-mark"
+          />
+        </template>
         <span class="truncate">{{ t("alert_library.notIngested", { stream: entry.stream }) }}</span>
       </OTag>
     </div>
@@ -112,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { raw, useI18nTyped } from "@/types/i18n";
 

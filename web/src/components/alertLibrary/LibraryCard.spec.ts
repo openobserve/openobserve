@@ -82,12 +82,21 @@ describe("LibraryCard", () => {
     expect(note.attributes("title")).toContain("would never fire");
   });
 
-  it("carries the warning tone, so the state is legible without comparing cards", () => {
-    // Colour is the signal now. Warning and not error: an alert with no data is
-    // not broken, it is waiting — installing it is a perfectly good thing to do.
-    const note = mountCard({ ready: false }).find('[data-test="alert-library-card-needs-data"]');
-    expect(note.html()).toMatch(/badge-warning/);
+  it("marks the state in colour, but only on the icon", () => {
+    // Warning and not error: an alert with no data is not broken, it is waiting.
+    // And only the ICON is tinted — 959 of 1242 alerts are not ingested on a
+    // typical org, so a filled amber chip put twelve amber blocks on every
+    // screen and the colour stopped being a signal, worst in dark mode where
+    // the hue sits at full chroma against near-black.
+    const wrapper = mountCard({ ready: false });
+    const note = wrapper.find('[data-test="alert-library-card-needs-data"]');
+    const mark = wrapper.find('[data-test="alert-library-card-needs-data-mark"]');
+
+    expect(mark.classes().join(" ")).toMatch(/badge-warning/);
     expect(note.html()).not.toMatch(/badge-error/);
+    // The chip body stays neutral — same treatment as the query-language chip.
+    expect(note.classes().join(" ")).toMatch(/badge-default/);
+    expect(note.classes().join(" ")).not.toMatch(/badge-warning/);
   });
 
   it("shapes the note like the query-language chip beside it", () => {
