@@ -34,7 +34,9 @@
       <!-- Stream picker and its action read as one control, sized to sit level
            with the toolbar buttons above rather than towering over them. -->
       <div
-        v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
+        v-if="
+          !hideViewTrace && showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
+        "
         class="mb-1.5 flex items-center gap-2"
       >
         <OSelect
@@ -258,7 +260,6 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
-import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
@@ -267,6 +268,7 @@ import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -309,6 +311,12 @@ export default {
       required: false,
     },
     hideViewRelated: {
+      type: Boolean,
+      default: false,
+    },
+    // Set by DetailTable's drawer, which renders the View Trace action in its
+    // own header row instead so it stays reachable from every tab.
+    hideViewTrace: {
       type: Boolean,
       default: false,
     },
@@ -356,17 +364,9 @@ export default {
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams } = useStreams(t);
-
-    const filteredTracesStreamOptions = ref([]);
-
     const router = useRouter();
 
-    const tracesStreams = ref([]);
-
     const queryEditorRef = ref<any>();
-
-    const isTracesStreamsLoading = ref(false);
 
     const typeOfRegexPattern = ref(false);
     const regexPatternType = ref("");
@@ -413,6 +413,20 @@ export default {
       emit("addFieldToTable", value);
     };
     const { searchObj, searchAggData } = searchState();
+
+    // Shared with DetailTable's drawer header so both renderings of the
+    // View Trace action apply the same rules. See useViewTraceAction.
+    const {
+      tracesStreams,
+      filteredTracesStreamOptions,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
+      getTracesStreams,
+      setViewTraceBtn: setViewTraceBtnFor,
+      filterStreamFn,
+    } = useViewTraceAction(t, searchObj);
+
+    const setViewTraceBtn = () => setViewTraceBtnFor(props.value);
 
     // Cross-linking: get all matching cross-links for a field using result_schema data
     const getCrossLinksForField = (
@@ -498,7 +512,6 @@ export default {
     };
     let multiStreamFields: any = ref([]);
 
-    const showViewTraceBtn = ref(false);
     const showViewRelatedBtn = ref(false);
 
     // Initialize service correlation composable
@@ -532,38 +545,18 @@ export default {
       }
     });
 
-    const getTracesStreams = async () => {
-      isTracesStreamsLoading.value = true;
-      try {
-        getStreams("traces", false)
-          .then((res: any) => {
-            tracesStreams.value = res.list.map((option: any) => option.name);
-            filteredTracesStreamOptions.value = JSON.parse(JSON.stringify(tracesStreams.value));
-
-            if (!searchObj.meta.selectedTraceStream.length)
-              searchObj.meta.selectedTraceStream = tracesStreams.value[0];
-          })
-          .catch(() => Promise.reject())
-          .finally(() => {
-            isTracesStreamsLoading.value = false;
-          });
-      } catch (err: any) {
-        isTracesStreamsLoading.value = false;
-        console.error("Failed to get traces streams", err);
-      }
-    };
-
-    const setViewTraceBtn = () => {
-      // Hide view traces button when service_streams_enabled is true
-      const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
-
-      showViewTraceBtn.value =
-        !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
-        !serviceStreamsEnabled && // Hide when service streams is enabled
-        props.value[store.state.organizationData?.organizationSettings?.trace_id_field_name];
-
-      if (showViewTraceBtn.value && !filteredTracesStreamOptions.value.length) getTracesStreams();
-    };
+    // `value` can arrive after this component mounts: DetailTable fills its
+    // `rowData` in an async created() hook, so the row-detail drawer's preview
+    // mounts with `{}`. The onBeforeMount check below then ran against an empty
+    // record, left `showViewTraceBtn` false and never fetched the traces
+    // streams, so the drawer's View Trace button stayed hidden for good.
+    // Re-evaluate whenever the previewed record changes.
+    watch(
+      () => props.value,
+      () => {
+        setViewTraceBtn();
+      },
+    );
 
     onBeforeMount(() => {
       setViewTraceBtn();
@@ -703,12 +696,6 @@ export default {
         deep: true,
       },
     );
-
-    const filterStreamFn = (val: any = "") => {
-      filteredTracesStreamOptions.value = tracesStreams.value.filter((stream: any) => {
-        return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
-      });
-    };
 
     // The previewed log rides along with the event: a listener bound by
     // reference (`@view-trace="handler"`) otherwise receives `undefined` and

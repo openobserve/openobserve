@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "Mở toàn màn hình",
     "viewLogs": "Xem Nhật ký",
+    "viewLogsUnavailable": "Không thể mở nhật ký cho span này.",
     "backToLogs": "Quay lại Nhật ký",
     "openInTraces": "Mở trong Dấu vết",
     "loadingStream": "Đang tải Luồng...",
