@@ -84,10 +84,9 @@ export default function useViewTraceAction(t: TranslateFn, searchObj: SearchObje
     // MainLayout has read `custom_hide_menus`, so accept either shape rather
     // than assuming `.has` exists.
     const hiddenMenus: Set<string> | string[] | undefined = store.state.hiddenMenus;
-    const tracesMenuHidden =
-      typeof hiddenMenus?.has === "function"
-        ? hiddenMenus.has("traces")
-        : Array.isArray(hiddenMenus) && hiddenMenus.includes("traces");
+    const tracesMenuHidden = Array.isArray(hiddenMenus)
+      ? hiddenMenus.includes("traces")
+      : Boolean(hiddenMenus?.has("traces"));
 
     showViewTraceBtn.value =
       !tracesMenuHidden && // Check if traces menu is hidden
