@@ -149,6 +149,30 @@ describe("ONavGroup", () => {
     expect(header.text()).toBe("Alerts");
   });
 
+  it("sizes the three levels by depth, not against it", async () => {
+    // It ran 11px → 11px → 14px: the group title and its section headers were
+    // the same size, and the ITEMS — the deepest level — were the largest text
+    // in the flyout. Group (base) > section (sm, secondary) > item (sm, plain).
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+      ],
+    });
+    await hoverOpen();
+
+    const classesOf = (sel: string) => flyout().find(sel).classes().join(" ");
+    expect(flyout().element.firstElementChild?.className).toContain("text-base");
+    expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain("text-sm");
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).toContain("text-sm");
+    // The section header outranks the items it heads by weight and colour,
+    // since both sit at text-sm — items must stay comfortably readable.
+    expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain("font-semibold");
+    expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain(
+      "text-text-secondary",
+    );
+  });
+
   it("heads the run once, not once per child", async () => {
     wrapper = mountGroup();
     await wrapper.setProps({
