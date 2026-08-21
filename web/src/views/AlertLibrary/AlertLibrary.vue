@@ -66,6 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-categories="selectedCategories"
             :severities="severityFacets"
             :severity="severity"
+            :search="railSearch"
+            @update:search="railSearch = $event"
             @update:selected-categories="selectedCategories = $event"
             @update:severity="severity = $event"
           />
@@ -129,6 +131,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-surface h-32 w-full"
                 />
               </div>
+
+              <!-- A catalog that loaded but holds nothing is not a filter
+                   problem, and "try another category" is not advice when there
+                   are no categories. Offering Clear filters there would be a
+                   button that changes nothing. -->
+              <OEmptyState
+                v-else-if="entries.length === 0"
+                size="block"
+                class="py-8"
+                illustration="no-results"
+                variant="no-results"
+                :title="t('alert_library.emptyLibraryTitle')"
+                :description="t('alert_library.emptyLibraryDescription')"
+                :action-label="t('alert_library.retry')"
+                action-icon="refresh"
+                data-test="alert-library-empty-catalog"
+                @action="refresh"
+              />
 
               <OEmptyState
                 v-else-if="groupedEntries.length === 0"
@@ -236,6 +256,8 @@ const { getStreams } = useStreams(t);
 
 /** Empty = every category. The rail narrows, it does not gate. */
 const selectedCategories = ref<string[]>([]);
+/** The rail's own list filter, held here so clearFilters can reset it too. */
+const railSearch = ref("");
 const severity = ref("all");
 /** Stat-strip facet. `null` = no availability filter; "all" never sticks. */
 const facet = ref<"ready" | "missing" | null>(null);
@@ -290,7 +312,9 @@ const errorDescription = computed(() => {
     unsupported_version: "alert_library.error.unsupported_version",
     malformed: "alert_library.error.malformed",
   };
-  return t(keys[code] ?? keys.malformed);
+  // hasOwn, not `??`: a code of "constructor" or "toString" would otherwise
+  // return an inherited function and hand t() something that is not a key.
+  return t(Object.hasOwn(keys, code) ? keys[code] : keys.malformed);
 });
 
 // ── readiness ──────────────────────────────────────────────────────────────
@@ -305,25 +329,43 @@ const entryReady = (entry: AlertLibraryEntry): boolean =>
  * filter is excluded so that clicking "Not ingested" cannot change the totals
  * it is being read against.
  */
+/**
+ * The manifest is fetched content, and only five fields are validated on the
+ * way in (see assertManifest) — `title`, `category` and `description` are not
+ * among them. Every read of them here is therefore defensive: an entry
+ * published without a title must not blank the gallery, which is the same
+ * posture `isReady` and `categoryLabel` already take.
+ */
+const text = (value: unknown): string => (typeof value === "string" ? value : "");
+
+const matchesSearch = (entry: AlertLibraryEntry, needle: string): boolean => {
+  if (!needle) return true;
+  // Joined from the fields that exist, so a missing description cannot put the
+  // literal string "undefined" into the haystack and make it searchable.
+  const haystack = [entry.title, entry.id, entry.description, entry.stream]
+    .filter((part): part is string => typeof part === "string")
+    .join(" ");
+  return haystack.toLowerCase().includes(needle);
+};
+
+const matchesCategory = (entry: AlertLibraryEntry): boolean =>
+  selectedCategories.value.length === 0 || selectedCategories.value.includes(entry.category);
+
+const matchesSeverity = (entry: AlertLibraryEntry): boolean =>
+  severity.value === "all" || entry.severity === severity.value;
+
+const matchesFacet = (entry: AlertLibraryEntry): boolean => {
+  if (facet.value === "ready") return entryReady(entry);
+  if (facet.value === "missing") return !entryReady(entry);
+  return true;
+};
+
 const searchScoped = computed(() => {
   const needle = search.value.trim().toLowerCase();
-  return entries.value
-    .filter(
-      (entry) =>
-        selectedCategories.value.length === 0 || selectedCategories.value.includes(entry.category),
-    )
-    .filter((entry) => {
-      if (!needle) return true;
-      const haystack = `${entry.title} ${entry.id} ${entry.description} ${entry.stream}`;
-      return haystack.toLowerCase().includes(needle);
-    });
+  return entries.value.filter((entry) => matchesCategory(entry) && matchesSearch(entry, needle));
 });
 
-const scopedEntries = computed(() =>
-  searchScoped.value.filter(
-    (entry) => severity.value === "all" || entry.severity === severity.value,
-  ),
-);
+const scopedEntries = computed(() => searchScoped.value.filter(matchesSeverity));
 
 const readyCount = computed(() => scopedEntries.value.filter(entryReady).length);
 const missingCount = computed(() => scopedEntries.value.length - readyCount.value);
@@ -348,32 +390,41 @@ const showCollectorBanner = computed(
     readinessKnown.value &&
     soleCategoryLabel.value !== null &&
     scopedEntries.value.length > 0 &&
-    readyCount.value === 0,
+    readyCount.value === 0 &&
+    // Not over an empty grid. With the "Ready to install" tile active and
+    // nothing ready, this banner and the no-results state both rendered — two
+    // different explanations for one blank area, and this one citing a count of
+    // alerts that were not on screen.
+    availableEntries.value.length > 0,
 );
 
 // ── facets ─────────────────────────────────────────────────────────────────
-const availableEntries = computed(() =>
-  scopedEntries.value.filter((entry) => {
-    if (facet.value === "ready") return entryReady(entry);
-    if (facet.value === "missing") return !entryReady(entry);
-    return true;
-  }),
-);
+const availableEntries = computed(() => scopedEntries.value.filter(matchesFacet));
 
 /**
- * Counted over the WHOLE library, not the current scope: a facet count answers
- * "how many are there", and recomputing it against the selection would make
- * every count drop to nothing the moment you ticked one row. A selected
- * category is pinned at whatever it holds so the rail can always list it.
+ * Counted against every OTHER active filter, never against the category
+ * selection itself — the metrics explorer's rule, where the comment reads
+ * "how many more would this add".
+ *
+ * Absolute counts read as a promise the rail cannot keep: with "kafka" typed in
+ * the toolbar it still advertised "Cassandra 30", and ticking it produced an
+ * empty grid. Counting within the selection would be the opposite mistake,
+ * dropping every other row to zero the moment you ticked one.
+ *
+ * A selected category is seeded at 0 so it stays listed even when the other
+ * filters leave it with nothing — otherwise the rail would hide the row you
+ * need in order to untick it. That is what the rail's dead-end rule is for.
  */
 const categoryFacets = computed<LibraryFacet[]>(() => {
+  const needle = search.value.trim().toLowerCase();
   const counts = new Map<string, number>();
   for (const id of selectedCategories.value) counts.set(id, 0);
   for (const entry of entries.value) {
+    if (!matchesSearch(entry, needle) || !matchesSeverity(entry) || !matchesFacet(entry)) continue;
     counts.set(entry.category, (counts.get(entry.category) ?? 0) + 1);
   }
   return [...counts.keys()]
-    .sort((a, b) => a.localeCompare(b))
+    .sort((a, b) => text(a).localeCompare(text(b)))
     .map((id) => ({ id, label: categoryLabel(id), count: counts.get(id) ?? 0 }));
 });
 
@@ -382,20 +433,37 @@ const categoryFacets = computed<LibraryFacet[]>(() => {
  * Warning to zero and make the chip you are standing on look like the only
  * one with anything behind it.
  */
-const severityFacets = computed<LibraryFacet[]>(() => [
-  { id: "all", label: t("alert_library.severityAll"), count: searchScoped.value.length },
-  ...SEVERITY_ORDER.map((id) => ({
-    id: id as string,
-    label: severityLabel(t, id),
-    count: searchScoped.value.filter((entry) => entry.severity === id).length,
-  })),
-]);
+const severityFacets = computed<LibraryFacet[]>(() => {
+  // One pass, not one per severity. The rail renders these chips without
+  // counts by design, so this ran four filters over the whole scope on every
+  // keystroke to produce numbers nothing displayed.
+  const tally = new Map<string, number>();
+  for (const entry of searchScoped.value) {
+    tally.set(entry.severity, (tally.get(entry.severity) ?? 0) + 1);
+  }
+  return [
+    { id: "all", label: t("alert_library.severityAll"), count: searchScoped.value.length },
+    ...SEVERITY_ORDER.map((id) => ({
+      id: id as string,
+      label: severityLabel(t, id),
+      count: tally.get(id) ?? 0,
+    })),
+  ];
+});
 
+/**
+ * Readiness is a claim about the org's data, and when the stream check failed
+ * we have no claim to make. The cards deliberately stay undimmed — refusing to
+ * say "none of your data matches" — but the strip was making the OPPOSITE
+ * assertion just as loudly: `entryReady` answers true while readiness is
+ * unknown, so a failed /streams call read as "Ready to install 42 / Not
+ * ingested 0". An em dash says the honest thing.
+ */
 const statItems = computed<StatItem[]>(() => [
   {
     key: "ready",
     label: t("alert_library.statReady"),
-    value: readyCount.value,
+    value: readinessKnown.value ? readyCount.value : "—",
     icon: "check-circle",
     tone: "success",
     max: scopedEntries.value.length,
@@ -404,7 +472,7 @@ const statItems = computed<StatItem[]>(() => [
   {
     key: "missing",
     label: t("alert_library.statNeedsData"),
-    value: missingCount.value,
+    value: readinessKnown.value ? missingCount.value : "—",
     icon: "sensors-off",
     // Same tone as the chip on every card this tile selects — StatTone exists
     // so one semantic state reads as one colour across the screen.
@@ -427,7 +495,9 @@ const statItems = computed<StatItem[]>(() => [
 /** Every filter has already been applied by `availableEntries`; this orders it. */
 const visibleEntries = computed(() =>
   [...availableEntries.value].sort(
-    (a, b) => severityRank(a.severity) - severityRank(b.severity) || a.title.localeCompare(b.title),
+    (a, b) =>
+      severityRank(a.severity) - severityRank(b.severity) ||
+      text(a.title).localeCompare(text(b.title)),
   ),
 );
 
@@ -448,7 +518,7 @@ const groupedEntries = computed(() => {
   }
   const packsOnScreen = new Set(visibleEntries.value.map((entry) => entry.pack));
   return [...groups.keys()]
-    .sort((a, b) => a.localeCompare(b))
+    .sort((a, b) => text(a).localeCompare(text(b)))
     .map((key) => {
       const entriesInGroup = groups.get(key) ?? [];
       const { pack, category } = entriesInGroup[0];
@@ -480,6 +550,7 @@ const onStatSelect = (key: string) => {
 
 const clearFilters = () => {
   selectedCategories.value = [];
+  railSearch.value = "";
   severity.value = "all";
   facet.value = null;
   search.value = "";
@@ -529,8 +600,12 @@ const loadStreams = async () => {
     streamsByType.value = toStreamsByType(payload?.list);
     readinessKnown.value = true;
   } catch {
-    // Leave readiness unknown: see readinessKnown.
-    readinessKnown.value = false;
+    // Keep whatever verdict we already had. Clearing it here meant a failed
+    // REFRESH threw away a correct answer: streamsByType still held the good
+    // data, but every card lost its "Not ingested" chip and the strip flipped
+    // to "Ready 42 / Not ingested 0". A transient timeout must not rewrite what
+    // the page already knew — on a first load there is nothing to keep, so
+    // readiness simply stays unknown.
   } finally {
     streamsPending.value = false;
   }

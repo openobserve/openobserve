@@ -131,22 +131,43 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 const asNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
+/**
+ * The file's PromQL condition, or null when it has none.
+ *
+ * ONE definition, shared by the reader and the writer. They used to disagree:
+ * the reader treated `{}` / `[]` as "no condition" (so the drawer showed no
+ * threshold row), while the writer treated them as truthy objects and wrote a
+ * fabricated `{ operator: ">=", value: 0 }` into the installed alert — a
+ * threshold nothing on screen had offered, firing on every evaluation of any
+ * non-negative metric.
+ */
+const promqlConditionOf = (file: AlertLibraryFile): Record<string, unknown> | null => {
+  const condition = asRecord(asRecord(file?.query_condition).promql_condition);
+  return Object.keys(condition).length > 0 ? condition : null;
+};
+
 export function readTunables(file: AlertLibraryFile): LibraryTunables {
   const trigger = asRecord(file?.trigger_condition);
-  const promqlCondition = asRecord(asRecord(file?.query_condition).promql_condition);
-  const hasPromqlCondition = Object.keys(promqlCondition).length > 0;
+  const promqlCondition = promqlConditionOf(file);
 
+  // Floored on the way IN, not only on edit. These numbers come from a remote
+  // file, and a value the user never touches reached install untouched: a
+  // published `period: 0` installed an alert that looks at zero minutes of
+  // data, and `threshold: 0` one that fires every evaluation — the exact
+  // states `coerceTunable` exists to make unreachable.
   return {
-    threshold: asNumber(trigger.threshold, DEFAULT_TUNABLES.threshold),
-    period: asNumber(trigger.period, DEFAULT_TUNABLES.period),
-    frequency: asNumber(trigger.frequency, DEFAULT_TUNABLES.frequency),
-    silence: asNumber(trigger.silence, DEFAULT_TUNABLES.silence),
-    promqlOperator: hasPromqlCondition
+    threshold: coerceTunable("threshold", asNumber(trigger.threshold, DEFAULT_TUNABLES.threshold)),
+    period: coerceTunable("period", asNumber(trigger.period, DEFAULT_TUNABLES.period)),
+    frequency: coerceTunable("frequency", asNumber(trigger.frequency, DEFAULT_TUNABLES.frequency)),
+    silence: coerceTunable("silence", asNumber(trigger.silence, DEFAULT_TUNABLES.silence)),
+    promqlOperator: promqlCondition
       ? typeof promqlCondition.operator === "string"
         ? promqlCondition.operator
         : ">="
       : null,
-    promqlValue: hasPromqlCondition ? asNumber(promqlCondition.value, 0) : null,
+    // Unbounded by design: compared against a metric, which is legitimately
+    // zero or negative.
+    promqlValue: promqlCondition ? asNumber(promqlCondition.value, 0) : null,
   };
 }
 
@@ -170,18 +191,19 @@ export function applyTunables(file: AlertLibraryFile, tunables: LibraryTunables)
   };
 
   const queryCondition = asRecord(file?.query_condition);
-  const promqlCondition = queryCondition.promql_condition;
-  next.query_condition =
-    promqlCondition && typeof promqlCondition === "object"
-      ? {
-          ...queryCondition,
-          promql_condition: {
-            ...asRecord(promqlCondition),
-            operator: tunables.promqlOperator ?? ">=",
-            value: tunables.promqlValue ?? 0,
-          },
-        }
-      : { ...queryCondition };
+  // Same predicate the reader used, so the writer can only ever edit a
+  // condition the drawer actually offered.
+  const promqlCondition = promqlConditionOf(file);
+  next.query_condition = promqlCondition
+    ? {
+        ...queryCondition,
+        promql_condition: {
+          ...promqlCondition,
+          operator: tunables.promqlOperator ?? ">=",
+          value: tunables.promqlValue ?? 0,
+        },
+      }
+    : { ...queryCondition };
 
   return next;
 }

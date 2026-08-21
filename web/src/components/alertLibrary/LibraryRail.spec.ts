@@ -24,7 +24,10 @@ import { raw } from "@/types/i18n";
 const categories: LibraryFacet[] = [
   { id: "kafka", label: raw("Kafka"), count: 12 },
   { id: "clickhouse", label: raw("Clickhouse"), count: 23 },
-  { id: "cert-manager", label: raw("Cert Manager"), count: 0 },
+  // id-vs-label discriminator: "cert-m" is in the id, not in "Cert Manager".
+  { id: "cert-manager", label: raw("Cert Manager"), count: 8 },
+  // The dead end.
+  { id: "retired", label: raw("Retired"), count: 0 },
 ];
 
 const severities: LibraryFacet[] = [
@@ -36,7 +39,14 @@ const severities: LibraryFacet[] = [
 
 const mountRail = (props: Record<string, unknown> = {}) =>
   mount(LibraryRail, {
-    props: { categories, selectedCategories: [], severities, severity: "all", ...props },
+    props: {
+      categories,
+      selectedCategories: [],
+      severities,
+      severity: "all",
+      search: "",
+      ...props,
+    },
     global: { plugins: [i18n] },
   });
 
@@ -53,6 +63,15 @@ const toggle = (wrapper: Rail, id: string) =>
 // itself is `<data-test>-field`.
 const field = (wrapper: Rail) =>
   wrapper.find<HTMLInputElement>('[data-test="alert-library-rail-search-categories-field"]');
+
+/**
+ * The page owns the term (so its "Clear filters" can reset it), so typing only
+ * EMITS — a real parent feeds the value back down. These tests play that parent.
+ */
+const type = async (wrapper: Rail, term: string) => {
+  await field(wrapper).setValue(term);
+  await wrapper.setProps({ search: term });
+};
 
 describe("LibraryRail", () => {
   it("lists one axis only — categories — with no pack switcher", () => {
@@ -127,7 +146,7 @@ describe("LibraryRail", () => {
   // ── search ───────────────────────────────────────────────────────────────
   it("filters the listed rows as you type, case-insensitively", async () => {
     const wrapper = mountRail();
-    await field(wrapper).setValue("KAF");
+    await type(wrapper, "KAF");
     expect(wrapper.find('[data-test="alert-library-rail-category-kafka"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-library-rail-category-clickhouse"]').exists()).toBe(
       false,
@@ -136,8 +155,8 @@ describe("LibraryRail", () => {
 
   it("searches the label people read, not the id", async () => {
     // "cert-manager" is the id; "Cert Manager" is what the row says.
-    const wrapper = mountRail({ selectedCategories: ["cert-manager"] });
-    await field(wrapper).setValue("cert-m");
+    const wrapper = mountRail();
+    await type(wrapper, "cert-m");
     expect(wrapper.find('[data-test="alert-library-rail-category-cert-manager"]').exists()).toBe(
       false,
     );
@@ -147,13 +166,13 @@ describe("LibraryRail", () => {
     // A search is a view over the list. Typing must never silently deselect
     // the category whose alerts are on screen.
     const wrapper = mountRail({ selectedCategories: ["clickhouse"] });
-    await field(wrapper).setValue("kafka");
+    await type(wrapper, "kafka");
     expect(wrapper.emitted("update:selectedCategories")).toBeUndefined();
   });
 
   it("says so when nothing matches, instead of showing a blank rail", async () => {
     const wrapper = mountRail();
-    await field(wrapper).setValue("zzzz");
+    await type(wrapper, "zzzz");
     expect(wrapper.find('[data-test="alert-library-rail-empty-categories"]').exists()).toBe(true);
   });
 
@@ -161,14 +180,10 @@ describe("LibraryRail", () => {
     // A zero-count row filters to nothing, so offering it wastes a click — but
     // hiding a SELECTED one would strand the user with no way to untick it.
     const wrapper = mountRail();
-    expect(wrapper.find('[data-test="alert-library-rail-category-cert-manager"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('[data-test="alert-library-rail-category-retired"]').exists()).toBe(false);
 
-    await wrapper.setProps({ selectedCategories: ["cert-manager"] });
-    expect(wrapper.find('[data-test="alert-library-rail-category-cert-manager"]').exists()).toBe(
-      true,
-    );
+    await wrapper.setProps({ selectedCategories: ["retired"] });
+    expect(wrapper.find('[data-test="alert-library-rail-category-retired"]').exists()).toBe(true);
   });
 
   // ── clearing ─────────────────────────────────────────────────────────────
@@ -195,5 +210,21 @@ describe("LibraryRail", () => {
     const text = mountRail().text();
     expect(text).not.toContain("Ready to install");
     expect(text).not.toContain("Installed");
+  });
+
+  it("never hides a row you have ticked, whatever you type", () => {
+    // The grid stays filtered to it, so hiding the row leaves a filter whose
+    // effect you can see and whose control you cannot reach.
+    const wrapper = mountRail({ selectedCategories: ["kafka"], search: "redis" });
+    expect(wrapper.find('[data-test="alert-library-rail-category-kafka"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-library-rail-category-clickhouse"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("emits the term rather than holding it, so the page can clear it", async () => {
+    const wrapper = mountRail();
+    await field(wrapper).setValue("kafka");
+    expect(wrapper.emitted("update:search")).toEqual([["kafka"]]);
   });
 });

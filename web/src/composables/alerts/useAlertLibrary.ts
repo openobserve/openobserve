@@ -49,11 +49,7 @@ import type {
  * button, and a `switch` over the union gets exhaustiveness checking for free.
  */
 export type AlertLibraryErrorCode =
-  | "network"
-  | "http"
-  | "unparseable"
-  | "unsupported_version"
-  | "malformed";
+  "network" | "http" | "unparseable" | "unsupported_version" | "malformed";
 
 /**
  * Failure with a stable `code`.
@@ -103,49 +99,60 @@ const hasOwn = (object: object, key: string): boolean =>
  * "__proto__" as a bare key retargets the cache's prototype, whereas
  * "__proto__@<hash>" is an ordinary own key.
  */
-const fileCacheKey = (entry: AlertLibraryEntry): string =>
-  `${entry.id}@${entry.content_hash}`;
+const fileCacheKey = (entry: AlertLibraryEntry): string => `${entry.id}@${entry.content_hash}`;
 
 /** GET + parse, failing loudly and identifiably on every error path. */
 async function fetchJson(url: string, options: { force?: boolean } = {}): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  let response: Response;
+  // The timer must outlive the BODY read, not just the headers. `fetch` settles
+  // as soon as headers arrive, so clearing it after the fetch disarmed the abort
+  // before `.json()` had read a byte: a server that sent `200 Content-Length:
+  // 47000` and then stalled left this promise pending forever, which left
+  // `isLoading` true, the in-flight slot occupied and the gallery on its
+  // skeleton with no error and no way back except a page reload.
   try {
-    response = await fetch(url, {
-      signal: controller.signal,
-      // A forced reload must reach the network: `force` bypasses our Vuex cache
-      // and in-flight slot, but without this the browser's own HTTP cache can
-      // still re-serve a stale body for an object with a max-age.
-      ...(options.force ? { cache: "reload" as RequestCache } : {}),
-    });
-  } catch (cause) {
-    throw new AlertLibraryError(
-      "network",
-      `Alert library request failed for ${url}: ${(cause as Error).message}`,
-    );
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        signal: controller.signal,
+        // A forced reload must reach the network: `force` bypasses our Vuex cache
+        // and in-flight slot, but without this the browser's own HTTP cache can
+        // still re-serve a stale body for an object with a max-age.
+        ...(options.force ? { cache: "reload" as RequestCache } : {}),
+      });
+    } catch (cause) {
+      throw new AlertLibraryError(
+        "network",
+        `Alert library request failed for ${url}: ${(cause as Error).message}`,
+      );
+    }
+
+    if (!response.ok) {
+      throw new AlertLibraryError(
+        "http",
+        `Alert library request failed: ${response.status} for ${url}`,
+      );
+    }
+
+    try {
+      // Rejects on an XML error document served under a 200, which S3 does in
+      // some misconfigurations. The URL is included — without it this surfaces as
+      // a bare "Unexpected token <" with no clue which alert failed.
+      return await response.json();
+    } catch (cause) {
+      // A timeout that fires mid-body aborts the read and lands here. That is a
+      // transport failure, not malformed JSON, and callers switch on the code.
+      throw new AlertLibraryError(
+        controller.signal.aborted ? "network" : "unparseable",
+        controller.signal.aborted
+          ? `Alert library request timed out reading ${url}`
+          : `Alert library response was not JSON for ${url}: ${(cause as Error).message}`,
+      );
+    }
   } finally {
     clearTimeout(timer);
-  }
-
-  if (!response.ok) {
-    throw new AlertLibraryError(
-      "http",
-      `Alert library request failed: ${response.status} for ${url}`,
-    );
-  }
-
-  try {
-    // Rejects on an XML error document served under a 200, which S3 does in
-    // some misconfigurations. The URL is included — without it this surfaces as
-    // a bare "Unexpected token <" with no clue which alert failed.
-    return await response.json();
-  } catch (cause) {
-    throw new AlertLibraryError(
-      "unparseable",
-      `Alert library response was not JSON for ${url}: ${(cause as Error).message}`,
-    );
   }
 }
 
@@ -212,10 +219,7 @@ function assertManifest(value: unknown): asserts value is AlertLibraryManifest {
 
 function assertAlertFile(value: unknown): asserts value is AlertLibraryFile {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new AlertLibraryError(
-      "malformed",
-      "Alert library file is not an alert object",
-    );
+    throw new AlertLibraryError("malformed", "Alert library file is not an alert object");
   }
 }
 
@@ -229,7 +233,12 @@ function assertAlertFile(value: unknown): asserts value is AlertLibraryFile {
 export function toStreamsByType(
   list: Array<{ name?: string; stream_type?: string }> | null | undefined,
 ): StreamsByType {
-  const grouped: StreamsByType = {};
+  // Null-prototype, so a stream_type of "constructor" or "toString" is an
+  // ordinary missing key rather than an inherited function. On a bare `{}` the
+  // `??=` below saw that inherited value as present, skipped the assignment and
+  // called `.add()` on a function — throwing here, before `isReady`'s own
+  // hardening for the same names could ever run.
+  const grouped: StreamsByType = Object.create(null) as StreamsByType;
   for (const stream of list ?? []) {
     if (!stream || typeof stream.name !== "string" || typeof stream.stream_type !== "string") {
       continue;
@@ -261,9 +270,7 @@ export function useAlertLibrary() {
    * the in-flight slot and the browser HTTP cache too. Joining an in-flight
    * request here would make Retry a permanent no-op against a stalled server.
    */
-  const loadManifest = async (
-    options: { force?: boolean } = {},
-  ): Promise<AlertLibraryManifest> => {
+  const loadManifest = async (options: { force?: boolean } = {}): Promise<AlertLibraryManifest> => {
     if (!options.force) {
       if (isManifestFresh()) return cache().manifest as AlertLibraryManifest;
       if (manifestInFlight) return manifestInFlight;
@@ -290,10 +297,14 @@ export function useAlertLibrary() {
 
     try {
       const result = await request;
-      error.value = null;
+      // Only the CURRENT request may speak for the shared error state. Without
+      // this an earlier request that settles late — after a forced retry has
+      // already succeeded — overwrites a cleared error with its own stale
+      // failure, for a response that committed nothing.
+      if (manifestInFlight === request) error.value = null;
       return result;
     } catch (cause) {
-      error.value = cause as AlertLibraryError;
+      if (manifestInFlight === request) error.value = cause as AlertLibraryError;
       throw cause;
     } finally {
       // Only clear the slot if it is still OURS: a forced request may have
@@ -327,10 +338,26 @@ export function useAlertLibrary() {
     const pending = fileInFlight.get(key);
     if (pending) return pending.then((file) => structuredClone(file));
 
+    // Captured before the request starts, so a clear that happens mid-flight
+    // can stop the response writing itself back. `fileInFlight.clear()` alone
+    // only dropped the lookup — the promise kept running and still committed,
+    // repopulating the cache the clear was supposed to have emptied.
+    const startedAt = manifestGeneration;
+
     const request = (async () => {
-      const body = await fetchJson(alertFileUrl(entry.path));
+      // `alertFileUrl` rejects a traversing or absolute path with a bare Error,
+      // and every failure out of this module is expected to carry a `code`.
+      let url: string;
+      try {
+        url = alertFileUrl(entry.path);
+      } catch (cause) {
+        throw new AlertLibraryError("malformed", (cause as Error).message);
+      }
+      const body = await fetchJson(url);
       assertAlertFile(body);
-      store.commit("setAlertLibraryFile", { id: key, file: body });
+      if (startedAt === manifestGeneration) {
+        store.commit("setAlertLibraryFile", { id: key, file: body });
+      }
       return body;
     })();
 

@@ -220,4 +220,34 @@ describe("coerceTunable", () => {
     expect(coerceTunable("period", "soon")).toBe(1);
     expect(coerceTunable("promqlValue", "soon")).toBe(0);
   });
+
+  it("does not invent a promql threshold from an EMPTY promql_condition", () => {
+    // The reader treats {} as "no condition" and shows no threshold row, so the
+    // writer must not emit one either — it used to write { ">=", 0 }, an alert
+    // that fires on every evaluation of any non-negative metric.
+    const file = {
+      query_condition: { type: "promql", promql: "up", promql_condition: {} },
+    } as unknown as AlertLibraryFile;
+
+    const tunables = readTunables(file);
+    expect(tunables.promqlOperator).toBeNull();
+
+    const applied = applyTunables(file, tunables);
+    expect((applied.query_condition as Record<string, unknown>).promql_condition).toEqual({});
+  });
+
+  it("floors numbers that came from the FILE, not just numbers the user typed", () => {
+    // A published period of 0 means "look at 0 minutes of data" and threshold 0
+    // fires every evaluation. Both used to reach install untouched, because the
+    // floors were applied only on the edit path.
+    const file = {
+      trigger_condition: { period: 0, frequency: 0, threshold: 0, silence: -5 },
+    } as unknown as AlertLibraryFile;
+
+    const tunables = readTunables(file);
+    expect(tunables.period).toBe(1);
+    expect(tunables.frequency).toBe(1);
+    expect(tunables.threshold).toBe(1);
+    expect(tunables.silence).toBe(0);
+  });
 });

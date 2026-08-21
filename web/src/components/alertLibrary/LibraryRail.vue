@@ -77,7 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </h2>
 
         <OInput
-          v-model="search"
+          :model-value="search"
+          @update:model-value="emit('update:search', String($event ?? ''))"
           size="sm"
           clearable
           :placeholder="t('alert_library.searchCategories')"
@@ -148,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import type { AcceptableValue } from "reka-ui";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -169,16 +170,21 @@ const props = defineProps<{
   /** Includes the "all" pseudo-facet, built by the caller. */
   severities: LibraryFacet[];
   severity: string;
+  /**
+   * The rail-local list filter. Owned by the page, not by this component, so
+   * its "Clear filters" can reset it — leaving it here meant clearing the
+   * filters left the rail still narrowed by a term nobody had cleared.
+   */
+  search: string;
 }>();
 
 const emit = defineEmits<{
   "update:selectedCategories": [ids: string[]];
   "update:severity": [id: string];
+  "update:search": [term: string];
 }>();
 
 const { t } = useI18nTyped();
-
-const search = ref("");
 
 /**
  * Search matches the LABEL, not the id: the box filters the list you can see,
@@ -188,10 +194,16 @@ const search = ref("");
  * since hiding it would strand the user with a filter they cannot lift.
  */
 const visibleItems = computed(() => {
-  const needle = search.value.trim().toLowerCase();
+  const needle = props.search.trim().toLowerCase();
   return props.categories.filter((item) => {
+    // A ticked row is never hidden — not by the search, not by a zero count.
+    // Both used to remove it: typing "redis" while "kafka" was ticked took the
+    // kafka row off screen while the grid stayed filtered to kafka, leaving a
+    // filter you could see the effect of but not the control for.
+    if (props.selectedCategories.includes(item.id)) return true;
     if (needle && !String(item.label).toLowerCase().includes(needle)) return false;
-    if (item.count === 0 && !props.selectedCategories.includes(item.id)) return false;
+    // A zero-count row filters to nothing, so offering it wastes a click.
+    if (item.count === 0) return false;
     return true;
   });
 });

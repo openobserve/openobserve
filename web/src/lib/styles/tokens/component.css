@@ -581,6 +581,9 @@
   --color-select-bg: var(--color-surface-base);
   /* Same reasoning as --color-input-border: an operable control's edge. */
   --color-select-border: var(--color-border-control);
+  /* Quieted like the input's, so a disabled select does not keep drawing the
+     3:1 edge that means "you can operate this". */
+  --color-select-disabled-border: var(--color-border-default);
   --color-select-border-hover: var(--color-primary-300);
   --color-select-border-focus: var(--color-primary-300);
   --color-select-border-error: var(--color-error-500);

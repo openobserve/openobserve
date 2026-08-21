@@ -364,7 +364,11 @@
        a distinct lighter gray; disabled-bg uses --d-well so disabled fields
        still read as a clearly different, inert surface. */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-default);
+  /* border-control, NOT border-default: this line sits after the
+     --color-border-control definition above and used to override it, so the
+     3:1 fix reached light mode only and dark inputs kept --d-border (#454545
+     on #0d1117 = 1.97:1) — the exact contrast the change existed to fix. */
+  --color-input-border: var(--color-border-control);
   --color-input-disabled-bg: var(--d-well);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-placeholder: var(--color-text-placeholder);
@@ -373,7 +377,8 @@
 
   /* Select (OSelect) — same surface-matching bg + disabled strategy as input. */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-default);
+  /* See --color-input-border above: this override had the same effect. */
+  --color-select-border: var(--color-border-control);
   --color-select-disabled-bg: var(--d-well);
   --color-select-disabled-text: var(--color-text-secondary);
   --color-select-placeholder: var(--color-text-placeholder);

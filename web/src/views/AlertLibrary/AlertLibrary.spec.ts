@@ -439,4 +439,112 @@ describe("AlertLibrary", () => {
     await errorState.findComponent({ name: "OButton" }).trigger("click");
     expect(loadManifest).toHaveBeenCalledWith({ force: true });
   });
+
+  describe("defects found in review", () => {
+    it("shows an em dash, not a ready count, when the stream check failed", async () => {
+      // entryReady answers true while readiness is unknown, so the cards stay
+      // undimmed on purpose — but the strip was making the opposite claim just
+      // as loudly: "Ready to install 4 / Not ingested 0" for an org we know
+      // nothing about.
+      getStreams.mockRejectedValue(new Error("boom"));
+      const wrapper = await mountView();
+      const tiles = wrapper.findAll('[data-test^="alert-library-stat-"]');
+      expect(tiles[0].text()).toContain("—");
+      expect(tiles[1].text()).toContain("—");
+      // The total is a fact about the catalog, not about the org.
+      expect(tiles[2].text()).toContain("4");
+    });
+
+    it("keeps a known verdict when a REFRESH fails, instead of discarding it", async () => {
+      const wrapper = await mountView();
+      expect(wrapper.findAll('[data-test^="alert-library-stat-"]')[1].text()).toContain("1");
+
+      getStreams.mockRejectedValueOnce(new Error("timeout"));
+      const callsBefore = getStreams.mock.calls.length;
+      await wrapper.findComponent({ name: "ORefreshButton" }).vm.$emit("click");
+      await flushPromises();
+      // Guard: without a real refresh this test would assert nothing.
+      expect(getStreams.mock.calls.length).toBe(callsBefore + 1);
+
+      // Still 1 missing: a transient failure must not rewrite what we knew.
+      expect(wrapper.findAll('[data-test^="alert-library-stat-"]')[1].text()).toContain("1");
+      expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').text()).toContain(
+        "Not ingested",
+      );
+    });
+
+    it("counts categories against the OTHER filters, not the whole library", async () => {
+      // Absolute counts advertised rows that filter to nothing: with a search
+      // active the rail still offered a category, and ticking it emptied the grid.
+      const wrapper = await mountView();
+      const facets = () =>
+        wrapper.findComponent({ name: "LibraryRail" }).props("categories") as Array<{
+          id: string;
+          count: number;
+        }>;
+      expect(facets().find((f) => f.id === "node")?.count).toBe(1);
+
+      wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", "OOM killer");
+      await flushPromises();
+      // "node-disk-pressure" does not match, so its category offers nothing.
+      expect(facets().find((f) => f.id === "node")).toBeUndefined();
+      expect(facets().find((f) => f.id === "pod")?.count).toBe(1);
+    });
+
+    it("does not explain an empty grid twice", async () => {
+      // The banner and the no-results state both used to render: two different
+      // explanations for one blank area, the banner citing alerts not on screen.
+      getStreams.mockResolvedValue({ name: "all", list: [] });
+      const wrapper = await mountView();
+      await tickRail(wrapper, "alert-library-rail-category-cert-manager");
+      expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(true);
+
+      await wrapper.find('[data-test="alert-library-stat-ready"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="alert-library-no-results"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(false);
+    });
+
+    it("calls an empty catalog what it is, rather than blaming the filters", async () => {
+      manifestRef.value = { ...manifestFixture, alerts: [] };
+      const wrapper = await mountView();
+      expect(wrapper.find('[data-test="alert-library-empty-catalog"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-library-no-results"]').exists()).toBe(false);
+    });
+
+    it("survives an entry the manifest never validated a title for", async () => {
+      // assertManifest checks five fields; title is not one of them, and the
+      // sort dereferenced it — one bad entry blanked the whole gallery.
+      manifestRef.value = {
+        ...manifestFixture,
+        alerts: [
+          { ...manifestFixture.alerts[0], title: undefined },
+          { ...manifestFixture.alerts[1], severity: "critical", title: undefined },
+        ],
+      } as unknown as AlertLibraryManifest;
+
+      const wrapper = await mountView();
+      expect(wrapper.find('[data-test="alert-library-grid"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("clears the rail's own search box along with the filters", async () => {
+      const wrapper = await mountView();
+      const rail = wrapper.findComponent({ name: "LibraryRail" });
+      await rail.vm.$emit("update:search", "kafka");
+      await flushPromises();
+      expect(rail.props("search")).toBe("kafka");
+
+      wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", "zzzz");
+      await flushPromises();
+      await wrapper
+        .find('[data-test="alert-library-no-results"]')
+        .findComponent({ name: "OButton" })
+        .trigger("click");
+      await flushPromises();
+      expect(rail.props("search")).toBe("");
+    });
+  });
 });

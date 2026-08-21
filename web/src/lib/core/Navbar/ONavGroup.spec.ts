@@ -144,9 +144,18 @@ describe("ONavGroup", () => {
     });
     await hoverOpen();
 
-    const header = flyout().find('[data-test="nav-group-section-h-menu.alerts"]');
+    const header = flyout().find('[data-test^="nav-group-section-label-"]');
     expect(header.exists()).toBe(true);
     expect(header.text()).toBe("Alerts");
+
+    // The run is a real group to assistive tech, named by that heading. A bare
+    // heading div is not a valid child of role="menu" — AT drops it, and the
+    // grouping this exists to convey is silent.
+    const group = flyout().find('[role="group"]');
+    expect(group.exists()).toBe(true);
+    expect(group.attributes("aria-labelledby")).toBe(header.attributes("id"));
+    expect(header.attributes("role")).toBe("presentation");
+    expect(group.findAll('[role="menuitem"]')).toHaveLength(2);
   });
 
   it("sizes the three levels by depth, not against it", async () => {
@@ -171,11 +180,9 @@ describe("ONavGroup", () => {
     expect(classesOf('[data-test="nav-group-item-logstreams"]')).not.toContain("font-semibold");
     // The section header is the one label that steps DOWN, in the secondary
     // colour — it names a run, it is not a thing you click.
-    expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain("text-xs");
-    expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain("font-semibold");
-    expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain(
-      "text-text-secondary",
-    );
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-xs");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("font-semibold");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-text-secondary");
   });
 
   it("heads the run once, not once per child", async () => {
@@ -193,7 +200,7 @@ describe("ONavGroup", () => {
     });
     await hoverOpen();
 
-    expect(flyout().findAll('[data-test^="nav-group-section-"]')).toHaveLength(1);
+    expect(flyout().findAll('[data-test^="nav-group-section-label-"]')).toHaveLength(1);
   });
 
   it("leaves uncategorised children unheaded, so they are not filed under it", async () => {
@@ -209,13 +216,17 @@ describe("ONavGroup", () => {
     await hoverOpen();
 
     const rows = flyout().findAll(
-      '[data-test^="nav-group-section-"], [data-test^="nav-group-item-"]',
+      '[data-test^="nav-group-section-label-"], [data-test^="nav-group-item-"]',
     );
     expect(rows.map((r) => r.attributes("data-test"))).toEqual([
-      "nav-group-section-h-menu.alerts",
+      "nav-group-section-label-h-menu.alerts-0",
       "nav-group-item-logstreams",
       "nav-group-item-pipelines",
     ]);
+    // Outside the group element, not merely after the heading.
+    expect(
+      flyout().find('[role="group"]').find('[data-test="nav-group-item-pipelines"]').exists(),
+    ).toBe(false);
     // And it is visibly outside: a header owns everything below it until
     // something says otherwise, and at the same indent nothing else does.
     expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).toContain("mt-3");

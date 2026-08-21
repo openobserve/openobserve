@@ -120,30 +120,51 @@ const visibleChildren = computed(() =>
   }),
 );
 
-// Flatten into render rows, inserting a category header whenever the category
-// changes (mirrors the sub-page's grouped section nav). Items with no category
-// render flat (e.g. the Data group).
-type Row =
-  | { kind: "header"; key: string; labelKey: I18nKey }
-  | { kind: "item"; key: string; child: SubnavChild; spaced?: boolean };
-const flyoutRows = computed<Row[]>(() => {
-  const rows: Row[] = [];
-  let lastCat: I18nKey | undefined;
+/**
+ * Blocks, not a flat row list, so the grouping is real to assistive tech.
+ *
+ * A bare heading <div> is not a valid child of `role="menu"` — AT drops or
+ * mis-places it — so a screen-reader user arrowing down heard all seven
+ * Reliability items as one flat list: exactly the structure the header exists
+ * to convey. Each headed run is now a `role="group"` labelled by its heading,
+ * and the heading itself is `role="presentation"` (it is named via
+ * aria-labelledby, not walked as a menu child).
+ */
+type Block =
+  | { kind: "group"; key: string; labelId: string; labelKey: I18nKey; children: SubnavChild[] }
+  | { kind: "item"; key: string; child: SubnavChild; spaced: boolean };
+
+const childKey = (child: SubnavChild) => `${child.name}-${child.tab ?? ""}`;
+
+const flyoutBlocks = computed<Block[]>(() => {
+  const blocks: Block[] = [];
+  let open: Extract<Block, { kind: "group" }> | null = null;
+
   for (const child of visibleChildren.value) {
+    if (child.categoryKey) {
+      if (!open || open.labelKey !== child.categoryKey) {
+        // Indexed, so two non-adjacent runs sharing a key cannot collide on
+        // the same `:key` within one v-for.
+        const key: string = `h-${child.categoryKey}-${blocks.length}`;
+        open = {
+          kind: "group",
+          key,
+          labelId: `${props.groupKey}-${key}`,
+          labelKey: child.categoryKey,
+          children: [],
+        };
+        blocks.push(open);
+      }
+      open.children.push(child);
+      continue;
+    }
     // An item that LEAVES a headed run needs a gap, or it reads as the last
     // member of that run: a header owns everything below it until something
     // says otherwise, and at the same indent nothing else does.
-    let spaced = false;
-    if (child.categoryKey && child.categoryKey !== lastCat) {
-      rows.push({ kind: "header", key: `h-${child.categoryKey}`, labelKey: child.categoryKey });
-      lastCat = child.categoryKey;
-    } else if (!child.categoryKey) {
-      spaced = lastCat !== undefined;
-      lastCat = undefined;
-    }
-    rows.push({ kind: "item", key: `i-${child.name}-${child.tab ?? ""}`, child, spaced });
+    blocks.push({ kind: "item", key: `i-${childKey(child)}`, child, spaced: open !== null });
+    open = null;
   }
-  return rows;
+  return blocks;
 });
 
 // Hover open/close are debounced so brushing past the tile or crossing the
@@ -452,39 +473,73 @@ function onChildMouseenter(event: MouseEvent) {
         <div class="px-3 pt-1.5 pb-1 text-sm font-semibold" :class="flyoutTextClass">
           {{ title }}
         </div>
-        <template v-for="(row, rowIndex) in flyoutRows" :key="row.key">
+        <template v-for="(block, blockIndex) in flyoutBlocks" :key="block.key">
+          <!-- A labelled group: the heading names it via aria-labelledby and is
+               itself presentational, because a bare <div> is not a valid child
+               of role="menu" and AT drops it. -->
           <div
-            v-if="row.kind === 'header'"
-            class="text-text-secondary px-3 pb-1 text-xs font-semibold"
-            :class="rowIndex === 0 ? 'pt-2' : 'pt-4'"
-            :data-test="`nav-group-section-${row.key}`"
+            v-if="block.kind === 'group'"
+            role="group"
+            :aria-labelledby="block.labelId"
+            :data-test="`nav-group-section-${block.key}`"
           >
-            {{ t(row.labelKey) }}
+            <div
+              :id="block.labelId"
+              role="presentation"
+              :data-test="`nav-group-section-label-${block.key}`"
+              class="text-text-secondary px-3 pb-1 text-xs font-semibold"
+              :class="blockIndex === 0 ? 'pt-2' : 'pt-4'"
+            >
+              {{ t(block.labelKey) }}
+            </div>
+            <router-link
+              v-for="child in block.children"
+              :key="childKey(child)"
+              :data-test="childDataTest(child)"
+              role="menuitem"
+              :to="childTo(child)"
+              class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2"
+              :class="[
+                flyoutTextClass,
+                isChildActive(child)
+                  ? 'bg-select-item-selected-bg font-medium'
+                  : 'hover:bg-dropdown-item-hover-bg',
+              ]"
+              :aria-current="isChildActive(child) ? 'page' : undefined"
+              @click="onChildClick"
+              @mouseenter="onChildMouseenter"
+            >
+              <!-- Icon color is locked to the text color so it never picks up a
+                   primary tint via currentColor inheritance. -->
+              <OIcon :name="child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
+              <span class="leading-none">{{
+                child.title ? raw(child.title) : t(child.titleKey)
+              }}</span>
+            </router-link>
           </div>
+
           <router-link
             v-else
-            :data-test="childDataTest(row.child)"
+            :data-test="childDataTest(block.child)"
             role="menuitem"
-            :to="childTo(row.child)"
+            :to="childTo(block.child)"
             class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2"
             :class="[
               flyoutTextClass,
               // Matches the pt-4 a header gets, so leaving a run and starting
               // one look like the same size of break.
-              row.spaced ? 'mt-3' : '',
-              isChildActive(row.child)
+              block.spaced ? 'mt-3' : '',
+              isChildActive(block.child)
                 ? 'bg-select-item-selected-bg font-medium'
                 : 'hover:bg-dropdown-item-hover-bg',
             ]"
-            :aria-current="isChildActive(row.child) ? 'page' : undefined"
+            :aria-current="isChildActive(block.child) ? 'page' : undefined"
             @click="onChildClick"
             @mouseenter="onChildMouseenter"
           >
-            <!-- Icon color is locked to the text color so it never picks up a
-                 primary tint via currentColor inheritance. -->
-            <OIcon :name="row.child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
+            <OIcon :name="block.child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
             <span class="leading-none">{{
-              row.child.title ? raw(row.child.title) : t(row.child.titleKey)
+              block.child.title ? raw(block.child.title) : t(block.child.titleKey)
             }}</span>
           </router-link>
         </template>

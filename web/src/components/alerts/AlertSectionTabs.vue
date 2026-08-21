@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   AlertSectionTabs — the section switcher across the four alerting siblings
-  (Alerts / Library / Destinations / Templates), rendered in an OPageLayout's
-  #header-tabs slot on each of them.
+  (All Alerts / Destinations / Templates / Library), rendered in an
+  OPageLayout's #header-tabs slot on each of them. Same order as the rail's
+  Reliability flyout.
 
   The routes stay FLAT top-level siblings (see shared/router.ts) — this is
   presentation, not nesting. Modelled on PipelineSectionTabs, which already

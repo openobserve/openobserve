@@ -452,7 +452,9 @@ describe("useAlertLibrary — loadAlertFile", () => {
     // Same requirement as the manifest: the store is the cache. A module-scope
     // Map that is written through to Vuex but never read back passes every
     // other test in this block.
-    mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed@1c09e8f6ac33"] = { name: "from-store" };
+    mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed@1c09e8f6ac33"] = {
+      name: "from-store",
+    };
 
     const file = await useAlertLibrary().loadAlertFile(entry());
 
@@ -528,7 +530,9 @@ describe("useAlertLibrary — loadAlertFile", () => {
 
     await expect(useAlertLibrary().loadAlertFile(entry())).rejects.toThrow();
     expect(committedTypes()).not.toContain("setAlertLibraryFile");
-    expect(mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed@1c09e8f6ac33"]).toBeUndefined();
+    expect(
+      mockStore.state.alertLibrary.fileCache["k8s/pod_oom_killed@1c09e8f6ac33"],
+    ).toBeUndefined();
   });
 
   it("rejects when the network call itself fails", async () => {
@@ -593,7 +597,9 @@ describe("useAlertLibrary — isReady", () => {
   });
 
   it("is not ready when the required stream is absent", () => {
-    expect(useAlertLibrary().isReady(entry(), streams({ metrics: ["something_else"] }))).toBe(false);
+    expect(useAlertLibrary().isReady(entry(), streams({ metrics: ["something_else"] }))).toBe(
+      false,
+    );
   });
 
   it("does not match a stream of the wrong type", () => {
@@ -643,9 +649,15 @@ describe("useAlertLibrary — isReady", () => {
     // isReady runs once per card across 87 cards — a throw here blanks the
     // whole gallery, so it must degrade to "not ready" instead.
     const available = streams({ metrics: ["kube_pod_container_status_terminated_reason"] });
-    expect(() => useAlertLibrary().isReady(entry({ required_streams: undefined }), available)).not.toThrow();
-    expect(useAlertLibrary().isReady(entry({ required_streams: undefined }), available)).toBe(false);
-    expect(useAlertLibrary().isReady(entry({ required_streams: "a_string" }), available)).toBe(false);
+    expect(() =>
+      useAlertLibrary().isReady(entry({ required_streams: undefined }), available),
+    ).not.toThrow();
+    expect(useAlertLibrary().isReady(entry({ required_streams: undefined }), available)).toBe(
+      false,
+    );
+    expect(useAlertLibrary().isReady(entry({ required_streams: "a_string" }), available)).toBe(
+      false,
+    );
   });
 
   it("does not throw on a prototype-named stream_type", () => {
@@ -675,5 +687,50 @@ describe("useAlertLibrary — isReady", () => {
     useAlertLibrary().isReady(entry(), available);
 
     expect(available.metrics).toEqual(new Set(["kube_pod_container_status_terminated_reason"]));
+  });
+
+  describe("hardening found in review", () => {
+    it("keeps the timeout armed while the BODY is read, not just the headers", async () => {
+      // fetch settles on headers, so clearing the timer after it disarmed the
+      // abort before .json() had read a byte. A 200 that then stalled left this
+      // promise pending forever: isLoading stuck true, the in-flight slot
+      // occupied, and the gallery on its skeleton with no error and no retry.
+      vi.useFakeTimers();
+      fetchMock.mockImplementationOnce((_url: string, init: { signal: AbortSignal }) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init.signal.addEventListener("abort", () =>
+                reject(new DOMException("Aborted", "AbortError")),
+              );
+            }),
+        }),
+      );
+
+      const library = useAlertLibrary();
+      const pending = library.loadManifest();
+      const settled = pending.catch((error) => error);
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      const error = await settled;
+      expect(error).toBeInstanceOf(Error);
+      // A timeout is a transport failure, not malformed JSON.
+      expect((error as { code?: string }).code).toBe("network");
+      expect(library.isLoading.value).toBe(false);
+      vi.useRealTimers();
+    });
+
+    it("classifies a rejected path as a coded error, not a bare Error", async () => {
+      // Every failure out of this module carries a code; callers switch on it.
+      const library = useAlertLibrary();
+      const error = await library
+        .loadAlertFile(entry({ path: "../../../etc/passwd" }) as never)
+        .catch((cause) => cause);
+
+      expect((error as { code?: string }).code).toBe("malformed");
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 });
