@@ -2297,7 +2297,13 @@ mod tests {
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn enterprise_read_endpoints_are_forbidden_on_oss() {
-        use axum::http::StatusCode;
+        use axum::{extract::Path, http::StatusCode};
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::auth::UserEmail;
+
+        use crate::request::db_monitoring::handler::{
+            get_dbm_blocking, get_dbm_deadlocks, get_dbm_table_health,
+        };
 
         let org = || Path("default".to_string());
         let user = || {
