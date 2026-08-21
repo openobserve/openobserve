@@ -346,18 +346,7 @@ describe("OnCallResponses", () => {
     }
   });
 
-  describe("the standing summary", () => {
-    /// The strip answers a question the list answers per row, and it has no
-    /// answer at all on an org that has never paged — so it waits until there
-    /// is something to describe.
-    it("stays hidden while setup owns the screen", async () => {
-      const wrapper = render();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallNowStrip" }).exists()).toBe(false);
-    });
-
+  describe("the ringing run", () => {
     /// "Is anything waiting on a person" is the ringing section of the list
     /// itself, not a second count above it — so a page somebody has claimed
     /// leaves that run rather than being subtracted from a separate total.
@@ -367,20 +356,6 @@ describe("OnCallResponses", () => {
       ]);
 
       expect(sections(wrapper)).toEqual({ handled: 1 });
-    });
-
-    it("hands the on-call strip each team's rotation", async () => {
-      const position = {
-        rotation_id: "rot_primary",
-        rotation_name: "Primary",
-        rule: "Base",
-        user_email: "ana@o2.ai",
-      };
-      service.whoIsOnCall.mockResolvedValue({ data: [position] } as any);
-      const wrapper = await withPages([page()]);
-
-      const strip = wrapper.findComponent({ name: "OnCallNowStrip" });
-      expect(strip.props("positionsByTeam")).toEqual({ team_1: [position] });
     });
   });
 

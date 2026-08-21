@@ -205,31 +205,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div v-else class="flex w-full flex-wrap items-center gap-2">
-          <!-- The standing question, on the same row as the filters that narrow
-               the list which answers it per row: would a page reach anyone.
-               It had a strip of its own above the toolbar, which spent a whole
-               line of the first screen on a button and a count.
-
-               "Is anything waiting on a person" used to be a banner here as
-               well. The ringing run is the first section of the list directly
-               below, with the same count and the same acknowledge-all on its
-               heading, so the banner was that heading said twice — and its
-               count was taken before the stat filter, so a filtered list could
-               disagree with it. -->
-          <OnCallNowStrip
-            v-if="setupLoaded"
-            :teams="teams"
-            :positions-by-team="positionsByTeam"
-            :handover-by-team="handoverByTeam"
-            :viewer-email="viewerEmail"
-            @view-schedules="goTo('onCallTeams')"
-            @view-team="openTeam"
-          />
-          <!-- Same rule as the header row: what follows narrows this list, what
-               precedes it does not. Who is on call right now is a standing fact
-               with a menu behind it, and sitting flush against the team filter
-               it read as the first of the filters. -->
-          <OSeparator v-if="setupLoaded" vertical class="mx-1 self-stretch" />
           <!-- `width` is a PROP, not a class: OSelect merges an incoming class
                with its own width class, so a `w-56` here lost to the default
                `w-full` and stacked the whole toolbar into three rows. -->
@@ -704,7 +679,6 @@ import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
-import OnCallNowStrip from "@/components/oncall/OnCallNowStrip.vue";
 import OnCallPageContext from "@/components/oncall/OnCallPageContext.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
