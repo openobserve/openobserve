@@ -12,9 +12,11 @@
 -->
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-schedule-editor">
-    <OText variant="body"
+    <OText
+      variant="body"
       v-if="!drawerOnly && !props.members.length"
-      data-test="oncall-schedule-no-members">
+      data-test="oncall-schedule-no-members"
+    >
       {{ t("oncall.scheduleNeedsMembers") }}
     </OText>
 
@@ -119,17 +121,18 @@
       </div>
     </template>
 
-    <!-- Editing gets room and a preview rather than expanding the page. -->
+    <!-- Editing gets room and a preview rather than expanding the page. The
+         wide panel is what lets a shift rule read as one row of decisions
+         instead of a column of wrapped paragraphs. -->
     <ODrawer
       v-model:open="editing"
+      size="xl"
       :title="isNew ? t('oncall.rotationAddTitle') : t('oncall.rotationTitle')"
       :subtitle="t('oncall.rotationDrawerHint')"
       data-test="oncall-rotation-drawer"
     >
       <div v-if="active" class="flex flex-col gap-6">
-        <section class="flex flex-col gap-4">
-          <OText variant="section">{{ t("oncall.rotationSectionWhat") }}</OText>
-
+        <div class="flex flex-col gap-1.5">
           <OInput
             v-model="active.name"
             :label="t('oncall.rotationName')"
@@ -140,23 +143,23 @@
 
           <p
             v-if="nameClash"
-            class="text-status-warning-text text-sm"
+            class="text-status-warning-text text-xs"
             data-test="oncall-schedule-name-clash"
           >
             {{ nameClash }}
           </p>
-        </section>
+        </div>
 
-        <!-- The rules. One is the ordinary case and reads as the whole form;
-             several is follow-the-sun, which had no editor at all — a rotation
-             the API had restricted rendered here as if it applied always. -->
+        <!-- The rules. One is the ordinary case and reads as the whole form, so
+             it gets no heading and no card of its own; several is
+             follow-the-sun, and only then does each rule need naming and
+             framing to be told apart. -->
         <section class="flex flex-col gap-4">
-          <OText variant="section">{{ t("oncall.rotationSectionRules") }}</OText>
-          <OText variant="body">{{ t("oncall.rotationRulesHint") }}</OText>
+          <OText v-if="multiRule" variant="section">{{ t("oncall.rotationSectionRules") }}</OText>
 
           <p
             v-if="!active.shift_rules.length"
-            class="text-status-warning-text text-sm"
+            class="text-status-warning-text text-xs"
             data-test="oncall-rotation-needs-rules"
           >
             {{ t("oncall.rotationNeedsRules") }}
@@ -165,11 +168,13 @@
           <div
             v-for="(rule, ruleIndex) in active.shift_rules"
             :key="ruleIndex"
-            class="border-border-default rounded-surface flex flex-col gap-4 border p-4"
+            class="flex flex-col gap-4"
+            :class="multiRule ? 'border-border-default rounded-surface border p-4' : ''"
             :data-test="`oncall-schedule-rule-${ruleIndex}`"
           >
-            <div class="flex flex-wrap items-end gap-3">
+            <div v-if="multiRule || isRetired(rule)" class="flex flex-wrap items-end gap-3">
               <OInput
+                v-if="multiRule"
                 v-model="rule.name"
                 class="min-w-0 flex-1"
                 :label="t('oncall.shiftRuleName')"
@@ -179,15 +184,14 @@
                 {{ t("oncall.rotationRetiredOnDate", { date: raw(shortDate(rule.ends_at ?? 0)) }) }}
               </OTag>
               <OButton
-                v-if="active.shift_rules.length > 1"
+                v-if="multiRule"
                 variant="ghost"
-                size="sm-action"
+                size="icon-sm"
                 icon-left="delete-outline"
+                :aria-label="t('oncall.removeShiftRule')"
                 :data-test="`oncall-schedule-rule-remove-${ruleIndex}`"
                 @click="removeRule(ruleIndex)"
-              >
-                {{ t("oncall.removeShiftRule") }}
-              </OButton>
+              />
             </div>
 
             <!-- The picker draws from the team roster, so on an empty team it
@@ -195,10 +199,10 @@
                  nothing. -->
             <div
               v-if="!props.members.length"
-              class="border-border-default rounded-surface flex flex-wrap items-center gap-3 border p-3"
+              class="border-border-default rounded-default flex flex-wrap items-center gap-3 border p-3"
               data-test="oncall-rotation-no-members"
             >
-              <span class="text-text-secondary min-w-0 flex-1 text-sm">
+              <span class="text-text-secondary min-w-0 flex-1 text-xs">
                 {{ t("oncall.scheduleNeedsMembers") }}
               </span>
               <OButton
@@ -228,20 +232,18 @@
                  store nothing. Said next to the pick that fixes it. -->
             <p
               v-if="!rule.members.length"
-              class="text-status-warning-text text-sm"
+              class="text-status-warning-text text-xs"
               :data-test="`oncall-rotation-needs-people-${ruleIndex}`"
             >
               {{ t("oncall.rotationNeedsPeople") }}
             </p>
 
             <!-- Catching this while somebody is still looking at the rotation
-                 is the entire value; catching it at 3am is not. The rota will
-                 pass the shift on — the warning is that the order will not be
-                 the one being written here. -->
+                 is the entire value; catching it at 3am is not. -->
             <p
               v-for="clash in awayClashesFor(rule)"
               :key="clash.id"
-              class="text-status-warning-text text-sm"
+              class="text-status-warning-text text-xs"
               :data-test="`oncall-schedule-away-${clash.user_email}`"
             >
               {{
@@ -253,7 +255,10 @@
               }}
             </p>
 
-            <div class="flex flex-wrap items-end gap-3">
+            <!-- Cadence and anchor are one decision — "every week, starting
+                 then" — so they sit on one row rather than reading as two
+                 unrelated questions. -->
+            <div class="grid gap-3 sm:grid-cols-2">
               <OSelect
                 v-model="rule.shift_micros"
                 :label="t('oncall.shiftLength')"
@@ -273,121 +278,144 @@
               />
             </div>
 
-            <OText variant="body">{{ t("oncall.rotationRestrictionHint") }}</OText>
-
-            <div
-              v-for="(window, index) in rule.restrictions ?? []"
-              :key="index"
-              class="border-border-default rounded-surface flex flex-wrap items-end gap-3 border p-3"
-              :data-test="`oncall-schedule-restriction-${ruleIndex}-${index}`"
+            <!-- Restricting the hours, ranking two rules and retiring one are
+                 what a follow-the-sun setup needs and what an ordinary rotation
+                 never touches, so they are folded away — and unfolded already
+                 when this rule is one of the ones using them. -->
+            <OCollapsible
+              :label="t('oncall.rotationSectionApplies')"
+              :caption="t('oncall.rotationSectionAppliesCaption')"
+              :default-open="usesAdvanced(rule)"
+              :data-test="`oncall-schedule-advanced-${ruleIndex}`"
             >
-              <OSelect
-                :model-value="window.days"
-                multiple
-                :label="t('oncall.rotationRestrictionDays')"
-                :options="dayOptions"
-                width="sm"
-                :data-test="`oncall-schedule-restriction-days-${ruleIndex}-${index}`"
-                @update:model-value="(v: unknown) => (window.days = (v as number[]) ?? [])"
-              />
-              <OSelect
-                :model-value="window.start_minute"
-                :label="t('oncall.rotationRestrictionFrom')"
-                :options="minuteOptions"
-                width="xs"
-                :data-test="`oncall-schedule-restriction-from-${ruleIndex}-${index}`"
-                @update:model-value="(v: unknown) => (window.start_minute = Number(v))"
-              />
-              <OSelect
-                :model-value="window.end_minute"
-                :label="t('oncall.rotationRestrictionTo')"
-                :options="minuteOptions"
-                width="xs"
-                :data-test="`oncall-schedule-restriction-to-${ruleIndex}-${index}`"
-                @update:model-value="(v: unknown) => (window.end_minute = Number(v))"
-              />
-              <OButton
-                variant="ghost"
-                size="sm-action"
-                icon-left="delete-outline"
-                :data-test="`oncall-schedule-restriction-remove-${ruleIndex}-${index}`"
-                @click="removeRestriction(rule, index)"
-              >
-                {{ t("oncall.rotationRestrictionRemove") }}
-              </OButton>
-            </div>
+              <div class="flex flex-col gap-4 px-2 pt-2 pb-1">
+                <!-- Hours: the windows and the button that adds one are one
+                     idea, so they sit together under one hint. -->
+                <div class="flex flex-col gap-2">
+                  <OText variant="meta">{{ t("oncall.rotationRestrictionHint") }}</OText>
 
-            <div class="flex flex-wrap items-end gap-3">
-              <OButton
-                variant="outline"
-                size="sm-action"
-                icon-left="add"
-                :data-test="`oncall-schedule-restriction-add-${ruleIndex}`"
-                @click="addRestriction(rule)"
-              >
-                {{ t("oncall.rotationRestrictionAdd") }}
-              </OButton>
+                  <div
+                    v-for="(window, index) in rule.restrictions ?? []"
+                    :key="index"
+                    class="border-border-default rounded-default grid items-end gap-3 border p-3 sm:grid-cols-[1fr_auto_auto_auto]"
+                    :data-test="`oncall-schedule-restriction-${ruleIndex}-${index}`"
+                  >
+                    <OSelect
+                      :model-value="window.days"
+                      multiple
+                      :label="t('oncall.rotationRestrictionDays')"
+                      :options="dayOptions"
+                      :data-test="`oncall-schedule-restriction-days-${ruleIndex}-${index}`"
+                      @update:model-value="(v: unknown) => (window.days = (v as number[]) ?? [])"
+                    />
+                    <OSelect
+                      :model-value="window.start_minute"
+                      :label="t('oncall.rotationRestrictionFrom')"
+                      :options="minuteOptions"
+                      width="xs"
+                      :data-test="`oncall-schedule-restriction-from-${ruleIndex}-${index}`"
+                      @update:model-value="(v: unknown) => (window.start_minute = Number(v))"
+                    />
+                    <OSelect
+                      :model-value="window.end_minute"
+                      :label="t('oncall.rotationRestrictionTo')"
+                      :options="minuteOptions"
+                      width="xs"
+                      :data-test="`oncall-schedule-restriction-to-${ruleIndex}-${index}`"
+                      @update:model-value="(v: unknown) => (window.end_minute = Number(v))"
+                    />
+                    <OButton
+                      variant="ghost"
+                      size="icon-sm"
+                      icon-left="delete-outline"
+                      :aria-label="t('oncall.rotationRestrictionRemove')"
+                      :data-test="`oncall-schedule-restriction-remove-${ruleIndex}-${index}`"
+                      @click="removeRestriction(rule, index)"
+                    />
+                  </div>
 
-              <!-- Two rules of the SAME rotation that both apply and share a
-                   priority are "equally in force", and the server refuses the
-                   WHOLE save — taking the rotation that already worked down
-                   with the edit. Across rotations it is not a clash at all:
-                   they resolve independently. -->
-              <OSelect
-                :model-value="rule.priority ?? 0"
-                :label="t('oncall.rotationPriority')"
-                :help-text="t('oncall.rotationPriorityHint')"
-                :options="priorityOptions"
-                width="sm"
-                :data-test="`oncall-schedule-priority-${ruleIndex}`"
-                @update:model-value="(v: unknown) => (rule.priority = Number(v))"
-              />
-            </div>
+                  <div class="flex">
+                    <OButton
+                      variant="outline"
+                      size="sm-action"
+                      icon-left="add"
+                      :data-test="`oncall-schedule-restriction-add-${ruleIndex}`"
+                      @click="addRestriction(rule)"
+                    >
+                      {{ t("oncall.rotationRestrictionAdd") }}
+                    </OButton>
+                  </div>
+                </div>
+
+                <!-- Two rules of the SAME rotation that both apply and share a
+                     priority are "equally in force", and the server refuses the
+                     WHOLE save. A lone rule has nothing to compete with, so it
+                     is not asked the question at all. -->
+                <template v-if="multiRule">
+                  <OSeparator />
+                  <OSelect
+                    :model-value="rule.priority ?? 0"
+                    :label="t('oncall.rotationPriority')"
+                    :help-text="t('oncall.rotationPriorityHint')"
+                    :options="priorityOptions"
+                    width="sm"
+                    :data-test="`oncall-schedule-priority-${ruleIndex}`"
+                    @update:model-value="(v: unknown) => (rule.priority = Number(v))"
+                  />
+                </template>
+
+                <OSeparator />
+
+                <!-- Retiring a rule, rather than deleting it. Delete was the only
+                     way to stop one and it threw away the record of who had been
+                     covering those hours. -->
+                <div class="flex flex-col gap-1.5">
+                  <OCheckbox
+                    :model-value="isRetired(rule)"
+                    :label="t('oncall.rotationRetire')"
+                    :data-test="`oncall-schedule-retire-${ruleIndex}`"
+                    @update:model-value="(on: CheckboxModelValue) => setRetired(rule, !!on)"
+                  />
+                  <OText variant="meta">{{ t("oncall.rotationRetireHint") }}</OText>
+                  <OInput
+                    v-if="isRetired(rule)"
+                    type="datetime-local"
+                    width="md"
+                    class="pt-1"
+                    :model-value="retiredAtLocal(rule)"
+                    :label="t('oncall.rotationRetiredOn')"
+                    :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(props.timezone) })"
+                    :data-test="`oncall-schedule-retire-at-${ruleIndex}`"
+                    @update:model-value="(v: string | number) => setRetiredAt(rule, v)"
+                  />
+                </div>
+              </div>
+            </OCollapsible>
+
+            <!-- Outside the fold on purpose: this one BLOCKS the save, and a
+                 reason for a dead Save button hidden behind a disclosure is how
+                 somebody concludes the form is broken. -->
             <p
               v-if="priorityClashFor(rule)"
-              class="text-status-warning-text text-sm"
+              class="text-status-warning-text text-xs"
               :data-test="`oncall-schedule-priority-clash-${ruleIndex}`"
             >
               {{ priorityClashFor(rule) }}
             </p>
 
-            <!-- Retiring a rule, rather than deleting it. Delete was the only
-                 way to stop one and it threw away the record of who had been
-                 covering those hours, so "the weekend rule ran until March"
-                 stopped being something the schedule could say. -->
-            <div class="flex flex-col gap-2">
-              <OCheckbox
-                :model-value="isRetired(rule)"
-                :label="t('oncall.rotationRetire')"
-                :data-test="`oncall-schedule-retire-${ruleIndex}`"
-                @update:model-value="(on: CheckboxModelValue) => setRetired(rule, !!on)"
-              />
-              <OText variant="meta">{{ t("oncall.rotationRetireHint") }}</OText>
-              <OInput
-                v-if="isRetired(rule)"
-                type="datetime-local"
-                width="md"
-                :model-value="retiredAtLocal(rule)"
-                :label="t('oncall.rotationRetiredOn')"
-                :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(props.timezone) })"
-                :data-test="`oncall-schedule-retire-at-${ruleIndex}`"
-                @update:model-value="(v: string | number) => setRetiredAt(rule, v)"
-              />
-            </div>
-
             <!-- The answer this rule produces. A cadence and an anchor are not
                  readable as a rota until you see the dates they generate. -->
-            <div class="flex flex-col gap-2">
+            <div class="border-border-default flex flex-col gap-2 border-t pt-4">
               <OText variant="section">{{ t("oncall.upcoming") }}</OText>
 
               <div
                 v-if="rule.members.length"
-                class="border-border-default rounded-surface flex flex-col divide-y divide-border-default border"
+                class="border-border-default divide-border-default rounded-default flex flex-col divide-y border"
               >
                 <div
                   v-for="shift in preview(rule)"
                   :key="shift.startMicros"
-                  class="flex flex-wrap items-center gap-2 px-3 py-2"
+                  class="flex flex-wrap items-center gap-2 px-3 py-1.5"
                   data-test="oncall-schedule-preview-shift"
                 >
                   <OUserCell :value="shift.member" />
@@ -400,13 +428,15 @@
 
               <!-- An empty preview is the most common state of a NEW rule, and
                    saying why beats showing nothing. -->
-              <OText variant="body" v-else data-test="oncall-schedule-preview-empty">
+              <OText variant="meta" v-else data-test="oncall-schedule-preview-empty">
                 {{ t("oncall.rotationPreviewEmpty") }}
               </OText>
             </div>
           </div>
 
-          <div class="flex">
+          <!-- The one place the second-rule idea is worth explaining is next to
+               the button that creates one. -->
+          <div class="flex flex-wrap items-center gap-3">
             <OButton
               variant="outline"
               size="sm-action"
@@ -416,10 +446,10 @@
             >
               {{ t("oncall.addShiftRule") }}
             </OButton>
+            <OText variant="meta" class="min-w-0 flex-1">{{ t("oncall.rotationRulesHint") }}</OText>
           </div>
         </section>
       </div>
-
       <template #footer>
         <div class="flex items-center gap-2">
           <!-- The only home deletion has now that the bulk table is not on the
@@ -460,6 +490,8 @@ import { useStore } from "vuex";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
@@ -592,6 +624,16 @@ const columns = computed<OTableColumnDef<Rotation>[]>(() => [
 const dirty = computed(
   () => JSON.stringify(draft.value) !== JSON.stringify(props.schedule?.rotations ?? []),
 );
+
+/// One rule IS the rotation, so it needs no name, no frame and no heading of
+/// its own; several are follow-the-sun and only then have to be told apart.
+const multiRule = computed(() => (active.value?.shift_rules.length ?? 0) > 1);
+
+/// Whether this rule already uses anything behind the fold — an unfolded
+/// section is how a restriction the API wrote stops being invisible.
+function usesAdvanced(rule: ShiftRule): boolean {
+  return (rule.restrictions?.length ?? 0) > 0 || (rule.priority ?? 0) !== 0 || isRetired(rule);
+}
 
 /// A rotation the user has not saved yet: the drawer says "Add", and its empty
 /// preview is expected rather than a fault.

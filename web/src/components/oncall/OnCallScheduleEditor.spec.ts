@@ -86,6 +86,9 @@ const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
+  // Always renders its slot: the fold is a display choice, and these tests are
+  // about what the rule stores, not about whether the section is open.
+  OCollapsible: { name: "OCollapsible", template: "<div><slot /></div>" },
   OButton: {
     name: "OButton",
     props: ["disabled"],
