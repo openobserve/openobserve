@@ -152,11 +152,11 @@ struct RecentIngestedTraceStream {
 // ─── SQL builders (pure — unit-tested against exact strings) ─────────────────
 //
 // **No builder here spells a `_timestamp` bound**, and none elsewhere in DBM
-// does either ([`super::api::build_stats_sql`] included). The window travels in
-// the request payload: every string here is executed through [`run_dbm_search`],
-// which puts `(start_time, end_time)` on `config::meta::search::Query`, and the
-// planner pushes that down as a physical `_timestamp >= start AND _timestamp <
-// end` FilterExec attached to EACH scan
+// does either (`build_stats_sql` in the api-management read layer included).
+// The window travels in the request payload: every string here is executed
+// through [`run_dbm_search`], which puts `(start_time, end_time)` on
+// `config::meta::search::Query`, and the planner pushes that down as a physical
+// `_timestamp >= start AND _timestamp < end` FilterExec attached to EACH scan
 // (`search/src/datafusion/table_provider/helpers.rs`) — per table alias, so even
 // a self-join is bounded on both sides. An inline copy would be a second literal
 // window to keep in sync by hand with nothing checking it: `Sql::time_range` is
@@ -164,9 +164,10 @@ struct RecentIngestedTraceStream {
 // and nothing parses the window back out of the WHERE clause, so inline text can
 // never narrow the scan.
 //
-// The stats family wants `(start, end]` over rows stamped at the window END,
+// The stats family wants `(start, end)` over rows stamped at the window END,
 // which is not the payload's interval; that shift is applied to the PAYLOAD, in
-// [`super::api::stats_read_range`].
+// `stats_read_range` (openobserve-api-management:
+// request/db_monitoring/service/common.rs).
 
 /// The shared §5.1 metric block: batch-aware statement count, call/error
 /// counts, total/percentile/max latency (ns — `start_time`/`end_time` are
