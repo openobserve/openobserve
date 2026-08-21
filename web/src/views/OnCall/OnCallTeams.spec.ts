@@ -183,29 +183,40 @@ describe("OnCallTeams", () => {
 
   /// The gap that used to hide: a team whose secondary is staffed but whose
   /// primary is empty filled the single shared cell and read as covered.
-  it("flags a missing primary even when the secondary is staffed", async () => {
+  /// **A rotation that resolves to nobody is ABSENT from the response**, so an
+  /// empty array is the coverage gap — there is no "primary slot with a null
+  /// holder" to look for. A team whose only rotation has a gap answers `[]`,
+  /// and that is the page's one alarm.
+  it("flags a team with nobody on call at all", async () => {
     service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-    service.whoIsOnCall.mockResolvedValue({
-      data: [{ slot: "secondary", rotation: "r1", user_email: "backup@example.com" }],
-    } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
 
     const wrapper = render();
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-teams-primary-gap-team_1"]').exists()).toBe(true);
-    expect(onCallCell(wrapper).findComponent({ name: "OUserCell" }).props("value")).toBe(
-      "backup@example.com",
-    );
   });
 
-  /// `slot` is an open vocabulary, so two fixed columns must not silently drop
-  /// the third pool a team declared.
-  it("keeps a pool neither column is named after", async () => {
+  /// Two fixed columns must not silently drop a third rotation a team declared.
+  /// The split is by POSITION in the response — there is no slot keyword left —
+  /// so the first entry fills the first column and everything else stays on the
+  /// page beside it.
+  it("keeps a rotation neither column is named after", async () => {
     service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
     service.whoIsOnCall.mockResolvedValue({
       data: [
-        { slot: "primary", rotation: "r1", user_email: "primary@example.com" },
-        { slot: "db-oncall", rotation: "r2", user_email: "dba@example.com" },
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "Base",
+          user_email: "primary@example.com",
+        },
+        {
+          rotation_id: "rot_db",
+          rotation_name: "Database",
+          rule: "Base",
+          user_email: "dba@example.com",
+        },
       ],
     } as any);
 
@@ -216,8 +227,8 @@ describe("OnCallTeams", () => {
       .findAllComponents({ name: "OUserCell" })
       .map((cell: any) => cell.props("value"));
     expect(emails).toEqual(["primary@example.com", "dba@example.com"]);
-    // The pool keeps its own name rather than being filed under "Secondary".
-    expect(wrapper.find('[data-test="oncall-teams-slot-team_1-db-oncall"]').exists()).toBe(true);
+    // It keeps its own name rather than being filed under "Secondary".
+    expect(wrapper.find('[data-test="oncall-teams-rotation-team_1-rot_db"]').exists()).toBe(true);
   });
 
   /// "We could not load it" and "nobody is on call" are different claims, and

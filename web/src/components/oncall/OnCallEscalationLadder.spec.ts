@@ -219,7 +219,9 @@ describe("OnCallEscalationLadder", () => {
   it("names who the rung resolves to, without listing channels", () => {
     const text = render().find('[data-test="oncall-ladder-rung-0"]').text();
 
-    expect(text).toContain("The on-call");
+    // The engine now NAMES the rotation. "The on-call" was a role word two
+    // screens resolved differently, and both were right.
+    expect(text).toContain("Whoever is on call");
     expect(text).toContain("right now that is ana@o2.ai");
     expect(text).not.toContain("Email");
   });

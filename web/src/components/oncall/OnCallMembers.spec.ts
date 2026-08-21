@@ -474,7 +474,20 @@ describe("OnCallMembers", () => {
       oncall.resolvedSchedule.mockRejectedValue(new Error("boom"));
       const wrapper = render({
         members: [ana],
-        rotations: [{ name: "Primary", members: ["ana@o2.ai"] }],
+        rotations: [
+          {
+            id: "rot_primary",
+            name: "Primary",
+            shift_rules: [
+              {
+                name: "Primary",
+                members: ["ana@o2.ai"],
+                shift_micros: 604_800_000_000,
+                anchor_micros: 0,
+              },
+            ],
+          },
+        ],
       });
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-members-shift-ana@o2.ai"]').text()).toContain(

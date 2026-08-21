@@ -193,10 +193,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   EscalationPreview,
   OnCallSchedule,
-  OnCallSlot,
+  OnCallPosition,
   TeamOverview,
 } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
+
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -205,7 +205,7 @@ import {
   nextHandover,
   rungProblem,
   speakTarget,
-  winningRotation,
+  winningRule,
 } from "@/utils/oncall";
 
 const props = withDefaults(
@@ -213,9 +213,13 @@ const props = withDefaults(
     /** The engine's own dry run of the ladder this strip draws. */
     preview?: EscalationPreview | null;
     loading?: boolean;
-    /** Slots as `whoIsOnCall` returns them — the authority on WHO hands over. */
-    slots?: OnCallSlot[];
-    /** The schedule answers WHEN; a slot carries no start or end instant. */
+    /**
+     * Positions as `whoIsOnCall` returns them — the authority on WHO hands
+     * over. One entry per rotation that resolves to somebody; a rotation with a
+     * gap is absent rather than null-held.
+     */
+    positions?: OnCallPosition[];
+    /** The schedule answers WHEN; a position carries no start or end instant. */
     schedule?: OnCallSchedule | null;
     /** `GET .../overview` — the silent priorities and the window's figures. */
     overview?: TeamOverview | null;
@@ -224,7 +228,7 @@ const props = withDefaults(
   {
     preview: null,
     loading: false,
-    slots: () => [],
+    positions: () => [],
     schedule: null,
     overview: null,
     timezone: "UTC",
@@ -308,28 +312,30 @@ const silentLabel = computed<I18nText>(() =>
   raw(silentPriorities.value.map((entry) => entry.priority).join(", ")),
 );
 
-/// The primary slot, named rather than taken as "the first one with somebody
-/// in it": a two-slot team returns two staffed slots and the order is the
-/// server's business, so first-non-empty eventually hands over the secondary.
-const holder = computed<OnCallSlot | null>(
-  () =>
-    props.slots.find((slot) => sameSlot(slot.slot, DEFAULT_SLOT) && !!slot.user_email) ??
-    props.slots.find((slot) => !!slot.user_email) ??
-    null,
-);
+/// The team's FIRST rotation, and whoever it puts on call.
+///
+/// Taken by position rather than by looking up a slot named "primary": the
+/// response is ordered by the schedule and every entry is an ordinary rotation,
+/// so there is no keyword to resolve — and a strip that says "on call now"
+/// speaks for the position the schedule lists first.
+const holder = computed<OnCallPosition | null>(() => props.positions[0] ?? null);
 
-/// The rotation actually in force, resolved the way the engine resolves it.
-const rotation = computed(() =>
-  props.schedule
-    ? winningRotation(props.schedule.rotations, nowMicros.value, props.schedule.timezone)
-    : null,
-);
+/// The shift rule in force inside that rotation, resolved the way the engine
+/// resolves it — which is what knows when the shift ends.
+const rule = computed(() => {
+  const schedule = props.schedule;
+  if (!schedule) return null;
+  const rotation = holder.value
+    ? schedule.rotations.find((r) => r.id === holder.value!.rotation_id)
+    : schedule.rotations[0];
+  return rotation ? winningRule(rotation, nowMicros.value, schedule.timezone) : null;
+});
 
 const zone = computed(() => props.schedule?.timezone || props.overview?.timezone || props.timezone);
 
 /// When the pager changes hands, or null when nothing is scheduled to take it.
 const handoverAt = computed<number | null>(() => {
-  const current = rotation.value;
+  const current = rule.value;
   if (!current || !holder.value?.next_user_email) return null;
   const at = nextHandover(current, nowMicros.value);
   return at && at > nowMicros.value ? at : null;

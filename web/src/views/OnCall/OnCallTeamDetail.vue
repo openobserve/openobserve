@@ -87,7 +87,7 @@
         <OnCallTeamPulse
           :preview="firesNowPreview"
           :loading="previewLoading"
-          :slots="onCallNow"
+          :positions="onCallNow"
           :schedule="schedule"
           :overview="overview"
           :timezone="team?.timezone ?? 'UTC'"

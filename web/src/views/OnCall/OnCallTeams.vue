@@ -107,19 +107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Nobody in the primary pool is this page's one alarm, and it was
              invisible while a staffed secondary filled the cell they shared. -->
         <OTag
-          v-else-if="!(slotsByTeam[row.id]?.primary.length ?? 0)"
+          v-else-if="!positionsByTeam[row.id]?.first"
           type="oncallCoverage"
           value="gap"
           size="sm"
           :data-test="`oncall-teams-primary-gap-${row.id}`"
         />
-        <span v-else class="flex flex-col gap-0.5">
-          <OUserCell
-            v-for="slot in slotsByTeam[row.id]?.primary ?? []"
-            :key="slot.user_email"
-            :value="slot.user_email"
-          />
-        </span>
+        <OUserCell v-else :value="positionsByTeam[row.id]!.first!.user_email" />
       </template>
 
       <template #cell-secondary="{ row }">
@@ -128,25 +122,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <!-- A team with no second pool is ordinary, not a gap: a muted dash,
              not the alarm colour the primary column spends. -->
-        <span v-else-if="!(slotsByTeam[row.id]?.backup.length ?? 0)" class="text-text-muted">
+        <span
+          v-else-if="!(positionsByTeam[row.id]?.rest.length ?? 0)"
+          class="text-text-muted"
+        >
           {{ raw("—") }}
         </span>
         <span v-else class="flex flex-col gap-0.5">
           <span
-            v-for="slot in slotsByTeam[row.id]?.backup ?? []"
-            :key="slot.user_email"
+            v-for="position in positionsByTeam[row.id]?.rest ?? []"
+            :key="position.rotation_id"
             class="flex flex-wrap items-center gap-1.5"
           >
-            <OUserCell :value="slot.user_email" />
-            <!-- The header already says "secondary". Only a pool the header
+            <OUserCell :value="position.user_email" />
+            <!-- The header already says "secondary". Only a rotation the header
                  does not name has to announce itself. -->
             <OTag
-              v-if="slot.slot && !sameSlot(slot.slot, SECONDARY_SLOT)"
+              v-if="position.rotation_name.toLowerCase() !== 'secondary'"
               variant="default-soft"
               size="sm"
-              :data-test="`oncall-teams-slot-${row.id}-${slot.slot}`"
+              :data-test="`oncall-teams-rotation-${row.id}-${position.rotation_id}`"
             >
-              {{ raw(slot.slot) }}
+              {{ raw(position.rotation_name) }}
             </OTag>
           </span>
         </span>
@@ -262,8 +259,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import oncallService from "@/services/oncall";
-import type { OnCallSlot, OnCallTeam } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
+import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -285,24 +281,26 @@ const teamToDelete = ref<OnCallTeam | null>(null);
 const testingTeamId = ref<string | null>(null);
 // Undefined = not fetched yet, so a team in flight reads as loading rather
 // than as an empty rotation.
-const onCallByTeam = ref<Record<string, OnCallSlot[]>>({});
+const onCallByTeam = ref<Record<string, OnCallPosition[]>>({});
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-// `slot` is an open vocabulary: "primary" is the default and the backend
-// auto-staffs "secondary", but a team can declare its own pool. So the split is
-// primary vs everything-else — a third pool keeps its name and stays on the
-// page rather than being dropped by a column that only knows two.
-const SECONDARY_SLOT = "secondary";
-
-const slotsByTeam = computed<Record<string, { primary: OnCallSlot[]; backup: OnCallSlot[] }>>(() =>
+/// The first rotation, and everything else.
+///
+/// Split by POSITION in the response rather than by a slot named "primary":
+/// there is no keyword left to resolve, and every entry is an ordinary
+/// rotation. A third rotation keeps its name and stays on the page rather than
+/// being dropped by a column that only knows two.
+///
+/// A rotation that resolves to nobody is absent from the response, so `first`
+/// being undefined IS the coverage gap — nothing has to check for a null holder.
+const positionsByTeam = computed<
+  Record<string, { first: OnCallPosition | undefined; rest: OnCallPosition[] }>
+>(() =>
   Object.fromEntries(
     Object.entries(onCallByTeam.value).map(([teamId, held]) => [
       teamId,
-      {
-        primary: held.filter((slot) => sameSlot(slot.slot, DEFAULT_SLOT)),
-        backup: held.filter((slot) => !sameSlot(slot.slot, DEFAULT_SLOT)),
-      },
+      { first: held[0], rest: held.slice(1) },
     ]),
   ),
 );
@@ -311,9 +309,13 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => {
   // Read the split HERE rather than inside the accessor: the sort key has to
   // change with the rotations, and a closure that reads the ref lazily leaves
   // the table ordered on what it knew before the rotations landed.
-  const held = slotsByTeam.value;
-  const holders = (teamId: string, pool: "primary" | "backup") =>
-    (held[teamId]?.[pool] ?? []).map((slot) => slot.user_email).join(", ");
+  const held = positionsByTeam.value;
+  const holders = (teamId: string, which: "first" | "rest") => {
+    const entry = held[teamId];
+    if (!entry) return "";
+    const list = which === "first" ? (entry.first ? [entry.first] : []) : entry.rest;
+    return list.map((position) => position.user_email).join(", ");
+  };
 
   return [
     {
@@ -333,7 +335,7 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => {
       size: 220,
       minSize: 180,
       sortable: true,
-      accessorFn: (row: OnCallTeam) => holders(row.id, "primary"),
+      accessorFn: (row: OnCallTeam) => holders(row.id, "first"),
     },
     {
       id: "secondary",
@@ -342,7 +344,7 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => {
       minSize: 180,
       sortable: true,
       hideable: true,
-      accessorFn: (row: OnCallTeam) => holders(row.id, "backup"),
+      accessorFn: (row: OnCallTeam) => holders(row.id, "rest"),
     },
     {
       id: "timezone",

@@ -298,7 +298,7 @@ import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
 import type {
   MemberReachability,
-  OnCallSlot,
+  OnCallPosition,
   OnCallTeamMember,
   ResolvedSegment,
   Rotation,
@@ -307,7 +307,7 @@ import type {
   Unavailability,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
-import { formatInZone } from "@/utils/oncall";
+import { formatInZone, rotationMembers } from "@/utils/oncall";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -318,8 +318,11 @@ const props = withDefaults(
     members: OnCallTeamMember[];
     rotations?: Rotation[];
     timezone: string;
-    /** Who holds the pager right now, per slot — the badge and the row rail. */
-    onCallNow?: OnCallSlot[];
+    /**
+     * Who holds the pager right now, one entry per rotation — the badge and the
+     * row rail. A rotation with a gap is absent rather than null-held.
+     */
+    onCallNow?: OnCallPosition[];
     /** Would a page land, per person. The verdicts are the server's. */
     reachability?: TeamReachability | null;
     /** Pages carried per person, for the magnitude bars. */
@@ -338,8 +341,16 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 /// Which rotation, if any, actually pages this person. Adding somebody to a
 /// team does not put them in the paging order, and that gap is where "why
 /// wasn't I paged" comes from.
+///
+/// Searched through the shift RULES: a rotation is a named position and holds
+/// no roster of its own, so a person is on one when any of its rules names
+/// them.
 function rotationOf(email: string): string | null {
-  return props.rotations?.find((r) => r.members?.some((m) => m === email))?.name ?? null;
+  return (
+    props.rotations?.find((rotation) =>
+      rotationMembers(rotation).some((m) => m.toLowerCase() === email.toLowerCase()),
+    )?.name ?? null
+  );
 }
 
 /// The window worth marking: an absence sixty days out is real but not this

@@ -42,11 +42,17 @@ const schedule = {
   updated_at: 0,
   rotations: [
     {
+      id: "rot_primary",
       name: "Primary",
-      members: ["ana@o2.ai", "bob@o2.ai"],
-      shift_micros: MICROS_PER_WEEK,
-      // Mid-shift, so there is a handover ahead to name.
-      anchor_micros: NOW - 2 * 24 * 60 * 60 * 1_000_000,
+      shift_rules: [
+        {
+          name: "Primary",
+          members: ["ana@o2.ai", "bob@o2.ai"],
+          shift_micros: MICROS_PER_WEEK,
+          // Mid-shift, so there is a handover ahead to name.
+          anchor_micros: NOW - 2 * 24 * 60 * 60 * 1_000_000,
+        },
+      ],
     },
   ],
 };
@@ -125,7 +131,15 @@ function render(over: Record<string, unknown> = {}) {
   return mount(OnCallTeamPulse, {
     props: {
       preview: preview(),
-      slots: [{ rotation: "Primary", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" }],
+      positions: [
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "Primary",
+          user_email: "ana@o2.ai",
+          next_user_email: "bob@o2.ai",
+        },
+      ],
       schedule,
       overview: overview(),
       ...over,
@@ -269,7 +283,15 @@ describe("OnCallTeamPulse", () => {
   /// suggest a second pair of hands that does not exist.
   it("says so when nothing is scheduled to take the pager", () => {
     const wrapper = render({
-      slots: [{ rotation: "Primary", user_email: "ana@o2.ai", next_user_email: null }],
+      positions: [
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "Primary",
+          user_email: "ana@o2.ai",
+          next_user_email: null,
+        },
+      ],
     });
     expect(wrapper.find('[data-test="oncall-pulse-no-handoff"]').exists()).toBe(true);
   });
