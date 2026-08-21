@@ -119,23 +119,6 @@ pub fn resolve_stream_names_with_type(sql: &str) -> Result<Vec<TableReference>, 
     Ok(tables)
 }
 
-/// Just the full outer WHERE of a query, verbatim; "" if none/unparseable. Use this
-/// when you only need the whole WHERE and not the per-stream split (`extract_where`).
-pub fn extract_where_clause(sql: &str) -> String {
-    let dialect = PostgreSqlDialect {};
-    let Ok(statements) = Parser::parse_sql(&dialect, sql) else {
-        return String::new();
-    };
-    for statement in statements {
-        if let Statement::Query(query) = statement
-            && let Some(w) = where_from_set_expr(query.body.as_ref())
-        {
-            return w;
-        }
-    }
-    String::new()
-}
-
 /// Both forms of a query's WHERE, produced from a single parse.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct WhereInfo {
@@ -372,7 +355,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_where_clause() {
+    fn test_extract_where_where_clause_field() {
         let wc = |sql: &str| extract_where(sql).where_clause;
 
         // Basic WHERE is returned without the leading keyword.

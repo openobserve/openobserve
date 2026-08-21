@@ -493,14 +493,14 @@ function fmtTsShort(ts: unknown): string {
   });
 }
 
-function fmtRelTime(tsµs: number, refµs: number): string {
-  const diffMs = (tsµs - refµs) / 1_000;
+function fmtRelTime(tsMicros: number, refMicros: number): string {
+  const diffMs = (tsMicros - refMicros) / 1_000;
   if (Math.abs(diffMs) < 500) return "now";
   const sign = diffMs >= 0 ? "+" : "−";
   const abs = Math.abs(diffMs);
   if (abs < 60_000) return `${sign}${Math.floor(abs / 1_000)}s`;
   // Use floor for both m and s to avoid "2m 60s" from rounding up
-  let m = Math.floor(abs / 60_000);
+  const m = Math.floor(abs / 60_000);
   const s = Math.floor((abs % 60_000) / 1_000);
   return s === 0 ? `${sign}${m}m` : `${sign}${m}m ${s}s`;
 }

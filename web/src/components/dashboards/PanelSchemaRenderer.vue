@@ -1696,7 +1696,7 @@ export default defineComponent({
     }
 
     // Dashboard timestamps are µs; Dates are built from µs so getTime() returns µs.
-    function toµs(v: any): number {
+    function toMicros(v: any): number {
       if (v instanceof Date) return v.getTime();
       const n = Number(v);
       return Number.isFinite(n) && n > 0 ? n : 0;
@@ -1770,18 +1770,18 @@ export default defineComponent({
         ? (panelWhereByStream.value[cell.streamName] ?? "")
         : panelBaseWhere.value;
 
-      const metaStartµs = Number(metadata.value?.queries?.[qi]?.startTime ?? 0);
-      const metaEndµs = Number(metadata.value?.queries?.[qi]?.endTime ?? 0);
-      const selStartµs = toµs((props.selectedTimeObj as any).start_time);
-      const selEndµs = toµs((props.selectedTimeObj as any).end_time);
+      const metaStartMicros = Number(metadata.value?.queries?.[qi]?.startTime ?? 0);
+      const metaEndMicros = Number(metadata.value?.queries?.[qi]?.endTime ?? 0);
+      const selStartMicros = toMicros((props.selectedTimeObj as any).start_time);
+      const selEndMicros = toMicros((props.selectedTimeObj as any).end_time);
 
       openCellDrawer({
         field: realField,
         value: value as string | number,
         stream,
         streamType,
-        startTime: metaStartµs || selStartµs,
-        endTime: metaEndµs || selEndµs || Date.now() * 1000,
+        startTime: metaStartMicros || selStartMicros,
+        endTime: metaEndMicros || selEndMicros || Date.now() * 1000,
         baseWhere,
       });
     }
