@@ -101,36 +101,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("oncall.addRotation") }}
         </OButton>
 
-        <!-- Beside Add, not under it: hand-building follow-the-sun out of
-             restriction windows is the thing a preset saves you from, so the
-             choice belongs where the adding is decided. -->
-        <ODropdown align="end">
-          <template #trigger>
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="expand-more"
-              :aria-label="t('oncall.presetsTitle')"
-              data-test="oncall-timeline-add-menu"
-            />
-          </template>
-          <ODropdownItem data-test="oncall-timeline-presets" @select="emit('presets')">
-            {{ t("oncall.presetsTitle") }}
-          </ODropdownItem>
-        </ODropdown>
+        <!-- Beside Add, not under it, and SAYING SO: hand-building
+             follow-the-sun out of restriction windows is the thing a preset
+             saves you from, so the choice belongs where the adding is decided.
+             It spent a while as a caret opening a one-item menu that repeated
+             the caret's own accessible name — a reader who never opened it
+             never learnt the shapes existed, which is the whole value of the
+             feature hidden behind an icon-sized guess. The label IS the
+             entry point. -->
+        <OButton
+          variant="outline"
+          size="sm-action"
+          icon-left="auto-awesome"
+          data-test="oncall-timeline-presets"
+          @click="emit('presets')"
+        >
+          {{ t("oncall.presetsTitle") }}
+        </OButton>
       </span>
     </div>
 
     <OInnerLoading v-if="loading" showing />
 
+    <!-- A team with no rotations is exactly the reader the presets were built
+         for, so the empty state offers both roads rather than only the one
+         that starts with a blank rotation form. -->
     <OEmptyState
       v-else-if="!tracks.length"
       size="inline"
       preset="no-data"
       :description="t('oncall.calendarEmpty')"
       :action-label="t('oncall.addRotation')"
+      :secondary-action-label="t('oncall.presetsTitle')"
       data-test="oncall-timeline-empty"
       @action="emit('add')"
+      @secondary-action="emit('presets')"
     />
 
     <OScheduleTimeline

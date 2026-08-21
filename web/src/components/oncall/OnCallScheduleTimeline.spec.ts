@@ -27,8 +27,12 @@ const stubs = {
   OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: {
     name: "OButton",
+    props: ["iconLeft"],
     emits: ["click"],
-    template: "<button @click=\"$emit('click')\"><slot /></button>",
+    // `aria-label` and `data-test` fall through; `icon-left` is a prop, so the
+    // stub has to publish it for a test to tell a labelled button from one
+    // carrying only an icon.
+    template: "<button :data-icon=\"iconLeft\" @click=\"$emit('click')\"><slot /></button>",
   },
   OScheduleTimeline: {
     name: "OScheduleTimeline",
@@ -46,7 +50,12 @@ const stubs = {
   },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OTooltip: { name: "OTooltip", template: "<span />" },
-  OEmptyState: { name: "OEmptyState", template: "<div />" },
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["actionLabel", "secondaryActionLabel"],
+    emits: ["action", "secondaryAction"],
+    template: "<div />",
+  },
   OToggleGroup: { name: "OToggleGroup", template: "<div><slot /></div>" },
   OToggleGroupItem: { name: "OToggleGroupItem", template: "<button><slot /></button>" },
   ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
@@ -417,5 +426,63 @@ describe("OnCallScheduleTimeline", () => {
     chart.vm.$emit("hover", null);
     await nextTick();
     expect(chart.props("hoverLabel")).toBeUndefined();
+  });
+
+  /// P1: the four schedule presets — follow-the-sun among them — were reached
+  /// only through an unlabelled 32px caret whose one-item menu repeated the
+  /// caret's own accessible name. Nothing on the screen said the shapes
+  /// existed, so the fastest route to a correct rota was found by accident or
+  /// not at all. The entry is now a button that says what it opens.
+  describe("the way in to the presets", () => {
+    it("names the presets on the button rather than hiding them behind a caret", async () => {
+      const wrapper = render();
+      const entry = wrapper.find('[data-test="oncall-timeline-presets"]');
+
+      expect(entry.exists()).toBe(true);
+      // VISIBLE text, not an aria-label on an icon: the stub renders slots
+      // only, so a passing assertion here means a reader can see the words.
+      expect(entry.text()).toBe("Start from a preset");
+
+      await entry.trigger("click");
+      expect(wrapper.emitted("presets")).toHaveLength(1);
+    });
+
+    /// The menu had one item and that item was its trigger's label, so opening
+    /// it bought the reader a second click and no new information.
+    it("keeps no one-item menu between the reader and the presets", () => {
+      const wrapper = render();
+
+      expect(wrapper.find('[data-test="oncall-timeline-add-menu"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-timeline-presets"]').element.tagName).toBe("BUTTON");
+    });
+
+    /// Beside Add rotation, at the same weight: the two are alternative ways
+    /// to build the same schedule, and the preset is the shorter one.
+    it("stands beside Add rotation and carries its own icon", () => {
+      const wrapper = render();
+      const add = wrapper.find('[data-test="oncall-timeline-add"]');
+      const presets = wrapper.find('[data-test="oncall-timeline-presets"]');
+
+      expect(add.text()).toBe("Add rotation");
+      expect(presets.attributes("data-icon")).toBe("auto-awesome");
+      // Adjacent in the DOM, so they read as one pair of choices.
+      expect(add.element.nextElementSibling).toBe(presets.element);
+    });
+
+    /// A team with no rotations is the reader the presets were written for,
+    /// and it is the one screen where the header's buttons are not the first
+    /// thing looked at.
+    it("offers the presets from the empty schedule as well", async () => {
+      const wrapper = render({ rotations: [], segments: [] });
+      const empty = wrapper.findComponent({ name: "OEmptyState" });
+
+      expect(empty.exists()).toBe(true);
+      expect(String(empty.props("actionLabel"))).toBe("Add rotation");
+      expect(String(empty.props("secondaryActionLabel"))).toBe("Start from a preset");
+
+      empty.vm.$emit("secondaryAction");
+      await nextTick();
+      expect(wrapper.emitted("presets")).toHaveLength(1);
+    });
   });
 });
