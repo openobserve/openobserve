@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "以全视图打开",
     "viewLogs": "查看日志",
+    "viewLogsUnavailable": "无法打开此跨度的日志。",
     "backToLogs": "返回日志",
     "openInTraces": "在追踪中打开",
     "loadingStream": "正在加载数据流...",

@@ -800,6 +800,7 @@ pub async fn advance_schedule<C: ConnectionTrait>(
     last_triggered_at: i64,
     next_run_at: i64,
 ) -> Result<(), errors::Error> {
+    let _lock = super::get_lock().await;
     Entity::update_many()
         .col_expr(Column::LastTriggeredAt, Expr::value(last_triggered_at))
         .col_expr(Column::NextRunAt, Expr::value(next_run_at))
@@ -829,6 +830,7 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
     id: &str,
     status: i32,
 ) -> Result<bool, errors::Error> {
+    let _lock = super::get_lock().await;
     let res = Entity::update_many()
         .col_expr(Column::LastCheckStatus, Expr::value(status))
         .filter(Column::Id.eq(id))
@@ -905,6 +907,7 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
     expected: AlertState,
     state: AlertState,
 ) -> Result<bool, errors::Error> {
+    let _lock = super::get_lock().await;
     let res = Entity::update_many()
         .col_expr(
             Column::ConsecutiveFailures,

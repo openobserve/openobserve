@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "Tam görünümde aç",
     "viewLogs": "Günlükleri Görüntüle",
+    "viewLogsUnavailable": "Bu span için günlükler açılamadı.",
     "backToLogs": "Günlüklere Dön",
     "openInTraces": "Traces'te aç",
     "loadingStream": "Akış Yükleniyor...",
