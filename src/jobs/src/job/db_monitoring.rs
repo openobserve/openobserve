@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Database Monitoring rollup job (design `docs/___databsepages/dbm-design-doc.md` §5).
+//! Database Monitoring rollup job (design `db-monitoring/dbm-design-doc.md` §5).
 //!
 //! A dedicated windowed job — structurally the service-graph job
 //! (scheduler-role-only, `spawn_pausable_job!`) but with NO enterprise cfg and

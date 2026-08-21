@@ -847,7 +847,7 @@ pub struct Config {
     pub db_monitoring: DatabaseMonitoring,
 }
 
-/// Database Monitoring (design: `docs/___databsepages/dbm-design-doc.md` §8) —
+/// Database Monitoring (design: `db-monitoring/dbm-design-doc.md` §8) —
 /// ingest-time db span fingerprinting, server-vantage log canonicalization, the
 /// query-stats rollup job, and the DBM read APIs. OSS feature; runtime-gated on
 /// `enabled` ONLY: enabled means every DBM signal is canonicalized and served,

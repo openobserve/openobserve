@@ -13,16 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Database Monitoring read HTTP API (design: `docs/___databsepages/dbm-design-doc.md` §6).
+//! Database Monitoring read HTTP API (design: `db-monitoring/dbm-design-doc.md` §6).
 //!
 //! Split along the crate's handler / service / model layering, the same shape
 //! `request/alerts/`, `request/organization/` and every other multi-file feature
 //! in this crate uses:
 //!
-//! - [`handler`] — the 20 axum handlers, each a config guard plus a delegation;
+//! - [`handler`] — the 17 axum handlers, each a config guard plus a delegation
+//!   (three are cfg-dual-implemented, so the file holds 20 fn definitions);
 //! - [`service`] — every read: SQL construction, the searches, the merge and envelope math, and the
 //!   authorization gates;
 //! - [`models`] — the 17 `*Query` structs the routes deserialize into.
+//!
+//! `db-monitoring/*.md` citations throughout DBM refer to the internal design
+//! repository, not to a path in this tree.
 //!
 //! The handlers live here, in the API layer, rather than beside the enrichment
 //! and rollup code in `openobserve-core`. Every other HTTP handler in the

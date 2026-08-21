@@ -16,7 +16,7 @@
 //! Server-vantage canonicalization tests.
 //!
 //! The deadlock/blocking fixtures are the REAL captured records from
-//! `docs/___databsepages/dbm-server-vantage-proof.md` §2.1/§2.2 — field names, pids, and SQL
+//! `db-monitoring/dbm-server-vantage-proof.md` §2.1/§2.2 — field names, pids, and SQL
 //! verbatim. If a collector release renames a field, these fail loudly rather than silently
 //! returning empty events.
 //!

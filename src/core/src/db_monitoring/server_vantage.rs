@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Server-vantage DBM canonicalization (proof: `docs/___databsepages/dbm-server-vantage-proof.md`
+//! Server-vantage DBM canonicalization (proof: `db-monitoring/dbm-server-vantage-proof.md`
 //! §2.1 deadlocks, §2.2 blocking chains; recipes:
-//! `docs/___databsepages/pipeline-recipes/postgres-deadlocks.md`,
+//! `db-monitoring/pipeline-recipes/postgres-deadlocks.md`,
 //! `postgres-blocking-chain.md`, `mysql-deadlocks.md`).
 //!
 //! Server-vantage signals arrive as **logs** carrying receiver-local, vendor-prefixed field
