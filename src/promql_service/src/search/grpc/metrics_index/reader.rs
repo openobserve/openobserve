@@ -87,6 +87,7 @@ pub(super) fn decode_metrics_index(
 pub(super) fn evaluate_metrics_index(
     data: &MetricsIndexData,
     filter: Option<&dyn PhysicalExpr>,
+    expected_rows: usize,
 ) -> Result<Vec<Range<usize>>> {
     let count_index = data.schema.index_of(METRICS_INDEX_ROW_COUNT)?;
     let mut ranges: Vec<Range<usize>> = Vec::new();
@@ -127,6 +128,11 @@ pub(super) fn evaluate_metrics_index(
             let end = start.checked_add(count).ok_or_else(|| {
                 DataFusionError::Execution("metrics-index row range overflow".to_string())
             })?;
+            if end > expected_rows {
+                return Err(DataFusionError::Execution(format!(
+                    "metrics-index row range ends at {end}, beyond the parent file's {expected_rows} records"
+                )));
+            }
             next_row = end;
             if mask.is_null(row) || !mask.value(row) {
                 continue;
@@ -139,6 +145,11 @@ pub(super) fn evaluate_metrics_index(
                 ranges.push(start..end);
             }
         }
+    }
+    if next_row != expected_rows {
+        return Err(DataFusionError::Execution(format!(
+            "metrics-index covers {next_row} rows, but the parent file contains {expected_rows} records"
+        )));
     }
     Ok(ranges)
 }
