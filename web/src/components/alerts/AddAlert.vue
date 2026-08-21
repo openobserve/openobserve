@@ -306,6 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :vrlFunction="decodedVrlFunction"
                     :streamName="formData.stream_name"
                     :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                    :sqlAggColumnOptions="sqlAggColumnOptions"
                     :isAggregationEnabled="isAggregationEnabled"
                     :beingUpdated="beingUpdated"
                     :promqlCondition="formData.query_condition.promql_condition"
@@ -518,6 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :isUsingBackendSql="isUsingBackendSql"
                   :isEditorOpen="isEditorOpen"
                   :previewDateTime="previewDateTimeValue"
+                  @schema-updated="handleSqlSchemaUpdated"
                 />
               </template>
             </div>
@@ -671,6 +673,16 @@ export default defineComponent({
     // Share server SQL-validation squiggle ranges with the descendant query
     // editors (QueryEditorDialog / QueryConfig) via inject.
     provide("alertSqlErrorRanges", alertForm.sqlErrorRanges);
+
+    // SQL tab's Multi Alert value-column dropdown (sql_simple_multi_alert_fe_prd.md
+    // §11): PreviewAlert already calls /result_schema every time the preview
+    // query itself fires (its own reactive query watcher / editor-closed
+    // refresh) — reuse that response instead of a second, differently-timed
+    // fetch. QueryConfig's own watcher on this prop does the actual
+    // clear-if-missing comparison; this handler only forwards the list.
+    const handleSqlSchemaUpdated = (projections: string[]) => {
+      alertForm.sqlAggColumnOptions.value = projections;
+    };
 
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
@@ -891,6 +903,7 @@ export default defineComponent({
       updateCompositeDraft,
       compositeSaveDisabled,
       onCompositeValidation,
+      handleSqlSchemaUpdated,
     };
   },
 });

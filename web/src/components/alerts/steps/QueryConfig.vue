@@ -1290,9 +1290,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- SQL: Alert if No. of events -->
+              <!-- SQL: Simple vs Multi alert choice — placed before the
+                   condition row so the row below reads as "pick a mode,
+                   then fill in its shape", not "fill in a row, then a
+                   switch silently repurposes it". -->
+              <AlertMultiToggle
+                v-if="!showVrl && localTab === 'sql'"
+                :enabled="isMultiAlert"
+                @change="onSqlMultiAlertChange"
+              />
+
+              <!-- SQL Simple: Alert if No. of events -->
               <div
-                v-if="localTab === 'sql'"
+                v-if="localTab === 'sql' && !isMultiAlert"
                 class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
               >
                 <span
@@ -1393,12 +1403,132 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="flex items-start gap-2">
-                  <AlertMultiToggle
-                      v-if="!showVrl && localTab === 'sql'"
-                      :enabled="isMultiAlert"
-                      @change="onMultiAlertChange"
-                  />
+
+              <!-- SQL Multi: Alert if [column]. Reuses the exact
+                   having.operator/.value + warning_value fields Custom's
+                   Measure mode uses (this flow classifies the whole SQL
+                   result set as one aggregate value, the same value-based
+                   severity shape). The column itself is a dropdown sourced
+                   from the query's own resolved output columns (§11 of
+                   sql_simple_multi_alert_fe_prd.md) rather than a fixed
+                   literal — options are refreshed on the same validate-sql
+                   pass as the SQL editor's own validation. -->
+              <div
+                v-if="localTab === 'sql' && isMultiAlert"
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+              >
+                <span
+                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                  >{{ t("alerts.alertIfColumn") }} *</span
+                >
+                <div class="flex flex-col gap-1.5">
+                  <div class="flex items-start gap-2">
+                    <span
+                      class="text-text-secondary text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      >{{ t("alerts.column") }}</span
+                    >
+                    <!-- onLogMeasureColumnChange's body is generic (reads/writes
+                         aggregation.having.column via the form) despite its
+                         name — reused as-is rather than duplicating it. -->
+                    <OFormSelect
+                      name="query_condition.aggregation.having.column"
+                      :options="sqlAggColumnOptions"
+                      searchable
+                      width="xs"
+                      data-test="alert-sql-agg-column-select"
+                      :placeholder="t('alerts.placeholders.selectColumn')"
+                      @update:model-value="onLogMeasureColumnChange($event)"
+                    />
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <span
+                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      >{{ t("alerts.criticalIf") }}</span
+                    >
+                    <OFormSelect
+                      name="query_condition.aggregation.having.operator"
+                      :options="numericOperators"
+                      :searchable="false"
+                      width="xs"
+                      data-test="alert-sql-agg-operator-select"
+                      @update:model-value="onConditionOperatorChange"
+                    />
+                    <!-- Message hangs under the value field it describes. -->
+                    <div class="flex flex-col gap-1">
+                      <OFormInput
+                        name="query_condition.aggregation.having.value"
+                        type="number"
+                        width="xs"
+                        data-test="alert-sql-agg-value-input"
+                        :placeholder="t('alerts.placeholders.value')"
+                        @update:model-value="onConditionValueChange($event)"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="havingValueError"
+                        class="text-input-error-text text-xs whitespace-nowrap"
+                        data-test="alert-sql-agg-value-error"
+                        role="alert"
+                      >
+                        {{ havingValueError }}
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Optional WARNING level, same pattern as Custom's
+                       Measure mode. Shares critical's operator, so the row
+                       only echoes it. -->
+                  <div v-if="aggWarningVisible" class="flex items-start gap-2">
+                    <span
+                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      >{{ t("alerts.warningIf") }}</span
+                    >
+                    <span
+                      class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                      >{{ conditionOperator }}</span
+                    >
+                    <div class="flex flex-col gap-1">
+                      <OFormInput
+                        name="query_condition.aggregation.warning_value"
+                        type="number"
+                        width="xs"
+                        data-test="alert-sql-agg-warning-value-input"
+                        :placeholder="t('alerts.optional')"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="aggregationWarningError"
+                        class="text-input-error-text text-xs whitespace-nowrap"
+                        data-test="alert-sql-agg-warning-value-error"
+                        role="alert"
+                      >
+                        {{ aggregationWarningError }}
+                      </div>
+                    </div>
+                    <OButton
+                      variant="ghost"
+                      size="icon-circle-sm"
+                      class="text-icon-color hover:text-status-error-text self-center"
+                      :aria-label="t('alerts.removeWarning')"
+                      data-test="alert-remove-warning-button"
+                      @click="removeAggWarning"
+                    >
+                      <OIcon name="close" size="sm" />
+                    </OButton>
+                  </div>
+                  <div v-else>
+                    <OButton
+                      variant="ghost-primary"
+                      size="sm"
+                      data-test="alert-add-warning-button"
+                      @click="addAggWarning"
+                    >
+                      <OIcon name="add" size="sm" />
+                      {{ t("alerts.addWarning") }}
+                    </OButton>
+                  </div>
+                </div>
               </div>
 
               <!-- PromQL: Alert if the value is + Having series -->
@@ -1734,6 +1864,10 @@ export default defineComponent({
     sqlQueryErrorMsg: {
       type: String,
       default: "",
+    },
+    sqlAggColumnOptions: {
+      type: Array as PropType<string[]>,
+      default: () => [],
     },
     isAggregationEnabled: {
       type: Boolean,
@@ -2417,6 +2551,26 @@ export default defineComponent({
     };
 
     /**
+     * SQL tab's Simple/Multi choice. Shares the M-10 count-gate side effect
+     * above, and additionally pins the fields the SQL multi-alert has no
+     * picker for: a fixed `count` function, no group-by (this flow classifies
+     * the whole result set as one aggregate value, not per-group). The value
+     * column is NOT pinned here — it's a user-picked dropdown sourced from
+     * the query's resolved output columns (§11 of sql_simple_multi_alert_fe_prd.md),
+     * so switching Multi on just clears any stale column and leaves the
+     * dropdown to be filled in.
+     */
+    const onSqlMultiAlertChange = (value: unknown) => {
+      onMultiAlertChange(value);
+      if (!value) return;
+      writeAggregation((agg) => {
+        agg.function = "count";
+        agg.group_by = [];
+        agg.having.column = "";
+      });
+    };
+
+    /**
      * Give the Simple/Multi choice a real `false` to select.
      *
      * An alert saved before this feature has no `multi_alert` key at all, so
@@ -2460,11 +2614,38 @@ export default defineComponent({
           if (fv("query_condition.aggregation.multi_alert")) {
             setFV("query_condition.aggregation.multi_alert", false);
           }
-        } else if (fv("query_condition.promql_multi_alert")) {
-          setFV("query_condition.promql_multi_alert", false);
+        } else {
+          // SQL's choice has no group-by to wait for either — visible
+          // whenever the sql tab is, so normalise on entering it too.
+          if (tab === "sql") normalizeMultiAlertFlag();
+          if (fv("query_condition.promql_multi_alert")) {
+            setFV("query_condition.promql_multi_alert", false);
+          }
         }
       },
       { immediate: true },
+    );
+
+    // SQL Multi's value-column dropdown options refresh whenever the preview
+    // query itself fires (PreviewAlert's own /result_schema call, forwarded
+    // via AddAlert's handleSqlSchemaUpdated — §11.7 of
+    // sql_simple_multi_alert_fe_prd.md, amended). Only clear the selection if
+    // the FETCHED list says it's actually gone — never eagerly/optimistically
+    // on every keystroke, so a column that's still valid in the next
+    // projection response is left alone rather than flashing empty.
+    // Re-requires an explicit pick once it IS confirmed missing (§11.4,
+    // mandatory).
+    watch(
+      () => props.sqlAggColumnOptions,
+      (options) => {
+        if (localTab.value !== "sql" || !isMultiAlert.value) return;
+        const column = fv("query_condition.aggregation.having.column");
+        if (column && !options.includes(column)) {
+          writeAggregation((agg) => {
+            agg.having.column = "";
+          });
+        }
+      },
     );
 
     // name="trigger_condition.operator" owns the value, but it is NOT written yet
@@ -3535,6 +3716,7 @@ export default defineComponent({
       hasMetricGroupByFields,
       isMultiAlert,
       onMultiAlertChange,
+      onSqlMultiAlertChange,
       isPromqlMultiAlert,
       onPromqlMultiAlertChange,
       checkEveryFrequency,

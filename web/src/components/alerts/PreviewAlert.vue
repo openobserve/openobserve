@@ -89,6 +89,14 @@ const props = defineProps({
   },
 });
 
+// SQL tab's Multi Alert value-column dropdown (sql_simple_multi_alert_fe_prd.md
+// §11): reuses this component's own /result_schema call below rather than a
+// second, separately-triggered fetch — the dropdown's options refresh in
+// lockstep with "the preview query firing", not on a different cadence.
+const emit = defineEmits<{
+  (e: "schema-updated", projections: string[]): void;
+}>();
+
 // Strip axis labels from field config so ECharts doesn't render axis titles
 // and the grid margins shrink accordingly (hasXAxisName/hasYAxisName become false)
 const clearFieldLabels = (data: any) => {
@@ -419,6 +427,13 @@ const fetchQuerySchema = async () => {
     if (requestId !== schemaRequestId.value) return;
 
     const extractedFields = schemaRes.data;
+
+    // SQL tab's Multi Alert value-column dropdown — see the emit declaration
+    // above. Only meaningful for the raw SQL tab (this branch only runs when
+    // selectedTab === "sql"; the aggregation branch above, Custom's
+    // BE-generated SQL, returns before reaching here).
+    emit("schema-updated", extractedFields.projections);
+
     const chartType = determineChartType(extractedFields);
     dashboardPanelData.data.type = chartType;
 
