@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model:active-tab="activeTab"
                       @update:active-tab="
                         () => {
-                          invalidateFolderCache(activeFolderId);
+                          invalidateFolderCache(activeFolderId, true);
                           loadReports(activeFolderId);
                         }
                       "
@@ -583,8 +583,19 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
 
 // Called after every write and by the refresh button. Prefix invalidation, so
 // the cached/scheduled tab and any active name search all refetch too.
-const invalidateFolderCache = (_folderId?: string) => {
-  queryClient.invalidateQueries({ queryKey: reportKeys.all(store.state.selectedOrganization.identifier) });
+//
+// `siblingsOnly` when a `loadReports` follows. Invalidating the entry the table
+// is *observing* makes it refetch on the spot, and the load right after asks
+// for it a second time — two identical requests behind one click. Skipping the
+// observed entry leaves that one read to `loadReports`, while every inactive
+// sibling still goes stale.
+const invalidateFolderCache = (_folderId?: string, siblingsOnly = false) => {
+  queryClient.invalidateQueries({
+    queryKey: reportKeys.all(store.state.selectedOrganization.identifier),
+    ...(siblingsOnly
+      ? { refetchType: "none" as const, predicate: (q: any) => q.getObserversCount() === 0 }
+      : {}),
+  });
 };
 
 const filterReports = () => {
@@ -659,7 +670,7 @@ watch(searchAcrossFolders, (enabled) => {
 // `undefined` here reset the name query, so the rows came back unfiltered while
 // the search box still showed the term.
 const refreshReports = () => {
-  invalidateFolderCache(activeFolderId.value);
+  invalidateFolderCache(activeFolderId.value, true);
   return loadReports(activeFolderId.value, searchQuery.value || undefined, true);
 };
 
@@ -903,9 +914,11 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
   selectedReports.value = [];
   reportIdsToMove.value = [];
   // Invalidate both source and destination folder caches
-  invalidateFolderCache(fromFolder || activeFolderId.value);
-  invalidateFolderCache(toFolder);
-  await loadReports(activeFolderId.value);
+  invalidateFolderCache(fromFolder || activeFolderId.value, true);
+  invalidateFolderCache(toFolder, true);
+  // Forced: this is a post-write reload, and `siblingsOnly` above deliberately
+  // left the folder on screen untouched so it is refetched exactly once here.
+  await loadReports(activeFolderId.value, undefined, true);
 };
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
