@@ -31,6 +31,32 @@ const NOW = 1_700_000_000_000; // ms
 const ANCHOR = NOW * 1000;
 
 /// Rotation fields live in a drawer now; open it before asserting on them.
+/**
+ * A rotation holding one ordinary rule — what almost every team has.
+ *
+ * The rules used to BE the rotations, which is the confusion the rework
+ * removed: two rotations are two people on call, two rules are one person
+ * across different hours.
+ */
+function rota(name: string, rules: any[] = [], over: Record<string, unknown> = {}) {
+  return {
+    id: `rot_${name.toLowerCase().replace(/\s+/g, "_")}`,
+    name,
+    shift_rules: rules.length ? rules : [rule({ name })],
+    ...over,
+  };
+}
+
+function rule(over: Record<string, unknown> = {}) {
+  return {
+    name: "Base",
+    members: ["ana@o2.ai"],
+    shift_micros: MICROS_PER_WEEK,
+    anchor_micros: ANCHOR,
+    ...over,
+  };
+}
+
 async function openRotation(wrapper: any, index = 0) {
   const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
   wrapper.findComponent({ name: "OTable" }).vm.$emit("row-click", rows[index]);
@@ -139,14 +165,7 @@ describe("OnCallScheduleEditor", () => {
   // cannot see.
   it("previews the upcoming shifts of a rotation", async () => {
     const wrapper = render({
-      schedule: schedule([
-        {
-          name: "Primary",
-          members: ["ana@o2.ai", "bob@o2.ai"],
-          shift_micros: MICROS_PER_WEEK,
-          anchor_micros: ANCHOR,
-        },
-      ]),
+      schedule: schedule([rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai"] })])]),
     });
     await flushPromises();
     await openRotation(wrapper);
@@ -161,14 +180,7 @@ describe("OnCallScheduleEditor", () => {
   // exactly one row carries the marker.
   it("marks exactly one shift as current", async () => {
     const wrapper = render({
-      schedule: schedule([
-        {
-          name: "Primary",
-          members: ["ana@o2.ai", "bob@o2.ai"],
-          shift_micros: MICROS_PER_WEEK,
-          anchor_micros: ANCHOR,
-        },
-      ]),
+      schedule: schedule([rota("Primary", [rule({ members: ["ana@o2.ai", "bob@o2.ai"] })])]),
     });
     await flushPromises();
     await openRotation(wrapper);
@@ -184,19 +196,12 @@ describe("OnCallScheduleEditor", () => {
   // handed over at 14:32 forever. It is an explicit field now.
   it("exposes the first handover and keeps the previous value on junk input", async () => {
     const wrapper = render({
-      schedule: schedule([
-        {
-          name: "Primary",
-          members: ["ana@o2.ai"],
-          shift_micros: MICROS_PER_WEEK,
-          anchor_micros: ANCHOR,
-        },
-      ]),
+      schedule: schedule([rota("Primary")]),
     });
     await flushPromises();
     await openRotation(wrapper);
 
-    const field = wrapper.find('[data-test="oncall-schedule-handover"]');
+    const field = wrapper.find('[data-test="oncall-schedule-handover-0"]');
     expect(field.exists()).toBe(true);
 
     const before = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]')[0].text();
@@ -212,18 +217,8 @@ describe("OnCallScheduleEditor", () => {
   it("refuses a save that would silently drop an empty rotation", async () => {
     const wrapper = render({
       schedule: schedule([
-        {
-          name: "Primary",
-          members: ["ana@o2.ai"],
-          shift_micros: MICROS_PER_WEEK,
-          anchor_micros: ANCHOR,
-        },
-        {
-          name: "Backup",
-          members: ["bob@o2.ai"],
-          shift_micros: MICROS_PER_WEEK,
-          anchor_micros: ANCHOR,
-        },
+        rota("Primary"),
+        rota("Backup", [rule({ members: ["bob@o2.ai"] })]),
       ]),
     });
     await flushPromises();
@@ -231,7 +226,7 @@ describe("OnCallScheduleEditor", () => {
     // Empty the second rotation the way a user would, through its editor.
     await openRotation(wrapper, 1);
     await wrapper
-      .findComponent('[data-test="oncall-schedule-members"]')
+      .findComponent('[data-test="oncall-schedule-members-0"]')
       .vm.$emit("update:modelValue", []);
     await flushPromises();
 
@@ -239,7 +234,7 @@ describe("OnCallScheduleEditor", () => {
     await flushPromises();
 
     expect(service.setSchedule).not.toHaveBeenCalled();
-    expect(wrapper.find('[data-test="oncall-rotation-needs-people"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-rotation-needs-people-0"]').exists()).toBe(true);
   });
 
   /// The drawer's Save is the one a new rotation is saved from, and a new
@@ -257,7 +252,7 @@ describe("OnCallScheduleEditor", () => {
     ).toBeDefined();
 
     await wrapper
-      .findComponent('[data-test="oncall-schedule-members"]')
+      .findComponent('[data-test="oncall-schedule-members-0"]')
       .vm.$emit("update:modelValue", ["ana@o2.ai"]);
     await flushPromises();
 
@@ -288,14 +283,7 @@ describe("OnCallScheduleEditor", () => {
   /// A second rotation is for follow-the-sun, not for a "secondary".
   it("adds a named rotation without asking for a level", async () => {
     const wrapper = render({
-      schedule: schedule([
-        {
-          name: "Primary",
-          members: ["ana@o2.ai"],
-          shift_micros: MICROS_PER_WEEK,
-          anchor_micros: ANCHOR,
-        },
-      ]),
+      schedule: schedule([rota("Primary")]),
     });
     await flushPromises();
 
@@ -307,20 +295,29 @@ describe("OnCallScheduleEditor", () => {
     expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(2);
   });
 
-  /// The blocker this pins: two rotations both defaulted to priority 0 with no
-  /// restrictions, which the server calls "equally in force" and rejects — so
-  /// adding a second one failed the WHOLE save and took the working one down.
-  it("gives a second rotation a distinct priority", async () => {
-    const wrapper = render({
-      schedule: schedule([
-        {
-          name: "On-call rotation",
-          members: ["ana@o2.ai"],
-          shift_micros: MICROS_PER_WEEK,
-          anchor_micros: ANCHOR,
-        },
-      ]),
-    });
+  /// The blocker this pins moved down a level with the data: two RULES of one
+  /// rotation both defaulting to priority 0 with no restrictions is what the
+  /// server calls "equally in force" and rejects — failing the WHOLE save and
+  /// taking the rule that already worked down with the new one.
+  it("gives a second shift rule a distinct priority", async () => {
+    const wrapper = render({ schedule: schedule([rota("On-call rotation")]) });
+    await flushPromises();
+    await openRotation(wrapper);
+
+    await wrapper.find('[data-test="oncall-schedule-rule-add"]').trigger("click");
+    await flushPromises();
+
+    const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    const rules = rows[0].shift_rules;
+    expect(rules).toHaveLength(2);
+    expect(rules[1].priority).not.toBe(rules[0].priority ?? 0);
+  });
+
+  /// Two rotations are two positions resolving independently, so an identical
+  /// priority across them is not a clash and never was one to the engine.
+  /// A second rotation is a second person on call, not a competing layer.
+  it("does not renumber priorities when a second rotation is added", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
     await flushPromises();
 
     await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
@@ -328,7 +325,7 @@ describe("OnCallScheduleEditor", () => {
 
     const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
     expect(rows).toHaveLength(2);
-    expect(rows[1].priority).not.toBe(rows[0].priority ?? 0);
+    expect(rows[1].shift_rules[0].priority).toBe(0);
   });
 
   /// The drawer used to survive its own save; the parent then rebuilt `draft`,
@@ -336,14 +333,7 @@ describe("OnCallScheduleEditor", () => {
   it("closes the editor after saving", async () => {
     service.setSchedule.mockResolvedValue({ data: {} } as any);
     const wrapper = render({
-      schedule: schedule([
-        {
-          name: "On-call rotation",
-          members: ["ana@o2.ai"],
-          shift_micros: MICROS_PER_WEEK,
-          anchor_micros: ANCHOR,
-        },
-      ]),
+      schedule: schedule([rota("On-call rotation")]),
     });
     await flushPromises();
     await openRotation(wrapper);
@@ -357,101 +347,113 @@ describe("OnCallScheduleEditor", () => {
   /// A layer's *when* was the half the editor could not express: a
   /// follow-the-sun setup was preset-or-API only, and a rotation the API had
   /// restricted rendered here as though it applied always.
-  describe("when a layer applies", () => {
-    const layer = (over: Record<string, unknown> = {}) => ({
-      name: "Primary",
-      members: ["ana@o2.ai"],
-      shift_micros: MICROS_PER_WEEK,
-      anchor_micros: ANCHOR,
-      priority: 0,
-      ...over,
-    });
+  describe("when a shift rule applies", () => {
+    const layer = (over: Record<string, unknown> = {}) => rule({ priority: 0, ...over });
 
     it("round-trips a restriction the API wrote", async () => {
       const wrapper = render({
         schedule: schedule([
-          layer({ restrictions: [{ days: [0, 1, 2], start_minute: 540, end_minute: 1020 }] }),
+          rota("Primary", [
+            layer({ restrictions: [{ days: [0, 1, 2], start_minute: 540, end_minute: 1020 }] }),
+          ]),
         ]),
       });
       await openRotation(wrapper);
 
-      expect(wrapper.find('[data-test="oncall-schedule-restriction-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-schedule-restriction-0-0"]').exists()).toBe(true);
       await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
       await flushPromises();
 
       const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations[0];
-      expect(sent.restrictions).toEqual([{ days: [0, 1, 2], start_minute: 540, end_minute: 1020 }]);
+      expect(sent.shift_rules[0].restrictions).toEqual([
+        { days: [0, 1, 2], start_minute: 540, end_minute: 1020 },
+      ]);
     });
 
     /// A window with no days applies on no day, which is a rotation resolving
     /// to nobody — so a new one starts as the working week.
     it("adds a window that already means something", async () => {
-      const wrapper = render({ schedule: schedule([layer()]) });
+      const wrapper = render({ schedule: schedule([rota("Primary", [layer()])]) });
       await openRotation(wrapper);
 
-      await wrapper.find('[data-test="oncall-schedule-restriction-add"]').trigger("click");
+      await wrapper.find('[data-test="oncall-schedule-restriction-add-0"]').trigger("click");
       await flushPromises();
       await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
       await flushPromises();
 
       const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations[0];
-      expect(sent.restrictions).toEqual([{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 }]);
+      expect(sent.shift_rules[0].restrictions).toEqual([
+        { days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 },
+      ]);
     });
 
     it("removes a window", async () => {
       const wrapper = render({
         schedule: schedule([
-          layer({ restrictions: [{ days: [0], start_minute: 0, end_minute: 60 }] }),
+          rota("Primary", [layer({ restrictions: [{ days: [0], start_minute: 0, end_minute: 60 }] })]),
         ]),
       });
       await openRotation(wrapper);
 
-      await wrapper.find('[data-test="oncall-schedule-restriction-remove-0"]').trigger("click");
+      await wrapper.find('[data-test="oncall-schedule-restriction-remove-0-0"]').trigger("click");
       await flushPromises();
       await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
       await flushPromises();
 
-      expect((service.setSchedule.mock.calls[0][0] as any).data.rotations[0].restrictions).toEqual([]);
+      expect(
+        (service.setSchedule.mock.calls[0][0] as any).data.rotations[0].shift_rules[0].restrictions,
+      ).toEqual([]);
     });
 
-    /// Two layers equally in force are refused as a WHOLE — the rotation that
-    /// works today goes down with the edit — so Save has to be unreachable
-    /// rather than the reader learning it from a 400.
-    it("blocks a save that would collide with another layer's priority", async () => {
+    /// Two rules of ONE rotation equally in force are refused as a WHOLE — the
+    /// rotation that works today goes down with the edit — so Save has to be
+    /// unreachable rather than the reader learning it from a 400.
+    it("blocks a save that would collide with a sibling rule's priority", async () => {
       const wrapper = render({
-        schedule: schedule([layer(), layer({ name: "Weekend", priority: 1 })]),
+        schedule: schedule([
+          rota("Primary", [layer(), layer({ name: "Weekend", priority: 1 })]),
+        ]),
       });
-      await openRotation(wrapper, 1);
+      await openRotation(wrapper);
 
-      const priority = wrapper.find('[data-test="oncall-schedule-priority"]');
-      priority.element.value = "0";
-      await priority.trigger("change");
+      wrapper
+        .findComponent('[data-test="oncall-schedule-priority-1"]')
+        .vm.$emit("update:modelValue", 0);
+      await flushPromises();
 
-      expect(wrapper.find('[data-test="oncall-schedule-priority-clash"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-schedule-priority-clash-1"]').exists()).toBe(true);
       expect(
         wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
       ).toBeDefined();
     });
 
-    /// Slots do not compete — both resolve at the same instant with their own
-    /// members — so an identical priority across two slots is not a clash.
-    it("allows the same priority in a different slot", async () => {
+    /// **Rotations do not compete.** Both resolve at the same instant with
+    /// their own people, so an identical priority across two of them is not a
+    /// clash — and reading it as one is exactly the conflation the rework
+    /// removed.
+    it("allows the same priority in a different rotation", async () => {
       const wrapper = render({
-        schedule: schedule([layer(), layer({ name: "Backup", slot: "secondary", priority: 0 })]),
+        schedule: schedule([
+          rota("Primary", [layer()]),
+          rota("Backup", [layer({ members: ["bob@o2.ai"] })]),
+        ]),
       });
       await openRotation(wrapper, 1);
 
-      expect(wrapper.find('[data-test="oncall-schedule-priority-clash"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-schedule-priority-clash-0"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
+      ).toBeUndefined();
     });
   });
 });
 
-/// **Retiring a layer instead of deleting it.** `ends_at` is how a rotation is
+/// **Retiring a shift rule instead of deleting it.** `ends_at` is how a rule is
 /// taken out of service without losing the record of who covered those hours.
-/// Deleting was the only way to stop one, so "the weekend layer ran until
-/// March" stopped being something the schedule could say the moment somebody
-/// tidied up.
-describe("OnCallScheduleEditor — retiring a layer", () => {
+/// Deleting was the only way to stop one, so "the weekend rule ran until March"
+/// stopped being something the schedule could say the moment somebody tidied
+/// up.
+describe("OnCallScheduleEditor — retiring a shift rule", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -463,12 +465,7 @@ describe("OnCallScheduleEditor — retiring a layer", () => {
     vi.useRealTimers();
   });
 
-  const WEEKEND = {
-    name: "Weekend",
-    members: ["ana@o2.ai"],
-    shift_micros: MICROS_PER_WEEK,
-    anchor_micros: ANCHOR,
-  };
+  const WEEKEND = rota("Weekend");
 
   const savedRotations = () => (service.setSchedule.mock.calls.at(-1)![0] as any).data.rotations;
 
@@ -477,34 +474,36 @@ describe("OnCallScheduleEditor — retiring a layer", () => {
     await flushPromises();
   }
 
-  it("writes ends_at when a layer is retired", async () => {
+  it("writes ends_at when a rule is retired", async () => {
     const wrapper = render({ schedule: schedule([WEEKEND]) });
     await openRotation(wrapper);
 
     wrapper
-      .findComponent('[data-test="oncall-schedule-retire"]')
+      .findComponent('[data-test="oncall-schedule-retire-0"]')
       .vm.$emit("update:modelValue", true);
     await flushPromises();
 
     await save(wrapper);
     // Defaults to now: "retire this" almost always means "as of today", and a
     // date somebody must fill in first makes the common case two steps.
-    expect(savedRotations()[0].ends_at).toBe(NOW * 1000);
+    expect(savedRotations()[0].shift_rules[0].ends_at).toBe(NOW * 1000);
   });
 
-  it("clears ends_at when the layer is put back into service", async () => {
+  it("clears ends_at when the rule is put back into service", async () => {
     const wrapper = render({
-      schedule: schedule([{ ...WEEKEND, ends_at: ANCHOR + MICROS_PER_WEEK }]),
+      schedule: schedule([
+        rota("Weekend", [rule({ ends_at: ANCHOR + MICROS_PER_WEEK })]),
+      ]),
     });
     await openRotation(wrapper);
 
     wrapper
-      .findComponent('[data-test="oncall-schedule-retire"]')
+      .findComponent('[data-test="oncall-schedule-retire-0"]')
       .vm.$emit("update:modelValue", false);
     await flushPromises();
 
     await save(wrapper);
-    expect(savedRotations()[0].ends_at).toBeUndefined();
+    expect(savedRotations()[0].shift_rules[0].ends_at).toBeUndefined();
   });
 
   /// The date is read and written in the TEAM's zone, which is what the field
@@ -514,33 +513,54 @@ describe("OnCallScheduleEditor — retiring a layer", () => {
       props: {
         teamId: "team_1",
         timezone: "Asia/Kolkata",
-        schedule: schedule([{ ...WEEKEND, ends_at: Date.UTC(2026, 7, 17, 4, 30) * 1000 }]),
+        schedule: schedule([
+          rota("Weekend", [rule({ ends_at: Date.UTC(2026, 7, 17, 4, 30) * 1000 })]),
+        ]),
         members: members("ana@o2.ai"),
       },
       global: { plugins: [i18n, store], stubs },
     });
     await openRotation(wrapper);
 
-    const field = wrapper.findComponent('[data-test="oncall-schedule-retire-at"]');
+    const field = wrapper.findComponent('[data-test="oncall-schedule-retire-at-0"]');
     expect(field.props("modelValue")).toBe("2026-08-17T10:00");
 
     field.vm.$emit("update:modelValue", "2026-08-18T10:00");
     await flushPromises();
     await save(wrapper);
 
-    expect(savedRotations()[0].ends_at).toBe(Date.UTC(2026, 7, 18, 4, 30) * 1000);
+    expect(savedRotations()[0].shift_rules[0].ends_at).toBe(Date.UTC(2026, 7, 18, 4, 30) * 1000);
   });
 
-  /// A retired layer stays in the list — it still resolves for the past — so
-  /// the row has to say it is not staffing anything now. Without that, the
-  /// name it shows sends somebody looking for a person who is not on call.
-  it("marks a retired layer in the list rather than hiding it", async () => {
+  /// A retired rule stays in the rotation — it still resolves for the past — so
+  /// it has to say it is not staffing anything now. Without that, the name it
+  /// shows sends somebody looking for a person who is not on call.
+  ///
+  /// It is marked beside the RULE, not on the rotation row: a rotation is not
+  /// retired, one of its rules is, and the others may still be staffing it.
+  it("marks a retired rule rather than hiding it", async () => {
     const wrapper = render({
-      schedule: schedule([WEEKEND, { ...WEEKEND, name: "Old weekend", ends_at: ANCHOR }]),
+      schedule: schedule([
+        rota("Weekend", [rule({ name: "Current" }), rule({ name: "Old", ends_at: ANCHOR })]),
+      ]),
+    });
+    await flushPromises();
+    await openRotation(wrapper);
+
+    expect(wrapper.find('[data-test="oncall-schedule-retire-at-0"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-schedule-retire-at-1"]').exists()).toBe(true);
+  });
+
+  /// A rotation the system staffed is not something somebody designed, and
+  /// reading it as a considered choice is how a default goes unreviewed until
+  /// it pages the wrong person.
+  it("marks a rotation the system staffed", async () => {
+    const wrapper = render({
+      schedule: schedule([rota("Primary", [], { source: "default" }), rota("Extra")]),
     });
     await flushPromises();
 
-    expect(wrapper.find('[data-test="oncall-schedule-retired-Weekend"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-schedule-retired-Old weekend"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-schedule-default-rot_primary"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-schedule-default-rot_extra"]').exists()).toBe(false);
   });
 });

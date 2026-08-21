@@ -3,6 +3,12 @@
   the calendar leads and the rotation form carries a live preview beside it.
   Configuring without one is how somebody discovers at 3am that the handover
   lands in the middle of their night.
+
+  The table lists ROTATIONS — named positions, one person on call each. The
+  drawer edits one rotation's SHIFT RULES, which is where layering lives.
+  Two rotations are two people on call; two shift rules are one person across
+  different hours. Collapsing those two ideas into one is what let a restricted
+  rotation silently hand its position to somebody no rule had rostered.
 -->
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-schedule-editor">
@@ -13,13 +19,13 @@
     </OText>
 
     <!-- No second drawing of the week here. This one resolved who was on call
-         CLIENT-side, so it could not see overrides, absences or slots, and it
+         CLIENT-side, so it could not see overrides or absences, and it
          disagreed with the server-resolved timeline sitting on the same tab. -->
     <template v-else-if="!drawerOnly">
       <OTable
         :data="draft"
         :columns="columns"
-        row-key="name"
+        row-key="id"
         :frame="false"
         pagination="client"
         :show-global-filter="false"
@@ -42,41 +48,37 @@
           </div>
         </template>
 
-        <!-- The order IS the paging order, so it is shown as such: whoever is
-             on now, and whoever the rotation hands to next. -->
-        <template #cell-people="{ row }">
-          <span class="flex flex-wrap items-center gap-1">
-            <OUserCell v-for="m in row.members" :key="m" :value="m" />
-            <OText variant="body" as="span" v-if="!row.members.length">
-              {{ t("oncall.rotationEmpty") }}
-            </OText>
-          </span>
-        </template>
-
-        <!-- A retired layer still resolves for the past, so it stays in the
-             list — but it is not staffing anything now, and a row that reads
-             like the others would have somebody looking for the person it
-             names. -->
+        <!-- A rotation the system staffed is not something somebody designed,
+             and reading it as a considered choice is how a default goes
+             unreviewed until it pages the wrong person. -->
         <template #cell-name="{ row }">
           <span class="flex flex-wrap items-center gap-2">
             {{ raw(row.name) }}
             <OTag
-              v-if="isRetired(row)"
+              v-if="row.source === 'default'"
               variant="default-soft"
               size="xs"
-              :data-test="`oncall-schedule-retired-${row.name}`"
+              :data-test="`oncall-schedule-default-${row.id}`"
             >
-              {{ t("oncall.rotationRetiredOnDate", { date: raw(shortDate(row.ends_at ?? 0)) }) }}
+              {{ t("oncall.rotationSourceDefault") }}
             </OTag>
           </span>
         </template>
 
-        <template #cell-primary="{ row }">
-          <OUserCell :value="holderOf(row, 0)" />
+        <!-- One rotation, one person. The second column is the calendar's "up
+             next" — it is NOT a position, and nothing pages it. -->
+        <template #cell-oncall="{ row }">
+          <OUserCell :value="holderOf(row)" />
         </template>
 
-        <template #cell-secondary="{ row }">
-          <OUserCell :value="holderOf(row, 1)" />
+        <template #cell-upnext="{ row }">
+          <OUserCell :value="nextOf(row)" />
+        </template>
+
+        <template #cell-rules="{ row }">
+          <OText variant="body" as="span">
+            {{ t("oncall.rotationRuleCount", { count: row.shift_rules?.length ?? 0 }) }}
+          </OText>
         </template>
 
         <template #cell-actions="{ row }">
@@ -85,7 +87,7 @@
             size="icon-sm"
             icon-left="delete-outline"
             :aria-label="t('oncall.removeRotation')"
-            :data-test="`oncall-schedule-remove-${row.name}`"
+            :data-test="`oncall-schedule-remove-${row.id}`"
             @click.stop="removeRotation(row)"
           />
         </template>
@@ -124,9 +126,6 @@
       :subtitle="t('oncall.rotationDrawerHint')"
       data-test="oncall-rotation-drawer"
     >
-      <!-- Three questions in the order somebody answers them — what is it, who
-           is in it, when does it turn over — then what that produces. A flat
-           stack of four controls made the last two read as afterthoughts. -->
       <div v-if="active" class="flex flex-col gap-6">
         <section class="flex flex-col gap-4">
           <OText variant="section">{{ t("oncall.rotationSectionWhat") }}</OText>
@@ -134,159 +133,277 @@
           <OInput
             v-model="active.name"
             :label="t('oncall.rotationName')"
+            :help-text="t('oncall.rotationNameHint')"
+            :maxlength="MAX_ROTATION_NAME_CHARS"
             data-test="oncall-schedule-name"
           />
 
-          <!-- The field that makes a secondary a separate pool rather than
-               next week's primary. Without it a team can staff one and no rung
-               can ever name it. -->
-          <OSelect
-            :model-value="active.slot ?? DEFAULT_SLOT"
-            :label="t('oncall.rotationSlot')"
-            :help-text="t('oncall.rotationSlotHint')"
-            :options="slotOptions"
-            data-test="oncall-schedule-slot"
-            @update:model-value="(v: unknown) => setSlot(active as Rotation, String(v))"
-          />
+          <p
+            v-if="nameClash"
+            class="text-status-warning-text text-sm"
+            data-test="oncall-schedule-name-clash"
+          >
+            {{ nameClash }}
+          </p>
         </section>
 
+        <!-- The rules. One is the ordinary case and reads as the whole form;
+             several is follow-the-sun, which had no editor at all — a rotation
+             the API had restricted rendered here as if it applied always. -->
         <section class="flex flex-col gap-4">
-          <OText variant="section">{{ t("oncall.rotationSectionWho") }}</OText>
+          <OText variant="section">{{ t("oncall.rotationSectionRules") }}</OText>
+          <OText variant="body">{{ t("oncall.rotationRulesHint") }}</OText>
 
-          <!-- The picker draws from the team roster, so on an empty team it has
-               nothing to offer. Saying so beats a select that opens on nothing. -->
-          <div
-            v-if="!props.members.length"
-            class="border-border-default rounded-surface flex flex-wrap items-center gap-3 border p-3"
-            data-test="oncall-rotation-no-members"
+          <p
+            v-if="!active.shift_rules.length"
+            class="text-status-warning-text text-sm"
+            data-test="oncall-rotation-needs-rules"
           >
-            <span class="text-text-secondary min-w-0 flex-1 text-sm">
-              {{ t("oncall.scheduleNeedsMembers") }}
-            </span>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="oncall-rotation-open-members"
-              @click="openMembers"
+            {{ t("oncall.rotationNeedsRules") }}
+          </p>
+
+          <div
+            v-for="(rule, ruleIndex) in active.shift_rules"
+            :key="ruleIndex"
+            class="border-border-default rounded-surface flex flex-col gap-4 border p-4"
+            :data-test="`oncall-schedule-rule-${ruleIndex}`"
+          >
+            <div class="flex flex-wrap items-end gap-3">
+              <OInput
+                v-model="rule.name"
+                class="min-w-0 flex-1"
+                :label="t('oncall.shiftRuleName')"
+                :data-test="`oncall-schedule-rule-name-${ruleIndex}`"
+              />
+              <OTag v-if="isRetired(rule)" variant="default-soft" size="xs">
+                {{ t("oncall.rotationRetiredOnDate", { date: raw(shortDate(rule.ends_at ?? 0)) }) }}
+              </OTag>
+              <OButton
+                v-if="active.shift_rules.length > 1"
+                variant="ghost"
+                size="sm-action"
+                icon-left="delete-outline"
+                :data-test="`oncall-schedule-rule-remove-${ruleIndex}`"
+                @click="removeRule(ruleIndex)"
+              >
+                {{ t("oncall.removeShiftRule") }}
+              </OButton>
+            </div>
+
+            <!-- The picker draws from the team roster, so on an empty team it
+                 has nothing to offer. Saying so beats a select that opens on
+                 nothing. -->
+            <div
+              v-if="!props.members.length"
+              class="border-border-default rounded-surface flex flex-wrap items-center gap-3 border p-3"
+              data-test="oncall-rotation-no-members"
             >
-              {{ t("oncall.rotationOpenMembers") }}
-            </OButton>
-          </div>
+              <span class="text-text-secondary min-w-0 flex-1 text-sm">
+                {{ t("oncall.scheduleNeedsMembers") }}
+              </span>
+              <OButton
+                variant="outline"
+                size="sm-action"
+                data-test="oncall-rotation-open-members"
+                @click="openMembers"
+              >
+                {{ t("oncall.rotationOpenMembers") }}
+              </OButton>
+            </div>
 
-          <OSelect
-            :model-value="active.members"
-            multiple
-            searchable
-            :label="t('oncall.rotationOrder')"
-            :help-text="t('oncall.rotationOrderHint')"
-            :placeholder="t('oncall.rotationPickPlaceholder')"
-            :options="memberOptions"
-            :disabled="!props.members.length"
-            data-test="oncall-schedule-members"
-            @update:model-value="(v: unknown) => setMembers(active as Rotation, v as string[])"
-          />
-
-          <!-- The server refuses a rotation with nobody in it, so this one would
-               store nothing. Said next to the pick that fixes it. -->
-          <p
-            v-if="!active.members.length"
-            class="text-status-warning-text text-sm"
-            data-test="oncall-rotation-needs-people"
-          >
-            {{ t("oncall.rotationNeedsPeople") }}
-          </p>
-
-          <!-- Catching this while somebody is still looking at the rotation is
-               the entire value; catching it at 3am is not. The rota will pass
-               the shift on — the warning is that the order will not be the one
-               being written here. -->
-          <p
-            v-for="clash in awayClashes"
-            :key="clash.id"
-            class="text-status-warning-text text-sm"
-            :data-test="`oncall-schedule-away-${clash.user_email}`"
-          >
-            {{
-              t("oncall.rotationMemberAway", {
-                who: raw(clash.user_email),
-                from: raw(shortDate(clash.start_at)),
-                to: raw(shortDate(clash.end_at)),
-              })
-            }}
-          </p>
-        </section>
-
-        <section class="flex flex-col gap-4">
-          <OText variant="section">{{ t("oncall.rotationSectionWhen") }}</OText>
-
-          <OSelect
-            v-model="active.shift_micros"
-            :label="t('oncall.shiftLength')"
-            :options="shiftOptions"
-            data-test="oncall-schedule-shift"
-          />
-
-          <!-- Without this the anchor was silently "now", so a rotation created
-               at 14:32 handed over at 14:32 forever. -->
-          <OInput
-            :model-value="handoverInput(active)"
-            type="datetime-local"
-            :label="t('oncall.firstHandover')"
-            :help-text="handoverHint"
-            data-test="oncall-schedule-handover"
-            @update:model-value="(v: string | number) => setAnchor(active as Rotation, String(v))"
-          />
-        </section>
-
-
-        <!-- The half of a layer the editor could not express at all: a
-             follow-the-sun setup was preset-or-API only, and a rotation the
-             API had restricted rendered here as if it applied always. -->
-        <section class="flex flex-col gap-4">
-          <OText variant="section">{{ t("oncall.rotationSectionApplies") }}</OText>
-
-          <OText variant="body">{{ t("oncall.rotationRestrictionHint") }}</OText>
-
-          <div
-            v-for="(window, index) in active.restrictions ?? []"
-            :key="index"
-            class="border-border-default rounded-surface flex flex-wrap items-end gap-3 border p-3"
-            :data-test="`oncall-schedule-restriction-${index}`"
-          >
             <OSelect
-              :model-value="window.days"
+              :model-value="rule.members"
               multiple
-              :label="t('oncall.rotationRestrictionDays')"
-              :options="dayOptions"
-              width="sm"
-              :data-test="`oncall-schedule-restriction-days-${index}`"
-              @update:model-value="(v: unknown) => (window.days = (v as number[]) ?? [])"
+              searchable
+              :label="t('oncall.rotationOrder')"
+              :help-text="t('oncall.rotationOrderHint')"
+              :placeholder="t('oncall.rotationPickPlaceholder')"
+              :options="memberOptions"
+              :disabled="!props.members.length"
+              :data-test="`oncall-schedule-members-${ruleIndex}`"
+              @update:model-value="(v: unknown) => setMembers(rule, v as string[])"
             />
-            <OSelect
-              :model-value="window.start_minute"
-              :label="t('oncall.rotationRestrictionFrom')"
-              :options="minuteOptions"
-              width="xs"
-              :data-test="`oncall-schedule-restriction-from-${index}`"
-              @update:model-value="(v: unknown) => (window.start_minute = Number(v))"
-            />
-            <OSelect
-              :model-value="window.end_minute"
-              :label="t('oncall.rotationRestrictionTo')"
-              :options="minuteOptions"
-              width="xs"
-              :data-test="`oncall-schedule-restriction-to-${index}`"
-              @update:model-value="(v: unknown) => (window.end_minute = Number(v))"
-            />
-            <OButton
-              variant="ghost"
-              size="sm-action"
-              icon-left="delete-outline"
-              :data-test="`oncall-schedule-restriction-remove-${index}`"
-              @click="removeRestriction(index)"
+
+            <!-- The server refuses a rule with nobody in it, so this one would
+                 store nothing. Said next to the pick that fixes it. -->
+            <p
+              v-if="!rule.members.length"
+              class="text-status-warning-text text-sm"
+              :data-test="`oncall-rotation-needs-people-${ruleIndex}`"
             >
-              {{ t("oncall.rotationRestrictionRemove") }}
-            </OButton>
+              {{ t("oncall.rotationNeedsPeople") }}
+            </p>
+
+            <!-- Catching this while somebody is still looking at the rotation
+                 is the entire value; catching it at 3am is not. The rota will
+                 pass the shift on — the warning is that the order will not be
+                 the one being written here. -->
+            <p
+              v-for="clash in awayClashesFor(rule)"
+              :key="clash.id"
+              class="text-status-warning-text text-sm"
+              :data-test="`oncall-schedule-away-${clash.user_email}`"
+            >
+              {{
+                t("oncall.rotationMemberAway", {
+                  who: raw(clash.user_email),
+                  from: raw(shortDate(clash.start_at)),
+                  to: raw(shortDate(clash.end_at)),
+                })
+              }}
+            </p>
+
+            <div class="flex flex-wrap items-end gap-3">
+              <OSelect
+                v-model="rule.shift_micros"
+                :label="t('oncall.shiftLength')"
+                :options="shiftOptions"
+                :data-test="`oncall-schedule-shift-${ruleIndex}`"
+              />
+
+              <!-- Without this the anchor was silently "now", so a rotation
+                   created at 14:32 handed over at 14:32 forever. -->
+              <OInput
+                :model-value="handoverInput(rule)"
+                type="datetime-local"
+                :label="t('oncall.firstHandover')"
+                :help-text="handoverHint"
+                :data-test="`oncall-schedule-handover-${ruleIndex}`"
+                @update:model-value="(v: string | number) => setAnchor(rule, String(v))"
+              />
+            </div>
+
+            <OText variant="body">{{ t("oncall.rotationRestrictionHint") }}</OText>
+
+            <div
+              v-for="(window, index) in rule.restrictions ?? []"
+              :key="index"
+              class="border-border-default rounded-surface flex flex-wrap items-end gap-3 border p-3"
+              :data-test="`oncall-schedule-restriction-${ruleIndex}-${index}`"
+            >
+              <OSelect
+                :model-value="window.days"
+                multiple
+                :label="t('oncall.rotationRestrictionDays')"
+                :options="dayOptions"
+                width="sm"
+                :data-test="`oncall-schedule-restriction-days-${ruleIndex}-${index}`"
+                @update:model-value="(v: unknown) => (window.days = (v as number[]) ?? [])"
+              />
+              <OSelect
+                :model-value="window.start_minute"
+                :label="t('oncall.rotationRestrictionFrom')"
+                :options="minuteOptions"
+                width="xs"
+                :data-test="`oncall-schedule-restriction-from-${ruleIndex}-${index}`"
+                @update:model-value="(v: unknown) => (window.start_minute = Number(v))"
+              />
+              <OSelect
+                :model-value="window.end_minute"
+                :label="t('oncall.rotationRestrictionTo')"
+                :options="minuteOptions"
+                width="xs"
+                :data-test="`oncall-schedule-restriction-to-${ruleIndex}-${index}`"
+                @update:model-value="(v: unknown) => (window.end_minute = Number(v))"
+              />
+              <OButton
+                variant="ghost"
+                size="sm-action"
+                icon-left="delete-outline"
+                :data-test="`oncall-schedule-restriction-remove-${ruleIndex}-${index}`"
+                @click="removeRestriction(rule, index)"
+              >
+                {{ t("oncall.rotationRestrictionRemove") }}
+              </OButton>
+            </div>
+
+            <div class="flex flex-wrap items-end gap-3">
+              <OButton
+                variant="outline"
+                size="sm-action"
+                icon-left="add"
+                :data-test="`oncall-schedule-restriction-add-${ruleIndex}`"
+                @click="addRestriction(rule)"
+              >
+                {{ t("oncall.rotationRestrictionAdd") }}
+              </OButton>
+
+              <!-- Two rules of the SAME rotation that both apply and share a
+                   priority are "equally in force", and the server refuses the
+                   WHOLE save — taking the rotation that already worked down
+                   with the edit. Across rotations it is not a clash at all:
+                   they resolve independently. -->
+              <OSelect
+                :model-value="rule.priority ?? 0"
+                :label="t('oncall.rotationPriority')"
+                :help-text="t('oncall.rotationPriorityHint')"
+                :options="priorityOptions"
+                width="sm"
+                :data-test="`oncall-schedule-priority-${ruleIndex}`"
+                @update:model-value="(v: unknown) => (rule.priority = Number(v))"
+              />
+            </div>
+            <p
+              v-if="priorityClashFor(rule)"
+              class="text-status-warning-text text-sm"
+              :data-test="`oncall-schedule-priority-clash-${ruleIndex}`"
+            >
+              {{ priorityClashFor(rule) }}
+            </p>
+
+            <!-- Retiring a rule, rather than deleting it. Delete was the only
+                 way to stop one and it threw away the record of who had been
+                 covering those hours, so "the weekend rule ran until March"
+                 stopped being something the schedule could say. -->
+            <div class="flex flex-col gap-2">
+              <OCheckbox
+                :model-value="isRetired(rule)"
+                :label="t('oncall.rotationRetire')"
+                :data-test="`oncall-schedule-retire-${ruleIndex}`"
+                @update:model-value="(on: CheckboxModelValue) => setRetired(rule, !!on)"
+              />
+              <OText variant="meta">{{ t("oncall.rotationRetireHint") }}</OText>
+              <OInput
+                v-if="isRetired(rule)"
+                type="datetime-local"
+                width="md"
+                :model-value="retiredAtLocal(rule)"
+                :label="t('oncall.rotationRetiredOn')"
+                :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(props.timezone) })"
+                :data-test="`oncall-schedule-retire-at-${ruleIndex}`"
+                @update:model-value="(v: string | number) => setRetiredAt(rule, v)"
+              />
+            </div>
+
+            <!-- The answer this rule produces. A cadence and an anchor are not
+                 readable as a rota until you see the dates they generate. -->
+            <div class="flex flex-col gap-2">
+              <OText variant="section">{{ t("oncall.upcoming") }}</OText>
+
+              <div
+                v-if="rule.members.length"
+                class="border-border-default rounded-surface flex flex-col divide-y divide-border-default border"
+              >
+                <div
+                  v-for="shift in preview(rule)"
+                  :key="shift.startMicros"
+                  class="flex flex-wrap items-center gap-2 px-3 py-2"
+                  data-test="oncall-schedule-preview-shift"
+                >
+                  <OUserCell :value="shift.member" />
+                  <span class="text-text-muted ms-auto text-xs">{{ raw(shiftRange(shift)) }}</span>
+                  <OTag v-if="isCurrent(shift)" variant="success-soft" size="xs">
+                    {{ t("oncall.onCallNowTag") }}
+                  </OTag>
+                </div>
+              </div>
+
+              <!-- An empty preview is the most common state of a NEW rule, and
+                   saying why beats showing nothing. -->
+              <OText variant="body" v-else data-test="oncall-schedule-preview-empty">
+                {{ t("oncall.rotationPreviewEmpty") }}
+              </OText>
+            </div>
           </div>
 
           <div class="flex">
@@ -294,87 +411,12 @@
               variant="outline"
               size="sm-action"
               icon-left="add"
-              data-test="oncall-schedule-restriction-add"
-              @click="addRestriction"
+              data-test="oncall-schedule-rule-add"
+              @click="addRule"
             >
-              {{ t("oncall.rotationRestrictionAdd") }}
+              {{ t("oncall.addShiftRule") }}
             </OButton>
           </div>
-
-          <!-- Two layers that both apply and share a priority are "equally in
-               force", and the server refuses the WHOLE save — taking the
-               rotation that already worked down with the edit. -->
-          <OSelect
-            :model-value="active.priority ?? 0"
-            :label="t('oncall.rotationPriority')"
-            :help-text="t('oncall.rotationPriorityHint')"
-            :options="priorityOptions"
-            width="sm"
-            data-test="oncall-schedule-priority"
-            @update:model-value="(v: unknown) => setPriority(active as Rotation, Number(v))"
-          />
-          <p
-            v-if="priorityClash"
-            class="text-status-warning-text text-sm"
-            data-test="oncall-schedule-priority-clash"
-          >
-            {{ priorityClash }}
-          </p>
-
-          <!-- Retiring a layer, rather than deleting it. Delete was the only
-               way to stop a rotation and it threw away the record of who had
-               been covering those hours, so "the weekend layer ran until
-               March" stopped being something the schedule could say. -->
-          <div class="flex flex-col gap-2">
-            <OCheckbox
-              :model-value="isRetired(active)"
-              :label="t('oncall.rotationRetire')"
-              data-test="oncall-schedule-retire"
-              @update:model-value="(on: CheckboxModelValue) => setRetired(active as Rotation, !!on)"
-            />
-            <OText variant="meta">{{ t("oncall.rotationRetireHint") }}</OText>
-            <OInput
-              v-if="isRetired(active)"
-              type="datetime-local"
-              width="md"
-              :model-value="retiredAtLocal(active)"
-              :label="t('oncall.rotationRetiredOn')"
-              :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(props.timezone) })"
-              data-test="oncall-schedule-retire-at"
-              @update:model-value="(v: string | number) => setRetiredAt(active as Rotation, v)"
-            />
-          </div>
-        </section>
-
-        <!-- The answer the form produces. It is the reason to have a drawer at
-             all: a cadence and an anchor are not readable as a rota until you
-             see the dates they generate. -->
-        <section class="flex flex-col gap-2">
-          <OText variant="section">{{ t("oncall.upcoming") }}</OText>
-
-          <div
-            v-if="active.members.length"
-            class="border-border-default rounded-surface flex flex-col divide-y divide-border-default border"
-          >
-            <div
-              v-for="shift in preview(active)"
-              :key="shift.startMicros"
-              class="flex flex-wrap items-center gap-2 px-3 py-2"
-              data-test="oncall-schedule-preview-shift"
-            >
-              <OUserCell :value="shift.member" />
-              <span class="text-text-muted ms-auto text-xs">{{ raw(shiftRange(shift)) }}</span>
-              <OTag v-if="isCurrent(shift)" variant="success-soft" size="xs">
-                {{ t("oncall.onCallNowTag") }}
-              </OTag>
-            </div>
-          </div>
-
-          <!-- An empty preview is the most common state of a NEW rotation, and
-               saying why beats showing nothing. -->
-          <OText variant="body" v-else data-test="oncall-schedule-preview-empty">
-            {{ t("oncall.rotationPreviewEmpty") }}
-          </OText>
         </section>
       </div>
 
@@ -400,7 +442,7 @@
             variant="primary"
             size="sm-action"
             :loading="saving"
-            :disabled="!!priorityClash || !activeIsStaffed"
+            :disabled="!activeIsSavable"
             data-test="oncall-rotation-done"
             @click="save"
           >
@@ -435,25 +477,28 @@ import type {
   OnCallTeamMember,
   Rotation,
   ScheduleEditorIntent,
+  ShiftRule,
   Unavailability,
 } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, MICROS_PER_WEEK, sameSlot } from "@/ts/interfaces/oncall";
+import {
+  DEFAULT_ROTATION_NAME,
+  MAX_ROTATION_NAME_CHARS,
+  MICROS_PER_WEEK,
+} from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Shift } from "@/utils/oncall";
 import {
   formatMinuteOfDay,
   fromZonedInputValue,
+  resolveHolder,
+  resolveNextHolder,
   SHIFT_PRESETS,
   toZonedInputValue,
   upcomingShifts,
 } from "@/utils/oncall";
 
 const PREVIEW_SHIFTS = 5;
-
-/// The second pool a team reaches for. Offered by name so the common case does
-/// not depend on somebody spelling it the same way the ladder does.
-const SECONDARY_SLOT = "secondary";
 
 const props = defineProps<{
   teamId: string;
@@ -485,11 +530,30 @@ const saving = ref(false);
 const editing = ref(false);
 const active = ref<Rotation | null>(null);
 
-/// Primary and secondary are POSITIONS in one rotation, not two rotations to
-/// staff. This is the same walk the engine does when it pages.
-function holderOf(rotation: Rotation, offset: number): string {
-  const shifts = preview(rotation);
-  return shifts[offset]?.member ?? "";
+/**
+ * A stable handle for a rotation the server has not seen yet.
+ *
+ * Minted here because the id is what an escalation level stores: the level has
+ * to be writable against this rotation the moment it is saved, and a
+ * server-assigned id would mean a round trip before a ladder could name it.
+ */
+function mintRotationId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return `rot_${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/// Who this rotation puts on call now — ONE person, resolved the way the engine
+/// resolves it. A rotation with a gap shows nobody rather than borrowing a
+/// holder from somewhere else.
+function holderOf(rotation: Rotation): string {
+  return resolveHolder(rotation, nowMicros.value, props.timezone).member ?? "";
+}
+
+/// The calendar's "up next". **Display only** — nothing pages it. It used to
+/// double as the secondary, which is exactly how one team got two different
+/// people both correctly labelled "the secondary".
+function nextOf(rotation: Rotation): string {
+  return resolveNextHolder(rotation, nowMicros.value, props.timezone) ?? "";
 }
 
 const columns = computed<OTableColumnDef<Rotation>[]>(() => [
@@ -500,19 +564,19 @@ const columns = computed<OTableColumnDef<Rotation>[]>(() => [
     meta: { isName: true },
   },
   {
-    id: "primary",
-    header: t("oncall.rolePrimary"),
-    accessorFn: (row: Rotation) => holderOf(row, 0),
+    id: "oncall",
+    header: t("oncall.rotationOnCallNow"),
+    accessorFn: (row: Rotation) => holderOf(row),
   },
   {
-    id: "secondary",
-    header: t("oncall.roleSecondary"),
-    accessorFn: (row: Rotation) => holderOf(row, 1),
+    id: "upnext",
+    header: t("oncall.rotationUpNext"),
+    accessorFn: (row: Rotation) => nextOf(row),
   },
   {
-    id: "people",
-    header: t("oncall.rotationOrder"),
-    accessorFn: (row: Rotation) => row.members.join(", "),
+    id: "rules",
+    header: t("oncall.rotationSectionRules"),
+    accessorFn: (row: Rotation) => String(row.shift_rules?.length ?? 0),
     hideable: true,
   },
   {
@@ -554,10 +618,10 @@ watch(editing, async (isOpen) => {
 });
 
 /// One line per chosen member with an absence in the horizon.
-const awayClashes = computed(() => {
-  const chosen = new Set((active.value?.members ?? []).map((m) => m.toLowerCase()));
+function awayClashesFor(rule: ShiftRule): Unavailability[] {
+  const chosen = new Set((rule.members ?? []).map((m) => m.toLowerCase()));
   return editorAbsences.value.filter((a) => chosen.has(a.user_email.toLowerCase()));
-});
+}
 
 function shortDate(micros: number): string {
   return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
@@ -570,18 +634,19 @@ function editRotation(rotation: Rotation) {
   editing.value = true;
 }
 
-/// The slots this team already staffs, plus the two everyone starts from.
-/// Offered as a list rather than free text because a typo is a rotation that
-/// resolves on its own and is reached by no rung.
-const slotOptions = computed(() => {
-  const used = draft.value.map((r) => r.slot ?? DEFAULT_SLOT);
-  const names = [...new Set([DEFAULT_SLOT, SECONDARY_SLOT, ...used])];
-  return names.map((name) => ({ label: raw(name), value: name }));
+/// Two rotations with one name is a screen where "page the Secondary" names
+/// two things. The server keys on the id, so this is a legibility rule rather
+/// than a storage one — which is why it warns rather than blocks.
+const nameClash = computed<I18nText | "">(() => {
+  const rotation = active.value;
+  if (!rotation) return "";
+  const rival = draft.value.find(
+    (other) =>
+      other.id !== rotation.id &&
+      other.name.trim().toLowerCase() === rotation.name.trim().toLowerCase(),
+  );
+  return rival ? t("oncall.rotationNameClash", { name: raw(rival.name) }) : "";
 });
-
-function setSlot(rotation: Rotation, slot: string) {
-  rotation.slot = slot;
-}
 
 /// The zone the handover is measured in. It is the team's, never the browser's,
 /// and getting that wrong is the single easiest mistake in this form.
@@ -594,9 +659,15 @@ const nowMicros = ref(Date.now() * 1000);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-/// A rotation with nobody in it stores nothing, so Save stays out of reach
-/// until somebody is picked.
-const activeIsStaffed = computed(() => !!active.value?.members.length);
+/// A rotation with no rules, or a rule with nobody in it, stores nothing — so
+/// Save stays out of reach until both are answered.
+const activeIsSavable = computed(() => {
+  const rotation = active.value;
+  if (!rotation?.name?.trim()) return false;
+  if (!rotation.shift_rules.length) return false;
+  if (rotation.shift_rules.some((rule) => !rule.members.length)) return false;
+  return !rotation.shift_rules.some((rule) => priorityClashFor(rule));
+});
 
 function openMembers() {
   cancelDrawer();
@@ -633,14 +704,14 @@ const minuteOptions = computed(() =>
   })),
 );
 
-/// Offered rather than typed. Two layers that both apply and share a priority
+/// Offered rather than typed. Two rules that both apply and share a priority
 /// are equally in force, and the server rejects the ENTIRE save rather than
-/// the one rotation — so a free number field is a way to take a working rota
-/// down while editing something else.
+/// the one rule — so a free number field is a way to take a working rota down
+/// while editing something else.
 const priorityOptions = computed(() => {
-  const highest = draft.value.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
-  const mine = active.value?.priority ?? 0;
-  const levels = new Set<number>([0, mine, highest, highest + 1]);
+  const rules = active.value?.shift_rules ?? [];
+  const highest = rules.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
+  const levels = new Set<number>([0, highest, highest + 1]);
   return [...levels]
     .filter((level) => level >= 0)
     .sort((a, b) => a - b)
@@ -650,80 +721,92 @@ const priorityOptions = computed(() => {
     }));
 });
 
-/// Only rotations sharing a SLOT compete: two slots resolve at the same instant
-/// with their own members, so an identical priority across them is not a clash.
-const priorityClash = computed<I18nText | "">(() => {
-  const rotation = active.value;
-  if (!rotation) return "";
-  const rival = draft.value.find(
-    (other) =>
-      other !== rotation &&
-      other.name !== rotation.name &&
-      sameSlot(other.slot, rotation.slot) &&
-      (other.priority ?? 0) === (rotation.priority ?? 0),
+/// Only rules of the SAME rotation compete. Two rotations resolve at the same
+/// instant with their own people, so an identical priority across them is not
+/// a clash — reading it as one is the confusion this rework removed.
+function priorityClashFor(rule: ShiftRule): I18nText | "" {
+  const rules = active.value?.shift_rules ?? [];
+  const rival = rules.find(
+    (other) => other !== rule && (other.priority ?? 0) === (rule.priority ?? 0),
   );
   return rival ? t("oncall.rotationPriorityClash", { name: raw(rival.name) }) : "";
-});
-
-function setPriority(rotation: Rotation, priority: number) {
-  rotation.priority = priority;
 }
 
-/// ── Retiring a layer ──────────────────────────────────────────────────────
+/// ── Retiring a rule ───────────────────────────────────────────────────────
 ///
-/// `ends_at` is how a rotation is taken out of service without deleting it.
+/// `ends_at` is how a rule is taken out of service without deleting it.
 /// Deleting was the only way to stop one, and it discarded exactly the record
-/// the field exists to keep: "the weekend layer ran until March" stopped being
+/// the field exists to keep: "the weekend rule ran until March" stopped being
 /// something the schedule could say, and the calendar lost the reason those
 /// hours had been covered at all.
 ///
 /// The end is exclusive, like every other boundary here.
-const isRetired = (rotation: Rotation) => rotation.ends_at !== undefined;
+const isRetired = (rule: ShiftRule) => rule.ends_at !== undefined;
 
-const retiredAt = (rotation: Rotation) => rotation.ends_at ?? nowMicros.value;
+const retiredAt = (rule: ShiftRule) => rule.ends_at ?? nowMicros.value;
 
 /// The picker is a `datetime-local`, which has no timezone of its own — so the
 /// value is rendered in the TEAM's zone and labelled with it, rather than in
 /// whatever zone the reader's laptop is set to.
-function retiredAtLocal(rotation: Rotation): string {
-  return toZonedInputValue(retiredAt(rotation), props.timezone);
+function retiredAtLocal(rule: ShiftRule): string {
+  return toZonedInputValue(retiredAt(rule), props.timezone);
 }
 
-function setRetired(rotation: Rotation, on: boolean) {
+function setRetired(rule: ShiftRule, on: boolean) {
   // Defaults to now: "retire this" almost always means "as of today", and a
   // date somebody has to fill in before the checkbox means anything is a
   // second step for the common case.
-  rotation.ends_at = on ? retiredAt(rotation) : undefined;
+  rule.ends_at = on ? retiredAt(rule) : undefined;
 }
 
-function setRetiredAt(rotation: Rotation, value: string | number) {
+function setRetiredAt(rule: ShiftRule, value: string | number) {
   const micros = fromZonedInputValue(String(value), props.timezone);
-  if (micros !== null) rotation.ends_at = micros;
+  if (micros !== null) rule.ends_at = micros;
 }
 
-/// A window with no days applies on no day, which is a rotation that resolves
-/// to nobody — so a new one starts as the working week.
-function addRestriction() {
-  const rotation = active.value;
-  if (!rotation) return;
-  rotation.restrictions = [
-    ...(rotation.restrictions ?? []),
+/// A window with no days applies on no day, which is a rule that resolves to
+/// nobody — so a new one starts as the working week.
+function addRestriction(rule: ShiftRule) {
+  rule.restrictions = [
+    ...(rule.restrictions ?? []),
     { days: [0, 1, 2, 3, 4], start_minute: 9 * 60, end_minute: 17 * 60 },
   ];
 }
 
-function removeRestriction(index: number) {
-  const rotation = active.value;
-  if (!rotation?.restrictions) return;
-  rotation.restrictions = rotation.restrictions.filter((_, at) => at !== index);
+function removeRestriction(rule: ShiftRule, index: number) {
+  if (!rule.restrictions) return;
+  rule.restrictions = rule.restrictions.filter((_, at) => at !== index);
 }
 
+/// A second rule is follow-the-sun: the same position, different hours. It gets
+/// a distinct priority for the same reason the server demands one — two rules
+/// equally in force are refused as a whole.
+function addRule() {
+  const rotation = active.value;
+  if (!rotation) return;
+  const highest = rotation.shift_rules.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
+  rotation.shift_rules.push({
+    name: rotation.shift_rules.length
+      ? String(t("oncall.shiftRuleNthName", { n: rotation.shift_rules.length + 1 }))
+      : rotation.name,
+    members: [],
+    shift_micros: MICROS_PER_WEEK,
+    // Top of the hour, so a handover is readable rather than landing at
+    // whatever minute somebody happened to click Add.
+    anchor_micros: Math.floor(nowMicros.value / 3_600_000_000) * 3_600_000_000,
+    priority: rotation.shift_rules.length ? highest + 1 : 0,
+    restrictions: [],
+  });
+}
 
+function removeRule(index: number) {
+  const rotation = active.value;
+  if (!rotation) return;
+  rotation.shift_rules = rotation.shift_rules.filter((_, at) => at !== index);
+}
 
-
-
-function preview(rotation: Rotation): Shift[] {
-  return upcomingShifts(rotation, nowMicros.value, PREVIEW_SHIFTS);
+function preview(rule: ShiftRule): Shift[] {
+  return upcomingShifts(rule, nowMicros.value, PREVIEW_SHIFTS);
 }
 
 function isCurrent(shift: Shift): boolean {
@@ -736,8 +819,8 @@ function shiftRange(shift: Shift): string {
   return `${start.toLocaleString()} — ${end.toLocaleString()}`;
 }
 
-function setMembers(rotation: Rotation, members: string[]) {
-  rotation.members = [...members];
+function setMembers(rule: ShiftRule, members: string[]) {
+  rule.members = [...members];
 }
 
 /// In the TEAM's zone, which is what the label beside it promises and what
@@ -745,21 +828,25 @@ function setMembers(rotation: Rotation, members: string[]) {
 /// browser's zone, an operator in Berlin editing an Asia/Kolkata team saw the
 /// handover three and a half hours from where it was — and moved it there by
 /// saving.
-function handoverInput(rotation: Rotation): string {
-  return toZonedInputValue(rotation.anchor_micros, props.timezone);
+function handoverInput(rule: ShiftRule): string {
+  return toZonedInputValue(rule.anchor_micros, props.timezone);
 }
 
-function setAnchor(rotation: Rotation, value: string) {
+function setAnchor(rule: ShiftRule, value: string) {
   const micros = fromZonedInputValue(value, props.timezone);
   // An incomplete value means the user is mid-edit; keeping the previous
   // anchor beats writing NaN and blanking the preview.
-  if (micros !== null) rotation.anchor_micros = micros;
+  if (micros !== null) rule.anchor_micros = micros;
 }
 
 function reset() {
   draft.value = (props.schedule?.rotations ?? []).map((r) => ({
     ...r,
-    members: [...r.members],
+    shift_rules: (r.shift_rules ?? []).map((rule) => ({
+      ...rule,
+      members: [...rule.members],
+      restrictions: rule.restrictions ? [...rule.restrictions] : undefined,
+    })),
   }));
   nowMicros.value = Date.now() * 1000;
 }
@@ -775,9 +862,9 @@ watch(
     if (intent.mode === "new") {
       addRotation();
     } else if (intent.mode === "duplicate") {
-      duplicateRotation(intent.name);
+      duplicateRotation(intent.id);
     } else {
-      const found = draft.value.find((r) => r.name === intent.name);
+      const found = draft.value.find((r) => r.id === intent.id);
       if (found) {
         isNew.value = false;
         editRotation(found);
@@ -788,28 +875,27 @@ watch(
   { immediate: true, flush: "post" },
 );
 
+/// A team's first rotation is its Primary; a second is an ordinary rotation
+/// that happens to be a second position. Nothing links them — if somebody
+/// edits one roster and not the other they drift, and `config-risks` reports
+/// the collision rather than a hidden rule preventing it.
 function addRotation() {
-  // NOT named "Primary". Primary and secondary are POSITIONS within a
-  // rotation, so naming the rotation itself "Primary" reads as though a
-  // second one called "Secondary" is also required. Most teams have exactly
-  // one; a second is for follow-the-sun, each covering part of the day.
-  // A distinct priority is mandatory, not cosmetic: two rotations with the
-  // same priority and the same (empty) restrictions are "equally in force",
-  // and the server rejects the ENTIRE save — taking the rotation that already
-  // worked down with the new one. Newer rotations sit above the base, which
-  // stays the catch-all underneath.
-  const highest = draft.value.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
+  const name = draft.value.length
+    ? String(t("oncall.rotationNthName", { n: draft.value.length + 1 }))
+    : DEFAULT_ROTATION_NAME;
   const rotation: Rotation = {
-    name: draft.value.length
-      ? t("oncall.rotationNthName", { n: draft.value.length + 1 })
-      : t("oncall.rotationDefaultName"),
-    members: [],
-    shift_micros: MICROS_PER_WEEK,
-    // Top of the hour, so a handover is readable rather than landing at
-    // whatever minute somebody happened to click Add.
-    anchor_micros: Math.floor(nowMicros.value / 3_600_000_000) * 3_600_000_000,
-    priority: draft.value.length ? highest + 1 : 0,
-    restrictions: [],
+    id: mintRotationId(),
+    name,
+    shift_rules: [
+      {
+        name,
+        members: [],
+        shift_micros: MICROS_PER_WEEK,
+        anchor_micros: Math.floor(nowMicros.value / 3_600_000_000) * 3_600_000_000,
+        priority: 0,
+        restrictions: [],
+      },
+    ],
   };
   draft.value.push(rotation);
   // Straight into the editor: an empty row is not something anybody can act on.
@@ -818,20 +904,22 @@ function addRotation() {
 }
 
 /// A copy is a starting point, not a save: the editor opens on a duplicate
-/// nobody has committed yet, so it is named and reviewed before it is real. The
-/// name must differ — the server keys a rotation by it — and so must the
-/// priority, or two identical layers are "equally in force" and the whole save
-/// is refused, taking the working one down with the copy.
-function duplicateRotation(name: string) {
-  const source = draft.value.find((r) => r.name === name);
+/// nobody has committed yet, so it is named and reviewed before it is real.
+/// It gets its own id — sharing one would make the copy and the original the
+/// same row to every level that names either.
+function duplicateRotation(id: string) {
+  const source = draft.value.find((r) => r.id === id);
   if (!source) return;
-  const highest = draft.value.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
   const copy: Rotation = {
-    ...source,
+    id: mintRotationId(),
     name: String(t("oncall.railCopyName", { name: raw(source.name) })),
-    members: [...source.members],
-    restrictions: source.restrictions ? [...source.restrictions] : [],
-    priority: highest + 1,
+    shift_rules: source.shift_rules.map((rule) => ({
+      ...rule,
+      members: [...rule.members],
+      restrictions: rule.restrictions ? [...rule.restrictions] : undefined,
+    })),
+    // A copy is somebody's choice, so it is no longer the system's default.
+    source: undefined,
   };
   draft.value.push(copy);
   isNew.value = true;
@@ -859,8 +947,10 @@ async function deleteActive() {
 async function save() {
   // Dropping the empty ones and reporting success is how a rotation somebody
   // just filled in looked saved while nothing was stored: the server refuses a
-  // rotation with nobody in it, so this has to be refused here and said out loud.
-  const empty = draft.value.find((r) => !r.members.length);
+  // rule with nobody in it, so this has to be refused here and said out loud.
+  const empty = draft.value.find(
+    (r) => !r.shift_rules.length || r.shift_rules.some((rule) => !rule.members.length),
+  );
   if (empty) {
     toast({
       variant: "error",
