@@ -15,36 +15,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  What this tab can be ACTED on: whether a secondary exists, and the buttons.
+  What this tab can be ACTED on: the three acts, and the one claim that stops
+  them meaning anything.
 
-  It used to open with a three-part line — the primary and how long they had
-  left, who was next, then the secondary. Every one of those three is said
-  elsewhere on the same screen. The primary and the handover are on the pulse
-  strip ABOVE the tabs, and the timeline's own band label says "<who> · on now ·
-  until <when>" on the span the reader is already looking at; the handover was
-  worse than redundant, because the strip derives it from rotation cadence while
-  this line derived it from resolved segments, so a cover on the next shift made
-  the two name different people a few pixels apart.
+  It used to open by naming people — the primary and how long they had left, who
+  was next, then whoever was backing them up. Every one of those is said again
+  within the same screenful: the timeline's own band label reads "<who> · on now
+  · until <when>" on the span the reader is already looking at, and it names the
+  second rotation's holder on the lane below. The line named them from
+  `whoIsOnCall` while the chart draws resolved segments, so a cover on the next
+  shift made the two disagree a few pixels apart.
 
-  What is left is what nothing else carries. A team with only ONE staffed
-  rotation reads as a single lane on the chart, which is not the same as being
-  told; and the three acts — add a second rotation, trade a shift, go and get
-  some people — have no other home on this tab. `whoIsOnCall` is still the
-  source, so the rotation named here is the one the engine would page.
+  What is left is what nothing else carries: two acts — add a second rotation,
+  go and get some people — and the claim that stops either mattering. Writing a
+  cover moved down onto the chart's own toolbar, beside Add rotation, where the
+  rest of what a reader can do to this schedule already lives.
 
-  "The secondary" is a second ROTATION now, not a derived position. There is no
-  slot keyword to look up: the response carries one entry per rotation that
-  resolves to somebody, so "is anybody backing the first up" is a count.
+  "The secondary" is a second ROTATION, not a derived position. There is no slot
+  keyword to look up: the response carries one entry per rotation that resolves
+  to somebody, so "is anybody backing the first up" is a count.
 -->
 <template>
   <div
     class="border-border-default px-page-edge flex flex-wrap items-center gap-x-8 gap-y-3 border-b py-3"
     data-test="oncall-schedule-answer"
   >
-    <!-- Nobody on call at all is a different and louder claim than an
-         unstaffed second rung, so it replaces it rather than sitting beside
-         it: naming the secondary's state is beside the point when the first
-         rung is empty too. -->
+    <!-- Nobody on call at all is the loudest thing this strip can say, and it
+         is the one state in which the buttons beside it are beside the point. -->
     <div v-if="!holder" class="flex min-w-0 flex-col gap-0.5">
       <OText variant="panel-title" class="text-status-error-text">
         {{ t("oncall.schedNobodyOnCall") }}
@@ -52,25 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p class="text-text-secondary text-xs" data-test="oncall-answer-nobody-hint">
         {{ t("oncall.schedNobodyOnCallHint") }}
       </p>
-    </div>
-
-    <div v-else class="flex min-w-0 flex-col gap-0.5" data-test="oncall-answer-secondary">
-      <OText variant="meta">{{ secondary ? raw(secondary.rotation_name) : t("oncall.schedSecondary") }}</OText>
-      <!-- One staffed rotation is the difference between "somebody is on call"
-           and "somebody is on call and somebody else is too", so it is coloured
-           like the finding it is. A rotation that resolves to nobody is absent
-           from the response, so this counts positions rather than reading a
-           holder that could be null. -->
-      <span
-        v-if="secondary"
-        class="text-text-body truncate text-sm"
-        data-test="oncall-answer-secondary-who"
-      >
-        {{ raw(secondary.user_email) }}
-      </span>
-      <span v-else class="text-status-error-text text-sm">
-        {{ t("oncall.schedNoOneAssigned") }}
-      </span>
     </div>
 
     <span class="ms-auto flex flex-wrap items-center gap-2">
@@ -94,16 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("oncall.schedAssignSecondary") }}
       </OButton>
-      <OButton
-        v-if="hasMembers"
-        variant="outline"
-        size="sm-action"
-        :disabled="!holder"
-        data-test="oncall-answer-request-swap"
-        @click="emit('request-swap')"
-      >
-        {{ t("oncall.requestCover") }}
-      </OButton>
     </span>
   </div>
 </template>
@@ -114,7 +82,7 @@ import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallPosition } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -137,7 +105,6 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   "assign-secondary": [];
-  "request-swap": [];
   /** The only act an empty team can take: go and add somebody. */
   "add-people": [];
 }>();

@@ -79,24 +79,10 @@
     </OContent>
 
     <template v-else>
-      <!-- What a page fired right now would do, end to end: who it wakes, in
-           what order, when the pager changes hands, and how the week went. The
-           tabs below are where you go to CHANGE any of it. One inset and one
-           gap: the two strips are peers, not two hand-picked pads. -->
-      <OContent y class="flex flex-col gap-3">
-        <OnCallTeamPulse
-          :preview="firesNowPreview"
-          :loading="previewLoading"
-          :positions="onCallNow"
-          :schedule="schedule"
-          :overview="overview"
-          :timezone="team?.timezone ?? 'UTC'"
-      :viewer-timezone="store.state.timezone"
-          @edit-ladder="activeTab = 'policy'"
-          @open-schedule="activeTab = 'schedule'"
-          @open-pages="openOnCallList"
-        />
-
+      <!-- What needs doing about this team, above the tabs that do it. The
+           dry run of a P1 that used to sit here restated the Escalation tab a
+           click away; what survives is the part that names a problem. -->
+      <OContent y>
         <OnCallTeamAttention
           :risks="configRisks"
           :timezone="team?.timezone ?? 'UTC'"
@@ -239,44 +225,25 @@
              engine, so it answers "is this right" in a way the draft cannot. -->
         <OTabPanel name="schedule">
           <!-- Only what the chart cannot be acted on for. Who is on, until
-               when and who is next are on the lane and on the pulse strip
-               above the tabs; restating them here gave the reader two
-               renderings to reconcile. -->
+               when and who is next are on the lane the reader is already
+               looking at; restating them here gave the reader two renderings
+               to reconcile. -->
           <OnCallScheduleAnswer
             :positions="onCallNow"
             :has-members="hasMembers !== false"
             @assign-secondary="onAssignSecondary"
-            @request-swap="openCover"
             @add-people="activeTab = 'members'"
           />
 
           <OContent y class="flex flex-col gap-5">
-            <!-- **The rotation detail, without a second screen.** Scoping this
-                 tab to one rotation puts its calendar, its shift rules and its
-                 covers together — which is what "open the Secondary" means on a
-                 team with three positions. Unscoped it is the team's whole
-                 schedule, which is what it has always been. -->
-            <div
-              v-if="(schedule?.rotations?.length ?? 0) > 1"
-              class="flex flex-wrap items-center gap-2"
-            >
-              <OText variant="label">{{ t("oncall.scheduleShowing") }}</OText>
-              <span class="w-56">
-                <OSelect
-                  v-model="focusedRotationId"
-                  size="sm"
-                  :options="rotationFocusOptions"
-                  data-test="oncall-schedule-rotation-focus"
-                />
-              </span>
-            </div>
-
             <!-- Every act on a rotation arrives here, and every one of them opens
                  the SAME drawer: a rotation is one form, and which button was
-                 pressed only decides what it opens on. -->
+                 pressed only decides what it opens on. The chart draws every
+                 rotation the team has: the picker that used to scope it to one
+                 hid lanes on exactly the teams whose lanes are worth comparing. -->
             <OnCallScheduleTimeline
               v-model:window="scheduleWindow"
-              :rotations="focusedRotations"
+              :rotations="teamRotations"
               :segments="segments"
               :timezone="team?.timezone ?? 'UTC'"
       :viewer-timezone="store.state.timezone"
@@ -288,6 +255,7 @@
               @assign-people="openScheduleEditor({ mode: 'edit', id: $event })"
               @duplicate="openScheduleEditor({ mode: 'duplicate', id: $event })"
               @override="openCover"
+              @request-cover="openCover"
               @delete="rotationToDelete = $event"
               @presets="presetsOpen = true"
             />
@@ -303,7 +271,6 @@
       :viewer-timezone="store.state.timezone"
               :window="scheduleWindow"
               :rotations="teamRotations"
-              :rotation-id="focusedRotationId || null"
               @changed="fetchSegments"
             />
 
@@ -444,11 +411,9 @@ import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
-import OnCallTeamPulse from "@/components/oncall/OnCallTeamPulse.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -551,12 +516,6 @@ const selectedPriority = ref("P1");
 const selectedPriorityNumber = computed(() => Number(selectedPriority.value.slice(1)) || 1);
 const preview = ref<EscalationPreview | null>(null);
 const previewLoading = ref(false);
-/// The dry run the header strip draws. Always the top priority, whatever the
-/// Escalation tab happens to be showing: a strip that changed under the reader
-/// because they clicked P3 on a tab below it would be answering a different
-/// question from the one its heading asks.
-const firesNowPreview = ref<EscalationPreview | null>(null);
-const HEADER_PRIORITY = 1;
 /// Owned by the timeline, which decides the visible range; the fetch follows it.
 const scheduleWindow = ref({ from: 0, to: 0 });
 const ruleCount = ref(0);
@@ -975,34 +934,6 @@ const SWAPPABLE_SHIFTS = 8;
 /// because something derived it, and a rotation cannot.
 const teamRotations = computed(() => schedule.value?.rotations ?? []);
 
-/// Which rotation the schedule tab is scoped to, or `""` for all of them.
-///
-/// This IS the rotation detail: one rotation's calendar, its shift rules and
-/// its covers, without a second screen to navigate to and back from.
-const focusedRotationId = ref("");
-
-/// Cleared whenever the schedule changes, so a rotation deleted under the
-/// filter cannot leave the tab scoped to nothing and reading as an empty team.
-watch(teamRotations, (rotations) => {
-  if (focusedRotationId.value && !rotations.some((r) => r.id === focusedRotationId.value)) {
-    focusedRotationId.value = "";
-  }
-});
-
-const rotationFocusOptions = computed(() => [
-  { label: t("oncall.scheduleShowingAll"), value: "" },
-  ...teamRotations.value.map((rotation) => ({ label: raw(rotation.name), value: rotation.id })),
-]);
-
-/// The lanes the timeline draws. Scoped to one rotation, that lane is the
-/// rotation's own calendar; the segments are already fetched per rotation, so
-/// nothing extra is asked for.
-const focusedRotations = computed(() =>
-  focusedRotationId.value
-    ? teamRotations.value.filter((rotation) => rotation.id === focusedRotationId.value)
-    : teamRotations.value,
-);
-
 /// The weeks a swap can trade, one run per rotation.
 ///
 /// Taken from the rotation's WINNING shift rule: that is the roster actually on
@@ -1163,21 +1094,14 @@ async function fetchPreview() {
   const priority = Number(selectedPriority.value.replace(/\D/g, "")) || 1;
   previewLoading.value = true;
   preview.value = await loadPreview(priority);
-  // One request feeding both surfaces while the tab is on the priority the
-  // header draws, which is where every reader starts.
-  if (priority === HEADER_PRIORITY) firesNowPreview.value = preview.value;
   previewLoading.value = false;
 }
 
 /// Back to the dry run on save — seeing whether the change actually reaches
-/// anybody is the reason to have made it. The editor edits ONE priority, so a
-/// save made from P3 leaves the header holding an answer from before it.
+/// anybody is the reason to have made it.
 async function onPolicySaved() {
   editingPolicy.value = false;
   await fetchAll();
-  if (selectedPriorityNumber.value !== HEADER_PRIORITY) {
-    firesNowPreview.value = await loadPreview(HEADER_PRIORITY);
-  }
 }
 
 async function onScheduleSaved() {

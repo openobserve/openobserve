@@ -78,7 +78,6 @@ const stubs = {
   OnCallScheduleEditor: true,
   OnCallEscalationLadder: true,
   OnCallCoverForm: true,
-  OnCallTeamPulse: true,
   OnCallMembers: true,
   OnCallPolicyEditor: true,
   OnCallOwnership: true,
@@ -780,7 +779,7 @@ describe("OnCallTeamDetail", () => {
     const wrapper = render();
     await flushPromises();
 
-    expect(wrapper.findComponent({ name: "OnCallTeamPulse" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OnCallTeamAttention" }).exists()).toBe(true);
   });
   /// B8. With the load failed, the page below would render a team with no
   /// members, no schedule and no policy — indistinguishable from one nobody
@@ -791,7 +790,7 @@ describe("OnCallTeamDetail", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(true);
-    expect(wrapper.findComponent({ name: "OnCallTeamPulse" }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OnCallTeamAttention" }).exists()).toBe(false);
   });
   /// `resolved-schedule` answers for ONE slot and defaults to the default one,
   /// so a two-slot team was only ever asked about primary — and the timeline
@@ -809,11 +808,12 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
     }
 
-    /// **This is the rotation detail.** Scoping the tab to one rotation puts its
-    /// calendar, its shift rules and its covers together — which is what "open
-    /// the Secondary" means on a team with three positions — without a second
-    /// screen to navigate to and back from.
-    it("scopes the calendar and the covers to one rotation", async () => {
+    /// Every rotation the team has, on one chart, with every cover under it.
+    /// The picker that used to scope the tab to one rotation hid lanes on
+    /// exactly the teams whose lanes are worth reading against each other —
+    /// and a cover list scoped to a rotation the reader had forgotten choosing
+    /// looked like a week with no covers in it.
+    it("draws every rotation the team has, and every cover with them", async () => {
       service.getSchedule.mockResolvedValue({
         data: {
           timezone: "UTC",
@@ -824,62 +824,13 @@ describe("OnCallTeamDetail", () => {
       const wrapper = render();
       await flushPromises();
       await showWeek(wrapper);
-
-      const timeline = () => wrapper.findComponent({ name: "OnCallScheduleTimeline" });
-      expect(timeline().props("rotations")).toHaveLength(2);
-
-      const focus = wrapper.findComponent('[data-test="oncall-schedule-rotation-focus"]');
-      focus.vm.$emit("update:modelValue", "rot_backup");
-      await flushPromises();
-
-      expect(timeline().props("rotations").map((r: any) => r.id)).toEqual(["rot_backup"]);
-      expect(wrapper.findComponent({ name: "OnCallCoverList" }).props("rotationId")).toBe(
-        "rot_backup",
-      );
-    });
-
-    /// One rotation is not a choice, so the control is not offered — a picker
-    /// with a single option teaches a distinction the team does not have.
-    it("offers no rotation filter on a team with one", async () => {
-      service.getSchedule.mockResolvedValue({
-        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
-      } as any);
-
-      const wrapper = render();
-      await flushPromises();
-      await showWeek(wrapper);
-
-      expect(wrapper.find('[data-test="oncall-schedule-rotation-focus"]').exists()).toBe(false);
-    });
-
-    /// A rotation deleted under the filter would leave the tab scoped to
-    /// nothing, which reads as a team with no schedule at all.
-    it("drops the filter when the rotation it names goes away", async () => {
-      service.getSchedule.mockResolvedValue({
-        data: {
-          timezone: "UTC",
-          rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
-        },
-      } as any);
-
-      const wrapper = render();
-      await flushPromises();
-      await showWeek(wrapper);
-
-      wrapper
-        .findComponent('[data-test="oncall-schedule-rotation-focus"]')
-        .vm.$emit("update:modelValue", "rot_backup");
-      await flushPromises();
-
-      service.getSchedule.mockResolvedValue({
-        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
-      } as any);
-      wrapper.findComponent({ name: "OnCallScheduleEditor" }).vm.$emit("saved");
-      await flushPromises();
 
       expect(
-        wrapper.findComponent({ name: "OnCallScheduleTimeline" }).props("rotations"),
-      ).toHaveLength(1);
+        wrapper
+          .findComponent({ name: "OnCallScheduleTimeline" })
+          .props("rotations")
+          .map((r: any) => r.id),
+      ).toEqual(["rot_primary", "rot_backup"]);
       expect(wrapper.findComponent({ name: "OnCallCoverList" }).props("rotationId")).toBe(null);
     });
 

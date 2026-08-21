@@ -485,4 +485,29 @@ describe("OnCallScheduleTimeline", () => {
       expect(wrapper.emitted("presets")).toHaveLength(1);
     });
   });
+
+  /// A cover is an exception to the weeks drawn below, so it belongs with the
+  /// controls that change them. It used to sit in a strip of its own above the
+  /// chart, a row away from every other act on the same schedule.
+  describe("writing a cover from the toolbar", () => {
+    it("offers it after the presets and asks the parent to open the dialog", async () => {
+      const wrapper = render();
+      const presets = wrapper.find('[data-test="oncall-timeline-presets"]');
+      const cover = wrapper.find('[data-test="oncall-timeline-request-cover"]');
+
+      expect(cover.text()).toBe("Request cover");
+      expect(presets.element.nextElementSibling).toBe(cover.element);
+
+      await cover.trigger("click");
+      expect(wrapper.emitted("request-cover")).toHaveLength(1);
+    });
+
+    /// A cover assigns a window to a PERSON, so on an empty roster it opens a
+    /// picker with no options — the same reason Fill gap is withheld.
+    it("is withheld when there is nobody to hand it to", () => {
+      expect(
+        render({ canCover: false }).find('[data-test="oncall-timeline-request-cover"]').exists(),
+      ).toBe(false);
+    });
+  });
 });

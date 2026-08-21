@@ -118,6 +118,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("oncall.presetsTitle") }}
         </OButton>
+
+        <!-- A cover is an exception to the weeks drawn below, so it is offered
+             beside the controls that change them rather than from a strip
+             above the chart, where it read as a heading's action and sat a row
+             away from everything else the reader can do to this schedule. -->
+        <OButton
+          v-if="canCover"
+          variant="outline"
+          size="sm-action"
+          data-test="oncall-timeline-request-cover"
+          @click="emit('request-cover')"
+        >
+          {{ t("oncall.requestCover") }}
+        </OButton>
       </span>
     </div>
 
@@ -336,9 +350,10 @@ const props = withDefaults(
     /**
      * Whether there is anybody to hand a cover to.
      *
-     * Filling a gap writes a window to a PERSON, so on a team with an empty
-     * roster the button opens a picker with no options. Defaults true so a
-     * caller that does not know still shows it.
+     * A cover — filling a gap or writing one from the toolbar — assigns a
+     * window to a PERSON, so on a team with an empty roster either button
+     * opens a picker with no options. Defaults true so a caller that does not
+     * know still shows them.
      */
     canCover?: boolean;
   }>(),
@@ -355,6 +370,9 @@ const emit = defineEmits<{
   (e: "fill-gap", gap: ResolvedSegment): void;
   (e: "add"): void;
   (e: "presets"): void;
+  /// A cover on no rotation in particular — the dialog asks which. The
+  /// per-lane `override` names one because the menu it hangs off already has.
+  (e: "request-cover"): void;
   /// Carries the rotation's **id**, not its name: a name is renameable and two
   /// rotations may share one, so a name cannot say which row was meant.
   (e: "edit" | "duplicate" | "override" | "delete" | "assign-people", rotationId: string): void;

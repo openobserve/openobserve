@@ -46,34 +46,12 @@ function render(over: Record<string, unknown> = {}) {
 }
 
 describe("OnCallScheduleAnswer", () => {
-  /// The whole reason this row was trimmed: the primary, their remaining shift
-  /// and the handover are on the pulse strip above the tabs and on the
-  /// timeline's own "on now" band, so saying them a third time here gave the
-  /// reader two derivations of one fact to reconcile.
-  it("does not restate the primary or the handover the chart already draws", () => {
-    const text = render().text();
-    expect(text).not.toContain("mei@o2.ai");
-    expect(text).not.toContain("On call until");
-    expect(text).not.toContain("Next");
-  });
-
-  /// An unstaffed secondary is the difference between "the ladder has a second
-  /// rung" and "the second rung resolves to nobody" — a finding, coloured as
-  /// one, with the act that fixes it beside it.
-  it("calls out an unstaffed secondary and offers to staff it", async () => {
-    const wrapper = render();
-    expect(wrapper.find('[data-test="oncall-answer-secondary"]').text()).toContain(
-      "No one assigned",
-    );
-
-    await wrapper.find('[data-test="oncall-answer-assign-secondary"]').trigger("click");
-    expect(wrapper.emitted("assign-secondary")).toHaveLength(1);
-  });
-
-  /// A second staffed ROTATION, named after itself. The old lookup asked for a
-  /// slot literally spelled "secondary", so a team whose second position was
-  /// called anything else read as having none.
-  it("names the second rotation when there is one, and stops offering to assign", () => {
+  /// The whole reason this row was trimmed: every person it used to name — the
+  /// primary, whoever is next, whoever backs them up — is drawn on the
+  /// timeline's own bands a few pixels below, from resolved segments rather
+  /// than from `whoIsOnCall`, so saying them here gave the reader two
+  /// derivations of one fact to reconcile.
+  it("names nobody the chart already draws", () => {
     const wrapper = render({
       positions: [
         position(),
@@ -84,33 +62,53 @@ describe("OnCallScheduleAnswer", () => {
         }),
       ],
     });
-    expect(wrapper.find('[data-test="oncall-answer-secondary-who"]').text()).toContain("dev@o2.ai");
+    const text = wrapper.text();
+    expect(text).not.toContain("mei@o2.ai");
+    expect(text).not.toContain("dev@o2.ai");
+    expect(text).not.toContain("Secondary");
+    expect(text).not.toContain("On call until");
+    expect(text).not.toContain("Next");
+  });
+
+  /// The act, not the status: a second rung that resolves to nobody is visible
+  /// on the chart as an empty lane, and what this row adds is the way to fill
+  /// it.
+  it("offers to staff a second rotation when there is none", async () => {
+    const wrapper = render();
+
+    await wrapper.find('[data-test="oncall-answer-assign-secondary"]').trigger("click");
+    expect(wrapper.emitted("assign-secondary")).toHaveLength(1);
+  });
+
+  /// A second staffed ROTATION, counted rather than looked up. The old lookup
+  /// asked for a slot literally spelled "secondary", so a team whose second
+  /// position was called anything else was still offered the act.
+  it("stops offering to assign once a second rotation is staffed", () => {
+    const wrapper = render({
+      positions: [
+        position(),
+        position({
+          rotation_id: "rot_secondary",
+          rotation_name: "Secondary",
+          user_email: "dev@o2.ai",
+        }),
+      ],
+    });
     expect(wrapper.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(false);
   });
 
-  /// Nobody on call is a louder claim than an empty second rung, and it must
-  /// not read as a blank name — so it takes the row rather than sitting beside
-  /// a secondary status that is beside the point.
-  it("states that nobody is on call instead of naming the secondary's state", () => {
+  /// Nobody on call is the one claim this row still makes, because it is the
+  /// state in which the acts beside it are beside the point.
+  it("states that nobody is on call", () => {
     const wrapper = render({ positions: [] });
     expect(wrapper.text()).toContain("Nobody is on call");
     expect(wrapper.find('[data-test="oncall-answer-nobody-hint"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-answer-secondary"]').exists()).toBe(false);
   });
 
-  /// A swap trades two people's shifts. With nobody on call there is no shift
-  /// on this side of the trade.
-  it("cannot request a swap when nobody holds the pager", () => {
-    const wrapper = render({ positions: [] });
-    expect(
-      wrapper.find('[data-test="oncall-answer-request-swap"]').attributes("disabled"),
-    ).toBeDefined();
-  });
-
-  it("asks the parent for a swap", async () => {
-    const wrapper = render();
-    await wrapper.find('[data-test="oncall-answer-request-swap"]').trigger("click");
-    expect(wrapper.emitted("request-swap")).toHaveLength(1);
+  /// Writing a cover lives on the chart's own toolbar now, beside Add rotation
+  /// — one row of things a reader can do to this schedule rather than two.
+  it("does not offer the cover the timeline's toolbar carries", () => {
+    expect(render().find('[data-test="oncall-answer-request-swap"]').exists()).toBe(false);
   });
 
   /// Every action here names a person, so on a team with nobody on it they all
@@ -119,7 +117,6 @@ describe("OnCallScheduleAnswer", () => {
     const wrapper = render({ positions: [], hasMembers: false });
 
     expect(wrapper.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-answer-request-swap"]').exists()).toBe(false);
 
     await wrapper.find('[data-test="oncall-answer-add-people"]').trigger("click");
     expect(wrapper.emitted("add-people")).toHaveLength(1);
@@ -130,6 +127,6 @@ describe("OnCallScheduleAnswer", () => {
   it("keeps its actions when the roster is unknown", () => {
     const wrapper = render({ positions: [] });
     expect(wrapper.find('[data-test="oncall-answer-add-people"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-answer-request-swap"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(true);
   });
 });
