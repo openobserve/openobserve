@@ -791,18 +791,18 @@ export interface TeamOverview {
  */
 export interface ResolvedSegment {
   /**
-   * Which rotation this span resolves. Absent means the team's primary.
+   * Which rotation this span resolves. Always present.
    *
-   * **The endpoint answers for one rotation at a time.** Segments for a second
-   * rotation come from a second call with its `rotation_id` — a lane drawn for
-   * one rotation and filled from another's segments will be empty, which is why
-   * the timeline says so rather than rendering a blank week that reads as
-   * "nobody".
+   * **The endpoint answers for one rotation at a time**, defaulting to the
+   * team's primary. Segments for a second rotation come from a second call with
+   * its `rotation_id` — a lane drawn for one rotation and filled from another's
+   * segments will be empty, which is why the timeline says so rather than
+   * rendering a blank week that reads as "nobody".
    *
    * A team with **no rotations at all** gets `[]` back, not one long gap
    * segment: there is no position to be unstaffed.
    */
-  rotation_id?: string | null;
+  rotation_id: string;
   /** Micros. */
   from: number;
   /** Micros. */
@@ -810,13 +810,13 @@ export interface ResolvedSegment {
   /** Absent means nobody is on call for this span. */
   user_email?: string | null;
   /**
-   * The layer this span belongs to — or the one a cover displaced.
+   * The **shift rule** that produced the holder, by name — so a grid can colour
+   * by layer. Not the rotation: that is `rotation_id`, and every segment in one
+   * response shares it.
    *
-   * **Null on a gap no rotation owns**, which is every span of a team with no
-   * schedule at all. Anything drawn per rotation has to skip those rather than
-   * render a lane with no name.
+   * Null on a gap, where no rule won and therefore none named anybody.
    */
-  rotation: string | null;
+  rotation?: string | null;
   /** Present when a cover took this span from the rotation. */
   override_id?: string | null;
 }

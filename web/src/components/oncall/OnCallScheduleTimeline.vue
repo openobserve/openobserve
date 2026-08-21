@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
               :data-test="`oncall-lane-edit-${track.key}`"
-              @click="emit('edit', laneOf(track).name)"
+              @click="emit('edit', laneOf(track).id)"
             >
               {{ t("oncall.edit") }}
             </OButton>
@@ -197,20 +197,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <ODropdownItem
                 :data-test="`oncall-lane-override-${track.key}`"
-                @select="emit('override', laneOf(track).name)"
+                @select="emit('override', laneOf(track).id)"
               >
                 {{ t("oncall.railOverride") }}
               </ODropdownItem>
               <ODropdownItem
                 :data-test="`oncall-lane-duplicate-${track.key}`"
-                @select="emit('duplicate', laneOf(track).name)"
+                @select="emit('duplicate', laneOf(track).id)"
               >
                 {{ t("oncall.railDuplicate") }}
               </ODropdownItem>
               <ODropdownItem
                 variant="destructive"
                 :data-test="`oncall-lane-delete-${track.key}`"
-                @select="emit('delete', laneOf(track).name)"
+                @select="emit('delete', laneOf(track).id)"
               >
                 {{ t("oncall.laneDelete") }}
               </ODropdownItem>
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="xs"
             class="ms-auto"
             :data-test="`oncall-lane-assign-${track.key}`"
-            @click="emit('assign-people', laneOf(track).name)"
+            @click="emit('assign-people', laneOf(track).id)"
           >
             {{ t("oncall.laneEmptyAssign") }}
           </OButton>
@@ -315,10 +315,10 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { ResolvedSegment, Rotation, TimeWindow } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone } from "@/utils/oncall";
+import { formatInZone, rotationMembers } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = withDefaults(
@@ -350,7 +350,9 @@ const emit = defineEmits<{
   (e: "fill-gap", gap: ResolvedSegment): void;
   (e: "add"): void;
   (e: "presets"): void;
-  (e: "edit" | "duplicate" | "override" | "delete" | "assign-people", name: string): void;
+  /// Carries the rotation's **id**, not its name: a name is renameable and two
+  /// rotations may share one, so a name cannot say which row was meant.
+  (e: "edit" | "duplicate" | "override" | "delete" | "assign-people", rotationId: string): void;
 }>();
 
 /** The window the parent must fetch, whenever the reader changes it. */
@@ -451,15 +453,14 @@ const zoneLine = computed<I18nText>(() =>
 
 const share = (micros: number) => (micros - from.value) / span.value;
 
-/// Which pools the segments actually answer for.
+/// Which rotations the segments actually answer for.
 ///
-/// `resolved-schedule` resolves **one slot** — a team with a staffed
-/// `secondary` gets no `secondary` segments back. Drawing that rotation a lane
-/// and filling it from these left a blank week under the word "Secondary",
-/// which reads as "nobody is backing you up" when the truth is "this view did
-/// not ask". Lanes for an unanswered slot say so instead.
-const answeredSlots = computed(
-  () => new Set(props.segments.map((segment) => (segment.slot ?? DEFAULT_SLOT).toLowerCase())),
+/// `resolved-schedule` resolves **one rotation** per call. Drawing a rotation a
+/// lane and filling it from segments that answer for a different one left a
+/// blank week under its name, which reads as "nobody is on call" when the truth
+/// is "this view did not ask". Lanes for an unanswered rotation say so instead.
+const answeredRotations = computed(
+  () => new Set(props.segments.map((segment) => segment.rotation_id)),
 );
 
 /// Weekday names starting at MONDAY, matching `TimeWindow.days` (which the
@@ -493,13 +494,13 @@ function cadenceWord(shiftMicros: number): string {
   );
 }
 
-/// The next instant this rotation hands the pool to somebody else, taken from
-/// the SEGMENTS rather than from `anchor + n * shift`: a cover or a restriction
+/// The next instant this rotation hands over to somebody else, taken from the
+/// SEGMENTS rather than from `anchor + n * shift`: a cover or a restriction
 /// ends the current shift somewhere the cadence alone would not put it.
-function nextHandover(name: string): number | null {
+function nextHandover(rotationId: string): number | null {
   const current = props.segments.find(
     (segment) =>
-      segment.rotation === name &&
+      segment.rotation_id === rotationId &&
       segment.from <= nowMicros.value &&
       segment.to > nowMicros.value,
   );
@@ -509,37 +510,42 @@ function nextHandover(name: string): number | null {
 /// Everything the lane header says about a rotation, computed once per lane.
 interface Lane {
   index: number;
+  /** The rotation's id — the lane key, and what a level stores. */
+  id: string;
   name: string;
   cadence: I18nText;
-  /** Nobody is in it, so no rung that names it can page. */
+  /** Nobody is in any of its rules, so no level that names it can page. */
   notPaging: boolean;
-  /** The endpoint did not resolve this rotation's pool at all. */
+  /** The endpoint did not resolve this rotation at all. */
   unanswered: boolean;
 }
 
-const lanes = computed<Lane[]>(() => {
-  // A team with no schedule resolves to one long gap the engine attributes to
-  // no rotation at all, so falling back to the segments drew a nameless lane
-  // whose Edit and menu pointed at a rotation that does not exist. Only named
-  // ones become lanes; with none left the empty state offers to add one.
-  const source: Array<{ name: string; rotation: Rotation | null }> = props.rotations.length
-    ? props.rotations.map((rotation) => ({ name: rotation.name, rotation }))
-    : [...new Set(props.segments.map((segment) => segment.rotation))]
-        .filter((name): name is string => !!name?.trim())
-        .map((name) => ({ name, rotation: null }));
-
-  return source.map(({ name, rotation }, index) => {
+const lanes = computed<Lane[]>(() =>
+  // ONE LANE PER ROTATION, and only from `props.rotations`. There is no
+  // fallback to the segments any more: a team with no rotations gets `[]`
+  // back rather than one long gap attributed to nothing, so there is no
+  // nameless lane left to invent — and inventing one gave its Edit and menu a
+  // rotation that does not exist to point at.
+  props.rotations.map((rotation, index) => {
     const parts: string[] = [];
-    const window = rotation?.restrictions?.[0];
+    // The header describes the rotation's WINNING shape, which for the
+    // ordinary one-rule rotation is that rule. A rotation with several is
+    // follow-the-sun and cannot be summarised in one cadence, so it says how
+    // many rules it has instead of picking one to speak for the rest.
+    const rules = rotation.shift_rules ?? [];
+    const only = rules.length === 1 ? rules[0] : null;
+    const window = only?.restrictions?.[0];
 
-    if (window) {
+    if (only && window) {
       const range = dayRange(window);
       if (range) parts.push(range);
-      parts.push(String(t("oncall.laneShifts", { duration: raw(formatMicrosDuration(rotation.shift_micros)) })));
+      parts.push(
+        String(t("oncall.laneShifts", { duration: raw(formatMicrosDuration(only.shift_micros)) })),
+      );
       parts.push(`${minuteLabel(window.start_minute)} / ${minuteLabel(window.end_minute)}`);
-    } else if (rotation) {
-      parts.push(cadenceWord(rotation.shift_micros));
-      const handover = nextHandover(name);
+    } else if (only) {
+      parts.push(cadenceWord(only.shift_micros));
+      const handover = nextHandover(rotation.id);
       if (handover) {
         parts.push(
           String(
@@ -549,29 +555,34 @@ const lanes = computed<Lane[]>(() => {
           ),
         );
       }
+    } else if (rules.length) {
+      parts.push(String(t("oncall.laneRuleCount", { count: rules.length }, rules.length)));
     }
 
-    const count = rotation?.members?.length ?? 0;
-    if (rotation) parts.push(String(t("oncall.lanePeople", { count }, count)));
+    const count = rotationMembers(rotation).length;
+    parts.push(String(t("oncall.lanePeople", { count }, count)));
 
     return {
       index,
-      name,
+      id: rotation.id,
+      name: rotation.name,
       cadence: raw(parts.join(" · ")),
-      notPaging: !!rotation && count === 0,
-      unanswered: !answeredSlots.value.has((rotation?.slot ?? DEFAULT_SLOT).toLowerCase()),
+      notPaging: count === 0,
+      unanswered: !answeredRotations.value.has(rotation.id),
     };
-  });
-});
+  }),
+);
 
-const laneByKey = computed(() => new Map(lanes.value.map((lane) => [lane.name, lane])));
+const laneByKey = computed(() => new Map(lanes.value.map((lane) => [lane.id, lane])));
 
 /// The primitive hands back a `ScheduleTrack`; the header needs the lane behind
-/// it. Keyed on the track key, which IS the rotation name.
+/// it. Keyed on the track key, which IS the rotation id — a name is renameable
+/// and two rotations may share one, so it cannot key a lane.
 function laneOf(track: ScheduleTrack): Lane {
   return (
     laneByKey.value.get(track.key) ?? {
       index: 0,
+      id: track.key,
       name: track.key,
       cadence: raw(""),
       notPaging: false,
@@ -585,24 +596,21 @@ function laneOf(track: ScheduleTrack): Lane {
 function emptyLine(track: ScheduleTrack): I18nText {
   const lane = laneOf(track);
   if (lane.notPaging) return t("oncall.laneEmptyNoMembers");
-  if (lane.unanswered) {
-    const rotation = props.rotations.find((r) => r.name === lane.name);
-    // Names the pool that is MISSING. An earlier wording put that same pool
-    // after "this calendar resolves", which said the opposite of the truth
-    // about the one lane whose whole problem is that it was not resolved.
-    return t("oncall.timelineSlotNotResolved", { slot: raw(rotation?.slot ?? DEFAULT_SLOT) });
-  }
+  // Names the rotation that is MISSING. An earlier wording put that same name
+  // after "this calendar resolves", which said the opposite of the truth about
+  // the one lane whose whole problem is that it was not resolved.
+  if (lane.unanswered) return t("oncall.timelineRotationNotResolved", { rotation: raw(lane.name) });
   return t("oncall.laneEmptyNeverWins");
 }
 
 const tracks = computed<ScheduleTrack[]>(() =>
   lanes.value.map((lane) => ({
-    key: lane.name,
+    key: lane.id,
     label: raw(lane.name),
     bands: props.segments
       .filter(
         (segment) =>
-          segment.rotation === lane.name && segment.to > from.value && segment.from < to.value,
+          segment.rotation_id === lane.id && segment.to > from.value && segment.from < to.value,
       )
       .map<ScheduleBand>((segment) => {
         const start = Math.max(segment.from, from.value);

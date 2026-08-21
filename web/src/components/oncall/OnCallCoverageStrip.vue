@@ -76,7 +76,6 @@ import { formatMicrosDuration } from "@/utils/formatters";
 import {
   formatInZone,
   resolveHolder,
-  resolveNextHolder,
   wallTimeInZone,
 } from "@/utils/oncall";
 
@@ -105,10 +104,17 @@ type Cover = "both" | "primary" | "none";
 
 /// Three states rather than a person per band: at a fortnight's zoom the
 /// question is "is anybody on, and is anybody behind them", not "who".
+///
+/// "Behind them" counts a SECOND STAFFED ROTATION. It used to count the next
+/// person in the same rotation, which is nobody's backup — they are not on call
+/// until the handover, and reading them as cover is how a team with one
+/// rotation looked doubly covered while a single gap would page no one.
 function coverAt(at: number): Cover {
-  const holder = resolveHolder(props.rotations, at, props.timezone).member;
-  if (!holder) return "none";
-  return resolveNextHolder(props.rotations, at, props.timezone) ? "both" : "primary";
+  const staffed = props.rotations.filter(
+    (rotation) => resolveHolder(rotation, at, props.timezone).member,
+  ).length;
+  if (staffed === 0) return "none";
+  return staffed > 1 ? "both" : "primary";
 }
 
 const TONE: Record<Cover, ScheduleBand["tone"]> = {
@@ -118,8 +124,8 @@ const TONE: Record<Cover, ScheduleBand["tone"]> = {
 };
 
 const COVER_LABEL: Record<Cover, string> = {
-  both: "oncall.coverPrimaryAndSecondary",
-  primary: "oncall.coverPrimaryOnly",
+  both: "oncall.coverTwoRotations",
+  primary: "oncall.coverOneRotation",
   none: "oncall.coverNobody",
 };
 
@@ -298,10 +304,10 @@ interface LegendEntry {
 const legend = computed<LegendEntry[]>(() => [
   {
     key: "both",
-    label: t("oncall.coverPrimaryAndSecondary"),
+    label: t("oncall.coverTwoRotations"),
     swatch: "bg-badge-success-solid-bg",
   },
-  { key: "primary", label: t("oncall.coverPrimaryOnly"), swatch: "bg-badge-warning-solid-bg" },
+  { key: "primary", label: t("oncall.coverOneRotation"), swatch: "bg-badge-warning-solid-bg" },
   { key: "none", label: t("oncall.coverNobody"), swatch: "bg-schedule-gap-bg" },
 ]);
 </script>

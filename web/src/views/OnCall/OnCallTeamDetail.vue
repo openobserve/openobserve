@@ -258,9 +258,9 @@
               :can-cover="hasMembers !== false"
               @fill-gap="onFillGap"
               @add="openScheduleEditor({ mode: 'new' })"
-              @edit="openScheduleEditor({ mode: 'edit', name: $event })"
-              @assign-people="openScheduleEditor({ mode: 'edit', name: $event })"
-              @duplicate="openScheduleEditor({ mode: 'duplicate', name: $event })"
+              @edit="openScheduleEditor({ mode: 'edit', id: $event })"
+              @assign-people="openScheduleEditor({ mode: 'edit', id: $event })"
+              @duplicate="openScheduleEditor({ mode: 'duplicate', id: $event })"
               @override="openCover"
               @delete="rotationToDelete = $event"
               @presets="presetsOpen = true"
@@ -363,7 +363,7 @@
     <ConfirmDialog
       :model-value="!!rotationToDelete"
       :title="t('oncall.laneDeleteTitle')"
-      :message="t('oncall.laneDeleteMessage', { name: rotationToDelete ?? '' })"
+      :message="t('oncall.laneDeleteMessage', { name: rotationNameToDelete })"
       @update:ok="deleteRotation"
       @update:cancel="rotationToDelete = null"
     />
@@ -495,7 +495,16 @@ async function refreshCoverage() {
 }
 const presetsOpen = ref(false);
 /// The rotation the reader asked to delete, held until they confirm it.
+/// The rotation's **id**. The confirm dialog needs its name, which is looked
+/// up rather than carried: a name is renameable and two rotations may share
+/// one, so it cannot say which row the reader picked.
 const rotationToDelete = ref<string | null>(null);
+const rotationNameToDelete = computed(() =>
+  raw(
+    (schedule.value?.rotations ?? []).find((rotation) => rotation.id === rotationToDelete.value)
+      ?.name ?? "",
+  ),
+);
 const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);
 /// Who the cover dialog opens pre-selected on. Empty for every opener that has
@@ -777,31 +786,42 @@ async function sendTestPage() {
 
 /// The engine's own resolution of the visible window. Capped server-side at 31
 /// days and 2000 segments, and a 400 there is a message rather than a spinner.
-/// One call per staffed slot: the endpoint resolves ONE at a time and defaults
-/// to the default slot, so a two-slot team used to get primary segments only —
-/// and the timeline drew a secondary lane it could never fill, then said so.
-/// The data was there the whole time; nothing asked for it.
+///
+/// **One call per rotation**: the endpoint resolves ONE at a time and defaults
+/// to the team's primary, so asking once got primary segments only — and the
+/// timeline drew every other rotation a lane it could never fill. The data was
+/// there the whole time; nothing asked for it.
+///
+/// A team with no rotations is not asked at all. It answers `[]` rather than
+/// one long gap segment, so there is nothing to draw and no call to spend.
 async function fetchSegments() {
   const { from, to } = scheduleWindow.value;
   if (!from || !to) return;
+  const rotations = schedule.value?.rotations ?? [];
+  if (!rotations.length) {
+    segments.value = [];
+    return;
+  }
   segmentsLoading.value = true;
-  const slots = teamSlots.value.length ? teamSlots.value : [DEFAULT_SLOT];
   try {
     const answers = await Promise.all(
-      slots.map((slot) =>
+      rotations.map((rotation) =>
         oncallService.resolvedSchedule({
           org_identifier: orgId.value,
           team_id: teamId.value,
           from,
           to,
-          slot,
+          rotation_id: rotation.id,
         }),
       ),
     );
-    // The default slot may answer without echoing its own name, so the lane
-    // lookup gets one it can match rather than an absent field.
+    // The primary may answer without echoing its own id, so the lane lookup
+    // gets one it can match rather than an absent field.
     segments.value = answers.flatMap((res, index) =>
-      (res.data ?? []).map((segment) => ({ ...segment, slot: segment.slot ?? slots[index] })),
+      (res.data ?? []).map((segment) => ({
+        ...segment,
+        rotation_id: segment.rotation_id || rotations[index].id,
+      })),
     );
   } catch (err: any) {
     segments.value = [];
@@ -839,12 +859,15 @@ function onAssignSecondary() {
 /// table that carried the only delete control is not rendered in `drawer-only`,
 /// which is the mode this tab has always used.
 async function deleteRotation() {
-  const name = rotationToDelete.value;
+  const id = rotationToDelete.value;
   const current = schedule.value;
   rotationToDelete.value = null;
-  if (!name || !current) return;
+  if (!id || !current) return;
 
-  const rotations = current.rotations.filter((rotation) => rotation.name !== name);
+  // Filtered by id, not by name: two rotations may share a name, and deleting
+  // "the Secondary" must not take a second one called the same thing with it.
+  const name = current.rotations.find((rotation) => rotation.id === id)?.name ?? id;
+  const rotations = current.rotations.filter((rotation) => rotation.id !== id);
   try {
     await oncallService.setSchedule({
       org_identifier: orgId.value,

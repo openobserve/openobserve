@@ -60,17 +60,28 @@ const stubs = {
 const DAY = MICROS_PER_DAY;
 const start = Math.floor((Date.now() * 1000) / DAY) * DAY;
 
-const rotation = (name: string): Rotation => ({
+/// A rotation id derived from the name, so a fixture can name one place and
+/// the segment that answers for it in another without threading a variable.
+const rid = (name: string) => `rot_${name.toLowerCase()}`;
+
+const rotation = (name: string, rules?: Rotation["shift_rules"]): Rotation => ({
+  id: rid(name),
   name,
-  members: ["ana@o2.ai", "bob@o2.ai"],
-  shift_micros: MICROS_PER_WEEK,
-  anchor_micros: start,
+  shift_rules: rules ?? [
+    {
+      name,
+      members: ["ana@o2.ai", "bob@o2.ai"],
+      shift_micros: MICROS_PER_WEEK,
+      anchor_micros: start,
+    },
+  ],
 });
 
 const seg = (over: Partial<ResolvedSegment> = {}): ResolvedSegment => ({
   from: start,
   to: start + 3 * DAY,
   user_email: "ana@o2.ai",
+  rotation_id: rid("Primary"),
   rotation: "Primary",
   ...over,
 });
@@ -96,9 +107,12 @@ describe("OnCallScheduleTimeline", () => {
   it("draws one lane per rotation", () => {
     const wrapper = render({
       rotations: [rotation("Primary"), rotation("Secondary")],
-      segments: [seg(), seg({ rotation: "Secondary", user_email: "bob@o2.ai" })],
+      segments: [seg(), seg({ rotation_id: rid("Secondary"), rotation: "Secondary", user_email: "bob@o2.ai" })],
     });
-    expect(tracksOf(wrapper).map((t: any) => t.key)).toEqual(["Primary", "Secondary"]);
+    // Keyed on the ROTATION ID. A name is renameable and two rotations may
+    // share one, so it cannot key a lane.
+    expect(tracksOf(wrapper).map((t: any) => t.key)).toEqual([rid("Primary"), rid("Secondary")]);
+    expect(tracksOf(wrapper).map((t: any) => t.label)).toEqual(["Primary", "Secondary"]);
   });
 
   /// A layer nobody is on all week still has to appear — an absent lane reads
@@ -108,7 +122,7 @@ describe("OnCallScheduleTimeline", () => {
       rotations: [rotation("Primary"), rotation("Weekends")],
       segments: [seg()],
     });
-    const weekends = tracksOf(wrapper).find((t: any) => t.key === "Weekends");
+    const weekends = tracksOf(wrapper).find((t: any) => t.key === rid("Weekends"));
     expect(weekends).toBeDefined();
     expect(weekends.bands).toHaveLength(0);
   });
@@ -138,7 +152,7 @@ describe("OnCallScheduleTimeline", () => {
   it("gives two rotations two different colours", () => {
     const wrapper = render({
       rotations: [rotation("Primary"), rotation("Secondary")],
-      segments: [seg(), seg({ rotation: "Secondary", user_email: "bob@o2.ai" })],
+      segments: [seg(), seg({ rotation_id: rid("Secondary"), rotation: "Secondary", user_email: "bob@o2.ai" })],
     });
     const [primary, secondary] = tracksOf(wrapper);
     expect(primary.bands[0].tone).not.toBe(secondary.bands[0].tone);
@@ -169,7 +183,7 @@ describe("OnCallScheduleTimeline", () => {
     const wrapper = render({ segments: [seg({ override_id: "ov_1" })] });
     const track = tracksOf(wrapper)[0];
 
-    expect(track.key).toBe("Primary");
+    expect(track.key).toBe(rid("Primary"));
     expect(track.bands[0].ariaLabel).toContain("covering");
   });
 
@@ -195,7 +209,7 @@ describe("OnCallScheduleTimeline", () => {
     const wrapper = render({ segments: [seg({ user_email: null })] });
     await wrapper.find('[data-test="oncall-timeline-fill-gap"]').trigger("click");
 
-    expect(wrapper.emitted("fill-gap")?.[0]?.[0]).toMatchObject({ rotation: "Primary" });
+    expect(wrapper.emitted("fill-gap")?.[0]?.[0]).toMatchObject({ rotation_id: rid("Primary") });
   });
 
   /// A team with no schedule resolves to one long gap the engine owns to no
@@ -211,10 +225,17 @@ describe("OnCallScheduleTimeline", () => {
     expect(wrapper.find('[data-test="oncall-timeline-empty"]').exists()).toBe(true);
   });
 
-  /// A named rotation's own gap is still its lane — only the unowned one goes.
-  it("keeps the lane of a gap its rotation owns", () => {
-    const wrapper = render({ rotations: [], segments: [seg({ user_email: null })] });
-    expect(tracksOf(wrapper).map((t: any) => t.key)).toEqual(["Primary"]);
+  /// A rotation's own gap is still its lane: the position exists and has
+  /// nobody in it, which is the finding. Only a team with no rotations at all
+  /// draws nothing — and the endpoint answers `[]` for one, so there is no
+  /// nameless lane left to invent.
+  it("keeps the lane of a rotation whose window is a gap", () => {
+    const wrapper = render({
+      rotations: [rotation("Primary")],
+      segments: [seg({ user_email: null })],
+    });
+    expect(tracksOf(wrapper).map((t: any) => t.key)).toEqual([rid("Primary")]);
+    expect(tracksOf(wrapper)[0].bands[0].tone).toBe("gap");
   });
 
   /// A week-long hole printed as `Wed 05:30–05:30` reads as one of zero length,
@@ -280,7 +301,7 @@ describe("OnCallScheduleTimeline", () => {
   /// What the rail's card used to say, on the row it describes. The header
   /// carries the cadence; the band carries who and for how long.
   it("states each rotation's cadence, handover and size on its lane header", () => {
-    const header = render().find('[data-test="oncall-lane-cadence-Primary"]').text();
+    const header = render().find('[data-test="oncall-lane-cadence-rot_primary"]').text();
     expect(header).toContain("weekly");
     expect(header).toContain("hands over");
     expect(header).toContain("2 people");
@@ -289,45 +310,67 @@ describe("OnCallScheduleTimeline", () => {
   /// The loudest answer on the chart was a blank strip. It has to name the
   /// consequence and offer the one act that ends it.
   it("says what an unstaffed rotation costs, and offers to staff it", async () => {
-    const empty = { ...rotation("Secondary"), members: [] };
+    const empty = rotation("Secondary", [
+      { name: "Base", members: [], shift_micros: MICROS_PER_WEEK, anchor_micros: start },
+    ]);
     const wrapper = render({ rotations: [rotation("Primary"), empty], segments: [seg()] });
 
-    expect(wrapper.find('[data-test="oncall-lane-not-paging-Secondary"]').exists()).toBe(true);
-    const state = wrapper.find('[data-test="oncall-lane-empty-Secondary"]');
+    expect(wrapper.find('[data-test="oncall-lane-not-paging-rot_secondary"]').exists()).toBe(true);
+    const state = wrapper.find('[data-test="oncall-lane-empty-rot_secondary"]');
     expect(state.text()).toContain("pages nobody");
 
-    await wrapper.find('[data-test="oncall-lane-assign-Secondary"]').trigger("click");
-    expect(wrapper.emitted("assign-people")?.[0]).toEqual(["Secondary"]);
+    await wrapper.find('[data-test="oncall-lane-assign-rot_secondary"]').trigger("click");
+    expect(wrapper.emitted("assign-people")?.[0]).toEqual([rid("Secondary")]);
   });
 
-  /// A rotation the resolver never puts anybody on is a finding, not an
-  /// unstaffed one — and offering "Assign people" for it would be wrong advice.
-  it("distinguishes a rotation that never wins from one with nobody in it", () => {
+  /// **A blank lane has three different causes and they are not interchangeable.**
+  /// This one is "nothing asked": the parent fetches one call per rotation, so a
+  /// rotation with no segments was never resolved — saying "nobody is on call"
+  /// there would be a claim this view has not earned.
+  it("says a lane is blank because nothing asked, not because nobody is on", () => {
     const wrapper = render({
       rotations: [rotation("Primary"), rotation("Weekends")],
       segments: [seg()],
     });
-    const state = wrapper.find('[data-test="oncall-lane-empty-Weekends"]');
-    expect(state.text()).toContain("Never wins");
-    expect(wrapper.find('[data-test="oncall-lane-assign-Weekends"]').exists()).toBe(false);
+    const state = wrapper.find('[data-test="oncall-lane-empty-rot_weekends"]');
+    expect(state.text()).toContain("did not resolve");
+    expect(state.text()).toContain("Weekends");
+    // Offering "Assign people" would be wrong advice: the rotation is staffed,
+    // it simply was not asked about.
+    expect(wrapper.find('[data-test="oncall-lane-assign-rot_weekends"]').exists()).toBe(false);
   });
 
-  /// Every act on a rotation reaches the parent by name — the parent owns the
-  /// one drawer they all open.
-  it("names the rotation each lane action was asked for", async () => {
+  /// A rotation that WAS asked about and resolves to nobody draws gap bands
+  /// rather than an empty lane. The endpoint tiles the window exactly, so the
+  /// gap is a segment — which is the whole reason to ask the server rather than
+  /// resolve the rotation on this side.
+  it("draws a resolved-but-unstaffed rotation as gaps, not as a blank lane", () => {
+    const wrapper = render({
+      rotations: [rotation("Primary"), rotation("Weekends")],
+      segments: [seg(), seg({ rotation_id: rid("Weekends"), rotation: null, user_email: null })],
+    });
+    const weekends = tracksOf(wrapper).find((t: any) => t.key === rid("Weekends"));
+    expect(weekends.bands).toHaveLength(1);
+    expect(weekends.bands[0].tone).toBe("gap");
+    expect(wrapper.find('[data-test="oncall-lane-empty-rot_weekends"]').exists()).toBe(false);
+  });
+
+  /// Every act on a rotation reaches the parent by ID — the parent owns the one
+  /// drawer they all open, and a renameable name cannot say which row was meant.
+  it("identifies the rotation each lane action was asked for", async () => {
     const wrapper = render();
 
-    await wrapper.find('[data-test="oncall-lane-edit-Primary"]').trigger("click");
-    expect(wrapper.emitted("edit")?.[0]).toEqual(["Primary"]);
+    await wrapper.find('[data-test="oncall-lane-edit-rot_primary"]').trigger("click");
+    expect(wrapper.emitted("edit")?.[0]).toEqual([rid("Primary")]);
 
-    await wrapper.find('[data-test="oncall-lane-duplicate-Primary"]').trigger("click");
-    expect(wrapper.emitted("duplicate")?.[0]).toEqual(["Primary"]);
+    await wrapper.find('[data-test="oncall-lane-duplicate-rot_primary"]').trigger("click");
+    expect(wrapper.emitted("duplicate")?.[0]).toEqual([rid("Primary")]);
 
-    await wrapper.find('[data-test="oncall-lane-delete-Primary"]').trigger("click");
-    expect(wrapper.emitted("delete")?.[0]).toEqual(["Primary"]);
+    await wrapper.find('[data-test="oncall-lane-delete-rot_primary"]').trigger("click");
+    expect(wrapper.emitted("delete")?.[0]).toEqual([rid("Primary")]);
 
-    await wrapper.find('[data-test="oncall-lane-override-Primary"]').trigger("click");
-    expect(wrapper.emitted("override")?.[0]).toEqual(["Primary"]);
+    await wrapper.find('[data-test="oncall-lane-override-rot_primary"]').trigger("click");
+    expect(wrapper.emitted("override")?.[0]).toEqual([rid("Primary")]);
   });
 
   /// Paging the window is the thing done most often on this tab, so it is two

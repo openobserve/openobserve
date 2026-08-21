@@ -34,12 +34,22 @@ const stubs = {
 
 const FROM = 1_700_000_000_000_000;
 
-const rotation = (members: string[], over: Partial<Rotation> = {}): Rotation => ({
-  name: "Primary",
-  members,
-  shift_micros: MICROS_PER_WEEK,
-  anchor_micros: FROM,
-  ...over,
+const rotation = (
+  members: string[],
+  over: Partial<Rotation["shift_rules"][number]> = {},
+  name = "Primary",
+): Rotation => ({
+  id: `rot_${name.toLowerCase()}`,
+  name,
+  shift_rules: [
+    {
+      name,
+      members,
+      shift_micros: MICROS_PER_WEEK,
+      anchor_micros: FROM,
+      ...over,
+    },
+  ],
 });
 
 function bandsOf(wrapper: any) {
@@ -64,15 +74,28 @@ describe("OnCallCoverageStrip", () => {
     expect(bands[0].width).toBeCloseTo(1, 5);
   });
 
-  /// A two-person rotation has a next; a one-person rotation does not, and the
-  /// difference is exactly "is anybody behind them".
-  it("distinguishes primary-only cover from primary plus secondary", () => {
-    const both = bandsOf(render([rotation(["ana@o2.ai", "bob@o2.ai"])]));
-    const alone = bandsOf(render([rotation(["ana@o2.ai"])]));
+  /// **"Is anybody behind them" counts a SECOND ROTATION**, not the next person
+  /// in the same one. The next person is not cover: they are not on call until
+  /// the handover, and counting them is how a team with one rotation looked
+  /// doubly covered while a single gap would page nobody.
+  it("distinguishes one staffed rotation from two", () => {
+    const two = bandsOf(
+      render([rotation(["ana@o2.ai"]), rotation(["bob@o2.ai"], {}, "Secondary")]),
+    );
+    const one = bandsOf(render([rotation(["ana@o2.ai", "bob@o2.ai"])]));
 
-    expect(both[0].tone).not.toBe(alone[0].tone);
-    expect(both[0].tone).not.toBe("gap");
-    expect(alone[0].tone).not.toBe("gap");
+    expect(two[0].tone).not.toBe(one[0].tone);
+    expect(two[0].tone).not.toBe("gap");
+    expect(one[0].tone).not.toBe("gap");
+  });
+
+  /// A two-person rotation is still ONE position. Its handover order says who
+  /// takes over next, not who is backing the holder up right now.
+  it("does not count a rotation's own next person as cover", () => {
+    const solo = bandsOf(render([rotation(["ana@o2.ai"])]));
+    const pair = bandsOf(render([rotation(["ana@o2.ai", "bob@o2.ai"])]));
+
+    expect(pair[0].tone).toBe(solo[0].tone);
   });
 
   /// The gap is the whole point of the strip.
@@ -177,8 +200,8 @@ describe("OnCallCoverageStrip", () => {
   it("offers a legend for all three states", () => {
     const text = render([rotation(["ana@o2.ai"])]).text();
 
-    expect(text).toContain("Primary + secondary");
-    expect(text).toContain("Primary only");
+    expect(text).toContain("Two or more on call");
+    expect(text).toContain("One on call");
     expect(text).toContain("Nobody");
   });
 });
