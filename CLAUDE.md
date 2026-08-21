@@ -7,6 +7,8 @@
 - `.env` in the project root overrides process env; check it before running the server.
 - Before finishing a task: run `cargo fmt --all` and make
   `cargo clippy --all-targets -- -D warnings` pass — that is exactly what CI runs.
+- Personal Claude Code settings go in `.claude/settings.local.json` (gitignored);
+  `.claude/settings.json` is shared and checked in.
 
 ## Rust code organization
 
