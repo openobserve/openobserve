@@ -17,6 +17,7 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
+import type { SearchObject } from "@/composables/useLogs/searchState";
 
 /**
  * State behind the "View Trace" action — the traces-stream picker and the
@@ -33,33 +34,41 @@ import useStreams from "@/composables/useStreams";
  * state — it is shared module state in the app, so the selection carries across
  * both renderings.
  */
-export default function useViewTraceAction(t: TranslateFn, searchObj: any) {
+export default function useViewTraceAction(t: TranslateFn, searchObj: SearchObject) {
   const store = useStore();
   const { getStreams } = useStreams(t);
 
-  const tracesStreams: any = ref([]);
-  const filteredTracesStreamOptions: any = ref([]);
+  const tracesStreams = ref<string[]>([]);
+  const filteredTracesStreamOptions = ref<string[]>([]);
   const isTracesStreamsLoading = ref(false);
-  const showViewTraceBtn: any = ref(false);
+  // Holds the trace-id value rather than a strict boolean: the gate below ends
+  // in the record lookup, and callers only ever use it for truthiness.
+  const showViewTraceBtn = ref<string | boolean | undefined>(false);
+  // Latches once a fetch has completed, successfully or not. `filteredTraces-
+  // StreamOptions.length` cannot serve as the guard: an org with no traces
+  // streams leaves it empty forever, which would refetch on every record.
+  const hasLoadedTracesStreams = ref(false);
 
   const getTracesStreams = async () => {
     isTracesStreamsLoading.value = true;
     try {
-      getStreams("traces", false)
-        .then((res: any) => {
-          tracesStreams.value = res.list.map((option: any) => option.name);
-          filteredTracesStreamOptions.value = JSON.parse(JSON.stringify(tracesStreams.value));
+      // Awaited inside the try so a rejection lands in the catch below instead
+      // of escaping as an unhandled rejection on a promise nobody holds.
+      const res = (await getStreams("traces", false)) as { list: { name: string }[] };
 
-          if (!searchObj.meta.selectedTraceStream.length)
-            searchObj.meta.selectedTraceStream = tracesStreams.value[0];
-        })
-        .catch(() => Promise.reject())
-        .finally(() => {
-          isTracesStreamsLoading.value = false;
-        });
-    } catch (err: any) {
-      isTracesStreamsLoading.value = false;
+      tracesStreams.value = (res?.list ?? []).map((option) => option.name);
+      filteredTracesStreamOptions.value = [...tracesStreams.value];
+
+      // Only default the selection when there is something to select —
+      // assigning `undefined` here used to make the next call throw on
+      // `selectedTraceStream.length`.
+      if (!searchObj.meta.selectedTraceStream?.length && tracesStreams.value.length)
+        searchObj.meta.selectedTraceStream = tracesStreams.value[0];
+    } catch (err: unknown) {
       console.error("Failed to get traces streams", err);
+    } finally {
+      hasLoadedTracesStreams.value = true;
+      isTracesStreamsLoading.value = false;
     }
   };
 
@@ -67,14 +76,14 @@ export default function useViewTraceAction(t: TranslateFn, searchObj: any) {
    * Decide whether the action is offered for `record`, and lazily load the
    * traces streams the picker needs the first time it is.
    */
-  const setViewTraceBtn = (record: any) => {
+  const setViewTraceBtn = (record: Record<string, unknown> | null | undefined) => {
     // Hide view traces button when service_streams_enabled is true
     const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
 
     // `hiddenMenus` is seeded as an array and only replaced with a Set once
     // MainLayout has read `custom_hide_menus`, so accept either shape rather
     // than assuming `.has` exists.
-    const hiddenMenus: any = store.state.hiddenMenus;
+    const hiddenMenus: Set<string> | string[] | undefined = store.state.hiddenMenus;
     const tracesMenuHidden =
       typeof hiddenMenus?.has === "function"
         ? hiddenMenus.has("traces")
@@ -83,13 +92,15 @@ export default function useViewTraceAction(t: TranslateFn, searchObj: any) {
     showViewTraceBtn.value =
       !tracesMenuHidden && // Check if traces menu is hidden
       !serviceStreamsEnabled && // Hide when service streams is enabled
-      record?.[store.state.organizationData?.organizationSettings?.trace_id_field_name];
+      (record?.[store.state.organizationData?.organizationSettings?.trace_id_field_name] as
+        string | undefined);
 
-    if (showViewTraceBtn.value && !filteredTracesStreamOptions.value.length) getTracesStreams();
+    if (showViewTraceBtn.value && !hasLoadedTracesStreams.value && !isTracesStreamsLoading.value)
+      getTracesStreams();
   };
 
-  const filterStreamFn = (val: any = "") => {
-    filteredTracesStreamOptions.value = tracesStreams.value.filter((stream: any) => {
+  const filterStreamFn = (val: string = "") => {
+    filteredTracesStreamOptions.value = tracesStreams.value.filter((stream: string) => {
       return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
     });
   };

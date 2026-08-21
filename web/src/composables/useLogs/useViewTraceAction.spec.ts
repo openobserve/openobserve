@@ -299,15 +299,21 @@ describe("useViewTraceAction", () => {
       expect(mockGetStreams).not.toHaveBeenCalled();
     });
 
-    it("does not fetch when options are already populated by another caller", async () => {
+    it("does not refetch for an org whose stream list came back empty", async () => {
+      // The guard latches on a *completed* fetch rather than on
+      // `filteredTracesStreamOptions.length`. An org with no traces streams
+      // leaves that array empty forever, so the old check re-fetched on every
+      // record; this is the case that regressed.
+      mockGetStreams.mockResolvedValue({ list: [] });
       const { setViewTraceBtn, filteredTracesStreamOptions } = useViewTraceAction(gt, searchObj);
-      filteredTracesStreamOptions.value = ["preloaded-stream"];
 
       setViewTraceBtn(recordWithTraceId);
       await flushPromises();
+      setViewTraceBtn(recordWithTraceId);
+      await flushPromises();
 
-      expect(mockGetStreams).not.toHaveBeenCalled();
-      expect(filteredTracesStreamOptions.value).toEqual(["preloaded-stream"]);
+      expect(mockGetStreams).toHaveBeenCalledTimes(1);
+      expect(filteredTracesStreamOptions.value).toEqual([]);
     });
   });
 
@@ -335,13 +341,15 @@ describe("useViewTraceAction", () => {
       expect(filteredTracesStreamOptions.value).not.toBe(tracesStreams.value);
     });
 
-    it("clears the loading flag once the fetch resolves", async () => {
+    it("raises the loading flag while fetching and clears it once resolved", async () => {
       const { getTracesStreams, isTracesStreamsLoading } = useViewTraceAction(gt, searchObj);
 
-      await getTracesStreams();
+      // The call awaits the fetch internally, so the flag is only observable
+      // as true before the returned promise settles.
+      const pending = getTracesStreams();
       expect(isTracesStreamsLoading.value).toBe(true);
 
-      await flushPromises();
+      await pending;
       expect(isTracesStreamsLoading.value).toBe(false);
     });
 
@@ -376,8 +384,10 @@ describe("useViewTraceAction", () => {
 
       expect(tracesStreams.value).toEqual([]);
       expect(filteredTracesStreamOptions.value).toEqual([]);
-      // Nothing to select — the picker stays empty rather than erroring.
-      expect(searchObj.meta.selectedTraceStream).toBeUndefined();
+      // Nothing to select, so the existing (empty) selection is left alone.
+      // Assigning `undefined` here used to make the *next* call throw on
+      // `selectedTraceStream.length`.
+      expect(searchObj.meta.selectedTraceStream).toBe("");
     });
 
     it("does not throw and leaves loading false when the fetch rejects", async () => {
