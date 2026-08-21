@@ -279,7 +279,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { orgUsersQuery } from "@/services/users.queries";
+import {
+  orgUsersQuery,
+  assignableRolesQuery,
+  allUserRolesQuery,
+} from "@/services/users.queries";
+import { rolesQuery } from "@/services/iam.queries";
 import { userKeys } from "@/services/users.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onActivated, onBeforeMount, watch, computed } from "vue";
@@ -310,7 +315,6 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { getRoles as getCustomRolesApi } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -694,21 +698,25 @@ export default defineComponent({
     let revokeInviteToken = "";
     const revokeInviteEmail = ref("");
 
+    // Resolves `true` either way, as it always has: callers only await it to
+    // sequence the mount, and a missing role list must not block the page.
     const getRoles = () => {
-      return new Promise((resolve) => {
-        usersService
-          .getRoles(store.state.selectedOrganization.identifier)
-          .then((res) => {
-            options.value = res.data;
-          })
-          .finally(() => resolve(true));
-      });
+      return queryClient
+        .fetchQuery(assignableRolesQuery(store.state.selectedOrganization.identifier))
+        .then((data: any) => {
+          options.value = data;
+          return true;
+        })
+        .catch(() => true);
     };
     const getCustomRoles = async (options: { silent?: boolean } = {}) => {
       if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
       try {
-        const res = await getCustomRolesApi(store.state.selectedOrganization.identifier);
-        customRoles.value = Array.isArray(res.data) ? res.data : [];
+        // Same endpoint as the IAM roles list — one cache entry, not one per page.
+        const data = await queryClient.fetchQuery(
+          rolesQuery(store.state.selectedOrganization.identifier),
+        );
+        customRoles.value = Array.isArray(data) ? data : [];
       } catch (err: any) {
         if (!options.silent && err?.response?.status !== 403) {
           toast({
@@ -864,11 +872,11 @@ export default defineComponent({
             if (isEnterpriseOrCloud) {
               const orgId = store.state.selectedOrganization.identifier;
               // Don't await — let the batched role fetch run in the background.
-              usersService
-                .getAllUserRoles(orgId)
+              queryClient
+                .fetchQuery(allUserRolesQuery(orgId))
                 .then((resp: any) => {
                   // Response is a map of user email -> role list.
-                  const roleMap: Record<string, any> = resp?.data || {};
+                  const roleMap: Record<string, any> = resp || {};
                   usersState.users.forEach((u: any) => {
                     if (u.status === "pending") return;
                     const fetched: string[] = Array.isArray(roleMap[u.rawEmail])

@@ -24,6 +24,7 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
 import segment from "@/services/segment_analytics";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
 const i18n = createI18n({
@@ -484,6 +485,9 @@ describe("User Component", () => {
         { label: "member", value: "member" },
       ];
       mockUsersService.getRoles.mockResolvedValue({ data: mockRoles } as any);
+      // The mount already warmed this query, so without clearing it the
+      // override above would be a cache hit and never reach the service.
+      queryClient.clear();
 
       await wrapper.vm.getRoles();
 
@@ -495,6 +499,7 @@ describe("User Component", () => {
 
     it("should handle getRoles error gracefully", async () => {
       mockUsersService.getRoles.mockRejectedValue(new Error("API Error"));
+      queryClient.clear();
 
       await expect(wrapper.vm.getRoles()).resolves.toBe(true);
       expect(mockUsersService.getRoles).toHaveBeenCalled();

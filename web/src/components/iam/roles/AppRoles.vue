@@ -86,6 +86,8 @@ import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { deleteRoleMutation, bulkDeleteRolesMutation } from "@/services/iam.queries";
 import { rolesQuery } from "@/services/iam.queries";
+import { allUserRolesQuery } from "@/services/users.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { onBeforeMount, ref , watch } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -95,7 +97,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
 import { getRoleUsers } from "@/services/iam";
-import usersService from "@/services/users";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
@@ -206,10 +207,12 @@ const roleUserCounts = ref<Record<string, number> | null>(null);
 const loadRoleUserCounts = async () => {
   if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
   try {
-    const res = await usersService.getAllUserRoles(store.state.selectedOrganization.identifier);
+    const res = await queryClient.fetchQuery(
+      allUserRolesQuery(store.state.selectedOrganization.identifier),
+    );
     const counts: Record<string, number> = {};
     // Response is a map of user email -> role list.
-    Object.values(res.data ?? {}).forEach((roles: any) => {
+    Object.values(res ?? {}).forEach((roles: any) => {
       (Array.isArray(roles) ? roles : []).forEach((role: any) => {
         const key = String(role ?? "").trim();
         if (!key) return;
