@@ -513,6 +513,7 @@ import type {
   Unavailability,
 } from "@/ts/interfaces/oncall";
 import {
+  BASE_SHIFT_RULE_NAME,
   DEFAULT_ROTATION_NAME,
   MAX_ROTATION_NAME_CHARS,
   MICROS_PER_WEEK,
@@ -828,9 +829,11 @@ function addRule() {
   if (!rotation) return;
   const highest = rotation.shift_rules.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
   rotation.shift_rules.push({
+    // Never the rotation's name: the rotation is the position, the rule is who
+    // holds it and when, and one word for both is what "Base" exists to avoid.
     name: rotation.shift_rules.length
       ? String(t("oncall.shiftRuleNthName", { n: rotation.shift_rules.length + 1 }))
-      : rotation.name,
+      : BASE_SHIFT_RULE_NAME,
     members: [],
     shift_micros: MICROS_PER_WEEK,
     // Top of the hour, so a handover is readable rather than landing at
@@ -930,7 +933,8 @@ function addRotation() {
     name,
     shift_rules: [
       {
-        name,
+        // The position is named above; the rule underneath is always "Base".
+        name: BASE_SHIFT_RULE_NAME,
         members: [],
         shift_micros: MICROS_PER_WEEK,
         anchor_micros: Math.floor(nowMicros.value / 3_600_000_000) * 3_600_000_000,

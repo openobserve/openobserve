@@ -131,6 +131,7 @@ import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
 import type { OnCallTeam, Rotation } from "@/ts/interfaces/oncall";
 import {
+  BASE_SHIFT_RULE_NAME,
   DEFAULT_ROTATION_NAME,
   MICROS_PER_WEEK,
   SECONDARY_ROTATION_NAME,
@@ -368,8 +369,11 @@ async function amendStaffedRotations(
   anchorMicros: number,
   wantSecondary: boolean,
 ): Promise<Rotation[]> {
-  const rule = (name: string, anchor: number) => ({
-    name,
+  // The rule takes the BASE name, never the rotation's: a rotation is a
+  // position, a rule is who holds it and when. Naming both "Secondary" put one
+  // word on two concepts, which is the confusion this rework exists to remove.
+  const rule = (anchor: number) => ({
+    name: BASE_SHIFT_RULE_NAME,
     members: emails,
     shift_micros: shift,
     anchor_micros: anchor,
@@ -378,14 +382,14 @@ async function amendStaffedRotations(
     {
       id: mintRotationId(),
       name: DEFAULT_ROTATION_NAME,
-      shift_rules: [rule(DEFAULT_ROTATION_NAME, anchorMicros)],
+      shift_rules: [rule(anchorMicros)],
     },
     ...(wantSecondary
       ? [
           {
             id: mintRotationId(),
             name: SECONDARY_ROTATION_NAME,
-            shift_rules: [rule(SECONDARY_ROTATION_NAME, anchorMicros - shift)],
+            shift_rules: [rule(anchorMicros - shift)],
           },
         ]
       : []),

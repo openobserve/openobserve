@@ -329,6 +329,9 @@ describe("OnCallScheduleEditor", () => {
     const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
     expect(rows).toHaveLength(2);
     expect(rows[1].shift_rules[0].priority).toBe(0);
+    // The position is named on the rotation; the rule underneath is "Base".
+    expect(rows[1].shift_rules[0].name).toBe("Base");
+    expect(rows[1].name).not.toBe("Base");
   });
 
   /// The drawer used to survive its own save; the parent then rebuilt `draft`,

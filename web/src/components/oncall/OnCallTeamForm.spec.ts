@@ -106,6 +106,10 @@ describe("OnCallTeamForm", () => {
     const [primary] = schedule.data.rotations;
     expect(primary.shift_rules[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
     expect(primary.shift_rules[0].anchor_micros).toBe(Date.parse("2026-08-17T10:00") * 1000);
+    // A rotation is a position; a rule is who holds it and when. Naming both
+    // "Secondary" put one word on two concepts and was a real defect.
+    expect(primary.shift_rules[0].name).toBe("Base");
+    expect(primary.name).toBe("Primary");
   });
 
   /// Adding members auto-staffs the team, and this PUT is a full replace: the

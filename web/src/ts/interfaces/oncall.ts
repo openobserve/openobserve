@@ -393,6 +393,16 @@ export const DEFAULT_ROTATION_NAME = "Primary";
  */
 export const SECONDARY_ROTATION_NAME = "Secondary";
 
+/**
+ * The name the system gives a rotation's first shift rule.
+ *
+ * A rule answers *when and who*; a rotation is *which position*. Naming the
+ * rule after the rotation put one word on two concepts — a rotation called
+ * `Secondary` whose only rule was called `Primary` was a real defect, fixed
+ * server-side 2026-08-21 (API-FOR-UI §N.9b). Anything the UI mints follows.
+ */
+export const BASE_SHIFT_RULE_NAME = "Base";
+
 /** The longest a rotation's name may be, server-side. */
 export const MAX_ROTATION_NAME_CHARS = 64;
 
