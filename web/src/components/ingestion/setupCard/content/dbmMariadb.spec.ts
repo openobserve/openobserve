@@ -97,7 +97,7 @@ describe("MariaDB Database Monitoring config", () => {
     // filter must name it explicitly or every MariaDB deadlock is dropped
     // while the pipeline still reports healthy.
     expect(config).toContain('attributes["o2_maria_event"]');
-    expect(config).toContain("stream-name: dbm_server");
+    expect(config).toContain("stream-name: _o2_dbm_server");
     expect(config).toContain("processors: [memory_limiter, filter/dbm, batch]");
   });
 

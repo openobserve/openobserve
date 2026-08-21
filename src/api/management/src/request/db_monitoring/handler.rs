@@ -327,7 +327,7 @@ pub async fn get_dbm_samples(
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default '_o2_dbm_server')"),
         ("system" = Option<String>, Query, description = "Database engine filter"),
         ("instance" = Option<String>, Query, description = "Database instance filter"),
         ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
@@ -392,7 +392,7 @@ pub async fn get_dbm_deadlocks(
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default '_o2_dbm_server')"),
         ("system" = Option<String>, Query, description = "Database engine filter"),
         ("instance" = Option<String>, Query, description = "Database instance filter"),
         ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
@@ -449,7 +449,7 @@ pub async fn get_dbm_blocking(
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default '_o2_dbm_server')"),
         ("system" = Option<String>, Query, description = "Database engine filter"),
         ("instance" = Option<String>, Query, description = "Database instance filter"),
         ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
@@ -533,7 +533,7 @@ pub async fn get_dbm_query_server_metrics(
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default '_o2_dbm_server')"),
         ("system" = Option<String>, Query, description = "Database engine filter"),
         ("instance" = Option<String>, Query, description = "Database instance filter"),
         ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
@@ -574,7 +574,7 @@ pub async fn get_dbm_server_queries(
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream; when absent BOTH defaults ('dbm_server' and 'dbm_server_logs') are read and merged"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream; when absent BOTH defaults ('_o2_dbm_server' and 'dbm_server_logs') are read and merged"),
         ("system" = Option<String>, Query, description = "Database engine filter"),
         ("instance" = Option<String>, Query, description = "Database instance filter"),
         ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
@@ -637,7 +637,7 @@ pub async fn get_dbm_query_plans(
 /// Logs-side pair in one round trip.
 ///
 /// `/query/plans` and `/query/server_metrics` were ALWAYS co-fired from the
-/// detail page: both default to `dbm_server`, both run the same
+/// detail page: both default to `_o2_dbm_server`, both run the same
 /// `present_dbm_columns` schema read, both query `KIND_TOP_QUERY` records for
 /// the same fingerprint and window. That is two OFGA round trips, two schema
 /// reads and two HTTP round trips to answer one question about one statement.
@@ -663,7 +663,7 @@ pub async fn get_dbm_query_plans(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("fingerprint" = String, Query, description = "Query fingerprint (required)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (defaults to dbm_server)"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (defaults to _o2_dbm_server)"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
         ("engine" = Option<String>, Query, description = "Server-metrics join key: database engine. Omit and `server_metrics` is null."),
@@ -700,7 +700,7 @@ pub async fn get_dbm_query_insights(
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default '_o2_dbm_server')"),
         ("system" = Option<String>, Query, description = "Restrict to one engine"),
     ),
     responses(
@@ -753,7 +753,7 @@ pub async fn get_dbm_instances(
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default '_o2_dbm_server')"),
         ("system" = Option<String>, Query, description = "Database engine filter"),
         ("instance" = Option<String>, Query, description = "Database instance filter"),
         ("limit" = Option<usize>, Query, description = "Max relations returned (default 100)"),

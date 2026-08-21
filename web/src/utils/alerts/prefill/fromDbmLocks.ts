@@ -20,7 +20,7 @@
  * of CLIENT-OBSERVED spans — latency and errors as the application experienced
  * them. These two conditions come from somewhere else entirely: the engine's
  * own lock views, polled by the collector and written to the shared
- * server-vantage stream `dbm_server`. Different stream, different columns,
+ * server-vantage stream `_o2_dbm_server`. Different stream, different columns,
  * different vantage. Folding them into one builder would mean switching all
  * three on a `kind` field, and the pairing is exactly the thing that must not
  * be gettable wrong.
@@ -56,7 +56,7 @@ import { sanitizeAlertNamePart, warn } from "../alertPrefill";
  * top-query records all land here and are told apart by `o2_dbm_kind` — which
  * is why every query this module builds carries that predicate.
  */
-export const DBM_SERVER_STREAM = "dbm_server";
+export const DBM_SERVER_STREAM = "_o2_dbm_server";
 
 /** What the user asked to be alerted about. */
 export type DbmLockAlertKind = "blocking" | "deadlocks";

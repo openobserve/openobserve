@@ -51,7 +51,7 @@ describe("db_monitoring service · getActivity", () => {
     dbMonitoringService.getActivity("myorg", {
       startTime: 1_754_880_000_000_000,
       endTime: 1_754_883_600_000_000,
-      stream: "dbm_server",
+      stream: "_o2_dbm_server",
       system: "postgresql",
       instance: "orders-db.prod.internal",
       namespace: "orders",
@@ -60,7 +60,7 @@ describe("db_monitoring service · getActivity", () => {
     expect(paramsOf()).toEqual({
       start_time: 1_754_880_000_000_000,
       end_time: 1_754_883_600_000_000,
-      stream: "dbm_server",
+      stream: "_o2_dbm_server",
       system: "postgresql",
       instance: "orders-db.prod.internal",
       namespace: "orders",
@@ -106,7 +106,7 @@ describe("db_monitoring service · getActivity", () => {
     ["system", "mysql"],
     ["instance", "orders-db.prod.internal"],
     ["namespace", "orders"],
-    ["stream", "dbm_server"],
+    ["stream", "_o2_dbm_server"],
   ])("keeps a genuine %s value", (key, value) => {
     dbMonitoringService.getActivity("myorg", { [key]: value });
     expect(paramsOf()).toEqual({ [key]: value });

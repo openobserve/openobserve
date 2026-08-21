@@ -1351,7 +1351,7 @@ processors:
   # records the filter silently drops.
   #
   # This is load-bearing, not tidiness. The filelog receivers tail the WHOLE
-  # database log, so without it every ordinary log line lands in dbm_server too —
+  # database log, so without it every ordinary log line lands in _o2_dbm_server too —
   # measured on a real deployment, tagged events were 787 rows against 4.8
   # MILLION untagged ones in the same hour, and the Deadlocks page slowed to
   # 8-18s because every query scanned all of them.
@@ -1425,7 +1425,7 @@ exporters:
     logs_endpoint: ${env:O2_ENDPOINT}/api/${env:O2_ORG}/v1/logs
     headers:
       Authorization: Basic ${env:O2_AUTH}
-      stream-name: dbm_server
+      stream-name: _o2_dbm_server
     tls: { insecure: true }
     retry_on_failure: { enabled: true }
   otlphttp/o2_metrics:
@@ -1471,7 +1471,7 @@ service:
     # SERVER VANTAGE / receiver-native events. Split onto its own pipeline purely
     # so the raw-evidence file holds ONLY db.server.query_sample and
     # db.server.top_query, undiluted by the sqlquery recipes and filelog tailing.
-    # Both pipelines export to the same `dbm_server` stream in O2.
+    # Both pipelines export to the same `_o2_dbm_server` stream in O2.
     logs/receiver_events:
       receivers: [postgresql, mysql]
       processors: [transform/tag_source, resource/ident, batch]

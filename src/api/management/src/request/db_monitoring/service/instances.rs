@@ -197,7 +197,8 @@ mod tests {
     /// could not offer an instance it had no rows for.
     #[test]
     fn test_instances_sql_unions_every_feed() {
-        let sql = build_dbm_instances_sql("dbm_server", None, &all_cols()).expect("instances sql");
+        let sql =
+            build_dbm_instances_sql("_o2_dbm_server", None, &all_cols()).expect("instances sql");
         assert!(
             sql.contains("GROUP BY"),
             "the identity list must dedup, not read rows — GROUP BY since the \
@@ -225,7 +226,8 @@ mod tests {
     /// earns the cache entry is the projected `_timestamp` beside it.
     #[test]
     fn test_instances_sql_projects_a_timestamp_so_the_result_cache_accepts_it() {
-        let sql = build_dbm_instances_sql("dbm_server", None, &all_cols()).expect("instances sql");
+        let sql =
+            build_dbm_instances_sql("_o2_dbm_server", None, &all_cols()).expect("instances sql");
         assert!(
             sql.contains("AS _timestamp"),
             "no projected _timestamp means the cache declines the query: {sql}"
@@ -250,8 +252,8 @@ mod tests {
     #[test]
     fn test_instances_sql_grid_stamps_its_timestamp_so_the_key_is_stable() {
         let end = 1_800_000_000_000_000_i64;
-        let a = build_dbm_instances_sql_at("dbm_server", None, &all_cols(), end).expect("sql");
-        let b = build_dbm_instances_sql_at("dbm_server", None, &all_cols(), end + 1_000_000)
+        let a = build_dbm_instances_sql_at("_o2_dbm_server", None, &all_cols(), end).expect("sql");
+        let b = build_dbm_instances_sql_at("_o2_dbm_server", None, &all_cols(), end + 1_000_000)
             .expect("sql");
         assert_eq!(
             a, b,
@@ -268,7 +270,7 @@ mod tests {
     /// A `system` chip must narrow the instance list beside it.
     #[test]
     fn test_instances_sql_narrows_by_engine() {
-        let sql = build_dbm_instances_sql("dbm_server", Some("mssql"), &all_cols())
+        let sql = build_dbm_instances_sql("_o2_dbm_server", Some("mssql"), &all_cols())
             .expect("instances sql");
         assert!(sql.contains("= 'mssql'"));
     }
@@ -280,7 +282,7 @@ mod tests {
     fn test_instances_sql_survives_a_missing_instance_column() {
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_INSTANCE);
-        let sql = build_dbm_instances_sql("dbm_server", None, &without)
+        let sql = build_dbm_instances_sql("_o2_dbm_server", None, &without)
             .expect("engine alone is still a usable identity list");
         assert!(
             sql.contains("CAST(NULL AS VARCHAR)"),
@@ -295,7 +297,7 @@ mod tests {
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_ENGINE);
         assert_eq!(
-            build_dbm_instances_sql("dbm_server", None, &without),
+            build_dbm_instances_sql("_o2_dbm_server", None, &without),
             None,
             "a stream with no engine column must skip the query, not 500 the endpoint"
         );

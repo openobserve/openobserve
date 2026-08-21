@@ -20,8 +20,8 @@
 use super::{super::models::*, *};
 
 /// Default server-vantage logs stream — the name the shipped collector recipes
-/// export to (`stream-name: dbm_server`).
-pub(super) const DEFAULT_SERVER_STREAM: &str = "dbm_server";
+/// export to (`stream-name: _o2_dbm_server`).
+pub(super) const DEFAULT_SERVER_STREAM: &str = "_o2_dbm_server";
 
 /// The DBM stream-read decision, split from the OFGA round trips that produce
 /// its inputs so the rule itself is unit-testable without a live OpenFGA store.
@@ -3109,8 +3109,14 @@ mod tests {
     /// the activity columns here.
     #[test]
     fn test_build_dbm_events_sql_exact() {
-        let sql = build_dbm_events_sql("dbm_server", "deadlock", "", 50, &proj(&all_cols(), None));
-        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_plan_source, o2_dbm_plan_duration_ms, o2_dbm_plan_rows_actual, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated, o2_dbm_index_name, o2_dbm_index_bytes, o2_dbm_idx_tup_read, o2_dbm_idx_tup_fetch, o2_dbm_index_is_unique, o2_dbm_stmt_duration_ms FROM \"dbm_server\"\nWHERE o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
+        let sql = build_dbm_events_sql(
+            "_o2_dbm_server",
+            "deadlock",
+            "",
+            50,
+            &proj(&all_cols(), None),
+        );
+        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_plan_source, o2_dbm_plan_duration_ms, o2_dbm_plan_rows_actual, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated, o2_dbm_index_name, o2_dbm_index_bytes, o2_dbm_idx_tup_read, o2_dbm_idx_tup_fetch, o2_dbm_index_is_unique, o2_dbm_stmt_duration_ms FROM \"_o2_dbm_server\"\nWHERE o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
     }
 
@@ -3126,7 +3132,7 @@ mod tests {
         let mut present = all_cols();
         present.remove(server_vantage::O2_DBM_INSTANCE);
 
-        let sql = build_dbm_events_sql("dbm_server", "deadlock", "", 50, &proj(&present, None));
+        let sql = build_dbm_events_sql("_o2_dbm_server", "deadlock", "", 50, &proj(&present, None));
         assert!(
             !sql.contains(server_vantage::O2_DBM_INSTANCE),
             "absent column must not be projected"
@@ -3143,7 +3149,7 @@ mod tests {
     #[test]
     fn test_build_dbm_events_sql_survives_an_empty_schema() {
         let sql = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             "deadlock",
             "",
             50,
@@ -3457,9 +3463,9 @@ mod tests {
     /// `probe_collection` call site.
     #[test]
     fn test_build_probe_sql_selects_kind_and_does_not_filter_it() {
-        let sql = build_probe_sql("dbm_server");
+        let sql = build_probe_sql("_o2_dbm_server");
         assert!(sql.contains("SELECT _timestamp, o2_dbm_kind"));
-        assert!(sql.contains("FROM \"dbm_server\""));
+        assert!(sql.contains("FROM \"_o2_dbm_server\""));
         // No kind predicate: filtering it out would discard the evidence.
         assert!(!sql.contains("o2_dbm_kind = "));
         assert!(sql.contains("LIMIT 2000"));
@@ -3469,7 +3475,7 @@ mod tests {
     #[test]
     fn test_build_last_seen_sql_applies_and_escapes_scope() {
         let preds = dbm_event_preds(Some("mysql"), None, Some("d'b"), &all_cols());
-        let sql = build_last_seen_sql("dbm_server", "deadlock", &preds);
+        let sql = build_last_seen_sql("_o2_dbm_server", "deadlock", &preds);
         assert!(sql.contains("o2_dbm_kind = 'deadlock'"));
         assert!(sql.contains("ORDER BY _timestamp DESC"));
         assert!(sql.contains("LIMIT 1"));

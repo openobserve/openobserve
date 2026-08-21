@@ -65,7 +65,7 @@ describe("postgresCard builder", () => {
     const card = postgresCard(SUBS, gt);
     expect(card.provider.name).toBe("Postgres");
     // Logs too: the optional Database Monitoring steps ship deadlock and
-    // blocking events into the dbm_server logs stream.
+    // blocking events into the _o2_dbm_server logs stream.
     expect(card.provider.metaBadges).toEqual(["Metrics", "Logs"]);
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -119,9 +119,9 @@ describe("postgresCard builder", () => {
     expect(config).toContain("dl_query_1");
     expect(config).toContain("o2_pg_event");
     // Must land in the stream the read endpoints look in.
-    expect(config).toContain("stream-name: dbm_server");
+    expect(config).toContain("stream-name: _o2_dbm_server");
     // The filter is load-bearing: filelog tails the WHOLE database log, so
-    // without it every ordinary log line lands in dbm_server too (measured:
+    // without it every ordinary log line lands in _o2_dbm_server too (measured:
     // 787 events vs 4.8M untagged rows in one hour) and the Deadlocks page
     // slows to a crawl. A processor that is defined but not listed in the
     // pipeline does nothing, so both are asserted.
@@ -301,7 +301,7 @@ describe("postgresCard builder", () => {
   // while matching nothing. These two settings are what prevent that, so they
   // are asserted as a contract rather than left to the runbook.
   // The read-time deadlock stitch groups on (engine, instance, database). If the
-  // recipes tag no instance, every host reporting into dbm_server collapses into
+  // recipes tag no instance, every host reporting into _o2_dbm_server collapses into
   // one bucket and two servers' deadlocks can fuse into one fabricated event.
   // server_address is the key detect_instance reads first.
   it("tags every server-vantage record with the host, so two servers never fuse", () => {

@@ -512,7 +512,7 @@ pub(crate) fn table_health_envelope(
     body
 }
 
-// ─── Shared dbm_server prologue (badges fan-in) ──────────────────────────────
+// ─── Shared _o2_dbm_server prologue (badges fan-in) ──────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -527,7 +527,7 @@ mod tests {
     /// would collapse them and silently drop one from the list.
     #[test]
     fn test_index_health_sql_groups_by_the_index_not_the_relation() {
-        let sql = build_dbm_index_health_sql("dbm_server", "", 50, &all_cols())
+        let sql = build_dbm_index_health_sql("_o2_dbm_server", "", 50, &all_cols())
             .expect("index health sql");
         assert!(
             sql.contains(&format!("GROUP BY {}", server_vantage::O2_DBM_SCHEMA)),
@@ -550,7 +550,7 @@ mod tests {
     /// Summing them multiplies an index's size by the number of samples.
     #[test]
     fn test_index_health_sql_uses_max_not_sum() {
-        let sql = build_dbm_index_health_sql("dbm_server", "", 50, &all_cols())
+        let sql = build_dbm_index_health_sql("_o2_dbm_server", "", 50, &all_cols())
             .expect("index health sql");
         assert!(
             sql.contains(&format!("MAX({})", server_vantage::O2_DBM_INDEX_BYTES)),
@@ -570,7 +570,7 @@ mod tests {
         let mut cols = all_cols();
         cols.remove(server_vantage::O2_DBM_INDEX_NAME);
         assert!(
-            build_dbm_index_health_sql("dbm_server", "", 50, &cols).is_none(),
+            build_dbm_index_health_sql("_o2_dbm_server", "", 50, &cols).is_none(),
             "no index column means no query, not a schema error"
         );
     }
@@ -737,7 +737,7 @@ mod tests {
     /// the question the page asks.
     #[test]
     fn test_build_dbm_table_health_sql_is_one_row_per_relation() {
-        let sql = build_dbm_table_health_sql("dbm_server", "", 50, &all_cols())
+        let sql = build_dbm_table_health_sql("_o2_dbm_server", "", 50, &all_cols())
             .expect("the table-health query must build when the columns are present");
 
         assert!(
@@ -776,7 +776,7 @@ mod tests {
     /// both.
     #[test]
     fn test_table_health_sql_never_sums_or_averages_a_snapshot() {
-        let sql = build_dbm_table_health_sql("dbm_server", "", 50, &all_cols())
+        let sql = build_dbm_table_health_sql("_o2_dbm_server", "", 50, &all_cols())
             .expect("table health sql");
 
         for banned in ["SUM(", "AVG(", "COUNT(o2_dbm"] {
@@ -800,7 +800,7 @@ mod tests {
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_RELATION);
         assert_eq!(
-            build_dbm_table_health_sql("dbm_server", "", 50, &without),
+            build_dbm_table_health_sql("_o2_dbm_server", "", 50, &without),
             None,
             "a stream with no relation column must skip the query, not 500 the endpoint"
         );
@@ -966,7 +966,7 @@ mod tests {
         // Asserted on the real JSON: [`table_health_envelope`] is the pure
         // shape assembly the body fn itself calls.
         let hits = vec![json!({"relation": "orders", "total_bytes": 1000i64})];
-        let env = table_health_envelope(&hits, "dbm_server", "postgresql", 100, None);
+        let env = table_health_envelope(&hits, "_o2_dbm_server", "postgresql", 100, None);
         let body = env.as_object().expect("the envelope is a JSON object");
 
         for key in ["counters_are_cumulative", "tuples_are_estimated"] {
@@ -988,8 +988,13 @@ mod tests {
         // The index section rides the same envelope when asked for, and carries
         // its own cumulative disclosure plus the read-failed flag — an empty
         // index list must not be able to wear "we could not read" as a costume.
-        let with_indexes =
-            table_health_envelope(&hits, "dbm_server", "postgresql", 100, Some((&[], true)));
+        let with_indexes = table_health_envelope(
+            &hits,
+            "_o2_dbm_server",
+            "postgresql",
+            100,
+            Some((&[], true)),
+        );
         for key in [
             "index_hits",
             "index_total",

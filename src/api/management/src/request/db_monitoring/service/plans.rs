@@ -490,7 +490,7 @@ mod tests {
     /// share — the shape W3.4 specifies.
     #[test]
     fn test_build_dbm_plans_sql_groups_by_hash() {
-        let sql = build_dbm_plans_sql("dbm_server", "3a74e60b4bd45cc6", "", &all_cols())
+        let sql = build_dbm_plans_sql("_o2_dbm_server", "3a74e60b4bd45cc6", "", &all_cols())
             .expect("the plans query must build when the columns are present");
 
         assert!(
@@ -542,7 +542,7 @@ mod tests {
     /// pg_stat_statements column in under any aggregate.
     #[test]
     fn test_plans_sql_never_aggregates_pgss_latency_by_plan() {
-        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &all_cols()).expect("plans sql");
+        let sql = build_dbm_plans_sql("_o2_dbm_server", "fp", "", &all_cols()).expect("plans sql");
         assert!(
             !sql.contains(server_vantage::O2_DBM_EXEC_TIME_S),
             "per-plan pg_stat_statements latency attributes execution time to a \
@@ -587,7 +587,7 @@ mod tests {
         without.remove(server_vantage::O2_DBM_PLAN_HASH);
         without.remove(server_vantage::O2_DBM_PLAN);
         assert_eq!(
-            build_dbm_plans_sql("dbm_server", "fp", "", &without),
+            build_dbm_plans_sql("_o2_dbm_server", "fp", "", &without),
             None,
             "a stream with neither plan column must skip the query, not 500 the endpoint"
         );
@@ -600,7 +600,7 @@ mod tests {
         // statement whose plan is sitting in the stream.
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_PLAN_HASH);
-        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &without)
+        let sql = build_dbm_plans_sql("_o2_dbm_server", "fp", "", &without)
             .expect("plans without a hash are still plans worth showing");
         assert!(
             sql.contains(server_vantage::O2_DBM_PLAN),
@@ -615,7 +615,7 @@ mod tests {
         // to the plan text does that without minting a hash over raw XML, which
         // would change on nearly every collection (the showplan embeds
         // per-execution costs) and fake a plan regression every interval.
-        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &all_cols()).expect("plans sql");
+        let sql = build_dbm_plans_sql("_o2_dbm_server", "fp", "", &all_cols()).expect("plans sql");
         assert!(
             sql.contains(&format!(
                 "COALESCE({}, {})",
@@ -738,7 +738,7 @@ mod tests {
             json!({"plan_hash": "a", "plan_source": "generic_null_bound"}),
             json!({"plan_hash": "b", "plan_source": "generic_null_bound"}),
         ];
-        let env = plans_envelope(&hits, "dbm_server", "on", true);
+        let env = plans_envelope(&hits, "_o2_dbm_server", "on", true);
         let body = env.as_object().expect("the envelope is a JSON object");
 
         for key in [
@@ -767,7 +767,12 @@ mod tests {
         assert_eq!(body.get("plan_source"), Some(&json!("generic_null_bound")));
         let executed = json!({"plan_hash": "a", "plan_source": "auto_explain"});
         assert_eq!(
-            plans_envelope(std::slice::from_ref(&executed), "dbm_server", "on", true)["plan_source"],
+            plans_envelope(
+                std::slice::from_ref(&executed),
+                "_o2_dbm_server",
+                "on",
+                true
+            )["plan_source"],
             json!("auto_explain"),
             "hardcoding generic_null_bound at the response level mislabels every \
              executed plan in the window (E-C)"
@@ -775,7 +780,7 @@ mod tests {
         assert_eq!(
             plans_envelope(
                 &[executed, json!({"plan_source": "generic_null_bound"})],
-                "dbm_server",
+                "_o2_dbm_server",
                 "on",
                 true
             )["plan_source"],
@@ -811,7 +816,7 @@ mod tests {
     /// naming an absent column in GROUP BY fails the whole query.
     #[test]
     fn test_plans_sql_groups_by_plan_source_only_when_present() {
-        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &all_cols()).expect("plans sql");
+        let sql = build_dbm_plans_sql("_o2_dbm_server", "fp", "", &all_cols()).expect("plans sql");
         // The producer is still part of the key — the group list now begins
         // with the hash-or-text fallback, so this asserts the SOURCE is present
         // in the GROUP BY rather than pinning the exact prefix.
@@ -828,7 +833,7 @@ mod tests {
         let mut without = all_cols();
         without.remove(server_vantage::O2_DBM_PLAN_SOURCE);
         without.remove(server_vantage::O2_DBM_PLAN_DURATION_MS);
-        let sql = build_dbm_plans_sql("dbm_server", "fp", "", &without)
+        let sql = build_dbm_plans_sql("_o2_dbm_server", "fp", "", &without)
             .expect("the query still builds for a pre-W-E3 stream");
         assert!(
             !sql.contains(server_vantage::O2_DBM_PLAN_SOURCE),
@@ -946,7 +951,7 @@ mod tests {
     #[test]
     fn test_plan_capture_state_agrees_with_whether_the_query_runs() {
         for present in [all_cols(), HashSet::new()] {
-            let runs = build_dbm_plans_sql("dbm_server", "fp", "", &present).is_some();
+            let runs = build_dbm_plans_sql("_o2_dbm_server", "fp", "", &present).is_some();
             let claimed_on = plan_capture_state(&present) == "on";
             assert_eq!(
                 claimed_on, runs,

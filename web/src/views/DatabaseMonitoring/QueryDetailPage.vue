@@ -43,7 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title-data-test="dbm-detail-title"
     scroll
   >
-    <template #actions>
+    <!-- With no query to scope, refresh, copy and the window picker all act on
+         nothing — copy in particular composes its summary from a row that is
+         not there. The empty state below carries the only action that applies. -->
+    <template v-if="hasQuery" #actions>
       <DateTime
         auto-apply
         menu-align="end"
@@ -78,8 +81,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            gets wrong: identity is not a section, it is the answer to "which
            query am I reading". A plan tree or a caller list with the statement
            hidden one tab away is unreadable. -->
+      <!-- No query to be about AT ALL — an org switch drops the fingerprint, so
+           the address names nothing. Replaces the page, because there is no
+           subject for any section to describe. A fingerprint that IS named but
+           matched nothing is a different state: see the note below, which
+           leaves the content standing. -->
+      <OEmptyState
+        v-if="!hasQuery"
+        size="hero"
+        illustration="query"
+        :title="notFoundCopy.title"
+        :description="notFoundCopy.description"
+        :action-label="t('dbm.detail.notFound.action')"
+        action-icon="chevron-right"
+        data-test="dbm-detail-not-found"
+        @action="openQueriesList"
+      />
+
+      <!-- The address names a query, but nothing matched it under the CURRENT
+           scope — most often a `?system=` that disagrees with the engine that
+           actually ran the statement. Reported inline rather than by blanking
+           the page: the fingerprint-keyed sections below (plans, the database's
+           own counters) may still hold answers, and the tab strip is how the
+           reader reaches them. -->
+      <DbmStateNote
+        v-if="scopeMissedQuery"
+        :title="t('dbm.detail.notFound.title')"
+        :hint="t('dbm.detail.notFound.scopeHint')"
+        data-test="dbm-detail-scope-missed"
+      />
+
       <!-- Identity: the statement, then the dimensions that locate it. -->
-      <section class="flex flex-col gap-2" data-test="dbm-detail-identity">
+      <section v-if="hasQuery" class="flex flex-col gap-2" data-test="dbm-detail-identity">
         <div class="flex flex-wrap items-center gap-1.5">
           <OTag v-if="row?.db_system" type="dbSystem" :value="row.db_system" />
           <OTag v-for="chip in identityChips" :key="chip.key" :label="chip.label" size="xs" />
@@ -126,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            No horizontal padding: a tab strip's first label self-aligns to the
            page-edge grid, so the labels line up with the statement above. -->
       <OTabs
+        v-if="hasQuery"
         :model-value="activeTab"
         align="left"
         class="shrink-0"
@@ -155,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTab>
       </OTabs>
 
-      <OTabPanels :model-value="activeTab" data-test="dbm-detail-tab-panels">
+      <OTabPanels v-if="hasQuery" :model-value="activeTab" data-test="dbm-detail-tab-panels">
         <!-- ── Overview ────────────────────────────────────────────────────
              How bad it is and whether it is getting worse. The client tiles
              and the database's own counters stay on ONE panel and in ONE flex
@@ -1103,6 +1137,7 @@ import DateTime from "@/components/DateTime.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -1133,6 +1168,8 @@ import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
 import { resolveQueryDetailTab, type QueryDetailTab } from "@/utils/dbm/queryDetailTabs";
+import { readDbmQueryDetailOrigin } from "@/utils/dbm/queryDetailOrigin";
+import { dbmQueryDetailPresence } from "@/utils/dbm/queryDetailPresence";
 import useStreams from "@/composables/useStreams";
 import {
   contextRegistry,
@@ -1305,6 +1342,15 @@ const seedRow = ref<QueryStatsRow | null>(null);
  * `0%` or "new".
  */
 const rowStatsReady = ref(false);
+/**
+ * Whether a read has ANSWERED for the fingerprint currently in the URL.
+ *
+ * Separate from `loading`, and the thing that keeps the not-found state
+ * honest: between mount and the first response both vantages are empty, which
+ * is indistinguishable from an answered "this org does not have it". Without
+ * this the empty state would flash over every cold entry.
+ */
+const rowLookupSettled = ref(false);
 /**
  * W6 — what the database itself recorded for this statement.
  *
@@ -1583,12 +1629,17 @@ watch(
 );
 
 /**
- * Where "back" goes: the tab the reader drilled in FROM (`?from=`), not a
+ * Where "back" goes: the tab the reader drilled in FROM (`?from_tab=`), not a
  * hardcoded Top queries. Four origins navigate here — Top queries, Activity,
  * Slowest calls, Deadlocks — and handing an Activity reader back to Top
  * queries strands them on a tab they never stood on. An absent or unknown
- * `from` falls back to Top queries, the detail page's natural parent (deep
+ * origin falls back to Top queries, the detail page's natural parent (deep
  * links and the traces-side entry point carry no origin).
+ *
+ * Read through `readDbmQueryDetailOrigin`, not off `route.query.from`: that
+ * key is the absolute window's start bound, and while the origin shared it
+ * every window change on this page erased the marker and sent the reader here
+ * — which is the "everything takes me back to top queries" report.
  *
  * Deadlocks is enterprise-only, so on OSS it is not offered as a back target:
  * the button would dead-end on a route that bounces straight back. Dropping
@@ -1605,7 +1656,7 @@ const backTarget = computed(() => {
       ? { deadlocks: { name: "dbmDeadlocks", label: t("dbm.detail.backToDeadlocks") } }
       : {}),
   };
-  const origin = targets[(route.query.from as string) ?? ""] ?? targets.queries;
+  const origin = targets[readDbmQueryDetailOrigin(route.query) ?? ""] ?? targets.queries;
   return {
     label: origin.label,
     to: {
@@ -1620,6 +1671,79 @@ const backTarget = computed(() => {
     },
   };
 });
+
+/**
+ * Whether this page has a query to be ABOUT, and what to say when it does not.
+ *
+ * Switching organization re-pushes this route with a new `org_identifier` and
+ * drops the rest of the query, so the page survives the switch while its
+ * subject does not. Before this the result was a header painted over empty
+ * tiles and empty panels — a blank page that read as broken rather than as a
+ * query this organization has never run. See `queryDetailPresence`.
+ */
+const presence = computed(() =>
+  dbmQueryDetailPresence({
+    fingerprint: fingerprint.value,
+    loading: loading.value,
+    settled: rowLookupSettled.value,
+    hasClientRow: row.value !== null,
+    hasServerRow: serverRow.value !== null,
+  }),
+);
+
+/**
+ * Whether the page's own content may paint at all.
+ *
+ * ONLY `missing` suppresses the body — an address that names no query has
+ * nothing to be about, which is the org-switch case this gate exists for.
+ *
+ * `notFound` deliberately does NOT suppress it. The URL still names a real
+ * fingerprint, and the sections keyed on the fingerprint ALONE (plans, the
+ * database's own counters, history, samples) can legitimately have content
+ * even when the system/instance-scoped row lookup matched nothing — the
+ * common cause being a `?system=` that disagrees with the engine that ran the
+ * statement. Blanking the page there hides real data and, because the tab
+ * strip went with it, removes the reader's only way to reach it.
+ */
+const hasQuery = computed(() => presence.value !== "missing");
+
+/**
+ * A named query that no vantage matched under the CURRENT scope. Reported
+ * inline, above the content, rather than by replacing the page: the scope is
+ * the thing to change, and the sections below may still hold answers.
+ */
+const scopeMissedQuery = computed(() => presence.value === "notFound");
+
+/**
+ * The two absent cases read differently and must not share a sentence: one is
+ * an address that names no query, the other an address naming one this
+ * organization has not run. The org is interpolated when we have it, because
+ * naming it is what turns "not found" into "you are in the wrong org".
+ */
+const notFoundCopy = computed(() => {
+  if (presence.value === "missing") {
+    return {
+      title: t("dbm.detail.notFound.missingTitle"),
+      description: t("dbm.detail.notFound.missingDescription"),
+    };
+  }
+  return {
+    title: t("dbm.detail.notFound.title"),
+    description: org.value
+      ? t("dbm.detail.notFound.description", { org: org.value })
+      : t("dbm.detail.notFound.descriptionNoOrg"),
+  };
+});
+
+/**
+ * The way out of the empty state — the same destination the header's back
+ * affordance uses, so the page has ONE idea of where "the list" is. Deliberately
+ * not `router.back()`: the reader arrived here by switching organization, and
+ * history's previous entry is this same page under the org they left.
+ */
+const openQueriesList = () => {
+  router.push(backTarget.value.to).catch(() => {});
+};
 
 /**
  * The statement itself. The server-vantage row is the SAME statement text —
@@ -2278,7 +2402,7 @@ const streamOptions = computed<SelectOption[]>(() =>
  * which is the mis-attribution the stream-resolution design exists to prevent.
  *
  * The server-vantage pair is deliberately NOT refetched. Plans and the
- * database's own counters are `dbm_server` records keyed on the fingerprint;
+ * database's own counters are `_o2_dbm_server` records keyed on the fingerprint;
  * neither reads the picked TRACE stream, so a refetch would re-request
  * identical data. (The old `loadPlans` call here did exactly that.) `loadRow`
  * stays out for its own reason: it is scoped by system/instance/namespace, not
@@ -2300,6 +2424,10 @@ const load = async () => {
   seedRow.value = null;
   loading.value = true;
   rowStatsReady.value = false;
+  // The previous answer described the previous question. Clearing it here is
+  // what stops a window change from being read as proof of absence while the
+  // new read is still in flight.
+  rowLookupSettled.value = false;
   refresh();
 
   // The stream list exists to RESOLVE an unknown stream (and to feed the
@@ -2359,6 +2487,9 @@ const load = async () => {
     if (!requestSeq.isStale(token)) {
       loading.value = false;
       lastRunAt.value = Date.now();
+      // A read has now answered for this fingerprint, so "neither vantage has
+      // it" may finally be reported as absence rather than as not-yet.
+      rowLookupSettled.value = true;
     }
   }
 };

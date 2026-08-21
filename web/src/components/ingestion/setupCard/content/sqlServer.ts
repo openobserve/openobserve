@@ -78,7 +78,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
       logo: getImageURL("images/ingestion/sqlserver.png"),
       tone: "#cc2927",
       // Logs too: the optional Database Monitoring steps ship blocking-chain
-      // samples into the dbm_server logs stream.
+      // samples into the _o2_dbm_server logs stream.
       metaBadges: [t("common.metrics"), t("common.logs")],
     },
     steps: [

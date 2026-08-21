@@ -813,7 +813,7 @@ export interface QueryPlansParams {
   fingerprint: string;
   /**
    * The server-vantage LOGS stream. Optional — the handler defaults it to the
-   * shared `dbm_server` stream, as its deadlock/blocking/activity siblings do,
+   * shared `_o2_dbm_server` stream, as its deadlock/blocking/activity siblings do,
    * so the UI need not carry a backend constant.
    */
   stream?: string;
@@ -838,7 +838,7 @@ export interface QueryServerMetricsParams {
    * — the endpoint matches instance-wide there and says so via `attribution`.
    */
   database?: string;
-  /** Optional — the handler defaults to the shared `dbm_server` logs stream. */
+  /** Optional — the handler defaults to the shared `_o2_dbm_server` logs stream. */
   stream?: string;
   startTime?: number;
   endTime?: number;
@@ -855,7 +855,7 @@ export interface QueryServerMetricsParams {
  */
 export interface QueryInsightsParams {
   fingerprint: string;
-  /** Optional — the handler defaults to the shared `dbm_server` logs stream. */
+  /** Optional — the handler defaults to the shared `_o2_dbm_server` logs stream. */
   stream?: string;
   startTime?: number;
   endTime?: number;

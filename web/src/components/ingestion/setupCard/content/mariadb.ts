@@ -84,7 +84,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       logo: getImageURL("images/ingestion/mysql.svg"),
       tone: "#C0765A",
       // Logs too: the optional Database Monitoring steps ship deadlock and
-      // blocking events into the dbm_server logs stream.
+      // blocking events into the _o2_dbm_server logs stream.
       metaBadges: [t("common.metrics"), t("common.logs")],
     },
     steps: [

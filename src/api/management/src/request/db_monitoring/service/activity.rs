@@ -62,7 +62,7 @@ fn wire_alias_of(col: &str) -> &'static str {
 
 /// A breakdown of sampled sessions, computed by SQL `GROUP BY`.
 ///
-/// **The aggregate is SQL, never a Rust fold over fetched rows.** `dbm_server`
+/// **The aggregate is SQL, never a Rust fold over fetched rows.** `_o2_dbm_server`
 /// is a single shared logs stream whose deadlock path writes a handful of rows
 /// per hour; activity sampling writes ~200 rows/sec for a 200-session instance,
 /// so a 5-minute window across a fleet holds millions. Folding the row-limited
@@ -612,7 +612,7 @@ mod tests {
     #[test]
     fn test_activity_breakdown_counts_sessions_not_samples() {
         let sql = build_dbm_activity_breakdown_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             server_vantage::O2_DBM_SESSION_STATE,
             None,
             "",
@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn test_activity_wait_event_aggregate_is_computed_by_sql() {
         let sql = build_dbm_activity_breakdown_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             server_vantage::O2_DBM_WAIT_EVENT_TYPE,
             Some(server_vantage::O2_DBM_WAIT_EVENT),
             "",
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn test_activity_state_aggregate_is_computed_by_sql() {
         let sql = build_dbm_activity_breakdown_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             server_vantage::O2_DBM_SESSION_STATE,
             None,
             "",
@@ -699,7 +699,7 @@ mod tests {
     #[test]
     fn test_activity_breakdown_is_not_capped_at_the_row_limit() {
         let sql = build_dbm_activity_breakdown_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             server_vantage::O2_DBM_SESSION_STATE,
             None,
             "",
@@ -739,7 +739,7 @@ mod tests {
     #[test]
     fn test_activity_rows_sql_reads_the_activity_kind() {
         let sql = build_dbm_events_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             server_vantage::KIND_ACTIVITY,
             "",
             50,
@@ -1045,7 +1045,7 @@ mod tests {
             &[json!({"wait_event": "Lock", "count": 3i64})],
             &[json!({"state": "active", "count": 2i64})],
             true,
-            "dbm_server",
+            "_o2_dbm_server",
             &probe,
         );
         let body = env.as_object().expect("the envelope is a JSON object");
@@ -1108,7 +1108,7 @@ mod tests {
     /// projection fails the WHOLE query with a schema error rather than
     /// returning nulls. That applies to a `GROUP BY` column as much as to a
     /// `SELECT` one — and the exposed case is the common one, not an edge:
-    /// every `dbm_server` stream that predates activity ingest has no
+    /// every `_o2_dbm_server` stream that predates activity ingest has no
     /// `o2_dbm_session_state` column at all.
     ///
     /// The rows query degrades gracefully there (the projection intersects to
@@ -1119,7 +1119,7 @@ mod tests {
         let empty: HashSet<String> = HashSet::new();
         assert!(
             build_dbm_activity_breakdown_sql(
-                "dbm_server",
+                "_o2_dbm_server",
                 server_vantage::O2_DBM_SESSION_STATE,
                 None,
                 "",
@@ -1137,7 +1137,7 @@ mod tests {
         partial.insert(server_vantage::O2_DBM_SESSION_STATE.to_string());
         assert!(
             build_dbm_activity_breakdown_sql(
-                "dbm_server",
+                "_o2_dbm_server",
                 server_vantage::O2_DBM_SESSION_STATE,
                 None,
                 "",
@@ -1148,7 +1148,7 @@ mod tests {
         );
         assert!(
             build_dbm_activity_breakdown_sql(
-                "dbm_server",
+                "_o2_dbm_server",
                 server_vantage::O2_DBM_WAIT_EVENT_TYPE,
                 Some(server_vantage::O2_DBM_WAIT_EVENT),
                 "",
@@ -1223,7 +1223,8 @@ mod tests {
         };
         let session = vec![json!({"query": "SELECT 1"})];
         let flag = |hits: &[Value], probe: &CollectionProbe| {
-            activity_envelope(hits, &[], &[], false, "dbm_server", probe)["not_collecting"].clone()
+            activity_envelope(hits, &[], &[], false, "_o2_dbm_server", probe)["not_collecting"]
+                .clone()
         };
 
         // The only true case: nothing on the page AND no evidence of life.
@@ -1264,7 +1265,7 @@ mod tests {
     fn test_breakdown_dtos_read_the_keys_the_sql_actually_returns() {
         // Derive the aliases from the SQL the builder emits, not from a literal.
         let sql = build_dbm_activity_breakdown_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             server_vantage::O2_DBM_SESSION_STATE,
             None,
             "",
@@ -1293,7 +1294,7 @@ mod tests {
 
         // Same for the two-column wait breakdown.
         let sql = build_dbm_activity_breakdown_sql(
-            "dbm_server",
+            "_o2_dbm_server",
             server_vantage::O2_DBM_WAIT_EVENT_TYPE,
             Some(server_vantage::O2_DBM_WAIT_EVENT),
             "",
@@ -1335,7 +1336,7 @@ mod tests {
     /// `SELECT DISTINCT` makes the cap count polls instead of sessions.
     #[test]
     fn test_sample_times_query_counts_polls_not_rows() {
-        let sql = build_dbm_sample_times_sql("dbm_server", server_vantage::KIND_ACTIVITY, "");
+        let sql = build_dbm_sample_times_sql("_o2_dbm_server", server_vantage::KIND_ACTIVITY, "");
         assert!(
             sql.to_uppercase().contains("SELECT DISTINCT"),
             "the cap must count distinct polls, not rows — one row per session \

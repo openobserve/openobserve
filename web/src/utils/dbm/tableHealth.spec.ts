@@ -56,7 +56,7 @@ const row = (over: Partial<TableHealthRow> = {}): TableHealthRow => ({
 
 const response = (over: Partial<TableHealthResponse> = {}): TableHealthResponse => ({
   hits: [],
-  stream: "dbm_server",
+  stream: "_o2_dbm_server",
   total: 0,
   counters_are_cumulative: true,
   tuples_are_estimated: true,
