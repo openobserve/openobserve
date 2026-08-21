@@ -193,7 +193,9 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
               lang: "bash",
               raw: `sqlcmd -S localhost,1433 -U sa -P "YOUR_SA_PASSWORD" -C -Q "${MSSQL_DBM_GRANT_SQL}"`,
             },
-            note: "VIEW SERVER STATE is what lets the collector read OTHER sessions in sys.dm_exec_requests. The metrics login's VIEW SERVER PERFORMANCE STATE is not enough — it exposes counters, not the session DMVs.",
+            note: raw(
+              "VIEW SERVER STATE is what lets the collector read OTHER sessions in sys.dm_exec_requests. The metrics login's VIEW SERVER PERFORMANCE STATE is not enough — it exposes counters, not the session DMVs.",
+            ),
           },
           {
             id: "docker",
@@ -236,7 +238,9 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
             masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
           },
         })),
-        note: "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Unlike Postgres and MySQL, every recipe here polls SQL views rather than tailing files, so they work on managed SQL Server (Amazon RDS, Azure SQL Managed Instance) — except Azure SQL Database, which does not provide sys.fn_xe_file_target_read_file, so deadlock capture degrades there while blocking still works. Activity, top queries and execution plans come from the sqlserver receiver, which reads across the whole instance rather than the one database above — the plans arrive with the top queries, on the same feed. Two honest limits on deadlock text: SQL Server records the client's whole batch, not just the statement that deadlocked, and stored-procedure workloads show up as the EXEC call rather than the statement inside the procedure. If you run the deadlock query yourself in sqlcmd, pass -I: it needs QUOTED_IDENTIFIER ON, which sqlcmd turns off by default (this config already sets it for the collector).",
+        note: raw(
+          "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Unlike Postgres and MySQL, every recipe here polls SQL views rather than tailing files, so they work on managed SQL Server (Amazon RDS, Azure SQL Managed Instance) — except Azure SQL Database, which does not provide sys.fn_xe_file_target_read_file, so deadlock capture degrades there while blocking still works. Activity, top queries and execution plans come from the sqlserver receiver, which reads across the whole instance rather than the one database above — the plans arrive with the top queries, on the same feed. Two honest limits on deadlock text: SQL Server records the client's whole batch, not just the statement that deadlocked, and stored-procedure workloads show up as the EXEC call rather than the statement inside the procedure. If you run the deadlock query yourself in sqlcmd, pass -I: it needs QUOTED_IDENTIFIER ON, which sqlcmd turns off by default (this config already sets it for the collector).",
+        ),
       },
       {
         id: "dbm-run",
@@ -248,7 +252,9 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
           lang: "bash",
           raw: "MSSQL_USER='otel' MSSQL_PASSWORD='YourStrong@Passw0rd' \\\n  ./otelcol-contrib --config ./config.yaml --config ./dbm-config.yaml",
         },
-        note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
+        note: raw(
+          "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
+        ),
       },
       // "full" + table health: every tab this card's config can fill. The
       // mssql_table_stats / mssql_index_stats recipes run at

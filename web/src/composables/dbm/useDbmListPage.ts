@@ -73,6 +73,24 @@ export interface DbmListPageOptions {
   /** Runs once on mount, after context registration and before the first
    *  load — where Top queries restores its filters from the URL. */
   beforeMount?: () => void;
+  /**
+   * The badges this page counts better than the shared fan-out can.
+   *
+   * Declared here rather than substituted into the page's own `tabCounts`
+   * copy, because a substitution is only visible while the reader is STANDING
+   * on the page that made it: Overview's exact fleet union read `6` on
+   * Overview and the fan-out's rawer number on every sibling tab. The same
+   * badge reading two different ways depending on where you stand is the bug
+   * this exists to close.
+   *
+   * Publishing it to the shared snapshot instead means every tab paints the
+   * best number anyone has measured. The getter returns `undefined` for "no
+   * better number yet" (typically while loading, or before the first read
+   * lands), which leaves the shared value alone — the same convention
+   * `withOwnCount` used, so the pages' existing expressions move over
+   * unchanged.
+   */
+  ownCounts?: readonly { key: DbmTabCountKey; value: () => BadgeCount | undefined }[];
 }
 
 /** What a page may hang on the shared load envelope. See `run`. */
@@ -106,24 +124,6 @@ export interface DbmRunOptions {
   /** Runs after a non-stale load settles, on success and failure alike —
    *  empty-state probes, scroll restoration. */
   settled?: () => void | Promise<void>;
-  /**
-   * The badges this page counts better than the shared fan-out can.
-   *
-   * Declared here rather than substituted into the page's own `tabCounts`
-   * copy, because a substitution is only visible while the reader is STANDING
-   * on the page that made it: Overview's exact fleet union read `6` on
-   * Overview and the fan-out's rawer number on every sibling tab. The same
-   * badge reading two different ways depending on where you stand is the bug
-   * this exists to close.
-   *
-   * Publishing it to the shared snapshot instead means every tab paints the
-   * best number anyone has measured. The getter returns `undefined` for "no
-   * better number yet" (typically while loading, or before the first read
-   * lands), which leaves the shared value alone — the same convention
-   * `withOwnCount` used, so the pages' existing expressions move over
-   * unchanged.
-   */
-  ownCounts?: readonly { key: DbmTabCountKey; value: () => BadgeCount | undefined }[];
 }
 
 export function useDbmListPage(options: DbmListPageOptions) {

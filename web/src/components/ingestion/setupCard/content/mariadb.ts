@@ -100,7 +100,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
             label: raw("mariadb"),
             icon: tool.terminal,
             code: { lang: "bash", raw: applyUser("mariadb -h localhost -u root -p") },
-            note: "Run as a MariaDB admin (it prompts for the password).",
+            note: raw("Run as a MariaDB admin (it prompts for the password)."),
           },
           {
             id: "docker",
@@ -194,7 +194,9 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
               lang: "bash",
               raw: `mariadb -h localhost -u root -p -e "${MARIADB_DBM_GRANT_SQL}"`,
             },
-            note: "Blocking chains read information_schema.INNODB_LOCK_WAITS — MariaDB's own lock view, present on every supported MariaDB version (MariaDB never adopted MySQL 8.0's performance_schema.data_lock_waits). Reading it uses the PROCESS privilege granted in step 1. Deadlock capture works on any version.",
+            note: raw(
+              "Blocking chains read information_schema.INNODB_LOCK_WAITS — MariaDB's own lock view, present on every supported MariaDB version (MariaDB never adopted MySQL 8.0's performance_schema.data_lock_waits). Reading it uses the PROCESS privilege granted in step 1. Deadlock capture works on any version.",
+            ),
           },
           {
             id: "docker",
@@ -244,7 +246,9 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
             masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
           },
         })),
-        note: "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Deadlock capture tails the MariaDB error log on disk, so it is not available on managed MariaDB (RDS, Azure Database for MariaDB): those platforms give the collector no file to read. Blocking chains, activity samples and top queries work there normally. Activity and top queries come from the mysql receiver pointed at MariaDB — MariaDB speaks the MySQL protocol, and the receiver identifies it correctly — with one honest gap it reports itself: MariaDB does not expose the sampled statement text, so an Activity row names the session without its SQL. Top queries carry their digests normally. Table and index health work everywhere, with a second gap: MariaDB ships with performance_schema off, so index USAGE counts are not collected — index sizes and definitions still are, and the Table health tab reports usage as unknown rather than inventing a zero.",
+        note: raw(
+          "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Deadlock capture tails the MariaDB error log on disk, so it is not available on managed MariaDB (RDS, Azure Database for MariaDB): those platforms give the collector no file to read. Blocking chains, activity samples and top queries work there normally. Activity and top queries come from the mysql receiver pointed at MariaDB — MariaDB speaks the MySQL protocol, and the receiver identifies it correctly — with one honest gap it reports itself: MariaDB does not expose the sampled statement text, so an Activity row names the session without its SQL. Top queries carry their digests normally. Table and index health work everywhere, with a second gap: MariaDB ships with performance_schema off, so index USAGE counts are not collected — index sizes and definitions still are, and the Table health tab reports usage as unknown rather than inventing a zero.",
+        ),
       },
       {
         id: "dbm-run",
@@ -256,7 +260,9 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
           lang: "bash",
           raw: "MYSQL_USER='otel' MYSQL_PASSWORD='yourpassword' \\\n  ./otelcol-contrib --config ./config.yaml --config ./dbm-config.yaml",
         },
-        note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
+        note: raw(
+          "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
+        ),
       },
       // "full": Activity and Top queries fill from mysqlreceiver's events.
       // Table health stays on the 60-second wording —
