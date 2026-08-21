@@ -118,6 +118,21 @@ describe("useSearchPagination", () => {
       expect(mockState.searchObj.data.queryResults.total).toBe(500);
     });
 
+    it("should preserve an exact search total when histogram buckets overcount", () => {
+      mockState.searchObj.meta.resultGrid.rowsPerPage = 50;
+      mockState.searchObj.data.resultGrid.currentPage = 1;
+      mockState.searchObj.data.queryResults.pageCountTotal = 8;
+      mockState.searchObj.data.queryResults.aggs = [
+        { zo_sql_key: "2026-08-20T06:31:40", zo_sql_num: 189 },
+        { zo_sql_key: "2026-08-20T06:31:40", zo_sql_num: 6 },
+      ];
+
+      pagination.refreshPagination();
+
+      expect(mockState.searchObj.data.queryResults.total).toBe(8);
+      expect(mockState.searchObj.data.queryResults.pagination).toEqual([{ from: 1, size: 50 }]);
+    });
+
     it("should limit pagination to currentPage + 10", () => {
       // Use mockState directly
       mockState.searchObj.meta.resultGrid.rowsPerPage = 10;

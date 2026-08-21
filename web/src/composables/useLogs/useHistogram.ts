@@ -276,12 +276,9 @@ export const useHistogram = () => {
           });
 
           // yData holds per-bucket totals (sum across all categories).
-          // Used only for the histogram title count, not for chart rendering.
           allTimestamps.forEach((_, i) => {
             yData.push([...seriesMap.values()].reduce((sum, arr) => sum + arr[i], 0));
           });
-
-          searchObj.data.queryResults.total = yData.reduce((a, b) => a + b, 0);
 
           searchObj.data.histogram = {
             xData,
@@ -315,18 +312,14 @@ export const useHistogram = () => {
             }
           });
 
-          let num_records = 0;
           const mergedData: any = Array.from(histogramMappedData.values());
           mergedData.forEach(
             (bucket: { zo_sql_key: string | number | Date; zo_sql_num: string }) => {
-              num_records = num_records + parseInt(bucket.zo_sql_num, 10);
               unparsed_x_data.push(bucket.zo_sql_key);
               xData.push(histogramDateTimezone(bucket.zo_sql_key, store.state.timezone));
               yData.push(parseInt(bucket.zo_sql_num, 10));
             },
           );
-
-          searchObj.data.queryResults.total = num_records;
 
           searchObj.data.histogram = {
             xData,

@@ -409,8 +409,7 @@ describe("useHistogram Composable", () => {
 
       expect([...series.keys()]).toEqual(["info"]);
       expect(series.get("info")).toEqual([3]);
-      // 99 and 77 should NOT leak into totals
-      expect(mockState.searchObj.data.queryResults.total).toBe(3);
+      expect(mockState.searchObj.data.histogram.yData).toEqual([3]);
     });
 
     it("sums multiple aggs rows for the same (timestamp, category)", () => {
@@ -501,7 +500,8 @@ describe("useHistogram Composable", () => {
       expect(hist.yData).toEqual([5, 6]);
     });
 
-    it("sets queryResults.total to sum of yData", () => {
+    it("preserves queryResults.total while building breakdown data", () => {
+      mockState.searchObj.data.queryResults.total = 8;
       setAggs([
         { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
         { zo_sql_key: ts1, zo_sql_breakdown: "error", zo_sql_num: 2 },
@@ -509,7 +509,7 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      expect(mockState.searchObj.data.queryResults.total).toBe(10);
+      expect(mockState.searchObj.data.queryResults.total).toBe(8);
     });
 
     it("fills missing (timestamp × category) cells with 0", () => {
@@ -558,6 +558,7 @@ describe("useHistogram Composable", () => {
     });
 
     it("falls through to flat path when no aggs row has zo_sql_breakdown", () => {
+      mockState.searchObj.data.queryResults.total = 8;
       setAggs(
         [
           { zo_sql_key: ts1, zo_sql_num: 3 },
@@ -572,6 +573,7 @@ describe("useHistogram Composable", () => {
       expect(hist.breakdownField).toBeNull();
       expect(hist.breakdownSeries).toBeNull();
       expect(hist.yData).toEqual([3, 5]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(8);
     });
 
     it("enters breakdown path when at least one aggs row has breakdown", () => {
@@ -589,7 +591,7 @@ describe("useHistogram Composable", () => {
       const series = hist.breakdownSeries as unknown as Map<string, number[]>;
       // The non-breakdown row is skipped; only the info row contributes.
       expect(series.get("info")).toEqual([3]);
-      expect(mockState.searchObj.data.queryResults.total).toBe(3);
+      expect(hist.yData).toEqual([3]);
     });
 
     it("writes chartParams.timezone from the store", () => {

@@ -46,19 +46,19 @@ export const useSearchPagination = (t: TranslateFn) => {
 
       if (searchObj.meta.jobId != "") searchObj.meta.resultGrid.rowsPerPage = 100;
 
-      let total = 0;
-      let totalPages = 0;
+      const pageCountTotal = searchObj.data.queryResults.pageCountTotal;
+      // A count within the current page capacity is exact; capacity + 1 is a lower bound.
+      const isPageCountExact =
+        pageCountTotal !== undefined && pageCountTotal <= rowsPerPage * currentPage;
 
-      total = getAggsTotal();
-
-      if ((searchObj.data.queryResults.pageCountTotal || -1) > total) {
-        total = searchObj.data.queryResults.pageCountTotal;
-      }
+      const total = isPageCountExact
+        ? pageCountTotal
+        : Math.max(getAggsTotal(), pageCountTotal ?? 0);
 
       searchObj.data.queryResults.total = total;
       searchObj.data.queryResults.pagination = [];
 
-      totalPages = Math.ceil(total / rowsPerPage);
+      const totalPages = Math.ceil(total / rowsPerPage);
 
       for (let i = 0; i < totalPages; i++) {
         if (i + 1 > currentPage + 10) {
