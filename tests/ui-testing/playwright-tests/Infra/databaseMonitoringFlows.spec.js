@@ -27,6 +27,11 @@ const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
+/** Escape all regex metacharacters (incl. backslash) so a literal string is safe inside RegExp. */
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /** Every tab in the strip, with the route segment its URL uses. */
 const ALL_TABS = [
   { tab: 'overview', segment: '' },
@@ -112,7 +117,7 @@ test.describe('Database Monitoring — flows', () => {
       await locator.click();
       const expected = segment ? `/infra/databases/${segment}` : '/infra/databases';
       await expect(page, `clicking ${tab} did not navigate`).toHaveURL(
-        new RegExp(expected.replace(/\//g, '\\/') + '(\\?|$)'),
+        new RegExp(escapeRegex(expected) + '(\\?|$)'),
         { timeout: 20000 },
       );
       await dbm.expectLoaded();
