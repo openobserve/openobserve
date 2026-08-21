@@ -70,5 +70,6 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 /.agents/*
 
 # ---------- Claude Code ----------
+/.claude/settings.json
 /.claude/settings.local.json
 /.claude/worktrees/

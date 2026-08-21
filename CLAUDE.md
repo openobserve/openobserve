@@ -7,8 +7,6 @@
 - `.env` in the project root overrides process env; check it before running the server.
 - Before finishing a task: run `cargo fmt --all` and make
   `cargo clippy --all-targets -- -D warnings` pass — that is exactly what CI runs.
-- Personal Claude Code settings go in `.claude/settings.local.json` (gitignored);
-  `.claude/settings.json` is shared and checked in.
 
 ## Rust code organization
 
@@ -23,8 +21,8 @@ Item order inside a file/module, top to bottom (clippy's default grouping):
   (clippy `items_after_test_module` runs under `--all-targets -- -D warnings`).
 - The module-level order above matches clippy's `arbitrary_source_item_ordering`
   lint with the `source-item-ordering = ["module"]` config in clippy.toml. The
-  lint is opt-in (too much pre-existing debt to enable repo-wide); a PostToolUse
-  hook (`.claude/hooks/rust_style_check.py`) checks newly added lines instead.
+  lint is opt-in (too much pre-existing debt to enable repo-wide); hold the code
+  you add to this order even though nothing enforces it yet.
 
 ## Comments
 
