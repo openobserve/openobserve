@@ -22,7 +22,7 @@ use arrow::datatypes::Schema;
 use config::{
     PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
     meta::{
-        promql::{EXEMPLARS_LABEL, VALUE_LABEL, metrics_layout::MetricsFileLayout},
+        promql::{EXEMPLARS_LABEL, VALUE_LABEL, layout::MetricsFileLayout},
         stream::{FileKey, FileSelection},
     },
 };

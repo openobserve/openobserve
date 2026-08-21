@@ -31,7 +31,7 @@ mod tests {
     use bytes::Bytes;
     use config::{
         TIMESTAMP_COL_NAME,
-        meta::promql::{VALUE_LABEL, metrics_layout::METRICS_INDEX_ROW_COUNT},
+        meta::promql::{VALUE_LABEL, layout::METRICS_INDEX_ROW_COUNT},
     };
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 

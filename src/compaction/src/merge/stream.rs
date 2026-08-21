@@ -18,7 +18,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use config::{
     get_config,
     meta::{
-        promql::metrics_layout::MetricsFileLayout,
+        promql::layout::MetricsFileLayout,
         stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
     },
     metrics,

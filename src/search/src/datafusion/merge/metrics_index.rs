@@ -26,9 +26,7 @@ use arrow::{
 };
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{
-        EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL, metrics_layout::METRICS_INDEX_ROW_COUNT,
-    },
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL, layout::METRICS_INDEX_ROW_COUNT},
 };
 use datafusion::error::{DataFusionError, Result};
 
@@ -235,7 +233,7 @@ mod tests {
         );
 
         let counts = batch
-            .column_by_name(config::meta::promql::metrics_layout::METRICS_INDEX_ROW_COUNT)
+            .column_by_name(config::meta::promql::layout::METRICS_INDEX_ROW_COUNT)
             .unwrap()
             .as_any()
             .downcast_ref::<UInt32Array>()

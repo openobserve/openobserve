@@ -20,7 +20,7 @@ use arrow::{
     datatypes::SchemaRef,
     ipc::reader::FileReaderBuilder as ArrowFileReaderBuilder,
 };
-use config::meta::promql::metrics_layout::METRICS_INDEX_ROW_COUNT;
+use config::meta::promql::layout::METRICS_INDEX_ROW_COUNT;
 use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::PhysicalExpr,

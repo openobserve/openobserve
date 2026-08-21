@@ -20,7 +20,7 @@ use bytes::Bytes;
 use config::{
     FileFormat, get_config, ider, is_local_disk_storage,
     meta::{
-        promql::metrics_layout::MetricsFileLayout,
+        promql::layout::MetricsFileLayout,
         stream::{FileKey, FileMeta, StorageType, StreamType},
     },
     metrics,

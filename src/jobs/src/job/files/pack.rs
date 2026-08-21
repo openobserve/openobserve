@@ -27,7 +27,7 @@ use chrono::Duration;
 use config::{
     FileFormat, cluster, get_config,
     meta::{
-        promql::metrics_layout::MetricsFileLayout,
+        promql::layout::MetricsFileLayout,
         stream::{FileMeta, StreamType},
     },
     metrics,

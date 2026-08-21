@@ -21,7 +21,7 @@ use arrow::{
 };
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{promql::metrics_layout::MetricsFileLayout, stream::FileMeta},
+    meta::{promql::layout::MetricsFileLayout, stream::FileMeta},
     utils::parquet::new_parquet_writer,
 };
 use datafusion::{

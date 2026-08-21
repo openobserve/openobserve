@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The indexed metrics layout (`ZO_METRICS_INDEX_ENABLED`): when it
+//! Indexed metrics layout (`ZO_METRICS_INDEX_ENABLED`): when it
 //! applies to a stream, how the physical layout of a metrics file is encoded
 //! in its name, and the names of the `.midx` metrics-index columns.
 
