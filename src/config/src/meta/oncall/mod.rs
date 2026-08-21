@@ -63,7 +63,7 @@ pub use response::{
     dependents_all_clear, flap_note, next_ladder_run, page_decision, upstream_recovery,
 };
 pub use rotation::{
-    AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, GridError, MAX_AWAY_SHIFTS, MAX_GRID_MICROS,
+    AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, DEFAULT_SHIFT_RULE_NAME, GridError, MAX_AWAY_SHIFTS, MAX_GRID_MICROS,
     MAX_GRID_SEGMENTS, MAX_ROTATION_NAME_CHARS, MICROS_PER_DAY, MICROS_PER_HOUR,
     MICROS_PER_MINUTE, MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallPosition, Rotation,
     RotationError, SECONDARY_ROTATION_NAME, SOURCE_DEFAULT, ScheduleOverride, ShiftRule,

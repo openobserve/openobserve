@@ -63,6 +63,20 @@ pub const SECONDARY_ROTATION_NAME: &str = "Secondary";
 /// The longest a rotation's name may be.
 pub const MAX_ROTATION_NAME_CHARS: usize = 64;
 
+/// What the single shift rule of a plain rotation is called.
+///
+/// Deliberately **not** the rotation's own name. `Rotation::weekly` used to
+/// copy it, so a team created with the two-rotation default got a rotation
+/// called "Secondary" whose only rule was called "Primary" — because
+/// `offset_from` clones the primary's rules. Two things named for a position,
+/// one of which is not that position.
+///
+/// A rule answers *when* and *who*, never *which position*. "Base" is what the
+/// architecture doc's follow-the-sun example calls the unrestricted catch-all
+/// underneath the regional rules, and it cannot be confused with a rotation
+/// name because no team names a position "Base".
+pub const DEFAULT_SHIFT_RULE_NAME: &str = "Base";
+
 pub const MICROS_PER_MINUTE: i64 = 60_000_000;
 pub const MICROS_PER_HOUR: i64 = 60 * MICROS_PER_MINUTE;
 pub const MICROS_PER_DAY: i64 = 24 * MICROS_PER_HOUR;
@@ -710,7 +724,7 @@ pub fn covering_override<'a>(
 }
 
 fn default_rule_name() -> String {
-    "On-call rotation".to_string()
+    DEFAULT_SHIFT_RULE_NAME.to_string()
 }
 
 /// A named position, and the only thing in this system that puts a person on
@@ -757,11 +771,15 @@ impl Rotation {
         members: Vec<String>,
         anchor_micros: i64,
     ) -> Self {
-        let name = name.into();
         Self {
             id: id.into(),
-            shift_rules: vec![ShiftRule::weekly(name.clone(), members, anchor_micros)],
-            name,
+            name: name.into(),
+            // Named for what it is, not for the position it happens to sit in.
+            shift_rules: vec![ShiftRule::weekly(
+                DEFAULT_SHIFT_RULE_NAME,
+                members,
+                anchor_micros,
+            )],
             source: None,
         }
     }
@@ -2880,6 +2898,37 @@ mod tests {
         // And the pairing is the one the calendar already shows.
         assert_eq!(primary.on_call(&[], &[], ANCHOR, TZ).as_deref(), Some("ana@o2.ai"));
         assert_eq!(secondary.on_call(&[], &[], ANCHOR, TZ).as_deref(), Some("bob@o2.ai"));
+    }
+
+    /// A rotation and its rules are named for different things, so the default
+    /// rule must not borrow the rotation's name.
+    ///
+    /// It did. `Rotation::weekly` copied it, and `offset_from` clones rules —
+    /// so the shipped two-rotation default produced a rotation called
+    /// "Secondary" whose only rule was called "Primary", which is the exact
+    /// species of confusion this rework exists to remove.
+    #[test]
+    fn test_the_default_rule_is_not_named_after_its_rotation() {
+        let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
+        assert_eq!(primary.name, "Primary");
+        assert_eq!(primary.shift_rules[0].name, DEFAULT_SHIFT_RULE_NAME);
+
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        assert_eq!(secondary.name, "Secondary");
+        assert_eq!(
+            secondary.shift_rules[0].name, DEFAULT_SHIFT_RULE_NAME,
+            "a Secondary rotation must not contain a rule called Primary"
+        );
+        // And the position each one reports is its own.
+        let at = ANCHOR;
+        assert_eq!(
+            primary.position_at(&[], &[], at, TZ).unwrap().rotation_name,
+            "Primary"
+        );
+        assert_eq!(
+            secondary.position_at(&[], &[], at, TZ).unwrap().rotation_name,
+            "Secondary"
+        );
     }
 
     /// A one-person roster cannot have a distinct secondary, and offsetting it
