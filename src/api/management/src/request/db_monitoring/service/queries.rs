@@ -29,7 +29,7 @@ pub(crate) async fn read_queries_response(
     user_id: &str,
     q: &QueriesQuery,
 ) -> HttpResponse {
-    let mut body = match read_queries_body(org_id, user_id, &q).await {
+    let mut body = match read_queries_body(org_id, user_id, q).await {
         Ok(body) => body,
         Err(resp) => return resp,
     };

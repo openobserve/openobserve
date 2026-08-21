@@ -186,6 +186,8 @@ pub(crate) fn build_dbm_instances_sql_at(
 
 #[cfg(test)]
 mod tests {
+    // Used only by enterprise-gated tests below; unused on an OSS build.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
     use super::{super::testutil::*, *};
 
     #[cfg(feature = "enterprise")]
