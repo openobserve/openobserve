@@ -201,7 +201,7 @@ describe("MariaDB Database Monitoring config", () => {
 
     // NOT on the recipe pipeline: those rows already carry MariaDB's own tags,
     // so the transform would be dead weight there.
-    const mainProcessors = config.match(/\n    logs:\n[\s\S]*?processors: \[([^\]]+)\]/)![1];
+    const mainProcessors = config.match(/\n {4}logs:\n[\s\S]*?processors: \[([^\]]+)\]/)![1];
     expect(mainProcessors).not.toContain("transform/mariadb_engine");
 
     // And nothing anywhere may re-stamp this lane as mysql.
