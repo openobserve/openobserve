@@ -523,6 +523,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Editor squiggle ranges for server SQL-validation errors (shared with editors
   // via provide/inject from AddAlert.vue).
   const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+  // SQL tab's Multi Alert value-column dropdown options — the query's own
+  // resolved output columns. Populated by PreviewAlert's `schema-updated`
+  // emit (AddAlert.vue's handleSqlSchemaUpdated), which reuses the
+  // /result_schema call PreviewAlert already makes every time the preview
+  // query itself fires (sql_simple_multi_alert_fe_prd.md §11.2/§11.3).
+  const sqlAggColumnOptions = ref<string[]>([]);
   const validateSqlQueryPromise = ref<Promise<unknown>>();
   const addAlertFormRef = ref(null);
   const viewSqlEditorDialog = ref(false);
@@ -2901,6 +2907,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     isUsingBackendSql,
     sqlQueryErrorMsg,
     sqlErrorRanges,
+    sqlAggColumnOptions,
     validateSqlQueryPromise,
     addAlertFormRef,
     viewSqlEditorDialog,

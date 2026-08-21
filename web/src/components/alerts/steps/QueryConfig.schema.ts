@@ -514,6 +514,24 @@ export const makeQueryConfigSchema = (t: Translator) =>
           }
         }
       }
+
+      // ── SQL Multi Alert — value column required ──────────────────────────────
+      // The value column is a dropdown sourced from the query's own resolved
+      // output columns (sql_simple_multi_alert_fe_prd.md §11), not a fixed
+      // literal — an unselected column is a real gap, not a placeholder, so
+      // it must block save the same way Custom's measure column does above.
+      // Same name-bound-OFormSelect reasoning: this must live in form state
+      // so the column <OFormSelect> paints its own error.
+      if (isSql && qc.aggregation?.multi_alert) {
+        const having = (qc.aggregation?.having ?? {}) as Record<string, unknown>;
+        if (having.column == null || String(having.column).trim() === "") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "aggregation", "having", "column"],
+            message: t("alerts.validation.aggregationColumnRequired"),
+          });
+        }
+      }
     });
 
 export type QueryConfigForm = z.infer<ReturnType<typeof makeQueryConfigSchema>>;
