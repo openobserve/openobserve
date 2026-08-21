@@ -2617,6 +2617,7 @@ dependencies = [
  "ingester",
  "itertools 0.14.0",
  "log",
+ "metrics_index",
  "o2_enterprise",
  "object_store",
  "parking_lot 0.12.5",
@@ -6753,6 +6754,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics_index"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "config",
+ "datafusion",
+ "futures",
+ "hashlink 0.11.1",
+ "infra",
+ "log",
+ "promql",
+ "promql-parser",
+ "regex",
+ "tokio",
+]
+
+[[package]]
 name = "mimalloc"
 version = "0.1.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8156,6 +8176,7 @@ dependencies = [
  "ingester",
  "ingestion-common",
  "log",
+ "metrics_index",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
@@ -9163,23 +9184,21 @@ version = "0.1.0"
 dependencies = [
  "arrow",
  "async-trait",
- "bytes",
  "config",
  "datafusion",
  "db",
  "futures",
  "hashbrown 0.16.1",
- "hashlink 0.11.1",
  "infra",
  "itertools 0.14.0",
  "log",
+ "metrics_index",
  "o2_enterprise",
  "promql",
  "promql-parser",
  "prost 0.14.4",
  "proto",
  "rayon",
- "regex",
  "search",
  "search_service",
  "serde",
@@ -11014,6 +11033,7 @@ dependencies = [
  "log",
  "md5",
  "memchr",
+ "metrics_index",
  "o2_enterprise",
  "object_store",
  "openobserve-cipher",
