@@ -439,17 +439,23 @@ function onChildMouseenter(event: MouseEvent) {
         @mouseleave="scheduleClose"
         @keydown="onFlyoutKeydown"
       >
-        <!-- Three levels, and the type says so: group (base/semibold) → section
-             (sm/semibold, secondary) → item (sm/normal). It used to run 11px →
+        <!-- Three levels, and the type says so: group (sm/semibold) → section
+             (xs/semibold, secondary) → item (sm/normal). It used to run 11px →
              11px → 14px, which put the most emphasis on the deepest level and
-             left the group title and its section headers indistinguishable. -->
-        <div class="px-3 pt-1.5 pb-1 text-base font-semibold" :class="flyoutTextClass">
+             left the group title and its section headers indistinguishable.
+
+             The group sits at body size rather than a step above it: 16px read
+             as a page title inside a 217px menu. It outranks the items it sits
+             over by weight, and the section header by both size and colour. The
+             scale has no 15px step and raw px is barred, so this is the only
+             move between the two. -->
+        <div class="px-3 pt-1.5 pb-1 text-sm font-semibold" :class="flyoutTextClass">
           {{ title }}
         </div>
         <template v-for="(row, rowIndex) in flyoutRows" :key="row.key">
           <div
             v-if="row.kind === 'header'"
-            class="text-text-secondary px-3 pb-1 text-sm font-semibold"
+            class="text-text-secondary px-3 pb-1 text-xs font-semibold"
             :class="rowIndex === 0 ? 'pt-2' : 'pt-4'"
             :data-test="`nav-group-section-${row.key}`"
           >

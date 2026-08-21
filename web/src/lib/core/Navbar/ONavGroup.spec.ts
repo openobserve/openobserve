@@ -162,11 +162,16 @@ describe("ONavGroup", () => {
     await hoverOpen();
 
     const classesOf = (sel: string) => flyout().find(sel).classes().join(" ");
-    expect(flyout().element.firstElementChild?.className).toContain("text-base");
-    expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain("text-sm");
+    const groupTitle = flyout().element.firstElementChild?.className ?? "";
+    // Group and items share body size; the group outranks them by weight. It is
+    // NOT a step above — 16px read as a page title inside a 217px menu.
+    expect(groupTitle).toContain("text-sm");
+    expect(groupTitle).toContain("font-semibold");
     expect(classesOf('[data-test="nav-group-item-logstreams"]')).toContain("text-sm");
-    // The section header outranks the items it heads by weight and colour,
-    // since both sit at text-sm — items must stay comfortably readable.
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).not.toContain("font-semibold");
+    // The section header is the one label that steps DOWN, in the secondary
+    // colour — it names a run, it is not a thing you click.
+    expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain("text-xs");
     expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain("font-semibold");
     expect(classesOf('[data-test="nav-group-section-h-menu.alerts"]')).toContain(
       "text-text-secondary",
