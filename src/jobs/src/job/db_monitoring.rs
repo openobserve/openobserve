@@ -18,7 +18,7 @@
 //! A dedicated windowed job — structurally the service-graph job
 //! (scheduler-role-only, `spawn_pausable_job!`) but with NO enterprise cfg and
 //! paced on the rollup's configured cadence
-//! (`openobserve_core::traces::db_monitoring::rollup::rollup_interval_secs`,
+//! (`openobserve_core::db_monitoring::rollup::rollup_interval_secs`,
 //! `ZO_DB_MONITORING_ROLLUP_INTERVAL_SECS`, default 900 s, clamped to
 //! [60, 3600]). The cadence is read once when the job is spawned, so a changed
 //! interval takes effect on restart.
@@ -44,11 +44,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     spawn_pausable_job!(
         "db_monitoring_rollup",
-        openobserve_core::traces::db_monitoring::rollup::rollup_interval_secs(),
+        openobserve_core::db_monitoring::rollup::rollup_interval_secs(),
         {
             log::debug!("[DB_MONITORING::JOB] Running db stats rollup");
             if let Err(e) =
-                openobserve_core::traces::db_monitoring::rollup::process_db_monitoring().await
+                openobserve_core::db_monitoring::rollup::process_db_monitoring().await
             {
                 log::error!("[DB_MONITORING::JOB] Processing failed: {e}");
             }

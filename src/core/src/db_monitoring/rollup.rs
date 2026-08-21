@@ -55,7 +55,7 @@ pub const O2_DB_STATS_STREAM: &str = "_o2_db_stats";
 /// records are then flagged `truncated=true` (design §5.2 defense in depth).
 /// Shared with the read API's live tail (design D4), which applies the same
 /// exactly-the-cap rule to set `tail_truncated`.
-pub(crate) const SEARCH_SIZE: usize = 100000;
+pub const SEARCH_SIZE: usize = 100000;
 
 /// Rollup window / job cadence in seconds, from
 /// `ZO_DB_MONITORING_ROLLUP_INTERVAL_SECS` (default 900).
@@ -105,7 +105,7 @@ pub(crate) const MAX_DELTA_INTERVALS: i64 = 4;
 /// The first two terms are the honest answer — start where the rollup stopped,
 /// but never before what was asked for. The third is the guard rail: whatever
 /// the rollup's state, one read never spans more than the catch-up budget.
-pub(crate) fn delta_start(offset: i64, q_start: i64, q_end: i64) -> i64 {
+pub fn delta_start(offset: i64, q_start: i64, q_end: i64) -> i64 {
     let budget = MAX_DELTA_INTERVALS.saturating_mul(rollup_interval_secs() as i64 * 1_000_000);
     offset
         .max(q_start)
@@ -126,7 +126,7 @@ pub(crate) fn delta_start(offset: i64, q_start: i64, q_end: i64) -> i64 {
 /// could never match two entries, and two overlapping deltas for the same window
 /// would both survive the merge — the double-counting shape `stats_read_range`
 /// documents.
-pub(crate) fn floor_to_grid(t: i64) -> i64 {
+pub fn floor_to_grid(t: i64) -> i64 {
     let w = rollup_interval_secs() as i64 * 1_000_000;
     if w <= 0 { t } else { t - t.rem_euclid(w) }
 }
@@ -195,7 +195,7 @@ fn metric_block(has_rows_col: bool) -> String {
 /// `SUM(total_time_ns)` per (system, instance, fingerprint) → `DENSE_RANK` per
 /// (system, instance) ordered by that fingerprint total → keep `rnk <= top_n`,
 /// retaining ALL constituent rows of each winning fingerprint.
-pub(crate) fn build_rank_sql(
+pub fn build_rank_sql(
     stream_name: &str,
     top_n: usize,
     has_rows_col: bool,
@@ -238,7 +238,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
 /// SETS on a live cluster (the UNION ALL shape is the live-verified one), and
 /// (b) without `GROUPING()` discriminator columns a genuinely-NULL group value
 /// would be ambiguous with the other grain's NULL marker.
-pub(crate) fn build_totals_sql(stream_name: &str, has_rows_col: bool, window_end: i64) -> String {
+pub fn build_totals_sql(stream_name: &str, has_rows_col: bool, window_end: i64) -> String {
     let metrics = metric_block(has_rows_col);
     format!(
         r#"SELECT
@@ -287,7 +287,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_instance, o2_db_env, COALESCE(o2
 
 // ─── Pure row transforms (unit-tested over synthetic rows) ───────────────────
 
-pub(crate) fn get_str(row: &Value, key: &str) -> String {
+pub fn get_str(row: &Value, key: &str) -> String {
     row.get(key)
         .and_then(|v| v.as_str())
         .unwrap_or_default()
@@ -298,12 +298,12 @@ pub(crate) fn get_str(row: &Value, key: &str) -> String {
 /// `SEARCH_SIZE` rows the owned version costs ~10^6 short String allocations
 /// per window. The rows outlive every map keyed by these slices, so the folds
 /// borrow and convert to owned only for emitted `_other` rows.
-pub(crate) fn get_str_ref<'a>(row: &'a Value, key: &str) -> &'a str {
+pub fn get_str_ref<'a>(row: &'a Value, key: &str) -> &'a str {
     row.get(key).and_then(|v| v.as_str()).unwrap_or_default()
 }
 
 /// Numeric extraction tolerant of the search path's i64/u64/f64 JSON numbers.
-pub(crate) fn get_i64(row: &Value, key: &str) -> i64 {
+pub fn get_i64(row: &Value, key: &str) -> i64 {
     match row.get(key) {
         Some(Value::Number(n)) => n
             .as_i64()
@@ -426,10 +426,7 @@ fn accumulate<'a>(
 ///   the stage-1 rows classed `query`.
 ///
 /// All differences clamp at 0; a remainder with `calls == 0` is not emitted.
-pub(crate) fn derive_other_rows<'a>(
-    stage1_rows: &'a [Value],
-    totals_rows: &'a [Value],
-) -> Vec<Value> {
+pub fn derive_other_rows<'a>(stage1_rows: &'a [Value], totals_rows: &'a [Value]) -> Vec<Value> {
     // Split db_totals into its two grains by which discriminator is set.
     let namespace_grain: Vec<&Value> = totals_rows
         .iter()
@@ -887,7 +884,7 @@ async fn process_window(
 /// rollup job and the read API's `run_stats_search`/`run_events_search` all
 /// build through here so the 30-field literal cannot drift between them; `size`
 /// and `timeout` are the only knobs that legitimately differ.
-pub(crate) fn dbm_search_request(
+pub fn dbm_search_request(
     sql: String,
     start_time: i64,
     end_time: i64,
@@ -933,7 +930,7 @@ pub(crate) fn dbm_search_request(
 /// processor (`crate::search::search`, `StreamType::Traces`). Also used by the
 /// read API's live tail, which runs the same bounded two-stage SQL over the
 /// un-rolled-up span tail (design D4).
-pub(crate) async fn run_dbm_search(
+pub async fn run_dbm_search(
     org_id: &str,
     user_id: Option<&str>,
     sql: String,
@@ -1472,7 +1469,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
             assert_eq!(r["_timestamp"], 1_700_000_900_000_000_i64); // window END
             assert_eq!(r["org_id"], "org1");
             assert_eq!(r["trace_stream_name"], "traces_a");
-            assert_eq!(r["fp_version"], crate::traces::db_monitoring::FP_VERSION);
+            assert_eq!(r["fp_version"], crate::db_monitoring::FP_VERSION);
             assert!(r.get("truncated").is_none()); // only stamped when true
             assert!(r.get("rnk").is_none());
             assert!(r.get("fp_total").is_none());

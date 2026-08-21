@@ -52,6 +52,7 @@ ignored = ["tikv-jemalloc-sys"]
 
 [dependencies]
 anyhow.workspace = true
+arrow-schema.workspace = true
 async-stream.workspace = true
 audit.workspace = true
 axum.workspace = true
@@ -109,5 +110,4 @@ uuid.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
-arrow-schema.workspace = true
 cron.workspace = true

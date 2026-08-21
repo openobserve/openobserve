@@ -54,7 +54,6 @@ use schema::{check_for_schema, stream_schema_exists};
 use serde_json::Map;
 
 pub mod agent_signals;
-pub mod db_monitoring;
 pub mod inferred;
 pub mod otel;
 pub mod service_graph;
@@ -99,20 +98,20 @@ const RESERVED_SPAN_FIELDS: [&str; 27] = [
     inferred::INFER_SERVICE_NAME,
     inferred::INFER_SERVICE_TYPE,
     inferred::INFER_SERVICE_SYSTEM,
-    // DBM identity columns written by db_monitoring::enrich (design D1
+    // DBM identity columns written by crate::db_monitoring::enrich (design D1
     // condition 1): a user span attribute named e.g. `o2.db.fingerprint` gets
     // the attr_ prefix instead of spoofing aggregates.
-    db_monitoring::O2_DB_FINGERPRINT,
-    db_monitoring::O2_DB_QUERY_NORM,
-    db_monitoring::O2_DB_SYSTEM,
-    db_monitoring::O2_DB_NAMESPACE,
-    db_monitoring::O2_DB_INSTANCE,
-    db_monitoring::O2_DB_OPERATION,
-    db_monitoring::O2_DB_STATUS_CODE,
-    db_monitoring::O2_DB_USER,
-    db_monitoring::O2_DB_ENV,
-    db_monitoring::O2_DB_STMT_CLASS,
-    db_monitoring::O2_DB_BATCH_MULTIPLIER,
+    crate::db_monitoring::O2_DB_FINGERPRINT,
+    crate::db_monitoring::O2_DB_QUERY_NORM,
+    crate::db_monitoring::O2_DB_SYSTEM,
+    crate::db_monitoring::O2_DB_NAMESPACE,
+    crate::db_monitoring::O2_DB_INSTANCE,
+    crate::db_monitoring::O2_DB_OPERATION,
+    crate::db_monitoring::O2_DB_STATUS_CODE,
+    crate::db_monitoring::O2_DB_USER,
+    crate::db_monitoring::O2_DB_ENV,
+    crate::db_monitoring::O2_DB_STMT_CLASS,
+    crate::db_monitoring::O2_DB_BATCH_MULTIPLIER,
     "events",
     "links",
     TIMESTAMP_COL_NAME,
@@ -289,7 +288,7 @@ async fn queue_gen_ai_agent_observations(org_id: &str, observations: AgentObserv
 /// enrichment re-derive identically from the raw `db_*` / peer attributes that
 /// are still on the record (the derivations are deterministic).
 fn strip_client_supplied_derived_fields(record_val: &mut Map<String, json::Value>) {
-    for field in db_monitoring::ALL_DB_FIELDS {
+    for field in crate::db_monitoring::ALL_DB_FIELDS {
         record_val.remove(field);
     }
     record_val.remove(inferred::INFER_SERVICE_NAME);
@@ -306,7 +305,7 @@ fn save_db_fields_for_uds(
     record_val: &Map<String, json::Value>,
     fields: &HashSet<String>,
 ) -> Vec<(&'static str, json::Value)> {
-    db_monitoring::ALL_DB_FIELDS
+    crate::db_monitoring::ALL_DB_FIELDS
         .iter()
         .filter(|f| !fields.contains(**f))
         .filter_map(|f| record_val.get(*f).map(|v| (*f, v.clone())))
@@ -493,7 +492,7 @@ pub async fn handle_otlp_request(
     // the old per-option config knobs were removed when DBM collapsed to a
     // single `enabled` switch.
     let mut has_db_spans = false;
-    let db_enrich_opts = db_monitoring::EnrichOptions::default();
+    let db_enrich_opts = crate::db_monitoring::EnrichOptions::default();
 
     // Start retrieving associated pipeline and construct pipeline params
     let stream_param = StreamParams::new(org_id, &traces_stream_name, StreamType::Traces);
@@ -735,8 +734,8 @@ pub async fn handle_otlp_request(
                 // resource-level dimensions resolve (o2_db_env lives on
                 // `deployment.environment[.name]`, a resource attribute).
                 if cfg.db_monitoring.enabled
-                    && let Some(db_fields) = db_monitoring::enrich_with_opts(
-                        &db_monitoring::SpanWithResource {
+                    && let Some(db_fields) = crate::db_monitoring::enrich_with_opts(
+                        &crate::db_monitoring::SpanWithResource {
                             span: &span_att_map,
                             resource: &service_att_map,
                         },
@@ -1205,7 +1204,7 @@ pub async fn ingest_json(
     // the old per-option config knobs were removed when DBM collapsed to a
     // single `enabled` switch.
     let mut has_db_spans = false;
-    let db_enrich_opts = db_monitoring::EnrichOptions::default();
+    let db_enrich_opts = crate::db_monitoring::EnrichOptions::default();
 
     let json_values: Vec<json::Value> = json::from_slice(&body)?;
     let mut json_data_by_stream = HashMap::new();
@@ -1306,7 +1305,7 @@ pub async fn ingest_json(
         // reasoning as above; enrich gates on span kind + db-attr presence.
         if cfg.db_monitoring.enabled
             && let Some(db_fields) =
-                db_monitoring::enrich_with_opts(&record_val, span_kind, &db_enrich_opts)
+                crate::db_monitoring::enrich_with_opts(&record_val, span_kind, &db_enrich_opts)
         {
             for (field, value) in db_fields {
                 record_val.insert(field, value);
@@ -2108,7 +2107,7 @@ mod tests {
         let reserved_span_fields = &super::RESERVED_SPAN_FIELDS;
         assert_eq!(reserved_span_fields.len(), 27);
         // All eleven DBM identity columns are reserved (design D1 condition 1).
-        for field in super::db_monitoring::ALL_DB_FIELDS {
+        for field in crate::db_monitoring::ALL_DB_FIELDS {
             assert!(
                 reserved_span_fields.contains(&field),
                 "missing DBM reserved field {field}"
@@ -2545,7 +2544,7 @@ mod tests {
         // A user span attribute must not be able to write the canonical
         // o2_db_* columns — they are DBM aggregation keys (design D1 cond. 1).
         let service_att_map = std::collections::HashMap::new();
-        for field in super::db_monitoring::ALL_DB_FIELDS {
+        for field in crate::db_monitoring::ALL_DB_FIELDS {
             let dotted = field.replace('_', ".");
             assert_eq!(
                 super::span_attribute_key(dotted.clone(), &service_att_map),
@@ -2591,7 +2590,7 @@ mod tests {
 
         super::strip_client_supplied_derived_fields(&mut record_val);
 
-        for field in super::db_monitoring::ALL_DB_FIELDS {
+        for field in crate::db_monitoring::ALL_DB_FIELDS {
             assert!(
                 !record_val.contains_key(field),
                 "client-supplied {field} must not survive the JSON path"

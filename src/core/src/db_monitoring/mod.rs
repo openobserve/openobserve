@@ -25,7 +25,6 @@
 //!
 //! The golden corpus lives in `corpus/*.json`, driven by `tests.rs`.
 
-pub mod api;
 pub mod rollup;
 pub mod server_vantage;
 
@@ -50,7 +49,7 @@ pub mod server_vantage;
 /// WHY the read tore. It is not itself a failure condition — on a complete read
 /// it carries per-row VRL notes about rows that *were* read, and failing those
 /// would 500 pages that are fine.
-pub(crate) fn hits_or_partial_error(
+pub fn hits_or_partial_error(
     resp: config::meta::search::Response,
     read: &str,
 ) -> Result<Vec<Value>, anyhow::Error> {
