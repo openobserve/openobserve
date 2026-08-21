@@ -18,7 +18,7 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use config::{
     FileFormat, get_config,
-    meta::{promql::layout::MetricsFileLayout, stream::FileMeta},
+    meta::stream::FileMeta,
     utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
 };
 use datafusion::{
@@ -28,6 +28,7 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
+use metrics_index::MetricsFileLayout;
 use parquet::{
     arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter},
     file::metadata::KeyValue,
@@ -62,6 +63,8 @@ pub struct MergedFile {
     pub meta: FileMeta,
     /// Physical layout the file was written in; decides its file name.
     pub layout: MetricsFileLayout,
+    /// `.midx` metrics index of a [`MetricsFileLayout::Indexed`] file.
+    pub metrics_index: Option<Vec<u8>>,
 }
 
 pub struct MergeParquetResult {
@@ -147,6 +150,7 @@ pub async fn merge_parquet_files(
                 buf,
                 meta: metadata,
                 layout: mode.file_layout(),
+                metrics_index: None,
             }]
         }
     };

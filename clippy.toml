@@ -1,1 +1,9 @@
 large-error-threshold = 200
+
+source-item-ordering = ["module"]
+
+# Ratchets for CI's -W flags: set just above today's worst offenders; tighten
+# over time by fixing code, never raise.
+too-many-lines-threshold = 1024
+cognitive-complexity-threshold = 100
+excessive-nesting-threshold = 10
