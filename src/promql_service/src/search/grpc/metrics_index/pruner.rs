@@ -35,7 +35,6 @@ use datafusion::{
 };
 use futures::{StreamExt, stream};
 use promql_parser::label::Matchers;
-use rayon::prelude::*;
 use search::types::QueryParams;
 
 use super::{
@@ -50,8 +49,8 @@ use super::{
 /// to each indexed [`FileKey`] (files without a matching series are
 /// dropped) and the generic DataFusion scan later converts that selection into
 /// a Parquet access plan. Files of any other layout are left untouched, in
-/// place, for the caller to run Tantivy / a full scan over. `Ok(None)` means
-/// no file or matcher was eligible and nothing was changed.
+/// place, for a full scan. `Ok(None)` means no file or matcher was eligible and
+/// nothing was changed.
 pub(in crate::search::grpc) async fn search(
     query: &QueryParams,
     files: &mut Vec<FileKey>,
@@ -76,17 +75,34 @@ pub(in crate::search::grpc) async fn search(
         if MetricsFileLayout::of(&file.key) != MetricsFileLayout::Indexed {
             continue;
         }
-        let sidecar_path = MetricsFileLayout::metrics_index_path(&file.key).ok_or_else(|| {
-            DataFusionError::Execution(format!(
-                "indexed metrics file has no metrics-index path: {}",
-                file.key
-            ))
-        })?;
-        let cache_key = format!("{}\0{sidecar_path}\0{filter_key}", file.account);
+        let Some(sidecar_path) = MetricsFileLayout::metrics_index_path(&file.key) else {
+            log::warn!(
+                "[trace_id {}] promql->metrics-index: indexed file {} has no metrics-index path, leaving the file unpruned",
+                query.trace_id,
+                file.key,
+            );
+            continue;
+        };
+        let Ok(expected_rows) = usize::try_from(file.meta.records) else {
+            log::warn!(
+                "[trace_id {}] promql->metrics-index: invalid record count {} for {}, leaving the file unpruned",
+                query.trace_id,
+                file.meta.records,
+                file.key,
+            );
+            continue;
+        };
+        // Include the parent row count so a corrected file-list entry cannot
+        // reuse ranges evaluated against stale metadata.
+        let cache_key = format!(
+            "{}\0{sidecar_path}\0{expected_rows}\0{filter_key}",
+            file.account
+        );
         index_files.entry(file.key.clone()).or_insert((
             file.account.clone(),
             sidecar_path,
             cache_key,
+            expected_rows,
         ));
     }
     if index_files.is_empty() {
@@ -101,49 +117,61 @@ pub(in crate::search::grpc) async fn search(
         let mut cache = METRICS_INDEX_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (data_path, (account, sidecar_path, cache_key)) in index_files {
+        for (data_path, (account, sidecar_path, cache_key, expected_rows)) in index_files {
             if let Some(ranges) = cache.get(&cache_key) {
                 evaluated.push((data_path, ranges));
             } else {
-                misses.push((data_path, account, sidecar_path, cache_key));
+                misses.push((data_path, account, sidecar_path, cache_key, expected_rows));
             }
         }
     }
     let cache_hits = evaluated.len();
     let concurrency = target_partitions.max(1).saturating_mul(2).min(64);
-    let loaded = stream::iter(misses.into_iter().map(
-        |(data_path, account, sidecar_path, cache_key)| {
+    let matchers = Arc::new(matchers.clone());
+    let mut evaluations = stream::iter(misses.into_iter().map(
+        |(data_path, account, sidecar_path, cache_key, expected_rows)| {
             let labels = Arc::clone(&matcher_labels);
+            let matchers = Arc::clone(&matchers);
             async move {
-                load_metrics_index_file(&account, &sidecar_path, labels)
+                let result = async {
+                    let data = load_metrics_index_file(&account, &sidecar_path, labels).await?;
+                    tokio::task::spawn_blocking(move || {
+                        let physical_filter =
+                            create_physical_filter(data.schema.as_ref(), &matchers)?;
+                        evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
+                            .map(|ranges| (cache_key, ranges))
+                    })
                     .await
-                    .map(|data| (data_path, cache_key, data))
+                    .map_err(|error| DataFusionError::External(Box::new(error)))?
+                }
+                .await;
+                (data_path, result)
             }
         },
     ))
-    .buffer_unordered(concurrency)
-    .collect::<Vec<_>>()
-    .await;
+    .buffer_unordered(concurrency);
 
-    let loaded_files = loaded.into_iter().collect::<Result<Vec<_>>>()?;
-    // Sidecars written at different times can carry different label sets and
-    // column orders, so the physical filter is resolved by name against each
-    // file's own schema instead of being shared across files.
-    let newly_evaluated = loaded_files
-        .into_par_iter()
-        .map(|(path, cache_key, data)| {
-            let physical_filter = create_physical_filter(data.schema.as_ref(), matchers)?;
-            evaluate_metrics_index(&data, physical_filter.as_deref())
-                .map(|ranges| (path, cache_key, Arc::new(ranges)))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    {
-        let mut cache = METRICS_INDEX_SELECTION_CACHE
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (path, cache_key, ranges) in newly_evaluated {
-            cache.insert(cache_key, Arc::clone(&ranges));
-            evaluated.push((path, ranges));
+    // Consume each result as soon as it is decoded and evaluated. This keeps
+    // decoded sidecar memory bounded by `concurrency`; only compact row ranges
+    // live until they are attached to the files below.
+    let mut failed_files = 0usize;
+    while let Some((data_path, result)) = evaluations.next().await {
+        match result {
+            Ok((cache_key, ranges)) => {
+                let ranges = Arc::new(ranges);
+                METRICS_INDEX_SELECTION_CACHE
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .insert(cache_key, Arc::clone(&ranges));
+                evaluated.push((data_path, ranges));
+            }
+            Err(error) => {
+                failed_files += 1;
+                log::warn!(
+                    "[trace_id {}] promql->metrics-index: failed to prune {data_path}, leaving the file for a full scan: {error}",
+                    query.trace_id,
+                );
+            }
         }
     }
 
@@ -155,7 +183,7 @@ pub(in crate::search::grpc) async fn search(
         .iter()
         .map(|(_, ranges)| ranges.len())
         .sum::<usize>();
-    let indexed_file_count = evaluated.len();
+    let indexed_file_count = evaluated.len() + failed_files;
     let mut selections = evaluated.into_iter().collect::<HashMap<_, _>>();
     files.retain_mut(|file| {
         let Some(ranges) = selections.remove(&file.key) else {
@@ -174,7 +202,7 @@ pub(in crate::search::grpc) async fn search(
 
     let took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {}] promql->metrics-index: selected {selected_ranges} ranges across {selected_files}/{} files, {other_files} files without a sidecar left to tantivy/full scan, selection cache hits: {cache_hits}, took: {took} ms",
+        "[trace_id {}] promql->metrics-index: selected {selected_ranges} ranges across {selected_files}/{} files, {failed_files} sidecars failed and were left for a full scan, {other_files} files without a usable sidecar left for a full scan, selection cache hits: {cache_hits}, took: {took} ms",
         query.trace_id,
         indexed_file_count,
     );

@@ -96,13 +96,13 @@ mod tests {
         assert!(filter.is_some());
 
         assert_eq!(
-            evaluate_metrics_index(&data, filter.as_deref()).unwrap(),
+            evaluate_metrics_index(&data, filter.as_deref(), 8).unwrap(),
             vec![0..2, 4..8]
         );
 
         // no evaluable matcher: every series is selected
         assert_eq!(
-            evaluate_metrics_index(&data, None).unwrap(),
+            evaluate_metrics_index(&data, None, 8).unwrap(),
             vec![Range { start: 0, end: 8 }]
         );
 
@@ -114,9 +114,25 @@ mod tests {
         }]);
         let filter = create_physical_filter(&schema, &matchers).unwrap();
         assert_eq!(
-            evaluate_metrics_index(&data, filter.as_deref()).unwrap(),
+            evaluate_metrics_index(&data, filter.as_deref(), 8).unwrap(),
             vec![Range { start: 2, end: 4 }]
         );
+    }
+
+    #[test]
+    fn rejects_sidecars_that_do_not_tile_the_parent_file() {
+        let bytes = sidecar_bytes(&[], vec![2, 3]);
+        let data = decode_metrics_index("mismatch", bytes, &[]).unwrap();
+
+        let too_long = evaluate_metrics_index(&data, None, 4).unwrap_err();
+        assert!(
+            too_long
+                .to_string()
+                .contains("beyond the parent file's 4 records")
+        );
+
+        let too_short = evaluate_metrics_index(&data, None, 6).unwrap_err();
+        assert!(too_short.to_string().contains("covers 5 rows"));
     }
 
     /// Serialize a metrics index with the given label columns (in this order).
@@ -156,15 +172,15 @@ mod tests {
             &[("path", vec!["b", "a"]), ("instance", vec!["i1", "i1"])],
             vec![7, 1],
         );
-        for (name, bytes, expected) in [
-            ("f1", file1, vec![Range { start: 0, end: 3 }]),
-            ("f2", file2, vec![Range { start: 7, end: 8 }]),
+        for (name, bytes, expected_rows, expected) in [
+            ("f1", file1, 9, vec![Range { start: 0, end: 3 }]),
+            ("f2", file2, 8, vec![Range { start: 7, end: 8 }]),
         ] {
             let data = decode_metrics_index(name, bytes, &labels).unwrap();
             assert_eq!(data.schema.fields().len(), 3, "{name}");
             let filter = create_physical_filter(&data.schema, &matchers).unwrap();
             assert_eq!(
-                evaluate_metrics_index(&data, filter.as_deref()).unwrap(),
+                evaluate_metrics_index(&data, filter.as_deref(), expected_rows).unwrap(),
                 expected,
                 "{name}"
             );
@@ -186,7 +202,7 @@ mod tests {
         let filter = create_physical_filter(&data.schema, &matchers).unwrap();
         assert!(filter.is_some());
         assert_eq!(
-            evaluate_metrics_index(&data, filter.as_deref()).unwrap(),
+            evaluate_metrics_index(&data, filter.as_deref(), 7).unwrap(),
             vec![0..2, 6..7]
         );
 
@@ -197,7 +213,7 @@ mod tests {
         let filter = create_physical_filter(&data.schema, &matchers).unwrap();
         assert!(filter.is_none());
         assert_eq!(
-            evaluate_metrics_index(&data, filter.as_deref()).unwrap(),
+            evaluate_metrics_index(&data, filter.as_deref(), 6).unwrap(),
             vec![Range { start: 0, end: 6 }]
         );
     }
