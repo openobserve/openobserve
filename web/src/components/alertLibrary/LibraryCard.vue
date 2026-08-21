@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            mark per card says the same thing and lets the text stay readable. -->
       <OTag
         v-if="!ready"
-        variant="default-soft"
+        variant="warning-quiet"
         size="xs"
         class="max-w-full min-w-0 self-start"
         :title="t('alert_library.notIngestedHint', { stream: entry.stream })"

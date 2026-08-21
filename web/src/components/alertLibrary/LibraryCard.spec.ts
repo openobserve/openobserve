@@ -82,21 +82,23 @@ describe("LibraryCard", () => {
     expect(note.attributes("title")).toContain("would never fire");
   });
 
-  it("marks the state in colour, but only on the icon", () => {
+  it("marks the state in a tone that each theme can wear", () => {
     // Warning and not error: an alert with no data is not broken, it is waiting.
-    // And only the ICON is tinted — 959 of 1242 alerts are not ingested on a
-    // typical org, so a filled amber chip put twelve amber blocks on every
-    // screen and the colour stopped being a signal, worst in dark mode where
-    // the hue sits at full chroma against near-black.
+    //
+    // The chip uses warning-QUIET, whose tokens differ by theme, because 959 of
+    // 1242 alerts are not ingested on a typical org. Light wears the amber wash
+    // at a dozen per screen; dark, where the same ramp is full-chroma against
+    // near-black, turns the chip neutral and lets the icon carry the colour.
     const wrapper = mountCard({ ready: false });
     const note = wrapper.find('[data-test="alert-library-card-needs-data"]');
     const mark = wrapper.find('[data-test="alert-library-card-needs-data-mark"]');
 
-    expect(mark.classes().join(" ")).toMatch(/badge-warning/);
+    expect(note.classes().join(" ")).toMatch(/badge-warning-quiet/);
+    // Never the filled variant: that one is identical in both themes.
+    expect(note.classes().join(" ")).not.toMatch(/badge-warning-soft-bg/);
     expect(note.html()).not.toMatch(/badge-error/);
-    // The chip body stays neutral — same treatment as the query-language chip.
-    expect(note.classes().join(" ")).toMatch(/badge-default/);
-    expect(note.classes().join(" ")).not.toMatch(/badge-warning/);
+    // The icon stays amber in BOTH themes, so dark keeps a colour cue.
+    expect(mark.classes().join(" ")).toMatch(/badge-warning/);
   });
 
   it("shapes the note like the query-language chip beside it", () => {

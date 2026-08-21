@@ -272,6 +272,12 @@
   /* warning: solid unchanged (yellow + dark text works on any bg); outline brightened */
   --color-badge-warning-ol-border: var(--color-warning-400);
   --color-badge-warning-ol-text: var(--color-warning-400);
+  /* warning-quiet in DARK is the NEUTRAL chip: warning-400 is full-chroma on
+     near-black, and this variant exists for states common enough to tile the
+     screen. Whatever needs to stay amber here does it on the icon. */
+  --color-badge-warning-quiet-bg: var(--color-grey-800);
+  --color-badge-warning-quiet-text: var(--color-grey-300);
+  --color-badge-warning-quiet-border: var(--color-grey-700);
   --color-badge-warning-soft-bg: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
   --color-badge-warning-soft-text: var(--color-warning-400);
 

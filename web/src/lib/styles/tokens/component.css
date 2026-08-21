@@ -362,6 +362,10 @@
   --color-badge-warning-ol-text: var(--color-warning-700);
   --color-badge-warning-soft-bg: var(--color-warning-50);
   --color-badge-warning-soft-text: var(--color-warning-700);
+  /* warning-quiet in LIGHT is the soft treatment: pale wash, deep text. */
+  --color-badge-warning-quiet-bg: var(--color-warning-50);
+  --color-badge-warning-quiet-text: var(--color-warning-700);
+  --color-badge-warning-quiet-border: var(--color-warning-600);
 
   /* Badge — error */
   --color-badge-error-solid-bg: var(--color-error-600);
@@ -1715,6 +1719,9 @@
   --color-badge-warning-ol-text: var(--color-badge-warning-ol-text);
   --color-badge-warning-soft-bg: var(--color-badge-warning-soft-bg);
   --color-badge-warning-soft-text: var(--color-badge-warning-soft-text);
+  --color-badge-warning-quiet-bg: var(--color-badge-warning-quiet-bg);
+  --color-badge-warning-quiet-text: var(--color-badge-warning-quiet-text);
+  --color-badge-warning-quiet-border: var(--color-badge-warning-quiet-border);
 
   /* Badge — error */
   --color-badge-error-solid-bg: var(--color-badge-error-solid-bg);
