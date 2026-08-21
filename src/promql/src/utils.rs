@@ -44,13 +44,8 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             continue;
         };
         let field_type = field.data_type().clone();
-        // Dictionary-encoded label columns compare and cast by their value type.
-        let value_type = match &field_type {
-            DataType::Dictionary(_, value_type) => value_type.as_ref().clone(),
-            other => other.clone(),
-        };
         let literal = |value: String| -> Expr {
-            match &value_type {
+            match &field_type {
                 // Explicitly type equality matcher literals to the label column;
                 // an untyped literal would become Utf8View == Utf8 at execution.
                 DataType::Utf8View => lit(ScalarValue::Utf8View(Some(value))),
@@ -66,10 +61,7 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
                 // DataFusion 54 can lower a regex on Utf8View to a mixed-type
                 // equality/LIKE expression. Cast only regex matchers until that
                 // optimizer bug is fixed; equality matchers stay zero-copy views.
-                // regexp_like also does not accept dictionary input.
-                let value = if field_type == DataType::Utf8View
-                    || matches!(field_type, DataType::Dictionary(..))
-                {
+                let value = if field_type == DataType::Utf8View {
                     cast(col(mat.name.clone()), DataType::Utf8)
                 } else {
                     col(mat.name.clone())
@@ -78,9 +70,7 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             }
             MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
-                let value = if field_type == DataType::Utf8View
-                    || matches!(field_type, DataType::Dictionary(..))
-                {
+                let value = if field_type == DataType::Utf8View {
                     cast(col(mat.name.clone()), DataType::Utf8)
                 } else {
                     col(mat.name.clone())
@@ -154,8 +144,8 @@ mod tests {
 
     use datafusion::{
         arrow::{
-            array::{DictionaryArray, Int32Array, StringArray, StringViewArray},
-            datatypes::{DataType, Field, Int32Type, Schema as ArrowSchema},
+            array::{Int32Array, StringArray, StringViewArray},
+            datatypes::{DataType, Field, Schema as ArrowSchema},
             record_batch::RecordBatch,
         },
         prelude::SessionContext,
@@ -216,20 +206,6 @@ mod tests {
             ]))],
         )
         .unwrap();
-        let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch).unwrap();
-        (df, schema.as_ref().clone())
-    }
-
-    fn make_dictionary_string_df() -> (DataFrame, ArrowSchema) {
-        let values: DictionaryArray<Int32Type> =
-            vec!["api", "worker", "api-v2"].into_iter().collect();
-        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
-            "service",
-            DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8)),
-            false,
-        )]));
-        let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(values)]).unwrap();
         let ctx = SessionContext::new();
         let df = ctx.read_batch(batch).unwrap();
         (df, schema.as_ref().clone())
@@ -377,39 +353,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
-            1
-        );
-    }
-
-    #[tokio::test]
-    async fn test_apply_matchers_supports_dictionary_labels() {
-        use promql_parser::label::Matcher;
-
-        let (df, _) = make_dictionary_string_df();
-        let equal = Matchers::new(vec![Matcher {
-            op: MatchOp::Equal,
-            name: "service".to_string(),
-            value: "api".to_string(),
-        }]);
-        let batches = apply_matchers(df, &equal).unwrap().collect().await.unwrap();
-        assert_eq!(
-            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
-            1
-        );
-
-        let (df, _) = make_dictionary_string_df();
-        let not_regex = Matchers::new(vec![Matcher {
-            op: MatchOp::NotRe(regex::Regex::new("api.*").unwrap()),
-            name: "service".to_string(),
-            value: "api.*".to_string(),
-        }]);
-        let batches = apply_matchers(df, &not_regex)
-            .unwrap()
-            .collect()
-            .await
-            .unwrap();
         assert_eq!(
             batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
             1
