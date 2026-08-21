@@ -1455,10 +1455,10 @@ const traceVantage = computed(() =>
 const callersEmptyChecks = computed<DbmLockCheck[]>(() => [
   {
     id: "server-vantage",
-    // Deliberately a PASS: the reader is looking at a query the database did
+    // Deliberately an OK: the reader is looking at a query the database did
     // report. Opening with what works stops the panel reading as "this page is
     // broken" and locates the gap precisely.
-    status: "pass",
+    status: "ok",
     title: t("dbm.detail.callersEmpty.checks.server.ok"),
     detail: t("dbm.detail.callersEmpty.checks.server.okDetail"),
   },
