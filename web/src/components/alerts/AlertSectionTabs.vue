@@ -70,9 +70,12 @@ interface Section {
 const sections = computed<Section[]>(() => {
   const query = { org_identifier: orgIdentifier.value };
   return [
+    // "All Alerts", not "Alerts": the page title above this strip already says
+    // "Alerts", so a tab repeating it names nothing. The rail's Alerts
+    // subsection uses the same string for the same reason.
     {
       key: "alertList",
-      label: t("menu.alerts"),
+      label: t("alerts.allAlerts"),
       icon: "shield-alert-outline",
       to: { name: "alertList", query },
     },

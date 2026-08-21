@@ -110,8 +110,11 @@ export const NAV_GROUPS: NavGroupDef[] = [
       // configuration, not deployment configuration. None of the three have a
       // rail entry of their own, so they ride on Alerts being present —
       // hiding `alertList` via custom_hide_menus takes its plumbing with it.
+      // "All Alerts", not "Alerts": it sits directly under an "Alerts" header,
+      // and a row repeating its own header names nothing. The peer tab uses the
+      // same string for the same reason — the page title above it says "Alerts".
       {
-        titleKey: "menu.alerts",
+        titleKey: "alerts.allAlerts",
         icon: "shield-alert-outline",
         name: "alertList",
         requires: "alertList",
@@ -135,7 +138,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       // hiding Alerts hides the place to get more. Last, like its tab: you go
       // looking for it once, then work in the other three.
       {
-        titleKey: "alert_library.sectionTab",
+        titleKey: "alert_library.header",
         icon: "menu-book",
         name: "alertLibrary",
         requires: "alertList",

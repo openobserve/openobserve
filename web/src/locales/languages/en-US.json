@@ -6017,6 +6017,7 @@
     "SearchSQLCancelled": "Error: Search SQL was cancelled."
   },
   "alerts": {
+    "allAlerts": "All Alerts",
     "compositeAlert": "Composite",
     "import": {
       "anomalyImportSuccess": "Anomaly Detection - {index}: \"{name}\" imported successfully",
@@ -7405,9 +7406,9 @@
     "impactDestination": "Used by {alerts}"
   },
   "alert_library": {
-    "header": "Alerts Library",
+    "header": "Alert Library",
     "subtitle": "Curated, ready-to-install alerts, matched against the data you already ingest",
-    "sectionTab": "Alerts Library",
+    "sectionTab": "Library",
     "contribute": "Contribute on GitHub",
     "searchPlaceholder": "Search by name, description or stream",
     "searchLabel": "Search the alert library",
