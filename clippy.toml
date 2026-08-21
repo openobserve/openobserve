@@ -1,1 +1,8 @@
 large-error-threshold = 200
+
+# Module item order for clippy::arbitrary_source_item_ordering, default
+# groupings: mod > use > macros > const/static > types > fns. "module" only —
+# the lint's default scope also forces alphabetical struct fields/enum
+# variants, which we don't want. The lint itself is opt-in (restriction group);
+# enable per module with #![warn(clippy::arbitrary_source_item_ordering)].
+source-item-ordering = ["module"]

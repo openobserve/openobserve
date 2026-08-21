@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/rust_style_check.py\"",
+            "timeout": 15,
+            "statusMessage": "Rust style check"
+          }
+        ]
+      }
+    ]
+  }
+}
