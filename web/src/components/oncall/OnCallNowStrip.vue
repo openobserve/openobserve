@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   menu to find is a failure nobody finds.
 -->
 <template>
-  <ODropdown content-class="min-w-80" data-test="oncall-now-strip">
+  <ODropdown content-class="min-w-80">
     <template #trigger>
       <OButton
         variant="outline"
