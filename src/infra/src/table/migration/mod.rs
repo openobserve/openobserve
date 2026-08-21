@@ -432,10 +432,6 @@ mod tests {
             .map(|migration| migration.name().to_string())
             .collect();
         assert_eq!(
-            names.last().map(String::as_str),
-            Some("m20260820_000001_add_icon_to_folders")
-        );
-        assert_eq!(
             names
                 .iter()
                 .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")

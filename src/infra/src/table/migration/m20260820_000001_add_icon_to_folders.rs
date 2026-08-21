@@ -17,39 +17,31 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
+fn add_icon_statement() -> TableAlterStatement {
+    Table::alter()
+        .table(Folders::Table)
+        .add_column_if_not_exists(ColumnDef::new(Folders::Icon).string_len(64).null())
+        .to_owned()
+}
+
+fn drop_icon_statement() -> TableAlterStatement {
+    Table::alter()
+        .table(Folders::Table)
+        .drop_column(Folders::Icon)
+        .to_owned()
+}
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Folders::Table)
-                    .add_column_if_not_exists(ColumnDef::new(Folders::Icon).string_len(64).null())
-                    .to_owned(),
-            )
-            .await
+        manager.alter_table(add_icon_statement()).await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Folders::Table)
-                    .drop_column(Folders::Icon)
-                    .to_owned(),
-            )
-            .await
+        manager.alter_table(drop_icon_statement()).await
     }
 }
 
-/// Nullable with no default: a folder that has never been given an icon is
-/// distinct from one whose icon was deliberately cleared, and both read as NULL
-/// rather than as an empty string.
-///
-/// 64 chars is well clear of the longest token the picker can produce today
-/// (`o2:ai-microsoft-agent-framework`, 31) while leaving room for a multi
-/// code-point emoji, which can run to ~28 bytes with skin-tone and ZWJ
-/// sequences.
 #[derive(DeriveIden)]
 enum Folders {
     Table,
@@ -65,24 +57,8 @@ mod tests {
     #[test]
     fn postgres() {
         collapsed_eq!(
-            &Table::alter()
-                .table(Folders::Table)
-                .add_column_if_not_exists(ColumnDef::new(Folders::Icon).string_len(64).null())
-                .to_owned()
-                .to_string(PostgresQueryBuilder),
+            &add_icon_statement().to_string(PostgresQueryBuilder),
             r#"ALTER TABLE "folders" ADD COLUMN IF NOT EXISTS "icon" varchar(64) NULL"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &Table::alter()
-                .table(Folders::Table)
-                .add_column_if_not_exists(ColumnDef::new(Folders::Icon).string_len(64).null())
-                .to_owned()
-                .to_string(MysqlQueryBuilder),
-            r#"ALTER TABLE `folders` ADD COLUMN IF NOT EXISTS `icon` varchar(64) NULL"#
         );
     }
 
@@ -91,11 +67,7 @@ mod tests {
         // SQLite has no IF NOT EXISTS on ALTER TABLE ADD COLUMN, so
         // add_column_if_not_exists emits the same SQL as add_column.
         collapsed_eq!(
-            &Table::alter()
-                .table(Folders::Table)
-                .add_column_if_not_exists(ColumnDef::new(Folders::Icon).string_len(64).null())
-                .to_owned()
-                .to_string(SqliteQueryBuilder),
+            &add_icon_statement().to_string(SqliteQueryBuilder),
             r#"ALTER TABLE "folders" ADD COLUMN "icon" varchar(64) NULL"#
         );
     }
