@@ -26,7 +26,6 @@ vi.mock("@/services/oncall", () => ({
     listTeams: vi.fn(),
     whoIsOnCall: vi.fn(),
     deleteTeam: vi.fn(),
-    testPage: vi.fn(),
   },
 }));
 
@@ -322,22 +321,20 @@ describe("OnCallTeams", () => {
       return wrapper;
     }
 
-    it("offers edit and a test page beside delete", async () => {
+    it("offers edit beside delete", async () => {
       const wrapper = await rendered();
       expect(wrapper.find('[data-test="oncall-team-edit-team_1"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-team-test-page-team_1"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').exists()).toBe(true);
     });
 
-    /// Three icons and no words: without a name each, the row offers a
-    /// destructive action and two glyphs the reader has to guess at. The
-    /// tooltip is the sighted reader's name and `aria-label` the other's, so
-    /// both are asserted — and both must SAY something, not merely exist.
+    /// Icons and no words: without a name each, the row offers a destructive
+    /// action and a glyph the reader has to guess at. The tooltip is the
+    /// sighted reader's name and `aria-label` the other's, so both are
+    /// asserted — and both must SAY something, not merely exist.
     it("names every icon-only action, on hover and to a screen reader", async () => {
       const wrapper = await rendered();
       for (const [id, name] of [
         ["edit", "Edit team"],
-        ["test-page", "Send test page"],
         ["delete", "Delete team"],
       ] as const) {
         const button = wrapper.find(`[data-test="oncall-team-${id}-team_1"]`);
@@ -347,13 +344,10 @@ describe("OnCallTeams", () => {
     });
 
     /// The destructive one last, so the mouse does not pass over it on the way
-    /// to either safe action.
+    /// to the safe action.
     it("puts the irreversible action last", async () => {
       const html = (await rendered()).html();
       expect(html.indexOf("oncall-team-edit-team_1")).toBeLessThan(
-        html.indexOf("oncall-team-test-page-team_1"),
-      );
-      expect(html.indexOf("oncall-team-test-page-team_1")).toBeLessThan(
         html.indexOf("oncall-team-delete-team_1"),
       );
     });
@@ -368,62 +362,6 @@ describe("OnCallTeams", () => {
       );
       // The row click navigates; the edit button must not do both.
       expect(push).not.toHaveBeenCalled();
-    });
-
-    /// G6: "would a page actually land" cost a drill-in to ask. `test-page`
-    /// runs the real transports and writes no record, so a list may offer it.
-    ///
-    /// The count comes from `attempts`. Reading a `recipients` field the wire
-    /// has never had made every delivered page report "Nothing was sent".
-    it("sends a real test page from the row and says who it reached", async () => {
-      service.testPage.mockResolvedValue({
-        data: {
-          reached_anyone: true,
-          channels: ["email"],
-          attempts: [
-            {
-              channel: "email",
-              recipient: "engineer@example.com",
-              reason: "on call now",
-              delivered: true,
-            },
-          ],
-        },
-      } as any);
-      const wrapper = await rendered();
-
-      await wrapper.find('[data-test="oncall-team-test-page-team_1"]').trigger("click");
-      await flushPromises();
-
-      expect(service.testPage).toHaveBeenCalledWith(expect.objectContaining({ team_id: "team_1" }));
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success", message: expect.stringContaining("1") }),
-      );
-      expect(push).not.toHaveBeenCalled();
-    });
-
-    /// The server's own reason for reaching nobody is the answer; re-wording it
-    /// in the UI is how the two screens start disagreeing about the same team.
-    it("reports reaching nobody without calling it a failure", async () => {
-      service.testPage.mockResolvedValue({
-        data: {
-          reached_anyone: false,
-          channels: [],
-          attempts: [],
-          not_sent_because: "no transport configured",
-        },
-      } as any);
-      const wrapper = await rendered();
-
-      await wrapper.find('[data-test="oncall-team-test-page-team_1"]').trigger("click");
-      await flushPromises();
-
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "warning",
-          message: expect.stringContaining("no transport configured"),
-        }),
-      );
     });
   });
 
