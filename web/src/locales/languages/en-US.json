@@ -13173,6 +13173,7 @@
     "coverNext7Days": "Next 7 days",
     "coverSummary": "{name} covers {team} {range}.",
     "coverSummaryAfter": "Outside that window the rotation resolves as normal.",
+    "coverSummaryTeamZone": "On the team's clock: {range}",
     "coverInvalidRange": "The end must be after the start.",
     "coverWindowPast": "That window has already ended. Pick hours that are still ahead.",
     "coverListTitle": "Covers",

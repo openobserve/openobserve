@@ -91,6 +91,7 @@
           :schedule="schedule"
           :overview="overview"
           :timezone="team?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
           @edit-ladder="activeTab = 'policy'"
           @open-schedule="activeTab = 'schedule'"
           @open-pages="openOnCallList"
@@ -99,6 +100,7 @@
         <OnCallTeamAttention
           :risks="configRisks"
           :timezone="team?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
           :reachability="reachability"
           :overview="overview"
           :checked-at="insightsCheckedAt"
@@ -203,6 +205,7 @@
               <OnCallCoverageStrip
                 :rotations="schedule?.rotations ?? []"
                 :timezone="team?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
                 :days="COVERAGE_DAYS"
               />
             </div>
@@ -220,6 +223,7 @@
             :members="members"
             :rotations="schedule?.rotations ?? []"
             :timezone="team?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
             :on-call-now="onCallNow"
             :reachability="reachability"
             :load="teamLoad"
@@ -275,6 +279,7 @@
               :rotations="focusedRotations"
               :segments="segments"
               :timezone="team?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
               :loading="segmentsLoading"
               :can-cover="hasMembers !== false"
               @fill-gap="onFillGap"
@@ -295,6 +300,7 @@
               ref="coverListRef"
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
               :window="scheduleWindow"
               :rotations="teamRotations"
               :rotation-id="focusedRotationId || null"
@@ -306,6 +312,7 @@
               :team-id="teamId"
               :members="members"
               :timezone="team?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
               :rotation-count="schedule?.rotations?.length ?? 0"
               @applied="onScheduleSaved"
             />
@@ -317,6 +324,7 @@
               drawer-only
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
               :schedule="schedule"
               :members="members"
               :intent="scheduleIntent"
@@ -394,6 +402,7 @@
       v-model:open="coverOpen"
       :members="members"
       :timezone="team?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
       :team-name="team?.name ?? ''"
       :saving="coverSaving"
       :current-holder="onCallNow[0]?.user_email ?? null"
@@ -1079,8 +1088,16 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
 /// is still a night on the team's calendar, and that is the night being agreed.
 function coverSavedMessage(value: { user_email: string; start_at: number; end_at: number }) {
   const zone = team.value?.timezone ?? "UTC";
+  // Named, always. The reader picked those hours on their OWN clock, and a
+  // confirmation restating them on the team's without saying so is how a cover
+  // reads as five and a half hours wrong to the person who just arranged it.
   const at = (micros: number) =>
-    formatInZone(micros, zone, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    formatInZone(micros, zone, {
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
   return t("oncall.coverSaved", {
     name: raw(value.user_email),
     team: raw(team.value?.name ?? ""),

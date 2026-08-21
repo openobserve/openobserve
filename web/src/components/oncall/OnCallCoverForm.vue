@@ -134,6 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- What this will actually do, in the team's own clock, before saving. -->
       <OBanner v-if="summary" variant="info" data-test="oncall-cover-summary">
         {{ summary }}
+        <span v-if="teamZoneSummary" class="block" data-test="oncall-cover-summary-team-zone">
+          {{ teamZoneSummary }}
+        </span>
         <span class="text-text-secondary">{{ t("oncall.coverSummaryAfter") }}</span>
       </OBanner>
     </OForm>
@@ -174,7 +177,7 @@ export interface UpcomingShift extends Shift {
   rotationId: string;
   rotationName: string;
 }
-import { formatInZone } from "@/utils/oncall";
+import { formatInZone, fromZonedInputValue, toZonedInputValue } from "@/utils/oncall";
 import { makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
 
 /**
@@ -198,6 +201,20 @@ const props = withDefaults(
     saving?: boolean;
     /** Who currently holds the shift, so the picker can say who is being relieved. */
     currentHolder?: string | null;
+    /**
+     * The clock the RANGE CONTROL edits in — the reader's own, which is not
+     * necessarily the team's.
+     *
+     * Passed in rather than read off the store because the picker takes it from
+     * there and this component does not: a summary that quietly restated the
+     * reader's 22:00 as the team's 16:30, with nothing on screen saying which
+     * clock either number was on, is the defect. Both are now named.
+     *
+     * Not fixed by handing the picker `initial-timezone` either — that DISPATCHES
+     * the zone into the store and persists it, so opening this dialog would
+     * change the reader's timezone for the whole app.
+     */
+    viewerTimezone?: string;
     /** Named in the confirmation, because a cover is always a cover OF a team. */
     teamName?: string;
     /** Pre-fills the window when the caller is covering a known gap. */
@@ -227,6 +244,7 @@ const props = withDefaults(
     open: false,
     members: () => [],
     timezone: "UTC",
+    viewerTimezone: "UTC",
     saving: false,
     currentHolder: null,
     teamName: "",
@@ -381,20 +399,54 @@ const PRESETS = [
   { key: "next-7-days", labelKey: "oncall.coverNext7Days" },
 ] as const satisfies ReadonlyArray<{ key: string; labelKey: I18nKey }>;
 
-/// Anchored to the team's day, not the browser's: "tonight" means the team's
-/// night, and somebody arranging cover from another office means that too.
+/// A wall time on the TEAM's clock: `addDays` from the day `micros` falls in,
+/// at `time`.
+///
+/// The day is added to the calendar DATE rather than to the instant because not
+/// every day is 24 hours long — across a DST boundary "tomorrow at midnight" is
+/// 23 or 25 hours away, and a shift that starts an hour out is a shift somebody
+/// is paged for.
+function zonedInstant(micros: number, zone: string, addDays: number, time = "00:00"): number {
+  const [year, month, day] = toZonedInputValue(micros, zone).slice(0, 10).split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + addDays)).toISOString().slice(0, 10);
+  return fromZonedInputValue(`${shifted}T${time}`, zone) ?? micros + addDays * MICROS_PER_DAY;
+}
+
+/// Anchored to the team's day, not the browser's and not UTC's: "tonight" means
+/// the team's night, and somebody arranging cover from another office means that
+/// too.
+///
+/// This used to say so while flooring the instant to a multiple of a day, which
+/// is midnight UTC — so an IST team's "tonight" began at 23:30 and its "rest of
+/// today" ran to half past five the following morning.
 function applyPreset(key: (typeof PRESETS)[number]["key"]) {
   const now = Date.now() * 1000;
-  const dayStart = Math.floor(now / MICROS_PER_DAY) * MICROS_PER_DAY;
+  const zone = props.timezone;
+  const at = (addDays: number, time?: string) => zonedInstant(now, zone, addDays, time);
 
   const ranges: Record<string, { from: number; to: number }> = {
-    "rest-of-day": { from: now, to: dayStart + MICROS_PER_DAY },
-    tonight: { from: dayStart + 18 * MICROS_PER_HOUR, to: dayStart + 30 * MICROS_PER_HOUR },
-    tomorrow: { from: dayStart + MICROS_PER_DAY, to: dayStart + 2 * MICROS_PER_DAY },
+    "rest-of-day": { from: now, to: at(1) },
+    tonight: { from: at(0, "18:00"), to: at(1, "06:00") },
+    tomorrow: { from: at(1), to: at(2) },
     "next-7-days": { from: now, to: now + 7 * MICROS_PER_DAY },
   };
-  form.setFieldValue("window", ranges[key]);
+  // `type` travels with every write into this field, not just the seed: the
+  // control is re-read whenever the value changes from outside it, and a range
+  // with no type is re-read as a relative period and resolved against `now` —
+  // which threw the preset away and put the past half hour back.
+  form.setFieldValue("window", { type: "absolute", ...ranges[key] });
 }
+
+/// `timeZoneName` is the whole point: the two ends of a handover mean nothing
+/// without the clock they are on, and a UTC team read from IST is off by five
+/// and a half hours with no way to tell from the numbers.
+const formatRange = (micros: number, zone: string) =>
+  formatInZone(micros, zone, {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
 
 const summary = computed<I18nText | "">(() => {
   const window = windowValue.value;
@@ -404,18 +456,29 @@ const summary = computed<I18nText | "">(() => {
   // range with nobody against it.
   if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
   if (!who) return "";
-  const fmt = (micros: number) =>
-    formatInZone(micros, props.timezone, {
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const fmt = (micros: number) => formatRange(micros, props.viewerTimezone);
   // The person TAKING the shift. This read `currentHolder` — whoever is being
   // relieved — so the confirmation named the wrong side of the handover, and
   // the team was passed as an empty string.
   return t("oncall.coverSummary", {
     name: raw(who),
     team: raw(props.teamName ?? ""),
+    range: raw(`${fmt(window.from)} – ${fmt(window.to)}`),
+  });
+});
+
+/// The same window on the team's clock, and only when that is a different
+/// clock. A cover is agreed in the team's calendar — somebody arranging one
+/// from another office is still handing over the team's night — but the reader
+/// typed their own wall times into the picker, so showing only the team's would
+/// read as the dialog having changed the answer.
+const teamZoneSummary = computed<I18nText | "">(() => {
+  const window = windowValue.value;
+  if (!summary.value) return "";
+  if (props.timezone === props.viewerTimezone) return "";
+  if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
+  const fmt = (micros: number) => formatRange(micros, props.timezone);
+  return t("oncall.coverSummaryTeamZone", {
     range: raw(`${fmt(window.from)} – ${fmt(window.to)}`),
   });
 });

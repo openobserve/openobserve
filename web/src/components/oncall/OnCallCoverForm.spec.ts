@@ -21,6 +21,7 @@ import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import i18n from "@/locales";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import { toZonedInputValue } from "@/utils/oncall";
 import type { UpcomingShift } from "./OnCallCoverForm.vue";
 
 /// Tomorrow, not a frozen instant in 2023. Every fixture below is a window
@@ -28,6 +29,10 @@ import type { UpcomingShift } from "./OnCallCoverForm.vue";
 /// which have already elapsed reads a hardcoded past constant as the defect it
 /// is there to catch.
 const FROM = Date.now() * 1000 + MICROS_PER_DAY;
+
+/// A team whose clock is half an hour off every round offset, which is where
+/// a UTC-flavoured "midnight" shows up as 05:30.
+const IST = "Asia/Kolkata";
 
 /// What a hand-pick in the range control puts into the field.
 const PICKED = { from: FROM, to: FROM + MICROS_PER_HOUR };
@@ -189,6 +194,61 @@ async function pick(wrapper: any, which: 0 | 1, optionIndex: number) {
 async function intoSwapMode(wrapper: any) {
   await wrapper.find('[data-test="oncall-cover-mode-swap"]').trigger("click");
 }
+
+/// A window means nothing without the clock it is on. The dialog showed a UTC
+/// team's hours to a reader in IST with no marker at all, so the summary read
+/// five and a half hours off the times they had just typed and nothing on
+/// screen said why.
+describe("OnCallCoverForm — which clock the times are on", () => {
+  const MEMBERS = [{ user_email: "ana@o2.ai" }];
+
+  function renderCover(props: Record<string, unknown> = {}) {
+    return mount(OnCallCoverForm, {
+      props: {
+        open: true,
+        members: MEMBERS,
+        timezone: "UTC",
+        shifts: [],
+        defaultUser: "ana@o2.ai",
+        teamName: "Platform",
+        gap: { from: FROM, to: FROM + MICROS_PER_HOUR },
+        ...props,
+      },
+      global: { plugins: [i18n], stubs },
+    });
+  }
+
+  const summaryOf = (wrapper: ReturnType<typeof renderCover>) =>
+    wrapper.find('[data-test="oncall-cover-summary"]').text();
+
+  it("names the clock the reader picked on", async () => {
+    const wrapper = renderCover({ viewerTimezone: IST });
+    await flushPromises();
+
+    // Whatever ICU calls it — "GMT+5:30" — the point is that SOMETHING names
+    // the offset, since the bare numbers cannot.
+    expect(summaryOf(wrapper)).toContain("GMT+5:30");
+  });
+
+  it("also says what the window is on the team's clock", async () => {
+    const wrapper = renderCover({ viewerTimezone: IST });
+    await flushPromises();
+
+    const teamLine = wrapper.find('[data-test="oncall-cover-summary-team-zone"]');
+    expect(teamLine.exists()).toBe(true);
+    expect(teamLine.text()).toContain("UTC");
+  });
+
+  /// One clock, said once. A reader on the team's own timezone has nothing to
+  /// reconcile, and repeating the same range twice reads as two windows.
+  it("says it once when the reader is already on the team's clock", async () => {
+    const wrapper = renderCover({ viewerTimezone: "UTC" });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-cover-summary-team-zone"]').exists()).toBe(false);
+    expect(summaryOf(wrapper)).toContain("UTC");
+  });
+});
 
 /// The header's *Cover a shift* opens this dialog on the reader — the answer
 /// they came to give, already filled in. A pre-selection the picker cannot
@@ -556,6 +616,39 @@ describe("OnCallCoverForm — taking a cover", () => {
     const picked = wrapper.find('[data-test="oncall-cover-summary"]').text();
     expect(picked).not.toBe(opening);
     expect(await save(wrapper)).toMatchObject({ start_at: PICKED.from, end_at: PICKED.to });
+  });
+
+  /// A preset is the answer almost every time, and it must land on the TEAM's
+  /// day. Flooring the instant to a multiple of a day is midnight UTC, so an
+  /// IST team's "tomorrow" began at half past five in the morning.
+  it("anchors a quick range to the team's day, not UTC's", async () => {
+    const wrapper = renderCover({ timezone: IST });
+    await wrapper.find('[data-test="oncall-cover-preset-tomorrow"]').trigger("click");
+
+    const saved = await save(wrapper);
+    expect(toZonedInputValue(saved!.start_at, IST)).toMatch(/T00:00$/);
+    expect(toZonedInputValue(saved!.end_at, IST)).toMatch(/T00:00$/);
+  });
+
+  it("starts \"tonight\" at the team's evening", async () => {
+    const wrapper = renderCover({ timezone: IST });
+    await wrapper.find('[data-test="oncall-cover-preset-tonight"]').trigger("click");
+
+    const saved = await save(wrapper);
+    expect(toZonedInputValue(saved!.start_at, IST)).toMatch(/T18:00$/);
+    expect(toZonedInputValue(saved!.end_at, IST)).toMatch(/T06:00$/);
+  });
+
+  /// The picker is re-read whenever the value changes from outside it, so a
+  /// preset written without the type was re-read as a relative period and
+  /// resolved against `now` — putting the past half hour back over the range
+  /// the reader had just chosen.
+  it("writes a quick range the picker cannot re-resolve", async () => {
+    const wrapper = renderCover();
+    await wrapper.find('[data-test="oncall-cover-preset-tonight"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test-field="window"]').attributes("data-test-type")).toBe("absolute");
   });
 
   /// Reopening on a different gap must not inherit the last one's window or
