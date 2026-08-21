@@ -35,17 +35,20 @@ const stubs = {
     props: ["disabled"],
     template: `<button :disabled="disabled"><slot /></button>`,
   },
+  /// Label and help text are rendered so the assertions can read what the
+  /// field says about itself — both are part of this form's contract now that
+  /// the rule is asked as labelled fields rather than a sentence.
   OSelect: {
     name: "OSelect",
-    props: ["modelValue", "options"],
+    props: ["modelValue", "options", "label", "helpText"],
     emits: ["update:modelValue"],
-    template: `<select :value="modelValue" />`,
+    template: `<span><label>{{ label }}</label><select :value="modelValue" /><small>{{ helpText }}</small></span>`,
   },
   OCombobox: {
     name: "OCombobox",
-    props: ["modelValue", "items"],
+    props: ["modelValue", "items", "label"],
     emits: ["update:modelValue"],
-    template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
+    template: `<span><label>{{ label }}</label><input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></span>`,
   },
   /// The chip's own two-segment rendering is its spec's business; here it only
   /// has to say which condition it carries.
@@ -56,6 +59,19 @@ const stubs = {
     template: `<span><span class="chip-label">{{ keyLabel || dimKey }} = {{ value }}</span><button class="chip-remove" @click="$emit('remove')" /></span>`,
   },
   OTimeCell: { name: "OTimeCell", props: ["value", "unit"], template: `<span />` },
+  /// Rendered inline so the menu's contents are assertable without driving the
+  /// real popup open; that it IS a menu is asserted through its trigger.
+  ODropdown: {
+    name: "ODropdown",
+    props: ["align", "contentClass"],
+    template: "<div><slot name='trigger' /><slot /></div>",
+  },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    props: ["textValue"],
+    emits: ["select"],
+    template: "<button @click=\"$emit('select')\"><slot /></button>",
+  },
 };
 
 const TEAMS = [
@@ -220,6 +236,70 @@ describe("OnCallRuleEditor", () => {
     );
   });
 
+  /// Two chips side by side read as an either/or just as easily as an and, and
+  /// the difference is the whole meaning of the rule.
+  it("spells out the conjunction between conditions", async () => {
+    const wrapper = render({
+      initialDimensions: { "k8s-namespace": "risk", service: "risk-api" },
+    });
+    await flushPromises();
+    // One "and": between the two chips, not before the first.
+    expect(wrapper.findAll('[data-test="oncall-rule-editor-and"]')).toHaveLength(1);
+
+    // Still one while a third is being written: the adder is a labelled row of
+    // its own, not another clause in the list.
+    await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
+    expect(wrapper.findAll('[data-test="oncall-rule-editor-and"]')).toHaveLength(1);
+  });
+
+  /// The only way out of the adder used to be to finish it: a half-written
+  /// condition left Add disabled and the row parked in the sentence.
+  it("discards a half-written condition without adding it", async () => {
+    const wrapper = render({ initialDimensions: { service: "risk-api" } });
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
+    await wrapper
+      .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
+      .vm.$emit("update:modelValue", "k8s-cluster");
+    await wrapper.find('[data-test="oncall-rule-editor-cancel-condition"]').trigger("click");
+
+    expect(wrapper.find('[data-test="oncall-rule-editor-dimension-name"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-cluster"]').exists()).toBe(
+      false,
+    );
+    // The draft went with it — reopening the adder starts clean.
+    await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
+    expect(
+      wrapper.findComponent('[data-test="oncall-rule-editor-dimension-name"]').props("modelValue"),
+    ).toBe("");
+  });
+
+  /// With no condition there is nothing to go back to, and a rule cannot be
+  /// saved without one — a cancel there would only empty the dialog.
+  it("offers no discard on the first condition", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-cancel-condition"]').exists()).toBe(false);
+  });
+
+  /// The hands are already on the value field; reaching for Add is the slow
+  /// half of writing a two-condition rule.
+  it("commits the condition on Enter in the value field", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    await wrapper
+      .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
+      .vm.$emit("update:modelValue", "service");
+    await wrapper
+      .findComponent('[data-test="oncall-rule-editor-dimension-value"]')
+      .vm.$emit("update:modelValue", "risk-api");
+    await wrapper.find('[data-test="oncall-rule-editor-dimension-value"]').trigger("keyup.enter");
+
+    expect(wrapper.find('[data-test="oncall-rule-editor-condition-service"]').exists()).toBe(true);
+  });
+
   it("cannot be saved with no condition", async () => {
     const wrapper = render();
     await flushPromises();
@@ -269,12 +349,28 @@ describe("OnCallRuleEditor", () => {
   it("starts from a signal without pinning its evidence", async () => {
     const wrapper = render();
     await flushPromises();
-    await wrapper.find('[data-test="oncall-rule-editor-use-s1"]').trigger("click");
+    await wrapper.find('[data-test="oncall-rule-editor-signal-s1"]').trigger("click");
 
     expect(wrapper.find('[data-test="oncall-rule-editor-condition-service"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-pod-name"]').exists()).toBe(
       false,
     );
+  });
+
+  /// The queue used to be printed open above an empty form: three paths of raw
+  /// dimensions to read before the first field. It is one control now, and it
+  /// stands down once the draft is the thing being judged.
+  it("offers the queue behind one control, and drops it once a condition exists", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-rule-editor-signals"]').text()).toContain(
+      "Start from a signal",
+    );
+
+    await addCondition(wrapper, "k8s-namespace", "risk");
+
+    expect(wrapper.find('[data-test="oncall-rule-editor-signals"]').exists()).toBe(false);
   });
 
   /// Two different emergencies share the queue: a path the catch-all absorbed
@@ -315,7 +411,9 @@ describe("OnCallRuleEditor", () => {
   it("names the ladder a page would run", async () => {
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-rule-editor-ladder"]').text()).toContain("P1 ladder");
+    expect(
+      wrapper.findComponent('[data-test="oncall-rule-editor-team"]').props("helpText"),
+    ).toContain("P1 ladder");
   });
 
   it("says when the target team has no ladder that wakes anybody", async () => {
@@ -323,9 +421,9 @@ describe("OnCallRuleEditor", () => {
       ladder: [{ priority: "P1", rungs: 0, pages_anyone: false, ends_with_whole_team: false }],
     });
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-rule-editor-ladder"]').text()).toContain(
-      "no escalation ladder yet",
-    );
+    expect(
+      wrapper.findComponent('[data-test="oncall-rule-editor-team"]').props("helpText"),
+    ).toContain("no escalation ladder yet");
   });
 
   /// The row is Edit and nothing else, so removing a rule is a decision made

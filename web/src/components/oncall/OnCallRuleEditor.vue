@@ -20,10 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   An ODialog, like every other short form in the app — add, edit and claim are
   the same three fields, so they are the same surface rather than three.
 
-  The rule is one sentence, filled in place: `When <field> is <value> → page
-  <team>`. Stacking the same three fields as labelled rows made a rule read as
-  a form to complete rather than a claim to check, and the claim is what the
-  reader has to judge.
+  Two labelled fields, the way every other form in the app asks its questions:
+  the conditions a page has to match, and the team they hand it to. The rule
+  was once written as a sentence filled in place — `When <field> is <value> →
+  page <team>` — which read well at one condition and lost its shape at two:
+  the row wrapped mid-clause, and whatever the form had to say about a field
+  landed under a different one.
 
   It carries its own verification: the draft is replayed against the unrouted
   queue, so "what would this catch" is answered before saving instead of by a
@@ -48,147 +50,184 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:neutral="emit('remove')"
   >
     <div class="flex flex-col gap-3">
-      <!-- The rule as one sentence. Conditions are chips inside it, so adding a
-           second one visibly narrows the same claim rather than filling in
-           another field somewhere else. -->
-      <div
-        class="border-border-default rounded-default flex flex-col gap-1.5 border px-3 py-2.5"
-        data-test="oncall-rule-editor-sentence"
-      >
-        <!-- Two groups, so a wrap breaks the sentence between "what arrives"
-             and "who it pages" rather than mid-clause. -->
-        <span class="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span class="flex flex-wrap items-center gap-x-2 gap-y-2">
-            <OText variant="label">{{ t("oncall.ruleEditorWhen") }}</OText>
+      <!-- Two labelled fields: what has to arrive, and who it pages. The
+           conditions are chips under their own label, so adding a second one
+           visibly narrows the same claim rather than opening another form. -->
+      <div class="flex flex-col gap-5" data-test="oncall-rule-editor-sentence">
+        <div class="flex flex-col gap-2" data-test="oncall-rule-editor-conditions">
+          <!-- Conditions are ANDed and matched exactly. Neither is visible in a
+               list of chips, and both change what the rule means. -->
+          <span class="flex flex-wrap items-baseline gap-x-2">
+            <OText variant="label">{{ t("oncall.ruleEditorConditions") }}</OText>
+            <OText variant="meta">{{ t("oncall.ruleEditorConditionsHint") }}</OText>
 
-            <ODimensionChip
-              v-for="(pair, index) in pairs"
-              :key="pair.name"
-              :dim-key="pair.name"
-              :key-label="displayOf(pair.name)"
-              :value="pair.value"
-              removable
-              :remove-label="t('oncall.removeDimension')"
-              :data-test="`oncall-rule-editor-condition-${pair.name}`"
-              @remove="pairs.splice(index, 1)"
-            />
+            <!-- The queue is where most rules come from, so its rows are one
+                 click away rather than a section the reader has to close this
+                 and scroll to. Printed open above the draft they were the first
+                 thing met on a form nobody had filled in yet — three paths of
+                 raw dimensions to read before the first field. Behind a menu
+                 they are offered to whoever wants them and silent otherwise,
+                 and the list is no longer paying for its own height, so it
+                 holds twice the paths it did.
 
-            <!-- A closed vocabulary for the dimension: free text is how a rule
-                 ends up pinned to a field nothing ever emits, which reads as
-                 "never matched". The value stays open — it is data — but the
-                 values already seen on this dimension are offered first. -->
-            <template v-if="adding">
-              <OSelect
-                v-model="draftName"
-                :options="dimensionOptions"
-                :placeholder="t('oncall.ruleEditorFieldPlaceholder')"
-                size="sm"
-                width="xs"
-                searchable
-                data-test="oncall-rule-editor-dimension-name"
-              />
-              <OText variant="meta">{{ t("oncall.ruleEditorIs") }}</OText>
-              <span class="w-36 min-w-0">
-                <OCombobox
-                  v-model="draftValue"
-                  :items="valueOptions"
-                  :placeholder="t('oncall.ruleEditorValuePlaceholder')"
-                  size="sm"
-                  data-test="oncall-rule-editor-dimension-value"
-                />
-              </span>
-              <OButton
-                variant="outline"
-                size="sm"
-                :disabled="!canAddPair"
-                data-test="oncall-rule-editor-confirm-condition"
-                @click="addPair"
-              >
-                {{ t("oncall.add") }}
-              </OButton>
-            </template>
-
-            <OButton
-              v-else
-              variant="ghost"
-              size="sm"
-              icon-left="add"
-              data-test="oncall-rule-editor-add-condition"
-              @click="adding = true"
+                 It stays an opening move: once the draft has a condition, that
+                 draft is the thing being judged and this would only be noise. -->
+            <ODropdown
+              v-if="!rule && !pairs.length && startable.length"
+              align="end"
+              content-class="min-w-120"
             >
-              {{ pairs.length ? t("oncall.ruleEditorAnd") : t("oncall.addDimension") }}
-            </OButton>
+              <template #trigger>
+                <OButton
+                  variant="ghost-primary"
+                  size="xs"
+                  icon-right="expand-more"
+                  class="ms-auto"
+                  data-test="oncall-rule-editor-signals"
+                >
+                  {{ t("oncall.ruleEditorOrStartFrom") }}
+                </OButton>
+              </template>
+
+              <ODropdownItem
+                v-for="signal in startable"
+                :key="signal.id"
+                :text-value="routablePathOf(signal)"
+                :data-test="`oncall-rule-editor-signal-${signal.id}`"
+                @select="startFrom(signal.id)"
+              >
+                <span class="flex w-full min-w-0 items-center gap-2">
+                  <code class="text-text-body min-w-0 flex-1 truncate text-xs">
+                    {{ raw(routablePathOf(signal)) }}
+                  </code>
+                  <!-- Two different emergencies share this queue, and which one
+                       a path is decides which way the rule fixes it. -->
+                  <OTag :variant="outcomeVariant(signal)" size="sm" class="shrink-0">
+                    {{ outcomeOf(signal) }}
+                  </OTag>
+                  <OText variant="meta" class="shrink-0">
+                    {{
+                      t(
+                        "oncall.routingFiresWindow",
+                        { count: signal.occurrences },
+                        signal.occurrences,
+                      )
+                    }}
+                  </OText>
+                </span>
+              </ODropdownItem>
+            </ODropdown>
           </span>
 
-          <!-- The team is a picker even on a team's own tab: handing a path to
-               the team that actually owns it is the common correction, and the
-               alternative is deleting the rule and writing it again elsewhere. -->
-          <span class="flex items-center gap-2 whitespace-nowrap">
-            <span aria-hidden="true" class="text-text-secondary">→</span>
-            <OText variant="label">{{ t("oncall.ruleEditorPage") }}</OText>
+          <!-- The conjunction is spelled out: chips sitting side by side read
+               as an either/or just as easily. -->
+          <span v-if="pairs.length" class="flex flex-wrap items-center gap-2">
+            <template v-for="(pair, index) in pairs" :key="pair.name">
+              <OText v-if="index" variant="meta" data-test="oncall-rule-editor-and">
+                {{ t("oncall.ruleEditorAnd") }}
+              </OText>
+              <ODimensionChip
+                :dim-key="pair.name"
+                :key-label="displayOf(pair.name)"
+                :value="pair.value"
+                removable
+                :remove-label="t('oncall.removeDimension')"
+                :data-test="`oncall-rule-editor-condition-${pair.name}`"
+                @remove="pairs.splice(index, 1)"
+              />
+            </template>
+          </span>
+
+          <!-- A closed vocabulary for the dimension: free text is how a rule
+               ends up pinned to a field nothing ever emits, which reads as
+               "never matched". The value stays open — it is data — but the
+               values already seen on this dimension are offered first. -->
+          <div v-if="adding" class="flex flex-wrap items-end gap-2">
             <OSelect
-              :model-value="team"
-              :options="teamOptions"
-              :placeholder="t('oncall.ruleTeamPlaceholder')"
+              v-model="draftName"
+              :label="t('oncall.ruleEditorDimensionLabel')"
+              :options="dimensionOptions"
+              :placeholder="t('oncall.ruleEditorFieldPlaceholder')"
               size="sm"
               width="sm"
               searchable
-              data-test="oncall-rule-editor-team"
-              @update:model-value="(v: unknown) => (team = String(v))"
+              data-test="oncall-rule-editor-dimension-name"
             />
-          </span>
-        </span>
+            <!-- Enter commits the pair: the hands are already on the value
+                 field, and reaching for Add to add a second condition is the
+                 slow half of writing a two-condition rule. -->
+            <span class="w-48 min-w-0" @keyup.enter="addPair">
+              <OCombobox
+                v-model="draftValue"
+                :label="t('oncall.ruleEditorValueLabel')"
+                :items="valueOptions"
+                :placeholder="t('oncall.ruleEditorValuePlaceholder')"
+                size="sm"
+                data-test="oncall-rule-editor-dimension-value"
+              />
+            </span>
+            <OButton
+              variant="outline"
+              size="sm"
+              :disabled="!canAddPair"
+              data-test="oncall-rule-editor-confirm-condition"
+              @click="addPair"
+            >
+              {{ t("oncall.add") }}
+            </OButton>
+            <!-- Only once a condition exists: with none there is nothing to go
+                 back to, and a rule cannot be saved without one. -->
+            <OButton
+              v-if="pairs.length"
+              variant="ghost"
+              size="sm"
+              data-test="oncall-rule-editor-cancel-condition"
+              @click="cancelPair"
+            >
+              {{ t("oncall.ruleEditorDiscardCondition") }}
+            </OButton>
+          </div>
 
-        <!-- The dialog used to go quiet here: no request, no message, and a
-             disabled Save with nothing on screen saying what was missing. It
-             belongs under the field it is about, not adrift below the panel. -->
-        <OText
-          v-if="adding && addPairProblem"
-          variant="meta"
-          data-test="oncall-rule-editor-dimension-problem"
-        >
-          {{ addPairProblem }}
-        </OText>
-
-        <!-- "Page" has to say what paging means, or it is a team name with no
-             consequence attached. -->
-        <OText variant="meta" data-test="oncall-rule-editor-ladder">{{ ladderNote }}</OText>
-      </div>
-
-      <!-- The queue is where most rules come from, so its rows are one click
-           away rather than a section the user has to close this and scroll to.
-           It is an opening move: once the sentence has a condition, the draft
-           is the thing being judged and these would only be noise. -->
-      <div
-        v-if="!rule && !pairs.length && startable.length"
-        class="flex flex-col gap-1.5"
-        data-test="oncall-rule-editor-signals"
-      >
-        <OText variant="section">{{ t("oncall.ruleEditorOrStartFrom") }}</OText>
-        <span
-          v-for="signal in startable"
-          :key="signal.id"
-          class="border-border-subtle rounded-default flex items-center gap-2 border px-2.5 py-1.5"
-          :data-test="`oncall-rule-editor-signal-${signal.id}`"
-        >
-          <code class="text-text-body min-w-0 flex-1 truncate text-xs">
-            {{ raw(routablePathOf(signal)) }}
-          </code>
-          <OTag :variant="outcomeVariant(signal)" size="sm" class="shrink-0">
-            {{ outcomeOf(signal) }}
-          </OTag>
-          <OText variant="meta" class="shrink-0">
-            {{ t("oncall.routingFiresWindow", { count: signal.occurrences }, signal.occurrences) }}
-          </OText>
           <OButton
-            variant="ghost"
-            size="xs"
-            :data-test="`oncall-rule-editor-use-${signal.id}`"
-            @click="startFrom(signal.id)"
+            v-else
+            variant="ghost-primary"
+            size="sm"
+            icon-left="add"
+            class="self-start"
+            data-test="oncall-rule-editor-add-condition"
+            @click="adding = true"
           >
-            {{ t("oncall.ruleEditorUse") }}
+            {{ t("oncall.ruleEditorAddCondition") }}
           </OButton>
-        </span>
+
+          <!-- The dialog used to go quiet here: no request, no message, and a
+               disabled Save with nothing on screen saying what was missing. -->
+          <OText
+            v-if="adding && addPairProblem"
+            variant="meta"
+            data-test="oncall-rule-editor-dimension-problem"
+          >
+            {{ addPairProblem }}
+          </OText>
+        </div>
+
+        <!-- The team is a picker even on a team's own tab: handing a path to
+             the team that actually owns it is the common correction, and the
+             alternative is deleting the rule and writing it again elsewhere.
+             Its help text says what paging that team means, or the field is a
+             team name with no consequence attached. -->
+        <OSelect
+          :model-value="team"
+          :label="t('oncall.ruleEditorTeamLabel')"
+          :options="teamOptions"
+          :placeholder="t('oncall.ruleTeamPlaceholder')"
+          :help-text="ladderNote"
+          size="sm"
+          width="sm"
+          searchable
+          data-test="oncall-rule-editor-team"
+          @update:model-value="(v: unknown) => (team = String(v))"
+        />
       </div>
 
       <!-- The verification, in the same panel as the edit. Only the unrouted
@@ -275,6 +314,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OwnershipRuleStats, TeamRungSummary, UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -295,6 +336,9 @@ export interface RuleDraft {
 /// The panel is a check, not a list: enough rows to recognise what the rule
 /// took, with the remainder counted rather than scrolled.
 const SHOWN_MATCHES = 4;
+
+/// How much of the unrouted queue the "start from a signal" menu offers.
+const STARTABLE_SHOWN = 6;
 
 const props = withDefaults(
   defineProps<{
@@ -389,9 +433,10 @@ const valueOptions = computed(() => {
 });
 
 /// The queue, heaviest first: the path that fell through most often is the one
-/// worth claiming first.
+/// worth claiming first. Six rather than the three it printed inline — in a menu
+/// the list costs no height on the form, and three was the space, not the answer.
 const startable = computed(() =>
-  [...props.signals].sort((a, b) => b.occurrences - a.occurrences).slice(0, 3),
+  [...props.signals].sort((a, b) => b.occurrences - a.occurrences).slice(0, STARTABLE_SHOWN),
 );
 
 /// Why `Add` is refused, in the reader's terms. A disabled button beside a
@@ -494,6 +539,14 @@ function startFrom(signalId: string) {
 /// Normalised on the way in, because the server lowercases these before
 /// matching — writing one string and reading back another is how a rule that
 /// looks right catches nothing.
+/// Abandoning a half-written condition, without having to complete it first:
+/// the only other way out of the builder was to add something.
+function cancelPair() {
+  draftName.value = "";
+  draftValue.value = "";
+  adding.value = false;
+}
+
 function addPair() {
   if (!canAddPair.value) return;
   pairs.value.push({
