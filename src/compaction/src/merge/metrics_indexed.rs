@@ -19,14 +19,14 @@
 
 use config::meta::{promql::layout::MetricsFileLayout, stream::FileKey};
 
-/// Indexed `metrics-indexed-v1-*` files a closed hour may hold beyond the ideal
+/// Indexed `indexed-v1-*` files a closed hour may hold beyond the ideal
 /// `total_size / max_file_size` before the whole hour is rewritten.
 const METRICS_INDEX_REWRITE_SLACK: usize = 4;
 
 /// What the merge of a closed indexed metrics hour covers.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum MetricsIndexMergeScope {
-    /// Every file is `metrics-indexed-v1-*` and the count fits the current
+    /// Every file is `indexed-v1-*` and the count fits the current
     /// `max_file_size`: leave the hour alone.
     Skip,
     /// Merge only the late, non-indexed files into one new indexed file;
@@ -80,8 +80,8 @@ mod tests {
     #[test]
     fn test_metrics_index_merge_scope() {
         let max_file_size = 100_usize;
-        let indexed = |id: usize| file_key(&format!("metrics-indexed-v1-{id}.parquet"), 10);
-        let late = |id: usize| file_key(&format!("metrics-hash-sorted-v1-{id}.parquet"), 10);
+        let indexed = |id: usize| file_key(&format!("indexed-v1-{id}.parquet"), 10);
+        let late = |id: usize| file_key(&format!("hash-sorted-v1-{id}.parquet"), 10);
 
         // every file indexed and acceptably sized: the hour is left alone
         assert_eq!(
@@ -123,7 +123,7 @@ mod tests {
         );
         // same file count but a large hour (ideal 9): still a late-only merge
         let mut large: Vec<FileKey> = (1..=8)
-            .map(|id| file_key(&format!("metrics-indexed-v1-{id}.parquet"), 100))
+            .map(|id| file_key(&format!("indexed-v1-{id}.parquet"), 100))
             .collect();
         large.push(late(9));
         assert_eq!(

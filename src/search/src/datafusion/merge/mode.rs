@@ -57,11 +57,11 @@ pub enum MergeMode {
     #[cfg(feature = "enterprise")]
     Downsampling(DownsamplingRule),
     /// Metrics index stream, hour still open: the ingester and the incremental
-    /// compactor merges write one `metrics-hash-sorted-v1-*` Parquet file
+    /// compactor merges write one `hash-sorted-v1-*` Parquet file
     /// ordered by `(__hash__, _timestamp)`.
     MetricsHashSorted,
     /// Metrics index stream, closed hour: the whole hour merges into
-    /// size-split `metrics-indexed-v1-*` files in the same order.
+    /// size-split `indexed-v1-*` files in the same order.
     MetricsIndexed,
 }
 
@@ -298,11 +298,9 @@ mod tests {
     #[test]
     fn input_sort_order_by_file_layout() {
         let legacy = FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/1.parquet");
-        let sorted = FileKey::from_file_name(
-            "files/o/metrics/m/2026/08/18/10/metrics-hash-sorted-v1-2.parquet",
-        );
-        let major =
-            FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/metrics-indexed-v1-3.parquet");
+        let sorted =
+            FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/hash-sorted-v1-2.parquet");
+        let major = FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/indexed-v1-3.parquet");
         // all inputs hash ordered: the hash modes merge them pre-sorted
         for mode in [MergeMode::MetricsHashSorted, MergeMode::MetricsIndexed] {
             assert_eq!(
