@@ -5,14 +5,19 @@
 - Build with `cargo build` (debug). Never use `--release` unless explicitly asked.
 - Skip UI build steps (`npm run build`) when working on backend tasks.
 - `.env` in the project root overrides process env; check it before running the server.
-- Before finishing a task: run `cargo fmt --all` and make
-  `cargo clippy --all-targets -- -D warnings` pass — that is exactly what CI runs.
+- Before finishing a task: run `cargo fmt --all` and make the CI clippy command
+  pass: `cargo clippy --workspace --all-targets -- -W clippy::too_many_lines
+  -W clippy::cognitive_complexity -W clippy::excessive_nesting -D warnings`.
 
 ## Rust code organization
 
 Item order inside a file/module, top to bottom (clippy's default grouping):
 `mod`/`pub mod` declarations → `use` imports → macros → `const`/`static` → types (`struct`/`enum`/`trait`/`type`) → `impl` blocks → functions.
 
+- Function length, cognitive complexity, and nesting depth are capped by the
+  thresholds in clippy.toml (set just above the worst existing code). They only
+  ratchet down — if CI flags your function, split it instead of raising the
+  threshold.
 - Never insert a function above the file's constants or type definitions.
 - Keep `pub` and private functions grouped. Do not drop a private helper into the
   middle of the pub API block, or a pub fn into a run of private helpers. Place
