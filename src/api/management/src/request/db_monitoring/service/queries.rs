@@ -168,6 +168,13 @@ async fn read_queries_window(
         }
     };
 
+    // `streams` scopes the LIVE TAIL, which reads raw spans where the stream is
+    // the table. It deliberately does NOT filter `qs_rows`: those are
+    // `_o2_db_stats` rollup rows, and reaching this function at all requires the
+    // `db_monitoring` module grant (the route table makes it a hard prerequisite,
+    // `bypass: false`), which `can_read_stream` treats as authorizing every
+    // stream's DB rows -- see its doc comment. Filtering the pool by `streams`
+    // would be a no-op that reads as a boundary this endpoint does not have.
     let Some(streams) = involved_streams(org_id, user_id, q.stream.as_ref(), &[&qs_rows[..]]).await
     else {
         return Err(unauthorized_response());

@@ -154,6 +154,9 @@ async fn read_databases_window(
         }
     };
 
+    // Scopes the LIVE TAIL only -- the rollup pools below are intentionally
+    // unfiltered by it. See the same call in `queries.rs` for why: the module
+    // grant this route requires already authorizes every stream's DB rows.
     let Some(streams) = involved_streams(
         org_id,
         user_id,
