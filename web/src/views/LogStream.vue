@@ -1220,17 +1220,18 @@ export default defineComponent({
       }
     };
 
-    const onPaginationChange = async (params: { page: number; size: number }) => {
+    // No reload here: `watch([currentPage, pageSize, sortBy, sortOrder])` above
+    // already loads on these writes, so calling it again would put two identical
+    // requests behind one page or sort change.
+    const onPaginationChange = (params: { page: number; size: number }) => {
       currentPage.value = params.page;
       pageSize.value = params.size;
-      await getLogStream();
     };
 
-    const onSortChange = async (params: { column: string; order: "asc" | "desc" }) => {
+    const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
       sortBy.value = params.column;
       sortOrder.value = params.order;
       currentPage.value = 1;
-      await getLogStream();
     };
 
     const filterLogStreamByTab = (tab: string) => {
