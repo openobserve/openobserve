@@ -138,7 +138,6 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     if triggers.is_empty() {
         return;
     }
-    let cfg = config::get_config();
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
         let module_key = scheduler_key(alert.id);
@@ -194,9 +193,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                 }
                 // enforce a minimum silence floor so a high-volume stream cannot
                 // fire (and write to the db) once per matching request
-                let silence_micros = alert
-                    .trigger_condition
-                    .effective_silence_micros(cfg.limit.alert_realtime_min_silence_secs);
+                let silence_micros = alert.trigger_condition.effective_silence_micros();
                 if silence_micros > 0 {
                     log::debug!(
                         "Realtime alert {}/{}/{}/{} triggered successfully, hence applying silence period",

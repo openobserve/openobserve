@@ -2321,12 +2321,6 @@ pub struct Limit {
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(
-        name = "ZO_ALERT_REALTIME_MIN_SILENCE_SECS",
-        default = 30,
-        help = "Minimum silence period (seconds) applied to a realtime alert after each notification, even when the alert's own silence is 0 — without a floor, every matching ingestion request sends a notification and its DB writes. 0 disables the floor."
-    )]
-    pub alert_realtime_min_silence_secs: i64,
-    #[env_config(
         name = "ZO_ALERT_PREVIEW_TIMERANGE_MINUTES",
         default = 0,
         help = "Time range in minutes for alert preview. If set to 0 (default), uses the alert's period value. If greater than 0, overrides period for preview."

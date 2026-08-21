@@ -44,6 +44,11 @@ pub mod state;
 pub mod state_level;
 pub mod tags;
 
+/// Minimum silence applied to a realtime alert after each notification, even
+/// when the alert's own silence is 0 — without a floor, every matching
+/// ingestion request sends a notification and its db writes.
+const REALTIME_MIN_SILENCE_SECS: i64 = 30;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
 pub struct TriggerCondition {
@@ -343,11 +348,11 @@ impl TriggerCondition {
     }
 
     /// Effective realtime-alert silence in microseconds: the alert's own
-    /// silence (minutes) floored by `min_silence_secs`.
-    pub fn effective_silence_micros(&self, min_silence_secs: i64) -> i64 {
+    /// silence (minutes) floored by [`REALTIME_MIN_SILENCE_SECS`].
+    pub fn effective_silence_micros(&self) -> i64 {
         self.silence
             .saturating_mul(60)
-            .max(min_silence_secs)
+            .max(REALTIME_MIN_SILENCE_SECS)
             .saturating_mul(1_000_000)
     }
 }
