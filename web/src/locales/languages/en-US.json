@@ -13675,7 +13675,6 @@
     "moreActions": "More actions",
     "snoozeFor": "Snooze for",
     "policyStepsSection": "Escalation steps",
-    "policyEverythingElse": "Everything else",
     "policyChipSteps": "{count} step | {count} steps",
     "policyAddStep": "Add step",
     "policyWhenStepsRunOut": "When the steps run out",

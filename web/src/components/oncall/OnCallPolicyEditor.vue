@@ -320,8 +320,6 @@
            the agent does before they do. Both are set once and then read at a
            glance, so both are folded behind a summary of what they say now. -->
       <div class="flex flex-col gap-2">
-        <OText variant="section" as="div">{{ t("oncall.policyEverythingElse") }}</OText>
-
         <OnCallPolicySection
           ref="deliverySection"
           icon="activity"
