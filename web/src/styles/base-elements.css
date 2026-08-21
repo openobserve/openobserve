@@ -337,3 +337,14 @@ html.dark [data-destructive-icon="true"]:hover,
 .dark [data-destructive-icon="true"]:hover {
   background-color: rgba(220, 38, 38, 0.18) !important;
 }
+
+/* Monaco's `editor.colorize` emits .mtk* token classes carrying the colours of
+   whichever Monaco theme is loaded, which is not ours. .mtk1 is its default
+   foreground — the unhighlighted bulk of the text — so pointing it back at the
+   inherited colour lets the surrounding O2 token drive it in both themes while
+   the keyword/string/number classes keep their syntax colours. Global because
+   three pages now render colorized SQL and the alternative is a scoped copy in
+   each. */
+.o2-colorized-query .mtk1 {
+  color: inherit;
+}

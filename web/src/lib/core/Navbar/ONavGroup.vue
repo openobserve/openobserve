@@ -37,7 +37,10 @@ const openGroupKey = moduleRef<string | null>(null);
  *
  * The flyout mirrors the target page's own section nav: same labels, icons and
  * category grouping. Children navigate by route `name` and are gated by
- * `router.hasRoute` so feature-gated sub-pages never show a dead link. It is
+ * `router.hasRoute` plus their `gate` predicate so feature-gated sub-pages never
+ * show a dead link — and when NO child survives that filtering, the tile itself
+ * does not render (see `hasVisibleChildren`), so a fully-gated section leaves no
+ * empty tile behind. It is
  * teleported to <body> (escapes the rail's overflow clip), styled like O2's
  * native dropdown, and positioned flush against the rail's right edge.
  */
@@ -102,6 +105,7 @@ const gateContext = computed<NavGateContext>(() => {
     modelPricing: !!z.model_pricing_enabled,
     serviceStreams: z.service_streams_enabled !== false,
     onlineEvals: !!z.online_evals_enabled,
+    databaseMonitoring: !!z.database_monitoring_enabled,
     // Raw split (no trim) to match how pages test custom_hide_menus.
     hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
   };
@@ -119,6 +123,16 @@ const visibleChildren = computed(() =>
     return true;
   }),
 );
+
+// A group with no surviving child is not a group — it is an empty tile that
+// opens nothing. `open()` already refuses to show an empty flyout, which on its
+// own leaves a dead tile the user can click into a page they are not entitled
+// to. Suppressing the whole tile is what makes a `gate` on the LAST child gate
+// the section itself: Infra holds only Database Monitoring, so on a build with
+// `database_monitoring_enabled` off, Infra must vanish rather than sit there
+// inert. Collapsing groups reach this too — every child hidden means the tile
+// has nothing left to offer.
+const hasVisibleChildren = computed(() => visibleChildren.value.length > 0);
 
 // Flatten into render rows, inserting a category header whenever the category
 // changes (mirrors the sub-page's grouped section nav). Items with no category
@@ -185,6 +199,13 @@ const activeChild = computed<SubnavChild | null>(() => {
     (c) => c.tab && route.name === c.name && route.query.tab === c.tab,
   );
   if (exactTab) return exactTab;
+
+  // A route alias, same idea for a section whose sub-views are sibling ROUTES
+  // rendered as in-page tabs (Databases owns dbmQueries / dbmQueryDetail).
+  // Checked before the prefix pass below, which would otherwise attribute a
+  // detail route to whichever child has the longest matching path.
+  const routeAlias = props.children.find((c) => c.activeOnRoutes?.includes(route.name as string));
+  if (routeAlias) return routeAlias;
 
   const exact = props.children.find((c) => route.name === c.name && !c.tab);
   if (exact) return exact;
@@ -386,6 +407,7 @@ function onChildMouseenter(event: MouseEvent) {
 
 <template>
   <div
+    v-if="hasVisibleChildren"
     ref="wrapperRef"
     :data-test="`nav-group-${groupKey}`"
     class="nav-group relative shrink-0"

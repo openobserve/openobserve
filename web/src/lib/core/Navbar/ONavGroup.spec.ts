@@ -114,6 +114,88 @@ describe("ONavGroup", () => {
     expect(flyout().exists()).toBe(true);
   });
 
+  // The Infra tile holds ONE child (Database Monitoring) behind the
+  // `databaseMonitoring` runtime gate. Rendering the tile regardless of its
+  // children would leave a dead "Infra" entry on every build with the feature
+  // off — it would open nothing, and clicking it would land on a page the route
+  // guard bounces straight back. The tile must not exist at all.
+  describe("a group whose children are all filtered out", () => {
+    // A store whose zoConfig can be set per test, unlike the shared one above.
+    function makeGatedStore(databaseMonitoringEnabled: boolean) {
+      return createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { database_monitoring_enabled: databaseMonitoringEnabled },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+    }
+
+    // Infra's real shape: one gated child, routes registered (they always are —
+    // the guard, not the router, is what turns the feature off).
+    function mountInfra(databaseMonitoringEnabled: boolean) {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          {
+            path: "/traces/databases",
+            name: "dbmDatabases",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "infra",
+          title: "Infra",
+          icon: "dns",
+          children: [
+            {
+              titleKey: "menu.databases",
+              icon: "database",
+              name: "dbmDatabases",
+              gate: "databaseMonitoring",
+            },
+          ] as SubnavChild[],
+          parentItem: {
+            link: "/traces/databases",
+            title: "Infra",
+            icon: "dns",
+            name: "infra",
+          },
+        },
+        global: {
+          plugins: [router, makeGatedStore(databaseMonitoringEnabled), i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    it("renders the Infra tile when the databaseMonitoring gate passes", () => {
+      wrapper = mountInfra(true);
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="tile"]').exists()).toBe(true);
+    });
+
+    it("renders NO Infra tile when the databaseMonitoring gate fails", () => {
+      wrapper = mountInfra(false);
+      // The whole wrapper element is gone — not merely an empty flyout.
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="tile"]').exists()).toBe(false);
+    });
+
+    it("renders no tile when every child's route is missing from the build", async () => {
+      // The other half of the filter: `router.hasRoute` rather than `gate`.
+      wrapper = mountGroup();
+      await wrapper.setProps({
+        children: [{ titleKey: "menu.ghost", icon: "x", name: "notARoute" }] as SubnavChild[],
+      });
+      expect(wrapper.find('[data-test="nav-group-data"]').exists()).toBe(false);
+    });
+  });
+
   it("renders only children whose routes are registered", async () => {
     wrapper = mountGroup();
     await wrapper.setProps({

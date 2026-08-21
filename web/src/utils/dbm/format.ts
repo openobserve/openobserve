@@ -1,0 +1,537 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Number formatting shared by every Database Monitoring screen.
+ *
+ * One module so the same quantity reads identically everywhere: a duration in
+ * the Databases table and the same duration on a Top Queries row must not
+ * disagree about units or precision, or the two screens look like two products.
+ */
+
+/**
+ * Durations arrive in NANOSECONDS from the rollup (`total_time_ns`, `p95_ns`).
+ *
+ * Style deliberately matches `formatTimeWithSuffix` (utils/formatters.ts), the
+ * app's norm for span/query latency — ASCII `us`, two decimals with trailing
+ * zeros kept, `0us` for a measured zero — because the Service Catalog prints
+ * its p50/p95/p99 one tab over and the two must not disagree about a duration.
+ * The ASCII `us` also parses back through the traces `UNIT_ALIASES` table,
+ * which does not accept the Greek mu.
+ *
+ * Two tiers the norm lacks are kept, because DBM genuinely reaches both ends:
+ * `ns` for sub-microsecond queries (the norm collapses them to `0.00us`) and
+ * `h` for database time, which on a busy instance runs to hours (the norm
+ * would print three of them as `180.00m`).
+ */
+export const formatNs = (ns: number | undefined | null): string => {
+  if (ns === undefined || ns === null || !Number.isFinite(ns)) return "—";
+  // `0us` is reachable ONLY for a duration that was genuinely measured at zero
+  // — a single sub-nanosecond row, or an engine that reported a zero total.
+  // It is NOT the rendering for "this vantage measured nothing": an absent
+  // measurement must never reach a formatter, because a formatter's contract
+  // is total (every input returns a string) and so it cannot withhold. Callers
+  // holding an OVERLAP measure route through `overlapTile`, which withholds
+  // before formatting; see D6/L2 and the constraint note there.
+  if (ns <= 0) return "0us";
+
+  const units: [limit: number, divisor: number, suffix: string][] = [
+    [1_000, 1, "ns"],
+    [1_000_000, 1_000, "us"],
+    [1_000_000_000, 1_000_000, "ms"],
+    [60 * 1_000_000_000, 1_000_000_000, "s"],
+  ];
+  for (const [limit, divisor, suffix] of units) {
+    if (ns < limit) return `${(ns / divisor).toFixed(2)}${suffix}`;
+  }
+  const minutes = ns / (60 * 1_000_000_000);
+  return minutes < 60 ? `${minutes.toFixed(2)}m` : `${(minutes / 60).toFixed(2)}h`;
+};
+
+/** 3 significant figures without trailing zeros: 1.23, 12.3, 123. */
+const trim = (value: number): string => {
+  const abs = Math.abs(value);
+  const decimals = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
+  return String(Number(value.toFixed(decimals)));
+};
+
+/** Grouped integer, or an em dash when the metric was never emitted. */
+export const formatCount = (value: number | undefined | null): string => {
+  if (value === undefined || value === null || !Number.isFinite(value)) return "—";
+  return value.toLocaleString();
+};
+
+/**
+ * Compact counts for dense cells: 1.2k, 3.4M. Below 1000 the exact number is
+ * shown, because rounding "847" to "0.8k" loses information for no space.
+ */
+export const formatCompact = (value: number | undefined | null): string => {
+  if (value === undefined || value === null || !Number.isFinite(value)) return "—";
+  if (Math.abs(value) < 1000) return String(Math.round(value));
+  const units: [threshold: number, suffix: string][] = [
+    [1_000_000_000, "B"],
+    [1_000_000, "M"],
+    [1_000, "k"],
+  ];
+  for (const [threshold, suffix] of units) {
+    if (Math.abs(value) >= threshold) return `${trim(value / threshold)}${suffix}`;
+  }
+  return String(value);
+};
+
+/**
+ * A share as a percentage. Small-but-nonzero shares render as `<0.1%` rather
+ * than `0.0%`, so a row that genuinely contributes never claims to contribute
+ * nothing.
+ */
+export const formatPercent = (share: number | undefined | null, decimals = 1): string => {
+  if (share === undefined || share === null || !Number.isFinite(share)) return "—";
+  const pct = share * 100;
+  if (pct > 0 && pct < 0.1) return "<0.1%";
+  return `${pct.toFixed(decimals)}%`;
+};
+
+/**
+ * Queries per second over a window, given the window's length in
+ * MICROSECONDS (the unit every DBM endpoint takes its range in).
+ */
+export const computeQps = (
+  calls: number | undefined,
+  startTimeUs: number,
+  endTimeUs: number,
+): number | null => {
+  const seconds = (endTimeUs - startTimeUs) / 1_000_000;
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return (calls ?? 0) / seconds;
+};
+
+/** QPS keeps two decimals below 10 — a 0.05 QPS query is not "0". */
+export const formatRate = (value: number | null | undefined): string => {
+  if (value === undefined || value === null || !Number.isFinite(value)) return "—";
+  if (value === 0) return "0";
+  if (value < 0.01) return "<0.01";
+  return trim(value);
+};
+
+/**
+ * Error rate as a share of calls. Returns `null` — not `0` — when there were no
+ * calls, because "no errors out of nothing" is not a zero error rate.
+ */
+export const errorRate = (errors: number | undefined, calls: number | undefined): number | null => {
+  const total = calls ?? 0;
+  if (total <= 0) return null;
+  return (errors ?? 0) / total;
+};
+
+/**
+ * The N+1 multiplier for a dense table cell: `15×`.
+ *
+ * No `≈`, although `traces_upper_bound` makes the value a lower bound: in a
+ * cell the glyph reads as part of the number rather than as a qualifier, and
+ * the plain-language rule bans it from visible copy outright. The caveat
+ * lives in the column's tooltip and the coverage panel, in words.
+ */
+export const formatMultiplier = (value: number | undefined | null): string => {
+  if (value === undefined || value === null || !Number.isFinite(value)) return "—";
+  return `${value >= 10 ? Math.round(value) : trim(value)}×`;
+};
+
+/**
+ * What the Failed column prints: an all-clear, or a count.
+ *
+ * The split follows what each surface is good at: the COLUMN carries the
+ * quantity, which is scannable down a column and comparable between rows, and
+ * the CHIP carries the reason, which is not. A category word ("all") in the
+ * column would restate the chip's claim in vaguer words while throwing the
+ * count away — the every-call-failed row already has its chip and its red
+ * rail.
+ *
+ * `"none"` survives for zero because that is the one value where the reader's
+ * question really is yes/no — and a bare `0` in a column of counts reads as a
+ * measurement, where "none" reads as an all-clear.
+ */
+export const failedCellKind = (errors: number | undefined | null): "none" | "count" =>
+  errors === undefined || errors === null || !Number.isFinite(errors) || errors <= 0
+    ? "none"
+    : "count";
+
+/** A count, plus whether it is the whole number or only as much as we could read. */
+export interface DbmCountClaim {
+  count: number;
+  /** `false` = the read hit its cap, so `count` is a floor and not a total. */
+  complete: boolean;
+  /**
+   * Which vantage counted it, for the two OVERLAP measures only — call count
+   * and database time are the exactly-two figures both feeds produce, and D2
+   * makes the qualifier mandatory wherever one renders.
+   *
+   * `undefined` is the honest default for every count that is NOT an overlap
+   * measure (deadlock events, blocked sessions, relations): those exist in one
+   * vantage only, so there is nothing to disambiguate and a qualifier would
+   * imply a choice that was never made.
+   */
+  vantage?: DbmCountVantage;
+}
+
+/**
+ * Which feed produced a count.
+ *
+ * `client` is the trace rollup — instrumented, finished calls only, with no
+ * head-sampling compensation, so it is a SUBSET and never the population.
+ * `server` is the database's own counters, which see every client.
+ */
+export type DbmCountVantage = "server" | "client";
+
+/**
+ * What a count is allowed to claim about itself.
+ *
+ * The event endpoints cap the rows they read and disclose it with `truncated`.
+ * A count taken off a capped read is a FLOOR, so every sentence built on it has
+ * to say "at least" rather than "every" — the difference between a completeness
+ * claim and an undercount presented as a total.
+ */
+export const countClaim = (
+  count: number,
+  truncated?: boolean,
+  vantage?: DbmCountVantage,
+): DbmCountClaim => ({
+  count,
+  complete: !truncated,
+  ...(vantage ? { vantage } : {}),
+});
+
+/**
+ * An OVERLAP count, withheld when the vantage that produced it measured zero.
+ *
+ * D6: never render an overlap value without a qualifier, and never render
+ * absent as `0`. Those two rules collide on a measured zero — qualifying it
+ * produces `0 client-observed`, which reads as "the databases ran nothing"
+ * when what actually happened is that ONE of the two vantages saw nothing and
+ * the other may be carrying the whole population. On a zero-trace org that is
+ * every window: the trace rollup is empty by construction, so the badge
+ * asserted an idle fleet beside a Top-queries tab listing 50 live statements.
+ *
+ * A zero is therefore returned as `null` — "no number from this vantage" —
+ * which the badge already renders as blank rather than as `0`. The server
+ * fallback (see `fetchDbmTabCounts`) overwrites it when the database's own
+ * list is non-empty, so the honest number still wins where one exists.
+ *
+ * Non-overlap counts keep using `countClaim`: a deadlock count has one feed,
+ * so its zero is the population and prints as `0`.
+ */
+export const overlapClaim = (
+  count: number,
+  truncated?: boolean,
+  vantage?: DbmCountVantage,
+): DbmCountClaim | null => (count === 0 ? null : countClaim(count, truncated, vantage));
+
+/** What a summary tile prints: a value, and the qualifier it is allowed to carry. */
+export interface DbmOverlapTile {
+  /**
+   * The formatted figure, or `null` for "this vantage measured nothing".
+   * `null` is what `OStatCard` already renders as `—`, so the withheld state
+   * needs no new rendering path.
+   */
+  value: string | null;
+  /** `true` only when `value` is non-null — a qualifier may not render alone. */
+  qualified: boolean;
+}
+
+/**
+ * A summary TILE for an OVERLAP measure, under the same rule as the badges.
+ *
+ * This is the third surface to hit the D6/L2 collision (detail tiles, tab
+ * badges, now the summary strip). Each re-implemented the absent-vs-zero
+ * decision and each got it wrong the same way, so the decision lives here and
+ * the render sites consume it.
+ *
+ * The collision: D2 makes the vantage qualifier mandatory on any overlap value
+ * that renders, and L2 forbids rendering absent as `0`. A vantage that measured
+ * nothing satisfies both only by NOT RENDERING — `0 client-observed` is a
+ * stronger claim than the data supports ("your instrumented callers observed
+ * zero database time"), and on a server-vantage-only fleet it is an all-clear
+ * printed inches from a server section reporting real traffic.
+ *
+ * `total` is the summed measure and `measured` is whether the vantage produced
+ * that sum from ANY row. The two are separate arguments because a sum cannot
+ * tell them apart: `[].reduce(+, 0)` and `[{calls: 0}].reduce(+, 0)` are both
+ * `0`, and only the caller knows whether there were rows. That is the whole
+ * absent-vs-measured-zero distinction, and it is why this takes a population
+ * signal rather than sniffing the number.
+ *
+ * A genuine measured zero — rows present, all reporting zero — still prints,
+ * qualifier and all. That zero IS the population, and hiding it would be its
+ * own lie.
+ */
+export const overlapTile = (
+  total: number | null | undefined,
+  measured: boolean,
+  format: (value: number) => string,
+): DbmOverlapTile =>
+  !measured || total === null || total === undefined || !Number.isFinite(total)
+    ? { value: null, qualified: false }
+    : { value: format(total), qualified: true };
+
+/**
+ * The vantage a badge count carries, or `null` when it carries none.
+ *
+ * Bare numbers answer `null` deliberately: a plain `number` is what the
+ * non-overlap badges have always passed, and inventing a vantage for one would
+ * qualify a figure that has nothing to be qualified against.
+ */
+export const countVantage = (
+  value: DbmCountClaim | number | null | undefined,
+): DbmCountVantage | null => {
+  if (value === null || value === undefined || typeof value === "number") return null;
+  return value.vantage ?? null;
+};
+
+/**
+ * The numeric floor of a count that may be a claim — for arithmetic and
+ * pluralization, where a `DbmCountClaim` cannot be compared or interpolated.
+ * A capped claim's count is a FLOOR, so "at least this many" is the honest
+ * reading everywhere this is used; `null` stays `null` ("we could not count").
+ */
+export const claimedCount = (value: DbmCountClaim | number | null | undefined): number | null => {
+  if (value === null || value === undefined) return null;
+  return typeof value === "number" ? value : value.count;
+};
+
+/**
+ * What a tab badge is allowed to print.
+ *
+ * The badges are counts off the SAME capped reads the sentences use, so the
+ * rule is `countClaim`'s in badge-sized form: a capped count is a FLOOR, and
+ * `+` is the disclosure — the truth is at or above it. Rendering the bare
+ * count instead shows a ceiling as a population, and a stably wrong one: a
+ * capped badge reads the same today and tomorrow while the real number moves,
+ * so it looks like a measurement that is not changing rather than one that is
+ * not being taken. (The live measurement behind this is pinned in
+ * format.spec.ts's badgeCount describe.)
+ *
+ * `null` for an unknown count, never `"0"`: every page's `catch` sets the count
+ * to `null` when the read FAILED, and a zero badge would claim a quiet database
+ * on the strength of a request that never landed. A measured zero is a real
+ * answer and still prints.
+ *
+ * Accepts a bare `number` so the badges with no cap to report (the database
+ * count, which is not a row-limited read) keep passing what they always passed.
+ */
+export const badgeCount = (value: DbmCountClaim | number | null | undefined): string | null => {
+  if (value == null) return null;
+  if (typeof value === "number") return String(value);
+  return value.complete ? String(value.count) : `${value.count}+`;
+};
+
+/**
+ * Below this, "runs per request" is not worth ink.
+ *
+ * A query that runs once per request is what every reader already assumes, and
+ * on real data that is the large majority of rows — so printing `1×` down the
+ * column produces a wall of identical glyphs the eye has to filter through
+ * before it can find the row that actually loops. Suppressing the default
+ * inverts the column: it is blank except where there is something to see.
+ *
+ * The cut sits at 2×, well below the N+1 insight's 10×, because the two answer
+ * different questions. 10× is "loud enough to interrupt someone"; 2× is "worth
+ * a glance while you are already reading this row". A query running 3× per
+ * request is a real fan-out even though it never earns a chip.
+ */
+export const PER_REQUEST_FLOOR = 2;
+
+/**
+ * Whether the Per request cell prints a value at all.
+ *
+ * `null` means we could not compute the ratio (no traces on the row), which is
+ * a different thing from 1× and renders the same way — as an em dash — because
+ * in both cases the honest answer is "nothing to report here".
+ */
+export const showsPerRequest = (callsPerTrace: number | null | undefined): boolean =>
+  callsPerTrace !== null &&
+  callsPerTrace !== undefined &&
+  Number.isFinite(callsPerTrace) &&
+  callsPerTrace >= PER_REQUEST_FLOOR;
+
+/** A signed percentage for the Δ column: +42%, -18%. */
+export const formatSignedPercent = (ratio: number | undefined | null): string => {
+  if (ratio === undefined || ratio === null || !Number.isFinite(ratio)) return "—";
+  const pct = ratio * 100;
+  const sign = pct > 0 ? "+" : "";
+  if (Math.abs(pct) > 0 && Math.abs(pct) < 0.1) return `${pct > 0 ? "+" : "-"}<0.1%`;
+  return `${sign}${pct.toFixed(Math.abs(pct) >= 10 ? 0 : 1)}%`;
+};
+
+/**
+ * Collapse a normalized statement to one line for a table cell. The stored text
+ * can be 4 KB and carries newlines from the original source, which would
+ * otherwise blow out the row height.
+ */
+export const oneLine = (text: string | undefined | null): string =>
+  (text ?? "").replace(/\s+/g, " ").trim();
+
+/**
+ * The part of a statement that tells one row apart from another.
+ *
+ * Plain head-truncation is close to useless on a table of SQL: the first 60
+ * characters of a wide SELECT are a column list, and every row in an ORM-backed
+ * schema opens the same way — so a column of previews reads as a column of
+ * identical strings. What actually discriminates is the TABLE and the
+ * PREDICATE, which live from the FROM clause onward.
+ *
+ * So the preview is anchored at the clause that carries the identity, and the
+ * skipped projection is elided rather than dropped, which keeps the statement
+ * honestly readable ("SELECT … FROM order_items WHERE order_id = ?") instead of
+ * silently implying the query starts at FROM.
+ *
+ * Statements with no such clause (INSERT, most non-SQL) are already
+ * discriminating at their head and are returned unchanged.
+ */
+const ANCHOR_CLAUSE = /\b(from|into|update|table)\b/i;
+/** Below this the whole statement fits a cell, so nothing needs eliding. */
+const ANCHOR_MIN_LENGTH = 56;
+/** Only skip a projection long enough to be the reason rows look alike. */
+const ANCHOR_MIN_SKIP = 24;
+
+export const discriminatingPart = (text: string | undefined | null): string => {
+  const line = oneLine(text);
+  if (line.length <= ANCHOR_MIN_LENGTH) return line;
+
+  const match = ANCHOR_CLAUSE.exec(line);
+  if (!match || match.index < ANCHOR_MIN_SKIP) return line;
+
+  return `… ${line.slice(match.index)}`;
+};
+
+/**
+ * Replication lag in BYTES of WAL, as `postgresql.replication.data_delay`
+ * reports it. Its MySQL counterpart is in seconds under the same role, so the
+ * two have separate formatters rather than one that guesses.
+ *
+ * One decimal only where the leading digit alone would misrepresent the size:
+ * "1 KB" for 1536 bytes reads as half of what it is.
+ */
+export const formatLagBytes = (bytes: number | null | undefined): string => {
+  // A negative delay is not a distance behind — it is an unusable reading
+  // (clock skew, or a replica reported ahead of its primary). Printing its
+  // magnitude would state the opposite of the truth.
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes < 0) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const rounded = value < 10 && unit > 0 ? Math.round(value * 10) / 10 : Math.round(value);
+  return `${rounded} ${units[unit]}`;
+};
+
+/**
+ * Replication lag in SECONDS, as `mysql.replica.time_behind_source` reports
+ * it. Broken into the two largest units because "4096s behind" is a number a
+ * reader has to do arithmetic on before it means anything.
+ */
+export const formatLagSeconds = (seconds: number | null | undefined): string => {
+  // Same reasoning as the byte form: a negative lag is unusable, and rendering
+  // it as "0s" would claim a caught-up replica we cannot vouch for.
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) {
+    return "—";
+  }
+  const total = Math.round(seconds);
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60) return `${minutes}m ${total % 60}s`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+};
+
+/**
+ * A microsecond timestamp as a wall clock, seconds included — for "sampled at"
+ * and "read up to" freshness lines, where the seconds are the point.
+ *
+ * NOT the formatter QueryDetailPage's chips use: those print minute-grain
+ * locale time (`hour: "2-digit", minute: "2-digit"`) because a first-seen chip
+ * carries no freshness claim. That variant stays local to the page — merging
+ * the two would change one surface or the other.
+ */
+export const formatClock = (micros: number): string =>
+  new Date(micros / 1000).toLocaleTimeString(undefined, { hour12: false });
+
+/**
+ * Relative age, so "20s ago" reads without arithmetic.
+ *
+ * Climbs all the way to hours and days: an age capped at minutes prints a
+ * three-hour-old sample as "180m ago", which the reader has to convert back —
+ * exactly the arithmetic this exists to remove.
+ */
+export const formatAge = (micros: number): string => {
+  const seconds = Math.max(0, Math.round((Date.now() - micros / 1000) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+};
+
+/**
+ * A timestamp from another day needs its DATE. A bare clock time on a
+ * three-day-old event reads as "today at 20:43", which is the one thing a
+ * "last time this wasn't empty" line must not say.
+ *
+ * Distinct from SamplesPage's `formatWhen`, which answers a different question
+ * (when a call ran, at the grain the window's span makes unambiguous) and
+ * stays local to that page — the two share a name's shape, not a meaning.
+ */
+export const formatWhenWithAge = (micros: number): string => {
+  const at = new Date(micros / 1000);
+  const sameDay = at.toDateString() === new Date().toDateString();
+  return sameDay
+    ? `${formatClock(micros)} (${formatAge(micros)})`
+    : `${at.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${formatClock(micros)} (${formatAge(micros)})`;
+};
+
+/** A share bar's width is a percentage of its track, not a fixed length. */
+export const shareWidth = (share: number) => ({ width: `${Math.round(share * 100)}%` });
+
+/** What an HTTP failure is allowed to claim about itself. */
+export interface DbmHttpError {
+  /** The response status, when the failure got as far as a response. */
+  status?: number;
+  /** The server's own message, verbatim — absent when it sent none. */
+  serverMessage?: string;
+  /** The server's message, or the error's own text. Never empty. */
+  message: string;
+}
+
+/**
+ * The one reading of an unknown `catch` value every DBM page shares.
+ *
+ * The axios error shape is reached through casts because `err` is honestly
+ * `unknown`; centralising the cast means one place can be wrong about it
+ * instead of nine. `serverMessage` is kept distinct from `message` because the
+ * pages disagree on the fallback — most print `String(err)`, the aggregate
+ * pages substitute their own "couldn't load" copy — and a helper that baked in
+ * either would silently change the other's banners.
+ */
+export const dbmHttpError = (err: unknown): DbmHttpError => {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  const serverMessage = (err as { response?: { data?: { message?: string } } })?.response?.data
+    ?.message;
+  return {
+    ...(status !== undefined ? { status } : {}),
+    ...(serverMessage ? { serverMessage } : {}),
+    message: serverMessage ?? String(err),
+  };
+};
