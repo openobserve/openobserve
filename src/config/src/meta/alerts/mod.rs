@@ -341,6 +341,15 @@ impl TriggerCondition {
             )
         }
     }
+
+    /// Effective realtime-alert silence in microseconds: the alert's own
+    /// silence (minutes) floored by `min_silence_secs`.
+    pub fn effective_silence_micros(&self, min_silence_secs: i64) -> i64 {
+        self.silence
+            .saturating_mul(60)
+            .max(min_silence_secs)
+            .saturating_mul(1_000_000)
+    }
 }
 
 impl TriggerCondition {

@@ -22,7 +22,7 @@ use std::{
     },
 };
 
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::{LOCAL_NODE, LOCAL_NODE_ID},
@@ -128,7 +128,7 @@ pub async fn get_stream_alerts(
             })
             .collect::<Vec<_>>();
         if alerts.is_empty() {
-            return;
+            continue;
         }
         stream_alerts_map.insert(key, alerts);
     }
@@ -138,6 +138,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     if triggers.is_empty() {
         return;
     }
+    let cfg = config::get_config();
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
         let module_key = scheduler_key(alert.id);
@@ -191,7 +192,12 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                 if !success_msg.is_empty() {
                     trigger_data_stream.success_response = Some(success_msg);
                 }
-                if alert.trigger_condition.silence > 0 {
+                // enforce a minimum silence floor so a high-volume stream cannot
+                // fire (and write to the db) once per matching request
+                let silence_micros = alert
+                    .trigger_condition
+                    .effective_silence_micros(cfg.limit.alert_realtime_min_silence_secs);
+                if silence_micros > 0 {
                     log::debug!(
                         "Realtime alert {}/{}/{}/{} triggered successfully, hence applying silence period",
                         alert.org_id,
@@ -200,11 +206,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                         alert.name
                     );
 
-                    let next_run_at = Utc::now().timestamp_micros()
-                        + Duration::try_minutes(alert.trigger_condition.silence)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap();
+                    let next_run_at = Utc::now().timestamp_micros() + silence_micros;
                     // After the notification is sent successfully, we need to update
                     // the silence period of the trigger
                     if let Err(e) = db::scheduler::update_trigger(
