@@ -1,3 +1,0 @@
-# Raw captures are never committed — only scrubbed fixtures/ are.
-out/
-__pycache__/

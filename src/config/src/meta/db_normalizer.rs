@@ -943,7 +943,7 @@ fn redis_key_pattern(key: &str) -> String {
 fn normalize_redis(text: &str) -> Result<NormalizedStatement, NormalizeError> {
     // Jedis serializes MULTI/pipeline bodies as one `;`-joined text
     // (`INCR txn:counter;INCR txn:counter`, `SET batch:1 ?; SET batch:2 ?; …` —
-    // real capture, tests/dbm-capture fixtures java-*). Only the first command binds
+    // real capture, o2-dbm-capture rig fixtures java-*). Only the first command binds
     // the pattern; without this cut the trailing `;CMD` glues onto the key and every
     // batch size mints a distinct fingerprint (and leaks the extra commands into
     // `query_norm`).
@@ -979,7 +979,7 @@ fn normalize_redis(text: &str) -> Result<NormalizedStatement, NormalizeError> {
 // ---------------------------------------------------------------------------
 
 /// Mongo command text arrives in two real-world serializations (captured corpus,
-/// `tests/dbm-capture/`):
+/// the o2-dbm-capture rig):
 ///
 /// * JSON command document, driver-masked or raw — js-contrib (`{"find":"?","filter":{"_id":"?"}}`)
 ///   and generic clients (`{"find":"users","filter":{"email":"bob@…"}}`);

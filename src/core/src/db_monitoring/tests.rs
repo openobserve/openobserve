@@ -110,8 +110,8 @@ const CORPUS: &[(&str, &str)] = &[
     ),
     ("fallbacks", include_str!("corpus/fallbacks.json")),
     ("negative", include_str!("corpus/negative.json")),
-    // Captured corpus: real scrubbed SDK fixtures (tests/dbm-capture/fixtures),
-    // extracted by tests/dbm-capture/extract/extract.py.
+    // Captured corpus: real scrubbed SDK fixtures from the
+    // o2-dbm-capture rig, extracted by its extract/extract.py.
     ("captured_sql", include_str!("corpus/captured_sql.json")),
     ("captured_redis", include_str!("corpus/captured_redis.json")),
     (
@@ -257,7 +257,7 @@ fn run_file(name: &str) {
 }
 
 // -- the table test over every corpus file -----------------------------------
-// (includes the captured corpus: real SDK fixtures from tests/dbm-capture)
+// (includes the captured corpus: real SDK fixtures from the o2-dbm-capture rig)
 
 /// One loop over all corpus files. Each file runs under `catch_unwind` so a failure in one
 /// file never hides failures in another, and every reported failure carries the FILE name

@@ -15,7 +15,7 @@
 
 //! Cross-SDK fingerprint-equivalence suite over the CAPTURED corpus
 //! (`corpus/captured_*.json`, extracted from real scrubbed SDK fixtures by
-//! `tests/dbm-capture/extract/extract.py`; provenance in `tests/dbm-capture/MANIFEST.md`).
+//! the o2-dbm-capture rig's `extract/extract.py`; provenance in its `MANIFEST.md`).
 //!
 //! The captured `fingerprint_class` values encode expected fingerprint equality per
 //! (engine, workload step) as scoped by the MANIFEST equivalence classes:
