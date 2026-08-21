@@ -14851,8 +14851,8 @@
       "loadFailed": "Could not load database data. Try again, or narrow the time range."
     },
     "ai": {
-      "suggestFix": "Suggest a fix",
-      "suggestFixHint": "Sends this query, its engine and its latency numbers to the AI assistant and asks what to change.",
+      "suggestFix": "Ask AI how to fix this",
+      "suggestFixHint": "Opens the AI assistant with this query, its engine and its latency numbers, and asks what to change. It does not change anything itself.",
       "rowSuggestFix": "Ask AI how to fix this",
       "deadlockFix": "How do I stop this deadlock?",
       "deadlockFixHint": "Sends both conflicting statements and the row-order evidence to the AI assistant.",
