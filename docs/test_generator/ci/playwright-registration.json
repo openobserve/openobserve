@@ -1,6 +1,0 @@
-{
-  "group": "Dashboards-Core",
-  "spec_filename": "dashboard-chart-selection.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

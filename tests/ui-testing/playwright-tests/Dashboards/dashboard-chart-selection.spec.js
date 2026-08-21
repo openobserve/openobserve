@@ -197,7 +197,11 @@ test.describe("Dashboard add-panel chart selection icons testcases", () => {
         return;
       }
 
-      await pm.chartTypeSelector.selectStream("default");
+      // Selecting the metrics stream-type auto-activates PromQL mode
+      // (QueryTypeSelector.vue watcher), and the default metrics stream is
+      // auto-selected with its fields hydrated. No explicit stream selection
+      // is needed — and the metrics stream dropdown does not list "default"
+      // by that name.
       await pm.chartTypeSelector.switchToPromqlMode();
 
       // Guard the mode switch actually took effect before asserting its result.
@@ -206,6 +210,12 @@ test.describe("Dashboard add-panel chart selection icons testcases", () => {
         "on",
         { timeout: 10000 }
       );
+
+      // Entering PromQL mode auto-seeds a metric whose default chart type can
+      // replace the panel's initial "bar" (promqlSeed → applySeedPanelShape
+      // rewrites data.type). Re-select "bar" explicitly (it is allowed in
+      // PromQL mode) so the "selection stays on bar" assertion is deterministic.
+      await pm.chartTypeSelector.selectChartType("bar");
 
       // Sankey is the only chart absent from promqlAllowedCharts → disabled.
       const sankeyTile = pm.chartTypeSelector.getChartTile("sankey");
