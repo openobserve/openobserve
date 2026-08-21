@@ -661,7 +661,9 @@ export default defineComponent({
     const bulkDeleteLoading = ref(false);
 
     onBeforeMount(async () => {
-      await getServiceAccountsUsers(true);
+      // Not forced: a route-change read stays cached. Only the refresh button
+      // and the post-write reloads below pass `true`.
+      await getServiceAccountsUsers();
 
       // Only `action=update&email=…` auto-opens the edit dialog so a shared
       // edit link still lands directly on the user's form. `action=add` is
