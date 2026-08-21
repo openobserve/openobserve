@@ -279,7 +279,7 @@
 
           <div class="flex flex-col gap-4">
             <OnCallWhoIsOn
-              :slots="onCallSlots"
+              :positions="onCallPositions"
               :deliveries="deliveries"
               :handover-at="handoverAt"
               :handover-to="handoverTo"
@@ -570,7 +570,7 @@ import type {
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
-  OnCallSlot,
+  OnCallPosition,
   PromoteSeverity,
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
@@ -720,7 +720,7 @@ const subjectAlert = ref<{
 } | null>(null);
 const escalation = ref<EscalationProgress | null>(null);
 /// Who a page to this team reaches right now, and where the pager goes next.
-const onCallSlots = ref<OnCallSlot[]>([]);
+const onCallPositions = ref<OnCallPosition[]>([]);
 const handoverAt = ref<number | null>(null);
 const handoverTo = ref<string | null>(null);
 /// The team's own policy, for the one thing progress cannot say: what the
@@ -1219,7 +1219,7 @@ async function fetchTeamContext() {
     oncallService.getPolicy({ org_identifier: orgId.value, team_id: r.team_id }),
     oncallService.teamReachability({ org_identifier: orgId.value, team_id: r.team_id }),
   ]);
-  onCallSlots.value = slots.status === "fulfilled" ? (slots.value.data ?? []) : [];
+  onCallPositions.value = slots.status === "fulfilled" ? (slots.value.data ?? []) : [];
   policy.value = policyRes.status === "fulfilled" ? (policyRes.value.data ?? null) : null;
   smtpConfigured.value =
     reach.status === "fulfilled" ? (reach.value.data?.smtp_configured ?? null) : null;

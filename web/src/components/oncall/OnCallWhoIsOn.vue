@@ -21,9 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the delivery ledger, and joining the two was left to the reader mid-incident.
   They are one question, so they are one card.
 
-  The secondary is DERIVED, not staffed: it is the same rotation walked
-  `next_offset` further down, which is why the offset is printed beside the
-  name — otherwise "why that person" has no answer on any screen.
+  Every name here is a ROTATION's holder. There is no derived secondary: a
+  position exists because a rotation fills it, and each row names the rotation
+  it came from so "why that person" is answerable on the screen itself.
+
+  A rotation that resolves to nobody is ABSENT from the response, not present
+  with a null holder — so a coverage gap is a row that is not drawn, which is
+  why the count of rows is the count of people who would be paged.
 -->
 <template>
   <OCard variant="glass" data-test="oncall-who-is-on">
@@ -37,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- An unstaffed rotation is an emergency while a page is open and a
            plain fact once it is closed, so the colour follows the state. -->
       <p
-        v-if="!slots.length"
+        v-if="!positions.length"
         class="text-sm"
         :class="closed ? 'text-text-secondary' : 'text-status-error-text'"
         data-test="oncall-who-is-on-nobody"
@@ -65,13 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </ODescriptionItem>
 
-          <!-- Every other staffed slot, named by the slot rather than called
-               "backup": a team may staff three, and two of them called backup is
-               a card that cannot be read. -->
+          <!-- Every other staffed rotation, named by the ROTATION rather than
+               called "backup": a team may staff three, and two of them called
+               backup is a card that cannot be read. -->
           <ODescriptionItem
             v-for="entry in others"
-            :key="entry.slot ?? entry.rotation"
-            :label="slotLabel(entry)"
+            :key="entry.rotation_id"
+            :label="raw(entry.rotation_name)"
           >
             <span class="flex w-full items-center gap-2">
               <OUserCell class="min-w-0 truncate" :value="entry.user_email" />
@@ -91,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Below the rule is the schedule around those people, not more
              people — the two were one run of rows, and the handover read as
              another seat somebody is sitting in. -->
-        <template v-if="!closed && (handoverAt || nextOffset)">
+        <template v-if="!closed && (handoverAt || upNext)">
           <OSeparator class="my-3" />
 
           <ODescriptionList dense>
@@ -108,13 +112,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </ODescriptionItem>
 
-            <!-- The derived secondary's distance down the cycle. A footnote to the
-                 roster above, so it is set in the quieter type — it explains a name
-                 rather than adding one. Absent for a rotation that hands over to
-                 nobody. -->
-            <ODescriptionItem v-if="nextOffset" :label="t('oncall.secondaryOffset')">
-              <span class="text-text-secondary text-xs">
-                {{ t("oncall.secondaryOffsetValue", { offset: nextOffset }) }}
+            <!-- Who takes the pager at the next handover. **Display only** —
+                 nothing pages them, and they are not cover. It is set in the
+                 quieter type below the rule because it is a fact about the
+                 schedule, not another seat somebody is sitting in. This field
+                 used to double as the secondary, which is exactly how one team
+                 got two different people both correctly labelled that. -->
+            <ODescriptionItem v-if="upNext" :label="t('oncall.upNextAfterHandover')">
+              <span class="flex items-center gap-2">
+                <OUserCell class="text-text-secondary min-w-0 truncate text-xs" :value="upNext" />
               </span>
             </ODescriptionItem>
           </ODescriptionList>
@@ -136,17 +142,19 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
-import type { DeliveryRecord, OnCallSlot } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
+import type { DeliveryRecord, OnCallPosition } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const props = withDefaults(
   defineProps<{
-    /** `GET /teams/{id}/on-call` — one entry per staffed slot. */
-    slots?: OnCallSlot[];
+    /**
+     * `GET /teams/{id}/on-call` — one entry per rotation that resolves to
+     * somebody. A rotation with a gap is absent rather than null-held.
+     */
+    positions?: OnCallPosition[];
     /** Every send this page attempted, for the reached/unreached tags. */
     deliveries?: DeliveryRecord[];
-    /** Micros — when the default slot's current span ends. */
+    /** Micros — when the first rotation's current span ends. */
     handoverAt?: number | null;
     /** Who holds it after that. */
     handoverTo?: string | null;
@@ -160,7 +168,7 @@ const props = withDefaults(
     closedAt?: number | null;
   }>(),
   {
-    slots: () => [],
+    positions: () => [],
     deliveries: () => [],
     handoverAt: null,
     handoverTo: null,
@@ -172,21 +180,24 @@ const { t } = useI18nTyped();
 
 const closed = computed(() => Boolean(props.closedAt));
 
-/// The default slot is the primary — every stored policy's unsuffixed target
-/// means it, so it is what "on call now" refers to.
-const primary = computed(
+/// The first rotation the team staffs. Not a special one: the response is
+/// ordered by the schedule, so this is "the position listed first" rather than
+/// a keyword the way `primary` was — there is no default slot to look up any
+/// more, and no derivation behind it.
+const primary = computed<OnCallPosition>(
   () =>
-    props.slots.find((s) => sameSlot(s.slot, DEFAULT_SLOT)) ??
-    props.slots[0] ?? { rotation: "", user_email: "" },
+    props.positions[0] ?? {
+      rotation_id: "",
+      rotation_name: "",
+      rule: "",
+      user_email: "",
+    },
 );
 
-const others = computed(() => props.slots.filter((s) => s !== primary.value));
+const others = computed(() => props.positions.filter((p) => p !== primary.value));
 
-const nextOffset = computed(() => primary.value.next_offset ?? null);
-
-function slotLabel(entry: OnCallSlot) {
-  return entry.slot ? raw(entry.slot) : t("oncall.nextOnCall");
-}
+/// Who takes over at the next handover. Display only — nothing pages it.
+const upNext = computed(() => primary.value.next_user_email ?? null);
 
 /// What this page's own sends did for one address — never the team's general
 /// reachability, which answers a different question and would contradict the

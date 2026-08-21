@@ -81,7 +81,7 @@ describe("OnCallNowStrip", () => {
   it("carries the gap count outside the menu", () => {
     const wrapper = render({
       teams: [team("t1", "A"), team("t2", "B")],
-      slotsByTeam: { t1: [{ rotation: "Primary", user_email: "ana@o2.ai" }], t2: [] },
+      positionsByTeam: { t1: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "Base", user_email: "ana@o2.ai" }], t2: [] },
     });
 
     expect(wrapper.find("[data-test='oncall-now-strip-gap-count']").text()).toBe("1 gap");
@@ -89,7 +89,7 @@ describe("OnCallNowStrip", () => {
 
   it("shows no gap count when every team is covered", () => {
     const wrapper = render({
-      slotsByTeam: { team_1: [{ rotation: "Primary", user_email: "ana@o2.ai" }] },
+      positionsByTeam: { team_1: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "Base", user_email: "ana@o2.ai" }] },
     });
 
     expect(wrapper.find("[data-test='oncall-now-strip-gap-count']").exists()).toBe(false);
@@ -99,7 +99,7 @@ describe("OnCallNowStrip", () => {
   /// column in the row, so the label spends its width on "why them".
   it("names the person on call and the rotation that picked them", () => {
     const wrapper = render({
-      slotsByTeam: { team_1: [{ rotation: "Primary", user_email: "ana@o2.ai" }] },
+      positionsByTeam: { team_1: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "Base", user_email: "ana@o2.ai" }] },
     });
 
     expect(wrapper.find("[data-test='oncall-now-holder-team_1']").text()).toContain(
@@ -112,7 +112,7 @@ describe("OnCallNowStrip", () => {
   /// mailbox it goes to.
   it("says You for the reader's own shift", () => {
     const wrapper = render({
-      slotsByTeam: { team_1: [{ rotation: "Primary", user_email: "Ana@o2.ai" }] },
+      positionsByTeam: { team_1: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "Base", user_email: "Ana@o2.ai" }] },
       viewerEmail: "ana@o2.ai",
     });
 
@@ -126,7 +126,7 @@ describe("OnCallNowStrip", () => {
   it("renders the handover in the team's own zone", () => {
     const wrapper = render({
       teams: [team("team_1", "Search", "Asia/Kolkata")],
-      slotsByTeam: { team_1: [{ rotation: "Primary", user_email: "ana@o2.ai" }] },
+      positionsByTeam: { team_1: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "Base", user_email: "ana@o2.ai" }] },
       // 2023-11-14T22:13:20Z, which is 03:43 the next morning in Kolkata.
       handoverByTeam: { team_1: 1_700_000_000_000_000 },
     });
@@ -139,11 +139,11 @@ describe("OnCallNowStrip", () => {
   it("marks a team with nobody on call, and shows it first", () => {
     const wrapper = render({
       teams: [team("t1", "A"), team("t2", "B"), team("t3", "C"), team("t4", "D"), team("t5", "E")],
-      slotsByTeam: {
-        t1: [{ rotation: "Primary", user_email: "ana@o2.ai" }],
-        t2: [{ rotation: "Primary", user_email: "b@o2.ai" }],
-        t3: [{ rotation: "Primary", user_email: "c@o2.ai" }],
-        t4: [{ rotation: "Primary", user_email: "d@o2.ai" }],
+      positionsByTeam: {
+        t1: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "Base", user_email: "ana@o2.ai" }],
+        t2: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "Base", user_email: "b@o2.ai" }],
+        t3: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "Base", user_email: "c@o2.ai" }],
+        t4: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "Base", user_email: "d@o2.ai" }],
         t5: [],
       },
     });

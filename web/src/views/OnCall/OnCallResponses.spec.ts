@@ -370,15 +370,17 @@ describe("OnCallResponses", () => {
     });
 
     it("hands the on-call strip each team's rotation", async () => {
-      service.whoIsOnCall.mockResolvedValue({
-        data: [{ rotation: "Primary", user_email: "ana@o2.ai" }],
-      } as any);
+      const position = {
+        rotation_id: "rot_primary",
+        rotation_name: "Primary",
+        rule: "Base",
+        user_email: "ana@o2.ai",
+      };
+      service.whoIsOnCall.mockResolvedValue({ data: [position] } as any);
       const wrapper = await withPages([page()]);
 
       const strip = wrapper.findComponent({ name: "OnCallNowStrip" });
-      expect(strip.props("slotsByTeam")).toEqual({
-        team_1: [{ rotation: "Primary", user_email: "ana@o2.ai" }],
-      });
+      expect(strip.props("positionsByTeam")).toEqual({ team_1: [position] });
     });
   });
 

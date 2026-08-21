@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import OnCallScheduleAnswer from "@/components/oncall/OnCallScheduleAnswer.vue";
 import i18n from "@/locales";
-import type { OnCallSlot } from "@/ts/interfaces/oncall";
+import type { OnCallPosition } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
@@ -30,16 +30,17 @@ const stubs = {
   },
 };
 
-const slot = (over: Partial<OnCallSlot> = {}): OnCallSlot => ({
-  slot: "primary",
-  rotation: "Primary",
+const position = (over: Partial<OnCallPosition> = {}): OnCallPosition => ({
+  rotation_id: "rot_primary",
+  rotation_name: "Primary",
+  rule: "Base",
   user_email: "mei@o2.ai",
   ...over,
 });
 
 function render(over: Record<string, unknown> = {}) {
   return mount(OnCallScheduleAnswer, {
-    props: { slots: [slot()], ...over },
+    props: { positions: [position()], ...over },
     global: { plugins: [i18n], stubs },
   });
 }
@@ -69,9 +70,19 @@ describe("OnCallScheduleAnswer", () => {
     expect(wrapper.emitted("assign-secondary")).toHaveLength(1);
   });
 
-  it("names the secondary when there is one, and stops offering to assign", () => {
+  /// A second staffed ROTATION, named after itself. The old lookup asked for a
+  /// slot literally spelled "secondary", so a team whose second position was
+  /// called anything else read as having none.
+  it("names the second rotation when there is one, and stops offering to assign", () => {
     const wrapper = render({
-      slots: [slot(), slot({ slot: "secondary", user_email: "dev@o2.ai" })],
+      positions: [
+        position(),
+        position({
+          rotation_id: "rot_secondary",
+          rotation_name: "Secondary",
+          user_email: "dev@o2.ai",
+        }),
+      ],
     });
     expect(wrapper.find('[data-test="oncall-answer-secondary-who"]').text()).toContain("dev@o2.ai");
     expect(wrapper.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(false);
@@ -81,7 +92,7 @@ describe("OnCallScheduleAnswer", () => {
   /// not read as a blank name — so it takes the row rather than sitting beside
   /// a secondary status that is beside the point.
   it("states that nobody is on call instead of naming the secondary's state", () => {
-    const wrapper = render({ slots: [] });
+    const wrapper = render({ positions: [] });
     expect(wrapper.text()).toContain("Nobody is on call");
     expect(wrapper.find('[data-test="oncall-answer-nobody-hint"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-answer-secondary"]').exists()).toBe(false);
@@ -90,7 +101,7 @@ describe("OnCallScheduleAnswer", () => {
   /// A swap trades two people's shifts. With nobody on call there is no shift
   /// on this side of the trade.
   it("cannot request a swap when nobody holds the pager", () => {
-    const wrapper = render({ slots: [] });
+    const wrapper = render({ positions: [] });
     expect(
       wrapper.find('[data-test="oncall-answer-request-swap"]').attributes("disabled"),
     ).toBeDefined();
@@ -105,7 +116,7 @@ describe("OnCallScheduleAnswer", () => {
   /// Every action here names a person, so on a team with nobody on it they all
   /// open on an empty picker. The one act that leads somewhere is offered.
   it("offers the roster instead of actions nobody can complete", async () => {
-    const wrapper = render({ slots: [], hasMembers: false });
+    const wrapper = render({ positions: [], hasMembers: false });
 
     expect(wrapper.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-answer-request-swap"]').exists()).toBe(false);
@@ -117,7 +128,7 @@ describe("OnCallScheduleAnswer", () => {
   /// A caller that has not read the roster yet must not hide the actions of a
   /// team that is staffed.
   it("keeps its actions when the roster is unknown", () => {
-    const wrapper = render({ slots: [] });
+    const wrapper = render({ positions: [] });
     expect(wrapper.find('[data-test="oncall-answer-add-people"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-answer-request-swap"]').exists()).toBe(true);
   });

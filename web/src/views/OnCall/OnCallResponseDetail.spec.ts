@@ -125,7 +125,7 @@ const stubs = {
   },
   OnCallWhoIsOn: {
     name: "OnCallWhoIsOn",
-    props: ["slots", "deliveries", "handoverAt", "handoverTo", "closedAt"],
+    props: ["positions", "deliveries", "handoverAt", "handoverTo", "closedAt"],
     template: "<div />",
   },
   OnCallAboutPage: {
@@ -830,12 +830,19 @@ describe("OnCallResponseDetail", () => {
   describe("team context", () => {
     it("passes who is on call and the transport verdict to the rail", async () => {
       service.whoIsOnCall.mockResolvedValue({
-        data: [{ slot: "primary", rotation: "weekly", user_email: "ana@o2.ai" }],
+        data: [
+          {
+            rotation_id: "rot_primary",
+            rotation_name: "Primary",
+            rule: "weekly",
+            user_email: "ana@o2.ai",
+          },
+        ],
       } as any);
       service.teamReachability.mockResolvedValue({ data: { smtp_configured: false } } as any);
       const wrapper = await renderWith();
 
-      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("slots")).toHaveLength(1);
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("positions")).toHaveLength(1);
       expect(
         wrapper.findComponent({ name: "OnCallReachAlarm" }).props("smtpConfigured"),
       ).toBe(false);

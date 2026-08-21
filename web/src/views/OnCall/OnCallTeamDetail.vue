@@ -238,7 +238,7 @@
                above the tabs; restating them here gave the reader two
                renderings to reconcile. -->
           <OnCallScheduleAnswer
-            :slots="onCallNow"
+            :positions="onCallNow"
             :has-members="hasMembers !== false"
             @assign-secondary="onAssignSecondary"
             @request-swap="openCover"
@@ -424,7 +424,7 @@ import type {
   OnCallPolicy,
   OnCallResponse,
   OnCallSchedule,
-  OnCallSlot,
+  OnCallPosition,
   OnCallTeam,
   ConfigRisks,
   EscalationPreview,
@@ -454,7 +454,7 @@ const team = ref<OnCallTeam | null>(null);
 const members = ref<OnCallTeamMember[]>([]);
 const schedule = ref<OnCallSchedule | null>(null);
 const policy = ref<OnCallPolicy | null>(null);
-const onCallNow = ref<OnCallSlot[]>([]);
+const onCallNow = ref<OnCallPosition[]>([]);
 // The routing tester can resolve to ANY team, so the whole list is needed to
 // name the winner rather than showing a bare id.
 const teams = ref<OnCallTeam[]>([]);
@@ -731,7 +731,7 @@ const coverageState = computed<"covered" | "gap" | "unreachable">(() => {
 
   const verdicts = reachability.value?.members ?? [];
   const holders = onCallNow.value
-    .map((slot) => slot.user_email?.toLowerCase())
+    .map((position) => position.user_email?.toLowerCase())
     .filter((email): email is string => !!email);
   const known = holders
     .map((email) => verdicts.find((member) => member.user_email.toLowerCase() === email))

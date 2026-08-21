@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
 import i18n from "@/locales";
-import type { DeliveryRecord, OnCallSlot } from "@/ts/interfaces/oncall";
+import type { DeliveryRecord, OnCallPosition } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
@@ -48,7 +48,7 @@ function delivery(overrides: Partial<DeliveryRecord>): DeliveryRecord {
 
 function render(props: Record<string, unknown> = {}) {
   return mount(OnCallWhoIsOn, {
-    props: { slots: [] as OnCallSlot[], deliveries: [], ...props },
+    props: { positions: [] as OnCallPosition[], deliveries: [], ...props },
     global: { plugins: [i18n], stubs },
   });
 }
@@ -60,27 +60,30 @@ describe("OnCallWhoIsOn", () => {
     expect(render().find('[data-test="oncall-who-is-on-nobody"]').exists()).toBe(true);
   });
 
-  /// The unsuffixed targets in every stored policy mean the DEFAULT slot, so
-  /// that is what "on call now" refers to even when it is listed second.
-  it("reads the default slot as the primary whatever order it arrives in", () => {
+  /// **There is no default slot to look up.** The response is ordered by the
+  /// schedule and every entry is an ordinary rotation, so "on call now" is the
+  /// first one listed — and every other row is labelled with the rotation that
+  /// produced it rather than with a role word two screens could disagree about.
+  it("names each row after the rotation that produced it", () => {
     const wrapper = render({
-      slots: [
-        { slot: "secondary", rotation: "weekly", user_email: "bo@o2.ai" },
-        { slot: "primary", rotation: "weekly", user_email: "ana@o2.ai" },
+      positions: [
+        { rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" },
+        { rotation_id: "rot_db", rotation_name: "Database", rule: "weekly", user_email: "bo@o2.ai" },
       ],
     });
     const rows = wrapper.findAll("dd");
     expect(rows[0].text()).toContain("ana@o2.ai");
     expect(wrapper.text()).toContain("bo@o2.ai");
+    expect(wrapper.text()).toContain("Database");
   });
 
   /// This page's own sends, never the team's general reachability — the two
   /// answer different questions and would contradict the ledger below.
   it("marks who this page reached and who it did not", () => {
     const wrapper = render({
-      slots: [
-        { slot: "primary", rotation: "weekly", user_email: "ana@o2.ai" },
-        { slot: "secondary", rotation: "weekly", user_email: "bo@o2.ai" },
+      positions: [
+        { rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" },
+        { rotation_id: "rot_secondary", rotation_name: "Secondary", rule: "weekly", user_email: "bo@o2.ai" },
       ],
       deliveries: [
         delivery({ recipient: "ana@o2.ai", delivered: false }),
@@ -96,7 +99,7 @@ describe("OnCallWhoIsOn", () => {
   /// does not un-reach the person.
   it("counts a person as reached if any send to them landed", () => {
     const wrapper = render({
-      slots: [{ slot: "primary", rotation: "weekly", user_email: "ana@o2.ai" }],
+      positions: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" }],
       deliveries: [
         delivery({ recipient: "ana@o2.ai", delivered: false }),
         delivery({ recipient: "ana@o2.ai", delivered: true }),
@@ -107,23 +110,37 @@ describe("OnCallWhoIsOn", () => {
 
   it("says nothing about somebody this page never tried", () => {
     const wrapper = render({
-      slots: [{ slot: "primary", rotation: "weekly", user_email: "ana@o2.ai" }],
+      positions: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" }],
     });
     expect(wrapper.find('[data-test="oncall-who-is-on-primary-reach"]').exists()).toBe(false);
   });
 
-  /// The offset answers "why that person": the secondary is the same rotation
-  /// walked further down, and without the number the choice looks arbitrary.
-  it("says how far down the rotation the derived secondary sits", () => {
+  /// **`next_user_email` is display only.** It is the calendar's "up next", not
+  /// a position — it used to double as the secondary, which is exactly how one
+  /// team got two different people both correctly labelled that. It is set
+  /// below the rule, apart from the roster, so it cannot be read as a seat
+  /// somebody is sitting in.
+  it("shows who takes over next without listing them as on call", () => {
     const wrapper = render({
-      slots: [{ slot: "primary", rotation: "weekly", user_email: "ana@o2.ai", next_offset: 3 }],
+      positions: [
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "weekly",
+          user_email: "ana@o2.ai",
+          next_user_email: "cy@o2.ai",
+        },
+      ],
     });
-    expect(wrapper.text()).toContain("3 further down the rotation");
+    expect(wrapper.text()).toContain("Up next");
+    expect(wrapper.text()).toContain("cy@o2.ai");
+    // One roster row, not two: the up-next person is not a second position.
+    expect(wrapper.findAll("dd").filter((d) => d.text().includes("cy@o2.ai"))).toHaveLength(1);
   });
 
   it("says when the pager changes hands, and to whom", () => {
     const wrapper = render({
-      slots: [{ slot: "primary", rotation: "weekly", user_email: "ana@o2.ai" }],
+      positions: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" }],
       handoverAt: 1_700_000_000_000_000,
       handoverTo: "yuki@o2.ai",
     });
@@ -137,7 +154,7 @@ describe("OnCallWhoIsOn", () => {
   /// about a person.
   describe("once the page is closed", () => {
     const closedProps = {
-      slots: [{ slot: "primary", rotation: "weekly", user_email: "ana@o2.ai", next_offset: 3 }],
+      positions: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai", next_user_email: "cy@o2.ai" }],
       closedAt: 1_700_000_000_000_000,
     };
 
@@ -163,7 +180,7 @@ describe("OnCallWhoIsOn", () => {
     /// An unstaffed rotation is an emergency while a page is open and a plain
     /// fact after it closed.
     it("states an empty roster without alarming about it", () => {
-      const wrapper = render({ slots: [], closedAt: 1_700_000_000_000_000 });
+      const wrapper = render({ positions: [], closedAt: 1_700_000_000_000_000 });
       const nobody = wrapper.find('[data-test="oncall-who-is-on-nobody"]');
       expect(nobody.text()).toContain("when this page closed");
       expect(nobody.classes()).not.toContain("text-status-error-text");

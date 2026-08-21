@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OnCallNowStrip
             v-if="setupLoaded"
             :teams="teams"
-            :slots-by-team="slotsByTeam"
+            :positions-by-team="positionsByTeam"
             :handover-by-team="handoverByTeam"
             :viewer-email="viewerEmail"
             @view-schedules="goTo('onCallTeams')"
@@ -745,7 +745,7 @@ import type {
   OnCallResponseEvent,
   OnCallResponseGroup,
   OnCallSchedule,
-  OnCallSlot,
+  OnCallPosition,
   OnCallTeam,
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
@@ -762,7 +762,7 @@ import {
   isSnoozed,
   nextHandover,
   priorityTone,
-  winningRotation,
+  winningRule,
 } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
@@ -806,7 +806,7 @@ const responses = ref<OnCallResponse[]>([]);
 const teams = ref<OnCallTeam[]>([]);
 const policyByTeam = ref<Record<string, OnCallPolicy>>({});
 const scheduleByTeam = ref<Record<string, OnCallSchedule>>({});
-const slotsByTeam = ref<Record<string, OnCallSlot[]>>({});
+const positionsByTeam = ref<Record<string, OnCallPosition[]>>({});
 const progressById = ref<Record<string, EscalationProgress>>({});
 const escalationCapped = ref(false);
 const expandedIds = ref<string[]>([]);
@@ -1025,7 +1025,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
 const myTeamIds = computed(() => {
   const ids = new Set<string>();
   if (!viewerEmail.value) return ids;
-  for (const [teamId, slots] of Object.entries(slotsByTeam.value)) {
+  for (const [teamId, slots] of Object.entries(positionsByTeam.value)) {
     if (slots.some((slot) => slot.user_email.toLowerCase() === viewerEmail.value)) {
       ids.add(teamId);
     }
@@ -1144,7 +1144,7 @@ function totalRungsFor(record: OnCallResponse): number | null {
 
 /// When each team's current shift hands over.
 ///
-/// `OnCallSlot` carries no end instant, so this is resolved from the schedule
+/// `OnCallPosition` carries no end instant, so this is resolved from the schedule
 /// with the same rotation maths the engine uses (`winningRotation` +
 /// `nextHandover`) rather than guessed from the shift length.
 const handoverByTeam = computed<Record<string, number | null>>(() => {
@@ -1153,24 +1153,29 @@ const handoverByTeam = computed<Record<string, number | null>>(() => {
   for (const team of teams.value) {
     const schedule = scheduleByTeam.value[team.id];
     if (!schedule) continue;
-    const rotation = winningRotation(schedule.rotations, nowMicros, schedule.timezone);
-    out[team.id] = rotation ? nextHandover(rotation, nowMicros) : null;
+    // The FIRST rotation's handover. Each rotation hands over on its own
+    // cadence now, so there is no single team-wide one — and the countdown
+    // beside "you are on call" is about the shift the viewer is holding, which
+    // is the position they were resolved into.
+    const rotation = schedule.rotations?.[0];
+    const rule = rotation ? winningRule(rotation, nowMicros, schedule.timezone) : null;
+    out[team.id] = rule ? nextHandover(rule, nowMicros) : null;
   }
   return out;
 });
 
-/// The viewer's own shift, if they hold one. Taken from the server's slots so
-/// the banner never names a different person from the one it would page.
+/// The viewer's own shift, if they hold one. Taken from the server's positions
+/// so the banner never names a different person from the one it would page.
 const myShift = computed(() => {
   if (!viewerEmail.value) return null;
   const mine = teams.value
     .map((team) => ({
       team,
-      slot: (slotsByTeam.value[team.id] ?? []).find(
+      position: (positionsByTeam.value[team.id] ?? []).find(
         (candidate) => candidate.user_email.toLowerCase() === viewerEmail.value,
       ),
     }))
-    .filter((entry): entry is { team: OnCallTeam; slot: OnCallSlot } => !!entry.slot);
+    .filter((entry): entry is { team: OnCallTeam; position: OnCallPosition } => !!entry.position);
 
   if (!mine.length) return null;
   // Soonest handover first: the shift ending next is the one being counted down.
@@ -1182,7 +1187,7 @@ const myShift = computed(() => {
   const first = sorted[0];
   return {
     teamName: first.team.name,
-    rotation: first.slot.rotation,
+    rotation: first.position.rotation_name,
     endsAt: handoverByTeam.value[first.team.id] ?? null,
     otherTeams: sorted.length - 1,
   };
@@ -1548,7 +1553,7 @@ async function fetchTeamContext() {
   ]);
 
   const nextPolicies: Record<string, OnCallPolicy> = {};
-  const nextSlots: Record<string, OnCallSlot[]> = {};
+  const nextSlots: Record<string, OnCallPosition[]> = {};
   const nextSchedules: Record<string, OnCallSchedule> = {};
   ids.forEach((id, index) => {
     const policy = policies[index];
@@ -1564,7 +1569,7 @@ async function fetchTeamContext() {
     }
   });
   policyByTeam.value = nextPolicies;
-  slotsByTeam.value = nextSlots;
+  positionsByTeam.value = nextSlots;
   scheduleByTeam.value = nextSchedules;
 }
 

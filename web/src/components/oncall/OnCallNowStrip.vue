@@ -117,7 +117,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import type { OnCallSlot, OnCallTeam } from "@/ts/interfaces/oncall";
+import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatInZone } from "@/utils/oncall";
@@ -125,15 +125,19 @@ import { formatInZone } from "@/utils/oncall";
 const props = withDefaults(
   defineProps<{
     teams: OnCallTeam[];
-    /** Slots per team id, as `whoIsOnCall` returns them. Empty means a gap. */
-    slotsByTeam?: Record<string, OnCallSlot[]>;
+    /**
+     * Positions per team id, as `whoIsOnCall` returns them. Empty means a gap —
+     * a rotation resolving to nobody is absent from the array rather than
+     * present with a null holder.
+     */
+    positionsByTeam?: Record<string, OnCallPosition[]>;
     /** When each team's shift hands over, in micros, keyed by team id. */
     handoverByTeam?: Record<string, number | null>;
     /** Lowercased email of the signed-in user, so their own shift reads "You". */
     viewerEmail?: string;
   }>(),
   {
-    slotsByTeam: () => ({}),
+    positionsByTeam: () => ({}),
     handoverByTeam: () => ({}),
     viewerEmail: "",
   },
@@ -143,9 +147,9 @@ const emit = defineEmits<{ "view-schedules": []; "view-team": [teamId: string] }
 
 const { t } = useI18nTyped();
 
-/// The first slot with somebody in it is the one a page reaches first.
-function holderOf(teamId: string): OnCallSlot | undefined {
-  return props.slotsByTeam[teamId]?.find((slot) => !!slot.user_email);
+/// The first rotation with somebody in it is the one a page reaches first.
+function holderOf(teamId: string): OnCallPosition | undefined {
+  return props.positionsByTeam[teamId]?.find((position) => !!position.user_email);
 }
 
 /**
@@ -156,9 +160,9 @@ function holderOf(teamId: string): OnCallSlot | undefined {
  */
 const orderedTeams = computed(() => {
   const rank = (team: OnCallTeam): number => {
-    const slot = holderOf(team.id);
-    if (!slot) return 0;
-    if (props.viewerEmail && slot.user_email.toLowerCase() === props.viewerEmail) return 1;
+    const position = holderOf(team.id);
+    if (!position) return 0;
+    if (props.viewerEmail && position.user_email.toLowerCase() === props.viewerEmail) return 1;
     return 2;
   };
   return [...props.teams].sort((a, b) => rank(a) - rank(b));
@@ -182,11 +186,13 @@ const triggerLabel = computed<I18nText>(() =>
 /// its own column in the row, so this is the person and the rotation that picked
 /// them — which is what a reader chasing "why them" is after.
 function holderLabel(teamId: string): I18nText {
-  const slot = holderOf(teamId);
-  if (!slot) return raw("");
-  const isViewer = !!props.viewerEmail && slot.user_email.toLowerCase() === props.viewerEmail;
-  const who = isViewer ? t("oncall.onCallYou") : raw(slot.user_email);
-  return raw(`${who} · ${slot.rotation}`);
+  const position = holderOf(teamId);
+  if (!position) return raw("");
+  const isViewer = !!props.viewerEmail && position.user_email.toLowerCase() === props.viewerEmail;
+  const who = isViewer ? t("oncall.onCallYou") : raw(position.user_email);
+  // Names the ROTATION, not the shift rule inside it: the rotation is the
+  // position a level pages, and the rule is which of its hours this is.
+  return raw(`${who} · ${position.rotation_name}`);
 }
 
 /// The handover as a wall clock in the TEAM's own zone — a rotation handing over
