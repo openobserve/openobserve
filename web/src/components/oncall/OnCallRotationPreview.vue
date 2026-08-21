@@ -15,9 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Who the rotation being described will actually put on call, first three
+  Who the rotations being described will actually put on call, first three
   shifts. The design asks for a live preview so the rule is verified by looking
   at it rather than by reading documentation (architecture/02 §4).
+
+  Both rotations, when a second is asked for. The pairing is the whole reason
+  the checkbox is safe to tick — same roster, anchor one shift behind, so the
+  two can never land on the same person — and that is a claim you have to SEE to
+  believe. A preview of the first alone would leave the reader taking it on
+  trust.
 
   A DESCENDANT of the team form's OForm: it injects FORM_CONTEXT_KEY and reads
   the values straight off the form, so there is no second copy of the state to
@@ -44,8 +50,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OTag variant="default-soft" size="sm">{{ raw(shift.when) }}</OTag>
         <OUserCell :value="shift.member" />
+        <!-- The second rotation's holder for the same week. Side by side is the
+             point: it is how "these two can never be the same person" stops
+             being a claim and becomes something the reader can check. -->
+        <template v-if="shift.secondary">
+          <span class="text-text-secondary text-xs">{{ raw("·") }}</span>
+          <OUserCell :value="shift.secondary" />
+        </template>
       </li>
     </ol>
+
+    <p
+      v-if="shifts.length && showSecondary"
+      class="text-text-muted text-xs"
+      data-test="oncall-rotation-preview-legend"
+    >
+      {{ t("oncall.rotationPreviewPairLegend") }}
+    </p>
   </div>
 </template>
 
@@ -70,6 +91,14 @@ const shiftMicros = form.useStore(
   (s: any) => (s.values?.shift_micros ?? MICROS_PER_WEEK) as number,
 );
 const firstHandover = form.useStore((s: any) => (s.values?.first_handover ?? "") as string);
+const wantSecondary = form.useStore(
+  (s: any) => (s.values?.create_secondary ?? true) as boolean,
+);
+
+/// Only worth a second column when there is somebody else to be in it. On a
+/// one-person roster the two rotations resolve to the same person, which is the
+/// collision the warning exists for — not something to preview as if it worked.
+const showSecondary = computed(() => wantSecondary.value && members.value.length > 1);
 
 /// The first three shifts the rotation would produce. Three because the point
 /// is to show the order rotating, which two cannot.
@@ -79,18 +108,24 @@ const shifts = computed(() => {
   if (!members.value.length || !Number.isFinite(anchor) || !shift || shift <= 0) return [];
 
   const anchorMicros = anchor * 1000;
-  const rotation = {
+  const rule = (anchorFor: number) => ({
     name: "",
     members: members.value,
     shift_micros: shift,
-    anchor_micros: anchorMicros,
-  };
+    anchor_micros: anchorFor,
+  });
+  const primary = rule(anchorMicros);
+  // One shift BEHIND, which is the whole mechanism: the second rotation is
+  // holding the week the first one has not reached yet, so the two are never
+  // the same person while the roster has two or more.
+  const secondary = rule(anchorMicros - shift);
 
   return [0, 1, 2].map((index) => {
     const startMicros = anchorMicros + index * shift;
     return {
       startMicros,
-      member: memberAt(rotation, startMicros) ?? "",
+      member: memberAt(primary, startMicros) ?? "",
+      secondary: showSecondary.value ? (memberAt(secondary, startMicros) ?? "") : "",
       when: formatInZone(startMicros, props.timezone, {
         dateStyle: "medium",
         timeStyle: "short",

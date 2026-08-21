@@ -32,6 +32,17 @@ export const makeOnCallTeamSchema = (t: (_key: string) => string) =>
     shift_micros: z.number().optional(),
     /** `datetime-local`, so a browser-local wall time. */
     first_handover: z.string().optional(),
+    /**
+     * Write a second rotation beside the first — same roster, anchor one shift
+     * behind, so the two can never resolve to the same person while the roster
+     * holds two or more people.
+     *
+     * It writes two ORDINARY rotations. Nothing links them: there is no
+     * `secondary_of` field and nothing at resolution time knows they are
+     * related, so editing either is allowed and drift is reported rather than
+     * prevented.
+     */
+    create_secondary: z.boolean().optional(),
   });
 
 export type OnCallTeamFormValues = z.infer<ReturnType<typeof makeOnCallTeamSchema>>;

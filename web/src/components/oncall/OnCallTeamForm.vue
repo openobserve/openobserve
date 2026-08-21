@@ -100,6 +100,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-team-form-handover"
         />
 
+        <!-- The default that replaced the derived secondary. Ticked, because
+             a team with one position and no backup is the state almost nobody
+             wants and nobody notices until a page goes unanswered. -->
+        <OFormCheckbox
+          name="create_secondary"
+          :label="t('oncall.teamCreateSecondary')"
+          :help-text="t('oncall.teamCreateSecondaryHint')"
+          data-test="oncall-team-form-secondary"
+        />
+
         <OnCallRotationPreview :timezone="previewZone" />
       </template>
     </OForm>
@@ -115,11 +125,16 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
 import type { OnCallTeam, Rotation } from "@/ts/interfaces/oncall";
-import { DEFAULT_SLOT, MICROS_PER_WEEK, sameSlot } from "@/ts/interfaces/oncall";
+import {
+  DEFAULT_ROTATION_NAME,
+  MICROS_PER_WEEK,
+  SECONDARY_ROTATION_NAME,
+} from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { resolvableTimezones, SHIFT_PRESETS } from "@/utils/oncall";
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
@@ -200,6 +215,9 @@ const defaultValues = computed<OnCallTeamFormValues>(() => ({
   members: [],
   shift_micros: MICROS_PER_WEEK,
   first_handover: nextMondayAt10(),
+  // Ticked. A team with one position and no backup is the state almost nobody
+  // wants and nobody notices until a page goes unanswered.
+  create_secondary: true,
 }));
 
 function addEveryone() {
@@ -304,7 +322,13 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
       team_id: teamId,
       data: {
         timezone: values.timezone,
-        rotations: await amendStaffedRotations(teamId, emails, shift, anchor * 1000),
+        rotations: await amendStaffedRotations(
+          teamId,
+          emails,
+          shift,
+          anchor * 1000,
+          values.create_secondary !== false,
+        ),
       },
     });
   } catch (err: any) {
@@ -315,28 +339,56 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
   }
 }
 
-/// Adding members auto-staffs the team, and this PUT is a **full replace** —
-/// so sending one hand-built primary rotation deleted whatever the server had
-/// just derived, most visibly the secondary slot. A team created by curl ended
-/// up with two slots and the same team created here with one.
+/// A stable handle for a rotation the server has not seen yet. An escalation
+/// level stores this, so the team's ladder is writable the moment it is saved.
+function mintRotationId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return `rot_${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/// Adding members auto-staffs the team, and this PUT is a **full replace** — so
+/// sending one hand-built rotation deleted whatever the server had just
+/// written, most visibly the second one. A team created by curl ended up with
+/// two rotations and the same team created here with one.
 ///
 /// So: read back what was staffed, carry every rotation through, and change
 /// only the two things this form actually asked for — shift length and first
-/// handover. Nothing staffed (or the read failed) falls back to the single
-/// rotation, which is what a team with no derived slots would have got anyway.
+/// handover. Nothing staffed (or the read failed) falls back to writing them
+/// here.
+///
+/// **The pairing is data, not a rule.** The second rotation is the same roster
+/// with its anchor one shift behind: while the roster holds two or more people
+/// the two can never resolve to the same person, and nothing at resolution time
+/// knows they are related. Editing either is allowed, and drift is reported by
+/// `two_rotations_resolve_to_one_person` rather than prevented by a hidden link.
 async function amendStaffedRotations(
   teamId: string,
   emails: string[],
   shift: number,
   anchorMicros: number,
+  wantSecondary: boolean,
 ): Promise<Rotation[]> {
+  const rule = (name: string, anchor: number) => ({
+    name,
+    members: emails,
+    shift_micros: shift,
+    anchor_micros: anchor,
+  });
   const fallback: Rotation[] = [
     {
-      name: t("oncall.defaultRotationName"),
-      members: emails,
-      shift_micros: shift,
-      anchor_micros: anchorMicros,
+      id: mintRotationId(),
+      name: DEFAULT_ROTATION_NAME,
+      shift_rules: [rule(DEFAULT_ROTATION_NAME, anchorMicros)],
     },
+    ...(wantSecondary
+      ? [
+          {
+            id: mintRotationId(),
+            name: SECONDARY_ROTATION_NAME,
+            shift_rules: [rule(SECONDARY_ROTATION_NAME, anchorMicros - shift)],
+          },
+        ]
+      : []),
   ];
   try {
     const res = await oncallService.getSchedule({
@@ -345,21 +397,25 @@ async function amendStaffedRotations(
     });
     const staffed = res.data?.rotations ?? [];
     if (!staffed.length) return fallback;
-    return staffed.map((rotation) => ({
+    const amended = staffed.map((rotation, index) => ({
       ...rotation,
-      // Only the DEFAULT slot's rotations take this form's cadence. A team the
-      // backend staffed with a second pool gave it its own handover day, and
-      // stamping the primary's anchor over every rotation collapsed the two
-      // onto one instant — which is the opposite of what a secondary is for.
-      ...(sameSlot(rotation.slot, DEFAULT_SLOT)
-        ? { shift_micros: shift, anchor_micros: anchorMicros }
-        : {}),
+      // Each rotation keeps its OWN offset from this form's anchor. Stamping
+      // the first one's anchor over every rotation collapsed them onto one
+      // instant, which is the opposite of what a second position is for.
+      shift_rules: (rotation.shift_rules ?? []).map((r) => ({
+        ...r,
+        shift_micros: shift,
+        anchor_micros: anchorMicros - index * shift,
+      })),
       // A human has now chosen the timezone, the handover and the cadence, so
       // this is no longer the rotation nobody chose. The marker is the
       // backend's to write and ours to clear — sending it back would make the
       // team detail screen offer to "customise" a schedule already customised.
       source: undefined,
     }));
+    // Unticking has to REMOVE what the backend staffed by default, or the
+    // checkbox reads as a choice the form quietly overrules.
+    return wantSecondary ? amended : amended.slice(0, 1);
   } catch {
     return fallback;
   }

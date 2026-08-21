@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import i18n from "@/locales";
+import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import usersService from "@/services/users";
@@ -99,25 +100,48 @@ describe("OnCallTeamForm", () => {
 
     const schedule = oncall.setSchedule.mock.calls[0][0] as any;
     expect(schedule.team_id).toBe("team_new");
-    // Selection order IS the paging order, so it must survive verbatim.
-    expect(schedule.data.rotations[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
-    expect(schedule.data.rotations[0].anchor_micros).toBe(
-      Date.parse("2026-08-17T10:00") * 1000,
-    );
+    // Selection order IS the paging order, so it must survive verbatim. The
+    // roster lives on the shift RULE now — a rotation is a named position and
+    // has no roster of its own.
+    const [primary] = schedule.data.rotations;
+    expect(primary.shift_rules[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
+    expect(primary.shift_rules[0].anchor_micros).toBe(Date.parse("2026-08-17T10:00") * 1000);
   });
 
   /// Adding members auto-staffs the team, and this PUT is a full replace: the
-  /// hand-built primary rotation used to delete the derived secondary, so a
-  /// team created here had one slot where the same team created by curl had
-  /// two. Every staffed rotation must come back, with only shift and anchor
-  /// changed to what the form asked for.
-  it("keeps the slots the server staffed instead of replacing them", async () => {
+  /// hand-built rotation used to delete the second one the server had written,
+  /// so a team created here had one position where the same team created by
+  /// curl had two. Every staffed rotation must come back, with only shift and
+  /// anchor changed to what the form asked for.
+  it("keeps the rotations the server staffed instead of replacing them", async () => {
     oncall.getSchedule.mockResolvedValue({
       data: {
         timezone: "UTC",
         rotations: [
-          { name: "Primary", slot: "primary", members: ["ana@o2.ai", "bob@o2.ai"], shift_micros: 1, anchor_micros: 1 },
-          { name: "Secondary", slot: "secondary", members: ["bob@o2.ai", "ana@o2.ai"], shift_micros: 1, anchor_micros: 7 },
+          {
+            id: "rot_primary",
+            name: "Primary",
+            shift_rules: [
+              {
+                name: "Primary",
+                members: ["ana@o2.ai", "bob@o2.ai"],
+                shift_micros: 1,
+                anchor_micros: 1,
+              },
+            ],
+          },
+          {
+            id: "rot_secondary",
+            name: "Secondary",
+            shift_rules: [
+              {
+                name: "Secondary",
+                members: ["ana@o2.ai", "bob@o2.ai"],
+                shift_micros: 1,
+                anchor_micros: 7,
+              },
+            ],
+          },
         ],
       },
     } as any);
@@ -133,15 +157,46 @@ describe("OnCallTeamForm", () => {
     await flushPromises();
 
     const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
-    expect(rotations.map((r: any) => r.slot)).toEqual(["primary", "secondary"]);
+    expect(rotations.map((r: any) => r.id)).toEqual(["rot_primary", "rot_secondary"]);
 
-    // Only the DEFAULT slot takes this form's cadence. A second pool has its
-    // own handover day — that separateness is the whole point of it — and
-    // stamping the primary's anchor over every rotation collapsed both slots
-    // onto one instant. The two people would still be different; the moment
-    // they change hands would not be.
-    expect(rotations[0].anchor_micros).toBe(Date.parse("2026-08-17T10:00") * 1000);
-    expect(rotations[1].anchor_micros).toBe(7);
+    /// **Each rotation keeps its own offset from the form's anchor.** The
+    /// second one sits a shift behind, which is the entire mechanism: while the
+    /// roster holds two or more people the two can never resolve to the same
+    /// person. Stamping the first anchor over every rotation collapsed them
+    /// onto one instant, which is the opposite of what a second position is
+    /// for.
+    const anchor = Date.parse("2026-08-17T10:00") * 1000;
+    expect(rotations[0].shift_rules[0].anchor_micros).toBe(anchor);
+    expect(rotations[1].shift_rules[0].anchor_micros).toBe(anchor - MICROS_PER_WEEK);
+  });
+
+  /// The checkbox has to be able to say no. The backend staffs a second
+  /// rotation by default, so leaving it in place when the box is clear would
+  /// make the control read as a choice the form quietly overrules.
+  it("removes the second rotation when the box is cleared", async () => {
+    oncall.getSchedule.mockResolvedValue({
+      data: {
+        timezone: "UTC",
+        rotations: [
+          { id: "rot_primary", name: "Primary", shift_rules: [] },
+          { id: "rot_secondary", name: "Secondary", shift_rules: [] },
+        ],
+      },
+    } as any);
+
+    const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, {
+      name: "Payments",
+      members: ["ana@o2.ai", "bob@o2.ai"],
+      first_handover: "2026-08-17T10:00",
+      create_secondary: false,
+    });
+    await submit(wrapper);
+    await flushPromises();
+
+    const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
+    expect(rotations.map((r: any) => r.id)).toEqual(["rot_primary"]);
   });
 
   /// `source: "default"` means "the backend staffed this and no human has
@@ -186,7 +241,36 @@ describe("OnCallTeamForm", () => {
 
   /// A server that staffed nothing, or a read that failed, still gets the one
   /// rotation the form describes — which is all such a team would have had.
-  it("falls back to the single rotation when the read-back fails", async () => {
+  /// **The pairing is data, not a rule.** Written here rather than read back,
+  /// the second rotation is the same roster with its anchor one shift behind —
+  /// nothing links the two, and nothing at resolution time knows they are
+  /// related.
+  it("writes both rotations itself when the read-back fails", async () => {
+    oncall.getSchedule.mockRejectedValue(new Error("boom"));
+
+    const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, {
+      name: "Payments",
+      members: ["ana@o2.ai", "bob@o2.ai"],
+      first_handover: "2026-08-17T10:00",
+    });
+    await submit(wrapper);
+    await flushPromises();
+
+    const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
+    expect(rotations).toHaveLength(2);
+    expect(rotations.map((r: any) => r.name)).toEqual(["Primary", "Secondary"]);
+    // Distinct ids, because a level stores one and two rotations sharing an id
+    // would be the same row to every level that names either.
+    expect(rotations[0].id).not.toBe(rotations[1].id);
+
+    const anchor = Date.parse("2026-08-17T10:00") * 1000;
+    expect(rotations[0].shift_rules[0].anchor_micros).toBe(anchor);
+    expect(rotations[1].shift_rules[0].anchor_micros).toBe(anchor - MICROS_PER_WEEK);
+  });
+
+  it("writes only the one rotation when the box is cleared and the read-back fails", async () => {
     oncall.getSchedule.mockRejectedValue(new Error("boom"));
 
     const wrapper = render();
@@ -195,13 +279,14 @@ describe("OnCallTeamForm", () => {
       name: "Payments",
       members: ["ana@o2.ai"],
       first_handover: "2026-08-17T10:00",
+      create_secondary: false,
     });
     await submit(wrapper);
     await flushPromises();
 
     const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
     expect(rotations).toHaveLength(1);
-    expect(rotations[0].members).toEqual(["ana@o2.ai"]);
+    expect(rotations[0].shift_rules[0].members).toEqual(["ana@o2.ai"]);
   });
 
   // Nobody picked is a legitimate way to create a team, and an empty rotation
