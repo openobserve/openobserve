@@ -8880,6 +8880,7 @@
     },
     "openInFullView": "在完整檢視中開啟",
     "viewLogs": "檢視日誌",
+    "viewLogsUnavailable": "無法開啟此 span 的日誌。",
     "backToLogs": "返回日誌",
     "openInTraces": "在追蹤中開啟",
     "loadingStream": "載入串流中...",

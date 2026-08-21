@@ -359,6 +359,9 @@ pub async fn batch_remove(org_ids: Vec<String>) -> Result<(), errors::Error> {
 }
 
 pub async fn set_status(org_id: &str, status: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = config::utils::time::now_micros();
     Entity::update_many()
@@ -380,6 +383,9 @@ pub async fn set_status_if(
     expected_status: &str,
     new_status: &str,
 ) -> Result<bool, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = config::utils::time::now_micros();
     let result = Entity::update_many()
@@ -407,6 +413,9 @@ pub async fn set_status_if_with_deleted_at(
     new_status: &str,
     deleted_at: Option<i64>,
 ) -> Result<bool, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = config::utils::time::now_micros();
     let result = Entity::update_many()

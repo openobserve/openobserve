@@ -40,8 +40,11 @@ use crate::{
 };
 
 pub static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
+/// Same pool as [`CLIENT_RW`], cloneable without taking the mutex — so the ORM
+/// can be lazily initialized while `table::get_lock()` is held.
+pub static CLIENT_RW_POOL: Lazy<Pool<Sqlite>> = Lazy::new(connect_rw);
 pub static CLIENT_RW: Lazy<Arc<Mutex<Pool<Sqlite>>>> =
-    Lazy::new(|| Arc::new(Mutex::new(connect_rw())));
+    Lazy::new(|| Arc::new(Mutex::new(CLIENT_RW_POOL.clone())));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
