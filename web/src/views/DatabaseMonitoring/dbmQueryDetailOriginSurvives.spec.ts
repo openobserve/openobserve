@@ -33,10 +33,7 @@ import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
 
 import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
 import { rangeFromQuery, rangeToQuery, type DbmRange } from "@/composables/dbm/useDbmScope";
-import {
-  DBM_ORIGIN_QUERY_KEY,
-  readDbmQueryDetailOrigin,
-} from "@/utils/dbm/queryDetailOrigin";
+import { DBM_ORIGIN_QUERY_KEY, readDbmQueryDetailOrigin } from "@/utils/dbm/queryDetailOrigin";
 
 const absolute: DbmRange = {
   type: "absolute",
@@ -117,7 +114,11 @@ describe("the origin survives a window change made on the detail page", () => {
       history: createMemoryHistory(),
       routes: [
         { path: "/", component: { template: "<div/>" } },
-        { path: "/infra/databases/query", name: "dbmQueryDetail", component: { template: "<div/>" } },
+        {
+          path: "/infra/databases/query",
+          name: "dbmQueryDetail",
+          component: { template: "<div/>" },
+        },
       ],
     });
 

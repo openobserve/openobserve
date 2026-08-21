@@ -304,13 +304,7 @@ const queriesVantageLabel = computed<I18nText | undefined>(() => {
  * to the default relative one.
  */
 const carriedQuery = computed(() => {
-  const {
-    fingerprint,
-    stream,
-    [DBM_ORIGIN_QUERY_KEY]: origin,
-    tab,
-    ...rest
-  } = route.query;
+  const { fingerprint, stream, [DBM_ORIGIN_QUERY_KEY]: origin, tab, ...rest } = route.query;
   void fingerprint;
   void stream;
   void origin;
