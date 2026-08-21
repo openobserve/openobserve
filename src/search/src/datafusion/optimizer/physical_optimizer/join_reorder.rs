@@ -98,6 +98,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
+    use config::meta::stream::StreamType;
     use datafusion::{
         common::Result,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
@@ -251,7 +252,7 @@ mod tests {
             .with_config(SessionConfig::new().with_target_partitions(12))
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
-            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)))
+            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)))
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
@@ -296,7 +297,7 @@ mod tests {
             .with_config(SessionConfig::new().with_target_partitions(12))
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
-            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)))
+            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)))
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
@@ -339,7 +340,7 @@ mod tests {
             .with_config(SessionConfig::new().with_target_partitions(12))
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
-            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)))
+            .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)))
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
