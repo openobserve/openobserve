@@ -159,7 +159,7 @@ pub fn resolve_event_name(rec: &Map<String, Value>) -> Option<&str> {
 // into the same `o2_dbm_*` namespace the deadlock and blocking paths use.
 //
 // Attribute names below are the MEASURED v0.158.0 wire shape (captures under
-// `tests/dbm-server-vantage/captures/`), not the documented one: where the two
+// `the o2-dbm-capture rig's server-vantage/captures/`), not the documented one: where the two
 // disagree the measurement wins. `state_change`, `duration_ms` and
 // `client_addr` are documented but do not exist on the wire, so no canonical
 // column reserves them.
