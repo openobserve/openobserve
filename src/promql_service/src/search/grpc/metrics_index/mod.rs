@@ -24,8 +24,8 @@ mod tests {
     use std::{ops::Range, sync::Arc};
 
     use arrow::{
-        array::{Array, DictionaryArray, RecordBatch, UInt32Array},
-        datatypes::{DataType, Field, Int32Type, Schema},
+        array::{Array, RecordBatch, StringViewArray, UInt32Array},
+        datatypes::{DataType, Field, Schema},
         ipc::writer::FileWriter as ArrowFileWriter,
     };
     use bytes::Bytes;
@@ -68,18 +68,16 @@ mod tests {
 
     #[test]
     fn evaluates_and_coalesces_selected_ranges() {
-        // dictionary-encoded label column, exactly as the writer produces it;
         // run starts are the prefix sums of the counts: 0, 2, 4, 5
-        let paths: DictionaryArray<Int32Type> = vec!["a", "b", "a", "a"].into_iter().collect();
         let schema = Arc::new(Schema::new(vec![
             Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false),
-            Field::new("path", paths.data_type().clone(), false),
+            Field::new("path", DataType::Utf8View, false),
         ]));
         let batch = RecordBatch::try_new(
             Arc::clone(&schema),
             vec![
                 Arc::new(UInt32Array::from(vec![2, 2, 1, 3])),
-                Arc::new(paths),
+                Arc::new(StringViewArray::from(vec!["a", "b", "a", "a"])),
             ],
         )
         .unwrap();
@@ -102,8 +100,7 @@ mod tests {
             vec![Range { start: 0, end: 8 }]
         );
 
-        // regex matchers go through regexp_like on the label column, which is
-        // cast out of its dictionary encoding
+        // regex matchers go through regexp_like on the (Utf8View) label column
         let matchers = Matchers::new(vec![Matcher {
             op: MatchOp::NotRe(regex::Regex::new("a").unwrap()),
             name: "path".to_string(),
@@ -116,15 +113,13 @@ mod tests {
         );
     }
 
-    /// Serialize a metrics index with the given label columns (in this order),
-    /// dictionary-encoded like the writer's output.
+    /// Serialize a metrics index with the given label columns (in this order).
     fn sidecar_bytes(labels: &[(&str, Vec<&str>)], counts: Vec<u32>) -> Bytes {
         let mut fields = vec![Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false)];
         let mut columns: Vec<Arc<dyn Array>> = vec![Arc::new(UInt32Array::from(counts))];
         for (name, values) in labels {
-            let values: DictionaryArray<Int32Type> = values.iter().copied().collect();
-            fields.push(Field::new(*name, values.data_type().clone(), true));
-            columns.push(Arc::new(values));
+            fields.push(Field::new(*name, DataType::Utf8View, true));
+            columns.push(Arc::new(StringViewArray::from(values.clone())));
         }
         let schema = Arc::new(Schema::new(fields));
         let batch = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();

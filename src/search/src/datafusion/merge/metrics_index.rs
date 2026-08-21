@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use arrow::{
     array::{Array, ArrayRef as ArrowArrayRef, RecordBatch, UInt32Array, UInt64Array},
-    compute::{cast, concat_batches, take},
+    compute::{concat_batches, take},
     datatypes::{DataType, Field, Schema},
     ipc::{
         CompressionType,
@@ -39,11 +39,9 @@ use datafusion::error::{DataFusionError, Result};
 /// coalescing makes that representation equivalent without buffering samples.
 ///
 /// Entries are buffered raw (one row per run) and written as a single
-/// dictionary-encoded, ZSTD-compressed IPC batch at [`finish`]: adjacent runs
-/// are different series, so raw label rows have no locality for the
-/// compressor, while label cardinality is far below the run count. One batch
-/// per file also means one dictionary per column and whole-column compression
-/// frames. The buffer is small next to the Parquet file built alongside.
+/// ZSTD-compressed IPC batch at [`finish`], giving whole-column compression
+/// frames and one decode on read. The buffer is small next to the Parquet
+/// file built alongside.
 ///
 /// [`finish`]: MetricsIndexWriter::finish
 pub(super) struct MetricsIndexWriter {
@@ -135,7 +133,7 @@ impl MetricsIndexWriter {
     }
 
     pub(super) fn finish(self) -> Result<Vec<u8>> {
-        let batch = dictionary_encode(&concat_batches(&self.schema, &self.pending_batches)?)?;
+        let batch = concat_batches(&self.schema, &self.pending_batches)?;
         let options =
             IpcWriteOptions::default().try_with_compression(Some(CompressionType::ZSTD))?;
         let mut writer =
@@ -145,39 +143,12 @@ impl MetricsIndexWriter {
     }
 }
 
-/// Dictionary-encode the string label columns as `Dictionary(Int32, Utf8)`.
-fn dictionary_encode(batch: &RecordBatch) -> Result<RecordBatch> {
-    let mut fields = Vec::with_capacity(batch.num_columns());
-    let mut columns = Vec::with_capacity(batch.num_columns());
-    for (field, column) in batch.schema().fields().iter().zip(batch.columns()) {
-        let (field, column) = match field.data_type() {
-            DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
-                let dictionary =
-                    DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8));
-                let column = cast(&cast(column, &DataType::Utf8)?, &dictionary)?;
-                (
-                    Arc::new(field.as_ref().clone().with_data_type(dictionary)),
-                    column,
-                )
-            }
-            _ => (Arc::clone(field), Arc::clone(column)),
-        };
-        fields.push(field);
-        columns.push(column);
-    }
-    Ok(RecordBatch::try_new(
-        Arc::new(Schema::new(fields)),
-        columns,
-    )?)
-}
-
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
 
     use arrow::{
-        array::{DictionaryArray, Float64Array, Int64Array, StringViewArray},
-        datatypes::Int32Type,
+        array::{Float64Array, Int64Array, StringViewArray},
         ipc::reader::FileReader,
     };
 
@@ -221,15 +192,15 @@ mod tests {
             .unwrap()
             .collect::<std::result::Result<Vec<_>, _>>()
             .unwrap();
-        // the whole index is one batch, labels dictionary-encoded, no
-        // __hash__ column and no stored row starts
+        // the whole index is one batch, no __hash__ column and no stored row
+        // starts; the label keeps its source type
         assert_eq!(batches.len(), 1);
         let batch = &batches[0];
         assert!(batch.schema().field_with_name(HASH_LABEL).is_err());
         assert_eq!(batch.num_columns(), 2);
         assert_eq!(
             batch.schema().field_with_name("path").unwrap().data_type(),
-            &DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8)),
+            &DataType::Utf8View,
         );
 
         let counts = batch
@@ -248,9 +219,7 @@ mod tests {
             .column_by_name("path")
             .unwrap()
             .as_any()
-            .downcast_ref::<DictionaryArray<Int32Type>>()
-            .unwrap()
-            .downcast_dict::<arrow::array::StringArray>()
+            .downcast_ref::<StringViewArray>()
             .unwrap()
             .into_iter()
             .map(|value| value.unwrap().to_string())
