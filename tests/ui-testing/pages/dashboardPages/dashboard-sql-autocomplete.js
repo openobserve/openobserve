@@ -166,6 +166,37 @@ export default class DashboardSqlAutocomplete {
   // (i.e. the suggestion list is currently being shown). Reads the
   // completion model length rather than the SuggestModel state enum
   // since the state enum's "Open" value differs across Monaco versions.
+  // Poll until the suggest controller reports items, returning whether it opened.
+  //
+  // isAutocompleteOpen() below is a single point-in-time read, so gating
+  // assertions on it means a list that is merely slow reads as "not open" and the
+  // test skips its checks while still reporting PASSED. Use this wherever the
+  // suggestions are EXPECTED; keep isAutocompleteOpen() for asserting they are
+  // absent, where waiting would be pointless.
+  async waitForAutocompleteOpen(timeout = 8000) {
+    return this.page
+      .waitForFunction(
+        () => {
+          const m = (window).monaco;
+          const editors = m?.editor?.getEditors?.() || [];
+          const editor =
+            editors.find((e) => e.hasTextFocus && e.hasTextFocus()) ||
+            editors[editors.length - 1];
+          if (!editor) return false;
+          const ctrl = editor.getContribution(
+            "editor.contrib.suggestController"
+          );
+          const items =
+            ctrl?.model?._completionModel?.items ?? ctrl?.model?.items ?? [];
+          return Array.isArray(items) && items.length > 0;
+        },
+        undefined,
+        { timeout }
+      )
+      .then(() => true)
+      .catch(() => false);
+  }
+
   async isAutocompleteOpen() {
     return this.page.evaluate(() => {
       const m = (window).monaco;
@@ -198,12 +229,31 @@ export default class DashboardSqlAutocomplete {
   // Discard the in-progress panel edit. Safe to call when the discard button
   // isn't rendered (returns silently).
   async discardPanelIfVisible() {
+    // waitFor, not isVisible: isVisible() samples the current DOM and its
+    // `timeout` option is documented as ignored, so this could miss a button
+    // that was about to render.
     const visible = await this.discardPanelBtn
-      .isVisible({ timeout: 2000 })
+      .waitFor({ state: "visible", timeout: 2000 })
+      .then(() => true)
       .catch(() => false);
-    if (visible) {
+    if (!visible) return;
+
+    // Discarding an EDITED panel fires a native confirm(). Playwright
+    // auto-DISMISSES dialogs unless a handler says otherwise, so the discard was
+    // being cancelled and the page stayed on /add_panel. Cleanup then sat waiting
+    // 20s for [data-test="dashboard-table"] — which only exists on the dashboards
+    // LIST — before the caller swallowed the timeout, so every test in this file
+    // silently leaked its dashboard (8 of them confirmed on alpha) and burned 20s
+    // doing it. Same handling as dashboard-panel-actions.js discardPanel().
+    const dialogHandler = (dialog) => dialog.accept();
+    this.page.on("dialog", dialogHandler);
+    try {
       await this.discardPanelBtn.click();
-      await this.page.waitForTimeout(500);
+      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
+        timeout: 30000,
+      });
+    } finally {
+      this.page.off("dialog", dialogHandler);
     }
   }
 }

@@ -58,9 +58,13 @@ async function buildPanelWithWideRange(page, pm, panelName, chartType = "area") 
 
 test.describe("Dashboard Max Query Range", () => {
   test.beforeEach(async ({ page }) => {
+    const pm = new PageManager(page);
     await navigateToBase(page);
     await ingestion(page, MAX_QUERY_STREAM);
-    await page.waitForTimeout(2000);
+    // Poll until the stream is actually queryable instead of sleeping 2s: the
+    // ingest -> queryable delay scales with load, so a constant wait is both
+    // wasteful when the box is idle and too short when it is not.
+    await pm.dashboardMaxQueryRange.waitForStreamReady(MAX_QUERY_STREAM);
   });
 
   // Ensure max query range is always reset even when a test fails mid-way,
