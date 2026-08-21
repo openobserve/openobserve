@@ -587,8 +587,12 @@ pub(crate) async fn read_blocking_body(
 
 #[cfg(test)]
 mod tests {
+    // Used only by enterprise-gated tests below; unused on an OSS build.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
     use serde_json::json;
 
+    // Used only by enterprise-gated tests below; unused on an OSS build.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
     use super::{super::testutil::*, *};
 
     /// ...and for a BLOCKING read.

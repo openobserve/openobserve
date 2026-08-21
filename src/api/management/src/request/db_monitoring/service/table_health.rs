@@ -520,6 +520,8 @@ pub(crate) fn table_health_envelope(
 
 #[cfg(test)]
 mod tests {
+    // Used only by enterprise-gated tests below; unused on an OSS build.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
     use serde_json::json;
 
     use super::{super::testutil::*, *};
