@@ -120,7 +120,7 @@
                   size="sm"
                   :data-test="`oncall-policy-target-${current.priority}-${stepIndex}-${ti}`"
                 >
-                  {{ describeTarget(target, t) }}
+                  {{ describeTarget(target, t, rotationNameOf(target)) }}
                   <button
                     type="button"
                     class="ml-1"
@@ -156,18 +156,19 @@
                   />
                 </span>
 
-                <!-- Same reason, for the slot-naming kinds: a step pointed at a
-                     slot nobody staffs reaches nobody, and `config-risks`
-                     reports it as `slot_pages_nobody`. Asking here is how it
-                     never gets written. -->
-                <span v-if="pendingSlot?.step === step" class="w-52">
+                <!-- Same reason, for a rotation target: a level pointed at a
+                     rotation the team does not have pages nobody and the ladder
+                     skips it in silence, which `config-risks` reports as
+                     `level_names_a_rotation_that_does_not_exist`. Asking here
+                     is how it never gets written. -->
+                <span v-if="pendingRotation?.step === step" class="w-52">
                   <OSelect
                     :model-value="''"
-                    :options="slotOptions"
+                    :options="rotationOptions"
                     size="sm"
-                    :placeholder="t('oncall.targetPickSlot')"
-                    :data-test="`oncall-policy-pick-slot-${current.priority}-${stepIndex}`"
-                    @update:model-value="(v: any) => addSlot(String(v))"
+                    :placeholder="t('oncall.targetPickRotation')"
+                    :data-test="`oncall-policy-pick-rotation-${current.priority}-${stepIndex}`"
+                    @update:model-value="(v: any) => addRotation(String(v))"
                   />
                 </span>
 
@@ -176,7 +177,7 @@
                      target KINDS never answers. On the same line as the step,
                      because it is the answer to that line. -->
                 <template
-                  v-for="(line, i) in [resolveLadder(current, onCallNow)[stepIndex]]"
+                  v-for="(line, i) in [resolveLadder(current, onCallNow, props.rotations)[stepIndex]]"
                   :key="i"
                 >
                   <span v-if="line?.people.length" class="flex items-center gap-2">
@@ -214,11 +215,30 @@
                   </span>
 
                   <OText variant="meta" v-for="pool in line?.pools ?? []" :key="pool">
-                    {{ t("oncall.ladderPoolEveryone", { slot: raw(pool) }) }}
+                    {{ t("oncall.ladderPoolEveryone", { rotation: raw(pool) }) }}
                   </OText>
 
+                  <!-- A level naming a rotation the team no longer has advanced
+                       in silence. It is a high risk server-side; here it is the
+                       one thing on the row that must not read as merely
+                       uncovered. -->
                   <span
-                    v-if="line && !line.people.length && !line.wholeTeam && !line.pools.length"
+                    v-for="gone in line?.missingRotations ?? []"
+                    :key="gone"
+                    class="text-status-error-text text-sm"
+                    :data-test="`oncall-policy-missing-rotation-${current.priority}-${stepIndex}`"
+                  >
+                    {{ t("oncall.ladderRotationGone") }}
+                  </span>
+
+                  <span
+                    v-if="
+                      line &&
+                      !line.people.length &&
+                      !line.wholeTeam &&
+                      !line.pools.length &&
+                      !line.missingRotations.length
+                    "
                     class="text-status-warning-text text-sm"
                     :data-test="`oncall-policy-preview-nobody-${current.priority}-${stepIndex}`"
                   >
@@ -538,16 +558,16 @@ import type {
   Channel,
   TeamChannel,
   EscalationTarget,
-  EscalationTargetKind,
   L0Policy,
   LadderStep,
   OnCallPolicy,
-  OnCallSlot,
+  OnCallPosition,
   PolicyFinalAction,
   PriorityRung,
-  SlotTargetKind,
+  Rotation,
+  RotationMode,
 } from "@/ts/interfaces/oncall";
-import { isSlotTarget, MICROS_PER_MINUTE, sameSlot, TARGET_KINDS } from "@/ts/interfaces/oncall";
+import { MICROS_PER_MINUTE, TARGET_KINDS } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -567,13 +587,15 @@ const props = withDefaults(
     /** The priority the reader had selected — the editor opens on the same one. */
     priority?: number;
     /**
-     * The slots this team staffs, in schedule order. More than one unlocks the
-     * slot-naming targets; the team's own schedule is the authority on which
-     * names are real, so a step cannot be pointed at a slot nobody staffs.
+     * The rotations this team staffs, in schedule order.
+     *
+     * The team's own schedule is the authority on which rotations are real, so
+     * a level cannot be pointed at one nothing staffs — and a chip can show a
+     * stored id as the name somebody recognises.
      */
-    slots?: string[];
+    rotations?: Rotation[];
   }>(),
-  { slots: () => [] },
+  { rotations: () => [] },
 );
 const emit = defineEmits<{ saved: []; "update:open": [boolean] }>();
 
@@ -595,15 +617,16 @@ const draft = ref<PriorityRung[]>([]);
 const selected = ref(1);
 const current = computed(() => draft.value.find((r) => r.priority === selected.value) ?? null);
 const pendingUserStep = ref<LadderStep | null>(null);
-/// The step and the kind together: three kinds take a slot, and which one was
-/// picked decides what the slot MEANS — on call in it, next in it, or all of it.
-const pendingSlot = ref<{ step: LadderStep; kind: SlotTargetKind } | null>(null);
+/// The step and the mode together: a rotation target pages either the one
+/// person on call in it or everyone on it, and which was asked for decides
+/// what the picked rotation MEANS.
+const pendingRotation = ref<{ step: LadderStep; mode: RotationMode } | null>(null);
 const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
 const teamMembers = computed(() => memberOptions.value.map((m) => m.value));
 /// The rotation in force, so the preview names people rather than target
 /// kinds. Empty is a legitimate answer — it means a coverage gap, which the
 /// preview then reports as a step reaching nobody.
-const onCallNow = ref<OnCallSlot[]>([]);
+const onCallNow = ref<OnCallPosition[]>([]);
 const destinations = ref<string[]>([]);
 /// Both are part of the ladder's shape, so both are draft state — reading them
 /// off `props.policy` is what made them read-only.
@@ -723,7 +746,9 @@ const ladderSentence = computed<I18nText>(() => {
 
   const steps = rung.steps
     .map((step) => {
-      const who = step.targets.map((target) => describeTarget(target, t)).join(", ");
+      const who = step.targets
+        .map((target) => describeTarget(target, t, rotationNameOf(target)))
+        .join(", ");
       return step.after_micros === 0
         ? t("oncall.policySentenceStepNow", { who: raw(who) })
         : t("oncall.policySentenceStepAt", {
@@ -803,20 +828,32 @@ const triageSummary = computed<I18nText>(() =>
   }),
 );
 
-/// The slot-naming kinds are offered only where there is a second slot to
-/// name: on a one-slot team "the primary on-call" and "whoever is on call" are
-/// the same person said two ways, and a picker offering both teaches a
-/// distinction that does not exist yet.
-const targetOptions = computed(() =>
-  TARGET_KINDS.filter((kind) => props.slots.length > 1 || !isSlotTarget(kind)).map((kind) => ({
-    label: t(`oncall.target_${kind}`),
-    value: kind,
-  })),
+/// **Three options: a rotation, some people, or the whole team.** It was eight,
+/// six of which existed only to name a slot or to describe a derivation — and
+/// a picker offering "the on-call" beside "the primary on-call" taught a
+/// distinction that did not exist.
+///
+/// `rotation_all` is the same kind with `mode: "all"`, offered as its own row
+/// because "everyone on Platform" and "whoever is on call in Platform" are
+/// different errands, not a setting on one.
+const targetOptions = computed(() => [
+  ...TARGET_KINDS.map((kind) => ({ label: t(`oncall.target_${kind}`), value: kind })),
+  { label: t("oncall.target_rotation_everyone"), value: "rotation_all" },
+]);
+
+const rotationOptions = computed(() =>
+  props.rotations.map((rotation) => ({ label: raw(rotation.name), value: rotation.id })),
 );
 
-const slotOptions = computed(() => props.slots.map((slot) => ({ label: raw(slot), value: slot })));
+/// A chip stores an id; a reader needs the name. A rotation the team no longer
+/// has resolves to `null`, which `describeTarget` says out loud rather than
+/// printing an identifier nobody can look up.
+function rotationNameOf(target: EscalationTarget): string | null {
+  if (target.kind !== "rotation") return null;
+  return props.rotations.find((r) => r.id === target.rotation_id)?.name ?? null;
+}
 
-/// A user target needs an email and a slot target needs a slot name, so both
+/// A user target needs an email and a rotation target needs a rotation, so both
 /// open a picker rather than adding an empty chip the policy would reject on
 /// save.
 function addTarget(step: LadderStep, kind: string) {
@@ -825,8 +862,8 @@ function addTarget(step: LadderStep, kind: string) {
     pendingUserStep.value = step;
     return;
   }
-  if (isSlotTarget(kind as EscalationTargetKind)) {
-    pendingSlot.value = { step, kind: kind as SlotTargetKind };
+  if (kind === "rotation" || kind === "rotation_all") {
+    pendingRotation.value = { step, mode: kind === "rotation_all" ? "all" : "on_call" };
     return;
   }
   if (!step.targets.some((x) => x.kind === kind)) {
@@ -843,17 +880,26 @@ function addUser(email: string) {
   }
 }
 
-/// Duplicates are compared on the PAIR. The same kind against two slots is two
-/// different steps' worth of people — "the primary on-call" and "the secondary
-/// on-call" on one step is a legitimate, and common, wide first step.
-function addSlot(slot: string) {
-  const pending = pendingSlot.value;
-  pendingSlot.value = null;
-  if (!pending || !slot) return;
-  const { step, kind } = pending;
-  if (!step.targets.some((x) => x.kind === kind && "slot" in x && sameSlot(x.slot, slot))) {
-    step.targets.push({ kind, slot });
-  }
+/// Duplicates are compared on the rotation AND the mode. Two rotations on one
+/// step is a legitimate — and common — wide first level, and it is now the only
+/// way a level pages more than one person.
+///
+/// `mode` is omitted from the wire when it is `on_call`, so a level written
+/// without it round-trips unchanged rather than gaining a field it never had.
+function addRotation(rotationId: string) {
+  const pending = pendingRotation.value;
+  pendingRotation.value = null;
+  if (!pending || !rotationId) return;
+  const { step, mode } = pending;
+  const already = step.targets.some(
+    (x) => x.kind === "rotation" && x.rotation_id === rotationId && (x.mode ?? "on_call") === mode,
+  );
+  if (already) return;
+  step.targets.push(
+    mode === "all"
+      ? { kind: "rotation", rotation_id: rotationId, mode }
+      : { kind: "rotation", rotation_id: rotationId },
+  );
 }
 
 /// The wait between two steps — what the connector edits. The data model
@@ -919,7 +965,7 @@ function reset() {
     channels: [...rung.channels],
   }));
   pendingUserStep.value = null;
-  pendingSlot.value = null;
+  pendingRotation.value = null;
   destinations.value = [...(props.policy?.destinations ?? [])];
   // `repeat_count` 1 means the ladder runs once; there is no zero.
   repeatCount.value = props.policy?.repeat_count ?? 1;
@@ -1019,8 +1065,14 @@ function addStep(rung: PriorityRung) {
   const last = rung.steps.reduce((max, s) => Math.max(max, s.after_micros), -1);
   let next = last < 0 ? 0 : last + 5 * MICROS_PER_MINUTE;
   while (used.has(next)) next += 5 * MICROS_PER_MINUTE;
-  // Starts with the on-call, which is what a new step almost always means.
-  rung.steps.push({ after_micros: next, targets: [{ kind: "on_call_now" }] });
+  // Starts with the team's first rotation, which is what a new step almost
+  // always means. With no rotations there is nothing honest to preselect — an
+  // empty step asks rather than writing a level that pages nobody.
+  const first = props.rotations[0];
+  rung.steps.push({
+    after_micros: next,
+    targets: first ? [{ kind: "rotation", rotation_id: first.id }] : [],
+  });
 }
 
 function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {
