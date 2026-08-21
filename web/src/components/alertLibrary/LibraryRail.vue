@@ -15,139 +15,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  LibraryRail — what am I looking at (packs × categories × severity).
+  LibraryRail — what am I looking at (severity × category).
 
-  Packs and categories are MULTI-SELECT, on the metrics-explorer rail pattern:
-  one segmented control switching which axis is listed, a search box over that
-  list, tick boxes with counts, and a "N selected / Clear" footer per axis. An
-  empty selection means "all of them", so the rail opens showing everything and
-  narrows from there rather than forcing one pack at a time.
+  ONE list, no axis switcher. Packs used to be a second axis, but a pack is a
+  coarse bucket ("databases", "observability") and the category is the thing
+  people actually come looking for — Kafka, Clickhouse, Cilium. Two axes over
+  the same catalogue meant a tab to reach the useful one; the pack still names
+  itself in the gallery's group headings, which is where it earns its keep.
 
-  Severity stays single-select. It is one question with one answer, and four
-  chips cost less height than four more rows.
+  Categories are MULTI-SELECT on the metrics-explorer rail pattern: a search
+  box over the list, tick boxes with counts, and a "N selected / Clear" footer.
+  An empty selection means all of them, so the rail opens showing everything
+  and narrows from there.
+
+  Severity sits ON TOP, outside the scrolling list, because it is a different
+  kind of question — "how bad", not "what of" — and there are only ever three
+  answers. Below the list it collided with the category rows and scrolled out
+  of reach after a hundred of them.
 
   Purely presentational — every choice is emitted, nothing is decided here.
 -->
 <template>
   <nav
-    class="flex h-full flex-col gap-4 overflow-y-auto py-3"
+    class="flex h-full flex-col"
     :aria-label="t('alert_library.header')"
     data-test="alert-library-rail"
   >
-    <section class="flex min-h-0 flex-col gap-1">
-      <!-- Stacking both axes cost roughly a screen of height on a 14-category
-           pack and pushed severity below the fold; only one axis is being
-           narrowed at a time anyway.
-
-           The per-tab count is the SELECTION, not the number of choices: the
-           question a hidden axis raises is "have I left a filter on over
-           there?". It sits in a fixed-width slot so 2 → 14 never nudges the
-           label. -->
-      <div class="px-2">
-        <OToggleGroup
-          type="single"
-          :model-value="axis"
-          data-test="alert-library-rail-axis"
-          @update:model-value="onAxisChange"
-        >
-          <OToggleGroupItem
-            v-for="tab in axisTabs"
-            :key="tab.id"
-            :value="tab.id"
-            size="xs"
-            :data-test="`alert-library-rail-axis-${tab.id}`"
-          >
-            <span class="flex items-center gap-1">
-              <span>{{ tab.label }}</span>
-              <span
-                class="text-2xs text-primary w-4 shrink-0 text-right font-semibold tabular-nums"
-                :data-test="`alert-library-rail-axis-count-${tab.id}`"
-                >{{ tab.selected || "" }}</span
-              >
-            </span>
-          </OToggleGroupItem>
-        </OToggleGroup>
-      </div>
-
-      <div class="px-2">
-        <OInput
-          v-model="searchTerm"
-          size="sm"
-          clearable
-          :placeholder="active.searchPlaceholder"
-          :aria-label="active.searchAria"
-          :data-test="`alert-library-rail-search-${axis}`"
-        />
-      </div>
-
-      <div class="flex items-center justify-between gap-2 px-2">
-        <span
-          class="text-text-secondary text-2xs tabular-nums"
-          :data-test="`alert-library-rail-selected-${axis}`"
-          >{{ t("alert_library.selectedCount", { count: active.selected.length }) }}</span
-        >
-        <OButton
-          variant="ghost-primary"
-          size="xs"
-          :disabled="active.selected.length === 0"
-          :data-test="`alert-library-rail-clear-${axis}`"
-          @click="clearAxis"
-        >
-          {{ t("alert_library.clearFilters") }}
-        </OButton>
-      </div>
-
-      <OEmptyState
-        v-if="visibleItems.length === 0"
-        size="inline"
-        illustration="no-results"
-        variant="no-results"
-        class="px-2"
-        :title="active.emptyTitle"
-        :data-test="`alert-library-rail-empty-${axis}`"
-      />
-
-      <div
-        v-for="item in visibleItems"
-        :key="item.id"
-        class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
-        :class="active.selected.includes(item.id) ? 'bg-surface-subtle' : ''"
-      >
-        <OCheckbox
-          size="sm"
-          class="min-w-0 flex-1"
-          :model-value="active.selected.includes(item.id)"
-          :aria-label="t('alert_library.facetAria', { label: item.label, count: item.count })"
-          :data-active="String(active.selected.includes(item.id))"
-          :data-test="`alert-library-rail-${active.rowPrefix}-${item.id}`"
-          @update:model-value="toggleItem(item.id)"
-        >
-          <template #label>
-            <span class="truncate text-xs" :title="item.label">{{ item.label }}</span>
-          </template>
-        </OCheckbox>
-
-        <OTag
-          type="countChip"
-          value="neutral"
-          size="xs"
-          shape="rounded"
-          :data-test="`alert-library-rail-count-${item.id}`"
-          >{{ item.count }}</OTag
-        >
-      </div>
-    </section>
-
-    <section class="flex flex-col gap-1">
-      <h2 class="text-text-secondary text-2xs px-2 font-semibold uppercase">
-        {{ t("alert_library.severity") }}
-      </h2>
-      <!-- A compact chip row rather than four more stacked rail items: those
-           cost ~7.5rem of height and pushed the rail past the fold. The chips
-           carry no counts and no colour — four coloured chips would be
-           colouring the norm; the per-card severity tag is where it means
-           something. -->
-      <div class="px-2">
+    <!-- Pinned controls. The list below owns the scroll: with 100+ categories a
+         rail that scrolls as one block carries its own controls off-screen. -->
+    <div class="flex shrink-0 flex-col gap-3 px-2 pt-3 pb-2">
+      <section class="flex flex-col gap-1">
+        <h2 class="text-text-secondary text-2xs font-semibold uppercase">
+          {{ t("alert_library.severity") }}
+        </h2>
+        <!-- Chips rather than three more tick rows: it is single-select — one
+             question with one answer — and the explicit All chip is how you
+             widen it again. No counts and no colour; four coloured chips would
+             be colouring the norm, and the per-card severity tag is where the
+             colour means something. -->
         <OToggleGroup
           type="single"
           :model-value="severity"
@@ -164,8 +69,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ item.label }}
           </OToggleGroupItem>
         </OToggleGroup>
+      </section>
+
+      <section class="flex flex-col gap-1">
+        <h2 class="text-text-secondary text-2xs font-semibold uppercase">
+          {{ t("alert_library.categories") }}
+        </h2>
+
+        <OInput
+          v-model="search"
+          size="sm"
+          clearable
+          :placeholder="t('alert_library.searchCategories')"
+          :aria-label="t('alert_library.searchCategoriesAria')"
+          data-test="alert-library-rail-search-categories"
+        />
+
+        <div class="flex items-center justify-between gap-2">
+          <span
+            class="text-text-secondary text-2xs tabular-nums"
+            data-test="alert-library-rail-selected-categories"
+            >{{ t("alert_library.selectedCount", { count: selectedCategories.length }) }}</span
+          >
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            :disabled="selectedCategories.length === 0"
+            data-test="alert-library-rail-clear-categories"
+            @click="emit('update:selectedCategories', [])"
+          >
+            {{ t("alert_library.clearFilters") }}
+          </OButton>
+        </div>
+      </section>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+      <OEmptyState
+        v-if="visibleItems.length === 0"
+        size="inline"
+        illustration="no-results"
+        variant="no-results"
+        :title="t('alert_library.noCategoryMatch')"
+        data-test="alert-library-rail-empty-categories"
+      />
+
+      <div
+        v-for="item in visibleItems"
+        :key="item.id"
+        class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
+        :class="selectedCategories.includes(item.id) ? 'bg-surface-subtle' : ''"
+      >
+        <OCheckbox
+          size="sm"
+          class="min-w-0 flex-1"
+          :model-value="selectedCategories.includes(item.id)"
+          :aria-label="t('alert_library.facetAria', { label: item.label, count: item.count })"
+          :data-active="String(selectedCategories.includes(item.id))"
+          :data-test="`alert-library-rail-category-${item.id}`"
+          @update:model-value="toggleCategory(item.id)"
+        >
+          <template #label>
+            <span class="truncate text-xs" :title="item.label">{{ item.label }}</span>
+          </template>
+        </OCheckbox>
+
+        <OTag
+          type="countChip"
+          value="neutral"
+          size="xs"
+          shape="rounded"
+          :data-test="`alert-library-rail-count-${item.id}`"
+          >{{ item.count }}</OTag
+        >
       </div>
-    </section>
+    </div>
   </nav>
 </template>
 
@@ -185,11 +163,8 @@ import { useI18nTyped } from "@/types/i18n";
 import type { LibraryFacet } from "./libraryFacets";
 
 const props = defineProps<{
-  packs: LibraryFacet[];
-  /** Empty means every pack — the rail opens unfiltered. */
-  selectedPacks: string[];
   categories: LibraryFacet[];
-  /** Empty means every category in the packs currently in scope. */
+  /** Empty means every category — the rail opens unfiltered. */
   selectedCategories: string[];
   /** Includes the "all" pseudo-facet, built by the caller. */
   severities: LibraryFacet[];
@@ -197,107 +172,41 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "update:selectedPacks": [ids: string[]];
   "update:selectedCategories": [ids: string[]];
   "update:severity": [id: string];
 }>();
 
 const { t } = useI18nTyped();
 
-/**
- * Which axis the shared list is showing. Local, not a prop: it is a view
- * preference over the same filter state, and the parent's selections for BOTH
- * axes survive switching tabs.
- */
-const axis = ref<"packs" | "categories">("packs");
-
-/**
- * One term per axis, so switching tabs to check something does not throw away
- * what you had typed. They answer different questions and never share a value.
- */
-const terms = ref<Record<"packs" | "categories", string>>({ packs: "", categories: "" });
-const searchTerm = computed({
-  get: () => terms.value[axis.value],
-  set: (value: string) => {
-    terms.value[axis.value] = value;
-  },
-});
-
-/** Everything that differs between the two axes, resolved once. */
-const active = computed(() =>
-  axis.value === "packs"
-    ? {
-        rowPrefix: "pack" as const,
-        items: props.packs,
-        selected: props.selectedPacks,
-        searchPlaceholder: t("alert_library.searchPacks"),
-        searchAria: t("alert_library.searchPacksAria"),
-        emptyTitle: t("alert_library.noPackMatch"),
-      }
-    : {
-        rowPrefix: "category" as const,
-        items: props.categories,
-        selected: props.selectedCategories,
-        searchPlaceholder: t("alert_library.searchCategories"),
-        searchAria: t("alert_library.searchCategoriesAria"),
-        emptyTitle: t("alert_library.noCategoryMatch"),
-      },
-);
-
-const axisTabs = computed(() => [
-  {
-    id: "packs" as const,
-    label: t("alert_library.packs"),
-    selected: props.selectedPacks.length,
-  },
-  {
-    id: "categories" as const,
-    label: t("alert_library.categories"),
-    selected: props.selectedCategories.length,
-  },
-]);
+const search = ref("");
 
 /**
  * Search matches the LABEL, not the id: the box filters the list you can see,
- * so matching a string the row never shows would look broken ("kube" finds
- * Kubernetes; "k8s" does not).
+ * so matching a string the row never shows would look broken.
  *
  * A zero-count row is a dead end and is dropped — except when it is selected,
  * since hiding it would strand the user with a filter they cannot lift.
  */
 const visibleItems = computed(() => {
-  const needle = searchTerm.value.trim().toLowerCase();
-  return active.value.items.filter((item) => {
+  const needle = search.value.trim().toLowerCase();
+  return props.categories.filter((item) => {
     if (needle && !String(item.label).toLowerCase().includes(needle)) return false;
-    if (item.count === 0 && !active.value.selected.includes(item.id)) return false;
+    if (item.count === 0 && !props.selectedCategories.includes(item.id)) return false;
     return true;
   });
 });
 
-/**
- * Emit against whichever axis is on screen. A named branch rather than a
- * computed event name: the emit overloads are keyed on the literal name, so a
- * computed one widens to `string` and matches none of them.
- */
-const emitSelection = (ids: string[]) => {
-  if (axis.value === "packs") emit("update:selectedPacks", ids);
-  else emit("update:selectedCategories", ids);
-};
-
-const toggleItem = (id: string) => {
-  const selected = active.value.selected;
-  emitSelection(selected.includes(id) ? selected.filter((it) => it !== id) : [...selected, id]);
-};
-
-const clearAxis = () => emitSelection([]);
-
-const onAxisChange = (value: AcceptableValue | AcceptableValue[] | boolean) => {
-  // Re-clicking the active tab yields "" — keep the current axis rather than
-  // emptying the list, since there is no "neither axis" state to show.
-  if (value === "packs" || value === "categories") axis.value = value;
+const toggleCategory = (id: string) => {
+  const selected = props.selectedCategories;
+  emit(
+    "update:selectedCategories",
+    selected.includes(id) ? selected.filter((it) => it !== id) : [...selected, id],
+  );
 };
 
 const onSeverityChange = (value: AcceptableValue | AcceptableValue[] | boolean) => {
+  // Re-clicking the active chip yields "" — the rail is navigation, and you
+  // widen it with the explicit All chip, never by accidentally clearing one.
   if (typeof value === "string" && value !== "") emit("update:severity", value);
 };
 </script>

@@ -22,15 +22,15 @@ import { raw } from "@/types/i18n";
 
 const mountBanner = (props: Record<string, unknown> = {}) =>
   mount(LibraryEmptyState, {
-    props: { packLabel: raw("Kubernetes"), count: 86, ...props },
+    props: { label: raw("Kafka"), count: 86, ...props },
     global: { plugins: [i18n] },
   });
 
 describe("LibraryEmptyState", () => {
-  it("names the pack and the number of alerts that cannot run", () => {
+  it("names the telemetry to send and the number of alerts that cannot run", () => {
     const text = mountBanner().text();
     expect(text).toContain("86");
-    expect(text).toContain("Kubernetes");
+    expect(text).toContain("Kafka");
   });
 
   it("stays neutral — an unusable alert is inert, not urgent", () => {

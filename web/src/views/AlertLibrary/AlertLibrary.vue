@@ -64,13 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-h-0 flex-1">
         <div class="w-rail border-border-default h-full shrink-0 border-r">
           <LibraryRail
-            :packs="packFacets"
-            :selected-packs="selectedPacks"
             :categories="categoryFacets"
             :selected-categories="selectedCategories"
             :severities="severityFacets"
             :severity="severity"
-            @update:selected-packs="selectedPacks = $event"
             @update:selected-categories="selectedCategories = $event"
             @update:severity="severity = $event"
           />
@@ -116,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div v-if="showCollectorBanner" class="px-page-edge shrink-0 pb-2">
               <LibraryEmptyState
-                :pack-label="activePackLabel"
+                :label="soleCategoryLabel ?? raw('')"
                 :count="scopedEntries.length"
                 @action="goToIngestion"
               />
@@ -227,7 +224,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types/alertLibrary";
-import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 
 /** Where the alerts are authored. Not the serving URL — that is a constant. */
 const CONTRIBUTE_URL = "https://github.com/openobserve/o2-alerts-library";
@@ -239,8 +236,7 @@ const router = useRouter();
 const { manifest, isLoading, error, loadManifest, isReady } = useAlertLibrary();
 const { getStreams } = useStreams(t);
 
-/** Empty = every pack / every category. The rail narrows, it does not gate. */
-const selectedPacks = ref<string[]>([]);
+/** Empty = every category. The rail narrows, it does not gate. */
 const selectedCategories = ref<string[]>([]);
 const severity = ref("all");
 /** Stat-strip facet. `null` = no availability filter; "all" never sticks. */
@@ -299,70 +295,65 @@ const errorDescription = computed(() => {
   return t(keys[code] ?? keys.malformed);
 });
 
-// ── pack ───────────────────────────────────────────────────────────────────
-/** Manifest pack order, with any pack that only the alerts mention appended. */
-const packIds = computed<string[]>(() => {
-  const ids = (manifest.value?.packs ?? []).map((pack) => pack.id).filter(Boolean);
-  for (const entry of entries.value) {
-    if (entry.pack && !ids.includes(entry.pack)) ids.push(entry.pack);
-  }
-  return ids;
-});
-
-/**
- * The packs actually on screen. An empty selection means all of them, so the
- * gallery opens on the whole library and the rail narrows it — the same
- * contract as the metrics explorer's facet rails.
- */
-const scopedPackIds = computed(() =>
-  selectedPacks.value.length > 0
-    ? packIds.value.filter((id) => selectedPacks.value.includes(id))
-    : packIds.value,
-);
-
-/** Non-null only when one pack is in view — see showCollectorBanner. */
-const solePack = computed(() => (scopedPackIds.value.length === 1 ? scopedPackIds.value[0] : null));
-const activePackLabel = computed(() => packLabel(solePack.value ?? ""));
-
-const scopedEntries = computed(() =>
-  selectedPacks.value.length > 0
-    ? entries.value.filter((entry) => selectedPacks.value.includes(entry.pack))
-    : entries.value,
-);
-
-const packFacets = computed<LibraryFacet[]>(() =>
-  packIds.value.map((id) => ({
-    id,
-    label: packLabel(id),
-    count: entries.value.filter((entry) => entry.pack === id).length,
-  })),
-);
-
 // ── readiness ──────────────────────────────────────────────────────────────
 const entryReady = (entry: AlertLibraryEntry): boolean =>
   readinessKnown.value ? isReady(entry, streamsByType.value) : true;
 
+// ── scope ──────────────────────────────────────────────────────────────────
+/**
+ * Everything the rail and the search have narrowed to, BEFORE the stat strip's
+ * availability filter. That order matters both ways round: the strip counts
+ * this set, so its numbers describe the grid underneath it, and the strip's own
+ * filter is excluded so that clicking "Not ingested" cannot change the totals
+ * it is being read against.
+ */
+const searchScoped = computed(() => {
+  const needle = search.value.trim().toLowerCase();
+  return entries.value
+    .filter(
+      (entry) =>
+        selectedCategories.value.length === 0 || selectedCategories.value.includes(entry.category),
+    )
+    .filter((entry) => {
+      if (!needle) return true;
+      const haystack = `${entry.title} ${entry.id} ${entry.description} ${entry.stream}`;
+      return haystack.toLowerCase().includes(needle);
+    });
+});
+
+const scopedEntries = computed(() =>
+  searchScoped.value.filter(
+    (entry) => severity.value === "all" || entry.severity === severity.value,
+  ),
+);
+
 const readyCount = computed(() => scopedEntries.value.filter(entryReady).length);
 const missingCount = computed(() => scopedEntries.value.length - readyCount.value);
+
+/** Non-null only when one category is in view — see showCollectorBanner. */
+const soleCategoryLabel = computed(() => {
+  const ids = new Set(scopedEntries.value.map((entry) => entry.category));
+  const [only] = [...ids];
+  return ids.size === 1 ? categoryLabel(only) : null;
+});
 
 /**
  * The one case a number cannot express: not a single alert in view can run, so
  * the answer is a CTA rather than a count. Anything else and the strip already
  * says it.
  *
- * Gated on ONE pack being in view because the copy names it — "send {pack}
- * telemetry" is only advice while there is a single pack to send.
+ * Gated on ONE category being in view because the copy names the telemetry to
+ * send — "send Kafka telemetry" is only advice while there is one thing to send.
  */
 const showCollectorBanner = computed(
   () =>
     readinessKnown.value &&
-    solePack.value !== null &&
+    soleCategoryLabel.value !== null &&
     scopedEntries.value.length > 0 &&
     readyCount.value === 0,
 );
 
 // ── facets ─────────────────────────────────────────────────────────────────
-/** Availability filter applies before the rail facets, so rail counts are stable. */
 const availableEntries = computed(() =>
   scopedEntries.value.filter((entry) => {
     if (facet.value === "ready") return entryReady(entry);
@@ -372,14 +363,15 @@ const availableEntries = computed(() =>
 );
 
 /**
- * Categories of the packs in scope. A selected category that no longer exists
- * in scope is kept at count 0 so the rail can still list it and the user can
- * untick it — see the rail's dead-end rule.
+ * Counted over the WHOLE library, not the current scope: a facet count answers
+ * "how many are there", and recomputing it against the selection would make
+ * every count drop to nothing the moment you ticked one row. A selected
+ * category is pinned at whatever it holds so the rail can always list it.
  */
 const categoryFacets = computed<LibraryFacet[]>(() => {
   const counts = new Map<string, number>();
   for (const id of selectedCategories.value) counts.set(id, 0);
-  for (const entry of scopedEntries.value) {
+  for (const entry of entries.value) {
     counts.set(entry.category, (counts.get(entry.category) ?? 0) + 1);
   }
   return [...counts.keys()]
@@ -387,12 +379,17 @@ const categoryFacets = computed<LibraryFacet[]>(() => {
     .map((id) => ({ id, label: categoryLabel(id), count: counts.get(id) ?? 0 }));
 });
 
+/**
+ * Counted BEFORE the severity filter itself, or picking Critical would drop
+ * Warning to zero and make the chip you are standing on look like the only
+ * one with anything behind it.
+ */
 const severityFacets = computed<LibraryFacet[]>(() => [
-  { id: "all", label: t("alert_library.severityAll"), count: scopedEntries.value.length },
+  { id: "all", label: t("alert_library.severityAll"), count: searchScoped.value.length },
   ...SEVERITY_ORDER.map((id) => ({
     id: id as string,
     label: severityLabel(t, id),
-    count: scopedEntries.value.filter((entry) => entry.severity === id).length,
+    count: searchScoped.value.filter((entry) => entry.severity === id).length,
   })),
 ]);
 
@@ -429,24 +426,12 @@ const statItems = computed<StatItem[]>(() => [
 ]);
 
 // ── visible set ────────────────────────────────────────────────────────────
-const visibleEntries = computed(() => {
-  const needle = search.value.trim().toLowerCase();
-  return availableEntries.value
-    .filter(
-      (entry) =>
-        selectedCategories.value.length === 0 || selectedCategories.value.includes(entry.category),
-    )
-    .filter((entry) => severity.value === "all" || entry.severity === severity.value)
-    .filter((entry) => {
-      if (!needle) return true;
-      const haystack = `${entry.title} ${entry.id} ${entry.description} ${entry.stream}`;
-      return haystack.toLowerCase().includes(needle);
-    })
-    .sort(
-      (a, b) =>
-        severityRank(a.severity) - severityRank(b.severity) || a.title.localeCompare(b.title),
-    );
-});
+/** Every filter has already been applied by `availableEntries`; this orders it. */
+const visibleEntries = computed(() =>
+  [...availableEntries.value].sort(
+    (a, b) => severityRank(a.severity) - severityRank(b.severity) || a.title.localeCompare(b.title),
+  ),
+);
 
 /**
  * Grouped by pack AND category, never category alone: category names are
@@ -480,7 +465,6 @@ const groupedEntries = computed(() => {
 
 const hasActiveFilters = computed(
   () =>
-    selectedPacks.value.length > 0 ||
     selectedCategories.value.length > 0 ||
     severity.value !== "all" ||
     facet.value !== null ||
@@ -497,7 +481,6 @@ const onStatSelect = (key: string) => {
 };
 
 const clearFilters = () => {
-  selectedPacks.value = [];
   selectedCategories.value = [];
   severity.value = "all";
   facet.value = null;

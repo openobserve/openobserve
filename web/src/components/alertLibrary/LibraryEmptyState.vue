@@ -15,8 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  LibraryEmptyState — shown only when NOT ONE alert in the active pack matches a
-  stream this org receives. That is the single case the stat strip cannot
+  LibraryEmptyState — shown only when NOT ONE alert in view matches a stream
+  this org receives, and everything in view is one category, so there is a
+  single thing to name as the fix. That is the case the stat strip cannot
   express: "0" is a number, "here is how to fix it" is not.
 
   Deliberately the DEFAULT (neutral) banner variant. An alert that cannot run is
@@ -34,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span class="flex flex-wrap gap-x-1">
       <span class="text-text-heading font-medium">{{ t("alert_library.noCollectorTitle") }}</span>
       <span class="text-text-secondary">{{
-        t("alert_library.noCollectorDescription", { count: props.count, pack: props.packLabel })
+        t("alert_library.noCollectorDescription", { count: props.count, group: props.label })
       }}</span>
     </span>
     <template #actions>
@@ -57,9 +58,9 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = defineProps<{
-  /** Display name of the pack being browsed. */
-  packLabel: I18nText;
-  /** How many alerts the pack holds — none of which can run yet. */
+  /** Display name of the one category in view. */
+  label: I18nText;
+  /** How many alerts are in view — none of which can run yet. */
   count: number;
 }>();
 
