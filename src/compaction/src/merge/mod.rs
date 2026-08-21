@@ -15,8 +15,8 @@
 
 mod file;
 mod job;
+mod metrics;
 mod stream;
-mod tsid_major;
 
 pub use file::merge_files;
 pub use job::{

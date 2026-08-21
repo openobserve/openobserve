@@ -18,7 +18,7 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use config::{
     FileFormat, get_config,
-    meta::{promql::tsid_layout::MetricsFileLayout, stream::FileMeta},
+    meta::{promql::layout::MetricsFileLayout, stream::FileMeta},
     utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
 };
 use datafusion::{
@@ -51,8 +51,8 @@ use crate::datafusion::{
 
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
+mod metrics;
 pub mod mode;
-mod tsid_major;
 
 pub use mode::{MergeMode, MergeOutput};
 
@@ -116,8 +116,8 @@ pub async fn merge_parquet_files(
             )
             .await?
         }
-        MergeMode::TsidMajor => {
-            tsid_major::write_files(
+        MergeMode::MetricsIndexed => {
+            metrics::write_files(
                 &schema,
                 bloom_filter_fields,
                 &metadata,
