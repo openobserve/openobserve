@@ -372,6 +372,7 @@
       v-model:open="coverOpen"
       :members="members"
       :timezone="team?.timezone ?? 'UTC'"
+      :team-name="team?.name ?? ''"
       :saving="coverSaving"
       :current-holder="onCallNow[0]?.user_email ?? null"
       :gap="coverGap"
@@ -436,7 +437,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { DEFAULT_SLOT, MICROS_PER_DAY, sameSlot, staffedSlots } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { isOnCallUnavailable, upcomingShifts, winningRotation } from "@/utils/oncall";
+import { formatInZone, isOnCallUnavailable, upcomingShifts, winningRotation } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -480,6 +481,18 @@ function openScheduleEditor(intent: ScheduleEditorIntent) {
 }
 
 const coverOpen = ref(false);
+/// The Covers panel reads its own endpoint, so a write made anywhere else has
+/// to tell it. `ref="coverListRef"` had no variable behind it in `<script
+/// setup>`, which binds to nothing in silence: every cover saved from this page
+/// landed on the server and left the list under the calendar unchanged.
+const coverListRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
+
+/// Both things a written cover invalidates: the calendar, which the server
+/// resolves, and the list of covers beneath it. Never one without the other —
+/// a band that moves over a list that does not is the same confusion by half.
+async function refreshCoverage() {
+  await Promise.allSettled([fetchSegments(), coverListRef.value?.refresh() ?? Promise.resolve()]);
+}
 const presetsOpen = ref(false);
 /// The rotation the reader asked to delete, held until they confirm it.
 const rotationToDelete = ref<string | null>(null);
@@ -956,7 +969,7 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
 
     coverOpen.value = false;
     toast({ variant: "success", message: t("oncall.swapSaved") });
-    await fetchSegments();
+    await refreshCoverage();
   } catch (err: any) {
     const reason = raw(err?.response?.data?.message) || t("oncall.coverSaveFailed");
     // Nothing was written, so the server's own sentence is the whole story.
@@ -975,11 +988,24 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
       // The undo failed too: one cover is live and the other is not. Saying
       // "swap failed" here would describe a schedule that no longer exists.
       toast({ variant: "warning", message: t("oncall.swapHalfDone", { reason }) });
-      await fetchSegments();
+      await refreshCoverage();
     }
   } finally {
     coverSaving.value = false;
   }
+}
+
+/// In the TEAM's zone, not the browser's: a cover arranged from another office
+/// is still a night on the team's calendar, and that is the night being agreed.
+function coverSavedMessage(value: { user_email: string; start_at: number; end_at: number }) {
+  const zone = team.value?.timezone ?? "UTC";
+  const at = (micros: number) =>
+    formatInZone(micros, zone, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  return t("oncall.coverSaved", {
+    name: raw(value.user_email),
+    team: raw(team.value?.name ?? ""),
+    range: raw(`${at(value.start_at)} – ${at(value.end_at)}`),
+  });
 }
 
 /// A cover takes a slot for a window; outside it the rotation resolves exactly
@@ -999,8 +1025,10 @@ async function saveCover(value: {
     });
     coverOpen.value = false;
     coverGap.value = null;
-    toast({ variant: "success", message: t("oncall.coverSaved") });
-    await fetchSegments();
+    // The message is "{name} covers {team} · {range}" and it was called with no
+    // params at all, so a successful save reported " covers  · ".
+    toast({ variant: "success", message: coverSavedMessage(value) });
+    await refreshCoverage();
   } catch (err: any) {
     // A 409 is the server saying somebody already covers that window — worth
     // the reader seeing verbatim, since it names them.

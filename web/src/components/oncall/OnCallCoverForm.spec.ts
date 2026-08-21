@@ -411,6 +411,34 @@ describe("OnCallCoverForm — taking a cover", () => {
     });
   });
 
+  /// The one sentence that says what Save is about to do, and it named the
+  /// wrong person: it read `currentHolder` — whoever is being RELIEVED — as the
+  /// one covering, and passed an empty string for the team, so a reader
+  /// arranging cover for somebody else was shown their own shift back.
+  it("says who is taking the shift, not who is losing it", async () => {
+    const wrapper = renderCover({
+      gap: GAP,
+      currentHolder: "ana@o2.ai",
+      defaultUser: "bo@o2.ai",
+      teamName: "Platform",
+    });
+    await flushPromises();
+
+    const summary = wrapper.find('[data-test="oncall-cover-summary"]').text();
+    expect(summary).toContain("bo@o2.ai");
+    expect(summary).toContain("Platform");
+    expect(summary).not.toContain("ana@o2.ai");
+  });
+
+  /// No person picked yet is the same half-answered state as a half-picked
+  /// window: "  covers Platform Sat 18:00 – …" is worse than no sentence.
+  it("says nothing until somebody has been picked", async () => {
+    const wrapper = renderCover({ gap: GAP, defaultUser: "", teamName: "Platform" });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-cover-summary"]').exists()).toBe(false);
+  });
+
   /// A preset is the answer almost every time, and it writes the field through
   /// the form rather than a mirror beside it.
   it("saves a window chosen from a quick range", async () => {

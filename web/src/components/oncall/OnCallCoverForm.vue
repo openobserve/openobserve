@@ -180,6 +180,8 @@ const props = withDefaults(
     saving?: boolean;
     /** Who currently holds the shift, so the picker can say who is being relieved. */
     currentHolder?: string | null;
+    /** Named in the confirmation, because a cover is always a cover OF a team. */
+    teamName?: string;
     /** Pre-fills the window when the caller is covering a known gap. */
     gap?: { from: number; to: number } | null;
     /**
@@ -206,6 +208,7 @@ const props = withDefaults(
     timezone: "UTC",
     saving: false,
     currentHolder: null,
+    teamName: "",
     gap: null,
     defaultUser: "",
     shifts: () => [],
@@ -309,10 +312,14 @@ function resetForm() {
   form.reset(initialValues());
 }
 
-/// The live window, for the summary and nothing else. `useStore` keeps it in
-/// step with the field on every change, which a mirrored ref could not.
+/// The live window and the live person, for the summary and nothing else.
+/// `useStore` keeps them in step with the fields on every change, which a
+/// mirrored ref could not.
 const windowValue = form.useStore(
   (state: { values: OnCallCoverFormValues }) => state.values.window,
+);
+const userValue = form.useStore(
+  (state: { values: OnCallCoverFormValues }) => state.values.user_email,
 );
 
 const PRESETS = [
@@ -339,18 +346,24 @@ function applyPreset(key: (typeof PRESETS)[number]["key"]) {
 
 const summary = computed<I18nText | "">(() => {
   const window = windowValue.value;
+  const who = String(userValue.value ?? "");
   // A half-picked range is not a sentence yet — the picker reports one end at
-  // a time, and "Sat 18:00 – Invalid Date" is worse than nothing.
+  // a time, and "Sat 18:00 – Invalid Date" is worse than nothing. Nor is a
+  // range with nobody against it.
   if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
+  if (!who) return "";
   const fmt = (micros: number) =>
     formatInZone(micros, props.timezone, {
       weekday: "short",
       hour: "2-digit",
       minute: "2-digit",
     });
+  // The person TAKING the shift. This read `currentHolder` — whoever is being
+  // relieved — so the confirmation named the wrong side of the handover, and
+  // the team was passed as an empty string.
   return t("oncall.coverSummary", {
-    name: raw(props.currentHolder ?? ""),
-    team: raw(""),
+    name: raw(who),
+    team: raw(props.teamName ?? ""),
     range: raw(`${fmt(window.from)} – ${fmt(window.to)}`),
   });
 });

@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallTeamDetail from "@/views/OnCall/OnCallTeamDetail.vue";
@@ -37,6 +38,9 @@ vi.mock("@/services/oncall", () => ({
     // The undo half of a swap: without it here, a spec asserting the rollback
     // fails on the mock rather than on the behaviour.
     deleteOverride: vi.fn(),
+    // What the Covers panel under the calendar reads. Absent, its fetch throws
+    // into its own catch and the panel is empty for the wrong reason.
+    listOverrides: vi.fn(),
     teamOverview: vi.fn(),
     teamReachability: vi.fn(),
     teamConfigRisks: vi.fn(),
@@ -57,7 +61,10 @@ vi.mock("vue-router", () => ({
   useRouter: () => router,
 }));
 
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+
 const service = vi.mocked(oncallService);
+const toasted = vi.mocked(toast);
 
 // The tab strip and the attention banner are what is under test, so they
 // render for real; everything they sit beside is a panel with its own spec.
@@ -102,6 +109,7 @@ describe("OnCallTeamDetail", () => {
     service.teamReachability.mockResolvedValue({ data: null } as any);
     service.teamConfigRisks.mockResolvedValue({ data: null } as any);
     service.teamLoad.mockResolvedValue({ data: null } as any);
+    service.listOverrides.mockResolvedValue({ data: [] } as any);
   });
 
   /// Overview first — what the team HAS been doing — then the chain that
@@ -340,6 +348,89 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
       expect(cover(wrapper).props("gap")).toBe(null);
       expect(cover(wrapper).props("defaultUser")).toBe("");
+    });
+  });
+
+  /// Saving a cover is three things, and only the first had a test: the write,
+  /// the panels that must catch up with it, and what the reader is told. A
+  /// cover that lands and leaves the Covers panel empty is indistinguishable
+  /// from one that never landed.
+  describe("saving a cover", () => {
+    const COVER = {
+      user_email: "bo@corp.com",
+      start_at: 1_000,
+      end_at: 2_000,
+      slot: "primary",
+    };
+
+    async function save(wrapper: ReturnType<typeof render>) {
+      wrapper.findComponent({ name: "OnCallCoverForm" }).vm.$emit("save", COVER);
+      await flushPromises();
+    }
+
+    it("writes the cover the dialog handed it", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+      await save(wrapper);
+
+      expect(service.createOverride).toHaveBeenCalledWith(
+        expect.objectContaining({ team_id: "team_1", data: COVER }),
+      );
+    });
+
+    /// The panel that lists covers sits directly under the calendar, on the
+    /// tab the reader is standing on while they take one. It reads its own
+    /// endpoint, so a save it is never told about leaves them looking at a list
+    /// that does not contain what they just saved.
+    it("re-reads the Covers panel so the new cover appears in it", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      const before = service.listOverrides.mock.calls.length;
+      expect(before).toBeGreaterThan(0);
+
+      await save(wrapper);
+      expect(service.listOverrides.mock.calls.length).toBeGreaterThan(before);
+    });
+
+    /// A swap is two covers written back to back, so it invalidates exactly
+    /// what one cover invalidates.
+    it("re-reads the Covers panel after a swap too", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      const before = service.listOverrides.mock.calls.length;
+
+      wrapper.findComponent({ name: "OnCallCoverForm" }).vm.$emit("swap", {
+        first: { user_email: "bo@corp.com", start_at: 1_000, end_at: 2_000 },
+        second: { user_email: "ana@corp.com", start_at: 2_000, end_at: 3_000 },
+      });
+      await flushPromises();
+
+      expect(service.listOverrides.mock.calls.length).toBeGreaterThan(before);
+    });
+
+    /// The toast is the whole report a save makes. Its message names who, which
+    /// team and which hours — all three interpolated, or it reads as a sentence
+    /// with the nouns cut out of it.
+    it("names who covers what in the success toast", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+      await save(wrapper);
+
+      const message = String(toasted.mock.calls.at(-1)?.[0]?.message ?? "");
+      expect(message).toContain("bo@corp.com");
+      expect(message).toContain("Platform");
+      expect(message).not.toMatch(/\{\w+\}/);
+      // " covers  · " — the shape the sentence collapses to when vue-i18n is
+      // handed no params for its placeholders.
+      expect(message).not.toMatch(/^\s*covers\s/);
     });
   });
 
