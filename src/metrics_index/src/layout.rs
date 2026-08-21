@@ -13,25 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Indexed metrics layout (`ZO_METRICS_INDEX_ENABLED`): when it applies to a
-//! stream and how the physical layout of a metrics file is encoded in its name.
+//! Indexed metrics layout (`ZO_METRICS_INDEX_ENABLED`): when it
+//! applies to a stream, how the physical layout of a metrics file is encoded
+//! in its name, and the names of the `.midx` metrics-index columns.
 
 use arrow_schema::{DataType, Schema};
+use config::{
+    FileFormat, get_config,
+    meta::{promql::HASH_LABEL, stream::StreamType},
+};
 
-use super::HASH_LABEL;
-use crate::{FileFormat, meta::stream::StreamType};
-
-/// True when `stream_type` uses the indexed metrics layout
-/// (`ZO_METRICS_INDEX_ENABLED`): Parquet metrics files ordered by
-/// `(__hash__, _timestamp)`, so readers must not assume a `_timestamp` order.
-pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
-    if stream_type != StreamType::Metrics {
-        return false;
-    }
-    let cfg = crate::get_config();
-    cfg.compact.metrics_index_enabled
-        && cfg.common.file_format.for_stream(stream_type) == FileFormat::Parquet
-}
+pub const METRICS_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
 
 /// [`metrics_index_enabled`] narrowed to one stream: the layout also
 /// needs a `__hash__` column of type `UInt64` (remote-write / OTLP metrics).
@@ -40,6 +32,18 @@ pub fn metrics_index_stream(stream_type: StreamType, schema: &Schema) -> bool {
         && schema
             .field_with_name(HASH_LABEL)
             .is_ok_and(|field| field.data_type() == &DataType::UInt64)
+}
+
+/// True when `stream_type` uses the metrics index layout
+/// (`ZO_METRICS_INDEX_ENABLED`): Parquet metrics files ordered by
+/// `(__hash__, _timestamp)`, so readers must not assume a `_timestamp` order.
+pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
+    if stream_type != StreamType::Metrics {
+        return false;
+    }
+    let cfg = get_config();
+    cfg.compact.metrics_index_enabled
+        && cfg.common.file_format.for_stream(stream_type) == FileFormat::Parquet
 }
 
 /// Physical layout of a metrics data file, encoded in its file-name prefix so
@@ -52,14 +56,18 @@ pub enum MetricsFileLayout {
     /// written by the ingester and by incremental compactor merges of the
     /// still-open hour (`hash-sorted-v1-{id}.parquet`).
     HashSorted,
-    /// Size-bounded Parquet ordered by `(__hash__ ASC, _timestamp ASC)`,
-    /// written by the compactor's hour-end merge (`indexed-v1-{id}.parquet`).
+    /// Size-bounded Parquet ordered by `(__hash__ ASC, _timestamp ASC)` with a
+    /// `.midx` metrics index (see [`MetricsFileLayout::metrics_index_path`]);
+    /// written by the compactor's hour-end merge
+    /// (`indexed-v1-{id}.parquet`).
     Indexed,
 }
 
 impl MetricsFileLayout {
     const HASH_SORTED_PREFIX: &'static str = "hash-sorted-v1-";
     const INDEXED_PREFIX: &'static str = "indexed-v1-";
+    const METRICS_INDEX_DIR: &'static str = "midx";
+    const METRICS_INDEX_EXT: &'static str = ".midx";
 
     /// Layout of the file at `path` (a full object key or a bare file name).
     pub fn of(path: &str) -> Self {
@@ -101,18 +109,41 @@ impl MetricsFileLayout {
     }
 
     /// Add this layout's marker to the file name of an existing key
-    /// (`files/.../7099.parquet` -> `files/.../hash-sorted-v1-7099.parquet`).
+    /// (`files/.../7099.parquet` ->
+    /// `files/.../hash-sorted-v1-7099.parquet`).
     pub fn mark_file_key(self, key: &str) -> String {
         match key.rfind('/') {
             Some(pos) => format!("{}/{}{}", &key[..pos], self.prefix(), &key[pos + 1..]),
             None => format!("{}{key}", self.prefix()),
         }
     }
+
+    /// The `.midx` metrics-index object of an indexed metrics data file. Stored like
+    /// the Tantivy index — under its own root instead of next to the data —
+    /// but in a distinct tree:
+    /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v1-{id}.parquet`
+    /// -> `files/{org}/midx/{stream}/{date}/{hour}/indexed-v1-{id}.midx`.
+    pub fn metrics_index_path(path: &str) -> Option<String> {
+        if Self::of(path) != Self::Indexed {
+            return None;
+        }
+        let mut parts: Vec<&str> = path.split('/').collect();
+        // files/{org}/metrics/{stream}/.../{file}
+        if parts.len() < 5 || parts[2] != StreamType::Metrics.as_str() {
+            return None;
+        }
+        parts[2] = Self::METRICS_INDEX_DIR;
+        let file_name_pos = parts.len() - 1;
+        let file_name = parts[file_name_pos].strip_suffix(".parquet")?;
+        let file_name = format!("{file_name}{}", Self::METRICS_INDEX_EXT);
+        parts[file_name_pos] = &file_name;
+        Some(parts.join("/"))
+    }
 }
 
 #[cfg(test)]
 mod metrics_file_layout_tests {
-    use FileFormat;
+    use config::FileFormat;
 
     use super::*;
 
@@ -187,6 +218,40 @@ mod metrics_file_layout_tests {
         assert_eq!(
             MetricsFileLayout::HashSorted.mark_file_key("1.parquet"),
             "hash-sorted-v1-1.parquet"
+        );
+    }
+
+    #[test]
+    fn metrics_index_path_only_for_indexed_metrics_keys() {
+        assert_eq!(
+            MetricsFileLayout::metrics_index_path(
+                "files/default/metrics/cpu/2026/08/19/07/indexed-v1-456.parquet"
+            ),
+            Some("files/default/midx/cpu/2026/08/19/07/indexed-v1-456.midx".to_string())
+        );
+        // other layouts have no metrics index
+        assert_eq!(
+            MetricsFileLayout::metrics_index_path(
+                "files/default/metrics/cpu/2026/08/19/07/hash-sorted-v1-456.parquet"
+            ),
+            None
+        );
+        assert_eq!(
+            MetricsFileLayout::metrics_index_path(
+                "files/default/metrics/cpu/2026/08/19/07/456.parquet"
+            ),
+            None
+        );
+        // not a full metrics object key
+        assert_eq!(
+            MetricsFileLayout::metrics_index_path("files/default/indexed-v1-456.parquet"),
+            None
+        );
+        assert_eq!(
+            MetricsFileLayout::metrics_index_path(
+                "files/default/logs/app/2026/08/19/07/indexed-v1-456.parquet"
+            ),
+            None
         );
     }
 }

@@ -16,6 +16,7 @@
 use config::meta::alerts::incidents::IncidentEvent;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 
+use super::get_lock;
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     table::entity::incident_events,
@@ -114,6 +115,9 @@ pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr>
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let event = IncidentEvent::created();
     let events_json = encode_events(&[event])?;
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
 
     let model = incident_events::ActiveModel {
         org_id: Set(org_id.to_string()),
@@ -223,6 +227,10 @@ pub async fn reconstruct_if_empty(
     incident_id: &str,
 ) -> Result<Option<usize>, sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = db.begin().await?;
 
     let row = incident_events::Entity::find()
@@ -296,6 +304,10 @@ pub async fn append(
     event: IncidentEvent,
 ) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = db.begin().await?;
 
     let row = incident_events::Entity::find()
@@ -342,6 +354,10 @@ pub async fn record_alert(
     triggered_at: i64,
 ) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = db.begin().await?;
 
     let row = incident_events::Entity::find()
@@ -398,6 +414,10 @@ pub async fn record_alert(
 /// Deletes all incident event entries belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), sea_orm::DbErr> {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     incident_events::Entity::delete_many()
         .filter(incident_events::Column::OrgId.eq(org_id))

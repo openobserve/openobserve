@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "전체 화면으로 열기",
     "viewLogs": "로그 보기",
+    "viewLogsUnavailable": "이 스팬의 로그를 열 수 없습니다.",
     "backToLogs": "로그로 돌아가기",
     "openInTraces": "오픈 인 트레이스",
     "loadingStream": "스트림 로드 중...",

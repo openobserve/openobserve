@@ -34,6 +34,7 @@ use super::{
     distinct_values::{self, OriginType},
     entity::{dashboards, folders, reports},
     folders::folder_type_into_i16,
+    get_lock,
 };
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -221,6 +222,9 @@ pub async fn put(
     let updated_at = dashboard.updated_at;
     let data = inner_data_as_json(dashboard)?;
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     // Try to get the new folder if the dashboard is being moved to a new folder.
     let maybe_new_folder_model = if let Some(new_folder_id) = new_folder_id {
         let new_folder_model = folders::Entity::find()
@@ -305,6 +309,9 @@ pub async fn delete_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = ORM_CLIENT.get_or_init(connect_to_orm).await.begin().await?;
     let maybe_dashboard_model = get_model_from_folder(&txn, org_id, folder_id, dashboard_id)
         .await?
@@ -341,6 +348,10 @@ pub async fn delete_all() -> Result<(), errors::Error> {
     for id in ids {
         distinct_values::batch_remove(OriginType::Dashboard, id).await?;
     }
+
+    // make sure only one client is writing to the database(only for sqlite)
+    // NOTE: acquired after batch_remove() calls above, which take this lock internally
+    let _lock = get_lock().await;
 
     dashboards::Entity::delete_many().exec(client).await?;
     Ok(())
@@ -532,6 +543,9 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
 
 /// Deletes all dashboards belonging to the given org (via folder join).
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // Collect folder PKs for this org
     let folder_ids: Vec<String> = folders::Entity::find()

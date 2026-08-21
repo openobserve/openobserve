@@ -8887,6 +8887,7 @@
     },
     "openInFullView": "Open in full view",
     "viewLogs": "View Logs",
+    "viewLogsUnavailable": "Could not open logs for this span.",
     "backToLogs": "Back to Logs",
     "openInTraces": "Open in Traces",
     "loadingStream": "Loading Stream...",

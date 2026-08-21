@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "Ouvrir en plein écran",
     "viewLogs": "Afficher les journaux",
+    "viewLogsUnavailable": "Impossible d'ouvrir les journaux pour ce span.",
     "backToLogs": "Retour aux journaux",
     "openInTraces": "Ouvrir dans Traces",
     "loadingStream": "Chargement du flux...",

@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "Открыть в полном виде",
     "viewLogs": "Просмотр логов",
+    "viewLogsUnavailable": "Не удалось открыть логи для этого span.",
     "backToLogs": "Назад к логам",
     "openInTraces": "Открыть в трейсах",
     "loadingStream": "Загрузка потока...",

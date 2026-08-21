@@ -601,6 +601,9 @@ pub async fn set_job_start(
     node: &str,
     updated_at: i64,
 ) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let res = Entity::update_many()

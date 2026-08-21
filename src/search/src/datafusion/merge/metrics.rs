@@ -19,15 +19,12 @@ use arrow::{
     array::{Array, Int64Array, RecordBatch},
     compute::{max, min},
 };
-use config::{
-    TIMESTAMP_COL_NAME,
-    meta::{promql::layout::MetricsFileLayout, stream::FileMeta},
-    utils::parquet::new_parquet_writer,
-};
+use config::{TIMESTAMP_COL_NAME, meta::stream::FileMeta, utils::parquet::new_parquet_writer};
 use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
+use metrics_index::{MetricsFileLayout, MetricsIndexWriter};
 use parquet::arrow::AsyncArrowWriter;
 
 use super::{MergedFile, append_metadata};
@@ -62,9 +59,15 @@ pub(super) async fn write_files(
         }) {
             files.push(full.finish(metadata, max_file_size).await?);
         }
-        let writer = active.get_or_insert_with(|| {
-            ActiveIndexedMetricsWriter::new(schema, bloom_filter_fields, metadata, timestamp_index)
-        });
+        let writer = match active.as_mut() {
+            Some(writer) => writer,
+            None => active.insert(ActiveIndexedMetricsWriter::try_new(
+                schema,
+                bloom_filter_fields,
+                metadata,
+                timestamp_index,
+            )?),
+        };
         writer.write(&batch).await?;
     }
 
@@ -83,20 +86,22 @@ pub(super) async fn write_files(
     Ok(files)
 }
 
-/// One output file in progress: the Parquet writer and the running file meta.
+/// One output file in progress: the Parquet writer, its `.midx` metrics-index
+/// writer and the running file meta.
 struct ActiveIndexedMetricsWriter {
     writer: AsyncArrowWriter<Vec<u8>>,
+    metrics_index: MetricsIndexWriter,
     file_meta: FileMeta,
     timestamp_index: usize,
 }
 
 impl ActiveIndexedMetricsWriter {
-    fn new(
+    fn try_new(
         schema: &Arc<Schema>,
         bloom_filter_fields: &[String],
         metadata: &FileMeta,
         timestamp_index: usize,
-    ) -> Self {
+    ) -> Result<Self> {
         let writer = new_parquet_writer(
             Vec::new(),
             schema,
@@ -105,17 +110,19 @@ impl ActiveIndexedMetricsWriter {
             false,
             None,
         );
-        Self {
+        Ok(Self {
             writer,
+            metrics_index: MetricsIndexWriter::try_new(schema)?,
             file_meta: FileMeta::default(),
             timestamp_index,
-        }
+        })
     }
 
-    /// Append one (hash, ts)-ordered batch to the data file and its rows /
-    /// time range to the file meta.
+    /// Append one (hash, ts)-ordered batch to the data file, its runs to the
+    /// metrics index and its rows / time range to the file meta.
     async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
         self.writer.write(batch).await?;
+        self.metrics_index.write(batch)?;
 
         let timestamps = batch
             .column(self.timestamp_index)
@@ -142,11 +149,12 @@ impl ActiveIndexedMetricsWriter {
     async fn finish(self, source_meta: &FileMeta, max_file_size: i64) -> Result<MergedFile> {
         let Self {
             mut writer,
+            metrics_index,
             mut file_meta,
             ..
         } = self;
 
-        // below the target so a finalized file never advertises >= max_file_size
+        // below the target so an indexed file never advertises >= max_file_size
         file_meta.original_size =
             proportional_original_size(source_meta, file_meta.records).min(max_file_size - 1);
         append_metadata(&mut writer, &file_meta)?;
@@ -158,6 +166,7 @@ impl ActiveIndexedMetricsWriter {
             buf,
             meta: file_meta,
             layout: MetricsFileLayout::Indexed,
+            metrics_index: Some(metrics_index.finish()?),
         })
     }
 }
@@ -255,6 +264,7 @@ mod tests {
         );
         assert!(files.iter().all(|f| {
             f.layout == MetricsFileLayout::Indexed
+                && f.metrics_index.is_some()
                 && f.meta.original_size < max_file_size as i64
                 && f.meta.compressed_size == f.buf.len() as i64
         }));

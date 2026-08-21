@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "フルビューで開く",
     "viewLogs": "ログを表示",
+    "viewLogsUnavailable": "このスパンのログを開けませんでした。",
     "backToLogs": "ログに戻る",
     "openInTraces": "トレースで開く",
     "loadingStream": "ストリームをロード中...",
