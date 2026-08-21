@@ -44,7 +44,7 @@ from pathlib import Path
 import pytest
 from requests.auth import HTTPBasicAuth
 
-from support.sse import read_sse_response
+from support.sse import read_sse_frames, read_sse_response
 
 logger = logging.getLogger(__name__)
 
@@ -580,6 +580,287 @@ class TestStreamingEnabled:
             assert "field" in hit
             assert "values" in hit
             assert isinstance(hit["values"], list)
+
+    def test_streaming_aggs_partitions_are_cumulative_not_disjoint(self, streams_setup):
+        """Pin the `/_search_stream` wire contract for `streaming_aggs: true`.
+
+        Two DIFFERENT per-partition semantics share one SSE frame shape, and the
+        `streaming_aggs` flag on the metadata frame is the only thing that tells
+        them apart:
+
+        - `streaming_aggs: false` — each response is a disjoint PAGE. `total` is
+          that page's row count and the whole-query count is `Σ total`.
+        - `streaming_aggs: true`  — each response is the CUMULATIVE merged
+          aggregation state. THE LAST FRAME IS THE ANSWER, and `Σ total` is
+          meaningless (it over-counts by roughly the partition count). `total`
+          also happens to rise monotonically for a query shaped like this one's,
+          but that is a property of the SHAPE and not of the contract — see the
+          message on assertion 2.
+
+        Every frontend consumer is built on top of that split, so if the emitter
+        ever switched `streaming_aggs: true` to per-partition deltas, all of them
+        would silently start reporting the wrong number:
+
+        - dashboards: `web/src/composables/dashboard/usePanelSearchHandlers.ts`
+          and `usePanelSQLExecutor.ts` branch on `streaming_aggs` and REPLACE the
+          panel data with the newest frame — deltas would make panels show only
+          the last partition's slice.
+        - the Logs page: `web/src/composables/useLogs/useSearchResponseHandler.ts`
+          and `useSearchPagination.ts` do `queryResults.total += results.total`,
+          which is only correct on the disjoint-page side of the flag — today it
+          over-counts aggregate queries by roughly the partition count.
+        - the alert preview: `web/src/components/alerts/PreviewAlert.vue` sums
+          `total` over partitions to decide whether an alert would fire. That sum
+          is exactly the over-count being fixed, which is why assertion 4 below
+          asserts BOTH that the last frame matches non-streaming `/_search` AND
+          that the sum does not — i.e. that summing is wrong, not just different.
+
+        Server side, the guarantee lives in
+        `src/search_service/src/streaming/execution.rs` ("Only accumulate the
+        results of the last partition", and the SSE frame stamped with the flag)
+        and `src/search_service/src/streaming/collect.rs::fold_response`. Before
+        this test its only coverage was a unit test on that private fold helper —
+        nothing pinned the HTTP boundary.
+        """
+        session = streams_setup
+        url = ZO_BASE_URL
+
+        # One window + one SQL string, reused verbatim by all three calls below,
+        # so the streaming and non-streaming runs cover exactly the same rows.
+        # 30 minutes is deliberate: it is under STREAM_NAME's max_query_range=1h
+        # (set by streams_setup) so neither call gets its range clamped, and it
+        # is >= 15 min, which is what puts the streaming-aggs partition ladder on
+        # its 5-minute interval and so yields several partitions.
+        end_time = int(datetime.now(UTC).timestamp() * 1_000_000)
+        start_time = end_time - 30 * 60 * 1_000_000
+        # No histogram() and no _timestamp anywhere in the projection or ORDER BY:
+        # that is what makes the server's `ts_column` None, which together with
+        # "simple aggregate query" is the precondition for the streaming-aggs path
+        # (src/search_service/src/partition/aggregate.rs::is_streaming_aggregate).
+        sql = (
+            "SELECT kubernetes_container_name, COUNT(*) AS cnt "
+            f'FROM "{STREAM_NAME}" GROUP BY kubernetes_container_name'
+        )
+
+        # --- precondition guard -------------------------------------------------
+        # Two independent server-side conditions can switch the streaming-aggs path
+        # off, and either one makes every assertion below pass vacuously, so ask
+        # the planner before asserting anything:
+        #
+        # 1. ZO_FEATURE_QUERY_STREAMING_AGGS is force-disabled when the disk cache
+        #    is off (src/config/src/config.rs, "disable result cache if disk cache
+        #    is disabled").
+        # 2. search_partition() collapses an aggregate query to ONE partition when
+        #    `total_secs <= aggs_min_num_partition_secs` (default 3) —
+        #    src/search_service/src/lib.rs:635-645. The non-obvious part:
+        #    `total_secs` is derived from `stream_files.original_size`, which counts
+        #    PARQUET FILES ONLY (src/search_service/src/partition/stream_files.rs
+        #    calls file_list::query_ids). Freshly ingested rows are still in the WAL
+        #    memtable and contribute 0 bytes, so `total_secs` is 0 and the planner
+        #    returns a single partition — on ANY size of test fixture. Even after a
+        #    WAL flush, query_group_base_speed is 1 GB/s/core, so a few-MB fixture
+        #    still gives total_secs = 1 <= 3.
+        #
+        # Neither is reachable over HTTP: `aggs_min_num_partition_secs` is read as
+        # `get_config().limit.*`, which comes from the process env / server-side
+        # .env at init. Unlike `enable_streaming_search` (an org row in the DB, which
+        # is why the _enable_streaming fixture can flip it at runtime), no settings
+        # endpoint writes it, so this test cannot arrange its own precondition.
+        #
+        # A THIRD hazard, which unlike the two above is NOT fixable from here:
+        # this probe plans with the result cache ON while the run it guards
+        # executes with it OFF, so the two disagree about the plan. `use_cache`
+        # is a URL query param on `/_search_stream`
+        # (src/api/search/src/search/search_stream.rs:429, via
+        # get_use_cache_from_request), but `/_search_partition` reads no such
+        # param and its body type has no such field — the handler passes a
+        # literal `true` as the use_cache argument
+        # (src/api/search/src/search/mod.rs:1432-1440; SearchPartitionRequest is
+        # src/config/src/meta/search.rs:620-640). Adding "use_cache" below would
+        # be silently dropped by serde rather than honoured, so it is left out
+        # on purpose. The consequence is a FALSE SKIP, never a false pass:
+        # prepare_streaming_aggregate(.., use_cache) skips cache discovery when
+        # it is false (src/search_service/src/partition/aggregate.rs:105-107),
+        # while the probe's `true` can find a warm cache and return the
+        # FullyCached strategy, which collapses to ONE partition
+        # (src/search/src/cache/streaming_agg/partition_optimizer.rs:76-88).
+        # The streaming-aggs cache key is time-independent (sql + vrl + regions
+        # + clusters, src/search/src/cache/streaming_agg/files.rs:433-447), so an
+        # earlier cached run of this same SQL can skip a run that would in fact
+        # have produced the many partitions the guard is looking for.
+        partition_payload = {
+            "sql": sql,
+            "start_time": start_time,
+            "end_time": end_time,
+            "streaming_output": True,
+        }
+        part_resp = session.post(
+            f"{url}api/{ORG_ID}/_search_partition?type=logs", json=partition_payload
+        )
+        assert part_resp.status_code == 200, part_resp.text
+        part_body = part_resp.json()
+        partitions = part_body.get("partitions") or []
+        if part_body.get("streaming_aggs") is not True or len(partitions) < 2:
+            pytest.skip(
+                "THE STREAMING-AGGS WIRE CONTRACT IS NOT PINNED ON THIS INSTANCE — "
+                "this is a COVERAGE GAP, not a passing test. The planner did not "
+                "return a streaming-aggs plan for this query "
+                f"(streaming_aggs={part_body.get('streaming_aggs')!r}, "
+                f"partitions={len(partitions)}), so the cumulative-vs-disjoint "
+                "semantics that dashboards, the Logs page and the alert preview all "
+                "depend on went unverified. To actually run it the SERVER needs: "
+                "ZO_AGGS_MIN_NUM_PARTITIONS_SECS=0 (required — the default of 3 "
+                "collapses every aggregate query over WAL-resident test data to a "
+                "single partition; see the comment above) and "
+                "ZO_FEATURE_QUERY_STREAMING_AGGS=true (on by default, but force-"
+                "disabled when the disk cache is off). Neither is settable over the "
+                "API; both must be in the server's environment at boot, or in its "
+                ".env followed by a root-only GET /config/reload."
+            )
+
+        # --- the streaming run --------------------------------------------------
+        # use_cache=false on purpose: it keeps the partition ladder deterministic
+        # (no FullyCached/Hybrid collapse) and suppresses the cached-response frame,
+        # which is emitted with streaming_aggs=false and would defeat assertion 1.
+        #
+        # DO NOT ADD "track_total_hits" TO THE QUERY BELOW. Streaming output is
+        # only switched on when `streaming_output && !track_total_hits`
+        # (src/search_service/src/lib.rs:163-165), so a `true` there disables the
+        # streaming-aggs path wholesale: no frame carries streaming_aggs=true,
+        # the guard above skips every run, and NOTHING in that skip message —
+        # which talks only about server env vars — points at track_total_hits as
+        # the cause. Leave it absent.
+        stream_payload = {
+            "query": {
+                "sql": sql,
+                "start_time": start_time,
+                "end_time": end_time,
+                "from": 0,
+                "size": -1,
+                "quick_mode": False,
+            },
+            "regions": [],
+            "clusters": [],
+        }
+        resp = session.post(
+            f"{url}api/{ORG_ID}/_search_stream?type=logs&search_type=UI&use_cache=false",
+            json=stream_payload,
+            stream=True,
+        )
+        assert resp.status_code == 200, f"{resp.status_code} {resp.content}"
+
+        # read_sse_response() collapses the frames (max total, hits concatenated)
+        # and so cannot see per-frame semantics — the raw frame list is the point.
+        frames = read_sse_frames(resp)
+        meta_idx = [i for i, (event, _) in enumerate(frames) if event == "search_response_metadata"]
+        assert meta_idx, f"no metadata frames in SSE response: {frames}"
+        metas = [frames[i][1] for i in meta_idx]
+        # LOAD-BEARING — do not relax or delete this as a redundant restatement
+        # of the planner's partition count. A single streaming-aggs frame is
+        # simultaneously the "delta" and the cumulative total, so with one frame
+        # every assertion below passes under BOTH semantics and the very
+        # ambiguity this test exists to detect becomes invisible. This is the
+        # only thing standing between this test and a silent tautology.
+        assert len(metas) > 1, (
+            f"expected one metadata frame per partition (planner reported "
+            f"{len(partitions)}), got {len(metas)} — with a single frame this test "
+            "cannot distinguish cumulative from disjoint"
+        )
+
+        # 1. Every metadata frame must carry the flag. A single false frame means
+        #    a consumer switching on it would treat that partition as a page.
+        for i, meta in enumerate(metas):
+            assert meta.get("streaming_aggs") is True, (
+                f"metadata frame {i}/{len(metas)}: expected streaming_aggs=True, "
+                f"got {meta.get('streaming_aggs')!r}"
+            )
+
+        # How the frames are expected to line up, which is load-bearing for both
+        # assertion 2 and assertion 4 and is NOT obvious from the wire:
+        # partitions come back NEWEST-FIRST — `to_time_partitions(sql_order_by)`
+        # reverses on OrderBy::Desc, which is the default when the SQL has no ORDER
+        # BY, and `search_type=UI` with `size == -1` skips the re-sort in
+        # execution.rs. streams_setup's rows all carry ~the same ingest timestamp,
+        # so they land in FRAME 0 and totals read [K, K, K, ...]: the accumulator
+        # reaches its final value immediately and later (empty) partitions re-emit
+        # it. Were the order ascending instead, the rows would land in the LAST
+        # frame, totals would read [0, ..., 0, K], and `sum == last` would fail
+        # assertion 4's second clause for a reason that has nothing to do with the
+        # contract. The same shape appears if this test runs more than ~25 minutes
+        # after streams_setup, once the rows have aged into the oldest 5-minute
+        # partition of the window — see the message on that assertion.
+        #
+        # 2. Cumulative state never shrinks — for THIS query shape; see below.
+        totals = [meta["results"]["total"] for meta in metas]
+        assert totals == sorted(totals), (
+            "this fixture's totals must be non-decreasing: its query is a bare "
+            "GROUP BY with no HAVING and no LIMIT, so merging another partition "
+            "can only add groups, never remove one. That is a property of THIS "
+            "query shape, not a general streaming-aggs guarantee — a shrinking "
+            "HAVING (`< N`, `!= N`) or a top-k makes the merged total FALL as "
+            "more data arrives, which is why the frontend takes the last frame "
+            f"rather than the max. Got {totals}"
+        )
+
+        # 3. The last frame's total describes the last frame's OWN hits, not a
+        #    running sum of hits the client was expected to keep.
+        last_hits: list[dict] = []
+        for event, data in frames[meta_idx[-1] + 1:]:
+            if event == "search_response_hits":
+                last_hits.extend(data.get("hits") or [])
+        assert totals[-1] == len(last_hits), (
+            f"last frame reports total={totals[-1]} but carries {len(last_hits)} hits"
+        )
+
+        # --- 4. the load-bearing one: same SQL, same window, no streaming --------
+        non_streaming = session.post(
+            f"{url}api/{ORG_ID}/_search?type=logs&search_type=UI&use_cache=false",
+            json={
+                "query": {
+                    "sql": sql,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "from": 0,
+                    "size": -1,
+                }
+            },
+        )
+        assert non_streaming.status_code == 200, non_streaming.text
+        non_streaming_hits = non_streaming.json().get("hits") or []
+        assert len(non_streaming_hits) > 0, (
+            "non-streaming /_search returned no rows for the same window — the "
+            "comparison below would be vacuous"
+        )
+        # The last frame IS the answer...
+        assert totals[-1] == len(non_streaming_hits), (
+            f"last streaming-aggs frame total={totals[-1]} but non-streaming "
+            f"/_search returned {len(non_streaming_hits)} rows for the same SQL "
+            f"and window; per-frame totals were {totals}"
+        )
+        # ...and summing the frames is WRONG, not merely a different spelling of
+        # the same number. If the emitter ever switches to per-partition deltas
+        # under an ascending ladder, Σ totals collapses onto the correct answer
+        # and this fires.
+        #
+        # DO NOT DELETE THIS AS REDUNDANT. Taken alone it is close to a tautology:
+        # given assertion 2 (non-decreasing) and >1 frame with positive totals,
+        # `sum > last` is arithmetic, not a fact about the server. Its value is
+        # semantic and only exists in combination with the clause directly above.
+        # Together the two say the thing no other assertion here says: the number
+        # PreviewAlert.vue computes by summing is NOT the number /_search returns.
+        # That is the statement the frontend fix depends on, so it is asserted
+        # rather than left as prose.
+        assert sum(totals) > totals[-1], (
+            f"summing streaming-aggs totals ({sum(totals)}) equals the correct "
+            f"answer ({totals[-1]}) across {len(totals)} frames — the frames are "
+            "no longer cumulative, so every consumer that takes only the last "
+            "frame (dashboards, Logs, alert preview) now under-counts. "
+            f"(per-frame totals: {totals}. If they read [0, ..., 0, N] instead, "
+            "the module's ingested rows have aged into the OLDEST partition of "
+            "this 30-minute window — this class already assumes it runs within "
+            "~10 minutes of streams_setup, so that is an infrastructure problem, "
+            "not a contract break.)"
+        )
 
     def test_streaming_sql_query_range_function_error(self, streams_setup):
         """A 61-min query window via /_search_stream returns the function_error message."""
