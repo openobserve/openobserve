@@ -7293,12 +7293,17 @@
       "matchingGroups": "匹配组",
       "dataPoint": "数据点",
       "dataPoints": "数据点",
+      "matchingSeries": "序列",
+      "matchingSeriesPlural": "序列",
       "row": "行",
       "rows": "行",
       "result": "结果",
       "results": "结果",
       "reasonMatch": "{count} {label} 匹配（{comparison}）",
-      "reasonNoMatch": "找到 {count} {label} - 不满足 {comparison}"
+      "reasonNoMatch": "找到 {count} {label} - 不满足 {comparison}",
+      "levelCritical": "严重",
+      "levelWarning": "警告",
+      "reasonLevel": "{reason} — {level}"
     },
     "selectAllColumnsNotAllowed": "不允许选择所有列",
     "customSql": "自定义 SQL",

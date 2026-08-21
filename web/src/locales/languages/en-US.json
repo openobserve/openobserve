@@ -7294,12 +7294,17 @@
       "matchingGroups": "matching groups",
       "dataPoint": "data point",
       "dataPoints": "data points",
+      "matchingSeries": "series",
+      "matchingSeriesPlural": "series",
       "row": "row",
       "rows": "rows",
       "result": "result",
       "results": "results",
       "reasonMatch": "{count} {label} match ({comparison})",
-      "reasonNoMatch": "{count} {label} found - does not meet {comparison}"
+      "reasonNoMatch": "{count} {label} found - does not meet {comparison}",
+      "levelCritical": "Critical",
+      "levelWarning": "Warning",
+      "reasonLevel": "{reason} — {level}"
     },
     "selectAllColumnsNotAllowed": "Selecting all columns is not allowed",
     "customSql": "Custom SQL",
