@@ -35,7 +35,7 @@ use tokio::{
 
 use super::{
     job::job_range_end,
-    metrics_indexed::{MetricsIndexMergeScope, metrics_index_merge_scope},
+    metrics::{MetricsIndexMergeScope, metrics_index_merge_scope},
 };
 use crate::worker::{MergeBatch, MergeSender};
 

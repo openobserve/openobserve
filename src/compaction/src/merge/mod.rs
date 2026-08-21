@@ -15,7 +15,7 @@
 
 mod file;
 mod job;
-mod metrics_indexed;
+mod metrics;
 mod stream;
 
 pub use file::merge_files;
