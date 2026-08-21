@@ -13,70 +13,119 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Database Monitoring read API (design: `docs/___databsepages/dbm-design-doc.md`
-//! §6 routes + §5.4/D4 hybrid live tail).
+//! Database Monitoring read API — service layer.
 //!
-//! GET handlers structurally modeled on the service-graph read API
-//! (`../service_graph/api.rs`): fixed SQL over the `_o2_db_stats` summary
-//! stream via `crate::search::search`, read as `StreamType::Logs`.
+//! Every read this feature performs: SQL construction, the searches themselves,
+//! the merge/fold/envelope math, and the authorization gates that guard them.
+//! No axum extractor and no route appears here — [`super::handler`] owns that
+//! boundary and delegates into these `read_*` bodies.
 //!
-//! Most of them carry no `#[cfg]` and serve both builds. Three do not:
-//! `get_dbm_deadlocks`, `get_dbm_blocking` and `get_dbm_table_health` are
-//! dual-implemented — the real handler behind `#[cfg(feature = "enterprise")]`
-//! and, on OSS, a stub returning 403 (`unauthorized_response`) before any auth
-//! or search work. Their bodies and the server-vantage canonicalizers they read
-//! live in `o2_enterprise`.
-//!
-//! The three rollup-backed endpoints (databases / queries / query history)
-//! serve a **hybrid**: rolled-up records for the requested window PLUS a live
-//! DataFusion pass over the un-rolled-up span tail, merged server-side. All D4
-//! guard rails apply:
-//!
-//! - tail spans `[max(offset, now − 1 rollup interval), now]` — never `now − offset` raw; a stalled
-//!   job surfaces as staleness (`data_through`), never as an unbounded raw scan;
-//! - the tail runs the SAME bounded two-stage SQL as the rollup ([`super::rollup::build_rank_sql`]
-//!   and [`super::rollup::build_totals_sql`]), never the raw unbounded aggregate; a tail query
-//!   answering exactly the request cap sets `tail_truncated=true` in the response;
-//! - the tail is computed **unfiltered** and cached per `(org, stream, offset)` for `min(30 s,
-//!   interval/10)` — the stored rollup offset IS the window-bucket: when the rollup advances, the
-//!   key changes and a stale tail can never double-count against the new rollup rows. Scope filters
-//!   are applied at merge time from the cached aggregate;
-//! - merge math: counts/totals add exactly; `traces` adds as an UPPER BOUND (§5.1 merge rule);
-//!   merged percentiles are request(calls)-weighted (the `aggregate_baselines` precedent) and
-//!   labeled `percentiles_estimated`;
-//! - the live tail is always on: DBM's only switch is `ZO_DB_MONITORING_ENABLED`, and a stalled
-//!   rollup job still surfaces through `data_through`.
+//! What lives in `openobserve-core` instead is the code the INGEST path and the
+//! rollup job need without an HTTP request: span enrichment
+//! (`openobserve_core::db_monitoring`), the rollup SQL (`::rollup`) and the
+//! server-vantage canonicalizers (`::server_vantage`). This module reads what
+//! those write.
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     future::Future,
 };
 
-use axum::{
-    extract::{Path, Query},
-    response::Response as HttpResponse,
-};
+use axum::response::Response as HttpResponse;
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::{get_config, meta::stream::StreamType, utils::time::now_micros};
+use config::{meta::stream::StreamType, utils::time::now_micros};
 use futures::{StreamExt, future::join_all};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
-use serde::Deserialize;
-use serde_json::{Value, json};
-
 #[cfg(feature = "enterprise")]
-use super::chains;
-use super::{
+use openobserve_core::auth::check_permissions;
+#[cfg(feature = "enterprise")]
+use openobserve_core::db_monitoring::chains;
+use openobserve_core::db_monitoring::{
     rollup::{self, O2_DB_STATS_STREAM, get_i64, get_str, get_str_ref},
     server_vantage,
 };
-use crate::auth::UserEmail;
-#[cfg(feature = "enterprise")]
-use crate::auth::check_permissions;
+use serde_json::{Value, json};
 
 /// Default server-vantage logs stream — the name the shipped collector recipes
 /// export to (`stream-name: dbm_server`).
 const DEFAULT_SERVER_STREAM: &str = "dbm_server";
+
+use super::models::*;
+
+/// The DBM read layer's own source, as one string, for the structural tests.
+///
+/// Several invariants in this feature are asserted over the SOURCE rather than
+/// over behaviour, because what they assert is a wiring property no unit-testable
+/// call can observe — a gate that must run BEFORE a read, a search that must hand
+/// its response to the partial guard. Those assertions predate the
+/// handler/service/model split, when all of it was one file and a single
+/// `include_str!("api.rs")` saw everything.
+///
+/// The split moved the code, not the invariants. A handler and the body it
+/// delegates to now live in two files, and a test asserting "the handler is thin
+/// AND the body is extracted" has to see both. Concatenating the three layers
+/// back into one corpus is what preserves that: the scrapes read the same bytes
+/// they always did, and a fn that moves BETWEEN layers stays visible rather than
+/// silently vanishing from a scrape and passing on its absence.
+///
+/// Order is load-bearing. The handlers come LAST, after the service bodies they
+/// delegate to, because `test_samples_body_is_extracted_from_the_handler` bounds
+/// the handler's text on the doc comment that follows it in the original file.
+///
+/// Returns `&'static str`, not `String`: the scrapes slice into this corpus and
+/// hand the slices back out (`samples_body_src`), which a temporary `String`
+/// cannot outlive. Built once, on first use.
+/// One layer's source with its `#[cfg(test)]` modules cut off.
+///
+/// The scrapes want PRODUCTION code only — a test that mentions
+/// `can_read_stream(` must not satisfy an assertion about where the real gate
+/// is called. In the single-file era one `split("\nmod tests {")` did that,
+/// because the tests were the tail of the only file. Across three files a
+/// whole-corpus truncation would instead discard every layer appended after the
+/// first one that happens to carry tests, so the cut is made PER LAYER and the
+/// surviving production halves are rejoined.
+#[cfg(test)]
+fn prod_half(layer: &'static str) -> &'static str {
+    // Both spellings the file uses: an attributed module and a bare one.
+    let cut = layer
+        .find("\n#[cfg(test)]\nmod tests")
+        .or_else(|| layer.find("\nmod tests {"))
+        .unwrap_or(layer.len());
+    &layer[..cut]
+}
+
+#[cfg(test)]
+pub(crate) fn dbm_source() -> &'static str {
+    static SRC: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    SRC.get_or_init(|| {
+        format!(
+            "{}\n{}\n{}",
+            include_str!("models.rs"),
+            include_str!("service.rs"),
+            include_str!("handler.rs"),
+        )
+    })
+}
+
+/// [`dbm_source`] with every layer's test modules stripped.
+///
+/// This is what the structural scrapes read. Same three layers in the same
+/// order, so byte offsets inside a layer are unchanged; only the test tails are
+/// gone, which is exactly what the old `split("\nmod tests {")` achieved when
+/// there was one file to split.
+#[cfg(test)]
+pub(crate) fn dbm_prod_source() -> &'static str {
+    static SRC: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    SRC.get_or_init(|| {
+        format!(
+            "{}\n{}\n{}",
+            prod_half(include_str!("models.rs")),
+            prod_half(include_str!("service.rs")),
+            prod_half(include_str!("handler.rs")),
+        )
+    })
+}
 
 /// The DBM stream-read decision, split from the OFGA round trips that produce
 /// its inputs so the rule itself is unit-testable without a live OpenFGA store.
@@ -95,7 +144,7 @@ const fn stream_read_decision(module_grant: bool, stream_grant: bool) -> bool {
 /// a caller-supplied `stream` parameter, so without this check any org member
 /// could read any trace or logs stream in the org through DBM.
 ///
-/// Delegates to [`crate::auth::check_permissions`], which resolves the caller's
+/// Delegates to [`openobserve_core::auth::check_permissions`], which resolves the caller's
 /// role from the DB, maps the stream type through `OFGA_MODELS`, and returns
 /// `true` for root users.
 ///
@@ -256,7 +305,7 @@ pub(crate) fn resolve_backfill_stream(
 /// Deliberately identical to the app-wide wording (`"Unauthorized Access"`) and
 /// a 403 — the same shape the traces search endpoints return, so a client can
 /// treat DBM denials like any other.
-fn unauthorized_response() -> HttpResponse {
+pub(crate) fn unauthorized_response() -> HttpResponse {
     MetaHttpResponse::forbidden("Unauthorized Access")
 }
 
@@ -1171,7 +1220,7 @@ async fn compute_tail(
     let schema = infra::schema::get(org_id, stream, StreamType::Traces).await;
     let (relevant, has_rows_col) = match &schema {
         Ok(s) => (
-            super::stream_supports_db_monitoring(s),
+            openobserve_core::db_monitoring::stream_supports_db_monitoring(s),
             s.field_with_name("db_response_returned_rows").is_ok(),
         ),
         Err(_) => (false, false),
@@ -1299,7 +1348,7 @@ async fn run_stats_search(
     )
     .await?;
     // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
-    super::hits_or_partial_error(resp, O2_DB_STATS_STREAM)
+    openobserve_core::db_monitoring::hits_or_partial_error(resp, O2_DB_STATS_STREAM)
 }
 
 // ─── Shared handler plumbing ─────────────────────────────────────────────────
@@ -1355,7 +1404,7 @@ async fn involved_streams(
         }
     }
     if set.is_empty() {
-        let mut grouped = crate::db::schema::list_all_streams_grouped().await;
+        let mut grouped = db::schema::list_all_streams_grouped().await;
         if let Some(streams) = grouped
             .get_mut(org_id)
             .and_then(|types| types.remove(&StreamType::Traces))
@@ -1463,7 +1512,7 @@ async fn collect_tails(
     // a fleet of fresh streams — the tails are skipped for this request and
     // staleness surfaces through `data_through` alone, the same degradation
     // the per-stream read failure produced.
-    let offsets = match crate::db::db_monitoring::list_offsets(org_id).await {
+    let offsets = match db::db_monitoring::list_offsets(org_id).await {
         Ok(map) => Some(map),
         Err(e) => {
             log::warn!(
@@ -1527,7 +1576,7 @@ async fn collect_tails(
     }
 }
 
-fn disabled_response() -> HttpResponse {
+pub(crate) fn disabled_response() -> HttpResponse {
     MetaHttpResponse::not_found("Database Monitoring is disabled (ZO_DB_MONITORING_ENABLED=false)")
 }
 
@@ -1585,85 +1634,11 @@ fn stamp_baseline_sections(body: &mut Value, sections: Vec<(&str, Value)>, faile
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
-pub struct DatabasesQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub stream: Option<String>,
-    pub system: Option<String>,
-    pub service: Option<String>,
-    /// The Δ baseline window, returned as `baseline_hits` in the same
-    /// response. The CLIENT computes the bounds — the baseline is a reader
-    /// choice (previous window, same hours yesterday) this endpoint must not
-    /// guess at. Both or neither; the pair rides one round trip and the two
-    /// windows are read concurrently.
-    pub baseline_start_time: Option<i64>,
-    pub baseline_end_time: Option<i64>,
-    /// Fold the per-instance schema → service split into THIS response, keyed
-    /// by instance, instead of the page issuing `GET /queries?instance=<row>`
-    /// once per expanded row (and re-issuing all of them on every window
-    /// change). Opt-in for the same reason `include_indexes` is: the split is
-    /// a drill-down nobody has opened yet on first paint.
-    ///
-    /// It costs no additional search: the fingerprint rows the split needs are
-    /// the `query_stats` pool this window already read to compute
-    /// `calling_services`. The fold is the same `group_query_rows(.., None,
-    /// false)` the queries endpoint runs for `stmt_class=all` under an
-    /// instance scope.
-    pub include_breakdown: Option<bool>,
-}
-
-/// GET /{org_id}/db_monitoring/databases — FR-1 overview.
-///
-/// `db_totals` rows grouped per (system, instance, namespace) — exact window
-/// totals with true percentiles, never fingerprint-fused — plus the distinct
-/// calling services from `query_stats` rows. Rollup + live tail (D4). With a
-/// `service` filter the totals grain does not exist, so rows aggregate from
-/// service-filtered `query_stats` instead and `top_n_subset` is set.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/databases",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringDatabases",
-    summary = "Database Monitoring: databases overview",
-    description = "Per-(system, instance, namespace) rollup totals with calling services, merged with a bounded live tail over the un-rolled-up spans.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Trace stream filter"),
-        ("system" = Option<String>, Query, description = "Database system filter"),
-        ("service" = Option<String>, Query, description = "Calling service filter"),
-        ("baseline_start_time" = Option<i64>, Query, description = "Δ baseline window start (microseconds); returns baseline_hits in the same response"),
-        ("baseline_end_time" = Option<i64>, Query, description = "Δ baseline window end (microseconds)"),
-        ("include_breakdown" = Option<bool>, Query, description = "Also return the per-instance schema→service split as `breakdown` (one entry per instance), folded from the query_stats rows this window already read"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-pub async fn get_dbm_databases(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<DatabasesQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_databases_body(&org_id, &user_email.user_id, &q).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
 /// The databases endpoint's whole body — validation, both windows, envelope —
 /// as a callable, so [`get_dbm_badges`] runs the SAME pipeline the tab renders
 /// and the badge cannot disagree with the page by construction. `Err` carries
 /// the ready HTTP response, exactly as [`read_databases_window`] does.
-async fn read_databases_body(
+pub(crate) async fn read_databases_body(
     org_id: &str,
     user_id: &str,
     q: &DatabasesQuery,
@@ -1941,103 +1916,15 @@ fn fold_breakdown_by_instance(qs_pool: &[Value]) -> Value {
     Value::Object(folded)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct QueriesQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub stream: Option<String>,
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    pub namespace: Option<String>,
-    pub env: Option<String>,
-    pub service: Option<String>,
-    /// Statement class filter — defaults to `query` (FR-2: COMMIT/SET/ping
-    /// noise must not dominate calls-sorted views); `all` disables.
-    pub stmt_class: Option<String>,
-    pub sort: Option<String>,
-    pub limit: Option<usize>,
-    /// Free-text search over the normalized query text. Applied at merge time
-    /// in Rust — never interpolated into SQL.
-    pub search: Option<String>,
-    /// The Δ baseline window, returned as `baseline_hits` in the same
-    /// response — same contract as the databases endpoint: client-computed
-    /// bounds, both or neither, read concurrently with the current window.
-    /// The baseline is fetched under the SAME filters and sort so the two
-    /// sets are comparable row-for-row.
-    pub baseline_start_time: Option<i64>,
-    pub baseline_end_time: Option<i64>,
-    /// Narrows the SERVER FALLBACK to one statement — it does not filter the
-    /// client-vantage rows, which the detail page already selects from the
-    /// ranked page it reads.
-    ///
-    /// The query-detail page looks up ONE fingerprint. Its client read is a
-    /// ranked page it filters in the browser, which is fine while traces
-    /// exist; with none, the fallback below is the only vantage that can
-    /// answer, and it must answer about THIS statement rather than handing
-    /// back the org's fifty most-frequent.
-    pub fingerprint: Option<String>,
-    /// Run the database-reported fallback list in this same request when — and
-    /// only when — the client-vantage answer is an EXACT zero, returning it as
-    /// `server_fallback`.
-    ///
-    /// On a deployment with the collector wired but no traced application
-    /// traffic, this page's client read is honestly empty while the databases
-    /// have been reporting their statement counters all along. The page
-    /// handled that by awaiting this response and THEN issuing
-    /// `/server_queries` — two sequential round trips on every load, in the
-    /// deployment least able to spare them.
-    ///
-    /// The server already runs exactly this conditional inside `/badges`; this
-    /// exposes it to the tab that renders the rows. Armed only by an exact
-    /// zero: a failed read is unknown, and unknown is not zero.
-    pub include_server_fallback: Option<bool>,
-}
-
-/// GET /{org_id}/db_monitoring/queries — FR-2 top queries.
-///
-/// `query_stats` rows merged per (fingerprint, system, instance) across
-/// windows and constituent rows, `_other` remainders passed through at their
-/// own grains, rollup + live tail (D4).
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/queries",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringQueries",
-    summary = "Database Monitoring: top queries",
-    description = "Top query fingerprints with merged stats and _other remainder, merged with a bounded live tail over the un-rolled-up spans.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Trace stream filter"),
-        ("system" = Option<String>, Query, description = "Database system filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("namespace" = Option<String>, Query, description = "Database namespace filter"),
-        ("env" = Option<String>, Query, description = "Environment filter"),
-        ("service" = Option<String>, Query, description = "Calling service filter"),
-        ("stmt_class" = Option<String>, Query, description = "Statement class filter (default 'query'; 'all' disables)"),
-        ("sort" = Option<String>, Query, description = "Sort key (whitelist; default total_time_ns)"),
-        ("limit" = Option<usize>, Query, description = "Max rows (default 100)"),
-        ("search" = Option<String>, Query, description = "Free-text search over normalized query text"),
-        ("include_server_fallback" = Option<bool>, Query, description = "When the client-vantage answer is an exact zero, also run the database-reported list and return it as `server_fallback` (with per-section forbidden/read-failed flags)"),
-        ("fingerprint" = Option<String>, Query, description = "Narrows the `server_fallback` section to one statement (the query-detail row lookup). Does not filter the client-vantage rows."),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-pub async fn get_dbm_queries(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<QueriesQuery>,
+/// The queries endpoint's whole body, as a callable — the ranked read plus the
+/// conditional server-vantage fallback, kept out of the handler so the handler is
+/// a config guard plus a delegation.
+pub(crate) async fn read_queries_response(
+    org_id: &str,
+    user_id: &str,
+    q: &QueriesQuery,
 ) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    let mut body = match read_queries_body(&org_id, &user_email.user_id, &q).await {
+    let mut body = match read_queries_body(org_id, user_id, &q).await {
         Ok(body) => body,
         Err(resp) => return resp,
     };
@@ -2068,7 +1955,7 @@ pub async fn get_dbm_queries(
         };
         stamp_server_fallback(
             &mut body,
-            read_server_queries_body(&org_id, &user_email.user_id, &sq).await,
+            read_server_queries_body(org_id, user_id, &sq).await,
         );
     }
     MetaHttpResponse::json(body)
@@ -2258,76 +2145,16 @@ async fn read_queries_window(
     })
 }
 
-#[derive(Debug, Deserialize)]
-pub struct HistoryQuery {
-    pub fingerprint: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub stream: Option<String>,
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    pub namespace: Option<String>,
-    pub env: Option<String>,
-    pub service: Option<String>,
-    /// Also return the FR-5 calling-endpoints aggregation as `endpoints`, in
-    /// this same response.
-    ///
-    /// The query-detail page fired `/query/history` and `/query/endpoints`
-    /// together on every entry, with the identical fingerprint and window —
-    /// and endpoints REQUIRES a `stream` the page had to resolve first, which
-    /// is the very stream this handler already resolves for its own backfill
-    /// (`trace_stream_name` in the response below). So the second request was
-    /// waiting on a fact this one had computed.
-    ///
-    /// Opt-in, like `include_indexes`: a caller who wants the series alone
-    /// should not pay for a raw-span aggregation.
-    pub include_endpoints: Option<bool>,
-    /// Cap for the `endpoints` section — the standalone endpoint's `limit`,
-    /// under the same default and clamp.
-    pub endpoints_limit: Option<usize>,
-}
-
-/// GET /{org_id}/db_monitoring/query/history — FR-5 per-fingerprint
-/// series.
-///
-/// Distinguishes "below top-N" from zero: a window whose `db_totals` rows
-/// exist but whose fingerprint row is absent means "ranked below top-N", never
-/// "0 calls". Up to [`HISTORY_BACKFILL_MAX_WINDOWS`] such windows are
-/// backfilled from raw spans (fingerprint + time bounded); the rest carry
-/// `below_top_n: true` without metrics. The live tail renders as the `live`
-/// point (D4).
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/query/history",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringQueryHistory",
-    summary = "Database Monitoring: per-query time series",
-    description = "Per-window series for one query fingerprint, distinguishing below-top-N windows from zero, with bounded raw-span backfill and a live-tail point.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("fingerprint" = String, Query, description = "Query fingerprint (required)"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Trace stream filter"),
-        ("include_endpoints" = Option<bool>, Query, description = "Also return the FR-5 calling-endpoints aggregation as `endpoints`, run against the trace stream this handler already resolves"),
-        ("endpoints_limit" = Option<usize>, Query, description = "Max endpoint rows when include_endpoints is set (default 50, max 500)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 400, description = "Missing fingerprint", content_type = "application/json", body = ()),
-    )
-)]
-pub async fn get_dbm_query_history(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<HistoryQuery>,
+/// The query-history endpoint's whole body, as a callable — the same handler/body
+/// split every other DBM read uses, so the handler stays a config guard plus a
+/// delegation. It returns [`HttpResponse`] rather than `Result<Value, _>` because
+/// this read has several distinct 4xx exits (missing fingerprint, inverted range,
+/// stream denial) that each carry their own status and message.
+pub(crate) async fn read_query_history_response(
+    org_id: &str,
+    user_id: &str,
+    q: &HistoryQuery,
 ) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
     let Some(fingerprint) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) else {
         return MetaHttpResponse::bad_request("fingerprint is required");
     };
@@ -2347,8 +2174,8 @@ pub async fn get_dbm_query_history(
     // ask); this early return is only for the explicit one.
     if let Some(stream) = q.stream.as_deref().filter(|s| !s.is_empty())
         && !can_read_stream(
-            &org_id,
-            &user_email.user_id,
+            org_id,
+            user_id,
             stream,
             required_stream_for(DbmVantage::Client),
         )
@@ -2357,7 +2184,9 @@ pub async fn get_dbm_query_history(
         return unauthorized_response();
     }
     // Carried into every search this handler runs — see `run_stats_search`.
-    let user_id = Some(user_email.user_id.as_str());
+    // The search-layer spelling of the caller: the `run_*_search` helpers
+    // take an `Option`, while the auth gates take the plain `&str` param.
+    let search_user = Some(user_id);
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
         return MetaHttpResponse::bad_request("start_time must be before end_time");
@@ -2380,7 +2209,7 @@ pub async fn get_dbm_query_history(
     };
 
     let fp_sql = build_stats_sql(
-        &org_id,
+        org_id,
         "query_stats",
         &format!("{}{}", filters.sql_preds(), fingerprint_pred(fingerprint)),
     );
@@ -2389,7 +2218,7 @@ pub async fn get_dbm_query_history(
     // never the metrics — so it projects the four columns those consume
     // instead of dragging every stored column per row.
     let totals_projection = stats_projection(
-        &org_id,
+        org_id,
         &[
             "_timestamp",
             "trace_stream_name",
@@ -2399,7 +2228,7 @@ pub async fn get_dbm_query_history(
     )
     .await;
     let totals_sql = build_stats_sql_projected(
-        &org_id,
+        org_id,
         "db_totals",
         &totals_filters.sql_preds(),
         &totals_projection,
@@ -2429,7 +2258,7 @@ pub async fn get_dbm_query_history(
             return Vec::new();
         }
         let ec_sql = build_stats_sql(
-            &org_id,
+            org_id,
             "error_class",
             &format!(
                 "{}{}",
@@ -2437,7 +2266,7 @@ pub async fn get_dbm_query_history(
                 fingerprint_pred(fingerprint)
             ),
         );
-        match run_stats_search(&org_id, user_id, ec_sql, start_time, end_time).await {
+        match run_stats_search(org_id, search_user, ec_sql, start_time, end_time).await {
             Ok(rows) => {
                 let rows: Vec<Value> = rows.into_iter().filter(|r| ec_filters.matches(r)).collect();
                 fold_error_code_counts(&rows)
@@ -2451,8 +2280,8 @@ pub async fn get_dbm_query_history(
 
     // Three independent reads over the same summary stream, concurrently.
     let (fp_res, totals_res, error_classes) = tokio::join!(
-        run_stats_search(&org_id, user_id, fp_sql, start_time, end_time),
-        run_stats_search(&org_id, user_id, totals_sql, start_time, end_time),
+        run_stats_search(org_id, search_user, fp_sql, start_time, end_time),
+        run_stats_search(org_id, search_user, totals_sql, start_time, end_time),
         error_classes_fut,
     );
     let (fp_rows, totals_rows) = match (fp_res, totals_res) {
@@ -2490,8 +2319,8 @@ pub async fn get_dbm_query_history(
     // org-scoped rollup rows, so without this the backfill could aggregate raw
     // spans from a stream this caller has no access to.
     let readable_streams: BTreeSet<String> = involved_streams(
-        &org_id,
-        &user_email.user_id,
+        org_id,
+        user_id,
         // The explicit param is deliberately NOT passed: it is already gated at
         // the top of this handler, and `involved_streams` would return `None`
         // for an unreadable one — collapsing the readable set that the INFERRED
@@ -2516,7 +2345,7 @@ pub async fn get_dbm_query_history(
     // The K backfill windows run CONCURRENTLY (`HISTORY_BACKFILL_MAX_WINDOWS`
     // bounds the fan-out), overlapped with stream resolution + tail
     // collection, which depend on `totals_rows` but not on the backfill.
-    let org = org_id.as_str();
+    let org = org_id;
     let backfill_stream_ref = backfill_stream.as_ref();
     let backfill_fut = join_all(to_backfill.iter().map(|window_end| async move {
         let mut point = json!({ "timestamp": window_end, "below_top_n": true });
@@ -2524,7 +2353,7 @@ pub async fn get_dbm_query_history(
             let sql = build_backfill_sql(stream, fingerprint);
             match rollup::run_dbm_search(
                 org,
-                user_id,
+                search_user,
                 sql,
                 window_end - interval_micros,
                 *window_end,
@@ -2562,17 +2391,11 @@ pub async fn get_dbm_query_history(
         // name so the handler can still 403 on it.
         let streams: Vec<String> = match q.stream.as_ref() {
             Some(_) => {
-                involved_streams(
-                    &org_id,
-                    &user_email.user_id,
-                    q.stream.as_ref(),
-                    &[&totals_rows[..]],
-                )
-                .await?
+                involved_streams(org_id, user_id, q.stream.as_ref(), &[&totals_rows[..]]).await?
             }
             None => readable_streams.iter().cloned().collect(),
         };
-        Some(collect_tails(&org_id, &streams, start_time, end_time).await)
+        Some(collect_tails(org_id, &streams, start_time, end_time).await)
     };
     // FR-5 calling endpoints, folded into this response when asked for.
     //
@@ -2606,7 +2429,7 @@ pub async fn get_dbm_query_history(
             &filters.span_sql_preds_for("dbspan."),
             endpoints_limit,
         );
-        Some(rollup::run_dbm_search(org, user_id, sql, start_time, end_time, true).await)
+        Some(rollup::run_dbm_search(org, search_user, sql, start_time, end_time, true).await)
     };
 
     let (backfill_points, collected, endpoints) =
@@ -2696,62 +2519,15 @@ pub async fn get_dbm_query_history(
     MetaHttpResponse::json(body)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct EndpointsQuery {
-    pub fingerprint: Option<String>,
-    pub stream: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    /// The REST of the join key. A fingerprint hashes statement text only, so
-    /// on a mixed fleet it names one statement running on several engines and
-    /// databases at once; aggregating callers without these fuses them into one
-    /// row that describes no engine (see [`build_endpoints_sql`]).
-    ///
-    /// Optional so the existing contract is unchanged for a caller that has no
-    /// engine to give — a fused answer is still what an unscoped question
-    /// deserves, and the caller that DOES enrich a server row now sends them.
-    pub system: Option<String>,
-    pub namespace: Option<String>,
-    pub limit: Option<usize>,
-}
-
-/// GET /{org_id}/db_monitoring/query/endpoints — FR-5 calling
-/// endpoints: on-demand raw-trace aggregation for ONE fingerprint joining DB
-/// spans to their trace roots. Bounded by the fingerprint predicate and the
-/// request payload's window — no rollup, no tail.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/query/endpoints",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringQueryEndpoints",
-    summary = "Database Monitoring: calling endpoints for a query",
-    description = "Aggregates raw DB spans for one fingerprint joined to their trace root spans, grouped per calling service + endpoint.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("fingerprint" = String, Query, description = "Query fingerprint (required)"),
-        ("stream" = String, Query, description = "Trace stream name (required)"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("system" = Option<String>, Query, description = "Database system — the rest of the join key; without it a fingerprint shared by two engines returns their callers fused into one row"),
-        ("namespace" = Option<String>, Query, description = "Database/schema — the rest of the join key (see `system`)"),
-        ("limit" = Option<usize>, Query, description = "Max rows (default 50)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 400, description = "Missing fingerprint/stream", content_type = "application/json", body = ()),
-    )
-)]
-pub async fn get_dbm_query_endpoints(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<EndpointsQuery>,
+/// The calling-endpoints endpoint's whole body, as a callable. Returns
+/// [`HttpResponse`] rather than `Result<Value, _>` because this read has several
+/// distinct 4xx exits (missing fingerprint, missing stream, stream denial,
+/// inverted range) that each carry their own status and message.
+pub(crate) async fn read_query_endpoints_response(
+    org_id: &str,
+    user_id: &str,
+    q: &EndpointsQuery,
 ) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
     let Some(fingerprint) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) else {
         return MetaHttpResponse::bad_request("fingerprint is required");
     };
@@ -2762,8 +2538,8 @@ pub async fn get_dbm_query_endpoints(
     // checked BEFORE the range/limit parsing below — a caller must not be able
     // to probe stream existence through error-message differences.
     if !can_read_stream(
-        &org_id,
-        &user_email.user_id,
+        org_id,
+        user_id,
         stream,
         required_stream_for(DbmVantage::Client),
     )
@@ -2786,107 +2562,21 @@ pub async fn get_dbm_query_endpoints(
         ..Default::default()
     };
     // Carried into the search — see `run_dbm_search`.
-    let user_id = Some(user_email.user_id.as_str());
+    // The search-layer spelling of the caller: the `run_*_search` helpers
+    // take an `Option`, while the auth gates take the plain `&str` param.
+    let search_user = Some(user_id);
     let sql = build_endpoints_sql(
         stream,
         fingerprint,
         &scope.span_sql_preds_for("dbspan."),
         limit,
     );
-    match rollup::run_dbm_search(&org_id, user_id, sql, start_time, end_time, true).await {
+    match rollup::run_dbm_search(org_id, search_user, sql, start_time, end_time, true).await {
         Ok(hits) => MetaHttpResponse::json(json!({ "hits": hits })),
         Err(e) => {
             log::error!("[DbMonitoring] endpoints query failed for {org_id}/{stream}: {e}");
             MetaHttpResponse::internal_error(e)
         }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SamplesQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub stream: Option<String>,
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    pub namespace: Option<String>,
-    pub env: Option<String>,
-    pub service: Option<String>,
-    pub limit: Option<usize>,
-    /// Run the database-reported fallback list (`/server_samples`) in this same
-    /// request when the client-vantage answer is an EXACT zero, returning it as
-    /// `server_fallback`. See [`QueriesQuery::include_server_fallback`] — same
-    /// contract, same reason, same per-section permission handling.
-    pub include_server_fallback: Option<bool>,
-    /// Scope the ranking to ONE statement — "show me the slowest executions of
-    /// this query", the question the detail page asks.
-    ///
-    /// The predicate is built here, through the same escaping every other
-    /// predicate in this module uses, and the stream is resolved through
-    /// `involved_streams` rather than interpolated from a URL.
-    pub fingerprint: Option<String>,
-}
-
-/// GET /{org_id}/db_monitoring/samples — FR-6 global slow samples: the
-/// slowest DB spans in the window ACROSS every system, instance and query.
-///
-/// The per-query samples on the detail page answer "show me one bad execution
-/// of THIS query"; this endpoint answers the shape of question that starts an
-/// incident — "what were the worst database calls anywhere, just now?" — before
-/// the reader knows which query to blame.
-///
-/// Reads RAW trace spans (the client vantage), no rollup and no tail: every
-/// row is one real completed execution with its trace attached. Stream
-/// resolution and RBAC follow the rollup-backed endpoints exactly — explicit
-/// `stream` param 403s loudly when unreadable; otherwise the involved streams
-/// are discovered from the window's rollup rows (falling back to the org's
-/// trace streams) and FILTERED to what the caller may read, then schema-gated
-/// on `o2_db_fingerprint` so a stream that never carried a DB span is skipped
-/// rather than queried.
-///
-/// Bounded: one fixed-shape SQL per involved stream, each `LIMIT limit`
-/// (default 100, max 500 — far under the search cap), merged in Rust
-/// ([`fold_sample_rows`]). `truncated` in the response says when more
-/// qualifying spans existed than were returned.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/samples",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringSamples",
-    summary = "Database Monitoring: slowest database calls in the window",
-    description = "The slowest raw DB spans across all systems, instances and queries in the window, with trace ids for pivoting. Client-observed, completed calls only.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Trace stream filter"),
-        ("system" = Option<String>, Query, description = "Database system filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("namespace" = Option<String>, Query, description = "Database/schema filter"),
-        ("env" = Option<String>, Query, description = "Deployment environment filter"),
-        ("service" = Option<String>, Query, description = "Calling service filter"),
-        ("limit" = Option<usize>, Query, description = "Max spans (default 100, max 500)"),
-        ("fingerprint" = Option<String>, Query, description = "Scope the ranking to one query fingerprint — the slowest executions of THAT statement"),
-        ("include_server_fallback" = Option<bool>, Query, description = "When the client-vantage answer is an exact zero, also run the database-reported list and return it as `server_fallback`"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-pub async fn get_dbm_samples(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<SamplesQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_samples_body(&org_id, &user_email.user_id, &q).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
     }
 }
 
@@ -2898,7 +2588,7 @@ pub async fn get_dbm_samples(
 /// `get_dbm_samples` stopped satisfying axum's `for<'a>` Handler bound. That
 /// fails at the route registration in `api/http`, naming neither the closure
 /// nor the await. Inside a plain `async fn` the same code is fine.
-async fn read_samples_body(
+pub(crate) async fn read_samples_body(
     org_id: &str,
     user_id: &str,
     q: &SamplesQuery,
@@ -2978,7 +2668,7 @@ async fn read_samples_body(
         futures::stream::iter(streams.into_iter().map(|stream| async move {
             let has_fp = infra::schema::get(org, &stream, StreamType::Traces)
                 .await
-                .map(|s| super::stream_supports_db_monitoring(&s))
+                .map(|s| openobserve_core::db_monitoring::stream_supports_db_monitoring(&s))
                 .unwrap_or(false);
             (stream, has_fp)
         }))
@@ -3103,7 +2793,7 @@ async fn stamp_samples_server_fallback(
 // ─── Server-vantage endpoints (deadlocks / blocking) ─────────────────────────
 //
 // These read the CANONICAL `o2_dbm_*` columns written at ingest by
-// `super::server_vantage` — never a raw receiver field. That is the D1 contract:
+// `server_vantage` — never a raw receiver field. That is the D1 contract:
 // receiver vocabularies are Development-stability and shift with collector
 // releases; absorbing the drift once at ingest keeps these queries and the whole
 // UI stable across upgrades.
@@ -4142,7 +3832,7 @@ async fn run_events_search(
     )
     .await?;
     // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
-    super::hits_or_partial_error(resp, stream)
+    openobserve_core::db_monitoring::hits_or_partial_error(resp, stream)
 }
 
 // ─── UI-facing DTOs (the API *is* the contract) ──────────────────────────────
@@ -4891,50 +4581,6 @@ fn event_freshness(probe: &CollectionProbe) -> Value {
     })
 }
 
-#[cfg(feature = "enterprise")]
-#[derive(Debug, Deserialize)]
-pub struct DeadlocksQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    /// Server-vantage LOGS stream carrying the canonical events.
-    pub stream: Option<String>,
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    /// The database name. Accepted as `namespace` too — that is the name the
-    /// rollup endpoints use for the same concept (`db_namespace`), and the UI
-    /// sends one vocabulary to every DBM endpoint.
-    pub database: Option<String>,
-    pub namespace: Option<String>,
-    /// Free text matched over participant statements, applications and objects.
-    /// Applied in Rust AFTER stitching so a term matching only one MySQL side
-    /// still returns the whole deadlock.
-    pub search: Option<String>,
-    pub limit: Option<usize>,
-}
-
-/// The database filter, under either spelling (`database` or the rollup
-/// endpoints' `namespace`) — one accessor for the five server-vantage query
-/// structs that carry the pair.
-macro_rules! impl_database_filter {
-    ($($query:ty),+ $(,)?) => {$(
-        impl $query {
-            fn database(&self) -> Option<&str> {
-                self.database
-                    .as_deref()
-                    .or(self.namespace.as_deref())
-                    .filter(|s| !s.is_empty())
-            }
-        }
-    )+};
-}
-
-impl_database_filter!(ActivityQuery, ServerQueriesQuery, ServerSamplesQuery,);
-
-// The two enterprise query types use the same accessor, but only exist on an
-// enterprise build.
-#[cfg(feature = "enterprise")]
-impl_database_filter!(DeadlocksQuery, BlockingQuery,);
-
 /// Does this assembled event match the free-text term?
 ///
 /// Matches over the fields a reader would search by: the statements, the
@@ -4959,78 +4605,6 @@ fn deadlock_matches_search(ev: &server_vantage::DeadlockEvent, needle_lower: &st
     }) || hit(&ev.database)
         || hit(&ev.instance)
 }
-
-/// GET /{org_id}/db_monitoring/deadlocks — FR-16 deadlock events.
-///
-/// Returns assembled deadlock EVENTS in the UI-facing DTO shape — never the raw
-/// stored rows. Newest first, each with a real `participants[]` array whose
-/// members carry the same `fingerprint` the span enrichment computes, so a
-/// deadlock JOINs straight to the query rows the UI already shows (proof §2.6).
-/// Also returns per-query-shape counts so the UI can rank "which query shape
-/// deadlocks most".
-///
-/// MySQL entries — one per transaction side — are stitched into whole deadlocks
-/// here (see [`stitch_mysql_deadlocks`]); Postgres records already carry the
-/// whole cycle and pass through untouched.
-#[cfg(feature = "enterprise")]
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/deadlocks",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringDeadlocks",
-    summary = "Database Monitoring: deadlock events",
-    description = "Canonical deadlock events with assembled participants and per-query-shape ranking.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
-        ("system" = Option<String>, Query, description = "Database engine filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
-        ("search" = Option<String>, Query, description = "Free text over participant statements, applications and objects"),
-        ("limit" = Option<usize>, Query, description = "Max raw records scanned (default 100)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-#[cfg(feature = "enterprise")]
-pub async fn get_dbm_deadlocks(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<DeadlocksQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_deadlocks_body(&org_id, &user_email.user_id, &q, false, None).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
-/// OSS stub — deadlocks are an Enterprise capability.
-///
-/// The ROUTE stays registered (see `router/mod.rs`); only the body is gated.
-/// Gating the route would answer 404, which reads as "this build is broken" or
-/// "you have the wrong URL"; 403 is what tells the UI to render an upgrade
-/// prompt. Deliberately NOT `disabled_response()`, which means
-/// `ZO_DB_MONITORING_ENABLED=false` and would send the operator to a collector
-/// checklist for a feature no amount of configuration will enable here.
-///
-/// The `Query<DeadlocksQuery>` extractor is dropped because that type is gated.
-#[cfg(not(feature = "enterprise"))]
-pub async fn get_dbm_deadlocks(
-    Path(_org_id): Path<String>,
-    _user_email: UserEmail,
-) -> HttpResponse {
-    unauthorized_response()
-}
-
 /// The deadlocks badge member — only the count-bearing fields the tab strip
 /// consumes: `total` (post-stitch, post-filter — the same count the tab
 /// renders), `truncated` and `stream`; shape ranking, the DTO serialization
@@ -5099,7 +4673,7 @@ pub(crate) fn deadlocks_envelope(
 /// skips the enrichment nothing on the strip reads. `prologue` shares the
 /// fan-in's one (auth, schema) prologue when it covers this body's stream.
 #[cfg(feature = "enterprise")]
-async fn read_deadlocks_body(
+pub(crate) async fn read_deadlocks_body(
     org_id: &str,
     user_id: &str,
     q: &DeadlocksQuery,
@@ -5323,25 +4897,6 @@ async fn read_deadlocks_body(
     ))
 }
 
-#[cfg(feature = "enterprise")]
-#[derive(Debug, Deserialize)]
-pub struct BlockingQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub stream: Option<String>,
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    /// See [`DeadlocksQuery::database`] — `namespace` is the same concept under
-    /// the rollup endpoints' spelling.
-    pub database: Option<String>,
-    pub namespace: Option<String>,
-    /// Free text over the blocked/blocking statements and applications.
-    pub search: Option<String>,
-    /// Drop samples whose blocked session waited less than this.
-    pub min_wait_seconds: Option<f64>,
-    pub limit: Option<usize>,
-}
-
 /// Free-text match over one blocking sample.
 #[cfg(feature = "enterprise")]
 fn blocking_matches_search(s: &server_vantage::BlockingSample, needle_lower: &str) -> bool {
@@ -5455,63 +5010,6 @@ fn dedupe_blocking_waits(
     kept.sort_by_key(|s| std::cmp::Reverse(s.timestamp.unwrap_or(0)));
     kept
 }
-
-/// GET /{org_id}/db_monitoring/blocking — FR-16 blocking chains.
-///
-/// Returns the flat canonical samples AND server-assembled root-blocker
-/// `chains[]`. `pg_blocking_pids()` yields only DIRECT blocker edges (proof
-/// §2.2/§4) — the transitive closure that identifies the one session worth
-/// killing is ours to build, and is [`super::chains::assemble_chains`].
-#[cfg(feature = "enterprise")]
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/blocking",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringBlocking",
-    summary = "Database Monitoring: blocking samples and root-blocker chains",
-    description = "Canonical blocking samples plus server-assembled transitive blocking chains with the root blocker identified.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
-        ("system" = Option<String>, Query, description = "Database engine filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
-        ("search" = Option<String>, Query, description = "Free text over statements and applications"),
-        ("min_wait_seconds" = Option<f64>, Query, description = "Minimum blocked wait to include"),
-        ("limit" = Option<usize>, Query, description = "Max samples (default 100)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-#[cfg(feature = "enterprise")]
-pub async fn get_dbm_blocking(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<BlockingQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_blocking_body(&org_id, &user_email.user_id, &q, false, None).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
-/// OSS stub — blocked queries are an Enterprise capability.
-/// See [`get_dbm_deadlocks`]'s OSS stub for why this is 403 and not 404 or
-/// `disabled_response()`, and why the route stays registered.
-#[cfg(not(feature = "enterprise"))]
-pub async fn get_dbm_blocking(Path(_org_id): Path<String>, _user_email: UserEmail) -> HttpResponse {
-    unauthorized_response()
-}
-
 /// The blocking badge member — the strip reads `total`/`truncated` for the
 /// badge and `hits` for its high-impact-blocker rule — the same samples the
 /// tab renders; chain assembly and the probe reads are enrichment it never
@@ -5566,7 +5064,7 @@ pub(crate) fn blocking_envelope(
 /// [`read_deadlocks_body`] — the badge member is [`blocking_badge_envelope`],
 /// which skips chain assembly and the probe reads.
 #[cfg(feature = "enterprise")]
-async fn read_blocking_body(
+pub(crate) async fn read_blocking_body(
     org_id: &str,
     user_id: &str,
     q: &BlockingQuery,
@@ -5746,63 +5244,6 @@ async fn read_blocking_body(
     ))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ActivityQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub stream: Option<String>,
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    /// See [`DeadlocksQuery::database`] — `namespace` is the same concept under
-    /// the rollup endpoints' spelling.
-    pub database: Option<String>,
-    pub namespace: Option<String>,
-    pub limit: Option<usize>,
-}
-
-/// GET /{org_id}/db_monitoring/activity — sampled active sessions.
-///
-/// `hits` is a row-limited SAMPLE OF SESSIONS, not the population;
-/// `by_wait_event` and `by_state` are SQL aggregates over the whole window, so
-/// the breakdown stays representative however many rows the table shows.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/activity",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringActivity",
-    summary = "Database Monitoring: sampled active sessions and wait-event breakdown",
-    description = "Sampled sessions from the server-vantage query_sample feed, with SQL-computed wait-event and state breakdowns over the full window.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
-        ("system" = Option<String>, Query, description = "Database engine filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
-        ("limit" = Option<usize>, Query, description = "Max sampled sessions returned (default 100)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-pub async fn get_dbm_activity(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<ActivityQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_activity_body(&org_id, &user_email.user_id, &q, false, None).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
 /// The activity badge member — the strip reads `hits` (its long-running-query
 /// rule's sessions), `by_state` (the badge counts the POPULATION, never the
 /// row-capped sample) and `truncated`; the wait-event breakdown, the probe
@@ -5870,7 +5311,7 @@ pub(crate) fn activity_envelope(
 /// [`read_deadlocks_body`] — the badge member is [`activity_badge_envelope`],
 /// which skips the wait-event breakdown, the probe and the sample-times
 /// reads.
-async fn read_activity_body(
+pub(crate) async fn read_activity_body(
     org_id: &str,
     user_id: &str,
     q: &ActivityQuery,
@@ -6640,59 +6081,9 @@ pub(crate) fn server_metrics_envelope(
     Value::Object(env)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ServerMetricsQuery {
-    pub fingerprint: Option<String>,
-    pub engine: Option<String>,
-    pub database: Option<String>,
-    pub stream: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-}
-
-/// GET /{org_id}/db_monitoring/query/server_metrics — W6.
-///
-/// The database's own counters for one fingerprint, to sit BESIDE (never
-/// merged into) the client-observed latency on the query detail page.
-///
-/// A sibling of `/query/plans` rather than a field on `/queries`: `/queries`
-/// reads the `_o2_db_stats` rollup AND live trace tails under
-/// `StreamType::Traces` auth, and folding a Logs-auth server source into it
-/// would put three provenances under two auth models in one response.
-///
-/// SUPERSEDED by [`get_dbm_query_insights`], which returns this exact envelope
-/// as its `server_metrics` section. That merge is the one this endpoint's own
-/// doc comment argued FOR: `/query/plans` shares this handler's stream, auth
-/// model and schema read, so the pair costs nothing to fold — unlike
-/// `/queries`, which does not. Kept registered and unchanged for compatibility.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/query/server_metrics",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringQueryServerMetrics",
-    summary = "Database Monitoring: server-side counters for a query",
-    description = "The database's OWN counters (pg_stat_statements / events_statements_summary_by_digest) for one query fingerprint, joined on (engine, database, fingerprint). Reports a MEAN and never a percentile, and withholds numbers when more than one instance is a candidate.",
-    security(("Authorization" = [])),
-)]
-pub async fn get_dbm_query_server_metrics(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<ServerMetricsQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_server_metrics_body(&org_id, &user_email.user_id, &q, None).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
 /// The server-metrics endpoint's whole body as a callable — same extraction and
 /// same `prologue` contract as [`read_plans_body`].
-async fn read_server_metrics_body(
+pub(crate) async fn read_server_metrics_body(
     org_id: &str,
     user_id: &str,
     q: &ServerMetricsQuery,
@@ -6968,83 +6359,6 @@ pub(crate) fn build_dbm_server_queries_sql(
     ))
 }
 
-#[cfg(test)]
-mod server_queries_without_calls_tests {
-    use super::*;
-
-    fn cols(with_calls: bool) -> HashSet<String> {
-        let mut c: HashSet<String> = [
-            server_vantage::O2_DBM_FINGERPRINT,
-            server_vantage::O2_DBM_ACTIVITY_QUERY,
-            server_vantage::O2_DBM_KIND,
-        ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-        if with_calls {
-            c.insert(server_vantage::O2_DBM_CALLS.to_string());
-        }
-        c
-    }
-
-    /// An engine that reports statements but no call counts must still list
-    /// them.
-    ///
-    /// `sqlserverreceiver`'s `db.server.top_query` carries the statement text
-    /// and its execution plan but NO metrics — no `calls`, no `exec_time`. This
-    /// builder required `calls`, so on a SQL Server stream it returned nothing
-    /// and the query-detail header fell through to painting a bare fingerprint
-    /// at a reader who came to see a statement. The fingerprint is the only
-    /// column this list truly cannot do without; `calls` is a ranking figure.
-    #[test]
-    fn server_queries_sql_builds_without_a_calls_column() {
-        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(false))
-            .expect("statements without call counts are still statements");
-        assert!(
-            sql.contains("NULL AS calls"),
-            "the wire field must survive as null: {sql}"
-        );
-        assert!(
-            sql.contains("ORDER BY last_seen DESC"),
-            "with no figure to rank by, newest-first is the honest order: {sql}"
-        );
-    }
-
-    #[test]
-    fn server_queries_sql_still_ranks_by_calls_where_it_can() {
-        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(true)).expect("sql");
-        assert!(sql.contains("ORDER BY calls DESC"), "{sql}");
-        assert!(
-            sql.contains(&format!("SUM({})", server_vantage::O2_DBM_CALLS)),
-            "{sql}"
-        );
-    }
-
-    #[cfg(feature = "enterprise")]
-    /// Same defect, same fix, on the server-queries list: it already grouped,
-    /// but aliased its timestamps `first_seen`/`last_seen`, so the resolver saw
-    /// no `_timestamp` and declined. Verified `has_ts=false` before, `true` after.
-    #[test]
-    fn test_server_queries_sql_projects_a_timestamp_the_cache_recognizes() {
-        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(true)).expect("sql");
-        assert!(
-            sql.contains("AS _timestamp"),
-            "aliasing every timestamp to first_seen/last_seen hides it from the cache: {sql}"
-        );
-    }
-
-    #[test]
-    fn server_queries_sql_still_needs_a_fingerprint() {
-        let mut without = cols(true);
-        without.remove(server_vantage::O2_DBM_FINGERPRINT);
-        assert_eq!(
-            build_dbm_server_queries_sql("dbm_server", "", 50, &without),
-            None,
-            "the list is KEYED on the fingerprint — without it there is nothing to group"
-        );
-    }
-}
-
 /// The server-queries response envelope — a callable fn, so the shape is
 /// tested for real instead of scraped out of the handler's source text.
 ///
@@ -7101,77 +6415,10 @@ pub(crate) fn server_queries_envelope(
     })
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ServerQueriesQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub stream: Option<String>,
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    /// See [`DeadlocksQuery::database`] — `namespace` is the same concept under
-    /// the rollup endpoints' spelling.
-    pub database: Option<String>,
-    pub namespace: Option<String>,
-    /// Narrow the list to ONE statement, for the query-detail page's row
-    /// lookup on a deployment with no traced traffic. Without it that page can
-    /// only find its row by paging the whole ranked list, and a statement
-    /// ranked below the cap is indistinguishable from one that does not exist.
-    ///
-    /// Additive and optional: absent, this endpoint is byte-identically the
-    /// ranked browse list it has always been.
-    pub fingerprint: Option<String>,
-    pub limit: Option<usize>,
-}
-
-/// GET /{org_id}/db_monitoring/server_queries — the statement list as
-/// the DATABASES report it, for deployments with no traced application
-/// traffic.
-///
-/// Ranked by call count because the underlying feed is a most-frequent top-N
-/// and can support no other ranking honestly — see the module note above.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/server_queries",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringServerQueries",
-    summary = "Database Monitoring: statements as reported by the databases themselves",
-    description = "Per-statement counters (pg_stat_statements / events_statements_summary_by_digest) aggregated over the window, ranked by call count. Server-vantage: measured inside the database across every client, disjoint from the trace-derived /queries list. Reports a MEAN and never a percentile.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
-        ("system" = Option<String>, Query, description = "Database engine filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
-        ("fingerprint" = Option<String>, Query, description = "Narrow to one statement — the query-detail row lookup on a deployment with no traced traffic. Omit for the ranked browse list."),
-        ("limit" = Option<usize>, Query, description = "Max statements returned (default 50, cap 200)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-pub async fn get_dbm_server_queries(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<ServerQueriesQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_server_queries_body(&org_id, &user_email.user_id, &q).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
 /// The server-queries endpoint's whole body as a callable — same extraction as
 /// [`read_databases_body`]. [`get_dbm_badges`] runs it as the zero-trace
 /// fallback slice, under the same Logs-stream auth this endpoint enforces.
-async fn read_server_queries_body(
+pub(crate) async fn read_server_queries_body(
     org_id: &str,
     user_id: &str,
     q: &ServerQueriesQuery,
@@ -7505,63 +6752,10 @@ pub(crate) fn server_samples_envelope(
     })
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ServerSamplesQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub stream: Option<String>,
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    /// See [`DeadlocksQuery::database`].
-    pub database: Option<String>,
-    pub namespace: Option<String>,
-    pub limit: Option<usize>,
-}
-
-/// GET /{org_id}/db_monitoring/server_samples — the slowest executions
-/// the DATABASE ITSELF captured, for deployments with no traced traffic.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/server_samples",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringServerSamples",
-    summary = "Database Monitoring: slowest executions captured by the database's own logging",
-    description = "Single executions with their measured in-engine durations — from log_min_duration_statement completed-statement lines and Postgres auto_explain records — ranked slowest first. A threshold-filtered capture: rows describe only the executions the database chose to log.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream; when absent BOTH defaults ('dbm_server' and 'dbm_server_logs') are read and merged"),
-        ("system" = Option<String>, Query, description = "Database engine filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
-        ("limit" = Option<usize>, Query, description = "Max executions returned (default 100, cap 500)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-pub async fn get_dbm_server_samples(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<ServerSamplesQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_server_samples_body(&org_id, &user_email.user_id, &q).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
 /// The server-samples endpoint's whole body as a callable — same extraction as
 /// [`read_databases_body`]. [`get_dbm_badges`] runs it as the zero-trace
 /// fallback slice, keeping the two-stream merge and the producer-twin dedupe.
-async fn read_server_samples_body(
+pub(crate) async fn read_server_samples_body(
     org_id: &str,
     user_id: &str,
     q: &ServerSamplesQuery,
@@ -7681,48 +6875,6 @@ async fn read_server_samples_body(
     Ok(envelope)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct PlansQuery {
-    pub fingerprint: Option<String>,
-    pub stream: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-}
-
-/// GET /{org_id}/db_monitoring/query/plans — W3.4.
-///
-/// Distinct generic plans captured for one fingerprint over the window. See the
-/// module comment above for what this data is and is not.
-///
-/// SUPERSEDED by [`get_dbm_query_insights`], which returns this exact envelope
-/// as its `plans` section alongside the server counters the detail page always
-/// requested in the same breath. Kept registered and unchanged for
-/// compatibility; new callers should use `/query/insights`.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/query/plans",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringQueryPlans",
-    summary = "Database Monitoring: captured query plans for a query",
-    description = "Distinct GENERIC, NULL-BOUND EXPLAIN plans captured for one query fingerprint, with first and last seen. Not the plan Postgres executed, and carries no per-plan latency.",
-    security(("Authorization" = [])),
-)]
-pub async fn get_dbm_query_plans(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<PlansQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_plans_body(&org_id, &user_email.user_id, &q, None).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
 /// The plans endpoint's whole body as a callable — same extraction as
 /// [`read_databases_body`], so [`get_dbm_query_insights`] emits a section
 /// byte-identical to the standalone response rather than a re-derivation of it.
@@ -7730,7 +6882,7 @@ pub async fn get_dbm_query_plans(
 /// `prologue` shares the `(stream, schema)` pair with the sibling section when
 /// both read the SAME default stream; `None` computes its own, exactly as the
 /// standalone handler does.
-async fn read_plans_body(
+pub(crate) async fn read_plans_body(
     org_id: &str,
     user_id: &str,
     q: &PlansQuery,
@@ -7818,72 +6970,16 @@ async fn read_plans_body(
 
 // ─── The query-detail Logs-side pair (`/query/insights`) ─────────────────────
 
-#[derive(Debug, Deserialize)]
-pub struct QueryInsightsQuery {
-    pub fingerprint: Option<String>,
-    pub stream: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    /// The server-metrics join key. Absent (or, for a database-carrying engine,
-    /// an absent `database`) means there IS no key — the section comes back
-    /// `null` and the page renders its "no join key" line, exactly as it did
-    /// when it decided not to send the second request at all.
-    pub engine: Option<String>,
-    pub database: Option<String>,
-}
-
-/// GET /{org_id}/db_monitoring/query/insights — the query-detail page's
-/// Logs-side pair in one round trip.
-///
-/// `/query/plans` and `/query/server_metrics` were ALWAYS co-fired from the
-/// detail page: both default to `dbm_server`, both run the same
-/// `present_dbm_columns` schema read, both query `KIND_TOP_QUERY` records for
-/// the same fingerprint and window. That is two OFGA round trips, two schema
-/// reads and two HTTP round trips to answer one question about one statement.
-///
-/// The two sections are the SAME envelopes the standalone endpoints return —
-/// produced by the same `read_*_body` callables, so a section here and the
-/// endpoint it came from cannot drift. Both standalone routes keep working
-/// (they are marked superseded, not removed).
-///
-/// Per-section failure, never a whole-request failure: this page is about the
-/// query, and a server-counters read that failed must not take the plans list
-/// down with it. Each section carries its own `*_read_failed` flag rather than
-/// letting an empty section imply "nothing captured".
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/query/insights",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringQueryInsights",
-    summary = "Database Monitoring: plans + server counters for a query",
-    description = "The query-detail page's server-vantage pair in one response: `plans` (the /query/plans envelope) and `server_metrics` (the /query/server_metrics envelope), each nullable with its own read-failed flag.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("fingerprint" = String, Query, description = "Query fingerprint (required)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (defaults to dbm_server)"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("engine" = Option<String>, Query, description = "Server-metrics join key: database engine. Omit and `server_metrics` is null."),
-        ("database" = Option<String>, Query, description = "Server-metrics join key: database name. Required for engines whose records carry one."),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 400, description = "Missing fingerprint", content_type = "application/json", body = ()),
-    )
-)]
-pub async fn get_dbm_query_insights(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<QueryInsightsQuery>,
+/// The query-insights endpoint's whole body, as a callable — the two-section fan-out
+/// (plans + server metrics) with its shared `(auth, schema)` prologue, kept out of
+/// the handler so the handler is a config guard plus a delegation.
+pub(crate) async fn read_query_insights_response(
+    org_id: &str,
+    user_id: &str,
+    q: &QueryInsightsQuery,
 ) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    let org = org_id.as_str();
-    let user = user_email.user_id.as_str();
+    let org = org_id;
+    let user = user_id;
     // Validated ONCE, up front: a missing fingerprint is a malformed request
     // for both sections, so it stays a 400 rather than becoming two nulls the
     // page would render as "nothing captured".
@@ -8352,92 +7448,12 @@ fn table_health_row_to_dto(row: &Value) -> Value {
     })
 }
 
-// ─── Instances (`/instances`) — the fleet's identity list ────────────────────
-//
-// Every DBM tab renders a scope filter whose "database" (instance) picker must
-// offer every instance the org HAS — not merely the ones whose rows happen to
-// be on screen. Deriving the options from a page's own loaded rows fails three
-// ways that all look like "the filter is broken":
-//
-//   * a feed that names no instance leaves the picker EMPTY (deadlocks return no identity of their
-//     own),
-//   * a feed no engine populates DROPS that engine (SQL Server has no session sampler, so Activity
-//     cannot offer `mssql-prod-1`),
-//   * a CAPPED read (activity stops at 100 sampled sessions) makes the list first-page-local rather
-//     than window-local.
-//
-// `/databases` cannot stand in: it is the CLIENT vantage (spans), so on a
-// zero-trace org it returns nothing at all while server-vantage data sits one
-// tab away. And no per-feed union is complete either — measured on the rig,
-// activity named 2 of 4 engines, table_health 2 of 4, deadlocks 0 of 4.
-//
-// So this is one DISTINCT over the identity columns with NO kind predicate:
-// every server-vantage record carries `(engine, instance)` whatever feed wrote
-// it, which makes the union complete BY CONSTRUCTION instead of by remembering
-// to add each new feed to a client-side merge.
-#[derive(Debug, Deserialize)]
-pub struct DbmInstancesQuery {
-    pub stream: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    /// Narrow to one engine. The picker uses this when a `system` chip is
-    /// already applied, so the instance list agrees with the engine filter
-    /// beside it rather than offering instances that chip excludes.
-    pub system: Option<String>,
-}
-
-/// GET /{org_id}/db_monitoring/instances — every (engine, instance).
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/instances",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringInstances",
-    summary = "Database Monitoring: every database instance the org knows",
-    description = "The distinct (engine, instance) identities the server-vantage stream carries in the window, across EVERY feed — sessions, blocking, deadlocks, table stats and statement lists. Feeds the scope filter's instance picker, which must offer instances that have no rows on the current tab.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
-        ("system" = Option<String>, Query, description = "Restrict to one engine"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-// NOT enterprise-gated, deliberately. This is the scope filter's instance
-// picker, and the filter rides on tabs OSS can see (Activity, Top queries) —
-// gating it would leave those tabs with an empty picker on an OSS build. It
-// also reads nothing enterprise: a `SELECT DISTINCT` over the `o2_dbm_engine` /
-// `o2_dbm_instance` columns, whose vocabulary lives in `config`. It carried a
-// `#[cfg(feature = "enterprise")]` from the commit that introduced it, while
-// `src/api/search/src/traces/mod.rs` re-exported it unconditionally — so an OSS
-// build failed to compile `openobserve-api-search` with E0432. The bug survived
-// because the OSS build was only ever checked against `openobserve-core`, which
-// re-exports nothing and so compiled clean.
-pub async fn get_dbm_instances(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<DbmInstancesQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_dbm_instances_body(&org_id, &user_email.user_id, &q).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
 /// The distinct identities, as [`get_dbm_instances`] returns them.
 ///
 /// An instance whose rows carry an engine but no instance name degrades to a
 /// `null` instance rather than being dropped: it is the only evidence that
 /// engine exists, and the picker renders it as an engine-level choice.
-async fn read_dbm_instances_body(
+pub(crate) async fn read_dbm_instances_body(
     org_id: &str,
     user_id: &str,
     q: &DbmInstancesQuery,
@@ -8599,92 +7615,10 @@ pub(crate) fn build_dbm_instances_sql_at(
     Some(sql)
 }
 
-#[cfg(feature = "enterprise")]
-#[derive(Debug, Deserialize)]
-pub struct TableHealthQuery {
-    pub stream: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    pub limit: Option<usize>,
-    /// Also return the index-health section (`index_hits` and its
-    /// disclosures) in the same response. Off by default: the tab-count badge
-    /// hits this endpoint purely to count tables, and making it pay for index
-    /// rows it discards would tax six pages to spare one round trip on one.
-    pub include_indexes: Option<bool>,
-}
-
-/// GET /{org_id}/db_monitoring/table_health — W10.
-///
-/// The newest snapshot of every relation in the window, largest first.
-///
-/// Two disclosures ride on the envelope because the UI cannot phrase them
-/// correctly otherwise: the scan and vacuum counters are LIFETIME totals since
-/// the last `pg_stat_reset()` (not per-window counts), and the tuple figures are
-/// PLANNER ESTIMATES (not exact counts).
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/table_health",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringTableHealth",
-    summary = "Database Monitoring: table size, bloat and vacuum state",
-    description = "Newest snapshot per relation from the table-stats server-vantage feed (pg_table_stats / mysql_table_stats / mariadb_table_stats). Scan and vacuum counters are LIFETIME totals since the last statistics reset; tuple counts and bloat percentage are planner estimates. Postgres, MySQL and MariaDB.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
-        ("system" = Option<String>, Query, description = "Database engine filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("limit" = Option<usize>, Query, description = "Max relations returned (default 100)"),
-        ("include_indexes" = Option<bool>, Query, description = "Also return the index-health section (index_hits, disclosures) in the same response"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-#[cfg(feature = "enterprise")]
-pub async fn get_dbm_table_health(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<TableHealthQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_table_health_body(&org_id, &user_email.user_id, &q).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
-/// OSS stub — Table Health is an Enterprise capability.
-///
-/// The ROUTE stays registered (see `router/mod.rs`); only the body is gated.
-/// Gating the route would answer 404, which reads as "this build is broken" or
-/// "you have the wrong URL"; 403 is what tells the UI to render an upgrade
-/// prompt. Deliberately NOT `disabled_response()`, which means
-/// `ZO_DB_MONITORING_ENABLED=false` and would send the operator to a collector
-/// checklist for a feature no amount of configuration will enable here.
-///
-/// The `Query<TableHealthQuery>` extractor is dropped because that type is
-/// gated.
-#[cfg(not(feature = "enterprise"))]
-pub async fn get_dbm_table_health(
-    Path(_org_id): Path<String>,
-    _user_email: UserEmail,
-) -> HttpResponse {
-    unauthorized_response()
-}
-
 /// The table-health endpoint's whole body as a callable — same extraction as
 /// [`read_databases_body`], auth included.
 #[cfg(feature = "enterprise")]
-async fn read_table_health_body(
+pub(crate) async fn read_table_health_body(
     org_id: &str,
     user_id: &str,
     q: &TableHealthQuery,
@@ -8871,7 +7805,7 @@ pub(crate) fn table_health_envelope(
 /// present-column set. Under the badges fan-in all three ask about the SAME
 /// default stream, so the OFGA round trip and the schema read need not run
 /// three times.
-struct DbmServerPrologue {
+pub(crate) struct DbmServerPrologue {
     stream: String,
     present: HashSet<String>,
 }
@@ -8920,30 +7854,6 @@ async fn server_prologue(org_id: &str, user_id: &str) -> Option<DbmServerPrologu
 // server-vantage slices under the Logs-stream check — so a caller lacking one
 // permission loses that member (null), never the whole response. Only a
 // caller who may read NOTHING gets the 403.
-
-#[derive(Debug, Deserialize)]
-pub struct BadgesQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    /// The reader's scope, forwarded to exactly the slices whose endpoint
-    /// ACCEPTS each dimension — the same matrix the pages apply to their own
-    /// reads, because a badge must count what its tab would show.
-    ///
-    /// Forwarding a narrower scope than a tab applies would make the strip
-    /// answer a different question than the tab it labels.
-    ///
-    /// A dimension a slice does not accept is simply not sent to it. That is
-    /// honest rather than lossy: the databases endpoint has no namespace
-    /// concept, so neither the Overview badge nor the Overview TAB can narrow
-    /// by one.
-    pub system: Option<String>,
-    pub instance: Option<String>,
-    pub namespace: Option<String>,
-    /// Trace-vantage only — the queries and samples slices are the only ones
-    /// whose feed carries the calling application.
-    pub env: Option<String>,
-    pub service: Option<String>,
-}
 
 /// The six slice outcomes plus the two conditionally-run fallbacks, ready to
 /// fold. A struct rather than parameters so the envelope fold is a callable
@@ -9060,47 +7970,16 @@ pub(crate) fn databases_slice_reports_zero_calls(databases: &Result<Value, HttpR
         Err(_) => false,
     }
 }
-
-/// GET /{org_id}/db_monitoring/badges — every tab badge in one read.
-///
-/// Runs the six sibling endpoints' bodies concurrently and — when the
-/// client-vantage answer is exactly zero — the server-vantage fallbacks, so the
-/// shell's per-window cost is this call plus the page's own read. Each member is
-/// that endpoint's unchanged response body, or `null` when its read failed.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/badges",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringBadges",
-    summary = "Database Monitoring: all tab badges in one read",
-    description = "One envelope carrying the databases, queries, activity, deadlocks, blocking and table-health response bodies for the window, read concurrently; members are null when their read failed. When the client-vantage answer is exactly zero, the server-vantage fallback members (server_queries, server_samples) are included too.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("system" = Option<String>, Query, description = "Database system filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("namespace" = Option<String>, Query, description = "Database/schema filter"),
-        ("env" = Option<String>, Query, description = "Environment filter (trace-vantage slices only)"),
-        ("service" = Option<String>, Query, description = "Calling service filter (trace-vantage slices only)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-pub async fn get_dbm_badges(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<BadgesQuery>,
+/// The badge strip's whole body, as a callable — the fan-out over the six slice
+/// bodies plus the shared fallback, kept out of the handler so the handler is a
+/// config guard plus a delegation.
+pub(crate) async fn read_badges_response(
+    org_id: &str,
+    user_id: &str,
+    q: &BadgesQuery,
 ) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    let org = org_id.as_str();
-    let user = user_email.user_id.as_str();
+    let org = org_id;
+    let user = user_id;
 
     // Each slice's query is the EXACT request the tab strip's own fan-out
     // sent: window + system on databases, window + system + `limit=1` on
@@ -9559,38 +8438,6 @@ fn is_safe_metric_stream(name: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b':' || b == b'-')
 }
 
-/// The whole instance-metrics sweep as ONE `UNION ALL`, or `None`.
-///
-/// One union rather than N searches: eight searches are eight DataFusion plans,
-/// eight scheduler entries and eight round trips (~208 ms wall against ~55 ms
-/// for the union on the live rig). The arms are independent scans with no join
-/// between them, so the planner runs them concurrently inside one plan and pays
-/// the fixed cost once.
-///
-/// The arms are UNIFORM because `UNION ALL` requires every arm to agree on arity
-/// and types, and the specs do not: the identity lives in
-/// `service_instance_id` on Postgres and `mysql_instance_endpoint` on MySQL,
-/// the label column is a database name here and a replica address there. So
-/// each arm PROJECTS ONTO a fixed five-column shape — timestamp, value, role,
-/// instance, series label — aliasing its own columns into it and filling an
-/// absent label with a NULL literal. The client's fold reads the shape back.
-///
-/// The fold stays the CLIENT'S. The folding rules — per-series
-/// grouping, counter differencing with reset detection, gauge-vs-counter
-/// figures, the `mariadb`→`mysql` alias, host normalisation across the two
-/// vantages — are ~200 lines pinned by `instanceMetrics.spec.ts`, and they run
-/// on rows the page already holds. Re-implementing them here would duplicate
-/// every rule in a second language with no test able to see the two drift. The
-/// EXPENSIVE half is the sweep, and that is what moved; the rows come back in
-/// exactly the shape `foldMetricRows` already consumes, so every existing
-/// client test keeps testing the code that really runs.
-///
-/// The grid stamp: the result cache resolves a complex query's timestamp
-/// column from its SELECT output, and a union is complex — so `_timestamp` is
-/// projected (it is real data here, not a synthetic stamp; the fold needs it).
-/// The `anchor_micros` grid floor rides in the ROLE column's sibling so two
-/// viewers of one window emit byte-identical SQL and share a cache entry;
-/// stamping raw `now` would give every reader its own key. See
 /// `build_dbm_instances_sql_at` for the same argument at length.
 ///
 /// `fields_by_stream` is each stream's REAL schema. A stream absent from the
@@ -9714,46 +8561,6 @@ pub(crate) fn build_instance_metrics_query(
     ))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct InstanceMetricsQuery {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-}
-
-/// GET /{org_id}/db_monitoring/instance_metrics — the receiver's health view.
-#[utoipa::path(
-    get,
-    path = "/{org_id}/db_monitoring/instance_metrics",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetDbMonitoringInstanceMetrics",
-    summary = "Database Monitoring: instance health from the collector's metric streams",
-    description = "Connection saturation, cache hit ratio, replication lag and deadlock counts for every database instance the org's collector reports on, swept from the metric streams in ONE query. The stream list and the SQL are server-constructed: this endpoint takes no stream or query parameter, so a `db_monitoring` grant buys database health columns and not general metrics access.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-    )
-)]
-pub async fn get_dbm_instance_metrics(
-    Path(org_id): Path<String>,
-    user_email: UserEmail,
-    Query(q): Query<InstanceMetricsQuery>,
-) -> HttpResponse {
-    let cfg = get_config();
-    if !cfg.db_monitoring.enabled {
-        return disabled_response();
-    }
-    match read_instance_metrics_body(&org_id, &user_email.user_id, &q).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
-    }
-}
-
 /// The instance-health rows, as [`get_dbm_instance_metrics`] returns them.
 ///
 /// GRACEFUL DEGRADATION IS THE CONTRACT. The client deliberately does not await
@@ -9762,7 +8569,7 @@ pub async fn get_dbm_instance_metrics(
 /// returns an EMPTY 200 rather than an error: no metric stream exists, no
 /// stream carries the identity columns, the catalog is empty. Only a genuine
 /// search failure is a 500, and the client treats even that as a blank column.
-async fn read_instance_metrics_body(
+pub(crate) async fn read_instance_metrics_body(
     org_id: &str,
     user_id: &str,
     q: &InstanceMetricsQuery,
@@ -9924,9 +8731,118 @@ async fn run_metrics_search(
         false,
     )
     .await?;
-    super::hits_or_partial_error(resp, "instance_metrics")
+    openobserve_core::db_monitoring::hits_or_partial_error(resp, "instance_metrics")
 }
 
+#[cfg(test)]
+mod server_queries_without_calls_tests {
+    use super::*;
+
+    fn cols(with_calls: bool) -> HashSet<String> {
+        let mut c: HashSet<String> = [
+            server_vantage::O2_DBM_FINGERPRINT,
+            server_vantage::O2_DBM_ACTIVITY_QUERY,
+            server_vantage::O2_DBM_KIND,
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        if with_calls {
+            c.insert(server_vantage::O2_DBM_CALLS.to_string());
+        }
+        c
+    }
+
+    /// An engine that reports statements but no call counts must still list
+    /// them.
+    ///
+    /// `sqlserverreceiver`'s `db.server.top_query` carries the statement text
+    /// and its execution plan but NO metrics — no `calls`, no `exec_time`. This
+    /// builder required `calls`, so on a SQL Server stream it returned nothing
+    /// and the query-detail header fell through to painting a bare fingerprint
+    /// at a reader who came to see a statement. The fingerprint is the only
+    /// column this list truly cannot do without; `calls` is a ranking figure.
+    #[test]
+    fn server_queries_sql_builds_without_a_calls_column() {
+        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(false))
+            .expect("statements without call counts are still statements");
+        assert!(
+            sql.contains("NULL AS calls"),
+            "the wire field must survive as null: {sql}"
+        );
+        assert!(
+            sql.contains("ORDER BY last_seen DESC"),
+            "with no figure to rank by, newest-first is the honest order: {sql}"
+        );
+    }
+
+    #[test]
+    fn server_queries_sql_still_ranks_by_calls_where_it_can() {
+        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(true)).expect("sql");
+        assert!(sql.contains("ORDER BY calls DESC"), "{sql}");
+        assert!(
+            sql.contains(&format!("SUM({})", server_vantage::O2_DBM_CALLS)),
+            "{sql}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// Same defect, same fix, on the server-queries list: it already grouped,
+    /// but aliased its timestamps `first_seen`/`last_seen`, so the resolver saw
+    /// no `_timestamp` and declined. Verified `has_ts=false` before, `true` after.
+    #[test]
+    fn test_server_queries_sql_projects_a_timestamp_the_cache_recognizes() {
+        let sql = build_dbm_server_queries_sql("dbm_server", "", 50, &cols(true)).expect("sql");
+        assert!(
+            sql.contains("AS _timestamp"),
+            "aliasing every timestamp to first_seen/last_seen hides it from the cache: {sql}"
+        );
+    }
+
+    #[test]
+    fn server_queries_sql_still_needs_a_fingerprint() {
+        let mut without = cols(true);
+        without.remove(server_vantage::O2_DBM_FINGERPRINT);
+        assert_eq!(
+            build_dbm_server_queries_sql("dbm_server", "", 50, &without),
+            None,
+            "the list is KEYED on the fingerprint — without it there is nothing to group"
+        );
+    }
+}
+
+/// The whole instance-metrics sweep as ONE `UNION ALL`, or `None`.
+///
+/// One union rather than N searches: eight searches are eight DataFusion plans,
+/// eight scheduler entries and eight round trips (~208 ms wall against ~55 ms
+/// for the union on the live rig). The arms are independent scans with no join
+/// between them, so the planner runs them concurrently inside one plan and pays
+/// the fixed cost once.
+///
+/// The arms are UNIFORM because `UNION ALL` requires every arm to agree on arity
+/// and types, and the specs do not: the identity lives in
+/// `service_instance_id` on Postgres and `mysql_instance_endpoint` on MySQL,
+/// the label column is a database name here and a replica address there. So
+/// each arm PROJECTS ONTO a fixed five-column shape — timestamp, value, role,
+/// instance, series label — aliasing its own columns into it and filling an
+/// absent label with a NULL literal. The client's fold reads the shape back.
+///
+/// The fold stays the CLIENT'S. The folding rules — per-series
+/// grouping, counter differencing with reset detection, gauge-vs-counter
+/// figures, the `mariadb`→`mysql` alias, host normalisation across the two
+/// vantages — are ~200 lines pinned by `instanceMetrics.spec.ts`, and they run
+/// on rows the page already holds. Re-implementing them here would duplicate
+/// every rule in a second language with no test able to see the two drift. The
+/// EXPENSIVE half is the sweep, and that is what moved; the rows come back in
+/// exactly the shape `foldMetricRows` already consumes, so every existing
+/// client test keeps testing the code that really runs.
+///
+/// The grid stamp: the result cache resolves a complex query's timestamp
+/// column from its SELECT output, and a union is complex — so `_timestamp` is
+/// projected (it is real data here, not a synthetic stamp; the fold needs it).
+/// The `anchor_micros` grid floor rides in the ROLE column's sibling so two
+/// viewers of one window emit byte-identical SQL and share a cache entry;
+/// stamping raw `now` would give every reader its own key. See
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -10072,7 +8988,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn module_grant_is_checked_against_the_org_level_db_monitoring_object() {
-        let src = include_str!("api.rs");
+        let src = dbm_prod_source();
         let start = src
             .find("async fn can_read_stream(")
             .expect("can_read_stream must exist");
@@ -10156,8 +9072,10 @@ mod tests {
         use axum::http::StatusCode;
 
         let org = || Path("default".to_string());
-        let user = || UserEmail {
-            user_id: "a@a.com".to_string(),
+        let user = || {
+            Headers(UserEmail {
+                user_id: "a@a.com".to_string(),
+            })
         };
 
         assert_eq!(
@@ -10244,8 +9162,8 @@ mod tests {
     /// (not found, or found but trivial) rather than silently scraping a
     /// neighbour and passing on its gate.
     fn assert_gates_on_vantage(fn_name: &str, vantage: DbmVantage) {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let src = dbm_prod_source();
+        let code = src;
         let start = code
             .find(&format!("async fn {fn_name}"))
             .unwrap_or_else(|| panic!("{fn_name} must exist — a renamed fn must fail, not pass"));
@@ -10370,6 +9288,51 @@ mod tests {
     /// observable. `get_dbm_query_endpoints` (`can_read_stream` at the top,
     /// before range parsing) is the pattern.
     ///
+    /// One endpoint's WHOLE implementation: the handler plus the body fn it
+    /// delegates to, concatenated in call order.
+    ///
+    /// The handler/service split moved most of every endpoint out of the
+    /// `get_dbm_*` fn and into a `read_*` fn in the service layer. The
+    /// invariants the scrapes pin — "the gate runs before the backfill", "the
+    /// limit is shared with the standalone endpoint" — are properties of the
+    /// endpoint, not of whichever file a line ended up in, so they are asserted
+    /// over both halves together.
+    ///
+    /// Both halves are REQUIRED. If either is missing the scrape panics rather
+    /// than quietly asserting over half an endpoint and passing: a body fn that
+    /// is renamed, or a handler that stops delegating, is exactly the drift
+    /// these tests exist to catch.
+    #[cfg(test)]
+    fn endpoint_impl(handler_fn: &str, body_fn: &str) -> String {
+        let src = dbm_prod_source();
+        let handler = src
+            .split(&format!("pub async fn {handler_fn}("))
+            .nth(1)
+            .unwrap_or_else(|| {
+                panic!("{handler_fn} must exist — a renamed handler must fail, not pass")
+            })
+            .split("\npub ")
+            .next()
+            .unwrap();
+        let body = src
+            .split(&format!("async fn {body_fn}("))
+            .nth(1)
+            .unwrap_or_else(|| {
+                panic!("{body_fn} must exist — a renamed body fn must fail, not pass")
+            })
+            .split("\n}\n")
+            .next()
+            .unwrap();
+        // The handler must actually reach the body it is being scraped with,
+        // or this concatenation would assert over two unrelated functions.
+        assert!(
+            handler.contains(&format!("{body_fn}(")),
+            "{handler_fn} must delegate to {body_fn} — scraping them together \
+             only means anything if one calls the other"
+        );
+        format!("{handler}\n{body}")
+    }
+
     /// Asserted on SOURCE ORDER because it cannot be asserted on behaviour here:
     /// `can_read_stream` is unconditionally permissive on OSS (see
     /// `can_read_stream_is_permissive_on_oss`), so no OSS-observable response
@@ -10377,14 +9340,11 @@ mod tests {
     /// the whole invariant, so ordering is what this pins.
     #[test]
     fn test_history_checks_stream_permission_before_backfilling() {
-        let src = include_str!("api.rs");
-        let handler = src
-            .split("pub async fn get_dbm_query_history(")
-            .nth(1)
-            .expect("handler must exist")
-            .split("\npub ")
-            .next()
-            .unwrap();
+        // Handler + the body it delegates to: the gate and the backfill are
+        // now on opposite sides of that split, and the ORDER between them is
+        // the invariant, so both halves are read as one.
+        let handler = endpoint_impl("get_dbm_query_history", "read_query_history_response");
+        let handler = handler.as_str();
 
         let gate = handler
             .find("can_read_stream(")
@@ -10614,8 +9574,8 @@ mod tests {
 
         // The call site takes only the filters — `search` must not appear in
         // the statement that builds the queries SQL.
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let src = dbm_prod_source();
+        let code = src;
         let window_fn = code
             .find("async fn read_queries_window")
             .expect("the queries window fn must exist");
@@ -10930,14 +9890,10 @@ mod tests {
     /// reason) as `test_history_checks_stream_permission_before_backfilling`.
     #[test]
     fn test_samples_checks_stream_permission_before_reading() {
-        let src = include_str!("api.rs");
-        let handler = src
-            .split("pub async fn get_dbm_samples(")
-            .nth(1)
-            .expect("handler must exist")
-            .split("\npub ")
-            .next()
-            .unwrap();
+        // Handler + delegated body: the gate and the raw-span read are on
+        // opposite sides of the split, and their ORDER is the invariant.
+        let handler = endpoint_impl("get_dbm_samples", "read_samples_body");
+        let handler = handler.as_str();
 
         let gate = handler
             .find("can_read_stream(")
@@ -11384,21 +10340,39 @@ mod tests {
     /// The samples body is a plain `async fn`, not the handler — the extraction
     /// every other DBM read follows, and here also what keeps axum's Handler
     /// bound satisfiable while the body awaits its optional section.
+    ///
+    /// Now a genuinely CROSS-FILE assertion: the thin half must be in
+    /// `handler.rs` and the extracted body in `service.rs`. Reading one file
+    /// could no longer tell the two apart — a handler that inlined its body
+    /// again would still look thin if you only measured the file it moved out
+    /// of — so each half is read from the layer it belongs to, and the
+    /// delegation between them is asserted explicitly.
     #[test]
     fn test_samples_body_is_extracted_from_the_handler() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let service = prod_half(include_str!("service.rs"));
+        let handlers = prod_half(include_str!("handler.rs"));
+
+        // The body lives in the SERVICE layer, as a callable.
         assert!(
-            code.contains("async fn read_samples_body("),
-            "the samples body must be a callable, like every other DBM read"
+            service.contains("async fn read_samples_body("),
+            "the samples body must be a callable in the service layer, like \
+             every other DBM read"
         );
-        let start = code
+        // ...and NOT in the handler layer, which is the regression this pins.
+        assert!(
+            !handlers.contains("async fn read_samples_body("),
+            "the samples body moved back into the handler layer"
+        );
+
+        // The handler is bounded by its own closing brace, so the measurement
+        // cannot silently run on past the end of the fn.
+        let start = handlers
             .find("pub async fn get_dbm_samples")
             .expect("the handler must exist");
-        let handler = code[start..]
-            .split("\n/// The samples endpoint's whole body")
+        let handler = handlers[start..]
+            .split("\n}\n")
             .next()
-            .expect("handler body");
+            .expect("the handler must have a body");
         assert!(
             handler.contains("read_samples_body(&org_id, &user_email.user_id, &q)"),
             "the handler must delegate to the body fn"
@@ -11414,8 +10388,8 @@ mod tests {
     /// carries: a fn that moved or was renamed fails LOUDLY here rather than
     /// silently scraping a neighbour and passing on its code.
     fn samples_body_src() -> &'static str {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let src = dbm_prod_source();
+        let code = src;
         let start = code
             .find("async fn read_samples_body(")
             .expect("read_samples_body must exist — a renamed fn must fail, not pass");
@@ -11442,16 +10416,14 @@ mod tests {
     /// (no stream), or the read-failed flag.
     #[test]
     fn test_history_folds_the_endpoints_section() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
-        let start = code
-            .find("pub async fn get_dbm_query_history")
-            .expect("the history handler must exist");
-        let handler = code[start..]
-            .split("\n#[derive")
-            .next()
-            .expect("the handler must have a body");
-        // Guard: prove the scrape landed on the real handler.
+        let src = dbm_prod_source();
+        // Handler + delegated body. The folded section is built in the body
+        // half; the handler half is what proves the body is still this
+        // endpoint's. Scraped together so the property stays "the /query/history
+        // ENDPOINT folds the section", independent of which file a line is in.
+        let handler = endpoint_impl("get_dbm_query_history", "read_query_history_response");
+        let handler = handler.as_str();
+        // Guard: prove the scrape landed on the real implementation.
         assert!(
             handler.len() > 2000 && handler.contains("build_backfill_sql("),
             "scraped the wrong function — get_dbm_query_history must be found \
@@ -11486,12 +10458,10 @@ mod tests {
     /// rows would not be the same answer.
     #[test]
     fn test_history_endpoints_section_shares_the_endpoints_limit() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
-        let start = code
-            .find("pub async fn get_dbm_query_history")
-            .expect("handler");
-        let handler = code[start..].split("\n#[derive").next().expect("body");
+        // Handler + delegated body: the clamp moved into the body half, and the
+        // property is about the ENDPOINT's cap, not about a file.
+        let handler = endpoint_impl("get_dbm_query_history", "read_query_history_response");
+        let handler = handler.as_str();
         assert!(handler.len() > 2000, "scraped the wrong function");
         assert!(handler.contains("DEFAULT_ENDPOINTS_LIMIT"));
         assert!(handler.contains("MAX_ENDPOINTS_LIMIT"));
@@ -11529,14 +10499,12 @@ mod tests {
     /// only when every section the caller asked for was denied.
     #[test]
     fn test_query_insights_folds_two_nullable_sections() {
-        let src = include_str!("api.rs");
-        let handler = src
-            .split("pub async fn get_dbm_query_insights(")
-            .nth(1)
-            .expect("the merged handler must exist")
-            .split("\n/// Whether a ready")
-            .next()
-            .unwrap();
+        let src = dbm_prod_source();
+        // Handler + delegated body: the fan-out, the prologue and the section
+        // flags are all in the body half now, while the handler half is the
+        // config guard that reaches it. The property is about the ENDPOINT.
+        let handler = endpoint_impl("get_dbm_query_insights", "read_query_insights_response");
+        let handler = handler.as_str();
         assert!(
             handler.len() > 800 && handler.contains("tokio::join!"),
             "scraped the wrong function — get_dbm_query_insights must be found and non-trivial"
@@ -11566,14 +10534,12 @@ mod tests {
     /// captured".
     #[test]
     fn test_query_insights_rejects_a_missing_fingerprint_up_front() {
-        let src = include_str!("api.rs");
-        let handler = src
-            .split("pub async fn get_dbm_query_insights(")
-            .nth(1)
-            .expect("the merged handler must exist")
-            .split("\n/// Whether a ready")
-            .next()
-            .unwrap();
+        let src = dbm_prod_source();
+        // Handler + delegated body: the fan-out, the prologue and the section
+        // flags are all in the body half now, while the handler half is the
+        // config guard that reaches it. The property is about the ENDPOINT.
+        let handler = endpoint_impl("get_dbm_query_insights", "read_query_insights_response");
+        let handler = handler.as_str();
         let reject = handler
             .find("fingerprint is required")
             .expect("insights must reject a missing fingerprint");
@@ -11674,7 +10640,7 @@ mod tests {
     /// what every existing caller already receives.
     #[test]
     fn test_databases_breakdown_is_opt_in() {
-        let src = include_str!("api.rs");
+        let src = dbm_prod_source();
         let body = src
             .split("async fn read_databases_body(")
             .nth(1)
@@ -12041,7 +11007,7 @@ mod tests {
     /// a new `get_dbm_*` handler cannot silently escape the guard.
     #[test]
     fn test_no_caller_swallows_a_schema_read_error() {
-        let src = include_str!("api.rs");
+        let src = dbm_prod_source();
 
         // Discover every `get_dbm_*` handler and keep the ones that actually
         // read the stream schema — the others have no Result to swallow.
@@ -12051,7 +11017,7 @@ mod tests {
         // Scan only the real code: the test module below contains the same
         // literal inside other source-scraping tests, and matching those pulls
         // in a bogus "handler" whose body is the rest of the file.
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let code = src;
         // Both spellings a schema-reading pipeline can have: a handler that
         // still owns its body, and a `read_*_body` fn extracted for the
         // badges fan-in. Scanning only the first would let an extracted body
@@ -12711,10 +11677,10 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_the_fallback_does_not_reach_the_blocking_or_activity_callers() {
-        let src = include_str!("api.rs");
+        let src = dbm_prod_source();
         // Only the real code — the test module below calls the builder many
         // times and matching those would make this vacuous.
-        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let code = src;
 
         // Every call site, discovered rather than listed: a NEW caller added
         // without a raw argument is exactly the drift this must catch.
@@ -13028,8 +11994,8 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_the_blocking_read_consults_the_probe() {
-        let src = include_str!("api.rs");
-        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let src = dbm_prod_source();
+        let code = src;
         let body = {
             let start = code
                 .find("async fn read_blocking_body(")
@@ -13071,8 +12037,8 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_failed_blocking_probe_widens_rather_than_hiding_rows() {
-        let src = include_str!("api.rs");
-        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let src = dbm_prod_source();
+        let code = src;
         let start = code
             .find("async fn blocking_window_needs_fallback(")
             .expect("the blocking probe exists");
@@ -13101,8 +12067,8 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_the_blocking_scope_predicates_leave_the_sql_when_widening() {
-        let src = include_str!("api.rs");
-        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let src = dbm_prod_source();
+        let code = src;
         let start = code
             .find("async fn read_blocking_body(")
             .expect("read_blocking_body exists");
@@ -13651,8 +12617,8 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_the_deadlocks_read_consults_the_boundary_before_widening() {
-        let src = include_str!("api.rs");
-        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let src = dbm_prod_source();
+        let code = src;
 
         let body_at = code
             .find("async fn read_deadlocks_body")
@@ -13702,8 +12668,8 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_scope_predicates_never_reach_the_sql_while_the_fallback_is_active() {
-        let src = include_str!("api.rs");
-        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let src = dbm_prod_source();
+        let code = src;
 
         // The deadlocks call site, discovered from its kind argument.
         let at = code
@@ -15300,7 +14266,7 @@ mod tests {
     /// test. Both wire-up lines live OUTSIDE api.rs, so nothing else catches it.
     #[test]
     fn test_activity_endpoint_is_wired_up() {
-        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        let router = include_str!("../../../../http/src/handler/http/router/mod.rs");
         assert!(
             router.contains("db_monitoring/activity"),
             "the activity route must be registered"
@@ -15309,10 +14275,10 @@ mod tests {
             router.contains("get_dbm_activity"),
             "the route must point at the handler"
         );
-        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
         assert!(
-            reexport.contains("get_dbm_activity"),
-            "the handler must be re-exported, or the router cannot name it"
+            router.contains("db_monitoring::handler::get_dbm_activity"),
+            "the route must name the handler through its own module — \
+             a route pointing anywhere else is not this handler"
         );
     }
 
@@ -15545,8 +14511,8 @@ mod tests {
     /// response needs a live search backend.
     #[test]
     fn test_activity_discloses_its_sample_interval_even_when_it_has_hits() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let src = dbm_prod_source();
+        let code = src;
         let start = code
             .find("async fn read_activity_body")
             .expect("the activity body fn must exist");
@@ -15738,7 +14704,7 @@ mod tests {
     /// the DBM read API would 404 the endpoint on OSS builds.
     #[test]
     fn test_activity_endpoint_is_not_enterprise_gated() {
-        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        let router = include_str!("../../../../http/src/handler/http/router/mod.rs");
         let idx = router
             .find("db_monitoring/activity")
             .expect("route must exist");
@@ -16246,8 +15212,8 @@ mod tests {
     /// reason.
     #[test]
     fn test_plans_requires_a_fingerprint_and_defaults_the_stream() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let src = dbm_prod_source();
+        let code = src;
         let start = code
             .find("async fn read_plans_body")
             .expect("the plans body fn must exist");
@@ -16592,7 +15558,7 @@ mod tests {
     /// so this route gets zero coverage without its own pair.
     #[test]
     fn test_server_metrics_endpoint_is_wired_up() {
-        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        let router = include_str!("../../../../http/src/handler/http/router/mod.rs");
         assert!(
             router.contains("db_monitoring/query/server_metrics"),
             "the server-metrics route must be registered"
@@ -16601,10 +15567,10 @@ mod tests {
             router.contains("get_dbm_query_server_metrics"),
             "the route must point at the handler"
         );
-        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
         assert!(
-            reexport.contains("get_dbm_query_server_metrics"),
-            "the handler must be re-exported, or the router cannot name it"
+            router.contains("db_monitoring::handler::get_dbm_query_server_metrics"),
+            "the route must name the handler through its own module — \
+             a route pointing anywhere else is not this handler"
         );
     }
 
@@ -17082,8 +16048,8 @@ mod tests {
     /// Same guard discipline as [`assert_gates_on_vantage`]: a scrape that
     /// cannot find its landmarks fails rather than passing vacuously.
     fn assert_gate_precedes_range(fn_name: &str) {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let src = dbm_prod_source();
+        let code = src;
         let start = code
             .find(&format!("async fn {fn_name}"))
             .unwrap_or_else(|| panic!("{fn_name} must exist"));
@@ -17112,8 +16078,8 @@ mod tests {
     /// report a healthy collector as broken.
     #[test]
     fn test_table_health_reports_schema_errors() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let src = dbm_prod_source();
+        let code = src;
         let start = code
             .find("async fn read_table_health_body")
             .expect("body fn");
@@ -17140,7 +16106,7 @@ mod tests {
     /// catches it.
     #[test]
     fn test_table_health_endpoint_is_wired_up() {
-        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        let router = include_str!("../../../../http/src/handler/http/router/mod.rs");
         assert!(
             router.contains("db_monitoring/table_health"),
             "the table-health route must be registered"
@@ -17149,10 +16115,10 @@ mod tests {
             router.contains("get_dbm_table_health"),
             "the route must point at the handler"
         );
-        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
         assert!(
-            reexport.contains("get_dbm_table_health"),
-            "the handler must be re-exported, or the router cannot name it"
+            router.contains("db_monitoring::handler::get_dbm_table_health"),
+            "the route must name the handler through its own module — \
+             a route pointing anywhere else is not this handler"
         );
     }
 
@@ -17169,7 +16135,7 @@ mod tests {
     /// checks the route still sits among its ungated DBM siblings.
     #[test]
     fn test_table_health_route_is_registered_ungated() {
-        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        let router = include_str!("../../../../http/src/handler/http/router/mod.rs");
         let idx = router
             .find("db_monitoring/table_health")
             .expect("route must exist");
@@ -17450,16 +16416,16 @@ mod tests {
     /// handler nothing routes to is dead code that reads as a feature.
     #[test]
     fn test_server_samples_route_is_registered() {
-        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        let router = include_str!("../../../../http/src/handler/http/router/mod.rs");
         assert!(
             router.contains("db_monitoring/server_samples"),
             "the server-samples route must be registered"
         );
         assert!(router.contains("get_dbm_server_samples"));
-        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
         assert!(
-            reexport.contains("get_dbm_server_samples"),
-            "the handler must be re-exported, or the router cannot name it"
+            router.contains("db_monitoring::handler::get_dbm_server_samples"),
+            "the route must name the handler through its own module — \
+             a route pointing anywhere else is not this handler"
         );
     }
 
@@ -17658,7 +16624,7 @@ mod tests {
     /// ungated beside them — an `#[cfg]` here would 404 the endpoint on OSS.
     #[test]
     fn test_badges_route_is_registered() {
-        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        let router = include_str!("../../../../http/src/handler/http/router/mod.rs");
         assert!(
             router.contains("db_monitoring/badges"),
             "the badges route must be registered"
@@ -17672,10 +16638,10 @@ mod tests {
             neighbourhood.contains("db_monitoring/"),
             "the badges route must live beside the other ungated DBM routes"
         );
-        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
         assert!(
-            reexport.contains("get_dbm_badges"),
-            "the handler must be re-exported, or the router cannot name it"
+            router.contains("db_monitoring::handler::get_dbm_badges"),
+            "the route must name the handler through its own module — \
+             a route pointing anywhere else is not this handler"
         );
     }
 
@@ -17689,7 +16655,7 @@ mod tests {
     /// `100+`.
     #[test]
     fn test_table_health_discloses_its_row_cap() {
-        let src = include_str!("api.rs");
+        let src = dbm_prod_source();
         let start = src
             .find("async fn read_table_health_body")
             .expect("table health body reader must exist");
@@ -17710,15 +16676,14 @@ mod tests {
     /// exactly the slices whose endpoint accepts it.
     #[test]
     fn test_badges_forwards_each_dimension_to_the_slices_that_accept_it() {
-        let src = include_str!("api.rs");
-        let start = src
-            .find("pub async fn get_dbm_badges")
-            .expect("badges handler must exist");
-        let end = src[start..]
-            .find("\n/// Attach the database-reported fallback")
-            .map(|i| start + i)
-            .unwrap_or(src.len());
-        let body = &src[start..end];
+        // `src` is the whole production corpus, because this test reaches across
+        // two layers: `BadgesQuery` is in `models.rs` while the per-slice query
+        // structs are built in the badges body in `service.rs`.
+        let src = dbm_prod_source();
+        // Handler + delegated body: the slice structs are constructed in the
+        // body half now.
+        let body = endpoint_impl("get_dbm_badges", "read_badges_response");
+        let body = body.as_str();
 
         // The query struct must be able to CARRY the scope in the first place.
         let bq_start = src
@@ -17740,9 +16705,9 @@ mod tests {
         // No slice may hardcode a dimension its endpoint accepts. The four
         // event slices are the ones that regressed, so they are named.
         for slice in ["activity_q", "deadlocks_q", "blocking_q", "table_health_q"] {
-            let at = body
-                .find(&format!("let {slice} = "))
-                .unwrap_or_else(|| panic!("{slice} must be constructed in the handler"));
+            let at = body.find(&format!("let {slice} = ")).unwrap_or_else(|| {
+                panic!("{slice} must be constructed in the badges implementation")
+            });
             let decl = &body[at..at + body[at..].find("};").unwrap_or(600)];
             assert!(
                 decl.contains("q.system.clone()"),
@@ -17765,7 +16730,7 @@ mod tests {
     // the false-verdict shape `present_dbm_columns` refuses for schema reads.
 
     /// The whole bug in one assertion: partial in, `Err` out.
-    use super::super::hits_or_partial_error;
+    use openobserve_core::db_monitoring::hits_or_partial_error;
 
     #[test]
     fn test_a_partial_response_is_an_error_not_empty_hits() {
@@ -17902,10 +16867,23 @@ mod tests {
         // third read harness — it feeds the live tail, the sparklines, the
         // endpoints endpoint AND the rollup WRITER, where a partial read does
         // not merely render a wrong page but persists wrong aggregates.
+        // The DBM read layer enters as its PRODUCTION corpus (all three of
+        // models/service/handler, test tails already stripped per layer); the
+        // two core modules are still whole files, so each is stripped here.
         let modules = [
-            ("api.rs", include_str!("api.rs")),
-            ("rollup.rs", include_str!("rollup.rs")),
-            ("server_vantage.rs", include_str!("server_vantage.rs")),
+            ("dbm read layer", dbm_prod_source()),
+            (
+                "rollup.rs",
+                prod_half(include_str!(
+                    "../../../../../core/src/db_monitoring/rollup.rs"
+                )),
+            ),
+            (
+                "server_vantage.rs",
+                prod_half(include_str!(
+                    "../../../../../core/src/db_monitoring/server_vantage.rs"
+                )),
+            ),
         ];
         // BOTH entrypoints count. A DBM read reaches the search layer either
         // through the bare planner (`crate::search::search`) or through the
@@ -17916,7 +16894,7 @@ mod tests {
         let entrypoints = ["crate::search::search(", "search_service::cache::search("];
         let mut total = 0;
         for (name, src) in modules {
-            let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+            let code = src;
             for (i, _) in entrypoints.iter().flat_map(|e| code.match_indices(e)) {
                 total += 1;
                 // The guard must appear in the lines that consume the response,
@@ -17959,8 +16937,8 @@ mod tests {
     /// cannot defend this boundary. Only the main read erroring out can.
     #[test]
     fn test_a_partial_read_cannot_reach_the_not_collecting_probe() {
-        let src = include_str!("api.rs");
-        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let src = dbm_prod_source();
+        let code = src;
 
         // The gate lives in the pure envelope builders, which receive `hits` as
         // a PARAMETER — so the property is about the handler bodies that feed
@@ -18222,9 +17200,10 @@ mod tests_instance_metrics_contract {
     /// The client TypeScript source, read at compile time.
     ///
     /// Path is relative to this file:
-    ///   src/core/src/traces/db_monitoring/api.rs
-    ///   → ../../../../../web/src/utils/dbm/instanceMetrics.ts
-    const CLIENT_SPEC: &str = include_str!("../../../../../web/src/utils/dbm/instanceMetrics.ts");
+    ///   src/api/management/src/request/db_monitoring/service.rs
+    ///   → ../../../../../../web/src/utils/dbm/instanceMetrics.ts
+    const CLIENT_SPEC: &str =
+        include_str!("../../../../../../web/src/utils/dbm/instanceMetrics.ts");
 
     /// The catalog here and the catalog in the browser must name the SAME
     /// streams.
@@ -18310,7 +17289,7 @@ mod tests_instance_metrics_contract {
     /// a parameter that was never added.
     #[test]
     fn instance_metrics_query_accepts_no_caller_supplied_sql_or_streams() {
-        let src = include_str!("api.rs");
+        let src = dbm_prod_source();
         let start = src
             .find("pub struct InstanceMetricsQuery {")
             .expect("InstanceMetricsQuery must exist");
@@ -18386,7 +17365,7 @@ mod tests_instance_metrics_contract {
     /// `StreamType::Metrics` directly rather than borrowing a vantage.
     #[test]
     fn instance_metrics_authorizes_against_the_metrics_stream_type() {
-        let src = include_str!("api.rs");
+        let src = dbm_prod_source();
         let start = src
             .find("async fn read_instance_metrics_body(")
             .expect("the read body must exist");

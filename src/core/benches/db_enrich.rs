@@ -18,7 +18,7 @@
 //! first and the single-pass lexer second).
 //!
 //! Same-run comparison over real captured statements
-//! (`src/traces/db_monitoring/corpus/captured_sql.json`):
+//! (`src/db_monitoring/corpus/captured_sql.json`):
 //! - `disabled`:      the `cfg.db_monitoring.enabled == false` path — the cost a non-DBM deployment
 //!   pays per span (the branch only).
 //! - `enabled_warm`:  enrichment with the raw-text LRU hitting — the steady state on real
@@ -31,10 +31,10 @@
 //! separate deliverable).
 
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use openobserve_core::traces::db_monitoring::{self, EnrichOptions};
+use openobserve_core::db_monitoring::{self, EnrichOptions};
 use serde_json::{Map, Value};
 
-const CORPUS: &str = include_str!("../src/traces/db_monitoring/corpus/captured_sql.json");
+const CORPUS: &str = include_str!("../src/db_monitoring/corpus/captured_sql.json");
 const SPAN_KIND_CLIENT: i32 = 3;
 
 /// Attr maps of every corpus case (all are CLIENT spans with db attributes).

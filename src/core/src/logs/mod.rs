@@ -356,13 +356,10 @@ async fn write_logs(
     // computes the write path from them, whereas the secondary index is
     // consumed later, by the parquet writer reading stream settings for itself.
     if config::get_config().db_monitoring.enabled
-        && crate::traces::db_monitoring::server_vantage::batch_has_dbm_records(&json_data)
+        && crate::db_monitoring::server_vantage::batch_has_dbm_records(&json_data)
     {
-        crate::traces::db_monitoring::server_vantage::ensure_server_stream_index_field(
-            org_id,
-            stream_name,
-        )
-        .await;
+        crate::db_monitoring::server_vantage::ensure_server_stream_index_field(org_id, stream_name)
+            .await;
     }
 
     // Start get stream alerts

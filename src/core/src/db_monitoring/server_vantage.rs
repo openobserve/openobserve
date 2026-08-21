@@ -1706,9 +1706,7 @@ pub fn plan_hash(plan_json: &str) -> Option<String> {
     if fields == 0 {
         return None;
     }
-    Some(crate::traces::db_monitoring::normalizer::fingerprint_hex(
-        &canon,
-    ))
+    Some(crate::db_monitoring::normalizer::fingerprint_hex(&canon))
 }
 
 /// The structural fields, in the order they are appended to the canonical form.

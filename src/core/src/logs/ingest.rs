@@ -723,7 +723,7 @@ fn finalize_and_buffer_record(
     // Client-supplied `o2_dbm_*` keys are dropped first — the logs path flattens
     // user keys directly, so without this a caller could spoof a deadlock event
     // (the same exposure D1 condition 1 closes for spans).
-    crate::traces::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+    crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
 
     if let Some(Some(fields)) = ctx.user_defined_schema_map.get(ctx.stream_name) {
         local_val = crate::ingestion::refactor_map(local_val, fields);

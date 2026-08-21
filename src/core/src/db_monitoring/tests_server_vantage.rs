@@ -444,8 +444,8 @@ fn empty_statement_yields_no_fingerprint() {
 fn every_logs_ingest_path_applies_canonicalization() {
     // (file, number of record-assembly sites that must canonicalize)
     let paths = [
-        (include_str!("../../logs/ingest.rs"), 1usize),
-        (include_str!("../../logs/otlp.rs"), 3usize),
+        (include_str!("../logs/ingest.rs"), 1usize),
+        (include_str!("../logs/otlp.rs"), 3usize),
     ];
     for (src, expected) in paths {
         let found = src.matches("server_vantage::apply_to_record").count();
@@ -565,9 +565,9 @@ fn mssql_blocking_survives_the_ingest_entry_point() {
 // BUILD rather than failing at runtime with a confusing missing-path error.
 
 const SHIPPED_RECIPES_TS: &str =
-    include_str!("../../../../../web/src/components/ingestion/setupCard/content/dbmShared.ts");
+    include_str!("../../../../web/src/components/ingestion/setupCard/content/dbmShared.ts");
 const RIG_COLLECTOR_YAML: &str =
-    include_str!("../../../../../tests/dbm-server-vantage/collector/config.yaml");
+    include_str!("../../../../tests/dbm-server-vantage/collector/config.yaml");
 
 /// Every `'<tag>' AS o2_recipe` literal in a collector config (or in the
 /// TypeScript that generates one). Both the shipped recipes and the rig write
@@ -1350,7 +1350,7 @@ fn resolution_is_none_when_neither_source_identifies_an_event() {
 /// `db.server.top_query` indistinguishable.
 #[test]
 fn every_apply_site_restores_the_event_name() {
-    let src = include_str!("../../logs/otlp.rs");
+    let src = include_str!("../logs/otlp.rs");
 
     let sites: Vec<usize> = src
         .match_indices("server_vantage::apply_to_record")
@@ -1464,7 +1464,7 @@ fn event_name_insertion_offset(src: &str) -> usize {
 /// synthesized field written into it makes the copy non-verbatim.
 #[test]
 fn otlp_producer_loop_surfaces_the_event_name() {
-    let src = include_str!("../../logs/otlp.rs");
+    let src = include_str!("../logs/otlp.rs");
 
     assert!(
         src.contains("log_record.event_name"),
@@ -1587,7 +1587,7 @@ fn enclosing_block_header(src: &str, at: usize) -> &str {
 /// onto receiver records.
 #[test]
 fn every_event_name_write_is_guarded_on_non_empty() {
-    let src = include_str!("../../logs/otlp.rs");
+    let src = include_str!("../logs/otlp.rs");
 
     // Every place that WRITES the reserved key (imports/comments excluded).
     let write_offsets = event_name_write_offsets(src);
@@ -4838,7 +4838,7 @@ fn the_top_query_selection_bias_is_documented() {
     // const to its new home. What is asserted is unchanged: the selection bias
     // must be stated where the kind is DEFINED, not somewhere a UI author has
     // to already know to look.
-    let src = include_str!("../../../../config/src/meta/db_monitoring.rs");
+    let src = include_str!("../../../config/src/meta/db_monitoring.rs");
     let anchor = src
         .find("pub const KIND_TOP_QUERY")
         .expect("the top_query kind must exist");

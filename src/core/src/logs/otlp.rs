@@ -49,11 +49,11 @@ use transform::TRANSFORM_FAILED;
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
         grpc::{get_val, get_val_with_type_retained},
     },
-    traces::db_monitoring::server_vantage::O2_EVENT_NAME,
 };
 
 pub async fn handle_request(
@@ -294,7 +294,7 @@ pub async fn handle_request(
 
                     // DBM server-vantage canonicalization — the shipped collector recipes all
                     // export over OTLP, so this path is the one that matters for them.
-                    crate::traces::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                    crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
 
                     // Re-insert the trusted event name AFTER canonicalization.
                     //
@@ -442,9 +442,7 @@ pub async fn handle_request(
 
                             // Pipeline-routed records are canonicalized too: a VRL transform may
                             // have produced the receiver fields we dispatch on.
-                            crate::traces::db_monitoring::server_vantage::apply_to_record(
-                                &mut local_val,
-                            );
+                            crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
 
                             if let Some(event_name) = trusted_event_name {
                                 local_val.insert(O2_EVENT_NAME.to_string(), event_name);
@@ -548,7 +546,7 @@ pub async fn handle_request(
                 let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
 
                 // DBM server-vantage canonicalization (see the note at the first call site).
-                crate::traces::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
 
                 if let Some(event_name) = trusted_event_name {
                     local_val.insert(O2_EVENT_NAME.to_string(), event_name);
