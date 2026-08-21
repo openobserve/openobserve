@@ -128,6 +128,35 @@ describe("buildPrefillFromLibrary", () => {
     expect(prefill.timezone).toBe("UTC");
   });
 
+  // The drawer's tunables edit trigger_condition and hand the RESULT here as
+  // `file`. Anything this adapter drops is tuning the user watched themselves
+  // do and then never sees again — which is what made "Customize in editor"
+  // open on a threshold of 3 for an alert whose file says 1.
+  it("carries the whole trigger across, not just the window", () => {
+    const prefill = buildPrefillFromLibrary({ entry: entry(), file: promqlFile() });
+    expect(prefill.triggerThreshold).toBe(1);
+    expect(prefill.triggerOperator).toBe(">=");
+    expect(prefill.silenceMinutes).toBe(30);
+  });
+
+  it("carries a threshold the drawer tuned, not the form's default", () => {
+    const file = promqlFile();
+    (file.trigger_condition as any).threshold = 7;
+    (file.trigger_condition as any).operator = ">";
+    (file.trigger_condition as any).silence = 120;
+    const prefill = buildPrefillFromLibrary({ entry: entry(), file });
+    expect(prefill.triggerThreshold).toBe(7);
+    expect(prefill.triggerOperator).toBe(">");
+    expect(prefill.silenceMinutes).toBe(120);
+  });
+
+  it("leaves the trigger fields unset when the file has no trigger at all", () => {
+    const prefill = buildPrefillFromLibrary({ entry: entry(), file: {} });
+    expect(prefill.triggerThreshold).toBeUndefined();
+    expect(prefill.triggerOperator).toBeUndefined();
+    expect(prefill.silenceMinutes).toBeUndefined();
+  });
+
   it("names the alert after the library alert, not after the surface", () => {
     const prefill = buildPrefillFromLibrary({ entry: entry(), file: promqlFile() });
     expect(prefill.name).toBe("go_gc_pause_high");

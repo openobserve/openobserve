@@ -110,8 +110,15 @@ export const buildPrefillFromLibrary = (input: LibraryPrefillInput): AlertPrefil
       ? { aggregation: aggregation as AlertPrefillAggregation }
       : {}),
     vrlFunction: asText(queryCondition.vrl_function) ?? null,
+    // The whole trigger travels, not just the window. A library alert is an
+    // export of a real one and the drawer's tunables edit these very fields —
+    // dropping them means the editor silently contradicts both the file and
+    // the tuning the user just did in the drawer.
+    triggerThreshold: asFiniteNumber(trigger.threshold),
+    triggerOperator: asText(trigger.operator),
     periodMinutes,
     frequencyMinutes: asFiniteNumber(trigger.frequency),
+    silenceMinutes: asFiniteNumber(trigger.silence),
     timezone: asText(trigger.timezone),
     warnings,
     meta: {
