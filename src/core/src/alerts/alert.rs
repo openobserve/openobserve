@@ -731,21 +731,15 @@ async fn prepare_alert(
             let schema = get_result_schema(sql, false, true)
                 .await
                 .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
-            if !schema.projections.contains(&"alert_agg_value".to_string()) {
-                return Err(AlertError::MultiAlertGroupingError(
-                    "SQL query must have a alert_agg_value field in projection".into(),
-                ));
-            }
-            log::warn!("here {:?}",schema);
             for group in &schema.group_by {
                 if !schema.projections.contains(group) {
                     return Err(AlertError::MultiAlertGroupingError(format!(
-                        "SQL query projections must contain all group by fields, missing {group}"
+                        "SQL query projections must contain all group by fields, missing field '{group}'"
                     )));
                 }
                 if let Some(v)=schema.field_alias_map.get(group) && v != group{
                     return Err(AlertError::MultiAlertGroupingError(format!(
-                        "SQL query projections must contain all group by fields  without alias, field {group} is aliased"
+                        "SQL query projections must contain all group by fields without alias, field '{group}' is aliased"
                     )));
                 }
             }
