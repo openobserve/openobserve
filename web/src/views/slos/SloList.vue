@@ -484,7 +484,17 @@ const loading = slosList.isPending;
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = slosList.isFetching;
-const error = ref<string | null>(null);
+// A failed read has to reach the table. `loadError` is only for the imperative
+// refresh path; a mount read that fails (a disabled-feature 501, say) sets the
+// query's error and nothing else, so the table used to render an empty list
+// with no explanation.
+const loadError = ref<string | null>(null);
+const error = computed<string | null>(() => {
+  if (loadError.value) return loadError.value;
+  const e = slosList.error.value as any;
+  if (!e) return null;
+  return e?.response?.data?.message || e?.message || t("slos.loadFailed");
+});
 const search = ref("");
 const typeFilter = ref("all");
 const healthFilter = ref<string | null>(null);
@@ -795,7 +805,7 @@ const refresh = () => load(null, undefined, true);
 // only caller that passes a folder the refs have not caught up with yet.
 async function load(orgId?: string | null, folderId?: string, force = false) {
   if (!org.value) return;
-  error.value = null;
+  loadError.value = null;
   // sometimes the folder id might not be updated so passed via
   // query params.
   readOrg.value = orgId ?? org.value;
@@ -808,7 +818,7 @@ async function load(orgId?: string | null, folderId?: string, force = false) {
     // bulk move act on rows no longer on screen.
     selectedIds.value = [];
   } catch (e: any) {
-    error.value = e?.response?.data?.message || e?.message || t("slos.loadFailed");
+    loadError.value = e?.response?.data?.message || e?.message || t("slos.loadFailed");
   }
 }
 
