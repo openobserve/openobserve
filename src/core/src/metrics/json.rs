@@ -443,12 +443,16 @@ pub async fn ingest(
             // remove type from labels
             record.remove(TYPE_LABEL);
             // add hash
-            let hash = super::signature_without_labels(&record, &get_exclude_labels());
+            let hash = super::signature_without_labels(&record, get_exclude_labels());
             record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
 
             // convert every label to string
             for (k, v) in record.iter_mut() {
-                if k == NAME_LABEL || k == TYPE_LABEL || k == VALUE_LABEL || k == TIMESTAMP_COL_NAME
+                if k == NAME_LABEL
+                    || k == TYPE_LABEL
+                    || k == VALUE_LABEL
+                    || k == TIMESTAMP_COL_NAME
+                    || k == HASH_LABEL
                 {
                     continue;
                 }

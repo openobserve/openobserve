@@ -1122,6 +1122,7 @@ dependencies = [
  "aws-credential-types",
  "aws-sigv4",
  "aws-smithy-async",
+ "aws-smithy-eventstream",
  "aws-smithy-http",
  "aws-smithy-runtime",
  "aws-smithy-runtime-api",
@@ -1136,6 +1137,33 @@ dependencies = [
  "pin-project-lite",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aws-sdk-lambda"
+version = "1.138.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b002aa94953a1aab8534280436ea3cf7805b821d51ebb49a89da41764650ce0b"
+dependencies = [
+ "arc-swap",
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-eventstream",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-observability",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-schema",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
+ "fastrand",
+ "http 0.2.12",
+ "http 1.5.0",
+ "regex-lite",
+ "tracing",
 ]
 
 [[package]]
@@ -1251,6 +1279,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "723c2234ad7511ceef63eab016b7ba6ff7c55590fefb96fa8467af014a07309f"
 dependencies = [
  "aws-credential-types",
+ "aws-smithy-eventstream",
  "aws-smithy-http",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
@@ -1278,11 +1307,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-smithy-eventstream"
+version = "0.61.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a9381123ab62d20c13082b151f30f962a3b112b727345394536dfa39a482944"
+dependencies = [
+ "aws-smithy-types",
+ "bytes",
+ "crc32fast",
+]
+
+[[package]]
 name = "aws-smithy-http"
 version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37843d9add67c3aff5856f409c6dc315d3cdff60f9c0cb5b670dab1e9920306d"
 dependencies = [
+ "aws-smithy-eventstream",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "bytes",
@@ -2576,6 +2617,7 @@ dependencies = [
  "ingester",
  "itertools 0.14.0",
  "log",
+ "metrics_index",
  "o2_enterprise",
  "object_store",
  "parking_lot 0.12.5",
@@ -5122,9 +5164,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.15"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cb093c84e8bd9b188d4c4a8cb6579fc016968d14c99882163cd3ff402a4f155"
+checksum = "a9f37a958b41b3b19ee2707c06439c0e9e547e847223eb791ecb0cb821c65e27"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -6712,6 +6754,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics_index"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "config",
+ "datafusion",
+ "futures",
+ "hashlink 0.11.1",
+ "infra",
+ "log",
+ "promql",
+ "promql-parser",
+ "regex",
+ "tokio",
+]
+
+[[package]]
 name = "mimalloc"
 version = "0.1.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7882,6 +7943,7 @@ dependencies = [
  "openobserve-node",
  "openobserve-org-storage",
  "openobserve-sourcemaps",
+ "openobserve-synthetics",
  "opentelemetry",
  "pprof",
  "promql-service",
@@ -8114,6 +8176,7 @@ dependencies = [
  "ingester",
  "ingestion-common",
  "log",
+ "metrics_index",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
@@ -8121,6 +8184,7 @@ dependencies = [
  "openobserve-core",
  "openobserve-node",
  "openobserve-org-storage",
+ "openobserve-synthetics",
  "prometheus",
  "promql-service",
  "proto",
@@ -8215,6 +8279,30 @@ dependencies = [
  "tokio",
  "tonic",
  "zip 8.6.0",
+]
+
+[[package]]
+name = "openobserve-synthetics"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aws-config",
+ "aws-sdk-lambda",
+ "chrono",
+ "config",
+ "dashmap",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "o2_openfga",
+ "reqwest 0.13.4",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "svix-ksuid",
+ "tokio",
+ "tracing",
+ "urlencoding",
 ]
 
 [[package]]
@@ -9104,6 +9192,7 @@ dependencies = [
  "infra",
  "itertools 0.14.0",
  "log",
+ "metrics_index",
  "o2_enterprise",
  "promql",
  "promql-parser",
@@ -10944,6 +11033,7 @@ dependencies = [
  "log",
  "md5",
  "memchr",
+ "metrics_index",
  "o2_enterprise",
  "object_store",
  "openobserve-cipher",

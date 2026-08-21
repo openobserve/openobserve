@@ -625,6 +625,12 @@
     "delete": "删除",
     "remove": "移除",
     "export": "导出",
+    "download": "下载",
+    "openProviderOnRegistry": "OpenObserve provider 在 {registry} 上",
+    "exportTerraformTabTooltip": "相同的配置适用于 Terraform 或 OpenTofu。",
+    "exportTerraformEmpty": "该选择没有对应的 Terraform 资源。请改为导出为 JSON。",
+    "exportTerraformSkipped": "未包含：{names}。OpenObserve Terraform provider 没有对应的资源。",
+    "exportTerraformDropped": "已省略 — provider schema 无法承载这些字段：{fields}。",
     "actions": "操作",
     "version": "版本",
     "updated_at": "更新于",
@@ -820,13 +826,7 @@
     "backTo": "返回 {label}",
     "boolTrue": "真",
     "boolFalse": "假",
-    "browserTimeWithZone": "浏览器时间（{zone}）",
-    "download": "下载",
-    "openProviderOnRegistry": "OpenObserve provider 在 {registry} 上",
-    "exportTerraformTabTooltip": "相同的配置适用于 Terraform 或 OpenTofu。",
-    "exportTerraformEmpty": "该选择没有对应的 Terraform 资源。请改为导出为 JSON。",
-    "exportTerraformSkipped": "未包含：{names}。OpenObserve Terraform provider 没有对应的资源。",
-    "exportTerraformDropped": "已省略 — provider schema 无法承载这些字段：{fields}。"
+    "browserTimeWithZone": "浏览器时间（{zone}）"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "无数据"
     },
     "importAlertTitle": "导入告警",
+    "exportDialogTitle": "导出告警 | 导出 {count} 条告警",
+    "exportDialogSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform。",
     "jsonFilesOnlyHint": "仅 .json 文件",
     "outputMessages": "输出消息",
     "destinationsRequiredLabel": "目标 *",
@@ -7370,9 +7372,7 @@
     "sloKind": "条件类型",
     "sloLongWindow": "长窗口",
     "sloShortWindow": "短窗口",
-    "sloCloneDisabled": "SLO 警报是在其 SLO 页面上创建的，因此无法从此处克隆。",
-    "exportDialogTitle": "导出告警 | 导出 {count} 条告警",
-    "exportDialogSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform。"
+    "sloCloneDisabled": "SLO 警报是在其 SLO 页面上创建的，因此无法从此处克隆。"
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "以全视图打开",
     "viewLogs": "查看日志",
+    "viewLogsUnavailable": "无法打开此跨度的日志。",
     "backToLogs": "返回日志",
     "openInTraces": "在追踪中打开",
     "loadingStream": "正在加载数据流...",
@@ -12660,6 +12661,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "未归因于步骤（{count}）",
+      "allSteps": "所有步骤（{count}）",
+      "stepOption": "{number} · {name}（{count}）",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12674,9 +12678,17 @@
       "reload": "重新加载页面",
       "retry": "Retry",
       "unattributedCount": "{count} 个事件未归属于任何步骤",
-      "stepFilterBanner": "显示步骤 {step} 的事件",
-      "clearStepFilter": "清除",
-      "rowTitleWithTimestamps": "{label}\n发起于 {initiated} · 观察于 {observed}"
+      "rowTitleWithTimestamps": "{label}\n发起于 {initiated} · 观察于 {observed}",
+      "detailEvent": "事件",
+      "detailOccurred": "发生",
+      "detailInitiated": "发起",
+      "detailResourceType": "资源类型",
+      "detailLevel": "级别",
+      "detailOrigin": "来源",
+      "detailFirstParty": "第一方",
+      "detailThirdParty": "第三方",
+      "detailStackTrace": "堆栈跟踪",
+      "footerEvents": "事件"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12724,8 +12736,7 @@
       "evidenceCounts": "{consoleErrors} 个控制台错误 · {pageErrors} 个页面错误 · {failed} 个失败请求 · {nonOk} 个非 2xx 响应",
       "evidenceTruncated": "由于达到捕获限制，本次运行期间丢弃了一些事件。该 bundle 说明了丢失的内容。",
       "pageActivity": "页面活动",
-      "pageActivityCount": "{shown} / {total}",
-      "pageActivityCountTruncated": "{shown} / {total}+",
+      "pageActivityEvents": "{count} 个事件 | {count} 个事件",
       "pageActivityViewAllShort": "在 Evidence 中查看全部",
       "expandScreenshot": "展开"
     },
@@ -13700,6 +13711,7 @@
       "resumingAlerts": "正在恢复告警...",
       "pausingAlerts": "正在暂停告警...",
       "errorExportingAlertsPleaseTryAgain": "导出告警时出错。请重试。",
+      "someAlertsCouldNotBeExported": "无法读取 {names}。其余已准备好导出。",
       "successfullyExportedAlert": "成功导出 {count} 个告警 | 成功导出 {count} 个告警",
       "exportingAlerts": "正在导出告警...",
       "pleaseWaitWhileSearchingForDashboards": "正在搜索仪表盘，请稍候...",
@@ -13754,8 +13766,7 @@
       "alertSavedSuccessfully": "告警保存成功。",
       "alertUpdatedSuccessfully": "告警更新成功。",
       "openingDedupConfig": "正在为 {name} 打开去重配置",
-      "editingAlert": "正在编辑告警：{name}",
-      "someAlertsCouldNotBeExported": "无法读取 {names}。其余已准备好导出。"
+      "editingAlert": "正在编辑告警：{name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "加密密钥更新成功",
@@ -14270,6 +14281,11 @@
     "move": "移动",
     "moveTitle": "将 {count} 个 SLO 移动到另一个文件夹",
     "moveSelected": "移动选定的 {count} 个",
+    "exportTitle": "导出 SLO | 导出 {count} 个 SLO",
+    "exportSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform 格式。",
+    "exportFailed": "无法读取 SLO 定义。请重试。",
+    "exportPartial": "无法读取 {names}。其余已准备好导出。",
+    "exportSucceeded": "已导出 {count} 个 SLO | 已导出 {count} 个 SLO",
     "moved": "已将 {count} 个 SLO 移动到 {folder}",
     "moveFailed": "移动失败",
     "preview": {
@@ -14324,12 +14340,7 @@
       "editTargetMissing": "该告警已不在此 SLO 上。",
       "describeBurn": "燃烧速率 > {critical} 在 {long} 和 {short} 期间",
       "describeBudget": "错误预算消耗 > {critical}%"
-    },
-    "exportTitle": "导出 SLO | 导出 {count} 个 SLO",
-    "exportSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform 格式。",
-    "exportFailed": "无法读取 SLO 定义。请重试。",
-    "exportPartial": "无法读取 {names}。其余已准备好导出。",
-    "exportSucceeded": "已导出 {count} 个 SLO | 已导出 {count} 个 SLO"
+    }
   },
   "promql": {
     "operations": {

@@ -167,6 +167,9 @@ pub async fn update(
     password: &str,
     password_ext: Option<String>,
 ) -> Result<u64, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let result = Entity::update_many()

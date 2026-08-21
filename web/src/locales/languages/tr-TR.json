@@ -625,6 +625,12 @@
     "delete": "Sil",
     "remove": "Kaldır",
     "export": "İhracat",
+    "download": "İndir",
+    "openProviderOnRegistry": "{registry} üzerindeki OpenObserve sağlayıcısı",
+    "exportTerraformTabTooltip": "Aynı yapılandırma Terraform veya OpenTofu ile de geçerlidir.",
+    "exportTerraformEmpty": "Bu seçim için Terraform kaynağı mevcut değil. Bunun yerine JSON olarak dışa aktarın.",
+    "exportTerraformSkipped": "Dahil edilmedi: {names}. OpenObserve Terraform sağlayıcısında bunlar için kaynak bulunmuyor.",
+    "exportTerraformDropped": "Dışarıda bırakıldı — sağlayıcı şeması bu alanları taşıyamıyor: {fields}.",
     "actions": "Eylemler",
     "version": "Versiyon",
     "updated_at": "Güncellendi:",
@@ -820,13 +826,7 @@
     "backTo": "{label} sayfasına geri dön",
     "boolTrue": "Doğru",
     "boolFalse": "Yanlış",
-    "browserTimeWithZone": "Tarayıcı Zamanı ({zone})",
-    "download": "İndir",
-    "openProviderOnRegistry": "{registry} üzerindeki OpenObserve sağlayıcısı",
-    "exportTerraformTabTooltip": "Aynı yapılandırma Terraform veya OpenTofu ile de geçerlidir.",
-    "exportTerraformEmpty": "Bu seçim için Terraform kaynağı mevcut değil. Bunun yerine JSON olarak dışa aktarın.",
-    "exportTerraformSkipped": "Dahil edilmedi: {names}. OpenObserve Terraform sağlayıcısında bunlar için kaynak bulunmuyor.",
-    "exportTerraformDropped": "Dışarıda bırakıldı — sağlayıcı şeması bu alanları taşıyamıyor: {fields}."
+    "browserTimeWithZone": "Tarayıcı Zamanı ({zone})"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "Veri yok"
     },
     "importAlertTitle": "Alert İçe Aktar",
+    "exportDialogTitle": "Uyarıyı dışa aktar | {count} uyarıyı dışa aktar",
+    "exportDialogSubtitle": "Tanımı gözden geçirin, ardından JSON veya OpenObserve sağlayıcısı için Terraform olarak indirin.",
     "jsonFilesOnlyHint": "Yalnızca .json dosyaları",
     "outputMessages": "Çıktı Mesajları",
     "destinationsRequiredLabel": "Hedefler *",
@@ -7370,9 +7372,7 @@
     "sloKind": "Koşul türü",
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
-    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
-    "exportDialogTitle": "Uyarıyı dışa aktar | {count} uyarıyı dışa aktar",
-    "exportDialogSubtitle": "Tanımı gözden geçirin, ardından JSON veya OpenObserve sağlayıcısı için Terraform olarak indirin."
+    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz."
   },
   "alert_dependencies": {
     "actionOpen": "Aç",
@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "Tam görünümde aç",
     "viewLogs": "Günlükleri Görüntüle",
+    "viewLogsUnavailable": "Bu span için günlükler açılamadı.",
     "backToLogs": "Günlüklere Dön",
     "openInTraces": "Traces'te aç",
     "loadingStream": "Akış Yükleniyor...",
@@ -12660,6 +12661,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "Bir adıma atfedilmemiş ({count})",
+      "allSteps": "Tüm adımlar ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12674,9 +12678,17 @@
       "reload": "Sayfayı yenile",
       "retry": "Retry",
       "unattributedCount": "{count} olay hiçbir adıma atfedilmedi",
-      "stepFilterBanner": "Adım {step} için olaylar gösteriliyor",
-      "clearStepFilter": "Temizle",
-      "rowTitleWithTimestamps": "{label}\nbaşlatıldı {initiated} · gözlemlendi {observed}"
+      "rowTitleWithTimestamps": "{label}\nbaşlatıldı {initiated} · gözlemlendi {observed}",
+      "detailEvent": "Olay",
+      "detailOccurred": "Gerçekleşti",
+      "detailInitiated": "Başlatıldı",
+      "detailResourceType": "Kaynak türü",
+      "detailLevel": "Seviye",
+      "detailOrigin": "Köken",
+      "detailFirstParty": "Birinci taraf",
+      "detailThirdParty": "Üçüncü taraf",
+      "detailStackTrace": "Yığın izi",
+      "footerEvents": "Olaylar"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12724,8 +12736,7 @@
       "evidenceCounts": "{consoleErrors} konsol hatası · {pageErrors} sayfa hatası · {failed} başarısız istek · {nonOk} 2xx olmayan yanıt",
       "evidenceTruncated": "Bu çalıştırma sırasında bazı olaylar, yakalama sınırına ulaşıldığı için atıldı. Paket, nelerin atıldığını belirtir.",
       "pageActivity": "Sayfa etkinliği",
-      "pageActivityCount": "{shown} / {total}",
-      "pageActivityCountTruncated": "{shown} / {total}+",
+      "pageActivityEvents": "{count} olay | {count} olay",
       "pageActivityViewAllShort": "Kanıtlarda tümünü görüntüle",
       "expandScreenshot": "Genişlet"
     },
@@ -13700,6 +13711,7 @@
       "resumingAlerts": "Alarmlar sürdürülüyor...",
       "pausingAlerts": "Alarmlar duraklatılıyor...",
       "errorExportingAlertsPleaseTryAgain": "Alarmlar dışa aktarılırken hata oluştu. Lütfen tekrar deneyin.",
+      "someAlertsCouldNotBeExported": "{names} okunamadı. Diğerleri dışa aktarılmaya hazır.",
       "successfullyExportedAlert": "{count} alarm başarıyla dışa aktarıldı | {count} alarm başarıyla dışa aktarıldı",
       "exportingAlerts": "Alarmlar dışa aktarılıyor...",
       "pleaseWaitWhileSearchingForDashboards": "Lütfen panolar aranırken bekleyin...",
@@ -13754,8 +13766,7 @@
       "alertSavedSuccessfully": "Uyarı başarıyla kaydedildi.",
       "alertUpdatedSuccessfully": "Uyarı başarıyla güncellendi.",
       "openingDedupConfig": "{name} için tekilleştirme yapılandırması açılıyor",
-      "editingAlert": "Uyarı düzenleniyor: {name}",
-      "someAlertsCouldNotBeExported": "{names} okunamadı. Diğerleri dışa aktarılmaya hazır."
+      "editingAlert": "Uyarı düzenleniyor: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Şifre anahtarı başarıyla güncellendi",
@@ -14270,6 +14281,11 @@
     "move": "Taşı",
     "moveTitle": "{count} SLO'yu başka bir klasöre taşı",
     "moveSelected": "{count} seçileni taşı",
+    "exportTitle": "SLO Dışa Aktar | {count} SLO Dışa Aktar",
+    "exportSubtitle": "Tanımı gözden geçirin, ardından OpenObserve sağlayıcısı için JSON veya Terraform olarak indirin.",
+    "exportFailed": "SLO tanımı okunamadı. Lütfen tekrar deneyin.",
+    "exportPartial": "{names} okunamadı. Geri kalanlar dışa aktarılmaya hazır.",
+    "exportSucceeded": "{count} SLO dışa aktarıldı | {count} SLO dışa aktarıldı",
     "moved": "{count} SLO, {folder} konumuna taşındı",
     "moveFailed": "Taşıma başarısız",
     "preview": {
@@ -14324,12 +14340,7 @@
       "editTargetMissing": "Bu uyarı artık bu SLO'da değil.",
       "describeBurn": "Tükenme oranı > {critical}, {long} ve {short} boyunca",
       "describeBudget": "Tüketilen hata bütçesi > {critical}%"
-    },
-    "exportTitle": "SLO Dışa Aktar | {count} SLO Dışa Aktar",
-    "exportSubtitle": "Tanımı gözden geçirin, ardından OpenObserve sağlayıcısı için JSON veya Terraform olarak indirin.",
-    "exportFailed": "SLO tanımı okunamadı. Lütfen tekrar deneyin.",
-    "exportPartial": "{names} okunamadı. Geri kalanlar dışa aktarılmaya hazır.",
-    "exportSucceeded": "{count} SLO dışa aktarıldı | {count} SLO dışa aktarıldı"
+    }
   },
   "promql": {
     "operations": {

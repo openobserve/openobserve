@@ -16,7 +16,7 @@
 //! Physical sort order of the files (and in-memory batches) that back a table.
 //!
 //! Historically every table was either unsorted or sorted by `_timestamp DESC`
-//! (`sorted_by_time: bool`). TSID-major metrics files are instead sorted by
+//! (`sorted_by_time: bool`). Indexed metrics files are instead sorted by
 //! `(__hash__ ASC, _timestamp ASC)`. This enum is the single place that knows
 //! how each order maps to DataFusion logical / physical sort expressions, so
 //! the table providers, `NewEmptyExec`, the memtable `SortExec` and the merge
@@ -77,9 +77,9 @@ pub enum FileSortOrder {
     #[default]
     None,
     /// `_timestamp DESC` — the classic layout written by the ingester and the
-    /// compactor for logs, traces and (non TSID-major) metrics.
+    /// compactor for logs, traces and non-indexed metrics.
     TimestampDesc,
-    /// `__hash__ ASC, _timestamp ASC` — TSID-major metrics layout: all samples of
+    /// `__hash__ ASC, _timestamp ASC` — indexed metrics layout: all samples of
     /// one series are contiguous and time-ordered inside a file. Only used by
     /// the compactor merge; distributed query plans never carry it.
     HashTimestampAsc,

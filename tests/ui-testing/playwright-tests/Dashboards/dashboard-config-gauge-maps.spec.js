@@ -16,7 +16,10 @@ import {
 const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
-test.describe.configure({ retries: 1 });
+// Kept for reference, commented rather than deleted so it can be restored easily.
+// This override beat --retries=0 locally (making a clean baseline impossible) and
+// in CI it *cut* the project's retry budget (3 standard / 2 alpha1) down to 1.
+// test.describe.configure({ retries: 1 });
 
 test.describe("ConfigPanel — Gauge and Maps Settings", () => {
   test.beforeEach(async ({ page }) => {
@@ -107,6 +110,7 @@ test.describe("ConfigPanel — Gauge and Maps Settings", () => {
     testLogger.info("Symbol size Fixed: fixed input visible, min/max hidden");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying symbol size Fixed persists after save");
     await reopenPanelConfig(page, pm);

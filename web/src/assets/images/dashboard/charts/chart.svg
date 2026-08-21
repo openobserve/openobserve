@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="color-scheme:light dark">
+  <defs>
+    <path id="gear-body" d="M475.3 406.5L495 430L475.3 453.5L472.6 484.1L442 486.8L418.5 506.5L395 486.8L364.4 484.1L361.7 453.5L342 430L361.7 406.5L364.4 375.9L395 373.2L418.5 353.5L442 373.2L472.6 375.9Z"/>
+    <mask id="doc-mask">
+      <rect width="512" height="512" fill="#fff"/>
+      <use href="#gear-body" fill="#000" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <rect x="14.5" y="3" width="358" height="503.5" fill="none" stroke="#4A555F" style="stroke:light-dark(#4A555F,#FFFFFF)" stroke-width="6.5" mask="url(#doc-mask)"/>
+  <path d="M104.3 127.8L206.7 155.3H287.4A93.5 93.5 0 1 1 104.3 127.8Z" fill="#FFD552"/>
+  <path d="M106.5 121A93.5 93.5 0 0 1 276.2 109.5L213.5 146Z" fill="#F68F6F"/>
+  <path d="M290.7 155.35A96.75 96.75 0 1 1 279.1 108" fill="none" stroke="#4A555F" style="stroke:light-dark(#4A555F,#FFFFFF)" stroke-width="6.5"/>
+  <path d="M262 141L300 116L322 115L309 146Z" fill="#71CDE1"/>
+  <g>
+    <rect x="67" y="289.5" width="254.5" height="37" fill="#4A555F" style="fill:light-dark(#4A555F,#FFFFFF)"/>
+    <rect x="67" y="295.5" width="70.5" height="25" fill="#71CDE1"/>
+    <rect x="137.5" y="295.5" width="184" height="25" fill="#F68F6F"/>
+    <rect x="67" y="351" width="254.5" height="37.5" fill="#4A555F" style="fill:light-dark(#4A555F,#FFFFFF)"/>
+    <rect x="67" y="357.5" width="70.5" height="25" fill="#71CDE1"/>
+    <rect x="137.5" y="357.5" width="184" height="25" fill="#F68F6F"/>
+    <rect x="67" y="413" width="254.5" height="37.5" fill="#4A555F" style="fill:light-dark(#4A555F,#FFFFFF)"/>
+    <rect x="67" y="419.5" width="70.5" height="25" fill="#71CDE1"/>
+    <rect x="137.5" y="419.5" width="184" height="25" fill="#F68F6F"/>
+  </g>
+  <use href="#gear-body" fill="none" stroke="#4A555F" style="stroke:light-dark(#4A555F,#FFFFFF)" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#FFD552">
+    <path d="M482 430L456.5 421.2L456.5 438.8Z"/>
+    <path d="M463.4 474.9L451.6 450.7L439.2 463.1Z"/>
+    <path d="M418.5 493.5L427.3 468L409.7 468Z"/>
+    <path d="M373.6 474.9L397.8 463.1L385.4 450.7Z"/>
+    <path d="M355 430L380.5 438.8L380.5 421.2Z"/>
+    <path d="M373.6 385.1L385.4 409.3L397.8 396.9Z"/>
+    <path d="M418.5 366.5L409.7 392L427.3 392Z"/>
+    <path d="M463.4 385.1L439.2 396.9L451.6 409.3Z"/>
+  </g>
+  <circle cx="418.5" cy="430" r="24.25" fill="none" stroke="#4A555F" style="stroke:light-dark(#4A555F,#FFFFFF)" stroke-width="6.5"/>
+</svg>

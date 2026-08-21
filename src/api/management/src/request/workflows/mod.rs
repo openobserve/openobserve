@@ -439,8 +439,9 @@ pub async fn update_workflows(
 
         // this means that originally this was a incident workflow and now we have made it an alert
         // workflow
-        if incident_association_exists && payload.trigger_type == WorkflowTriggerType::AlertFired {
-            if let Err(e) = db::workflows::delete_workflow_association(
+        if incident_association_exists
+            && payload.trigger_type == WorkflowTriggerType::AlertFired
+            && let Err(e) = db::workflows::delete_workflow_association(
                 AssociationDeleteEvent::TriggerWorkflow {
                     org_id: org_id.clone(),
                     trigger: WorkflowTriggerType::IncidentEvent.to_string(),
@@ -448,12 +449,11 @@ pub async fn update_workflows(
                 },
             )
             .await
-            {
-                log::error!(
-                    "error deleting incident trigger for workflow {org_id}/{id} after update : {e}"
-                );
-                return MetaHttpResponse::internal_error(e);
-            }
+        {
+            log::error!(
+                "error deleting incident trigger for workflow {org_id}/{id} after update : {e}"
+            );
+            return MetaHttpResponse::internal_error(e);
         };
 
         if let Err(e) = workflows::update_workflow(workflow).await {
@@ -466,8 +466,7 @@ pub async fn update_workflows(
         // themselves as trigger type agnostic
         if !incident_association_exists
             && payload.trigger_type == WorkflowTriggerType::IncidentEvent
-        {
-            if let Err(e) = db::workflows::associate_workflow(
+            && let Err(e) = db::workflows::associate_workflow(
                 &org_id,
                 &id,
                 "system",
@@ -475,14 +474,13 @@ pub async fn update_workflows(
                 WorkflowTriggerType::IncidentEvent.to_string(),
             )
             .await
-            {
-                log::error!(
-                    "error in associating workflow to incident after successful updating of workflow : {org_id}/{id} : {e}"
-                );
-                return MetaHttpResponse::internal_error(format!(
-                    "workflow updated successfully , but failed to save the association : {e}"
-                ));
-            }
+        {
+            log::error!(
+                "error in associating workflow to incident after successful updating of workflow : {org_id}/{id} : {e}"
+            );
+            return MetaHttpResponse::internal_error(format!(
+                "workflow updated successfully , but failed to save the association : {e}"
+            ));
         }
         MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Workflow updated successfully")

@@ -625,6 +625,12 @@
     "delete": "Eliminar",
     "remove": "Eliminar",
     "export": "Exportación",
+    "download": "Descargar",
+    "openProviderOnRegistry": "Proveedor de OpenObserve en {registry}",
+    "exportTerraformTabTooltip": "La misma configuración se aplica con Terraform u OpenTofu.",
+    "exportTerraformEmpty": "No existe un recurso de Terraform para esta selección. Exprésalo como JSON en su lugar.",
+    "exportTerraformSkipped": "No incluidos: {names}. El proveedor de OpenObserve para Terraform no tiene un recurso para estos.",
+    "exportTerraformDropped": "Omitidos — el esquema del proveedor no puede contener estos campos: {fields}.",
     "actions": "Acciones",
     "version": "Versión",
     "updated_at": "Actualizado en",
@@ -820,13 +826,7 @@
     "backTo": "Volver a {label}",
     "boolTrue": "Verdadero",
     "boolFalse": "Falso",
-    "browserTimeWithZone": "Hora del navegador ({zone})",
-    "download": "Descargar",
-    "openProviderOnRegistry": "Proveedor de OpenObserve en {registry}",
-    "exportTerraformTabTooltip": "La misma configuración se aplica con Terraform u OpenTofu.",
-    "exportTerraformEmpty": "No existe un recurso de Terraform para esta selección. Exprésalo como JSON en su lugar.",
-    "exportTerraformSkipped": "No incluidos: {names}. El proveedor de OpenObserve para Terraform no tiene un recurso para estos.",
-    "exportTerraformDropped": "Omitidos — el esquema del proveedor no puede contener estos campos: {fields}."
+    "browserTimeWithZone": "Hora del navegador ({zone})"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "Sin datos"
     },
     "importAlertTitle": "Importar alerta",
+    "exportDialogTitle": "Exportar alerta | Exportar {count} alertas",
+    "exportDialogSubtitle": "Revisa la definición y luego descárgala como JSON o como Terraform para el proveedor de OpenObserve.",
     "jsonFilesOnlyHint": "Solo archivos .json",
     "outputMessages": "Mensajes de salida",
     "destinationsRequiredLabel": "Destinos *",
@@ -7370,9 +7372,7 @@
     "sloKind": "Tipo de condición",
     "sloLongWindow": "Ventana larga",
     "sloShortWindow": "Ventana corta",
-    "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí.",
-    "exportDialogTitle": "Exportar alerta | Exportar {count} alertas",
-    "exportDialogSubtitle": "Revisa la definición y luego descárgala como JSON o como Terraform para el proveedor de OpenObserve."
+    "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí."
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "Abrir a la vista",
     "viewLogs": "Ver registros",
+    "viewLogsUnavailable": "No se pudieron abrir los registros para este span.",
     "backToLogs": "Volver a los registros",
     "openInTraces": "Abrir en Traces",
     "loadingStream": "Cargando Stream...",
@@ -12660,6 +12661,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "No atribuido a un paso ({count})",
+      "allSteps": "Todos los pasos ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12674,9 +12678,17 @@
       "reload": "Recargar página",
       "retry": "Retry",
       "unattributedCount": "{count} eventos no se atribuyeron a ningún paso",
-      "stepFilterBanner": "Mostrando eventos para el paso {step}",
-      "clearStepFilter": "Limpiar",
-      "rowTitleWithTimestamps": "{label}\niniciado {initiated} · observado {observed}"
+      "rowTitleWithTimestamps": "{label}\niniciado {initiated} · observado {observed}",
+      "detailEvent": "Evento",
+      "detailOccurred": "Ocurrido",
+      "detailInitiated": "Iniciado",
+      "detailResourceType": "Tipo de recurso",
+      "detailLevel": "Nivel",
+      "detailOrigin": "Origen",
+      "detailFirstParty": "Primera parte",
+      "detailThirdParty": "Tercera parte",
+      "detailStackTrace": "Traza de pila",
+      "footerEvents": "Eventos"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12724,8 +12736,7 @@
       "evidenceCounts": "{consoleErrors} errores de consola · {pageErrors} errores de página · {failed} solicitudes fallidas · {nonOk} respuestas no-2xx",
       "evidenceTruncated": "Algunos eventos se descartaron durante esta ejecución porque se alcanzó el límite de captura. El paquete indica lo que ocurrió.",
       "pageActivity": "Actividad de la página",
-      "pageActivityCount": "{shown} de {total}",
-      "pageActivityCountTruncated": "{shown} de {total}+",
+      "pageActivityEvents": "{count} evento | {count} eventos",
       "pageActivityViewAllShort": "Ver todo en Evidencia",
       "expandScreenshot": "Expandir"
     },
@@ -13700,6 +13711,7 @@
       "resumingAlerts": "Reanudando alertas...",
       "pausingAlerts": "Pausando alertas...",
       "errorExportingAlertsPleaseTryAgain": "Error al exportar las alertas. Inténtelo de nuevo.",
+      "someAlertsCouldNotBeExported": "No se pudieron leer {names}. El resto está listo para exportar.",
       "successfullyExportedAlert": "Se exportó correctamente {count} alerta | Se exportaron correctamente {count} alertas",
       "exportingAlerts": "Exportando alertas...",
       "pleaseWaitWhileSearchingForDashboards": "Espere mientras se buscan los paneles...",
@@ -13754,8 +13766,7 @@
       "alertSavedSuccessfully": "Alerta guardada correctamente.",
       "alertUpdatedSuccessfully": "Alerta actualizada correctamente.",
       "openingDedupConfig": "Abriendo configuración de deduplicación para: {name}",
-      "editingAlert": "Editando alerta: {name}",
-      "someAlertsCouldNotBeExported": "No se pudieron leer {names}. El resto está listo para exportar."
+      "editingAlert": "Editando alerta: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Clave de cifrado actualizada correctamente",
@@ -14270,6 +14281,11 @@
     "move": "Mover",
     "moveTitle": "Mover {count} SLO(s) a otra carpeta",
     "moveSelected": "Mover {count} seleccionados",
+    "exportTitle": "Exportar SLO | Exportar {count} SLOs",
+    "exportSubtitle": "Revise la definición, luego descárguela como JSON o como Terraform para el proveedor de OpenObserve.",
+    "exportFailed": "No se pudo leer la definición del SLO. Inténtelo de nuevo.",
+    "exportPartial": "No se pudo leer {names}. El resto está listo para exportar.",
+    "exportSucceeded": "Exportado {count} SLO | Exportados {count} SLOs",
     "moved": "Se movieron {count} SLO(s) a {folder}",
     "moveFailed": "Error al mover",
     "preview": {
@@ -14324,12 +14340,7 @@
       "editTargetMissing": "Esa alerta ya no está en este SLO.",
       "describeBurn": "Tasa de consumo > {critical} en {long} y {short}",
       "describeBudget": "Presupuesto de errores consumido > {critical}%"
-    },
-    "exportTitle": "Exportar SLO | Exportar {count} SLOs",
-    "exportSubtitle": "Revise la definición, luego descárguela como JSON o como Terraform para el proveedor de OpenObserve.",
-    "exportFailed": "No se pudo leer la definición del SLO. Inténtelo de nuevo.",
-    "exportPartial": "No se pudo leer {names}. El resto está listo para exportar.",
-    "exportSucceeded": "Exportado {count} SLO | Exportados {count} SLOs"
+    }
   },
   "promql": {
     "operations": {

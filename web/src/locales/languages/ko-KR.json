@@ -625,6 +625,12 @@
     "delete": "삭제",
     "remove": "제거",
     "export": "익스포트",
+    "download": "다운로드",
+    "openProviderOnRegistry": "{registry}의 OpenObserve 프로바이더",
+    "exportTerraformTabTooltip": "동일한 구성이 Terraform 또는 OpenTofu에 적용됩니다.",
+    "exportTerraformEmpty": "이 선택에 대한 Terraform 리소스가 없습니다. 대신 JSON으로 내보내세요.",
+    "exportTerraformSkipped": "포함되지 않음: {names}. OpenObserve Terraform 프로바이더에는 이에 대한 리소스가 없습니다.",
+    "exportTerraformDropped": "제외됨 — 프로바이더 스키마가 다음 필드를 포함할 수 없습니다: {fields}.",
     "actions": "액션",
     "version": "버전",
     "updated_at": "업데이트 날짜",
@@ -820,13 +826,7 @@
     "backTo": "{label}로 돌아가기",
     "boolTrue": "참",
     "boolFalse": "거짓",
-    "browserTimeWithZone": "브라우저 시간 ({zone})",
-    "download": "다운로드",
-    "openProviderOnRegistry": "{registry}의 OpenObserve 프로바이더",
-    "exportTerraformTabTooltip": "동일한 구성이 Terraform 또는 OpenTofu에 적용됩니다.",
-    "exportTerraformEmpty": "이 선택에 대한 Terraform 리소스가 없습니다. 대신 JSON으로 내보내세요.",
-    "exportTerraformSkipped": "포함되지 않음: {names}. OpenObserve Terraform 프로바이더에는 이에 대한 리소스가 없습니다.",
-    "exportTerraformDropped": "제외됨 — 프로바이더 스키마가 다음 필드를 포함할 수 없습니다: {fields}."
+    "browserTimeWithZone": "브라우저 시간 ({zone})"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "데이터 없음"
     },
     "importAlertTitle": "알림 가져오기",
+    "exportDialogTitle": "알림 내보내기 | 알림 {count}개 내보내기",
+    "exportDialogSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 프로바이더용 Terraform으로 다운로드하세요.",
     "jsonFilesOnlyHint": ".json 파일만",
     "outputMessages": "출력 메시지",
     "destinationsRequiredLabel": "대상 *",
@@ -7370,9 +7372,7 @@
     "sloKind": "조건 유형",
     "sloLongWindow": "긴 기간",
     "sloShortWindow": "짧은 기간",
-    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
-    "exportDialogTitle": "알림 내보내기 | 알림 {count}개 내보내기",
-    "exportDialogSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 프로바이더용 Terraform으로 다운로드하세요."
+    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다."
   },
   "alert_dependencies": {
     "actionOpen": "열기",
@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "전체 화면으로 열기",
     "viewLogs": "로그 보기",
+    "viewLogsUnavailable": "이 스팬의 로그를 열 수 없습니다.",
     "backToLogs": "로그로 돌아가기",
     "openInTraces": "오픈 인 트레이스",
     "loadingStream": "스트림 로드 중...",
@@ -12660,6 +12661,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "단계에 귀속되지 않음 ({count})",
+      "allSteps": "모든 단계 ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12674,9 +12678,17 @@
       "reload": "페이지 새로 고침",
       "retry": "Retry",
       "unattributedCount": "{count}개 이벤트가 어떤 단계에도 할당되지 않았습니다.",
-      "stepFilterBanner": "단계 {step}에 대한 이벤트 표시",
-      "clearStepFilter": "지우기",
-      "rowTitleWithTimestamps": "{label}\n시작: {initiated} · 관찰: {observed}"
+      "rowTitleWithTimestamps": "{label}\n시작: {initiated} · 관찰: {observed}",
+      "detailEvent": "이벤트",
+      "detailOccurred": "발생",
+      "detailInitiated": "시작됨",
+      "detailResourceType": "리소스 유형",
+      "detailLevel": "레벨",
+      "detailOrigin": "출처",
+      "detailFirstParty": "퍼스트파티",
+      "detailThirdParty": "서드파티",
+      "detailStackTrace": "스택 추적",
+      "footerEvents": "이벤트"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12724,8 +12736,7 @@
       "evidenceCounts": "{consoleErrors} 콘솔 오류 · {pageErrors} 페이지 오류 · {failed} 실패한 요청 · {nonOk} 2xx가 아닌 응답",
       "evidenceTruncated": "캡처 한도에 도달하여 이 실행 중 일부 이벤트가 삭제되었습니다. 번들이 누락된 항목을 알려줍니다.",
       "pageActivity": "페이지 활동",
-      "pageActivityCount": "전체 {total} 중 {shown}",
-      "pageActivityCountTruncated": "전체 {total}+ 중 {shown}",
+      "pageActivityEvents": "{count} 이벤트 | {count} 이벤트",
       "pageActivityViewAllShort": "증거에서 모두 보기",
       "expandScreenshot": "펼치기"
     },
@@ -13700,6 +13711,7 @@
       "resumingAlerts": "알림 재개 중...",
       "pausingAlerts": "알림 일시 중지 중...",
       "errorExportingAlertsPleaseTryAgain": "알림 내보내기 중 오류가 발생했습니다. 다시 시도해 주세요.",
+      "someAlertsCouldNotBeExported": "{names}을(를) 읽을 수 없습니다. 나머지는 내보낼 준비가 되었습니다.",
       "successfullyExportedAlert": "{count}개 알림을 성공적으로 내보냈습니다. | {count}개 알림을 성공적으로 내보냈습니다.",
       "exportingAlerts": "알림을 내보내는 중...",
       "pleaseWaitWhileSearchingForDashboards": "대시보드를 검색하는 동안 기다려 주세요...",
@@ -13754,8 +13766,7 @@
       "alertSavedSuccessfully": "알림이 성공적으로 저장되었습니다.",
       "alertUpdatedSuccessfully": "알림이 성공적으로 업데이트되었습니다.",
       "openingDedupConfig": "{name}에 대한 중복 제거 구성 열기",
-      "editingAlert": "알림 편집 중: {name}",
-      "someAlertsCouldNotBeExported": "{names}을(를) 읽을 수 없습니다. 나머지는 내보낼 준비가 되었습니다."
+      "editingAlert": "알림 편집 중: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "암호화 키가 성공적으로 업데이트되었습니다.",
@@ -14270,6 +14281,11 @@
     "move": "이동",
     "moveTitle": "{count}개의 SLO를 다른 폴더로 이동",
     "moveSelected": "선택한 {count}개 이동",
+    "exportTitle": "SLO 내보내기 | {count} SLO 내보내기",
+    "exportSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 공급자용 Terraform으로 다운로드하세요.",
+    "exportFailed": "SLO 정의를 읽을 수 없습니다. 다시 시도하십시오.",
+    "exportPartial": "{names}을(를) 읽을 수 없습니다. 나머지는 내보낼 준비가 되었습니다.",
+    "exportSucceeded": "SLO {count}개 내보냈습니다 | SLO {count}개 내보냈습니다",
     "moved": "{count}개의 SLO를 {folder}(으)로 이동했습니다",
     "moveFailed": "이동 실패",
     "preview": {
@@ -14324,12 +14340,7 @@
       "editTargetMissing": "그 알림은 더 이상 이 SLO에 없습니다.",
       "describeBurn": "소진율 > {critical} ({long} 및 {short} 동안)",
       "describeBudget": "오류 예산 소비 > {critical}%"
-    },
-    "exportTitle": "SLO 내보내기 | {count} SLO 내보내기",
-    "exportSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 공급자용 Terraform으로 다운로드하세요.",
-    "exportFailed": "SLO 정의를 읽을 수 없습니다. 다시 시도하십시오.",
-    "exportPartial": "{names}을(를) 읽을 수 없습니다. 나머지는 내보낼 준비가 되었습니다.",
-    "exportSucceeded": "SLO {count}개 내보냈습니다 | SLO {count}개 내보냈습니다"
+    }
   },
   "promql": {
     "operations": {

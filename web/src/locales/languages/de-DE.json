@@ -625,6 +625,12 @@
     "delete": "Löschen",
     "remove": "entfernen",
     "export": "Exportieren",
+    "download": "Herunterladen",
+    "openProviderOnRegistry": "OpenObserve-Provider auf {registry}",
+    "exportTerraformTabTooltip": "Die gleiche Konfiguration gilt für Terraform oder OpenTofu.",
+    "exportTerraformEmpty": "Für diese Auswahl existiert keine Terraform-Ressource. Exportieren Sie sie stattdessen als JSON.",
+    "exportTerraformSkipped": "Nicht enthalten: {names}. Der OpenObserve-Terraform-Provider hat keine Ressource für diese.",
+    "exportTerraformDropped": "Ausgelassen – das Provider-Schema kann diese Felder nicht abbilden: {fields}.",
     "actions": "Aktionen",
     "version": "Version",
     "updated_at": "Aktualisiert am",
@@ -820,13 +826,7 @@
     "backTo": "Zurück zu {label}",
     "boolTrue": "Wahr",
     "boolFalse": "Falsch",
-    "browserTimeWithZone": "Browser-Zeit ({zone})",
-    "download": "Herunterladen",
-    "openProviderOnRegistry": "OpenObserve-Provider auf {registry}",
-    "exportTerraformTabTooltip": "Die gleiche Konfiguration gilt für Terraform oder OpenTofu.",
-    "exportTerraformEmpty": "Für diese Auswahl existiert keine Terraform-Ressource. Exportieren Sie sie stattdessen als JSON.",
-    "exportTerraformSkipped": "Nicht enthalten: {names}. Der OpenObserve-Terraform-Provider hat keine Ressource für diese.",
-    "exportTerraformDropped": "Ausgelassen – das Provider-Schema kann diese Felder nicht abbilden: {fields}."
+    "browserTimeWithZone": "Browser-Zeit ({zone})"
   },
   "flow": {
     "stepPicker": {
@@ -6162,6 +6162,8 @@
       "legendNoData": "Keine Daten"
     },
     "importAlertTitle": "Alert importieren",
+    "exportDialogTitle": "Alert exportieren | {count} Alerts exportieren",
+    "exportDialogSubtitle": "Überprüfen Sie die Definition und laden Sie sie dann als JSON oder als Terraform für den OpenObserve-Provider herunter.",
     "jsonFilesOnlyHint": "Nur .json-Dateien",
     "outputMessages": "Ausgabenachrichten",
     "destinationsRequiredLabel": "Ziele *",
@@ -7370,9 +7372,7 @@
     "sloKind": "Bedingungstyp",
     "sloLongWindow": "Langes Zeitfenster",
     "sloShortWindow": "Kurzes Zeitfenster",
-    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
-    "exportDialogTitle": "Alert exportieren | {count} Alerts exportieren",
-    "exportDialogSubtitle": "Überprüfen Sie die Definition und laden Sie sie dann als JSON oder als Terraform für den OpenObserve-Provider herunter."
+    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden."
   },
   "alert_dependencies": {
     "actionOpen": "Öffnen",
@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "In Vollansicht öffnen",
     "viewLogs": "Protokolle anzeigen",
+    "viewLogsUnavailable": "Logs für diesen Span konnten nicht geöffnet werden.",
     "backToLogs": "Zurück zu Logs",
     "openInTraces": "In Traces öffnen",
     "loadingStream": "Stream wird geladen...",
@@ -12660,6 +12661,9 @@
       "noEventsInStep": "No events in this step's window.",
       "noEvents": "No console, network or page events were captured.",
       "unattributed": "Not attributed to a step",
+      "unattributedOption": "Keinem Schritt zugeordnet ({count})",
+      "allSteps": "Alle Schritte ({count})",
+      "stepOption": "{number} · {name} ({count})",
       "truncated": "Capture cap reached (2000 events / 256 KB). Later events are not in this bundle — download to see what was kept.",
       "captureOff": "Evidence capture is off for this check.",
       "failuresOnly": "Evidence is kept for failed runs only.",
@@ -12674,9 +12678,17 @@
       "reload": "Seite neu laden",
       "retry": "Retry",
       "unattributedCount": "{count} Ereignisse wurden keinem Schritt zugeordnet",
-      "stepFilterBanner": "Zeige Ereignisse für Schritt {step}",
-      "clearStepFilter": "Löschen",
-      "rowTitleWithTimestamps": "{label}\ninitiiert {initiated} · beobachtet {observed}"
+      "rowTitleWithTimestamps": "{label}\ninitiiert {initiated} · beobachtet {observed}",
+      "detailEvent": "Ereignis",
+      "detailOccurred": "Aufgetreten",
+      "detailInitiated": "Initiiert",
+      "detailResourceType": "Ressourcentyp",
+      "detailLevel": "Stufe",
+      "detailOrigin": "Ursprung",
+      "detailFirstParty": "Erstanbieter",
+      "detailThirdParty": "Drittanbieter",
+      "detailStackTrace": "Stack-Trace",
+      "footerEvents": "Ereignisse"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
@@ -12724,8 +12736,7 @@
       "evidenceCounts": "{consoleErrors} Konsolenfehler · {pageErrors} Seitenfehler · {failed} fehlgeschlagene Anfragen · {nonOk} Nicht-2xx-Antworten",
       "evidenceTruncated": "Einige Ereignisse wurden während dieses Laufs verworfen, da das Erfassungslimit erreicht wurde. Das Bundle benennt, was verloren ging.",
       "pageActivity": "Seitenaktivität",
-      "pageActivityCount": "{shown} von {total}",
-      "pageActivityCountTruncated": "{shown} von {total}+",
+      "pageActivityEvents": "{count} Ereignis | {count} Ereignisse",
       "pageActivityViewAllShort": "Alle in Evidence anzeigen",
       "expandScreenshot": "Erweitern"
     },
@@ -13700,6 +13711,7 @@
       "resumingAlerts": "Alarme werden fortgesetzt...",
       "pausingAlerts": "Alarme werden angehalten...",
       "errorExportingAlertsPleaseTryAgain": "Fehler beim Exportieren der Alarme. Bitte versuchen Sie es erneut.",
+      "someAlertsCouldNotBeExported": "{names} konnten nicht gelesen werden. Die restlichen sind für den Export bereit.",
       "successfullyExportedAlert": "Erfolgreich {count} Alarm exportiert | Erfolgreich {count} Alarme exportiert",
       "exportingAlerts": "Alarme werden exportiert...",
       "pleaseWaitWhileSearchingForDashboards": "Bitte warten Sie, während nach Dashboards gesucht wird...",
@@ -13754,8 +13766,7 @@
       "alertSavedSuccessfully": "Alarm erfolgreich gespeichert.",
       "alertUpdatedSuccessfully": "Alarm erfolgreich aktualisiert.",
       "openingDedupConfig": "Dedup-Konfiguration für {name} wird geöffnet",
-      "editingAlert": "Alarm bearbeiten: {name}",
-      "someAlertsCouldNotBeExported": "{names} konnten nicht gelesen werden. Die restlichen sind für den Export bereit."
+      "editingAlert": "Alarm bearbeiten: {name}"
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Cipher-Schlüssel erfolgreich aktualisiert",
@@ -14270,6 +14281,11 @@
     "move": "Verschieben",
     "moveTitle": "{count} SLO(s) in einen anderen Ordner verschieben",
     "moveSelected": "Verschiebe {count} ausgewählte",
+    "exportTitle": "SLO exportieren | {count} SLOs exportieren",
+    "exportSubtitle": "Überprüfen Sie die Definition und laden Sie sie dann als JSON oder als Terraform für den OpenObserve-Provider herunter.",
+    "exportFailed": "Die SLO-Definition konnte nicht gelesen werden. Bitte versuchen Sie es erneut.",
+    "exportPartial": "Konnte {names} nicht lesen. Der Rest ist bereit für den Export.",
+    "exportSucceeded": "{count} SLO exportiert | {count} SLOs exportiert",
     "moved": "{count} SLO(s) in den Ordner {folder} verschoben",
     "moveFailed": "Verschieben fehlgeschlagen",
     "preview": {
@@ -14324,12 +14340,7 @@
       "editTargetMissing": "Dieser Alarm ist diesem SLO nicht mehr zugeordnet.",
       "describeBurn": "Burn-Rate > {critical} über {long} und {short}",
       "describeBudget": "Fehlerbudget verbraucht > {critical}%"
-    },
-    "exportTitle": "SLO exportieren | {count} SLOs exportieren",
-    "exportSubtitle": "Überprüfen Sie die Definition und laden Sie sie dann als JSON oder als Terraform für den OpenObserve-Provider herunter.",
-    "exportFailed": "Die SLO-Definition konnte nicht gelesen werden. Bitte versuchen Sie es erneut.",
-    "exportPartial": "Konnte {names} nicht lesen. Der Rest ist bereit für den Export.",
-    "exportSucceeded": "{count} SLO exportiert | {count} SLOs exportiert"
+    }
   },
   "promql": {
     "operations": {

@@ -784,12 +784,13 @@ async fn merge_files(
         .await?;
 
     let start = std::time::Instant::now();
+    let mode = MergeMode::for_ingester(stream_type, &stream_name, &schema);
     let merge_result = merge::merge_parquet_files(
         schema,
         tables,
         &bloom_filter_fields,
         new_file_meta,
-        &MergeMode::for_ingester(stream_type, &stream_name),
+        &mode,
         MergeOutput::for_ingester(stream_type),
     )
     .await;
@@ -809,20 +810,20 @@ async fn merge_files(
 
     // the ingester always merges into exactly one file
     let (merged, file_format) = buf.into_single()?;
-    let (buf, mut new_file_meta) = (merged.buf, merged.meta);
+    let (buf, mut new_file_meta, layout) = (merged.buf, merged.meta, merged.layout);
 
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-    let new_file_key = super::generate_ingester_storage_file_key(
+    let new_file_key = layout.mark_file_key(&super::generate_ingester_storage_file_key(
         &org_id,
         stream_type,
         &stream_name,
         &file_name,
         file_format,
-    );
+    ));
     log::info!(
         "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
