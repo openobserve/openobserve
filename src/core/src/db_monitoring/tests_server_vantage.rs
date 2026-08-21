@@ -113,7 +113,7 @@ fn pg_blocking_record() -> Map<String, Value> {
 }
 
 /// A row the shipped SQL Server deadlock shred returns against the rig
-/// (`tests/dbm-server-vantage/captures/mssql-deadlock.xml`). Used by the W8
+/// (`the o2-dbm-capture rig's server-vantage/captures/mssql-deadlock.xml`). Used by the W8
 /// recipe-classification tests below, which feed one realistic row per shipped
 /// recipe tag; the deadlock canonicalizer's own tests live in enterprise.
 fn mssql_deadlock_row(spid: &str, victim: &str, query: &str) -> Map<String, Value> {
@@ -548,7 +548,9 @@ fn mssql_blocking_survives_the_ingest_entry_point() {
 //
 //   1. web/.../dbmShared.ts        — the recipes we SHIP; they stamp the tags.
 //   2. server_vantage.rs           — the dispatcher; it matches on the tags.
-//   3. tests/dbm-server-vantage/   — the capture rig; it must EXERCISE them.
+//   3. fixtures/rig-collector.yaml — the capture rig's collector config, kept here as a fixture; it
+//      must EXERCISE them. The rig itself lives in the o2-dbm-capture repo; only this file is
+//      compiled in, for the guard below.
 //
 // Rename a tag on any one side and the other two keep compiling, keep passing
 // their own unit tests, and canonicalization silently stops: records land in
@@ -566,8 +568,7 @@ fn mssql_blocking_survives_the_ingest_entry_point() {
 
 const SHIPPED_RECIPES_TS: &str =
     include_str!("../../../../web/src/components/ingestion/setupCard/content/dbmShared.ts");
-const RIG_COLLECTOR_YAML: &str =
-    include_str!("../../../../tests/dbm-server-vantage/collector/config.yaml");
+const RIG_COLLECTOR_YAML: &str = include_str!("fixtures/rig-collector.yaml");
 
 /// Every `'<tag>' AS o2_recipe` literal in a collector config (or in the
 /// TypeScript that generates one). Both the shipped recipes and the rig write
@@ -777,7 +778,7 @@ fn capture_rig_exercises_every_shipped_recipe() {
     let missing: Vec<_> = shipped.difference(&in_rig).collect();
     assert!(
         missing.is_empty(),
-        "tests/dbm-server-vantage/collector/config.yaml must run every recipe we ship, \
+        "fixtures/rig-collector.yaml must run every recipe we ship, \
          so a recipe cannot reach users unverified against a real server. Missing: {missing:?}"
     );
 }
@@ -1638,7 +1639,7 @@ fn every_event_name_write_is_guarded_on_non_empty() {
 // ─── W2 · Active sessions (`db.server.query_sample`) ─────────────────────────
 //
 // Spec §3 W2.1/W2.2. Every fixture below is a REAL captured record from
-// `tests/dbm-server-vantage/captures/*.jsonl` (collector-contrib v0.158.0 against
+// `the o2-dbm-capture rig's server-vantage/captures/*.jsonl` (collector-contrib v0.158.0 against
 // live Postgres 16 / MySQL 8.4), flattened the way logs ingest flattens it:
 // attribute dots become underscores, `intValue` arrives as a JSON number.
 //
@@ -3281,7 +3282,7 @@ fn client_addresses_are_normalized_across_engines() {
 // ─── W3 · Top queries + plan visibility (`db.server.top_query`) ──────────────
 //
 // Fixtures below are the REAL captured records from
-// `tests/dbm-server-vantage/captures/pg-top-query.jsonl` and
+// `the o2-dbm-capture rig's server-vantage/captures/pg-top-query.jsonl` and
 // `mysql-top-query.jsonl` (collector-contrib v0.158.0 against live Postgres 16 /
 // MySQL 8.4), flattened the way logs ingest flattens them: attribute dots become
 // underscores, `intValue` arrives as a JSON number, `doubleValue` as a float.
@@ -5907,7 +5908,7 @@ fn index_stats_without_an_index_name_is_dropped() {
 //
 // Every fixture below is the VERBATIM wire shape captured off the live
 // dbm-server-vantage rig on 2026-08-13 (MySQL 8.4 / MariaDB 11.8, contrib
-// 0.158.0) — `tests/dbm-server-vantage/captures/{mysql,mariadb}-{table,index}-
+// 0.158.0) — `the o2-dbm-capture rig's server-vantage/captures/{mysql,mariadb}-{table,index}-
 // stats.jsonl`, flattened as logs ingest stores it. Note `server_address` carries
 // NO port: the shipped recipes stamp the bare `{host}`.
 
