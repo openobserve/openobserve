@@ -1,0 +1,17 @@
+{
+  "name": "openobserve-mobile-testing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mobile RUM SDK end-to-end suite: Maestro drives the app, then API + Playwright UI layers assert the data landed and renders in OpenObserve.",
+  "scripts": {
+    "test": "playwright test",
+    "test:rn-android": "playwright test --project=rn-android",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report",
+    "flow": "node scripts/run-flow.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "dotenv": "^16.4.5"
+  }
+}

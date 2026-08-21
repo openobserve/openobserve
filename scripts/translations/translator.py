@@ -138,6 +138,31 @@ def load_json(path, default=None):
     return {} if default is None else default
 
 
+def find_duplicate_keys(path):
+    """Return the key names duplicated within a single object in `path`.
+
+    json.load keeps the LAST of a duplicated pair, so a locale file carrying two
+    "announcements" blocks parses, validates and compares as up-to-date while the
+    earlier block is silently dead. Nothing this module writes can produce one —
+    it dumps Python dicts — but git can: line-merging two locale files that each
+    added the same block at a different offset keeps both and reports no conflict.
+    Only a pairs hook sees them, which is why this is checked rather than assumed.
+    """
+    found = []
+
+    def hook(pairs):
+        seen = set()
+        for key, _ in pairs:
+            if key in seen:
+                found.append(key)
+            seen.add(key)
+        return dict(pairs)
+
+    with open(path, "r", encoding="utf-8") as f:
+        json.load(f, object_pairs_hook=hook)
+    return sorted(set(found))
+
+
 def load_source():
     """Load the English source (en-US.json)."""
     return load_json(get_language_file_path(SOURCE_LOCALE), {})

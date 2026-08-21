@@ -88,11 +88,17 @@ export class ServicesCatalogPage {
     this.sidePanel = page.locator('[data-test="service-graph-side-panel"]');
 
     // =====================================================================
-    // Navigation — Services is its own route (/traces/services), reached from
-    // the Traces rail tile's hover flyout (no longer a tab on the Traces page)
+    // Navigation — Services Catalog is reached from the Traces rail tile's hover
+    // flyout; since #13852 the flyout item lands on the Traces page's in-page
+    // `?tab=services-catalog` view (the old /traces/services route now only
+    // exists as a legacy redirect).
     // =====================================================================
     this.tracesRailTile = page.locator('[data-test="nav-group-traces"]');
-    this.servicesCatalogNavItem = page.locator('[data-test="nav-group-item-servicesCatalog"]');
+    // #13852 rerouted the flyout children through the Traces page's ?tab= views, so the
+    // Services Catalog flyout item is now `nav-group-item-traces-services-catalog`
+    // (childDataTest = `nav-group-item-${child.name}-${child.tab}`), not the old
+    // standalone `nav-group-item-servicesCatalog`.
+    this.servicesCatalogNavItem = page.locator('[data-test="nav-group-item-traces-services-catalog"]');
 
     // =====================================================================
     // Factory locators — runtime-bound (allowed by POM strict policy)
@@ -168,8 +174,14 @@ export class ServicesCatalogPage {
   /** Navigate to Services via the left-rail flyout (the discovery path a user takes). */
   async clickServiceCatalogTab() {
     await this.tracesRailTile.hover();
+    // The flyout is teleported to <body> and opens after ONavGroup's 120ms OPEN_DELAY, so the
+    // item is not in the DOM the instant hover() resolves — wait for it before clicking, else
+    // the click races the debounce and times out.
+    await this.servicesCatalogNavItem.waitFor({ state: 'visible', timeout: 10000 });
     await this.servicesCatalogNavItem.click();
-    await this.page.waitForURL(/\/traces\/services/, { timeout: 10000 });
+    // #13852 lands Services Catalog on the Traces page as `?tab=services-catalog`; the old
+    // /traces/services path now only exists as a legacy redirect.
+    await this.page.waitForURL(/\/traces\?.*tab=services-catalog/, { timeout: 10000 });
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 

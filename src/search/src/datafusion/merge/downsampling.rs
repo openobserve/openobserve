@@ -19,7 +19,7 @@ use arrow::array::{Int64Array, RecordBatch};
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
+        promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL, layout::MetricsFileLayout},
         stream::FileMeta,
     },
     utils::parquet::new_parquet_writer,
@@ -72,7 +72,11 @@ pub(super) async fn write_files(
     Ok(bufs
         .into_iter()
         .zip(file_metas)
-        .map(|(buf, meta)| MergedFile { buf, meta })
+        .map(|(buf, meta)| MergedFile {
+            buf,
+            meta,
+            layout: MetricsFileLayout::Legacy,
+        })
         .collect())
 }
 

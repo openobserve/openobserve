@@ -27,7 +27,10 @@ use sea_orm::{
 use serde::Serialize;
 use svix_ksuid::KsuidLike as _;
 
-use super::entity::synthetics_jobs::{Column, Entity};
+use super::{
+    entity::synthetics_jobs::{Column, Entity},
+    get_lock,
+};
 use crate::errors;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -151,6 +154,9 @@ pub async fn enqueue<C: ConnectionTrait>(
         ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING
     "#;
 
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     conn.execute(Statement::from_sql_and_values(
         conn.get_database_backend(),
         sql,
@@ -221,6 +227,9 @@ pub async fn drain_check<C: ConnectionTrait>(
     conn: &C,
     synthetics_id: &str,
 ) -> Result<u64, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let sql = "DELETE FROM synthetics_jobs WHERE synthetics_id = $1";
     let res = conn
         .execute(Statement::from_sql_and_values(
@@ -264,7 +273,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
     lease_secs: i64,
     browser: Option<bool>,
 ) -> Result<Vec<LeasedRow>, errors::Error> {
-    let lease_secs = lease_secs.max(config::meta::synthetics::limits().job_lease_secs);
+    let lease_secs = lease_secs.max(config::get_config().synthetics.job_lease_secs);
     let lease_expires_at = now_us + lease_secs * 1_000_000;
 
     // `limit` arrives from a client and is cast to u64 below, where a negative
@@ -273,6 +282,11 @@ pub async fn lease_batch<C: ConnectionTrait>(
     // Reachable from a single mistyped env var, so it is clamped here rather than
     // trusted: a probe does not get to decide how much of the queue it may take.
     let limit = limit.clamp(1, MAX_LEASE_BATCH);
+
+    // make sure only one client is writing to the database(only for sqlite).
+    // One lock across the candidate pick and the claim; released before the
+    // read-back, which only reads rows pinned by our own stamp.
+    let _lock = get_lock().await;
 
     // Step 1: pick candidate IDs.
     //
@@ -328,6 +342,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
         .filter(Column::Status.eq(0i32))
         .exec(conn)
         .await?;
+    drop(_lock);
 
     // Step 3: return ONLY the rows THIS call actually won — pinned by our
     // (claimed_by, claimed_at) stamp. A racing agent that lost the guard above
@@ -434,6 +449,10 @@ pub async fn ack_complete<C: ConnectionTrait>(
         "UPDATE synthetics_jobs SET status = $1, result = $2, completed_at = $3 \
          WHERE id = $4 AND status = 1{owner_clause}"
     );
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let applied = conn
         .execute(Statement::from_sql_and_values(
             conn.get_database_backend(),
@@ -491,6 +510,10 @@ pub async fn requeue_expired<C: ConnectionTrait>(
           AND valid_until >= $1
           AND dispatch_attempts < $2
     "#;
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let res = conn
         .execute(Statement::from_sql_and_values(
             conn.get_database_backend(),
@@ -526,6 +549,16 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
     now_us: i64,
     max_attempts: i32,
 ) -> Result<Vec<DeadLetteredRow>, errors::Error> {
+    // Bounds one reaper pass so the global write lock below is never held
+    // across an unbounded backlog; the reaper runs periodically and picks up
+    // the remainder on its next tick.
+    const MAX_DEAD_LETTER_BATCH: i64 = 500;
+
+    // make sure only one client is writing to the database(only for sqlite).
+    // One lock across the bounded SELECT and the per-row CAS updates — drops
+    // at fn end.
+    let _lock = get_lock().await;
+
     // Step 1: find candidates before marking them dead. `status` comes back so
     // the CAS can require the row not to have moved under us.
     let select_sql = r#"
@@ -533,12 +566,17 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
         FROM synthetics_jobs
         WHERE (status = 1 AND lease_expires_at < $1 AND (dispatch_attempts >= $2 OR valid_until < $1))
            OR (status = 0 AND valid_until < $1)
+        LIMIT $3
     "#;
     let rows = conn
         .query_all(Statement::from_sql_and_values(
             conn.get_database_backend(),
             select_sql,
-            [Value::from(now_us), Value::from(max_attempts)],
+            [
+                Value::from(now_us),
+                Value::from(max_attempts),
+                Value::from(MAX_DEAD_LETTER_BATCH),
+            ],
         ))
         .await?;
 
@@ -630,6 +668,9 @@ pub async fn fail_dispatch<C: ConnectionTrait>(
     current_attempts: i32,
     max_attempts: i32,
 ) -> Result<DispatchFailureOutcome, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     if current_attempts < max_attempts {
         // `AND status = 1` is what keeps this from resurrecting finished work. A
         // dispatch can be judged failed after the probe has already acked — a
@@ -828,6 +869,9 @@ pub async fn pending_backlog<C: ConnectionTrait>(
 /// count here is a bug signal, not routine housekeeping — the reaper logs it at
 /// warn for that reason.
 pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u64, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let sql = r#"
         DELETE FROM synthetics_jobs
         WHERE status = 0 AND valid_until < $1

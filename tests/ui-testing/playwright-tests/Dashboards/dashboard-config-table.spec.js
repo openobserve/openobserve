@@ -33,6 +33,7 @@ test.describe("ConfigPanel — Table Settings", () => {
     await expect(wrapCellsToggle).toBeVisible();
     await pm.dashboardPanelConfigs.selectWrapCell();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     testLogger.info("Wrap cells enabled for table chart");
     await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
@@ -55,6 +56,7 @@ test.describe("ConfigPanel — Table Settings", () => {
     await expect(transposeToggle).toBeVisible();
     await pm.dashboardPanelConfigs.selectTranspose();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     testLogger.info("Transpose enabled");
     await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
@@ -77,6 +79,7 @@ test.describe("ConfigPanel — Table Settings", () => {
     await expect(dynamicColsToggle).toBeVisible();
     await pm.dashboardPanelConfigs.selectDynamicColumns();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     testLogger.info("Dynamic columns enabled");
     await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
@@ -108,6 +111,7 @@ test.describe("ConfigPanel — Table Settings", () => {
     // Set rows per page to 25
     await rowsPerPageInput.locator('[data-test$="-field"]').fill("25");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     testLogger.info("Pagination enabled, rows per page set to 25");
     await expect(pm.dashboardPanelConfigs.tablePagination).toBeVisible();
 

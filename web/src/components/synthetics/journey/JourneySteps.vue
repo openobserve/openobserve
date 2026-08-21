@@ -34,7 +34,7 @@ export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 </script>
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -235,7 +235,10 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
         id: "details",
         header: t("synthetics.journey.stepHeader"),
         size: 200,
-        meta: { autoWidth: true },
+        // `relative` so the recording marker positions against the CELL rather
+        // than the truncating wrapper inside it — the marker sits on the row's
+        // top edge, which only the cell's own box can locate.
+        meta: { autoWidth: true, cellClass: "relative" },
       },
       // Sized to the buttons it holds, which is now four: record-before, insert,
       // duplicate, delete. An `xs` button is h-7 with ps-2.5/pe-2.5 around a 1rem
@@ -268,8 +271,77 @@ const reorderEnabled = computed(() => props.enableReorder && !props.filterActive
 const isLocked = computed(() => props.locked);
 
 /** Whether the recording marker belongs above `row`. */
+function rowId(row: TData): string | null {
+  return (row as { id?: string }).id ?? null;
+}
+
 function isAnchor(row: TData): boolean {
-  return !!props.anchorId && (row as { id?: string }).id === props.anchorId;
+  return !!props.anchorId && rowId(row) === props.anchorId;
+}
+
+// Pointer and keyboard are tracked apart. Sharing one slot meant whichever left
+// first cleared the preview for both, so tabbing to a control and then moving
+// the mouse across the row lost the marker while the control was still focused.
+const hoverAnchorId = ref<string | null>(null);
+const focusAnchorId = ref<string | null>(null);
+
+/**
+ * One rule for the control's `:disabled` and for whether it may be previewed.
+ *
+ * The button is what gets disabled, but the span around it is what reports the
+ * hover — so a second copy of the condition would preview a click that cannot
+ * happen. The pointer/focus handlers deliberately do NOT consult it: `markerTone`
+ * gates the render, which also covers the case no handler can see.
+ */
+function recordBeforeDisabled(row: TData): boolean {
+  return isLocked.value || isFirstRow(row) || !props.canRecordFrom;
+}
+
+function onRecordBeforeEnter(row: TData) {
+  hoverAnchorId.value = rowId(row);
+}
+
+function onRecordBeforeLeave() {
+  hoverAnchorId.value = null;
+}
+
+function onRecordBeforeFocus(row: TData) {
+  focusAnchorId.value = rowId(row);
+}
+
+function onRecordBeforeBlur() {
+  focusAnchorId.value = null;
+}
+
+/**
+ * Which marker a row shows, if any. Hover is a preview; anchor is committed.
+ *
+ * The single gate on previewing. Checking `recordBeforeDisabled` here rather than
+ * in the handlers covers the case they cannot see: a replay started from the
+ * toolbar locks the table while the pointer rests on a control, and with nothing
+ * moving no `mouseleave` ever arrives to clear it.
+ * Results rows are excluded outright — a finished run has nothing to insert into,
+ * and only the editor's details column is positioned to host the marker.
+ */
+function markerTone(row: TData): "anchor" | "hover" | null {
+  if (!isEditor.value) return null;
+  if (isAnchor(row)) return "anchor";
+  const id = rowId(row);
+  if (!id) return null;
+  const previewed = id === hoverAnchorId.value || id === focusAnchorId.value;
+  return previewed && !recordBeforeDisabled(row) ? "hover" : null;
+}
+
+/**
+ * Let the marker's label overhang the row boundary.
+ *
+ * The cell clips by default so long step names truncate, and the label is the one
+ * thing that has to escape — so the clip is lifted only on the row carrying a
+ * marker, and only on the cell hosting it.
+ */
+function markerCellStyle({ columnId, row }: { columnId: string; row: TData }) {
+  if (columnId !== "details" || !markerTone(row)) return {};
+  return { overflow: "visible" };
 }
 
 /**
@@ -331,6 +403,7 @@ function handleUpdateExpanded(ids: string[]) {
     :fill-height="false"
     :expand-on-row-click="true"
     :get-row-status-color="getRowStatusColor"
+    :get-cell-style="markerCellStyle"
     @row-reorder="handleRowReorder"
     @update:selected-ids="handleUpdateSelected"
     @update:expanded-ids="handleUpdateExpanded"
@@ -389,15 +462,6 @@ function handleUpdateExpanded(ids: string[]) {
           />
         </span>
 
-        <!-- Recording marker: new steps land here, above this row. -->
-        <span
-          v-if="isAnchor(row)"
-          class="bg-accent text-accent-foreground rounded-default mr-1 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase"
-          data-test="synthetics-journey-recording-marker"
-        >
-          {{ t("synthetics.journey.recordingHere") }}
-        </span>
-
         <!-- Action label badge -->
         <div class="w-24!">
           <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
@@ -414,6 +478,45 @@ function handleUpdateExpanded(ids: string[]) {
           class="text-text-secondary max-w-[25%] shrink-0 truncate font-mono text-xs"
         >
           {{ stepDetail(row) }}
+        </span>
+
+        <!-- Insertion marker: recorded steps land ABOVE this row. Absolutely
+             positioned against the cell, so previewing it on hover repaints
+             rather than reflowing — a rule that nudged every row would jitter
+             the whole table as the pointer crossed the action column. Last in
+             the cell so it paints over the step content it straddles. -->
+        <!-- Two segments with the label between them, not one rule behind it:
+             with no background to punch a hole, a continuous rule would run
+             straight through the words. Equal `flex-1` segments centre the
+             label without measuring anything. Tone sits on the container so the
+             segments and the label cannot disagree about it. -->
+        <span
+          v-if="markerTone(row)"
+          :class="[
+            'absolute inset-x-0 top-0 flex -translate-y-1/2 items-center gap-2',
+            markerTone(row) === 'hover' ? 'text-accent/50' : 'text-accent',
+          ]"
+          data-test="synthetics-journey-recording-marker"
+        >
+          <span
+            class="h-0.5 flex-1 bg-current"
+            data-test="synthetics-journey-recording-marker-rule"
+            aria-hidden="true"
+          />
+          <!-- Opts out of the container's tone: only the rule fades for a
+               preview, because a half-opacity word at this size is just hard
+               to read. -->
+          <span
+            class="text-accent text-2xs shrink-0 font-semibold capitalize"
+            data-test="synthetics-journey-recording-marker-label"
+          >
+            {{ t("synthetics.journey.newStepsLandHere") }}
+          </span>
+          <span
+            class="h-0.5 flex-1 bg-current"
+            data-test="synthetics-journey-recording-marker-rule"
+            aria-hidden="true"
+          />
         </span>
       </div>
     </template>
@@ -457,14 +560,22 @@ function handleUpdateExpanded(ids: string[]) {
         <OTooltip v-if="!readonly" :content="recordBeforeTooltip">
           <!-- The span is the hover target, not the button: a disabled control
                dispatches no pointer events, so a tooltip bound straight to it would
-               stay shut in the one state that has something to explain. -->
-          <span class="inline-flex">
+               stay shut in the one state that has something to explain. The marker
+               preview rides the same span for the same reason, and focus is bound
+               alongside hover so the destination is not mouse-only. -->
+          <span
+            class="inline-flex"
+            @mouseenter="onRecordBeforeEnter(row)"
+            @mouseleave="onRecordBeforeLeave"
+            @focusin="onRecordBeforeFocus(row)"
+            @focusout="onRecordBeforeBlur"
+          >
             <OButton
               variant="ghost"
               size="xs"
               :aria-label="t('synthetics.journey.recordBeforeStep')"
               data-test="synthetics-journey-step-record-before-btn"
-              :disabled="isLocked || isFirstRow(row) || !canRecordFrom"
+              :disabled="recordBeforeDisabled(row)"
               @click="emit('record-before', row)"
             >
               <!-- The same icon as the toolbar's Record button: this row action starts a

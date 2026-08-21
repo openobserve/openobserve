@@ -565,8 +565,7 @@ pub async fn create_org(
                 );
             }
             if let Err(e) =
-                infra::table::synthetics_probe_tokens::create_for_org(&org.identifier, user_email)
-                    .await
+                crate::synthetics::create_default_probe_token(&org.identifier, user_email).await
             {
                 log::error!(
                     "Failed to create synthetics probe token for org '{}': {e}",
@@ -792,8 +791,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
                 );
             }
             if let Err(e) =
-                infra::table::synthetics_probe_tokens::create_for_org(&org.identifier, "system")
-                    .await
+                crate::synthetics::create_default_probe_token(&org.identifier, "system").await
             {
                 log::error!(
                     "Failed to create synthetics probe token for org '{}': {e}",
@@ -838,8 +836,7 @@ pub async fn check_and_create_org_without_ofga(
                 );
             }
             if let Err(e) =
-                infra::table::synthetics_probe_tokens::create_for_org(&org.identifier, "system")
-                    .await
+                crate::synthetics::create_default_probe_token(&org.identifier, "system").await
             {
                 log::error!(
                     "Failed to create synthetics probe token for org '{}': {e}",

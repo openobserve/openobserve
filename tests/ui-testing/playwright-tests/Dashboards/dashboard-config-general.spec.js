@@ -15,7 +15,10 @@ import {
 const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
-test.describe.configure({ retries: 1 });
+// Kept for reference, commented rather than deleted so it can be restored easily.
+// This override beat --retries=0 locally (making a clean baseline impossible) and
+// in CI it *cut* the project's retry budget (3 standard / 2 alpha1) down to 1.
+// test.describe.configure({ retries: 1 });
 
 test.describe("ConfigPanel — General Settings", () => {
   test.beforeEach(async ({ page }) => {
@@ -35,6 +38,11 @@ test.describe("ConfigPanel — General Settings", () => {
     await expect(descriptionField).toBeVisible();
     await descriptionField.locator('[data-test$="-field"]').fill(description);
     await pm.dashboardPanelActions.applyDashboardBtn();
+    // Let the query finish before saving. Every other test in this file waits
+    // after Apply; this one saved immediately, so savePanel could race an
+    // in-flight query — the same apply/save race fixed in
+    // dashboard-config-advanced.spec.js and dashboard-config-gauge-maps.spec.js.
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.savePanel();
 
     testLogger.info("Description saved, re-opening panel to verify persistence");

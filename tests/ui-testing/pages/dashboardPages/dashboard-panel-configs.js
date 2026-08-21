@@ -338,6 +338,12 @@ export default class DashboardPanelConfigs {
     await this._clickVirtualOption("dashboard-config-legend-position", position);
   }
 
+  // Select chart alignment ("Auto" | "Left" | "Center"). Same OToggleGroup shape as
+  // legend position — the items are always rendered, so click the label directly.
+  async selectChartAlign(align) {
+    await this._clickVirtualOption("dashboard-config-chart-align", align);
+  }
+
   // Return the panel description input field locator
   getDescriptionField() {
     return this.descriptionField;
@@ -854,6 +860,18 @@ export default class DashboardPanelConfigs {
     );
   }
 
+  /**
+   * The inner input for a value-mapping row field, for reading back persisted values.
+   * @param {import('@playwright/test').Locator} popup
+   * @param {number} index - mapping row index
+   * @param {"value"|"text"|"from"|"to"} kind - which field of the row
+   */
+  valueMappingRowField(popup, index, kind) {
+    return popup
+      .locator(`[data-test="dashboard-addpanel-config-value-mapping-${kind}-input-${index}"]`)
+      .locator('[data-test$="-field"]');
+  }
+
   /** Apply the value-mapping dialog (primary button) and wait for it to close. */
   async applyValueMappingPopup(popup) {
     await popup.locator('[data-test="o-dialog-primary-btn"]').click();
@@ -1117,45 +1135,101 @@ export default class DashboardPanelConfigs {
   }
 
   /**
-   * Select a series from the autocomplete dropdown at the given row index.
-   * Can select by index or by matching text (e.g., "ago" to find comparison series).
+   * Returns the option locators for a color-by-series row's combobox.
+   * OCombobox uses ComboboxPortal — options render at document root, outside the
+   * popup — so this must be a page-level locator, not a colorBySeriesPopup-scoped one.
    * @param {number} rowIndex - Row index in the color-by-series popup (0-based)
-   * @param {Object} options - Selection options
-   * @param {number} [options.optionIndex] - Which option to select by index (0-based)
-   * @param {string} [options.matchText] - Text to match in the option (e.g., "ago", "Minutes")
-   * @returns {string} The selected series name
    */
-  async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
-    // OCombobox input — `dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input`
-    const comboboxInput = this.colorBySeriesPopup.locator(
+  colorBySeriesOptions(rowIndex = 0) {
+    return this.page.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-option"]`
+    );
+  }
+
+  /** Returns the combobox input locator for a color-by-series row. */
+  colorBySeriesSeriesInput(rowIndex = 0) {
+    return this.colorBySeriesPopup.locator(
       `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input"]`
     );
+  }
+
+  /**
+   * Open a row's series dropdown and return every option label, then close it again.
+   * Lets a test assert on which series the chart is actually offering (e.g. that a
+   * time-shift comparison series exists) without reaching for raw locators.
+   * @param {number} rowIndex - Row index (0-based)
+   * @returns {Promise<string[]>} The option labels
+   */
+  async getColorBySeriesOptionLabels(rowIndex = 0) {
+    const comboboxInput = this.colorBySeriesSeriesInput(rowIndex);
     await comboboxInput.waitFor({ state: "visible", timeout: 10000 });
     await comboboxInput.click();
 
-    // OCombobox uses ComboboxPortal — options are rendered at document root, outside the popup.
-    // Must use page-level locator, not colorBySeriesPopup-scoped locator.
-    const optionLocators = this.page.locator(
-      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-option"]`
+    const optionLocators = this.colorBySeriesOptions(rowIndex);
+    await optionLocators
+      .first()
+      .waitFor({ state: "visible", timeout: 10000 })
+      .catch(() => {});
+
+    const labels = await optionLocators.evaluateAll((els) =>
+      els.map((el) => (el.getAttribute("data-test-label") || el.textContent || "").trim())
     );
+    // Close the portal without picking anything, so the caller can re-open it.
+    await this.page.keyboard.press("Escape");
+    return labels;
+  }
+
+  /** Returns the currently committed series name for a color-by-series row. */
+  async getColorBySeriesRowValue(rowIndex = 0) {
+    return this.colorBySeriesSeriesInput(rowIndex).inputValue();
+  }
+
+  /** Returns the currently committed colour (hex string) for a color-by-series row. */
+  async getColorBySeriesRowColor(rowIndex = 0) {
+    const colorSection = this.colorBySeriesPopup.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-color-section-${rowIndex}"]`
+    );
+    await colorSection.waitFor({ state: "visible", timeout: 5000 });
+    return colorSection.locator("input").first().inputValue();
+  }
+
+  /**
+   * Select a series from the autocomplete dropdown at the given row index.
+   * Can select by index or by matching text (e.g., "ago" to find comparison series).
+   *
+   * `matchText` is strict: if no option contains it, this throws and lists what was
+   * on offer. It used to fall back to the first/last option, which silently turned
+   * "colour the comparison series" into "colour whatever series happened to exist"
+   * — a test that passed without exercising the behaviour it named.
+   *
+   * @param {number} rowIndex - Row index in the color-by-series popup (0-based)
+   * @param {Object} options - Selection options
+   * @param {number} [options.optionIndex] - Which option to select by index (0-based)
+   * @param {string} [options.matchText] - Text the option must contain (e.g. "15 Minutes ago")
+   * @returns {string} The selected series name
+   */
+  async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
+    const comboboxInput = this.colorBySeriesSeriesInput(rowIndex);
+    await comboboxInput.waitFor({ state: "visible", timeout: 10000 });
+    await comboboxInput.click();
+
+    const optionLocators = this.colorBySeriesOptions(rowIndex);
     await optionLocators.first().waitFor({ state: "visible", timeout: 10000 });
 
     let targetOption;
 
     if (matchText) {
-      const count = await optionLocators.count();
-      for (let i = 0; i < count; i++) {
-        const text = await optionLocators.nth(i).textContent();
-        if (text && text.includes(matchText)) {
-          targetOption = optionLocators.nth(i);
-          break;
-        }
+      const labels = await optionLocators.evaluateAll((els) =>
+        els.map((el) => (el.getAttribute("data-test-label") || el.textContent || "").trim())
+      );
+      const index = labels.findIndex((label) => label.includes(matchText));
+      if (index === -1) {
+        throw new Error(
+          `No color-by-series option matching "${matchText}" in row ${rowIndex}. ` +
+            `Available options: ${JSON.stringify(labels)}`
+        );
       }
-      if (!targetOption && count > 1) {
-        targetOption = optionLocators.nth(count - 1);
-      } else if (!targetOption) {
-        targetOption = optionLocators.first();
-      }
+      targetOption = optionLocators.nth(index);
     } else {
       targetOption = optionLocators.nth(optionIndex ?? 0);
     }

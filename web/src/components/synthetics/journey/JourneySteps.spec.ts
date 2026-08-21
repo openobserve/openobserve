@@ -712,4 +712,308 @@ describe("JourneySteps", () => {
       expect(wrapper.findAll('[data-status-bar="true"]').length).toBe(0);
     });
   });
+
+  // ── Recording marker ──────────────────────────────────────────────
+  // Where recorded steps will land. The row action that sets it costs a full
+  // prefix replay, so the destination has to be legible before the click and
+  // stay legible for the session that follows.
+  describe("recording marker", () => {
+    it("draws a labelled rule above the anchored row and nowhere else", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const markers = wrapper.findAll('[data-test="synthetics-journey-recording-marker"]');
+      expect(markers).toHaveLength(1);
+      expect(markers[0].text()).toBe(enUS.synthetics.journey.newStepsLandHere);
+      // Anchored, not hovered: the marker is solid. Tone lives on the container
+      // so the rule segments and the label cannot disagree about it.
+      expect(markers[0].classes()).toContain("text-accent");
+      expect(markers[0].classes()).not.toContain("text-accent/50");
+
+      // The label sits in a real gap between two segments rather than painting
+      // over one continuous rule — with no background, a single rule would run
+      // straight through the words.
+      const rules = wrapper.findAll('[data-test="synthetics-journey-recording-marker-rule"]');
+      expect(rules).toHaveLength(2);
+      expect(rules[0].classes()).toEqual(expect.arrayContaining(["h-0.5", "flex-1", "bg-current"]));
+    });
+
+    it("renders no marker when nothing is anchored", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("lets the label escape the cell it is anchored in", async () => {
+      // The label straddles the row boundary, so the one cell that hosts it must
+      // stop clipping. Every other cell keeps the truncation the table relies on.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const details = wrapper.findAll('[data-test="o2-table-cell-details"]');
+      expect(details[1].attributes("style")).toContain("overflow: visible");
+      expect(details[0].attributes("style") ?? "").not.toContain("overflow: visible");
+      // The pinned actions cell keeps the separator shadow it renders inline.
+      const actions = wrapper.findAll('[data-test="o2-table-cell-actions"]');
+      expect(actions[1].attributes("style") ?? "").not.toContain("overflow: visible");
+    });
+
+    // The hover target is the span WRAPPING the button, not the button — a
+    // disabled control dispatches no pointer events, so the span is the only
+    // thing that can report a hover in the state that most needs explaining.
+    function recordBeforeTarget(w: VueWrapper, index: number): HTMLElement {
+      const btns = w.findAll('[data-test="synthetics-journey-step-record-before-btn"]');
+      return btns[index].element.parentElement as HTMLElement;
+    }
+
+    it("previews the marker while the record control is hovered", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      // Row 1 has no "before", so the second control belongs to step-2.
+      const target = recordBeforeTarget(wrapper, 1);
+
+      target.dispatchEvent(new MouseEvent("mouseenter"));
+      await flushPromises();
+      const marker = wrapper.find('[data-test="synthetics-journey-recording-marker"]');
+      expect(marker.exists()).toBe(true);
+      // A preview reads lighter than the committed anchor.
+      expect(marker.classes()).toContain("text-accent/50");
+
+      // Only the rule fades. The label stays full strength in both states —
+      // at this size a half-opacity word is just hard to read.
+      const label = wrapper.find('[data-test="synthetics-journey-recording-marker-label"]');
+      expect(label.classes()).toContain("text-accent");
+      expect(label.classes()).not.toContain("text-accent/50");
+
+      target.dispatchEvent(new MouseEvent("mouseleave"));
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("previews nothing where the control cannot be used", async () => {
+      // A preview of an action you cannot take is worse than no preview. The
+      // first row has no "before"; a locked table and an extension too old to
+      // restore both disable the control everywhere.
+      const cases: Array<[Record<string, unknown>, number]> = [
+        [{ data: makeSteps(3), mode: "editor" }, 0],
+        [{ data: makeSteps(3), mode: "editor", locked: true }, 1],
+        [{ data: makeSteps(3), mode: "editor", canRecordFrom: false }, 1],
+      ];
+
+      // Pointer and keyboard carry the guard separately, so both are exercised —
+      // one path passing says nothing about the other.
+      const events = [
+        () => new MouseEvent("mouseenter"),
+        () => new FocusEvent("focusin", { bubbles: true }),
+      ];
+
+      for (const [props, index] of cases) {
+        for (const makeEvent of events) {
+          const w = mount(JourneySteps, { props: props as any, global: { stubs: STUBS } });
+          await flushPromises();
+
+          recordBeforeTarget(w, index).dispatchEvent(makeEvent());
+          await flushPromises();
+
+          expect(
+            w.find('[data-test="synthetics-journey-recording-marker-rule"]').exists(),
+            `a disabled control at index ${index} still previewed on ${makeEvent().type}`,
+          ).toBe(false);
+          w.unmount();
+        }
+      }
+    });
+
+    it("previews on keyboard focus, so the control is not mouse-only", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const target = recordBeforeTarget(wrapper, 1);
+
+      target.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        true,
+      );
+
+      target.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("holds the preview while either the pointer or focus is still on the control", async () => {
+      // Pointer and keyboard are independent. Sharing one slot meant whichever
+      // left first cleared the marker for both — so tabbing to the control and
+      // then moving the mouse across the row lost the preview while the control
+      // was still focused, which is the case the focus binding exists for.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const target = recordBeforeTarget(wrapper, 1);
+      const shown = () =>
+        wrapper.find('[data-test="synthetics-journey-recording-marker"]').exists();
+
+      // Focus first, then a pointer round-trip.
+      target.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+      target.dispatchEvent(new MouseEvent("mouseenter"));
+      await flushPromises();
+      expect(shown()).toBe(true);
+
+      target.dispatchEvent(new MouseEvent("mouseleave"));
+      await flushPromises();
+      expect(shown(), "mouseleave cleared a marker the focus still owns").toBe(true);
+
+      target.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await flushPromises();
+      expect(shown()).toBe(false);
+
+      // And the mirror: pointer first, then a focus round-trip.
+      target.dispatchEvent(new MouseEvent("mouseenter"));
+      target.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+      await flushPromises();
+      target.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await flushPromises();
+      expect(shown(), "focusout cleared a marker the pointer still owns").toBe(true);
+
+      target.dispatchEvent(new MouseEvent("mouseleave"));
+      await flushPromises();
+      expect(shown()).toBe(false);
+    });
+
+    it("keeps the committed anchor solid while another row is hovered", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(4), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      recordBeforeTarget(wrapper, 2).dispatchEvent(new MouseEvent("mouseenter"));
+      await flushPromises();
+
+      const markers = wrapper.findAll('[data-test="synthetics-journey-recording-marker"]');
+      expect(markers).toHaveLength(2);
+      expect(markers[0].classes()).toContain("text-accent");
+      expect(markers[1].classes()).toContain("text-accent/50");
+    });
+
+    it("drops a stale preview once the control it belongs to is disabled", async () => {
+      // A replay can start from the toolbar while the pointer rests on a row
+      // control. Nothing moves, so no mouseleave arrives — and a preview would
+      // otherwise sit on a locked table offering a click that is now refused.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      recordBeforeTarget(wrapper, 1).dispatchEvent(new MouseEvent("mouseenter"));
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        true,
+      );
+
+      await wrapper.setProps({ locked: true });
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker-rule"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("moves the marker when the anchor moves", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const detailsFor = (id: string) =>
+        wrapper.findAll('[data-test="o2-table-cell-details"]')[
+          makeSteps(3).findIndex((s) => s.id === id)
+        ];
+      expect(
+        detailsFor("step-2").find('[data-test="synthetics-journey-recording-marker"]').exists(),
+      ).toBe(true);
+
+      await wrapper.setProps({ anchorId: "step-3" });
+      await flushPromises();
+
+      expect(
+        detailsFor("step-2").find('[data-test="synthetics-journey-recording-marker"]').exists(),
+      ).toBe(false);
+      expect(
+        detailsFor("step-3").find('[data-test="synthetics-journey-recording-marker"]').exists(),
+      ).toBe(true);
+    });
+
+    it("positions the marker on the row's top edge without taking layout", async () => {
+      // The whole point of absolute positioning here: previewing on hover must
+      // repaint, never reflow. These classes ARE that contract.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "editor", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      // The marker straddles the boundary, which is what makes it read as a
+      // position BETWEEN rows rather than a badge on one.
+      const marker = wrapper.find('[data-test="synthetics-journey-recording-marker"]');
+      expect(marker.classes()).toEqual(
+        expect.arrayContaining([
+          "absolute",
+          "inset-x-0",
+          "top-0",
+          "-translate-y-1/2",
+          "flex",
+          "items-center",
+        ]),
+      );
+
+      // Equal flex-1 segments either side are what centre the label — no
+      // width is measured and none is hardcoded.
+      const rules = wrapper.findAll('[data-test="synthetics-journey-recording-marker-rule"]');
+      expect(rules).toHaveLength(2);
+      for (const rule of rules) {
+        expect(rule.classes()).toContain("flex-1");
+      }
+    });
+
+    it("renders no marker in results mode", async () => {
+      // Results rows are a record of a run — there is nothing to insert into.
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "results", anchorId: "step-2" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="synthetics-journey-recording-marker"]').exists()).toBe(
+        false,
+      );
+    });
+  });
 });

@@ -448,7 +448,11 @@ pub async fn ingest(
 
             // convert every label to string
             for (k, v) in record.iter_mut() {
-                if k == NAME_LABEL || k == TYPE_LABEL || k == VALUE_LABEL || k == TIMESTAMP_COL_NAME
+                if k == NAME_LABEL
+                    || k == TYPE_LABEL
+                    || k == VALUE_LABEL
+                    || k == TIMESTAMP_COL_NAME
+                    || k == HASH_LABEL
                 {
                     continue;
                 }

@@ -20,7 +20,10 @@ use sea_orm::{
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
-use super::entity::folders::{ActiveModel, Column, Entity, Model};
+use super::{
+    entity::folders::{ActiveModel, Column, Entity, Model},
+    get_lock,
+};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors::{self, FromStrError},
@@ -104,6 +107,8 @@ pub async fn put(
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let model = match get_model(client, org_id, &folder.folder_id, folder_type).await? {
@@ -150,6 +155,8 @@ pub async fn delete(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let model = get_model(client, org_id, folder_id, folder_type).await?;
 
@@ -248,6 +255,8 @@ async fn list_models(
 
 /// Deletes all folders belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
         .filter(Column::Org.eq(org_id))

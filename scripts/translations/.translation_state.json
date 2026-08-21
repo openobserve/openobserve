@@ -12301,8 +12301,8 @@
       "checks": "f0be2c240d7379f2"
     },
     "evidence": {
+      "allSteps": "ed4cfb57d876b0a2",
       "captureOff": "f6b46262d4c4d01c",
-      "clearStepFilter": "83b12c2216efb4fd",
       "colDuration": "168d36c2d331807e",
       "colMessage": "2f77668a9dfbf8d5",
       "colMethod": "52a0f9b65b278850",
@@ -12310,9 +12310,19 @@
       "colStep": "8e6a6cca7aae1d1e",
       "colTime": "33b93476cf597a33",
       "colType": "baaddf70fb5d432b",
+      "detailEvent": "4e1f49a9c8ae8a15",
+      "detailFirstParty": "ee374836b96dbc01",
+      "detailInitiated": "20802cd3ceff79d3",
+      "detailLevel": "1709305c9fa966d1",
+      "detailOccurred": "553bd4fea6c1bc29",
+      "detailOrigin": "d3e1c5f8a6e240fc",
+      "detailResourceType": "c9bf2e8987cca1e2",
+      "detailStackTrace": "1baa66070b6193ee",
+      "detailThirdParty": "e4696640127b9126",
       "failuresOnly": "49c697b59d88e265",
       "filterAll": "a52ace420f2175d0",
       "firstPartyOnly": "47d48b2138e92604",
+      "footerEvents": "8d14f6e72de8f18a",
       "groupConsole": "29a40861bafe31e7",
       "groupNetwork": "1744b96470b51bf3",
       "kindConsole": "29a40861bafe31e7",
@@ -12332,10 +12342,11 @@
       "reload": "437d0d63bfbd9732",
       "retry": "942087cc2d41e013",
       "rowTitleWithTimestamps": "1ddca0414964d7f7",
-      "stepFilterBanner": "8dcb944d2efd3db0",
+      "stepOption": "81b38328f4163036",
       "truncated": "eb9818794916f263",
       "unattributed": "67d98905288c429b",
-      "unattributedCount": "8d49679aaaeaa1d0"
+      "unattributedCount": "8d49679aaaeaa1d0",
+      "unattributedOption": "45a166db4fe03a08"
     },
     "executionDetail": {
       "noStepData": "b2ef7572cf01e46a",
@@ -12488,6 +12499,7 @@
       "locatorPositionalWarningHelp": "b228791fd82d2c1f",
       "locatorSelectedCount": "529aacfdfd2b17bf",
       "locatorTriedFirst": "647572170bf90e5c",
+      "newStepsLandHere": "614948a34bcd9011",
       "noSteps": "55963bd55abb68e5",
       "optionalDescription": "2c5251b41dbd97c3",
       "optionalHelp": "882703725b6a6560",
@@ -12504,7 +12516,6 @@
       "recordJourney": "cab6d39f7928d588",
       "recordedStepsAdded": "16fbf54df74662e1",
       "recording": "80e8dd1a5a05f707",
-      "recordingHere": "cce87d4cd5520e9f",
       "replay": "c8dae6371b33b8d6",
       "replayFailed": "0d9fc1061d53fb7c",
       "replayInProgressDescription": "47146115ec9fa2b6",
@@ -12661,8 +12672,11 @@
       "statusDown": "b86d11af79188e58",
       "statusOffline": "a1794783aab72d20",
       "statusReady": "5fa7aac5375c5815",
+      "statusUnknown": "b764cdc0eab71374",
       "title": "95c61170318a2851",
       "toggleFailed": "bf60121ca191b16e",
+      "unknownAgents": "0e7cb1802ba90a29",
+      "unknownMessage": "41db47d55dff94f0",
       "updateClose": "ec146cf4339c74c6",
       "updateFailed": "84c3a675a48ff67e",
       "updateSuccess": "962906f4f658a9a2",
@@ -12717,6 +12731,7 @@
         "agentName": "11b39c93777e8f1f",
         "agentsSubtitle": "e1ba4bf7a102f71e",
         "agentsTitle": "279b44d2ab4b40c0",
+        "agentsUnavailable": "9354bfc5c7065b2a",
         "back": "7e411e6d1fb73865",
         "checkName": "dcd1d5223f73b3a9",
         "checksTitle": "10014025dca36813",
@@ -12761,7 +12776,9 @@
       "status": {
         "offline": "a1794783aab72d20",
         "online": "0d21bd52022ca7f7",
-        "pending": "331551b0de4157c9"
+        "pending": "331551b0de4157c9",
+        "unknown": "b764cdc0eab71374",
+        "unknownHint": "41db47d55dff94f0"
       },
       "table": {
         "agents": "279b44d2ab4b40c0",
@@ -12949,8 +12966,7 @@
       "noExecutionDataDesc": "9c9c4c247bf43cb3",
       "openTrace": "085aceb6b7068e2e",
       "pageActivity": "1e2957f8365bceee",
-      "pageActivityCount": "214af50beb5559ef",
-      "pageActivityCountTruncated": "92d41f1a039407d7",
+      "pageActivityEvents": "8d382b0be1e0773f",
       "pageActivityViewAllShort": "d51b55d443b6b437",
       "runId": "26d3e7aaace43436",
       "screenshotAlt": "e7990f9af6cbbfe7",
@@ -14296,6 +14312,7 @@
     "unknownService": "30dbef66f0d96ed5",
     "viewFilters": "6fae22556dc2d946",
     "viewLogs": "e087f046dc3cda9a",
+    "viewLogsUnavailable": "e2468fc4f70cc910",
     "waterfall": "6b53bc225e0aae1d"
   },
   "user": {
