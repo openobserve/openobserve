@@ -15,6 +15,10 @@
 
 //! `/table_health` — the table and index health reads.
 
+// The models these pull in are named only from enterprise-gated bodies, so the
+// glob is genuinely unused on OSS. Keep the import (enterprise needs it) and
+// silence the OSS-only lint rather than splitting it behind a cfg.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
 use super::{super::models::*, *};
 
 /// Which engines this signal is collected for.

@@ -16,6 +16,10 @@
 //! `/blocking` — the blocking/waiting session read, its raw-span fallback and
 //! the episode de-duplication that collapses repeated polls.
 
+// The models these pull in are named only from enterprise-gated bodies, so the
+// glob is genuinely unused on OSS. Keep the import (enterprise needs it) and
+// silence the OSS-only lint rather than splitting it behind a cfg.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
 use super::{super::models::*, *};
 
 /// The raw BLOCKING columns this stream can be queried for.

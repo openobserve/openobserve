@@ -17,6 +17,10 @@
 //! window/range math, the three search harnesses, the merge/fold/sort helpers,
 //! and the server-vantage prologue every feature module builds on.
 
+// The models these pull in are named only from enterprise-gated bodies, so the
+// glob is genuinely unused on OSS. Keep the import (enterprise needs it) and
+// silence the OSS-only lint rather than splitting it behind a cfg.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
 use super::{super::models::*, *};
 
 /// Default server-vantage logs stream — the name the shipped collector recipes
@@ -30,6 +34,7 @@ pub(super) const DEFAULT_SERVER_STREAM: &str = "_o2_dbm_server";
 /// the role editor hands out; `stream_grant` is the per-stream check. Either
 /// one suffices, and neither means denied — that last clause is the security
 /// property, so it has its own test.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub(super) const fn stream_read_decision(module_grant: bool, stream_grant: bool) -> bool {
     module_grant || stream_grant
 }
@@ -327,10 +332,11 @@ impl ScopeFilters {
 /// Read one record family from `_o2_db_stats`.
 ///
 /// Time semantics: rollup `_timestamp` is the window END, so the read must keep
-/// windows ending inside `(start_time, end_time]` — the window whose END lands
+/// windows ending inside `(start_time, end_time)` — the window whose END lands
 /// exactly on `start_time` belongs to the PREVIOUS range, and admitting it
 /// double-counts one window at every adjacent range boundary (the paging /
-/// refresh case where two successive reads share an edge).
+/// refresh case where two successive reads share an edge). The UPPER edge is
+/// exclusive too; see [`stats_read_range`] for why.
 ///
 /// **No builder here spells a `_timestamp` bound** — this one used to, and the
 /// inline `_timestamp > start AND _timestamp <= end` it carried was measured to
@@ -345,9 +351,9 @@ impl ScopeFilters {
 /// planner pushes down as a physical `_timestamp >= start AND _timestamp < end`
 /// FilterExec per scan (`search/src/datafusion/table_provider/helpers.rs`).
 /// [`stats_read_range`] converts the caller's range into that payload:
-/// `_timestamp` is integer µs, so on integers `> start` ≡ `>= start + 1` and
-/// `<= end` ≡ `< end + 1`, making the payload `[start + 1, end + 1)` exactly
-/// the intended `(start, end]`.
+/// `_timestamp` is integer µs, so on integers `> start` ≡ `>= start + 1`, and
+/// `< end` is already exclusive, making the payload `[start + 1, end)` exactly
+/// the intended `(start, end)`.
 pub(crate) fn build_stats_sql(org_id: &str, record_type: &str, preds: &str) -> String {
     build_stats_sql_projected(org_id, record_type, preds, "*")
 }

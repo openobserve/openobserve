@@ -16,6 +16,10 @@
 //! `/deadlocks` — the canonical event read, the MySQL side stitching and the
 //! raw-span fallback that covers windows the canonicalizer had not yet seen.
 
+// The models these pull in are named only from enterprise-gated bodies, so the
+// glob is genuinely unused on OSS. Keep the import (enterprise needs it) and
+// silence the OSS-only lint rather than splitting it behind a cfg.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
 use super::{super::models::*, *};
 
 /// The raw deadlock columns this stream can be queried for.
