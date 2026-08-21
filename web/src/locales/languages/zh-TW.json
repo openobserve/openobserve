@@ -4345,7 +4345,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -8880,6 +8885,7 @@
     },
     "openInFullView": "在完整檢視中開啟",
     "viewLogs": "檢視日誌",
+    "viewLogsUnavailable": "無法開啟此 span 的日誌。",
     "backToLogs": "返回日誌",
     "openInTraces": "在追蹤中開啟",
     "loadingStream": "載入串流中...",

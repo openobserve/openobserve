@@ -8885,6 +8885,7 @@
     },
     "openInFullView": "In volledige weergave openen",
     "viewLogs": "Logboeken bekijken",
+    "viewLogsUnavailable": "Kan de logs voor deze span niet openen.",
     "backToLogs": "Terug naar de logboeken",
     "openInTraces": "Openen in Traces",
     "loadingStream": "Stream wordt geladen...",
