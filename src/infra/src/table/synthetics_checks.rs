@@ -220,17 +220,55 @@ pub async fn get_cached<C: ConnectionTrait>(
     Ok(found)
 }
 
+/// Converts a batch of rows, dropping the ones that will not convert.
+///
+/// A row whose stored shape no longer parses — a `synthetics_type` written by a
+/// newer build, a corrupt `locations` blob — is one check that cannot be read.
+/// Collecting the batch with `?` made it every check: one such row 500s the
+/// whole org's list API and stops `claim_due` for the entire deployment, so the
+/// blast radius of one unreadable row was the fleet. Skipping keeps the other
+/// 999 working.
+///
+/// Loud on purpose. The failure it replaces was at least obvious; a silent skip
+/// would trade one visible outage for a check that quietly never runs, so every
+/// dropped row is logged with its id and the parse error, and its id is
+/// returned so the caller can surface it too.
+fn convert_batch<T>(models: Vec<synthetics_checks::Model>, caller: &str) -> (Vec<T>, Vec<String>)
+where
+    T: TryFrom<synthetics_checks::Model, Error = errors::Error>,
+{
+    let mut converted = Vec::with_capacity(models.len());
+    let mut skipped = Vec::new();
+    for m in models {
+        let id = m.id.clone();
+        let org_id = m.org_id.clone();
+        match T::try_from(m) {
+            Ok(v) => converted.push(v),
+            Err(e) => {
+                log::error!("[synthetics] {caller}: skipping unreadable check {org_id}/{id}: {e}");
+                config::metrics::SYNTHETICS_UNREADABLE_CHECKS_TOTAL.inc();
+                skipped.push(id);
+            }
+        }
+    }
+    (converted, skipped)
+}
+
 pub async fn list<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     params: &ListSyntheticsParams,
 ) -> Result<Vec<Synthetic>, errors::Error> {
     let _lock = super::get_lock().await;
-    list_models(conn, org_id, params)
-        .await?
-        .into_iter()
-        .map(Synthetic::try_from)
-        .collect()
+    let models = list_models(conn, org_id, params).await?;
+    // A single unreadable row used to 500 the whole org's list — the UI renders
+    // that as "no checks yet", so a total outage looked like an empty state.
+    //
+    // `count` still counts the skipped row, so a page can come back one short of
+    // the total. That is the same shape any server-side filter has, and it beats
+    // the alternative of a second full read just to make the number agree.
+    let (checks, _skipped) = convert_batch(models, "list");
+    Ok(checks)
 }
 
 pub async fn count<C: ConnectionTrait>(
@@ -292,15 +330,34 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// Picks the primary key for a new row. Split out of [`create`] so the
+/// super-cluster branch is testable without a database. An empty id cannot be
+/// honoured, so it falls back rather than inserting `""`.
+fn new_check_id(check: &Synthetic, use_given_id: bool) -> String {
+    if use_given_id && !check.id.is_empty() {
+        check.id.clone()
+    } else {
+        config::ider::uuid()
+    }
+}
+
+/// Inserts a new check.
+///
+/// `use_given_id` keeps `check.id` instead of minting a fresh one. Only the
+/// super-cluster consumer sets it: a check replicated from another region must
+/// keep the primary key it was created with, or every region would invent its
+/// own id for the same check and nothing would ever match up again. Mirrors
+/// `table::alerts::create`.
 pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
     check: Synthetic,
+    use_given_id: bool,
 ) -> Result<Synthetic, errors::Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
-    let id = config::ider::uuid();
+    let id = new_check_id(&check, use_given_id);
 
     let mut am = build_active_model(&check)?;
     am.id = Set(id);
@@ -541,21 +598,122 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
     }
 }
 
+/// The one definition of "this check should be running by now": enabled, slot
+/// already reached, most overdue first, bounded.
+///
+/// Shared by [`fetch_due`], [`claim_due`] and [`fetch_overdue`] because the
+/// orphan detector's whole claim is "the scheduler would have taken this and
+/// didn't". Two hand-copied predicates make that claim false the moment one of
+/// them gains a filter — a replication-era `owner_region` added to the
+/// scheduler's side would leave the detector alerting on every check another
+/// region legitimately owns. Only the PROJECTION differs between callers: the
+/// scheduler needs the whole row to fan out, the detector needs seven columns.
+fn due_checks_query(now_us: i64, limit: u64) -> sea_orm::Select<Entity> {
+    Entity::find()
+        .filter(Column::Enabled.eq(true))
+        .filter(Column::NextRunAt.lte(now_us))
+        .order_by_asc(Column::NextRunAt)
+        .limit(limit)
+}
+
 pub async fn fetch_due<C: ConnectionTrait>(
     conn: &C,
     now_us: i64,
     limit: u64,
 ) -> Result<Vec<DueCheck>, errors::Error> {
     let _lock = super::get_lock().await;
-    let models = Entity::find()
-        .filter(Column::Enabled.eq(true))
-        .filter(Column::NextRunAt.lte(now_us))
-        .order_by_asc(Column::NextRunAt)
-        .limit(limit)
+    let models = due_checks_query(now_us, limit).all(conn).await?;
+
+    let (due, _skipped) = convert_batch(models, "fetch_due");
+    Ok(due)
+}
+
+/// A check the orphan detector may need to report.
+///
+/// Deliberately **not** an extension of [`DueCheck`]. That is the scheduler's
+/// fan-out payload — it carries locations and browser devices the scheduler
+/// needs, and none of the anchors this needs. The detector measures against
+/// `next_run_at` when it is set, and falls back to `last_triggered_at` /
+/// `updated_at` when it is 0, because 0 means "fire immediately" rather than
+/// "not scheduled".
+pub struct OrphanCandidate {
+    pub id: String,
+    pub org_id: String,
+    pub name: String,
+    pub frequency: SyntheticFrequency,
+    /// Minutes from UTC — needed to resolve a cron schedule's slot spacing.
+    pub tz_offset: i32,
+    pub next_run_at: i64,
+    pub last_triggered_at: i64,
+    pub updated_at: i64,
+}
+
+/// The projected row behind [`OrphanCandidate`] — exactly the columns the
+/// detector reads, and no more. `config` (full Playwright scripts) and
+/// `secrets` (encrypted blobs) run to several KB per row; pulling them a
+/// thousand at a time to compare a timestamp is the same waste
+/// [`get_alert_state`] avoids on the ack path.
+#[derive(sea_orm::FromQueryResult)]
+struct OrphanRow {
+    id: String,
+    org_id: String,
+    name: String,
+    frequency: sea_orm::JsonValue,
+    tz_offset: i32,
+    next_run_at: i64,
+    last_triggered_at: i64,
+    updated_at: i64,
+}
+
+impl From<OrphanRow> for OrphanCandidate {
+    fn from(r: OrphanRow) -> Self {
+        // Same tolerance as `DueCheck::try_from`: a malformed frequency degrades
+        // to the default rather than failing, so one bad row cannot blind the
+        // detector to every other check in the batch.
+        let frequency: SyntheticFrequency = serde_json::from_value(r.frequency).unwrap_or_default();
+
+        OrphanCandidate {
+            id: r.id,
+            org_id: r.org_id,
+            name: r.name,
+            frequency,
+            tz_offset: r.tz_offset,
+            next_run_at: r.next_run_at,
+            last_triggered_at: r.last_triggered_at,
+            updated_at: r.updated_at,
+        }
+    }
+}
+
+/// Enabled checks whose scheduled slot is already in the past, most overdue
+/// first. `next_run_at = 0` means "fire immediately", so those are candidates
+/// too — a scheduler drains them within a tick, and one still sitting at 0 is
+/// the signal the orphan detector is looking for.
+///
+/// This is a read-only superset of what `claim_due` would take; whether a
+/// candidate is actually orphaned is the caller's decision, since the threshold
+/// is per-check (N of its own intervals).
+pub async fn fetch_overdue<C: ConnectionTrait>(
+    conn: &C,
+    now_us: i64,
+    limit: u64,
+) -> Result<Vec<OrphanCandidate>, errors::Error> {
+    let _lock = super::get_lock().await;
+    let rows = due_checks_query(now_us, limit)
+        .select_only()
+        .column(Column::Id)
+        .column(Column::OrgId)
+        .column(Column::Name)
+        .column(Column::Frequency)
+        .column(Column::TzOffset)
+        .column(Column::NextRunAt)
+        .column(Column::LastTriggeredAt)
+        .column(Column::UpdatedAt)
+        .into_model::<OrphanRow>()
         .all(conn)
         .await?;
 
-    models.into_iter().map(DueCheck::try_from).collect()
+    Ok(rows.into_iter().map(OrphanCandidate::from).collect())
 }
 
 /// Updates `last_triggered_at` and `next_run_at` after the scheduler fans out a check.
@@ -599,11 +757,7 @@ where
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
-    let mut query = Entity::find()
-        .filter(Column::Enabled.eq(true))
-        .filter(Column::NextRunAt.lte(now_us))
-        .order_by_asc(Column::NextRunAt)
-        .limit(limit);
+    let mut query = due_checks_query(now_us, limit);
     if txn.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
         query = query.lock_with_behavior(
             sea_orm::sea_query::LockType::Update,
@@ -612,10 +766,16 @@ where
     }
     let models = query.all(&txn).await?;
 
-    let due: Vec<DueCheck> = models
-        .into_iter()
-        .map(DueCheck::try_from)
-        .collect::<Result<Vec<_>, _>>()?;
+    // Skip-and-log rather than fail the batch: an unreadable row is one check
+    // that cannot be scheduled, and it must not cost the other 999. Failing
+    // here stopped the scheduler for the whole deployment every five seconds,
+    // and nothing anywhere ran.
+    //
+    // The skipped rows are not silently dropped twice over: they stay enabled
+    // and overdue, so the orphan detector — which reads the same predicate
+    // through an infallible projection — keeps reporting them, and that is the
+    // signal that says a check is not running.
+    let (due, _skipped): (Vec<DueCheck>, _) = convert_batch(models, "claim_due");
 
     for check in &due {
         Entity::update_many()
@@ -640,6 +800,7 @@ pub async fn advance_schedule<C: ConnectionTrait>(
     last_triggered_at: i64,
     next_run_at: i64,
 ) -> Result<(), errors::Error> {
+    let _lock = super::get_lock().await;
     Entity::update_many()
         .col_expr(Column::LastTriggeredAt, Expr::value(last_triggered_at))
         .col_expr(Column::NextRunAt, Expr::value(next_run_at))
@@ -650,17 +811,33 @@ pub async fn advance_schedule<C: ConnectionTrait>(
 }
 
 /// Updates `last_check_status` after a probe acks a job.
+///
+/// Returns `true` when the stored value actually CHANGED — `false` for a repeat
+/// of the same status, and for a check that is not in this region at all.
+///
+/// The `ne` filter is what makes transition-only replication possible. This is
+/// called on every ack, so a caller that published unconditionally would put a
+/// message on the super-cluster queue for every run of every check, forever;
+/// publishing on `true` instead makes the traffic scale with status *flips*, and
+/// a healthy check acking every minute sends nothing. It also makes the write
+/// idempotent, which is what lets the super-cluster consumer treat a redelivery
+/// as a no-op rather than having to remember what it already applied.
+///
+/// One statement, so there is no read-modify-write window for two acks of the
+/// same check to race through — the database decides who changed the value.
 pub async fn update_last_check_status<C: ConnectionTrait>(
     conn: &C,
     id: &str,
     status: i32,
-) -> Result<(), errors::Error> {
-    Entity::update_many()
+) -> Result<bool, errors::Error> {
+    let _lock = super::get_lock().await;
+    let res = Entity::update_many()
         .col_expr(Column::LastCheckStatus, Expr::value(status))
         .filter(Column::Id.eq(id))
+        .filter(Column::LastCheckStatus.ne(status))
         .exec(conn)
         .await?;
-    Ok(())
+    Ok(res.rows_affected > 0)
 }
 
 /// The alert bookkeeping a completed run needs in order to decide whether to
@@ -730,6 +907,7 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
     expected: AlertState,
     state: AlertState,
 ) -> Result<bool, errors::Error> {
+    let _lock = super::get_lock().await;
     let res = Entity::update_many()
         .col_expr(
             Column::ConsecutiveFailures,
@@ -821,6 +999,18 @@ fn pack_secrets(check: &Synthetic) -> Result<String, errors::Error> {
     .map_err(|e| errors::Error::Message(format!("secrets serialize failed: {e}")))
 }
 
+/// Writes the columns a user edit may change, and only those.
+///
+/// The omissions are the point: `next_run_at`, `last_triggered_at`,
+/// `last_check_status`, `consecutive_failures`, `last_alert_at`, `alerting` and
+/// `degraded_notified_at` are rewritten by the scheduler and ack paths of
+/// whichever region is running the checks. Because the super-cluster consumer
+/// applies replicated edits through [`update`], leaving them out here is what
+/// stops an edit made in one region from resetting another region's schedule
+/// and alert counters — see the guard test at the bottom of this file.
+///
+/// A new *config* column must be added here or edits to it will not propagate;
+/// a new *runtime* column must not be, or every edit will clobber it.
 fn update_mutable_fields(am: &mut ActiveModel, check: &Synthetic) -> Result<(), errors::Error> {
     let locations = serde_json::to_value(&check.locations)?;
     let destinations = serde_json::to_value(&check.destinations)?;
@@ -984,6 +1174,100 @@ mod tests {
         assert_eq!(check.last_check_status, SyntheticStatus::Passed);
     }
 
+    /// A row whose `synthetics_type` no longer parses — written by a newer
+    /// build, or by a bad migration. One of these disabled scheduling for an
+    /// entire deployment and 500ed the list API for a whole org.
+    fn an_unreadable_model() -> Model {
+        Model {
+            id: "poison-1".to_string(),
+            synthetics_type: "NOT_A_VALID_TYPE".to_string(),
+            ..make_model()
+        }
+    }
+
+    /// The blast radius of one bad row is one check. `claim_due` must return
+    /// every readable check in the batch and advance those, not fail.
+    #[tokio::test]
+    async fn test_claim_due_skips_an_unreadable_row_and_keeps_the_rest() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+        let good = Model {
+            id: "mon-2".to_string(),
+            ..make_model()
+        };
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![an_unreadable_model(), make_model(), good]])
+            .append_exec_results(vec![
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+            ])
+            .into_connection();
+
+        let claimed = claim_due(&db, 500, 10, |_| 900).await.unwrap();
+
+        let ids: Vec<&str> = claimed.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["mon-1", "mon-2"],
+            "the readable checks must still be claimed"
+        );
+    }
+
+    /// The skip is a decision, not an accident: the caller is handed the ids it
+    /// dropped, and each one is logged. Asserted on the returned set because a
+    /// skip nobody can see is a worse failure than the one it replaced.
+    #[test]
+    fn test_convert_batch_reports_every_row_it_skips() {
+        let (checks, skipped): (Vec<Synthetic>, _) =
+            convert_batch(vec![an_unreadable_model(), make_model()], "test");
+
+        assert_eq!(skipped, vec!["poison-1".to_string()]);
+        assert_eq!(checks.len(), 1);
+        assert_eq!(checks[0].id, "mon-1");
+    }
+
+    /// The ordinary case has to stay ordinary — no dropped rows, nothing to
+    /// report.
+    #[test]
+    fn test_convert_batch_leaves_a_healthy_batch_alone() {
+        let good = Model {
+            id: "mon-2".to_string(),
+            ..make_model()
+        };
+        let (checks, skipped): (Vec<DueCheck>, _) = convert_batch(vec![make_model(), good], "test");
+
+        assert!(skipped.is_empty());
+        assert_eq!(
+            checks.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+            vec!["mon-1", "mon-2"]
+        );
+    }
+
+    /// The list path had the same shape, and its failure mode was worse than an
+    /// error: the UI renders a 500 from this endpoint as "Create your first
+    /// Check", so one bad row made a working org look empty.
+    #[tokio::test]
+    async fn test_list_returns_the_readable_checks_despite_a_bad_row() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![an_unreadable_model(), make_model()]])
+            .into_connection();
+
+        let checks = list(&db, "org1", &ListSyntheticsParams::default())
+            .await
+            .unwrap();
+
+        assert_eq!(checks.len(), 1);
+        assert_eq!(checks[0].id, "mon-1");
+    }
+
     /// The lock clause is the whole HA fix: without FOR UPDATE SKIP LOCKED the
     /// SELECT is plain and every scheduler node claims every due check.
     #[tokio::test]
@@ -1038,6 +1322,362 @@ mod tests {
         assert!(
             !sql.contains("FOR UPDATE"),
             "SQLite cannot parse FOR UPDATE: {sql}"
+        );
+    }
+
+    /// The projected row the detector actually reads. Built from `make_model`
+    /// so the two cannot drift on field names — `FromQueryResult` matches by
+    /// name, so a renamed column would fail at the database, not here.
+    fn make_orphan_row() -> OrphanRow {
+        let m = make_model();
+        OrphanRow {
+            id: m.id,
+            org_id: m.org_id,
+            name: m.name,
+            frequency: m.frequency,
+            tz_offset: m.tz_offset,
+            next_run_at: m.next_run_at,
+            last_triggered_at: m.last_triggered_at,
+            updated_at: m.updated_at,
+        }
+    }
+
+    /// The detector anchors on the newest of `next_run_at`, `last_triggered_at`
+    /// and `updated_at`, so all three have to survive the conversion.
+    #[test]
+    fn test_orphan_candidate_from_model() {
+        let mut m = make_orphan_row();
+        m.next_run_at = 1750000060000000;
+        m.last_triggered_at = 1750000030000000;
+        m.tz_offset = -300;
+
+        let c = OrphanCandidate::from(m);
+        assert_eq!(c.id, "mon-1");
+        assert_eq!(c.org_id, "org1");
+        assert_eq!(c.name, "Login Flow");
+        assert_eq!(c.tz_offset, -300);
+        assert_eq!(c.next_run_at, 1750000060000000);
+        assert_eq!(c.last_triggered_at, 1750000030000000);
+        assert_eq!(c.updated_at, 1750000000000000);
+        assert_eq!(c.frequency.interval, 5);
+        assert_eq!(
+            c.frequency.frequency_type,
+            config::meta::synthetics::SyntheticFrequencyType::Minutes
+        );
+    }
+
+    /// A malformed `frequency` must degrade to the default, not fail — one bad
+    /// row would otherwise blind the detector to the whole batch.
+    #[test]
+    fn test_orphan_candidate_from_model_tolerates_bad_frequency() {
+        let mut m = make_orphan_row();
+        m.frequency = serde_json::json!("not-a-frequency");
+
+        let c = OrphanCandidate::from(m);
+        assert_eq!(
+            c.frequency.frequency_type,
+            config::meta::synthetics::SyntheticFrequencyType::Minutes
+        );
+        assert_eq!(c.frequency.interval, 5);
+    }
+
+    /// `fetch_overdue` is the detector's whole input set: a missing `enabled`
+    /// filter would report paused checks, and a missing `next_run_at` bound
+    /// would pull the entire table on every reaper tick.
+    ///
+    /// Asserted on the WHERE clause verbatim rather than on substrings. The
+    /// earlier version matched `"enabled"` and `"next_run_at"` anywhere in the
+    /// statement, which the SELECT list satisfies on its own — deleting BOTH
+    /// filters left it green.
+    #[tokio::test]
+    async fn test_fetch_overdue_filters_and_orders() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![make_model()]])
+            .into_connection();
+
+        let rows = fetch_overdue(&db, 1750000000000000, 1000).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, "mon-1");
+
+        let sql = format!("{:?}", db.into_transaction_log());
+        assert!(
+            sql.contains(
+                r#"WHERE \"synthetics\".\"enabled\" = $1 AND \"synthetics\".\"next_run_at\" <= $2"#
+            ),
+            "both predicates must survive: a missing `enabled` reports paused checks, a missing \
+             `next_run_at` scans the whole table every pass: {sql}"
+        );
+        assert!(
+            sql.contains("Bool(Some(true))"),
+            "the enabled predicate must bind TRUE: {sql}"
+        );
+        assert!(
+            sql.contains(r#"ORDER BY \"synthetics\".\"next_run_at\" ASC LIMIT $3"#),
+            "most overdue first and bounded, so a truncated batch reports the worst: {sql}"
+        );
+    }
+
+    /// The detector compares timestamps; it has no use for the check's body.
+    /// `config` holds full Playwright scripts and `secrets` holds encrypted
+    /// blobs — several KB per row, a thousand rows, every pass.
+    #[tokio::test]
+    async fn test_fetch_overdue_projects_only_the_anchor_columns() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![make_model()]])
+            .into_connection();
+
+        fetch_overdue(&db, 1750000000000000, 1000).await.unwrap();
+
+        let sql = format!("{:?}", db.into_transaction_log());
+        assert!(
+            !sql.contains(r#"\"synthetics\".\"config\""#),
+            "must not pull Playwright scripts to compare a timestamp: {sql}"
+        );
+        assert!(
+            !sql.contains(r#"\"synthetics\".\"secrets\""#),
+            "must not pull encrypted credentials to compare a timestamp: {sql}"
+        );
+        assert!(
+            sql.contains(r#"\"synthetics\".\"frequency\""#),
+            "the frequency is what the threshold is measured in: {sql}"
+        );
+    }
+
+    /// `fetch_due` and `fetch_overdue` must select from the same set. If the
+    /// detector's predicate ever drifts from the scheduler's, it starts
+    /// reporting checks the scheduler was never going to claim.
+    #[tokio::test]
+    async fn test_fetch_due_and_fetch_overdue_share_one_predicate() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        fn where_clause(sql: &str) -> String {
+            let start = sql.find("WHERE").expect("query must have a WHERE clause");
+            let end = sql.find("ORDER BY").expect("query must be ordered");
+            sql[start..end].to_string()
+        }
+
+        let due_db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![make_model()]])
+            .into_connection();
+        fetch_due(&due_db, 1750000000000000, 1000).await.unwrap();
+        let due_sql = format!("{:?}", due_db.into_transaction_log());
+
+        let overdue_db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![make_model()]])
+            .into_connection();
+        fetch_overdue(&overdue_db, 1750000000000000, 1000)
+            .await
+            .unwrap();
+        let overdue_sql = format!("{:?}", overdue_db.into_transaction_log());
+
+        assert_eq!(
+            where_clause(&due_sql),
+            where_clause(&overdue_sql),
+            "the scheduler's candidate set and the detector's must not drift"
+        );
+    }
+
+    /// The guarantee super-cluster replication rests on (spec §4, test 4).
+    ///
+    /// A replicated edit is applied through [`update`], which builds its
+    /// `ActiveModel` from the row already in this region and hands it to
+    /// [`update_mutable_fields`]. Anything that function leaves alone keeps the
+    /// local value. If a runtime column ever slips into it, every edit made in
+    /// any region resets this region's schedule anchor and alert counters — a
+    /// silent failure: the check still runs, just on the wrong clock and with
+    /// its failure count back at zero.
+    ///
+    /// `Unchanged` is exactly that assertion — the column will not appear in
+    /// the generated `UPDATE` at all.
+    #[test]
+    fn an_edit_never_touches_a_runtime_column() {
+        let mut m = make_model();
+        // Values a region that has been running this check would hold.
+        m.next_run_at = 1_750_000_000_000_000;
+        m.last_triggered_at = 1_749_999_000_000_000;
+        m.last_check_status = 3;
+        m.consecutive_failures = 2;
+        m.last_alert_at = 1_749_998_000_000_000;
+        m.alerting = true;
+        m.degraded_notified_at = 1_749_997_000_000_000;
+
+        let mut check = Synthetic::try_from(m.clone()).unwrap();
+        check.name = "renamed".to_string();
+        check.enabled = false;
+
+        let mut am: ActiveModel = m.into();
+        update_mutable_fields(&mut am, &check).unwrap();
+
+        assert!(am.name.is_set(), "the edit itself must still apply");
+        assert!(am.enabled.is_set());
+
+        assert!(
+            am.next_run_at.is_unchanged(),
+            "next_run_at is the schedule anchor"
+        );
+        assert!(am.last_triggered_at.is_unchanged());
+        assert!(am.last_check_status.is_unchanged());
+        assert!(
+            am.consecutive_failures.is_unchanged(),
+            "resetting this delays a real page"
+        );
+        assert!(
+            am.last_alert_at.is_unchanged(),
+            "resetting this breaks the alert cooldown"
+        );
+        assert!(am.alerting.is_unchanged());
+        assert!(am.degraded_notified_at.is_unchanged());
+    }
+
+    /// `create` mints an id unless told otherwise. The super-cluster consumer
+    /// must be able to reproduce the origin region's primary key, or the same
+    /// check ends up under a different id in every region and no later update
+    /// or delete ever finds it again.
+    #[test]
+    fn a_replicated_create_keeps_the_origin_region_id() {
+        let check = Synthetic::try_from(make_model()).unwrap();
+        assert_eq!(new_check_id(&check, true), "mon-1");
+        assert_ne!(
+            new_check_id(&check, false),
+            "mon-1",
+            "a user-facing create must still mint its own id"
+        );
+
+        let mut blank = check.clone();
+        blank.id = String::new();
+        assert!(
+            !new_check_id(&blank, true).is_empty(),
+            "an empty id is not an id to honour"
+        );
+    }
+
+    /// A real sqlite with just this table, because the property under test is
+    /// the DATABASE's answer to "did that write change anything". A mock returns
+    /// whatever `rows_affected` the test queued, which would make the assertions
+    /// below about the mock rather than about the `ne` filter.
+    ///
+    /// One connection, not a pool: separate connections to `sqlite::memory:` get
+    /// separate databases, so a second checkout would see an empty table.
+    async fn db_with_one_check(status: i32) -> sea_orm::DatabaseConnection {
+        use sea_orm::{ActiveModelTrait, ConnectOptions, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(Entity)))
+            .await
+            .unwrap();
+
+        let model = Model {
+            last_check_status: status,
+            ..make_model()
+        };
+        // `reset_all` because `From<Model>` marks every field `Unchanged`, which
+        // an INSERT would skip.
+        let am: ActiveModel = model.into();
+        am.reset_all().insert(&db).await.unwrap();
+        db
+    }
+
+    async fn stored_status(db: &sea_orm::DatabaseConnection, id: &str) -> i32 {
+        Entity::find_by_id(id)
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap()
+            .last_check_status
+    }
+
+    /// **The one that matters.** This is called on every ack, so the bool it
+    /// returns is the entire budget for super-cluster status replication: the
+    /// callers publish on `true`, so a check that keeps reporting the same
+    /// status publishes once and then never again, however often it runs.
+    ///
+    /// If this ever returns `true` twice for the same value, a thousand
+    /// 1-minute checks become a thousand messages a minute, forever.
+    #[tokio::test]
+    async fn acking_the_same_status_twice_reports_one_change() {
+        let db = db_with_one_check(0).await;
+
+        assert!(
+            update_last_check_status(&db, "mon-1", 1).await.unwrap(),
+            "0 -> 1 is a transition and must be published"
+        );
+        assert!(
+            !update_last_check_status(&db, "mon-1", 1).await.unwrap(),
+            "the second ack of the same status must be silent"
+        );
+        assert!(
+            !update_last_check_status(&db, "mon-1", 1).await.unwrap(),
+            "and stay silent"
+        );
+
+        assert_eq!(stored_status(&db, "mon-1").await, 1);
+    }
+
+    /// The flip side: a real transition must still be reported, or a check that
+    /// starts failing stays green in every other region until someone edits it.
+    #[tokio::test]
+    async fn a_changed_status_reports_a_change() {
+        let db = db_with_one_check(1).await;
+
+        assert!(update_last_check_status(&db, "mon-1", 3).await.unwrap());
+        assert_eq!(stored_status(&db, "mon-1").await, 3);
+        assert!(
+            update_last_check_status(&db, "mon-1", 1).await.unwrap(),
+            "recovery is a transition too"
+        );
+        assert_eq!(stored_status(&db, "mon-1").await, 1);
+    }
+
+    /// No row is `false`, not an error. It is what the super-cluster consumer
+    /// sees when a status message outran its create or arrived after a delete,
+    /// and erroring there would redeliver a message about a check that does not
+    /// exist until it dead-lettered.
+    #[tokio::test]
+    async fn a_missing_check_is_not_a_change_and_not_an_error() {
+        let db = db_with_one_check(1).await;
+
+        assert!(
+            !update_last_check_status(&db, "no-such-check", 3)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            stored_status(&db, "mon-1").await,
+            1,
+            "and it must not have written some other row"
+        );
+    }
+
+    /// The `ne` filter is the mechanism, so assert it reaches the SQL. The
+    /// behavioural tests above run on sqlite; this pins the emitted statement so
+    /// the filter cannot be dropped in favour of an application-side compare,
+    /// which would reintroduce the read-modify-write race between two acks of
+    /// the same check.
+    #[tokio::test]
+    async fn the_update_filters_on_the_status_being_different() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        update_last_check_status(&db, "mon-1", 2).await.unwrap();
+
+        let sql = format!("{:?}", db.into_transaction_log());
+        assert!(
+            sql.contains(r#"\"last_check_status\" <> $"#),
+            "the transition test must be in the WHERE clause, not in Rust: {sql}"
         );
     }
 }

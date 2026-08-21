@@ -1,0 +1,14 @@
+# Background/foreground — part 1: launch and record a view BEFORE backgrounding.
+appId: com.o2rumtester
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "O2 RUM Tester"
+    timeout: 40000
+- tapOn: "Go to Details →"
+- assertVisible: "Details"
+- tapOn: "← Back to Home"
+- extendedWaitUntil:
+    visible: "O2 RUM Tester"
+    timeout: 40000

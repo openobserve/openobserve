@@ -49,6 +49,9 @@ mod search_job;
 mod semantic_groups;
 mod service_streams;
 mod short_urls;
+mod synthetics;
+mod synthetics_locations;
+mod synthetics_probe_tokens;
 mod templates;
 mod user;
 
@@ -57,7 +60,7 @@ use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
     EvalDatasetsQueue, EvalJobsQueue, EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue,
     FoldersQueue, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
-    SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
+    SearchJobsQueue, SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
 };
 
 fn parse_eval_key(
@@ -159,6 +162,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let action_scripts_queue = ActionScriptsQueue {
         on_action_script_msg: action_scripts::process,
     };
+    // One topic, three modules: the subscriber routes on the key's module
+    // segment, and an unmatched module falls through to `Ok(())` — so a handler
+    // left off here does not fail to compile, it silently drops every message
+    // for that table.
+    let synthetics_queue = SyntheticsQueue {
+        on_synthetics_msg: synthetics::process,
+        on_locations_msg: synthetics_locations::process,
+        on_probe_tokens_msg: synthetics_probe_tokens::process,
+    };
     let org_users_queue = OrgUsersQueue {
         on_org_users_msg: org_user::process,
         on_user_msg: user::process,
@@ -184,6 +196,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(destinations_queue),
         Box::new(action_scripts_queue),
         Box::new(scheduler_queue),
+        Box::new(synthetics_queue),
         Box::new(org_users_queue),
     ];
 

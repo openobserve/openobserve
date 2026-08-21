@@ -85,6 +85,10 @@ const store = createStore({
     regionInfo: [],
     zoConfig: {
       service_account_enabled: true,
+      // Enterprise-shaped by default, which is what the synthetics specs were
+      // written against. The specs that cover the OSS shape set it to false
+      // themselves.
+      synthetics_private_locations_enabled: true,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",

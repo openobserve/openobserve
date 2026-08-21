@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
-
-use arc_swap::ArcSwap;
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -268,6 +265,48 @@ impl SyntheticType {
             _ => &[],
         }
     }
+}
+
+/// Applies `f` to every secret-bearing string on a check, in one place.
+///
+/// The set of places a secret can hide is not obvious — `auth`, `variables`,
+/// `cookies`, the extracted `config_secrets` map, and legacy rows that still
+/// hold `AESenc:` values inline in `config` at
+/// [`SyntheticType::secret_config_paths`]. Three callers have to agree on that
+/// list: the synthetics service encrypting on write, the super-cluster producer
+/// decrypting for the wire, and the applier re-encrypting on arrival. Any one
+/// of them missing a field is a silent leak or a silently unreadable
+/// credential, so the list lives here and they share it.
+///
+/// `f` sees each value in place and replaces it. Errors propagate — a caller
+/// that cannot transform one secret must not be left with a half-transformed
+/// check.
+pub fn for_each_secret<E>(
+    check: &mut Synthetic,
+    f: &mut impl FnMut(&mut String) -> Result<(), E>,
+) -> Result<(), E> {
+    if let Some(auth) = check.auth.as_mut() {
+        match auth {
+            SyntheticAuth::Basic { password, .. } => f(password)?,
+            SyntheticAuth::Bearer { token } => f(token)?,
+            _ => {}
+        }
+    }
+    for var in &mut check.variables {
+        f(&mut var.value)?;
+    }
+    for cookie in &mut check.cookies {
+        f(&mut cookie.value)?;
+    }
+    for value in check.config_secrets.values_mut() {
+        f(value)?;
+    }
+    // Legacy rows: secrets never extracted into `config_secrets`.
+    let paths = check.check_type.secret_config_paths();
+    for path in paths {
+        for_each_string_at_path(&mut check.config, path, f)?;
+    }
+    Ok(())
 }
 
 /// Walks `value` along `path` (`/`-separated, `*` = every array element) and
@@ -993,98 +1032,171 @@ pub const DEFAULT_MAX_CHECK_BUDGET_SECS: i64 = 840;
 pub const DEFAULT_MAX_NET_TIMEOUT_MS: u32 = 300_000;
 const MIN_NET_TIMEOUT_MS: u32 = 1_000;
 
-/// The three stacked bounds, tunable by deployment.
-///
-/// ```text
-/// check worst case  <=  max_check_budget_secs  <  job_lease_secs
-///                              840s                   900s
-///                       (also the Lambda
-///                        function timeout)
-/// ```
-///
-/// Synthetics is enterprise-only, so the values are declared in
-/// `o2_enterprise`'s `SyntheticsConfig` (`O2_SYNTHETICS_*` env vars) and pushed
-/// in here at startup by [`init_limits`]. This crate cannot read them directly —
-/// `config` has no dependency on `o2_enterprise` — so the holder below is the
-/// seam, and it falls back to the `DEFAULT_*` values in OSS builds and in tests.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SyntheticsLimits {
-    pub job_lease_secs: i64,
-    pub max_check_budget_secs: i64,
-    pub max_net_timeout_ms: u32,
+// ── Deployment-shaped values ─────────────────────────────────────────────────
+//
+// Everything below is derived from `ZO_SYNTHETICS_*` and nothing else — no
+// database, no request context. It lives here rather than in
+// `openobserve-synthetics` because both the OSS crate and the enterprise
+// private-agent code need it, and neither may depend on the other: the OSS crate
+// publishes super-cluster messages through `o2_enterprise`, so an edge back the
+// other way is a package cycle cargo rejects outright.
+
+/// Public base URL for probe-facing traffic: sent to probes as
+/// `JOBAPI_ENDPOINT`, returned as the ingest `base_url` at resolve, and used by
+/// the reaper's stream writes. `ZO_SYNTHETICS_API_ENDPOINT` when set, else the
+/// deployment's `ZO_WEB_URL` — so self-hosted works with no synthetics URL
+/// config. Trailing slashes stripped (callers append `/api/...`).
+pub fn api_endpoint() -> String {
+    let cfg = crate::get_config();
+    let endpoint = cfg.synthetics.api_endpoint.trim().trim_end_matches('/');
+    if !endpoint.is_empty() {
+        return endpoint.to_string();
+    }
+    cfg.common.web_url.trim().trim_end_matches('/').to_string()
 }
 
-impl Default for SyntheticsLimits {
-    fn default() -> Self {
-        Self {
-            job_lease_secs: DEFAULT_JOB_LEASE_SECS,
-            max_check_budget_secs: DEFAULT_MAX_CHECK_BUDGET_SECS,
-            max_net_timeout_ms: DEFAULT_MAX_NET_TIMEOUT_MS,
+/// A device class with its viewport dimensions — returned by the capabilities
+/// endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyntheticsDevice {
+    pub id: String,
+    pub label: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Browser/device capabilities — env-controlled so admins can restrict them per
+/// deployment. Locations are NOT here: `synthetics_locations` (DB table) is the
+/// single source of truth, served separately by `list_locations_for_org` /
+/// `SyntheticsCapabilitiesV2` (`GET /api/{org}/synthetics/locations`).
+#[derive(Debug, Serialize)]
+pub struct SyntheticsCapabilities {
+    pub browsers: Vec<String>,
+    pub devices: Vec<SyntheticsDevice>,
+}
+
+/// Parse `ZO_SYNTHETICS_BROWSERS` env var into a list of browser engine names.
+fn parse_browsers(csv: &str) -> Vec<String> {
+    if csv.is_empty() {
+        // firefox temporarily disabled by default — re-add once ready.
+        return vec!["chromium".to_string()];
+    }
+    csv.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Parse one `id:width:height` device token into a `SyntheticsDevice`.
+fn parse_device(token: &str) -> Option<SyntheticsDevice> {
+    let parts: Vec<&str> = token.splitn(3, ':').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let id = parts[0].trim().to_string();
+    let width: u32 = parts[1].trim().parse().ok()?;
+    let height: u32 = parts[2].trim().parse().ok()?;
+    let label = device_display_label(&id);
+    Some(SyntheticsDevice {
+        id,
+        label,
+        width,
+        height,
+    })
+}
+
+fn device_display_label(id: &str) -> String {
+    match id {
+        "desktop" | "laptop_large" => "Desktop".to_string(),
+        "tablet" => "Tablet".to_string(),
+        "mobile" | "mobile_small" => "Mobile".to_string(),
+        other => {
+            // Capitalise first char, replace underscores with spaces
+            let mut s = other.replace('_', " ");
+            if let Some(c) = s.get_mut(0..1) {
+                c.make_ascii_uppercase();
+            }
+            s
         }
     }
 }
 
-impl SyntheticsLimits {
-    /// Rejects a set of limits that cannot hold together.
-    ///
-    /// The ordering is the whole point: a budget at or above the lease means a
-    /// check can be accepted, run to its limit, and still have its ack rejected
-    /// as stale — which surfaces to the user as a failure their target never
-    /// had. Operators own these values; this only refuses combinations that
-    /// cannot work.
-    pub fn validate(&self) -> Result<(), String> {
-        if self.max_check_budget_secs >= self.job_lease_secs {
-            return Err(format!(
-                "O2_SYNTHETICS_MAX_CHECK_BUDGET_SECS ({}) must be strictly less than \
-                 O2_SYNTHETICS_JOB_LEASE_SECS ({}) — the gap is what dispatch and the ack need. \
-                 A run that finishes at the budget still has to report before the reaper assumes \
-                 the probe is gone.",
-                self.max_check_budget_secs, self.job_lease_secs
-            ));
-        }
-        if self.max_check_budget_secs <= 0 || self.job_lease_secs <= 0 {
-            return Err("synthetics limits must be positive".to_string());
-        }
-        if self.max_net_timeout_ms as i64 > self.max_check_budget_secs * 1_000 {
-            return Err(format!(
-                "O2_SYNTHETICS_MAX_NET_TIMEOUT_MS ({}) exceeds the check budget ({}s) — a single \
-                 attempt could never fit",
-                self.max_net_timeout_ms, self.max_check_budget_secs
-            ));
-        }
-        Ok(())
+/// Parse `ZO_SYNTHETICS_DEVICES` env var into a list of `SyntheticsDevice`.
+fn parse_devices(csv: &str) -> Vec<SyntheticsDevice> {
+    if csv.is_empty() {
+        return vec![
+            SyntheticsDevice {
+                id: "desktop".to_string(),
+                label: "Desktop".to_string(),
+                width: 1440,
+                height: 900,
+            },
+            SyntheticsDevice {
+                id: "tablet".to_string(),
+                label: "Tablet".to_string(),
+                width: 768,
+                height: 1024,
+            },
+            SyntheticsDevice {
+                id: "mobile".to_string(),
+                label: "Mobile".to_string(),
+                width: 375,
+                height: 667,
+            },
+        ];
     }
+    csv.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .filter_map(parse_device)
+        .collect()
 }
 
-/// The active limits. `ArcSwap` so a config reload can re-publish them: this
-/// was a `OnceLock`, whose `set` is a no-op after the first write, so every
-/// reload was silently discarded and validation kept using the boot-time
-/// ceiling. Swap over a lock because [`limits`] is read on request threads.
-static LIMITS: Lazy<ArcSwap<SyntheticsLimits>> =
-    Lazy::new(|| ArcSwap::from(Arc::new(SyntheticsLimits::default())));
+/// Returns available browsers and device definitions. Env-controlled; see
+/// `ZO_SYNTHETICS_BROWSERS` and `ZO_SYNTHETICS_DEVICES`. Locations are not
+/// part of this — see `SyntheticsCapabilities`'s doc comment.
+pub fn list_capabilities() -> SyntheticsCapabilities {
+    let cfg = crate::get_config();
+    let cfg = &cfg.synthetics;
 
-/// Installs deployment-configured limits, overwriting whatever is there. Safe
-/// to call repeatedly — boot calls it via [`init_limits`], reload calls it again.
+    let browsers = parse_browsers(&cfg.browsers);
+    let devices = parse_devices(&cfg.devices);
+
+    SyntheticsCapabilities { browsers, devices }
+}
+
+/// Lowercases and hyphenates a string for use inside an identifier.
 ///
-/// Rejection keeps the LAST GOOD value, not `DEFAULT_*`: reverting a
-/// deliberately tight ceiling to the looser default would silently accept
-/// checks the deployment was configured to refuse. At boot there is no
-/// last-good value, so the defaults stand.
-pub fn set_limits(limits: SyntheticsLimits) -> Result<(), String> {
-    limits.validate()?;
-    LIMITS.store(Arc::new(limits));
-    Ok(())
+/// Lives here rather than beside its callers because both sides need it and
+/// neither may depend on the other: the OSS `create_location` derives a private
+/// location's pool name with it, and the enterprise agent register path derives
+/// the same slug when it upserts a deploy-declared location. They must agree
+/// exactly, or an agent registers into a pool no job is ever queued to.
+pub fn slugify(s: &str) -> String {
+    s.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
-/// Installs limits at startup; see [`set_limits`] for the rejection contract.
-pub fn init_limits(limits: SyntheticsLimits) -> Result<(), String> {
-    set_limits(limits)
-}
-
-/// The active limits — deployment-configured when enterprise has installed
-/// them, otherwise the `DEFAULT_*` values.
-pub fn limits() -> SyntheticsLimits {
-    **LIMITS.load()
+/// Lookup viewport for a device id from env config. Returns `None` for unknown
+/// devices.
+pub fn device_viewport(device_id: &str) -> Option<(u32, u32)> {
+    let cfg = crate::get_config();
+    parse_devices(&cfg.synthetics.devices)
+        .into_iter()
+        .find(|d| d.id == device_id)
+        .map(|d| (d.width, d.height))
 }
 
 /// Worst-case wall clock for one leased job, in milliseconds.
@@ -1147,14 +1259,14 @@ fn validate_net_retry_budget(
         .and_then(|v| u32::try_from(v).ok())
         .unwrap_or_else(default_timeout_ms);
 
-    let max_net_timeout_ms = limits().max_net_timeout_ms;
+    let max_net_timeout_ms = crate::get_config().synthetics.max_net_timeout_ms;
     if !(MIN_NET_TIMEOUT_MS..=max_net_timeout_ms).contains(&timeout_ms) {
         return Err(format!(
             "config.timeout_ms: must be {MIN_NET_TIMEOUT_MS}..={max_net_timeout_ms}, got {timeout_ms}"
         ));
     }
 
-    let budget_secs = limits().max_check_budget_secs;
+    let budget_secs = crate::get_config().synthetics.max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(timeout_ms, 1, retries, wait_before_retry_secs);
     // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
     // remedy first, durations rather than raw milliseconds.
@@ -2019,7 +2131,7 @@ fn validate_browser_config(
     // duplicate. Which is verbatim what the LEASE_SECS comment in
     // `dispatcher/mod.rs` was written to prevent.
     let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
-    let budget_secs = limits().max_check_budget_secs;
+    let budget_secs = crate::get_config().synthetics.max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(budget_ms, devices, retries, wait_before_retry_secs);
     // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
     // remedy first, and journey_budget_ms named last because the UI does not
@@ -2180,68 +2292,113 @@ fn validate_browser_devices_and_schedule(
 }
 
 #[cfg(test)]
-mod limits_tests {
+mod for_each_secret_tests {
     use super::*;
 
-    #[test]
-    fn defaults_hold_together() {
-        SyntheticsLimits::default()
-            .validate()
-            .expect("shipped defaults must be a valid combination");
-    }
-
-    #[test]
-    fn budget_equal_to_lease_is_rejected() {
-        // The gap is what dispatch and the ack need. Equal means a run that
-        // uses its full budget cannot report before the reaper requeues it.
-        let l = SyntheticsLimits {
-            job_lease_secs: 900,
-            max_check_budget_secs: 900,
+    fn ssh_check_with_every_secret_kind() -> Synthetic {
+        let mut c = Synthetic {
+            check_type: SyntheticType::Ssh,
             ..Default::default()
         };
-        assert!(l.validate().is_err());
+        c.auth = Some(SyntheticAuth::Basic {
+            username: "u".into(),
+            password: "pw".into(),
+        });
+        c.variables = vec![SyntheticVariable {
+            name: "V".into(),
+            value: "vv".into(),
+            secure: true,
+            example: String::new(),
+        }];
+        c.cookies = vec![SyntheticCookie {
+            name: "c".into(),
+            value: "cv".into(),
+            ..Default::default()
+        }];
+        c.config_secrets.insert("/auth/secret".into(), "cs".into());
+        c
+    }
+
+    /// Every secret-bearing field must be visited. A field missed here ships in
+    /// clear on one side or stays unreadable on the other, so the count is
+    /// asserted rather than trusted.
+    #[test]
+    fn visits_auth_variables_cookies_and_config_secrets() {
+        let mut c = ssh_check_with_every_secret_kind();
+        let mut seen = Vec::new();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            seen.push(v.clone());
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        seen.sort();
+        assert_eq!(seen, vec!["cs", "cv", "pw", "vv"]);
     }
 
     #[test]
-    fn budget_above_lease_is_rejected() {
-        let l = SyntheticsLimits {
-            job_lease_secs: 900,
-            max_check_budget_secs: 901,
+    fn replacements_are_written_back() {
+        let mut c = ssh_check_with_every_secret_kind();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            *v = format!("X{v}");
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        match c.auth.as_ref().unwrap() {
+            SyntheticAuth::Basic { password, .. } => assert_eq!(password, "Xpw"),
+            _ => panic!("auth shape changed"),
+        }
+        assert_eq!(c.variables[0].value, "Xvv");
+        assert_eq!(c.cookies[0].value, "Xcv");
+        assert_eq!(c.config_secrets["/auth/secret"], "Xcs");
+    }
+
+    /// A bearer token is a secret too — the other arm of the auth enum.
+    #[test]
+    fn visits_a_bearer_token() {
+        let mut c = Synthetic {
+            auth: Some(SyntheticAuth::Bearer { token: "t".into() }),
             ..Default::default()
         };
-        assert!(l.validate().is_err());
+        let mut seen = Vec::new();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            seen.push(v.clone());
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        assert_eq!(seen, vec!["t"]);
     }
 
+    /// Legacy rows keep secrets inline in `config` rather than in the extracted
+    /// map, and those must be visited as well.
     #[test]
-    fn net_timeout_larger_than_the_budget_is_rejected() {
-        // One attempt could never fit, so every config of that type would fail
-        // validation for a reason the user cannot act on.
-        let l = SyntheticsLimits {
-            max_check_budget_secs: 10,
-            max_net_timeout_ms: 300_000,
+    fn visits_legacy_inline_config_secrets() {
+        let mut c = Synthetic {
+            check_type: SyntheticType::Ssh,
+            config: serde_json::json!({"auth": {"secret": "inline"}}),
             ..Default::default()
         };
-        assert!(l.validate().is_err());
+        let mut seen = Vec::new();
+        for_each_secret(&mut c, &mut |v: &mut String| {
+            seen.push(v.clone());
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        assert_eq!(seen, vec!["inline"]);
     }
 
+    /// A partially transformed check must never be stored, so the error stops
+    /// the walk.
     #[test]
-    fn a_raised_but_still_ordered_pair_is_accepted() {
-        // Operators own these values; validation only refuses combinations that
-        // cannot work, not ones it merely dislikes.
-        let l = SyntheticsLimits {
-            job_lease_secs: 600,
-            max_check_budget_secs: 540,
-            max_net_timeout_ms: 120_000,
-        };
-        assert!(l.validate().is_ok());
+    fn an_error_propagates() {
+        let mut c = ssh_check_with_every_secret_kind();
+        let r = for_each_secret(&mut c, &mut |_v: &mut String| Err("nope"));
+        assert_eq!(r, Err("nope"));
     }
+}
 
-    #[test]
-    fn limits_fall_back_to_defaults_when_uninitialised() {
-        // Tests and OSS builds never call init_limits, so this is the path the
-        // whole validation suite actually runs on.
-        assert_eq!(limits(), SyntheticsLimits::default());
-    }
+#[cfg(test)]
+mod limits_tests {
+    use super::*;
 
     #[test]
     fn browser_retries_are_capped_lower_than_net() {

@@ -83,8 +83,18 @@ export default class DashboardListPage {
     // intended env org over whatever org is in the current URL — the current
     // page may itself be stuck on the wrong (e.g. personal/default) org, and
     // extracting from it would just perpetuate that mistake.
+    //
+    // Match the section ROOT, not `**/${targetPath}**`: that glob also matches
+    // the sub-routes we are trying to leave (`/web/dashboards/view`,
+    // `/web/dashboards/add_panel`), and waitForURL tests the CURRENT url first.
+    // So calling this from a dashboard view resolved instantly whether or not
+    // the click actually navigated — the fallback goto could never fire, and
+    // the caller was handed a still-on-the-view page that then timed out
+    // looking for list-only elements (`dashboard-table`, `dashboard-name-cell-*`).
+    const atSectionRoot = (url) =>
+      new URL(url).pathname.replace(/\/+$/, "").endsWith(`/${targetPath}`);
     try {
-      await this.page.waitForURL(`**/${targetPath}**`, { timeout: 15000 });
+      await this.page.waitForURL((url) => atSectionRoot(url), { timeout: 15000 });
     } catch (e) {
       const orgId = process.env['ORGNAME'] ?? this.page.url().match(/org_identifier=([^&]+)/)?.[1];
       // Dashboards.vue expects a `folder` query param (goBackToDashboardList

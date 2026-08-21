@@ -261,10 +261,28 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(mcpRoute.path).toBe("mcpServer");
     });
 
-    // Test 20: Should have only 1 route in basic configuration
-    it("should have only 1 route in basic configuration", () => {
+    // Test 20: iam + the 6 synthetics routes, which ship in OSS.
+    it("should have 7 routes in basic configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1);
+      expect(routes.length).toBe(7);
+    });
+
+    // Synthetics moved out of `o2_enterprise` into `src/synthetics`; only the
+    // private-VPC-agent half stays enterprise, so the pages register in an OSS
+    // build and the backend `/config` flag decides whether they are reachable.
+    it("should register every synthetics route on OSS", () => {
+      const routes = useEnterpriseRoutes();
+      const names = routes.map((r: any) => r.name);
+      expect(names).toEqual(
+        expect.arrayContaining([
+          "synthetics",
+          "synthetics-add",
+          "synthetics-edit",
+          "synthetic-private-location",
+          "synthetic-monitor-results",
+          "synthetics-run-detail",
+        ]),
+      );
     });
   });
 
@@ -723,7 +741,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = undefined;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should fallback to basic routes only
+      expect(routes.length).toBe(7); // Basic routes only: iam + the 6 OSS synthetics routes
     });
 
     // Test 63: Should handle config with null values
@@ -733,7 +751,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = null;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should fallback to basic routes only
+      expect(routes.length).toBe(7); // Basic routes only: iam + the 6 OSS synthetics routes
     });
 
     // Test 64: Should handle config with non-string values
@@ -743,7 +761,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = false;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should only add routes when string "true"
+      expect(routes.length).toBe(7); // Only adds enterprise routes when string "true"
     });
 
     // Test 65: Should handle config with empty string values
@@ -753,7 +771,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should fallback to basic routes only
+      expect(routes.length).toBe(7); // Basic routes only: iam + the 6 OSS synthetics routes
     });
 
     // Test 66: Should handle mixed string cases
@@ -763,7 +781,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "TRUE";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should be case sensitive, only "true" should work
+      expect(routes.length).toBe(7); // Case sensitive: only "true" adds enterprise routes
     });
 
     // Test 67: Should maintain iam route as first element

@@ -11,7 +11,10 @@ use sea_orm::{
     sea_query::{Expr, LockType},
 };
 
-use super::entity::{alert_composite_children, alert_composites, alerts};
+use super::{
+    entity::{alert_composite_children, alert_composites, alerts},
+    get_lock,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i16)]
@@ -47,6 +50,10 @@ where
 {
     let id = active_string(&definition.id, "composite id")?;
     validate_child_ownership(&children, &id)?;
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
     let definition = definition.insert(&txn).await?;
     if !children.is_empty() {
@@ -73,6 +80,10 @@ where
     let id = active_string(&replacement.id, "composite id")?;
     let org = active_string(&replacement.org, "composite org")?;
     validate_child_ownership(&children, &id)?;
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
     let mut current_query =
         alert_composites::Entity::find_by_id(&id).filter(alert_composites::Column::Org.eq(&org));
@@ -305,6 +316,9 @@ pub async fn increment_evaluation_generation<C: ConnectionTrait>(
     org: &str,
     id: &str,
 ) -> Result<i64, sea_orm::DbErr> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let backend = conn.get_database_backend();
     let sql = match backend {
         sea_orm::DatabaseBackend::Postgres => {
@@ -352,6 +366,9 @@ pub async fn delete_by_id<C>(conn: &C, org: &str, id: &str) -> Result<(), sea_or
 where
     C: ConnectionTrait + TransactionTrait,
 {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
     let exists = alert_composites::Entity::find_by_id(id)
         .filter(alert_composites::Column::Org.eq(org))
@@ -381,6 +398,9 @@ pub async fn delete_by_org<C>(conn: &C, org: &str) -> Result<(), sea_orm::DbErr>
 where
     C: ConnectionTrait + TransactionTrait,
 {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
     let ids = alert_composites::Entity::find()
         .select_only()

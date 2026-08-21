@@ -25,6 +25,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::get_lock;
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     orm_err,
@@ -112,6 +113,9 @@ pub async fn fetch_rules_by_id(rule_id: &str) -> Result<Option<RatelimitRule>, a
 }
 
 pub async fn add(rule: RuleEntry) -> Result<(), anyhow::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     match rule {
         RuleEntry::Single(rule) => add_single(rule).await,
         RuleEntry::Batch(rules) => add_batch(rules).await,
@@ -350,6 +354,9 @@ async fn add_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
 }
 
 pub async fn update(rule: RuleEntry) -> Result<(), anyhow::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     match rule {
         RuleEntry::Single(rule) => update_single(rule).await,
         RuleEntry::Batch(rules) => update_batch(rules).await,
@@ -499,6 +506,9 @@ async fn update_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
 }
 
 pub async fn delete(rule_id: String) -> Result<(), anyhow::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     match fetch_rules_by_id(rule_id.as_str()).await {
         Ok(Some(_)) => {
             let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -755,10 +765,10 @@ mod tests {
 
     async fn setup_test_db(mock_db: sea_orm::DatabaseConnection) {
         INIT.call_once(|| {
-            // Initialize ORM_CLIENT only once
-            ORM_CLIENT
-                .set(mock_db)
-                .expect("Failed to set mock database");
+            // Another test in the shared process may already have initialized
+            // ORM_CLIENT; the validation paths under test never reach a query,
+            // so losing the race is fine.
+            let _ = ORM_CLIENT.set(mock_db);
         });
     }
 

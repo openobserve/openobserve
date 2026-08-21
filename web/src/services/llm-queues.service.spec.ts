@@ -145,6 +145,15 @@ describe("llmQueuesService Workbench contracts", () => {
             timestamp: 456,
           },
         ],
+        reviews: [
+          {
+            submissionId: "submission-1",
+            reviewer: "reviewer@example.com",
+            comments: null,
+            submittedAt: 789,
+            scores: [{ name: "faithfulness", value_numeric: 1 }],
+          },
+        ],
       },
     });
 
@@ -157,6 +166,11 @@ describe("llmQueuesService Workbench contracts", () => {
       name: "faithfulness",
       value: 0.8,
       sourceType: "llm_judge",
+    });
+    expect(detail.reviews).toHaveLength(1);
+    expect(detail.reviews[0]).toMatchObject({
+      submissionId: "submission-1",
+      scores: [{ name: "faithfulness", value: 1 }],
     });
   });
 

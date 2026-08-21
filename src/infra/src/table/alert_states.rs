@@ -33,7 +33,10 @@ use sea_orm::{
     TransactionTrait,
 };
 
-use super::entity::{alert_state_transitions, alert_states, alerts};
+use super::{
+    entity::{alert_state_transitions, alert_states, alerts},
+    get_lock,
+};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
@@ -161,6 +164,10 @@ pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
     if update.state.is_none() && ledger.is_none() {
         return Ok(());
     }
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
     write_update(&txn, update).await?;
     if let Some(write) = ledger {
@@ -195,6 +202,9 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     plan: &GroupPlan,
     alert_id: &str,
 ) -> Result<bool, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
 
     // §5.3 opt-out race: this evaluation may have read the alert BEFORE a save
@@ -260,6 +270,9 @@ pub async fn advance_delivery_state_with<C: sea_orm::ConnectionTrait + Transacti
     episode: DeliveryEpisode,
     outcome: DeliveryOutcome,
 ) -> Result<bool, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
 
     let Some(current) =
@@ -445,6 +458,10 @@ pub async fn delete_groups_with<C: sea_orm::ConnectionTrait>(
     if group_keys.is_empty() {
         return Ok(());
     }
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     alert_states::Entity::delete_many()
         .filter(alert_states::Column::AlertId.eq(alert_id))
         .filter(alert_states::Column::GroupKey.is_in(group_keys.to_vec()))
@@ -512,6 +529,9 @@ pub async fn delete_all_groups_with<C: sea_orm::ConnectionTrait>(
     conn: &C,
     alert_id: &str,
 ) -> Result<u64, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let res = alert_states::Entity::delete_many()
         .filter(alert_states::Column::AlertId.eq(alert_id))
         .filter(alert_states::Column::GroupKey.ne(ROLLUP_GROUP_KEY))
@@ -806,6 +826,9 @@ pub async fn delete_by_alert_with<C: sea_orm::ConnectionTrait + TransactionTrait
     conn: &C,
     alert_id: &str,
 ) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let txn = conn.begin().await?;
     alert_states::Entity::delete_many()
         .filter(alert_states::Column::AlertId.eq(alert_id))
@@ -822,6 +845,9 @@ pub async fn delete_by_alert_with<C: sea_orm::ConnectionTrait + TransactionTrait
 /// Retention for the append-only transition log. Governed by audit needs, set
 /// independently of the `triggers` stream retention.
 pub async fn delete_transitions_before(cutoff: i64) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     alert_state_transitions::Entity::delete_many()
         .filter(alert_state_transitions::Column::At.lt(cutoff))
