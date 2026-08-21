@@ -48,6 +48,11 @@ export default class ChartTypeSelector {
     // HTML chart editor + rendered output
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
     this.htmlRenderer = page.locator('[data-test="html-renderer"]');
+
+    // Chart selection sidebar (ChartSelection.vue) — chart type tiles + icons
+    this.chartSelectionItems = page.locator('[data-test="dashboard-addpanel-chart-selection-item"]');
+    this.chartSelectionIcons = page.locator('[data-test="dashboard-addpanel-chart-selection-icon"]');
+    this.chartSelectionTooltip = page.locator('[data-test="o-tooltip-content"]');
   }
 
   // Click the geomap chart canvas at a given pixel position
@@ -89,6 +94,87 @@ export default class ChartTypeSelector {
   // Returns the "selected chart type" indicator item (e.g. pie, donut)
   getSelectedChartItem(chartType) {
     return this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+  }
+
+  // ===== Chart selection sidebar (ChartSelection.vue) =====
+
+  // All 20 chart option tiles (<li>), one per chart type
+  getChartSelectionItems() {
+    return this.chartSelectionItems;
+  }
+
+  // All 20 chart icon <img> elements
+  getChartSelectionIcons() {
+    return this.chartSelectionIcons;
+  }
+
+  // The icon <img> inside a specific chart tile — the element the child-mode
+  // OTooltip attaches its hover listener to (the previous sibling of the anchor).
+  getChartIcon(chartType) {
+    return this.page.locator(
+      `[data-test="selected-chart-${chartType}-item"] [data-test="dashboard-addpanel-chart-selection-icon"]`
+    );
+  }
+
+  // The shared OTooltip bubble (rendered lazily on first hover/focus)
+  getChartSelectionTooltip() {
+    return this.chartSelectionTooltip;
+  }
+
+  // The single tile (<li>) that currently carries data-test-selected="{chartType}"
+  getSelectedChartTile(chartType) {
+    return this.page.locator(
+      `[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected="${chartType}"]`
+    );
+  }
+
+  // Every tile carrying data-test-selected (there must be exactly one)
+  getSelectedChartTiles() {
+    return this.page.locator(
+      '[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected]'
+    );
+  }
+
+  // The <li> tile for a given chart id (scoped via its inner selected-chart-{id}-item)
+  getChartTile(chartType) {
+    return this.page.locator('[data-test="dashboard-addpanel-chart-selection-item"]', {
+      has: this.page.locator(`[data-test="selected-chart-${chartType}-item"]`),
+    });
+  }
+
+  // Wait for the async selected-state signal (data-test-selected) to be assigned
+  // after the panel editor mounts. addPanel() only waits for the first
+  // selected-chart-* item to appear, not for initializePanel() to set data.type
+  // and stamp data-test-selected on the default tile.
+  async waitForChartSelectionHighlight() {
+    await this.page
+      .locator('[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected]')
+      .first()
+      .waitFor({ state: "visible", timeout: 15000 });
+  }
+
+  // Computed `color-scheme` of the first chart icon — "dark" when the
+  // dark:scheme-dark variant resolves, "light" otherwise.
+  async getChartIconColorScheme() {
+    await this.chartSelectionIcons.first().waitFor({ state: "attached", timeout: 10000 });
+    return await this.chartSelectionIcons.first().evaluate(
+      (el) => getComputedStyle(el).colorScheme
+    );
+  }
+
+  // The PromQL query-type toggle is v-if'd on stream_type == "metrics" —
+  // returns whether it is currently rendered (metrics stream-type selected).
+  async isPromqlToggleVisible() {
+    return await this.promqlQueryTypeBtn
+      .waitFor({ state: "visible", timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  // Switch to PromQL query mode (toggle only renders after a metrics stream-type).
+  async switchToPromqlMode() {
+    await this.promqlQueryTypeBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.promqlQueryTypeBtn.click();
   }
 
   // Sankey builder layout areas

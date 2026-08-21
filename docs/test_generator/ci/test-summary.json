@@ -1,0 +1,7 @@
+[
+  { "title": "should render all 20 chart selection icons with the default (bar) selection", "action": "new", "verifies": "the add-panel chart sidebar renders 20 tiles + 20 icons and the default (bar) tile carries the single selection highlight" },
+  { "title": "should move the single selection highlight to the clicked chart tile", "action": "new", "verifies": "clicking a chart transfers the single highlight to it and de-selects the previous tile" },
+  { "title": "should show the localized tooltip when hovering a chart icon", "action": "new", "verifies": "hovering a chart icon reveals its localized tooltip text" },
+  { "title": "should render the theme-aware icon variant in dark mode", "action": "new", "verifies": "dark mode resolves the dark color-scheme variant on the chart icons" },
+  { "title": "should disable the Sankey chart tile in PromQL mode while other charts remain selectable", "action": "new", "verifies": "PromQL mode disables the Sankey tile (suppressed click) while other chart types stay selectable" }
+]

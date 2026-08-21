@@ -1,0 +1,18 @@
+{
+  "feature_slug": "dashboard-chart-selection",
+  "feature_title": "Dashboard Add-Panel Chart Selection Icons (SVG + Dark Mode)",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-chart-selection.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-chart-selection.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/components/dashboards/addPanel/ChartSelection.vue",
+    "web/src/assets/images/dashboard/charts/"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
