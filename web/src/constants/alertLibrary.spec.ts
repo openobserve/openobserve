@@ -16,7 +16,6 @@
 import { describe, expect, it } from "vitest";
 import {
   ALERT_LIBRARY_MANIFEST_URL,
-  ALERT_LIBRARY_S3_BASE,
   ALERT_LIBRARY_S3_PREFIX,
   SEVERITY_TO_PRIORITY,
   SUPPORTED_MANIFEST_MAJOR,

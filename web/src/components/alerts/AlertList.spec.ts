@@ -439,6 +439,15 @@ describe("AlertList - basic rendering", () => {
     expect(wrapper.find('[data-test="alert-list-page"]').exists()).toBe(true);
   });
 
+  it("titles itself with the SECTION, so the peer tabs never move", async () => {
+    // Identical on all four alerting pages — see TemplateList.spec.ts. Note it
+    // is NOT "Alerts": a per-page title sizes the title block and shifts the
+    // tab strip horizontally on every navigation.
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
+  });
+
   it("renders search input and toggle", async () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);

@@ -19,16 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       v-if="!showDestinationEditor && !showImportDestination"
-      :title="t('alert_destinations.header')"
+      :title="t('alerts.header')"
       title-data-test="alert-destinations-list-title"
-      icon="location-on"
+      icon="shield-alert-outline"
     >
-      <!-- Fixed-width, subtitle-free title so the peer tabs anchor at the same
-           x on all four alerting pages — see AlertList.vue for the rationale. -->
-      <template #title>
-        <span class="inline-block w-60 truncate">{{ t("alert_destinations.header") }}</span>
-      </template>
-      <!-- Peer tabs across the four alerting siblings; the routes stay flat. -->
+      <!-- Section-level title, identical on all four alerting pages, so the
+           peer tabs anchor at the same x — see AlertList.vue for the rationale.
+           Subtitle-free for the same reason. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>

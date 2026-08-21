@@ -61,9 +61,11 @@ describe("Alert List", async () => {
     vi.clearAllMocks();
   });
 
-  it("Should render alerts title", () => {
-    // Title now lives in the standard OPageHeader (row 1).
-    expect(wrapper.find(".app-page-header h1").text()).toBe("Templates");
+  it("titles itself with the SECTION, so the peer tabs never move", () => {
+    // All four alerting pages carry this identical string: the title block
+    // sizes to its content, so a per-page title would shift the tab strip
+    // horizontally on every navigation. The active tab says which page it is.
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
   });
 
   it("Should reder table with templates", () => {

@@ -181,11 +181,11 @@ describe("AlertsDestinationList", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("renders the list title", async () => {
+    it("titles itself with the SECTION, so the peer tabs never move", async () => {
+      // Identical on all four alerting pages — see TemplateList.spec.ts.
       wrapper = mountComponent();
       await flushPromises();
-      const title = wrapper.find(".app-page-header h1");
-      expect(title.exists()).toBe(true);
+      expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
     });
 
     it("renders the table when no editor is open", async () => {

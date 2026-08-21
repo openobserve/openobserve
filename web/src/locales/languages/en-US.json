@@ -7866,6 +7866,7 @@
       "title": "Import Destination",
       "errorValidations": "Error Validations",
       "outputMessages": "Output Messages",
+      "destinationName": "Destination Name",
       "destinationUrl": "Destination URL",
       "destinationMethod": "Destination Method",
       "templates": "Templates",

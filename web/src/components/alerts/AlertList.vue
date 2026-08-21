@@ -24,16 +24,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.header')"
       icon="shield-alert-outline"
     >
-      <!-- Peer tabs across the four alerting siblings. The routes stay flat;
-           this is presentation, not nesting.
-           No subtitle, and a fixed-width title: the title block is shrink-0 and
-           sizes to its content, so a per-page subtitle (or just a longer title)
-           moved the tab strip horizontally on every navigation. Peer tabs must
-           sit at the same x on all four pages or clicking one makes the row
-           jump under the cursor. -->
-      <template #title>
-        <span class="inline-block w-60 truncate">{{ t("alerts.header") }}</span>
-      </template>
+      <!-- The header names the GROUP the four tabs form — "Alerts" — not the
+           page. The same string and the same icon on all four siblings; the
+           active tab is what says which page you are on. It deliberately reads
+           the same as the first tab, which is the price of naming the group
+           after its main page (PipelineSectionTabs makes the same trade).
+
+           That is what keeps the tab strip still. The title block is shrink-0
+           and sizes to its content, so a per-page title moved the strip
+           horizontally on every navigation, and peer tabs that jump under the
+           cursor are worse than no tabs. A constant title fixes it by
+           construction; the previous fix reserved a fixed 15rem box, which
+           bought the same stillness with 196px of dead space.
+
+           For the same reason these four pages carry NO subtitle: a subtitle is
+           usually wider than the title, so it would size the block and move the
+           strip again. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>

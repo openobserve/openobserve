@@ -30,15 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="alert-library-page" class="flex h-full flex-col">
     <OPageLayout
       bleed
-      :title="t('alert_library.header')"
-      icon="menu-book"
+      :title="t('alerts.header')"
+      icon="shield-alert-outline"
       title-data-test="alert-library-title"
     >
-      <!-- Fixed-width, subtitle-free title so the peer tabs anchor at the same
-           x on all four alerting pages — see AlertList.vue for the rationale. -->
-      <template #title>
-        <span class="inline-block w-60 truncate">{{ t("alert_library.header") }}</span>
-      </template>
+      <!-- Section-level title, identical on all four alerting pages, so the
+           peer tabs anchor at the same x — see AlertList.vue for the rationale.
+           Subtitle-free for the same reason. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>

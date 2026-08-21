@@ -153,7 +153,8 @@ describe("AlertLibrary", () => {
 
   it("renders the page header and the sibling section tabs", async () => {
     const wrapper = await mountView();
-    expect(wrapper.find(".app-page-header h1").text()).toBe("Alert Library");
+    // Identical on all four alerting pages — see TemplateList.spec.ts.
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
     expect(wrapper.find('[data-test="alert-section-tabs"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-section-tab-alertLibrary"]').exists()).toBe(true);
   });
