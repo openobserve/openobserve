@@ -21,6 +21,7 @@ use openobserve_core::{
         experiment_ingest::{self, IngestError},
         experiment_results,
         experiments::{self, ExperimentError},
+        remote_tasks,
     },
 };
 
@@ -38,7 +39,7 @@ use crate::{
             ExperimentResponseBody, ExperimentResultPaginationBody, ExperimentResultsResponseBody,
             ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
             ExperimentRowSnapshotBody, ExperimentScoreSummaryBody, ExperimentSlotPageQuery,
-            ExperimentSlotPageResponseBody, ListExperimentsResponseBody,
+            ExperimentSlotPageResponseBody, ExperimentTaskBody, ListExperimentsResponseBody,
             RetryExperimentSlotRequestBody, SubmitExperimentRecordsRequestBody,
             SubmitExperimentRecordsResponseBody,
         },
@@ -187,6 +188,9 @@ async fn derive_scoring_status(
     ))
 }
 
+/// `method` must be the OpenFGA permission the route already resolved to, not
+/// the HTTP method. Lifecycle routes are POST but map to `PUT`, so passing the
+/// HTTP verb here denies a caller the route middleware already let through.
 async fn require_experiment_visibility(
     org_id: &str,
     experiment_id: &str,
@@ -205,6 +209,53 @@ async fn require_experiment_visibility(
         return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
     }
     Ok(())
+}
+
+/// The Remote Task reference is the one place an Experiment reaches outside
+/// itself, so the caller must be able to see the Task it names.
+///
+/// Without this, a caller who knows a hidden `name@version` can make the
+/// platform place that Task's credentialed outbound call and can read its output
+/// back through the Experiment results. The Experiment routes authorize the
+/// Experiment alone, so nothing else covers this.
+async fn require_remote_task_visibility(
+    org_id: &str,
+    user_id: &str,
+    task_ref: &str,
+) -> Result<(), Response> {
+    // The OpenFGA object is the head's `entity_id`, not the `name@version` an
+    // Experiment carries, so the reference has to be resolved first. An
+    // unresolvable reference is answered as a denial rather than a 404, so that
+    // a caller cannot use the difference to probe for hidden Tasks.
+    let task = remote_tasks::resolve_task_ref(org_id, task_ref)
+        .await
+        .map_err(|_| MetaHttpResponse::forbidden("Unauthorized Access"))?;
+    let permitted_objects = openobserve_api_common::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        "GET",
+        "remote_task",
+    )
+    .await
+    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
+    if !is_ofga_object_visible(
+        org_id,
+        "remote_task",
+        &task.entity_id,
+        permitted_objects.as_deref(),
+    ) {
+        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+    }
+    Ok(())
+}
+
+/// The `task_ref` of a Remote Task request, or `None` for the task types that
+/// never leave the platform.
+fn remote_task_ref(task: &ExperimentTaskBody) -> Option<&str> {
+    match task {
+        ExperimentTaskBody::Remote { task_ref, .. } => Some(task_ref.as_str()),
+        _ => None,
+    }
 }
 
 #[utoipa::path(
@@ -227,8 +278,15 @@ async fn require_experiment_visibility(
 pub async fn preview_experiment(
     Path(org_id): Path<String>,
     Query(query): Query<ExperimentPreviewQuery>,
+    Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CreateExperimentRequestBody>,
 ) -> Response {
+    if let Some(task_ref) = remote_task_ref(&body.task)
+        && let Err(response) =
+            require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
+    {
+        return response;
+    }
     match experiments::preview(&org_id, body.into(), query.sample_size).await {
         Ok(preview) => MetaHttpResponse::json(ExperimentPreviewResponseBody::from(preview)),
         Err(error) => experiment_error_response(error),
@@ -255,6 +313,12 @@ pub async fn create_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CreateExperimentRequestBody>,
 ) -> Response {
+    if let Some(task_ref) = remote_task_ref(&body.task)
+        && let Err(response) =
+            require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
+    {
+        return response;
+    }
     // Re-serialized rather than hashed from the raw bytes so two encodings of
     // the same request agree on their canonical hash.
     let canonical_request = match serde_json::to_value(&body) {
@@ -944,7 +1008,7 @@ pub async fn retry_experiment_slot(
     use openobserve_core::llm_evaluations::experiment_runner::ExperimentSlotRetryError;
 
     if let Err(response) =
-        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "POST").await
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
     {
         return response;
     }
@@ -1001,6 +1065,20 @@ pub async fn clone_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CloneExperimentRequestBody>,
 ) -> Response {
+    // A clone copies the source Task config verbatim, so it reaches the same
+    // Remote Task. Checking only at create would leave clone as the way around
+    // that check.
+    match experiments::get(&org_id, &experiment_id).await {
+        Ok(source) => {
+            if let Some((task_ref, _)) = source.task.remote_task()
+                && let Err(response) =
+                    require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
+            {
+                return response;
+            }
+        }
+        Err(error) => return experiment_error_response(error),
+    }
     match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, body.name).await {
         Ok(experiment) => {
             set_ownership(&org_id, "experiments", Authz::new(&experiment.id)).await;
@@ -1093,7 +1171,7 @@ pub async fn submit_experiment_records(
     axum::Json(body): axum::Json<SubmitExperimentRecordsRequestBody>,
 ) -> Response {
     if let Err(response) =
-        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "POST").await
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
     {
         return response;
     }
@@ -1129,7 +1207,7 @@ pub async fn finalize_experiment(
     Headers(user): Headers<UserEmail>,
 ) -> Response {
     if let Err(response) =
-        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "POST").await
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
     {
         return response;
     }
@@ -1217,6 +1295,65 @@ mod tests {
             "acme",
             "experiment-1",
             Some(&forbidden)
+        ));
+    }
+
+    /// The guard that decides whether the Remote Task check runs at all. If this
+    /// ever returned `None` for a Remote Task, `create_experiment` would go back
+    /// to reaching any Task in the org without a permission check, and no other
+    /// test would notice.
+    #[test]
+    fn only_a_remote_task_carries_a_reference_that_needs_checking() {
+        assert_eq!(
+            remote_task_ref(&ExperimentTaskBody::Remote {
+                task_ref: "grader@3".to_string(),
+                overrides: None,
+            }),
+            Some("grader@3")
+        );
+        assert_eq!(
+            remote_task_ref(&ExperimentTaskBody::Sdk {
+                task_fingerprint: "abc".to_string(),
+                config: serde_json::json!({}),
+            }),
+            None
+        );
+        assert_eq!(
+            remote_task_ref(&ExperimentTaskBody::InlinePrompt {
+                messages: vec![],
+                provider_id: "provider-1".to_string(),
+                model: None,
+                params: None,
+            }),
+            None
+        );
+    }
+
+    /// The Remote Task check keys on the head `entity_id`, so it has to accept
+    /// the same grant shapes the Remote Task list already accepts.
+    #[test]
+    fn remote_task_visibility_accepts_exact_or_org_wildcard_and_rejects_other_tasks() {
+        let exact = vec!["remote_task:task-1".to_string()];
+        let wildcard = vec!["remote_task:_all_acme".to_string()];
+        let other = vec!["remote_task:task-2".to_string()];
+
+        assert!(is_ofga_object_visible(
+            "acme",
+            "remote_task",
+            "task-1",
+            Some(&exact)
+        ));
+        assert!(is_ofga_object_visible(
+            "acme",
+            "remote_task",
+            "task-1",
+            Some(&wildcard)
+        ));
+        assert!(!is_ofga_object_visible(
+            "acme",
+            "remote_task",
+            "task-1",
+            Some(&other)
         ));
     }
 
