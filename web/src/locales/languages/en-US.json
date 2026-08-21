@@ -13174,6 +13174,7 @@
     "coverSummary": "{name} covers {team} {range}.",
     "coverSummaryAfter": "Outside that window the rotation resolves as normal.",
     "coverInvalidRange": "The end must be after the start.",
+    "coverWindowPast": "That window has already ended. Pick hours that are still ahead.",
     "coverListTitle": "Covers",
     "coverListHint": "Somebody standing in over a window. A cover wins over every rotation while it lasts.",
     "coverListEmpty": "No covers in this window.",

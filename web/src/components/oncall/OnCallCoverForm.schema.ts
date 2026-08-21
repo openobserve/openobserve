@@ -55,6 +55,15 @@ export const makeOnCallCoverSchema = (t: TranslateFn, now: () => number = () => 
       message: t("oncall.coverInvalidRange"),
       path: ["window"],
     })
+    // A window that has already ended is not a cover: the hours it names are
+    // gone and nothing will ever resolve to it. Worth its own check rather than
+    // being left to the server, because this is the shape the form used to
+    // produce on its own — the picker's default range runs backwards from the
+    // moment the dialog opens, and it saved.
+    .refine((value) => value.window.to > now(), {
+      message: t("oncall.coverWindowPast"),
+      path: ["window"],
+    })
     .refine((value) => value.window.to - value.window.from <= MAX_SPAN_MICROS, {
       message: t("oncall.coverTooLong"),
       path: ["window"],

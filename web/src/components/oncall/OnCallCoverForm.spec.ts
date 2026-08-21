@@ -20,10 +20,17 @@ import { describe, expect, it } from "vitest";
 import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import i18n from "@/locales";
-import { MICROS_PER_DAY, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { UpcomingShift } from "./OnCallCoverForm.vue";
 
-const FROM = 1_700_000_000_000_000;
+/// Tomorrow, not a frozen instant in 2023. Every fixture below is a window
+/// somebody could actually be asked to cover, and a schema that refuses hours
+/// which have already elapsed reads a hardcoded past constant as the defect it
+/// is there to catch.
+const FROM = Date.now() * 1000 + MICROS_PER_DAY;
+
+/// What a hand-pick in the range control puts into the field.
+const PICKED = { from: FROM, to: FROM + MICROS_PER_HOUR };
 
 /**
  * What a stubbed field shares with a real one: it reads its value and **its
@@ -52,7 +59,7 @@ function useStubbedField(name: string) {
         )
         .join(" "),
     ),
-    set: (range: { from: number; to: number }) => form?.setFieldValue(name, range),
+    set: (range: { from: number; to: number } | undefined) => form?.setFieldValue(name, range),
   };
 }
 
@@ -93,14 +100,19 @@ const stubs = {
     },
     template: `<div :data-test-field="name" :data-test-value="value">{{ error }}</div>`,
   },
+  // `data-test-type` is the picker's OWN bookkeeping, and it decides whether
+  // the instants beside it survive: read back as `relative`, the real control
+  // re-resolves the period against the moment it mounts and throws the seeded
+  // window away.
   OFormDateTimeRange: {
     name: "OFormDateTimeRange",
     props: ["name"],
-    template: `<button :data-test-field="name" @click="set({ from: ${FROM}, to: ${FROM} + 3600000000 })">
-      {{ error }}
-    </button>`,
+    template: `<span :data-test-field="name" :data-test-type="value?.type">
+      <button data-test="window-pick" @click="set(PICKED)">{{ error }}</button>
+      <button data-test="window-clear" @click="set(undefined)"></button>
+    </span>`,
     setup(props: { name: string }) {
-      return useStubbedField(props.name);
+      return { ...useStubbedField(props.name), PICKED };
     },
   },
   OButton: {
@@ -462,11 +474,53 @@ describe("OnCallCoverForm — taking a cover", () => {
   /// The failure that made this dialog look broken rather than incomplete: no
   /// request, no message, nothing on screen. An unfilled window must refuse
   /// *visibly*.
+  ///
+  /// Cleared by hand, because the form no longer OPENS empty — it opens on a
+  /// window that has not happened yet.
   it("refuses to save with no window, and says so on the control", async () => {
     const wrapper = renderCover();
+    await wrapper.find('[data-test="window-clear"]').trigger("click");
 
     expect(await save(wrapper)).toBeUndefined();
     expect(wrapper.text()).toContain("Pick when the cover starts and ends");
+  });
+
+  /// The P1 this seed exists for. The control is the log-search relative picker,
+  /// which defaults to the past half hour and emits it ON MOUNT — so a dialog
+  /// nobody touched held a window that had already elapsed, and it saved. The
+  /// window a cover opens on must be one somebody can still be asked to work.
+  it("opens on a window that has not happened yet", async () => {
+    const openedAt = Date.now() * 1000;
+    const saved = await save(renderCover());
+
+    expect(saved!.start_at).toBeGreaterThanOrEqual(openedAt);
+    expect(saved!.end_at).toBeGreaterThan(saved!.start_at);
+  });
+
+  /// Absolute, not relative. A relative window is a period re-resolved against
+  /// whenever the picker is read, so seeding one hands the control a rule that
+  /// walks backwards from now — which is the defect, not a fix for it. It is
+  /// also why a pre-filled gap never survived being opened.
+  it("hands the picker instants rather than a period to re-resolve", async () => {
+    const wrapper = renderCover({ gap: GAP });
+    await flushPromises();
+
+    const field = wrapper.find('[data-test-field="window"]');
+    expect(field.attributes("data-test-type")).toBe("absolute");
+    // And the reader cannot choose one either: there is no forward-looking
+    // reading of "Past 30 Minutes" to offer here.
+    expect(field.attributes("disable-relative")).toBeDefined();
+  });
+
+  /// Measured on a real save: window 15:56 → 16:26, created at 16:27 — expired
+  /// 59 seconds before it was written, and the server took it. A cover over
+  /// hours that are gone resolves for nobody and pages nobody.
+  it("refuses a window that has already ended", async () => {
+    const ended = Date.now() * 1000 - 2 * MICROS_PER_DAY;
+    const wrapper = renderCover({ gap: { from: ended, to: ended + MICROS_PER_HOUR } });
+
+    expect(await save(wrapper)).toBeUndefined();
+    expect(wrapper.text()).toContain("already ended");
   });
 
   it("refuses a window that ends before it starts", async () => {
@@ -490,12 +544,18 @@ describe("OnCallCoverForm — taking a cover", () => {
   /// element whose whole job is "what this will actually do".
   it("summarises the window the reader picked, not the one a preset last set", async () => {
     const wrapper = renderCover();
-    expect(wrapper.find('[data-test="oncall-cover-summary"]').exists()).toBe(false);
+    await flushPromises();
+    // Not "absent then present": the dialog now opens on a window, so what
+    // proves the summary is reading the FIELD is that it follows a hand-pick
+    // away from that opening one.
+    const opening = wrapper.find('[data-test="oncall-cover-summary"]').text();
 
-    await wrapper.find('[data-test-field="window"]').trigger("click");
+    await wrapper.find('[data-test="window-pick"]').trigger("click");
     await flushPromises();
 
-    expect(wrapper.find('[data-test="oncall-cover-summary"]').exists()).toBe(true);
+    const picked = wrapper.find('[data-test="oncall-cover-summary"]').text();
+    expect(picked).not.toBe(opening);
+    expect(await save(wrapper)).toMatchObject({ start_at: PICKED.from, end_at: PICKED.to });
   });
 
   /// Reopening on a different gap must not inherit the last one's window or

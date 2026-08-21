@@ -120,10 +120,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
 
+      <!-- Absolute only. A relative period is a question about the past — the
+           picker resolves "Past 30 Minutes" against the moment it is read —
+           and there is no forward-looking reading of it to offer here. -->
       <OFormDateTimeRange
         name="window"
         :label="t('oncall.coverWhen')"
         required
+        disable-relative
         data-test="oncall-cover-window"
       />
 
@@ -268,6 +272,10 @@ const { t } = useI18nTyped();
 
 const FORM_ID = "oncall-cover-form";
 
+/// How long a cover runs when nobody says otherwise: long enough to be worth
+/// arranging, short enough that accepting it unread cannot hand somebody a week.
+const DEFAULT_COVER_MICROS = 4 * MICROS_PER_HOUR;
+
 /// Which errand this dialog is doing. Declared here rather than beside the swap
 /// helpers below, because the open watcher resets it.
 const mode = ref<"cover" | "swap">("cover");
@@ -327,10 +335,25 @@ const form = useOForm<OnCallCoverFormValues>({
 });
 
 function initialValues(): OnCallCoverFormValues {
+  const now = Date.now() * 1000;
   return {
     user_email: prefilledUser.value,
     rotation_id: props.rotations[0]?.id ?? "",
-    window: props.gap ? { from: props.gap.from, to: props.gap.to } : undefined,
+    // A cover is arranged for hours that have not happened yet, so the window
+    // opens on some. Left undefined, the picker fell back to its log-search
+    // default — the past half hour — and emitted it on mount, so a dialog
+    // nobody touched held a window that had already elapsed by the time Save
+    // was pressed. It saved, and a cover over hours that are gone pages nobody.
+    //
+    // `type` is load-bearing: the picker re-reads a relative type as a period
+    // and re-resolves it against `now`, discarding the instants beside it —
+    // which is why a pre-filled `gap` never survived being opened either.
+    window: {
+      type: "absolute",
+      ...(props.gap
+        ? { from: props.gap.from, to: props.gap.to }
+        : { from: now, to: now + DEFAULT_COVER_MICROS }),
+    },
   };
 }
 
