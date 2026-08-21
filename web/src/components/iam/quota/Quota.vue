@@ -726,13 +726,10 @@ export default defineComponent({
           //here we are getting the role limits for the selected organization
           await getRolesByOrganization();
         }
-        //these are the modules that are displayed in the dropdown
-        //to select the api category that user can use to filter the api limits
-        if (!store.state.modulesToDisplay[selectedOrganization.value.value]) {
-          apiCategories.value = await getModulesToDisplay(selectedOrganization.value.value);
-        } else {
-          apiCategories.value = store.state.modulesToDisplay[selectedOrganization.value.value];
-        }
+        // The module dropdown is loaded by the `selectedOrganization` watcher
+        // below, which the assignment above has already triggered. Loading it
+        // here too raced that watcher — the store guard cannot help, since
+        // neither call has resolved yet — and fetched the list twice.
       }
     });
 
