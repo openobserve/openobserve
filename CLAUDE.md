@@ -49,7 +49,5 @@ Item order inside a file/module, top to bottom (clippy's default grouping):
   restore `Cargo.toml` (never commit the swap). Without access, say so in the PR.
 - A change needing paired PRs in openobserve and o2-enterprise must use the
   SAME branch name in both repos — CI checks out the paired side by branch name.
-- When bumping the tantivy fork, update `[patch.crates-io]` in both workspaces.
-- The collectors in `src/config/src/tantivy/query/` are API mirrors of
-  enterprise fast-path collectors: constructor signatures and Fruit types must
-  stay in sync — no shared trait enforces it.
+- When changing this repo's root `Cargo.toml`, mirror the change into
+  `Cargo.toml.openobserve` in the o2-enterprise repo.
