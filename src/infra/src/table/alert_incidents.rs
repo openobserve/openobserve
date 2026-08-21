@@ -19,7 +19,8 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait, sea_query::LockType,
+    QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, LockType},
 };
 use svix_ksuid::KsuidLike;
 
@@ -664,39 +665,54 @@ pub async fn upgrade_incident_group_values(
 pub async fn auto_resolve_stale(
     stale_threshold_micros: i64,
 ) -> Result<(u64, Vec<(String, String)>), errors::Error> {
+    const PAGE_SIZE: u64 = 500;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
     let cutoff = now - stale_threshold_micros;
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let mut resolved_ids = Vec::new();
+    loop {
+        // make sure only one client is writing to the database(only for sqlite).
+        // Re-acquired per page so a large backlog doesn't monopolize the global
+        // write lock; each pass shrinks the non-resolved candidate set.
+        let _lock = get_lock().await;
 
-    // Find all open/acknowledged incidents with last_alert_at older than threshold
-    let stale_incidents = alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        // Find open/acknowledged incidents with last_alert_at older than threshold
+        let stale_incidents = alert_incidents::Entity::find()
+            .filter(alert_incidents::Column::Status.ne("resolved"))
+            .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+            .limit(PAGE_SIZE)
+            .all(client)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        if stale_incidents.is_empty() {
+            break;
+        }
+        let page_full = stale_incidents.len() as u64 == PAGE_SIZE;
 
-    let count = stale_incidents.len() as u64;
-    let mut resolved_ids = Vec::with_capacity(stale_incidents.len());
+        let page_ids: Vec<String> = stale_incidents.iter().map(|i| i.id.clone()).collect();
+        alert_incidents::Entity::update_many()
+            .col_expr(alert_incidents::Column::Status, Expr::value("resolved"))
+            .col_expr(alert_incidents::Column::ResolvedAt, Expr::value(Some(now)))
+            .col_expr(alert_incidents::Column::UpdatedAt, Expr::value(now))
+            .filter(alert_incidents::Column::Id.is_in(page_ids))
+            .filter(alert_incidents::Column::Status.ne("resolved"))
+            .exec(client)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    for incident in stale_incidents {
-        let org_id = incident.org_id.clone();
-        let incident_id = incident.id.clone();
-        let mut active: alert_incidents::ActiveModel = incident.into();
-        active.status = Set("resolved".to_string());
-        active.resolved_at = Set(Some(now));
-        active.updated_at = Set(now);
-
-        if let Err(e) = active.update(client).await {
-            log::warn!("[incidents] Failed to auto-resolve incident: {}", e);
-        } else {
-            resolved_ids.push((org_id, incident_id));
+        resolved_ids.extend(
+            stale_incidents
+                .into_iter()
+                .map(|incident| (incident.org_id, incident.id)),
+        );
+        if !page_full {
+            break;
         }
     }
 
+    let count = resolved_ids.len() as u64;
     Ok((count, resolved_ids))
 }
 

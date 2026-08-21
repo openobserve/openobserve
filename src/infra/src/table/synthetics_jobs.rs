@@ -549,8 +549,14 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
     now_us: i64,
     max_attempts: i32,
 ) -> Result<Vec<DeadLetteredRow>, errors::Error> {
+    // Bounds one reaper pass so the global write lock below is never held
+    // across an unbounded backlog; the reaper runs periodically and picks up
+    // the remainder on its next tick.
+    const MAX_DEAD_LETTER_BATCH: i64 = 500;
+
     // make sure only one client is writing to the database(only for sqlite).
-    // One lock across the SELECT and the per-row CAS updates — drops at fn end.
+    // One lock across the bounded SELECT and the per-row CAS updates — drops
+    // at fn end.
     let _lock = get_lock().await;
 
     // Step 1: find candidates before marking them dead. `status` comes back so
@@ -560,12 +566,17 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
         FROM synthetics_jobs
         WHERE (status = 1 AND lease_expires_at < $1 AND (dispatch_attempts >= $2 OR valid_until < $1))
            OR (status = 0 AND valid_until < $1)
+        LIMIT $3
     "#;
     let rows = conn
         .query_all(Statement::from_sql_and_values(
             conn.get_database_backend(),
             select_sql,
-            [Value::from(now_us), Value::from(max_attempts)],
+            [
+                Value::from(now_us),
+                Value::from(max_attempts),
+                Value::from(MAX_DEAD_LETTER_BATCH),
+            ],
         ))
         .await?;
 

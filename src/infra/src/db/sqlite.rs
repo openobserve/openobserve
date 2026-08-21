@@ -40,8 +40,14 @@ use crate::{
 };
 
 pub static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
+/// The shared RW pool. sqlx pools are cheap Arc-style handles, so this and the
+/// clone inside [`CLIENT_RW`] are the same underlying pool. Cloning this never
+/// touches the write mutex — `connect_to_orm` must use this so that a task
+/// already holding [`CLIENT_RW`] (via `table::get_lock()`) can lazily
+/// initialize the ORM client without deadlocking on its own guard.
+pub static CLIENT_RW_POOL: Lazy<Pool<Sqlite>> = Lazy::new(connect_rw);
 pub static CLIENT_RW: Lazy<Arc<Mutex<Pool<Sqlite>>>> =
-    Lazy::new(|| Arc::new(Mutex::new(connect_rw())));
+    Lazy::new(|| Arc::new(Mutex::new(CLIENT_RW_POOL.clone())));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
