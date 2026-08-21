@@ -210,11 +210,16 @@ describe("OnCallTeamForm", () => {
         timezone: "UTC",
         rotations: [
           {
+            id: "rot_primary",
             name: "Primary",
-            members: ["ana@o2.ai"],
-            shift_micros: 1,
-            anchor_micros: 1,
-            secondary_slot: "secondary",
+            shift_rules: [
+              {
+                name: "Primary",
+                members: ["ana@o2.ai"],
+                shift_micros: 1,
+                anchor_micros: 1,
+              },
+            ],
             source: "default",
           },
         ],
@@ -233,10 +238,11 @@ describe("OnCallTeamForm", () => {
 
     const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
     expect(rotations[0].source).toBeUndefined();
-    // The declared secondary slot is the backend's, not the form's, and it
-    // survives: dropping it is what left a UI-created team with one slot while
-    // the same team built by curl had two.
-    expect(rotations[0].secondary_slot).toBe("secondary");
+    // The amendment clears what it owns and keeps what it does not: the id is
+    // the backend's, an escalation level stores it, and a form that minted a
+    // fresh one here would silently repoint every level that named this
+    // rotation.
+    expect(rotations[0].id).toBe("rot_primary");
   });
 
   /// A server that staffed nothing, or a read that failed, still gets the one

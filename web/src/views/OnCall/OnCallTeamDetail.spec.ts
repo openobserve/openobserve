@@ -167,7 +167,14 @@ describe("OnCallTeamDetail", () => {
   describe("the coverage chip", () => {
     function onCall(email: string) {
       service.whoIsOnCall.mockResolvedValue({
-        data: [{ slot: "primary", user_email: email, rotation: "Weekdays" }],
+        data: [
+          {
+            rotation_id: "rot_primary",
+            rotation_name: "Weekdays",
+            rule: "Base",
+            user_email: email,
+          },
+        ],
       } as any);
     }
 
@@ -376,7 +383,7 @@ describe("OnCallTeamDetail", () => {
       user_email: "bo@corp.com",
       start_at: 1_000,
       end_at: 2_000,
-      slot: "primary",
+      rotation_id: "rot_primary",
     };
 
     async function save(wrapper: ReturnType<typeof render>) {
