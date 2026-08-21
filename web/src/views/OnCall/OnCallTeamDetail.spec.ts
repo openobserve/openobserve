@@ -802,6 +802,80 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
     }
 
+    /// **This is the rotation detail.** Scoping the tab to one rotation puts its
+    /// calendar, its shift rules and its covers together — which is what "open
+    /// the Secondary" means on a team with three positions — without a second
+    /// screen to navigate to and back from.
+    it("scopes the calendar and the covers to one rotation", async () => {
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: "UTC",
+          rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
+        },
+      } as any);
+
+      const wrapper = render();
+      await flushPromises();
+      await showWeek(wrapper);
+
+      const timeline = () => wrapper.findComponent({ name: "OnCallScheduleTimeline" });
+      expect(timeline().props("rotations")).toHaveLength(2);
+
+      const focus = wrapper.findComponent('[data-test="oncall-schedule-rotation-focus"]');
+      focus.vm.$emit("update:modelValue", "rot_backup");
+      await flushPromises();
+
+      expect(timeline().props("rotations").map((r: any) => r.id)).toEqual(["rot_backup"]);
+      expect(wrapper.findComponent({ name: "OnCallCoverList" }).props("rotationId")).toBe(
+        "rot_backup",
+      );
+    });
+
+    /// One rotation is not a choice, so the control is not offered — a picker
+    /// with a single option teaches a distinction the team does not have.
+    it("offers no rotation filter on a team with one", async () => {
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as any);
+
+      const wrapper = render();
+      await flushPromises();
+      await showWeek(wrapper);
+
+      expect(wrapper.find('[data-test="oncall-schedule-rotation-focus"]').exists()).toBe(false);
+    });
+
+    /// A rotation deleted under the filter would leave the tab scoped to
+    /// nothing, which reads as a team with no schedule at all.
+    it("drops the filter when the rotation it names goes away", async () => {
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: "UTC",
+          rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
+        },
+      } as any);
+
+      const wrapper = render();
+      await flushPromises();
+      await showWeek(wrapper);
+
+      wrapper
+        .findComponent('[data-test="oncall-schedule-rotation-focus"]')
+        .vm.$emit("update:modelValue", "rot_backup");
+      await flushPromises();
+
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as any);
+      wrapper.findComponent({ name: "OnCallScheduleEditor" }).vm.$emit("saved");
+      await flushPromises();
+
+      expect(
+        wrapper.findComponent({ name: "OnCallScheduleTimeline" }).props("rotations"),
+      ).toHaveLength(1);
+      expect(wrapper.findComponent({ name: "OnCallCoverList" }).props("rotationId")).toBe(null);
+    });
+
     /// The endpoint resolves ONE rotation per call, so a team with two needs
     /// two — asking once got primary segments only, and every other rotation
     /// was drawn a lane it could never fill.

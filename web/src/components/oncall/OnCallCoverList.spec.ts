@@ -203,6 +203,25 @@ describe("OnCallCoverList", () => {
     });
   });
 
+  /// A cover replaces the holder of ONE position and leaves the others alone,
+  /// so "which covers apply to this rotation" is a real question — and on a
+  /// team with three of them the unfiltered list answers it by making the
+  /// reader check every chip.
+  it("shows only the covers standing over the rotation it is scoped to", async () => {
+    service.listOverrides.mockResolvedValue({
+      data: [
+        cover({ id: "ov_primary", rotation_id: "rot_primary" }),
+        cover({ id: "ov_secondary", rotation_id: "rot_secondary" }),
+      ],
+    } as any);
+
+    const wrapper = render({ rotationId: "rot_secondary" });
+    await flushPromises();
+
+    const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    expect(rows.map((r) => r.id)).toEqual(["ov_secondary"]);
+  });
+
   /// The chip answers "which rotation is this standing over", which is not a
   /// question a one-rotation team can ask. It shows the rotation's NAME from
   /// its stored id — printing the id would be an identifier nobody can look up.

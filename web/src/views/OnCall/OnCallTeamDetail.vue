@@ -247,12 +247,32 @@
           />
 
           <OContent y class="flex flex-col gap-5">
+            <!-- **The rotation detail, without a second screen.** Scoping this
+                 tab to one rotation puts its calendar, its shift rules and its
+                 covers together — which is what "open the Secondary" means on a
+                 team with three positions. Unscoped it is the team's whole
+                 schedule, which is what it has always been. -->
+            <div
+              v-if="(schedule?.rotations?.length ?? 0) > 1"
+              class="flex flex-wrap items-center gap-2"
+            >
+              <OText variant="label">{{ t("oncall.scheduleShowing") }}</OText>
+              <span class="w-56">
+                <OSelect
+                  v-model="focusedRotationId"
+                  size="sm"
+                  :options="rotationFocusOptions"
+                  data-test="oncall-schedule-rotation-focus"
+                />
+              </span>
+            </div>
+
             <!-- Every act on a rotation arrives here, and every one of them opens
                  the SAME drawer: a rotation is one form, and which button was
                  pressed only decides what it opens on. -->
             <OnCallScheduleTimeline
               v-model:window="scheduleWindow"
-              :rotations="schedule?.rotations ?? []"
+              :rotations="focusedRotations"
               :segments="segments"
               :timezone="team?.timezone ?? 'UTC'"
               :loading="segmentsLoading"
@@ -277,6 +297,7 @@
               :timezone="team?.timezone ?? 'UTC'"
               :window="scheduleWindow"
               :rotations="teamRotations"
+              :rotation-id="focusedRotationId || null"
               @changed="fetchSegments"
             />
 
@@ -417,6 +438,7 @@ import OnCallTeamPulse from "@/components/oncall/OnCallTeamPulse.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -942,6 +964,34 @@ const SWAPPABLE_SHIFTS = 8;
 /// "which slots does this team staff" asks this instead — a slot could exist
 /// because something derived it, and a rotation cannot.
 const teamRotations = computed(() => schedule.value?.rotations ?? []);
+
+/// Which rotation the schedule tab is scoped to, or `""` for all of them.
+///
+/// This IS the rotation detail: one rotation's calendar, its shift rules and
+/// its covers, without a second screen to navigate to and back from.
+const focusedRotationId = ref("");
+
+/// Cleared whenever the schedule changes, so a rotation deleted under the
+/// filter cannot leave the tab scoped to nothing and reading as an empty team.
+watch(teamRotations, (rotations) => {
+  if (focusedRotationId.value && !rotations.some((r) => r.id === focusedRotationId.value)) {
+    focusedRotationId.value = "";
+  }
+});
+
+const rotationFocusOptions = computed(() => [
+  { label: t("oncall.scheduleShowingAll"), value: "" },
+  ...teamRotations.value.map((rotation) => ({ label: raw(rotation.name), value: rotation.id })),
+]);
+
+/// The lanes the timeline draws. Scoped to one rotation, that lane is the
+/// rotation's own calendar; the segments are already fetched per rotation, so
+/// nothing extra is asked for.
+const focusedRotations = computed(() =>
+  focusedRotationId.value
+    ? teamRotations.value.filter((rotation) => rotation.id === focusedRotationId.value)
+    : teamRotations.value,
+);
 
 /// The weeks a swap can trade, one run per rotation.
 ///

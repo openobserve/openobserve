@@ -150,8 +150,17 @@ const props = withDefaults(
      * a choice — and so an id can be shown as the name somebody recognises.
      */
     rotations?: Rotation[];
+    /**
+     * Show only the covers standing over ONE rotation, by id.
+     *
+     * A cover replaces the holder of one position and leaves the others alone,
+     * so "which covers apply to this rotation" is a real question — and on a
+     * team with three of them the unfiltered list answers it by making the
+     * reader check every chip.
+     */
+    rotationId?: string | null;
   }>(),
-  { timezone: "UTC", window: null, rotations: () => [] },
+  { timezone: "UTC", window: null, rotations: () => [], rotationId: null },
 );
 
 const emit = defineEmits<{ changed: [] }>();
@@ -228,7 +237,13 @@ async function fetchCovers() {
       team_id: props.teamId,
       ...(props.window ? { from: props.window.from, to: props.window.to } : {}),
     });
-    covers.value = [...(res.data ?? [])].sort(
+    // Filtered here rather than by the endpoint: `listOverrides` answers for
+    // the whole team, and asking per rotation would be N requests to narrow a
+    // list already in hand.
+    const all = props.rotationId
+      ? (res.data ?? []).filter((cover) => cover.rotation_id === props.rotationId)
+      : (res.data ?? []);
+    covers.value = [...all].sort(
       (a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id),
     );
   } catch {
@@ -267,9 +282,11 @@ async function removeCover() {
   }
 }
 
-watch(() => [props.teamId, props.window?.from, props.window?.to], fetchCovers, {
-  immediate: true,
-});
+watch(
+  () => [props.teamId, props.window?.from, props.window?.to, props.rotationId],
+  fetchCovers,
+  { immediate: true },
+);
 
 defineExpose({ refresh: fetchCovers });
 </script>

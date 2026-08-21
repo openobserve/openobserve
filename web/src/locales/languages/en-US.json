@@ -12841,6 +12841,8 @@
     "addMemberFailed": "Could not add the member",
     "removeMemberFailed": "Could not remove the member",
     "schedule": "Schedule",
+    "scheduleShowing": "Showing",
+    "scheduleShowingAll": "All rotations",
     "scheduleHint": "Each level rotates through its people in order. The handover instant belongs to the incoming person.",
     "rotationOrder": "Handover order",
     "rotationEmpty": "Nobody in this rotation yet.",
