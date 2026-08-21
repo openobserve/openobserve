@@ -113,12 +113,15 @@ describe("identity and scope stay outside the tabs", () => {
    * The window picker, the copy-summary button and refresh stay in the page
    * header's `#actions`, so a window change re-scopes all three tabs. Inside a
    * panel they would appear to scope only the open one.
+   *
+   * Located by the slot NAME rather than the literal `<template #actions>`: the
+   * slot also carries the `hasQuery` gate that hides these three when there is
+   * no query for them to act on.
    */
   it("keeps the window, copy and refresh controls in the page header", () => {
-    const actions = template.slice(
-      template.indexOf("<template #actions>"),
-      template.indexOf("</template>", template.indexOf("<template #actions>")),
-    );
+    const open = template.indexOf("#actions>");
+    expect(open, "the page must have a header actions slot").toBeGreaterThan(-1);
+    const actions = template.slice(open, template.indexOf("</template>", open));
     for (const control of [
       "dbm-detail-date-time",
       "dbm-detail-copy-summary",
@@ -235,12 +238,21 @@ describe("the tab lives in the URL", () => {
   });
 
   /**
-   * `?from=` is the L2 strip's ORIGIN key and `?tab=` is this page's own. They
-   * are different questions and the back target must keep reading `from`.
+   * The ORIGIN key and `?tab=` are different questions, and the back target
+   * must keep reading the origin.
+   *
+   * It reads it through `readDbmQueryDetailOrigin`, never off `route.query.from`
+   * — that name is the absolute window's start bound, and while the two shared
+   * it every window change on this page erased the origin and sent the reader
+   * back to Top queries. Pinned as the ABSENCE of the old spelling, because
+   * that is the regression: see `dbmQueryDetailOriginSurvives.spec.ts`.
    */
-  it("leaves the ?from= origin handling untouched", () => {
+  it("resolves the back target from the origin, not from the window's bound", () => {
     expect(page).toContain("const backTarget = computed(");
-    expect(page).toContain("route.query.from as string");
+    expect(page).toContain("readDbmQueryDetailOrigin(route.query)");
+    expect(page, "`from` is a time bound here, not a tab").not.toContain(
+      "route.query.from as string",
+    );
   });
 
   /**

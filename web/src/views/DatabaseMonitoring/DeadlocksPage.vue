@@ -456,6 +456,7 @@ import {
   formatWhenWithAge,
 } from "@/utils/dbm/format";
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
+import { DBM_ORIGIN_QUERY_KEY } from "@/utils/dbm/queryDetailOrigin";
 import { DBM_STATUS_TONES } from "@/utils/dbm/tones";
 
 const { t } = useI18nTyped();
@@ -1032,8 +1033,10 @@ const onParticipantAction = (id: string, participant: DeadlockParticipant, row: 
           fingerprint: participant.fingerprint,
           system: row.db_system,
           // The back affordance and the tab strip both honor the origin — a
-          // Deadlocks reader must not be handed back to Top queries.
-          from: "deadlocks",
+          // Deadlocks reader must not be handed back to Top queries. Under its
+          // OWN key: spelled `from`, it overwrote the absolute window's start
+          // bound spread in from `route.query` one line above.
+          [DBM_ORIGIN_QUERY_KEY]: "deadlocks",
           // No `tab` param: the query detail page is a single scroll with no
           // tabs and never reads one, so passing it only put a dead key in the
           // URL that a reader would reasonably expect to select something.

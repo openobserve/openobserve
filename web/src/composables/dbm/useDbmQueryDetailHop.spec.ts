@@ -18,6 +18,7 @@ import { computed, ref } from "vue";
 import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
 
 import { takeDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
+import { DBM_ORIGIN_QUERY_KEY } from "@/utils/dbm/queryDetailOrigin";
 import type { DbmRange } from "@/composables/dbm/useDbmScope";
 import type { QueryStatsRow } from "@/services/db_monitoring";
 
@@ -93,15 +94,22 @@ describe("useDbmQueryDetailHop", () => {
   /**
    * The origin is what the detail page's back affordance reads. An activity
    * reader handed back to Top queries lands on a tab they never stood on.
+   *
+   * Under `from_tab`, never `from`: that name is the absolute window's start
+   * bound, written by the scope spread one line above in the same object.
    */
   it("marks the hop with its origin, and omits the marker when there is none", () => {
     const { openDbmQueryDetail } = setup();
     openDbmQueryDetail({ target: { fingerprint: "abc123" }, from: "activity" });
-    expect(push.mock.calls[0]?.[0]).toMatchObject({ query: { from: "activity" } });
+    expect(push.mock.calls[0]?.[0]).toMatchObject({
+      query: { [DBM_ORIGIN_QUERY_KEY]: "activity" },
+    });
 
     push.mockClear();
     openDbmQueryDetail({ target: { fingerprint: "abc123" } });
-    expect(push.mock.calls[0]?.[0]).not.toMatchObject({ query: { from: expect.anything() } });
+    expect(push.mock.calls[0]?.[0]).not.toMatchObject({
+      query: { [DBM_ORIGIN_QUERY_KEY]: expect.anything() },
+    });
   });
 
   /** The whole point of the seed: the detail header paints before any fetch settles. */
