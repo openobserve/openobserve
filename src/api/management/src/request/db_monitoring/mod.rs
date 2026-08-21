@@ -19,8 +19,8 @@
 //! `request/alerts/`, `request/organization/` and every other multi-file feature
 //! in this crate uses:
 //!
-//! - [`handler`] — the 17 axum handlers, each a config guard plus a delegation
-//!   (three are cfg-dual-implemented, so the file holds 20 fn definitions);
+//! - [`handler`] — the 17 axum handlers, each a config guard plus a delegation (three are
+//!   cfg-dual-implemented, so the file holds 20 fn definitions);
 //! - [`service`] — every read: SQL construction, the searches, the merge and envelope math, and the
 //!   authorization gates;
 //! - [`models`] — the 17 `*Query` structs the routes deserialize into.
