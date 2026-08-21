@@ -219,13 +219,17 @@ import type {
   TeamOverview,
   TeamReachability,
 } from "@/ts/interfaces/oncall";
+import { RISK_LEVEL_PAGES_NOBODY, RISK_ROTATIONS_COLLIDE } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { formatInZone } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
     risks?: ConfigRisks | null;
+    /** The team's zone, so a date on a finding is read where the rota is. */
+    timezone?: string;
     /**
      * `GET .../reachability` — the deployment-level half of "can we page".
      *
@@ -255,7 +259,14 @@ const props = withDefaults(
      */
     hasMembers?: boolean | null;
   }>(),
-  { risks: null, reachability: null, overview: null, checkedAt: null, hasMembers: null },
+  {
+    risks: null,
+    timezone: "UTC",
+    reachability: null,
+    overview: null,
+    checkedAt: null,
+    hasMembers: null,
+  },
 );
 
 const emit = defineEmits<{
@@ -281,7 +292,7 @@ const FIX_FOR_KIND: Record<string, { tab: FixTab; cta: I18nKey }> = {
     tab: "policy",
     cta: "oncall.attentionAddFinalRung",
   },
-  slot_pages_nobody: { tab: "policy", cta: "oncall.attentionOpenPolicy" },
+  [RISK_LEVEL_PAGES_NOBODY]: { tab: "policy", cta: "oncall.attentionOpenPolicy" },
   unreachable_on_rung: { tab: "policy", cta: "oncall.attentionOpenPolicy" },
   coverage_gap: { tab: "schedule", cta: "oncall.attentionFillGap" },
   single_member_rotation: { tab: "schedule", cta: "oncall.attentionAddMember" },
@@ -289,7 +300,7 @@ const FIX_FOR_KIND: Record<string, { tab: FixTab; cta: I18nKey }> = {
     tab: "schedule",
     cta: "oncall.openSchedule",
   },
-  slots_can_collide: { tab: "schedule", cta: "oncall.openSchedule" },
+  [RISK_ROTATIONS_COLLIDE]: { tab: "schedule", cta: "oncall.openSchedule" },
   ownership_rule_never_matched: { tab: "ownership", cta: "oncall.attentionOpenRouting" },
 };
 
@@ -385,13 +396,33 @@ function evidenceFor(risk: ConfigRisk): I18nText[] {
   const reachedFinal = props.overview?.stats?.reached_final_rung ?? 0;
 
   switch (risk.kind) {
-    case "coverage_gap": {
-      // Only while it is still ahead: a gap that has opened is described by the
-      // schedule itself, and a countdown that has passed reads as stale.
+    // Both carry `at`, and both are only worth a countdown while it is still
+    // ahead: something that has already happened is described by the schedule
+    // itself, and a countdown that has passed reads as stale.
+    case "coverage_gap":
+    case RISK_ROTATIONS_COLLIDE: {
       const at = risk.at;
       if (at) {
         const away = at - nowMicros.value;
-        if (away > 0) out.push(t("oncall.attentionStartsIn", { duration: formatMicrosDuration(away) }));
+        if (away > 0) {
+          out.push(t("oncall.attentionStartsIn", { duration: formatMicrosDuration(away) }));
+          // **The date, not only the distance.** A collision looks up to three
+          // weeks ahead, and "in 3w" is a number somebody has to convert before
+          // they can act on it — a warning about September is only actionable
+          // if it says September.
+          out.push(
+            raw(
+              formatInZone(at, props.timezone, {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+              }),
+            ),
+          );
+        }
+      }
+      if (risk.kind === RISK_ROTATIONS_COLLIDE && risk.user_email) {
+        out.push(raw(risk.user_email));
       }
       break;
     }

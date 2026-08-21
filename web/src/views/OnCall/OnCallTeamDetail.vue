@@ -98,6 +98,7 @@
 
         <OnCallTeamAttention
           :risks="configRisks"
+          :timezone="team?.timezone ?? 'UTC'"
           :reachability="reachability"
           :overview="overview"
           :checked-at="insightsCheckedAt"

@@ -95,6 +95,7 @@ function render(
     overview?: TeamOverview;
     checkedAt?: number;
     hasMembers?: boolean | null;
+    timezone?: string;
   } = {},
 ) {
   return mount(OnCallTeamAttention, {
@@ -221,6 +222,10 @@ describe("OnCallTeamAttention", () => {
     ["coverage_gap", "schedule"],
     ["single_member_rotation", "schedule"],
     ["ownership_rule_never_matched", "ownership"],
+    // Renamed with the rotation rework. A hardcoded `slot_pages_nobody` here
+    // routed nothing, because the engine stopped emitting that string.
+    ["level_names_a_rotation_that_does_not_exist", "policy"],
+    ["two_rotations_resolve_to_one_person", "schedule"],
   ])("sends %s to the %s tab", async (kind, tab) => {
     const wrapper = await open(render(risks([risk({ kind })])));
     await wrapper.find(`[data-test="oncall-attention-cta-${kind}"]`).trigger("click");
@@ -349,6 +354,36 @@ describe("OnCallTeamAttention", () => {
       render(risks([risk({ kind: "coverage_gap", severity: "medium", at: 1 })])),
     );
     expect(past.find('[data-test="oncall-attention-evidence-coverage_gap"]').exists()).toBe(false);
+  });
+
+  /// **A collision looks up to three weeks ahead**, and "in 3w" is a number
+  /// somebody has to convert before they can act on it. A warning about
+  /// something happening in September is only actionable if it says September.
+  it("dates a rotation collision rather than only counting down to it", async () => {
+    const at = Date.UTC(2026, 8, 10, 9, 0) * 1000;
+    const wrapper = await open(
+      render(
+        risks([
+          risk({
+            kind: "two_rotations_resolve_to_one_person",
+            severity: "medium",
+            message: "`Primary` and `Secondary` both put bhargav@openobserve.ai on call",
+            user_email: "bhargav@openobserve.ai",
+            at,
+          }),
+        ]),
+        { timezone: "UTC" },
+      ),
+    );
+
+    const evidence = wrapper.find(
+      '[data-test="oncall-attention-evidence-two_rotations_resolve_to_one_person"]',
+    );
+    expect(evidence.text()).toContain("Sep");
+    expect(evidence.text()).toContain("10");
+    // And who it lands on: the whole finding is that ONE person holds two
+    // positions, so naming them is the finding rather than decoration.
+    expect(evidence.text()).toContain("bhargav@openobserve.ai");
   });
 
   /// The server truncates its own list but reports the true total, so a count
