@@ -153,6 +153,12 @@ pub async fn ingest(
                 }
             },
         };
+        // keep the `__name__` column equal to the stream the record is written to;
+        // otherwise `{__name__="..."}` selectors can never match the rows (same
+        // policy as the OTLP writer)
+        if let Some(v) = record.get_mut(NAME_LABEL) {
+            *v = json::Value::String(stream_name.clone());
+        }
 
         // check stream if it is deleting
         let is_deleting = match stream_delete_status.get(&stream_name) {
