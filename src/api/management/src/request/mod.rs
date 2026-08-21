@@ -30,8 +30,8 @@ pub mod authz;
 #[cfg(feature = "cloud")]
 pub mod cloud;
 pub mod dashboards;
-pub mod datasets;
 #[cfg(feature = "enterprise")]
+pub mod datasets;
 pub mod db_monitoring;
 #[cfg(feature = "enterprise")]
 pub mod discovery;
