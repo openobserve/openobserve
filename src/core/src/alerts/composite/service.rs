@@ -21,6 +21,7 @@ use infra::{
     table::{
         alert_composites,
         entity::{alert_composite_children, alert_composites as composite_entity},
+        get_lock,
     },
 };
 #[cfg(feature = "enterprise")]
@@ -151,6 +152,8 @@ pub async fn set_composite_enabled(
     }
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     let result = composite_entity::Entity::update_many()
         .col_expr(composite_entity::Column::Enabled, Expr::value(enabled))
         .col_expr(
@@ -161,6 +164,8 @@ pub async fn set_composite_enabled(
         .filter(composite_entity::Column::Id.eq(id))
         .exec(db)
         .await?;
+    // released before the scheduler follow-ups below, which take this lock themselves
+    drop(_lock);
     if result.rows_affected != 1 {
         return Err(CompositeServiceError::NotFound);
     }
@@ -242,6 +247,8 @@ pub async fn move_composite(
     {
         return Err(CompositeServiceError::PermissionDenied);
     }
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
     let result = composite_entity::Entity::update_many()
         .col_expr(composite_entity::Column::FolderId, Expr::value(folder_id))
         .col_expr(composite_entity::Column::LastEditedBy, Expr::value(editor))
@@ -257,6 +264,8 @@ pub async fn move_composite(
         .filter(composite_entity::Column::Id.eq(id))
         .exec(db)
         .await?;
+    // released before the OpenFGA relation rewrites below
+    drop(_lock);
     #[cfg(feature = "enterprise")]
     if get_openfga_config().enabled {
         set_parent_relation(

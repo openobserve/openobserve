@@ -50,8 +50,10 @@ pub async fn connect_to_orm() -> DatabaseConnection {
             SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
         }
         _ => {
-            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
+            // clone the pool handle directly, NOT through the CLIENT_RW mutex:
+            // callers may lazily initialize ORM_CLIENT while already holding
+            // `table::get_lock()`, and locking here again would self-deadlock
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW_POOL.clone())
         }
     }
 }
@@ -64,8 +66,7 @@ pub async fn connect_to_orm_ddl() -> DatabaseConnection {
         }
         _ => {
             // for sqlite, there is no separate ddl client, use the common one
-            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW_POOL.clone())
         }
     }
 }
@@ -451,5 +452,17 @@ mod tests {
         db.put("/foo/del/bar3", hello, false, None).await.unwrap();
         assert_eq!(db.list_keys("/foo/del/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/del/").await.unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn connect_to_orm_never_takes_the_sqlite_write_mutex() {
+        // Regression: a task may lazily initialize ORM_CLIENT while already
+        // holding table::get_lock() (the CLIENT_RW mutex). connect_to_orm must
+        // clone the pool handle without locking CLIENT_RW itself, or the first
+        // cold-start write from any entry point self-deadlocks forever.
+        let _guard = sqlite::CLIENT_RW.lock().await;
+        tokio::time::timeout(std::time::Duration::from_secs(5), connect_to_orm())
+            .await
+            .expect("connect_to_orm deadlocked on the held CLIENT_RW mutex");
     }
 }

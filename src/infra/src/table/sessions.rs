@@ -15,7 +15,10 @@
 
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, sea_query::OnConflict};
 
-use super::entity::sessions::{ActiveModel, Column, Entity, Model};
+use super::{
+    entity::sessions::{ActiveModel, Column, Entity, Model},
+    get_lock,
+};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
@@ -43,6 +46,9 @@ pub async fn set_with_expiry(
     access_token: &str,
     expires_at: i64,
 ) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
@@ -75,6 +81,9 @@ pub async fn set_with_expiry(
 
 /// Deletes a session by session_id
 pub async fn delete(session_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
         .filter(Column::SessionId.eq(session_id))
@@ -93,6 +102,9 @@ pub async fn list() -> Result<Vec<Model>, errors::Error> {
 /// Deletes all expired sessions from the database
 /// This is more efficient than deleting one at a time
 pub async fn delete_expired() -> Result<u64, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp();
 
