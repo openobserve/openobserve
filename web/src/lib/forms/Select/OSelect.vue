@@ -1547,8 +1547,13 @@ const fieldWidthClass = computed(() => {
                           >
                             <div class="flex w-full flex-col gap-1 overflow-hidden">
                               <span class="flex w-full items-center gap-1.5 leading-snug">
+                                <!-- The weight is what separates a label from the
+                                     sub-label under it. With no sub-label there is
+                                     nothing to separate from, and every option in
+                                     the list reading bold emphasises nothing. -->
                                 <span
-                                  class="truncate font-medium"
+                                  class="truncate"
+                                  :class="filteredOptions[vRow.index].subLabel ? 'font-medium' : ''"
                                   :title="
                                     optionTooltip ? filteredOptions[vRow.index].label : undefined
                                   "
