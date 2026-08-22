@@ -59,6 +59,13 @@ pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
+/// Opaque per-build fingerprint for the unauthenticated `/config` bootstrap:
+/// the UI detects a redeploy by comparing it, without the endpoint disclosing
+/// the version or commit hash. Derived from the commit alone — BUILD_DATE
+/// would differ between rebuilds of the same commit (per-arch images,
+/// staggered fleet builds) and make mixed same-commit fleets flap the UI's
+/// stale-build prompt.
+pub static BUILD_ID: Lazy<String> = Lazy::new(|| digest(COMMIT_HASH)[..16].to_string());
 
 pub const META_ORG_ID: &str = "_meta";
 pub const DEFAULT_ORG: &str = "default";
@@ -4443,6 +4450,18 @@ mod tests {
     #[test]
     fn every_env_config_default_parses() {
         let _ = super::Config::init().expect("a default failed to parse");
+    }
+
+    /// BUILD_ID is served on the UNAUTHENTICATED /config bootstrap so the UI can
+    /// detect a redeploy; it must change per build without echoing the version
+    /// or commit hash that endpoint exists to hide.
+    #[test]
+    fn build_id_is_an_opaque_hex_fingerprint() {
+        let id = super::BUILD_ID.as_str();
+        assert_eq!(id.len(), 16);
+        assert!(id.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(!super::COMMIT_HASH.starts_with(id));
+        assert!(!super::VERSION.contains(id));
     }
 
     use super::*;

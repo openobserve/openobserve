@@ -387,4 +387,28 @@ describe("Config Service", () => {
       expect(mockHttp.get).toHaveBeenNthCalledWith(3, "/config");
     });
   });
+
+  describe("get_config_full", () => {
+    it("should get the authenticated full configuration for the org", async () => {
+      await zo_config.get_config_full("my-org");
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/my-org/config");
+    });
+
+    it("should return the full configuration data", async () => {
+      const fullConfig = { data: { version: "v1.0.0", sql_reserved_keywords: ["from"] } };
+      mockHttp.get.mockResolvedValue(fullConfig);
+
+      const result = await zo_config.get_config_full("default");
+
+      expect(result).toEqual(fullConfig);
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/default/config");
+    });
+
+    it("should propagate errors", async () => {
+      mockHttp.get.mockRejectedValue(new Error("unauthorized"));
+
+      await expect(zo_config.get_config_full("default")).rejects.toThrow("unauthorized");
+    });
+  });
 });

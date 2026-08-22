@@ -57,9 +57,13 @@ reoInit();
 
 // app.use(SearchPlugin);
 
+// Unauthenticated bootstrap payload: only what the login page needs. The full
+// configuration is fetched authenticated (per org) once the user is signed in.
 interface ConfigResponse {
   data?: {
     telemetry_enabled?: boolean;
+    build_id?: string;
+    build_type?: string;
     commit_hash?: string;
     rum?: {
       enabled: boolean;
@@ -80,12 +84,18 @@ const getConfig = async () => {
   await configService.get_config().then((res: ConfigResponse) => {
     if (!res.data) return;
 
-    store.dispatch("setConfig", res.data);
+    // Never clobber the authenticated full config with the bootstrap subset if
+    // the full fetch (MainLayout) happens to resolve first.
+    if (!store.state.zoConfig?.version) {
+      store.dispatch("setConfig", res.data);
+    }
     config.enableAnalytics = res.data.telemetry_enabled?.toString() ?? "false";
 
-    // Store initial commit hash for version checking
-    if (res.data.commit_hash) {
-      buildVersionChecker.setInitialVersion(res.data.commit_hash);
+    // Store the opaque build fingerprint for stale-build detection.
+    // commit_hash fallback covers a not-yet-upgraded backend mid rolling deploy.
+    const buildFingerprint = res.data.build_id ?? res.data.commit_hash;
+    if (buildFingerprint) {
+      buildVersionChecker.setInitialVersion(buildFingerprint);
     }
     if (res.data.rum?.enabled) {
       const options = {
