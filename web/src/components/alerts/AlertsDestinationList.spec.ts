@@ -388,6 +388,26 @@ describe("AlertsDestinationList", () => {
       );
     });
 
+    it("drops the deleted row in place, without refetching the list", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const before = [...(wrapper.vm as any).destinations];
+      const dest = before[0];
+      (destinationService.list as any).mockClear();
+
+      (wrapper.vm as any).confirmDelete.data = dest;
+      (wrapper.vm as any).deleteDestination();
+      await flushPromises();
+
+      // A refetch would blank the table behind its spinner and a loading toast
+      // for a row the server has already confirmed gone.
+      expect(destinationService.list).not.toHaveBeenCalled();
+      const after = (wrapper.vm as any).destinations;
+      expect(after).toHaveLength(before.length - 1);
+      expect(after.map((d: any) => d.name)).not.toContain(dest.name);
+    });
+
     it("resets confirmDelete on cancelDeleteDestination()", async () => {
       wrapper = mountComponent();
       await flushPromises();

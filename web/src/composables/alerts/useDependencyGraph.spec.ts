@@ -18,6 +18,7 @@ import {
   useDependencyGraph,
   buildFocusChain,
   focusSummary,
+  removeNodeFromGraph,
   depKindIcon,
   depKindColor,
 } from "@/composables/alerts/useDependencyGraph";
@@ -238,5 +239,77 @@ describe("dependency kind helpers", () => {
     expect(depKindColor({ kind: "template", orphan: false, missing: false })).toBe(
       "text-text-secondary",
     );
+  });
+});
+
+describe("useDependencyGraph.removeNodeFromGraph", () => {
+  const graph = () =>
+    buildGraph(
+      [
+        { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
+        { alert_id: "a2", name: "mem", destinations: ["slack"], enabled: true },
+      ],
+      [{ name: "slack", type: "http", template: "tpl" }],
+      [{ name: "tpl", type: "http" }],
+    );
+
+  it("drops a deleted alert and the usage it contributed", () => {
+    const next = removeNodeFromGraph(graph(), "alert:a1");
+
+    expect(next.nodes.find((n) => n.id === "alert:a1")).toBeUndefined();
+    expect(next.edges.some((e) => e.target === "alert:a1")).toBe(false);
+    expect(byName(next.nodes, "slack", "destination").usageCount).toBe(1);
+    expect(next.stats.alerts).toBe(1);
+  });
+
+  it("turns a destination its last alert leaves into an orphan", () => {
+    let next = removeNodeFromGraph(graph(), "alert:a1");
+    next = removeNodeFromGraph(next, "alert:a2");
+
+    const slack = byName(next.nodes, "slack", "destination");
+    expect(slack.usageCount).toBe(0);
+    expect(slack.orphan).toBe(true);
+    expect(next.stats.orphanDestinations).toBe(1);
+  });
+
+  it("keeps a deleted destination alerts still name, as a dangling reference", () => {
+    const next = removeNodeFromGraph(graph(), "destination:slack");
+
+    const slack = byName(next.nodes, "slack", "destination");
+    expect(slack.missing).toBe(true);
+    expect(slack.usageCount).toBe(2);
+    expect(next.stats.destinations).toBe(0);
+    expect(next.stats.danglingReferences).toBe(1);
+    // The template edge died with the destination row that declared it.
+    expect(byName(next.nodes, "tpl", "template").usageCount).toBe(0);
+  });
+
+  it("keeps a deleted template its destination still names", () => {
+    const next = removeNodeFromGraph(graph(), "template:tpl");
+
+    const tpl = byName(next.nodes, "tpl", "template");
+    expect(tpl.missing).toBe(true);
+    expect(tpl.orphan).toBe(false);
+    expect(next.stats.templates).toBe(0);
+    expect(next.stats.danglingReferences).toBe(1);
+  });
+
+  it("takes a dangling reference with the last alert that named it", () => {
+    const withGhost = buildGraph(
+      [{ alert_id: "a1", name: "cpu", destinations: ["ghost"], enabled: true }],
+      [],
+      [],
+    );
+    expect(withGhost.stats.danglingReferences).toBe(1);
+
+    const next = removeNodeFromGraph(withGhost, "alert:a1");
+
+    expect(next.nodes).toEqual([]);
+    expect(next.stats.danglingReferences).toBe(0);
+  });
+
+  it("leaves the graph alone when the node is already gone", () => {
+    const before = graph();
+    expect(removeNodeFromGraph(before, "alert:nope")).toBe(before);
   });
 });

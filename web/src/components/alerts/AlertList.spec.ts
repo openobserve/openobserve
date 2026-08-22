@@ -682,12 +682,22 @@ describe("AlertList - row actions", () => {
     await wrapper.vm.showDeleteDialogFn({ row });
     expect(wrapper.vm.confirmDelete).toBe(true);
 
+    (alertsSvc.listByFolderId as any).mockClear();
     await wrapper.vm.deleteAlertByAlertId();
     await flushPromises();
 
     expect(
       wrapper.vm.filteredResults.find((r: any) => r.alert_id === row.alert_id),
     ).toBeUndefined();
+    // No refetch: reloading the folder would blank the table behind its skeleton
+    // and a loading toast for a row the server already confirmed gone.
+    expect(alertsSvc.listByFolderId).not.toHaveBeenCalled();
+    // The store cache backs a folder revisit, so the row must leave it too or it
+    // reappears the moment the user navigates away and back.
+    const cached = store.state.organizationData.allAlertsListByFolderId[wrapper.vm.activeFolderId];
+    if (Array.isArray(cached)) {
+      expect(cached.find((r: any) => r.alert_id === row.alert_id)).toBeUndefined();
+    }
   });
 
   it("edit action navigates to update route (sets query action=update)", async () => {

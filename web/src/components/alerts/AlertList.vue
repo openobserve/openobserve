@@ -2439,6 +2439,40 @@ export default defineComponent({
         page: "Add Alert",
       });
     };
+    // A delete is one row leaving a list the server has already confirmed. Splice
+    // it out — of the rows, the filtered view, the selection AND the per-folder
+    // cache a folder revisit is served from — instead of refetching every alert in
+    // the folder behind a loading toast and the table's skeleton, which reads as a
+    // page reload and takes the user's scroll and page with it.
+    const dropAlerts = (alertIds: any[]) => {
+      const gone = new Set(alertIds.filter(Boolean).map((id: any) => String(id)));
+      if (!gone.size) return;
+
+      const keep = (row: any) => !gone.has(String(row?.alert_id));
+      allAlerts.value = allAlerts.value.filter(keep);
+      filteredResults.value = filteredResults.value.filter(keep);
+      // Anything that failed to delete stays selected, so a bulk retry is one click.
+      selectedAlertIds.value = selectedAlertIds.value.filter((id: string) => !gone.has(String(id)));
+
+      // Without this the row returns the moment the user leaves the folder and
+      // comes back — that path reads the store, never the API. EVERY cached
+      // folder, not just the active one: a cross-folder search deletes alerts
+      // that live elsewhere, and that folder's own cache still holds them.
+      const byFolder = store.state.organizationData.allAlertsListByFolderId;
+      if (byFolder && typeof byFolder === "object") {
+        const pruned = Object.fromEntries(
+          Object.entries(byFolder).map(([folderId, rows]) => [
+            folderId,
+            Array.isArray(rows) ? rows.filter(keep) : rows,
+          ]),
+        );
+        store.dispatch("setAllAlertsListByFolderId", pruned);
+      }
+
+      // The alert is gone from every destination and template that referenced it.
+      invalidateDependencyGraphCache();
+    };
+
     const deleteAlertByAlertId = () => {
       alertsService
         .delete_by_alert_id(
@@ -2452,10 +2486,7 @@ export default defineComponent({
               variant: "success",
               message: res.data.message,
             });
-            await getAlertsFn(store, activeFolderId.value);
-            if (filterQuery.value) {
-              filterAlertsByQuery(filterQuery.value);
-            }
+            dropAlerts([selectedDelete.value.alert_id]);
           } else {
             toast({
               variant: "error",
@@ -3199,12 +3230,19 @@ export default defineComponent({
           });
         }
 
-        selectedAlerts.value = [];
-        // Refresh alerts
-        await getAlertsFn(store, activeFolderId.value);
-
-        if (filterQuery.value) {
-          filterAlertsByQuery(filterQuery.value);
+        // `successful` carries the ids the server actually deleted; the shape has
+        // varied, so accept a bare id or an object carrying one. An unrecognised
+        // shape is NOT taken as "all of them" — splicing rows the server may have
+        // kept would show a delete that never happened; refetch and let the
+        // server say.
+        if (Array.isArray(response.data?.successful)) {
+          dropAlerts(
+            response.data.successful.map((entry: any) => entry?.alert_id ?? entry?.id ?? entry),
+          );
+        } else {
+          selectedAlerts.value = [];
+          await getAlertsFn(store, activeFolderId.value);
+          if (filterQuery.value) filterAlertsByQuery(filterQuery.value);
         }
       } catch (error: any) {
         dismiss();
