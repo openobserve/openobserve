@@ -15,18 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  LibraryDrawer — one library alert in full, and the decision to install it.
+  LibraryDrawer — one library alert in full: what it detects, and the query it
+  would run.
 
   Opening it is the second (and only other) GET the library makes: the gallery
-  renders entirely from the manifest, and the query, the trigger and the row
-  template arrive with the file.
+  renders entirely from the manifest, and the query arrives with the file.
 
-  Two things it deliberately does NOT do. It never rewrites query text — the
-  library stores exports of real alerts, so a threshold living inside a
-  `HAVING` is shown locked and handed to "Customize in editor" rather than
-  edited through a form field (settled decision 2). And it does not install:
-  that is the wizard's job, so the primary button announces the intent and
-  Phase 4 answers it.
+  It never rewrites query text. The library stores exports of real alerts, so
+  the query is shown exactly as published and handed to "Customize in editor"
+  for any change (settled decision 2).
 -->
 <template>
   <ODrawer
@@ -54,14 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-library-drawer-query-type"
         />
         <OTag
-          :variant="ready ? 'success-soft' : 'default-soft'"
+          :variant="availability.variant"
           size="xs"
-          :icon="ready ? 'check-circle' : 'sensors-off'"
-          :label="
-            ready
-              ? t('alert_library.drawer.dataAvailable')
-              : t('alert_library.drawer.streamNotFound')
-          "
+          :icon="availability.icon"
+          :label="availability.label"
           data-test="alert-library-drawer-availability"
         />
       </div>
@@ -78,11 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Stated before the query, not after: an alert that cannot fire is the
            first thing worth knowing about it. -->
       <OBanner
-        v-if="!ready"
+        v-if="availability.callout"
         variant="warning"
         icon="sensors-off"
         dense
-        :content="t('alert_library.drawer.needsDataCallout', { stream: entry.stream })"
+        :content="availability.callout"
         data-test="alert-library-drawer-needs-data"
       />
 
@@ -113,12 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="code" size="xs" />
             <span>{{ t("alert_library.drawer.query") }}</span>
           </h3>
-          <OCodeBlock
-            :code="queryText"
-            :lang="codeLang"
-            wrap
-            :max-lines="14"
-            :copy-message="t('alert_library.drawer.queryCopied')"
+          <AlertQueryPreview
+            :query="queryText"
+            :language="codeLang"
             data-test="alert-library-drawer-query"
           />
 
@@ -132,164 +122,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <dt class="text-text-secondary">{{ t("alert_library.drawer.streamType") }}</dt>
             <dd class="text-text-body font-mono">{{ streamType }}</dd>
 
-            <dt class="text-text-secondary">{{ t("alert_library.drawer.condition") }}</dt>
-            <dd class="text-text-body font-mono" data-test="alert-library-drawer-condition">
-              {{ conditionText }}
-            </dd>
-
-            <dt class="text-text-secondary">{{ t("alert_library.drawer.libraryId") }}</dt>
-            <dd class="text-text-body font-mono break-all" data-test="alert-library-drawer-id">
-              {{ entry.id }}
-            </dd>
-
-            <dt class="text-text-secondary">{{ t("alert_library.drawer.contentHash") }}</dt>
-            <dd class="text-text-body font-mono break-all" data-test="alert-library-drawer-hash">
-              {{ entry.content_hash }}
-            </dd>
-
-            <dt class="text-text-secondary">{{ t("alert_library.drawer.installsAs") }}</dt>
-            <dd class="text-text-body" data-test="alert-library-drawer-priority">
-              {{ priorityText }}
-              <span class="text-text-secondary text-2xs block">
-                {{ t("alert_library.drawer.installsAsHint") }}
-              </span>
+            <dt class="text-text-secondary">{{ thresholdLabel }}</dt>
+            <dd class="text-text-body font-mono" data-test="alert-library-drawer-threshold">
+              {{ thresholdText }}
             </dd>
           </dl>
-        </section>
-
-        <section data-test="alert-library-drawer-tunables">
-          <h3
-            class="text-text-secondary text-2xs flex items-center gap-1.5 pb-1 font-semibold uppercase"
-          >
-            <OIcon name="tune" size="xs" />
-            <span>{{ t("alert_library.drawer.tunables") }}</span>
-          </h3>
-          <p class="text-text-secondary pb-3 text-xs">
-            {{ t("alert_library.drawer.tunablesHint") }}
-          </p>
-
-          <!-- PromQL alerts carry the real threshold in a field BESIDE the query,
-               which is why 69 of 87 alerts are fully tunable without touching text. -->
-          <div v-if="hasPromqlCondition" class="pb-3">
-            <p class="text-text-body pb-1 text-xs font-medium">
-              {{ t("alert_library.drawer.metricCondition") }}
-            </p>
-            <p class="text-text-secondary pb-2 text-xs">
-              {{ t("alert_library.drawer.metricConditionHint") }}
-            </p>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <OSelect
-                :model-value="tunables.promqlOperator ?? '>='"
-                :options="operatorOptions"
-                size="sm"
-                :label="t('alert_library.drawer.operator')"
-                data-test="alert-library-drawer-promql-operator"
-                @update:model-value="setOperator($event)"
-              />
-              <OInput
-                type="number"
-                size="sm"
-                :model-value="tunables.promqlValue ?? 0"
-                :label="t('alert_library.drawer.threshold')"
-                data-test="alert-library-drawer-promql-value"
-                @update:model-value="setTunable('promqlValue', $event)"
-              />
-            </div>
-          </div>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            <!-- Series/row COUNT, not a magnitude — "how many matched", where
-                 Metric condition above is "how much". Hidden when the alert has
-                 a structured metric condition: every PromQL alert in the library
-                 pins this at 1, so it was an editable field with one sensible
-                 value sitting directly under the threshold people actually came
-                 to change, sharing its label and reading as a contradiction.
-                 SQL alerts have no metric condition, so there it is the only
-                 threshold and stays. -->
-            <OInput
-              v-if="showMatchCount"
-              type="number"
-              size="sm"
-              :model-value="tunables.threshold"
-              :label="t('alert_library.drawer.matchCount')"
-              :help-text="thresholdHint"
-              data-test="alert-library-drawer-threshold"
-              @update:model-value="setTunable('threshold', $event)"
-            />
-            <OInput
-              type="number"
-              size="sm"
-              :model-value="tunables.period"
-              :label="t('alert_library.drawer.period')"
-              :suffix="minutesSuffix"
-              :help-text="t('alert_library.drawer.periodHint')"
-              data-test="alert-library-drawer-period"
-              @update:model-value="setTunable('period', $event)"
-            />
-            <OInput
-              type="number"
-              size="sm"
-              :model-value="tunables.frequency"
-              :label="t('alert_library.drawer.frequency')"
-              :suffix="minutesSuffix"
-              :help-text="t('alert_library.drawer.frequencyHint')"
-              data-test="alert-library-drawer-frequency"
-              @update:model-value="setTunable('frequency', $event)"
-            />
-            <OInput
-              type="number"
-              size="sm"
-              :model-value="tunables.silence"
-              :label="t('alert_library.drawer.silence')"
-              :suffix="minutesSuffix"
-              :help-text="t('alert_library.drawer.silenceHint')"
-              data-test="alert-library-drawer-silence"
-              @update:model-value="setTunable('silence', $event)"
-            />
-          </div>
-
-          <!-- Locked, not hidden: the number is real and the user needs to see it
-               to decide whether the editor is worth opening. -->
-          <div v-if="locked" class="pt-3" data-test="alert-library-drawer-locked">
-            <div class="flex items-center gap-2 pb-1">
-              <span class="text-text-body text-xs font-medium">
-                {{ t("alert_library.drawer.groupThreshold") }}
-              </span>
-              <OTag
-                variant="default-soft"
-                size="xs"
-                icon="lock"
-                :label="t('alert_library.drawer.readOnly')"
-                data-test="alert-library-drawer-locked-tag"
-              />
-            </div>
-            <OCode block data-test="alert-library-drawer-locked-clause">{{ locked.clause }}</OCode>
-            <p class="text-text-secondary pt-1 text-xs">
-              {{ t("alert_library.drawer.groupThresholdHint") }}
-            </p>
-            <OBanner
-              variant="info"
-              icon="info-outline"
-              dense
-              class="mt-2"
-              :content="t('alert_library.drawer.lockedCallout')"
-            />
-          </div>
-        </section>
-
-        <section>
-          <h3
-            class="text-text-secondary text-2xs flex items-center gap-1.5 pb-2 font-semibold uppercase"
-          >
-            <OIcon name="bolt" size="xs" />
-            <span>{{ t("alert_library.drawer.notificationPreview") }}</span>
-          </h3>
-          <OCode v-if="rowTemplate" block data-test="alert-library-drawer-row-template">{{
-            rowTemplate
-          }}</OCode>
-          <p v-else class="text-text-secondary text-xs">
-            {{ t("alert_library.drawer.noRowTemplate") }}
-          </p>
         </section>
 
         <section data-test="alert-library-drawer-preview">
@@ -297,30 +134,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-secondary text-2xs flex items-center gap-1.5 pb-2 font-semibold uppercase"
           >
             <OIcon name="query-stats" size="xs" />
-            <span>{{ t("alert_library.drawer.runPreviewTitle") }}</span>
+            <span>{{ t("alerts.preview") }}</span>
+            <template v-if="evaluation">
+              <OTag
+                :variant="evaluation.wouldTrigger ? 'error-soft' : 'success-soft'"
+                size="xs"
+                :label="
+                  evaluation.wouldTrigger
+                    ? t('alert_library.drawer.wouldTrigger')
+                    : t('alert_library.drawer.wouldNotTrigger')
+                "
+                data-test="alert-library-drawer-evaluation"
+              />
+              <span class="text-text-secondary normal-case">{{ raw(evaluation.reason) }}</span>
+            </template>
           </h3>
 
           <p v-if="!ready" class="text-text-secondary text-xs">
-            {{ t("alert_library.drawer.runPreviewBlocked", { stream: entry.stream }) }}
+            {{ t("alert_library.drawer.previewBlocked", { stream: entry.stream }) }}
           </p>
-          <p v-else-if="!previewStarted" class="text-text-secondary text-xs">
-            {{ t("alert_library.drawer.runPreviewIdle") }}
-          </p>
-          <template v-else>
-            <OTag
-              v-if="evaluation"
-              :variant="evaluation.wouldTrigger ? 'error-soft' : 'success-soft'"
-              size="xs"
-              class="mb-2"
-              :label="
-                evaluation.wouldTrigger
-                  ? t('alert_library.drawer.wouldTrigger')
-                  : t('alert_library.drawer.wouldNotTrigger')
-              "
-              data-test="alert-library-drawer-evaluation"
-            />
+          <!-- PanelSchemaRenderer draws its own loading bar, "No Data" and error
+               message, so the drawer adds no second set of those states. -->
+          <div v-else class="h-64">
             <PreviewAlert
+              :key="previewRunId"
               ref="previewRef"
+              class="h-full w-full"
               :query="queryText"
               :form-data="previewFormData"
               :is-aggregation-enabled="isAggregationEnabled"
@@ -328,46 +167,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is-using-backend-sql="false"
               :is-editor-open="false"
             />
-          </template>
-        </section>
-
-        <section>
-          <h3
-            class="text-text-secondary text-2xs flex items-center gap-1.5 pb-2 font-semibold uppercase"
-          >
-            <OIcon name="menu-book" size="xs" />
-            <span>{{ t("alert_library.drawer.remediation") }}</span>
-          </h3>
-          <p class="text-text-secondary text-xs" data-test="alert-library-drawer-remediation">
-            {{ t("alert_library.drawer.remediationEmpty") }}
-          </p>
-          <OButton
-            v-if="entry.docs_url"
-            variant="ghost-primary"
-            size="sm"
-            icon-left="open-in-new"
-            class="mt-1"
-            data-test="alert-library-drawer-runbook"
-            @click="openRunbook"
-          >
-            {{ t("alert_library.drawer.remediationDocs") }}
-          </OButton>
+          </div>
         </section>
       </template>
     </div>
 
     <template #footer>
       <div class="flex w-full justify-end gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="play-arrow"
-          :disabled="!file || !ready"
-          data-test="alert-library-drawer-run-preview"
-          @click="runPreview"
-        >
-          {{ t("alert_library.drawer.runPreview") }}
-        </OButton>
         <OButton
           variant="outline"
           size="sm-action"
@@ -397,37 +203,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 
+import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
-import { priorityForSeverity } from "@/constants/alertLibrary";
 import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCode from "@/lib/core/Code/OCode.vue";
-import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
+import type { AlertLibraryEntry, AlertLibraryFile, StreamDataState } from "@/types/alertLibrary";
+import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { buildPrefillFromLibrary } from "@/utils/alerts/prefill/fromLibrary";
 
 import { categoryLabel, packLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
-import {
-  DEFAULT_TUNABLES,
-  NUMERIC_OPERATORS,
-  applyTunables,
-  coerceTunable,
-  lockedSqlThreshold,
-  readTunables,
-  type LibraryTunables,
-  type LockedSqlThreshold,
-  type NumericTunableKey,
-} from "./libraryTunables";
+import { readTunables, applyTunables } from "./libraryTunables";
 
 const props = defineProps<{
   open: boolean;
@@ -435,11 +228,15 @@ const props = defineProps<{
   entry: AlertLibraryEntry | null;
   /** Whether every stream this alert queries exists in the org. */
   ready: boolean;
+  /** What those streams would actually give it — see streamDataState. */
+  dataState?: StreamDataState;
+  /** Microsecond epoch of their oldest last-ingest, when they have one. */
+  lastIngestedMicros?: number | null;
 }>();
 
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void;
-  /** Phase 4 owns the wizard; this hands it a file the drawer has already tuned. */
+  /** The wizard owns install; this hands it the file the drawer fetched. */
   (e: "install", payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }): void;
 }>();
 
@@ -450,9 +247,8 @@ const { openAlertCreation } = useAlertCreation();
 const file = ref<AlertLibraryFile | null>(null);
 const isLoading = ref(false);
 const loadFailed = ref(false);
-const tunables = ref<LibraryTunables>({ ...DEFAULT_TUNABLES });
-const locked = ref<LockedSqlThreshold | null>(null);
-const previewStarted = ref(false);
+/** Bumped per open so the chart remounts instead of showing the last alert's. */
+const previewRunId = ref(0);
 const previewRef = ref<{
   refreshData: () => void;
   evaluationStatus: { wouldTrigger: boolean; reason: string } | null;
@@ -464,9 +260,6 @@ let loadToken = 0;
 const reset = () => {
   file.value = null;
   loadFailed.value = false;
-  locked.value = null;
-  previewStarted.value = false;
-  tunables.value = { ...DEFAULT_TUNABLES };
 };
 
 const load = async (entry: AlertLibraryEntry) => {
@@ -477,13 +270,17 @@ const load = async (entry: AlertLibraryEntry) => {
     const loaded = await loadAlertFile(entry);
     if (token !== loadToken) return;
     file.value = loaded;
-    tunables.value = readTunables(loaded);
-    locked.value = lockedSqlThreshold(loaded);
   } catch {
     if (token !== loadToken) return;
     loadFailed.value = true;
   } finally {
     if (token === loadToken) isLoading.value = false;
+  }
+
+  // After the skeleton is gone, or the chart it must drive is not mounted yet.
+  if (token === loadToken && file.value) {
+    previewRunId.value += 1;
+    await runPreview();
   }
 };
 
@@ -515,7 +312,6 @@ const severityValue = computed(() => severityBadgeValue(props.entry?.severity ??
 const severityText = computed(() => severityLabel(t, props.entry?.severity ?? ""));
 // A query language, not prose — one correct form worldwide.
 const queryTypeLabel = computed(() => raw(String(props.entry?.query_type ?? "").toUpperCase()));
-const minutesSuffix = computed(() => t("alert_library.drawer.minutes"));
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -535,10 +331,6 @@ const queryText = computed(() => {
   return typeof query === "string" ? query : "";
 });
 
-const rowTemplate = computed(() =>
-  typeof file.value?.row_template === "string" ? file.value.row_template : "",
-);
-
 const streamName = computed(() =>
   typeof file.value?.stream_name === "string"
     ? file.value.stream_name
@@ -550,80 +342,150 @@ const streamType = computed(() =>
     : (props.entry?.stream_type ?? ""),
 );
 
-/** The trigger as one line — `>= 3`, the same shape the alert list shows. */
-const conditionText = computed(() => {
-  const operator = triggerCondition.value.operator;
-  return raw(`${typeof operator === "string" ? operator : ">="} ${tunables.value.threshold}`);
-});
+/**
+ * The number that decides whether the alert fires. PromQL alerts keep it in a
+ * structured field beside the query; SQL alerts have only the row count the
+ * trigger compares.
+ */
+const tunables = computed(() => (file.value ? readTunables(file.value) : null));
 
-const priorityText = computed(() => {
-  const priority = priorityForSeverity(props.entry?.severity ?? "");
-  return priority === null
-    ? t("alert_library.drawer.installsAsUnset")
-    : t("alert_library.drawer.installsAsPriority", { priority });
-});
+/**
+ * The file with readTunables' floors written back — what the preview evaluates
+ * and what install receives.
+ *
+ * A published file may carry `period: 0` or `threshold: 0`, or no
+ * `trigger_condition` at all (`assertAlertFile` only checks it is an object).
+ * Raw, that previews over a zero-length window — or an `undefined` relative time
+ * that reaches the search API as `new Date(NaN)` — and installs an alert that
+ * fires on every evaluation. It would also contradict the panel above it, which
+ * shows the FLOORED threshold.
+ */
+const tunedFile = computed(() =>
+  file.value && tunables.value ? applyTunables(file.value, tunables.value) : null,
+);
+const tunedQueryCondition = computed(() => asRecord(tunedFile.value?.query_condition));
+const tunedTriggerCondition = computed(() => asRecord(tunedFile.value?.trigger_condition));
 
-const hasPromqlCondition = computed(() => tunables.value.promqlOperator !== null);
-const operatorOptions = computed(() => NUMERIC_OPERATORS.map((operator) => raw(operator)));
-
-// The match-count field is only meaningful where there is no structured metric
-// condition to carry the real threshold — i.e. the SQL alerts. Keyed off the
-// same condition as the metric block so the two can never both claim to be
-// "the threshold".
-const showMatchCount = computed(() => !hasPromqlCondition.value);
-
-const thresholdHint = computed(() => {
-  const operator = triggerCondition.value.operator;
-  const params = { operator: typeof operator === "string" ? operator : ">=" };
-  return isPromql.value
-    ? t("alert_library.drawer.thresholdHintPromql", params)
-    : t("alert_library.drawer.thresholdHintSql", params);
-});
-
-// ── tuning ─────────────────────────────────────────────────────────────────
-const setTunable = (key: NumericTunableKey, value: string | number) => {
-  tunables.value = { ...tunables.value, [key]: coerceTunable(key, value) };
-};
-
-const setOperator = (value: unknown) => {
-  if (typeof value !== "string") return;
-  tunables.value = { ...tunables.value, promqlOperator: value };
-};
-
-/** What install and the editor actually receive — never the fetched copy. */
-const tunedFile = computed<AlertLibraryFile | null>(() =>
-  file.value ? applyTunables(file.value, tunables.value) : null,
+const thresholdLabel = computed(() =>
+  tunables.value?.promqlOperator != null
+    ? t("alert_library.drawer.metricCondition")
+    : t("alert_library.drawer.matchCount"),
 );
 
+const thresholdText = computed(() => {
+  const current = tunables.value;
+  if (!current) return raw("");
+  if (current.promqlOperator !== null) {
+    return raw(`${current.promqlOperator} ${current.promqlValue ?? 0}`);
+  }
+  const operator = triggerCondition.value.operator;
+  return raw(`${typeof operator === "string" ? operator : ">="} ${current.threshold}`);
+});
+
+/**
+ * The one place the stream posture is turned into words.
+ *
+ * "The stream exists" and "the stream has data" are different answers, and only
+ * the first was ever shown: an alert on a stream created months ago and never
+ * written to read "Data available" and previewed as "would not fire", which
+ * blames the alert for a gap in ingestion.
+ */
+const availability = computed(() => {
+  const state: StreamDataState = props.ready ? (props.dataState ?? "fresh") : "missing";
+  const stream = props.entry?.stream ?? "";
+
+  if (state === "missing") {
+    return {
+      variant: "default-soft" as const,
+      icon: "sensors-off",
+      label: t("alert_library.drawer.streamNotFound"),
+      callout: t("alert_library.drawer.needsDataCallout", { stream }),
+    };
+  }
+  if (state === "never") {
+    return {
+      variant: "default-soft" as const,
+      icon: "sensors-off",
+      label: t("alert_library.drawer.neverIngested"),
+      callout: t("alert_library.drawer.neverIngestedCallout", { stream }),
+    };
+  }
+  if (state === "stale") {
+    return {
+      variant: "warning-quiet" as const,
+      icon: "schedule",
+      label: t("alert_library.drawer.lastData", { when: lastIngestedLabel.value }),
+      callout: t("alert_library.drawer.staleCallout", {
+        stream,
+        when: lastIngestedLabel.value,
+      }),
+    };
+  }
+  return {
+    variant: "success-soft" as const,
+    icon: "check-circle",
+    label: t("alert_library.drawer.dataAvailable"),
+    callout: null,
+  };
+});
+
+// Relative ("3 days ago"), the same reading the streams list gives — an absolute
+// timestamp makes the reader do the subtraction that is the point of showing it.
+const lastIngestedLabel = computed(() => {
+  if (!props.lastIngestedMicros) return t("alert_library.drawer.unknownTime");
+  return raw(
+    formatDistanceToNowStrict(new Date(props.lastIngestedMicros / 1000), {
+      addSuffix: true,
+    }),
+  );
+});
+
 // ── preview ────────────────────────────────────────────────────────────────
-// PreviewAlert emits nothing; it is driven through the ref it exposes. The
-// form data it reads must carry stream, query and trigger or refreshData()
-// silently returns.
+// PreviewAlert reads stream, query and trigger off this; without all four
+// refreshData() silently returns.
 const previewFormData = computed(() => ({
   stream_name: streamName.value,
   stream_type: streamType.value,
-  query_condition: asRecord(tunedFile.value?.query_condition),
-  trigger_condition: asRecord(tunedFile.value?.trigger_condition),
+  query_condition: tunedQueryCondition.value,
+  trigger_condition: tunedTriggerCondition.value,
 }));
 
 const isAggregationEnabled = computed(
-  () => Object.keys(asRecord(queryCondition.value.aggregation)).length > 0,
+  () => Object.keys(asRecord(tunedQueryCondition.value.aggregation)).length > 0,
 );
 
 const evaluation = computed(() => previewRef.value?.evaluationStatus ?? null);
 
+/**
+ * PreviewAlert evaluates itself on mount for SQL, but deliberately skips PromQL
+ * there and waits for the alert form's watcher — which the drawer has no
+ * equivalent of, so it starts that case through the exposed ref.
+ */
 const runPreview = async () => {
-  previewStarted.value = true;
   await nextTick();
-  previewRef.value?.refreshData();
+  if (isPromql.value) previewRef.value?.refreshData();
 };
+
+// The chart is mounted behind `v-if="ready"`, so a file that loads while the
+// stream is still missing has nothing to start. Refreshing the gallery can flip
+// readiness afterwards, mounting PreviewAlert for the first time — and its own
+// onMounted deliberately skips PromQL. Without this it would sit blank forever.
+watch(
+  () => props.ready,
+  (isReady, was) => {
+    if (isReady && !was && file.value) {
+      previewRunId.value += 1;
+      void runPreview();
+    }
+  },
+);
 
 // ── actions ────────────────────────────────────────────────────────────────
 const customize = () => {
-  if (!props.entry || !tunedFile.value) return;
+  if (!props.entry || !file.value) return;
 
   const opened = openAlertCreation(
-    buildPrefillFromLibrary({ entry: props.entry, file: tunedFile.value }),
+    buildPrefillFromLibrary({ entry: props.entry, file: file.value }),
   );
   if (!opened) {
     toast({ variant: "error", message: t("alert_library.drawer.customizeFailed") });
@@ -635,9 +497,5 @@ const customize = () => {
 const install = () => {
   if (!props.entry || !tunedFile.value) return;
   emit("install", { entry: props.entry, file: tunedFile.value });
-};
-
-const openRunbook = () => {
-  if (props.entry?.docs_url) window.open(props.entry.docs_url, "_blank", "noopener");
 };
 </script>

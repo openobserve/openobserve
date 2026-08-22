@@ -66,6 +66,7 @@ import {
 // makes concurrent callers share one GET), so each test needs a fresh module
 // rather than a `resetForTests` hatch bolted onto the production API.
 let useAlertLibrary: typeof import("./useAlertLibrary").useAlertLibrary;
+let streamDataState: typeof import("./useAlertLibrary").streamDataState;
 
 /** One manifest entry, shaped exactly like the live generator emits. */
 function entry(overrides: Record<string, unknown> = {}) {
@@ -97,9 +98,24 @@ function manifest(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Stream names the org ingests, grouped by stream type. */
-function streams(byType: Record<string, string[]>): Record<string, Set<string>> {
-  return Object.fromEntries(Object.entries(byType).map(([type, names]) => [type, new Set(names)]));
+/**
+ * Stream names the org ingests, grouped by stream type. Values are the newest
+ * record's microsecond epoch; a bare name defaults to "ingesting now", since
+ * most callers here only care that the stream exists.
+ */
+function streams(
+  byType: Record<string, Array<string | [string, number]>>,
+): Record<string, Map<string, number>> {
+  return Object.fromEntries(
+    Object.entries(byType).map(([type, names]) => [
+      type,
+      new Map(
+        names.map((entry) => (Array.isArray(entry) ? entry : [entry, Date.now() * 1000])) as Array<
+          [string, number]
+        >,
+      ),
+    ]),
+  );
 }
 
 const fetchMock = vi.fn();
@@ -135,7 +151,7 @@ beforeEach(async () => {
   mockStore.state.alertLibrary = freshLibraryState();
   vi.stubGlobal("fetch", fetchMock);
   vi.resetModules();
-  ({ useAlertLibrary } = await import("./useAlertLibrary"));
+  ({ useAlertLibrary, streamDataState } = await import("./useAlertLibrary"));
 });
 
 afterEach(() => {
@@ -680,13 +696,88 @@ describe("useAlertLibrary — isReady", () => {
     expect(useAlertLibrary().isReady(entry(), shouty)).toBe(false);
   });
 
-  it("does not mutate the caller's stream sets", () => {
-    // Called once per card per render across 87 entries against shared sets;
+  it("does not mutate the caller's stream map", () => {
+    // Called once per card per render across 87 entries against a shared map;
     // compare contents, since a size check cannot catch delete-then-add.
     const available = streams({ metrics: ["kube_pod_container_status_terminated_reason"] });
     useAlertLibrary().isReady(entry(), available);
 
-    expect(available.metrics).toEqual(new Set(["kube_pod_container_status_terminated_reason"]));
+    expect([...available.metrics.keys()]).toEqual(["kube_pod_container_status_terminated_reason"]);
+  });
+
+  describe("streamDataState", () => {
+    const DAY_US = 24 * 60 * 60 * 1000 * 1000;
+    const nowUs = () => Date.now() * 1000;
+
+    it("reports a stream that exists but has never ingested", () => {
+      const available = streams({ metrics: [["kube_pod_container_status_terminated_reason", 0]] });
+
+      expect(streamDataState(entry(), available).state).toBe("never");
+    });
+
+    it("reports a stream that has gone quiet, with when it last spoke", () => {
+      const lastIngested = nowUs() - 3 * DAY_US;
+      const available = streams({
+        metrics: [["kube_pod_container_status_terminated_reason", lastIngested]],
+      });
+
+      const result = streamDataState(entry(), available);
+      expect(result.state).toBe("stale");
+      expect(result.lastIngestedMicros).toBe(lastIngested);
+    });
+
+    it("reports a stream taking data now as fresh", () => {
+      const available = streams({ metrics: ["kube_pod_container_status_terminated_reason"] });
+
+      expect(streamDataState(entry(), available).state).toBe("fresh");
+    });
+
+    it("reports a stream the org does not have as missing", () => {
+      expect(streamDataState(entry(), streams({ metrics: ["something_else"] })).state).toBe(
+        "missing",
+      );
+    });
+
+    // One silent stream is enough to keep the alert quiet, so the worst state wins.
+    it("takes the worst state and the oldest time across every required stream", () => {
+      const fresh = nowUs();
+      const stale = nowUs() - 5 * DAY_US;
+      const available = streams({
+        metrics: [
+          ["a", fresh],
+          ["b", stale],
+        ],
+      });
+
+      const result = streamDataState(
+        entry({ required_streams: ["a", "b"], stream_type: "metrics" }),
+        available,
+      );
+      expect(result.state).toBe("stale");
+      expect(result.lastIngestedMicros).toBe(stale);
+    });
+
+    // "Never ingested, as of a second ago" is a contradiction — that timestamp
+    // belongs to the sibling stream, not to the verdict.
+    it("reports no time when the verdict is not about a time", () => {
+      const available = streams({
+        metrics: [
+          ["a", 0],
+          ["b", Date.now() * 1000],
+        ],
+      });
+
+      const result = streamDataState(
+        entry({ required_streams: ["a", "b"], stream_type: "metrics" }),
+        available,
+      );
+      expect(result.state).toBe("never");
+      expect(result.lastIngestedMicros).toBeNull();
+    });
+
+    it("has nothing to block on when the alert declares no streams", () => {
+      expect(streamDataState(entry({ required_streams: [] }), streams({})).state).toBe("fresh");
+    });
   });
 
   describe("hardening found in review", () => {

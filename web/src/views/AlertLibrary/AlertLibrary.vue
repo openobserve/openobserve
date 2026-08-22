@@ -197,6 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="drawerOpen"
       :entry="selectedEntry"
       :ready="selectedEntry ? entryReady(selectedEntry) : false"
+      :data-state="selectedDataState.state"
+      :last-ingested-micros="selectedDataState.lastIngestedMicros"
       @install="onInstall"
     />
 
@@ -230,7 +232,11 @@ import {
   SEVERITY_ORDER,
   type LibraryFacet,
 } from "@/components/alertLibrary/libraryFacets";
-import { useAlertLibrary, toStreamsByType } from "@/composables/alerts/useAlertLibrary";
+import {
+  useAlertLibrary,
+  toStreamsByType,
+  streamDataState,
+} from "@/composables/alerts/useAlertLibrary";
 import type { AlertLibraryErrorCode } from "@/composables/alerts/useAlertLibrary";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -366,6 +372,15 @@ const searchScoped = computed(() => {
 });
 
 const scopedEntries = computed(() => searchScoped.value.filter(matchesSeverity));
+
+// Readiness is "the streams exist"; this is what they would actually give the
+// alert. Only the drawer reads it — the gallery's ready/needs-data facets stay
+// on stream existence, which is the question the stat strip asks.
+const selectedDataState = computed(() =>
+  selectedEntry.value && readinessKnown.value
+    ? streamDataState(selectedEntry.value, streamsByType.value)
+    : { state: "fresh" as const, lastIngestedMicros: null },
+);
 
 const readyCount = computed(() => scopedEntries.value.filter(entryReady).length);
 const missingCount = computed(() => scopedEntries.value.length - readyCount.value);

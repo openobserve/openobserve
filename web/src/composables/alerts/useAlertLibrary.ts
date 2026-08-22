@@ -26,6 +26,7 @@ import type {
   AlertLibraryFile,
   AlertLibraryManifest,
   StreamsByType,
+  StreamDataState,
 } from "@/types/alertLibrary";
 
 // Reads the curated alert library from S3: one GET for the manifest (which
@@ -231,7 +232,10 @@ function assertAlertFile(value: unknown): asserts value is AlertLibraryFile {
  * readiness check, so the three Phase-2 surfaces do not each write their own.
  */
 export function toStreamsByType(
-  list: Array<{ name?: string; stream_type?: string }> | null | undefined,
+  list:
+    | Array<{ name?: string; stream_type?: string; stats?: { doc_time_max?: unknown } }>
+    | null
+    | undefined,
 ): StreamsByType {
   // Null-prototype, so a stream_type of "constructor" or "toString" is an
   // ordinary missing key rather than an inherited function. On a bare `{}` the
@@ -243,9 +247,73 @@ export function toStreamsByType(
     if (!stream || typeof stream.name !== "string" || typeof stream.stream_type !== "string") {
       continue;
     }
-    (grouped[stream.stream_type] ??= new Set<string>()).add(stream.name);
+    // Microsecond epoch of the newest record. A stream that has never ingested
+    // reports 0 or nothing; both mean the same thing here, so both become 0.
+    const lastIngested = Number(stream.stats?.doc_time_max);
+    (grouped[stream.stream_type] ??= new Map<string, number>()).set(
+      stream.name,
+      Number.isFinite(lastIngested) && lastIngested > 0 ? lastIngested : 0,
+    );
   }
   return grouped;
+}
+
+/**
+ * How recently a stream has to have ingested to count as live. The same
+ * threshold the streams list draws its liveness rail with, so "stale" means the
+ * same thing on both pages.
+ */
+const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * What an alert's streams would actually give it, and when they last did.
+ *
+ * `isReady` answers only "do these streams exist" — an alert on a stream that
+ * was created and never written to reads ready and would never fire. This
+ * answers the question behind that one, reporting the WORST state across the
+ * alert's required streams (one silent stream is enough to keep it quiet) and
+ * the oldest of their last-ingest times.
+ *
+ * Never throws, for the same reason `isReady` does not: it runs per card.
+ */
+export function streamDataState(
+  entry: AlertLibraryEntry,
+  streamsByType: StreamsByType,
+  now: number = Date.now(),
+): { state: StreamDataState; lastIngestedMicros: number | null } {
+  const required = entry?.required_streams;
+  const streamType = entry?.stream_type;
+  if (!Array.isArray(required) || required.length === 0) {
+    return { state: "fresh", lastIngestedMicros: null };
+  }
+  if (typeof streamType !== "string" || !streamsByType || !hasOwn(streamsByType, streamType)) {
+    return { state: "missing", lastIngestedMicros: null };
+  }
+  const available = streamsByType[streamType];
+  if (!(available instanceof Map)) return { state: "missing", lastIngestedMicros: null };
+
+  let worst: StreamDataState = "fresh";
+  let oldest: number | null = null;
+  const rank: Record<StreamDataState, number> = { fresh: 0, stale: 1, never: 2, missing: 3 };
+
+  for (const streamName of required) {
+    if (!available.has(streamName)) {
+      worst = "missing";
+      break;
+    }
+    const lastIngested = available.get(streamName) ?? 0;
+    const state: StreamDataState =
+      lastIngested <= 0 ? "never" : now - lastIngested / 1000 > STALE_AFTER_MS ? "stale" : "fresh";
+    if (rank[state] > rank[worst]) worst = state;
+    if (lastIngested > 0 && (oldest === null || lastIngested < oldest)) oldest = lastIngested;
+  }
+
+  // Only report a time when it describes the verdict. "Never ingested, as of a
+  // second ago" is a contradiction: that timestamp belongs to a sibling stream.
+  return {
+    state: worst,
+    lastIngestedMicros: worst === "stale" || worst === "fresh" ? oldest : null,
+  };
 }
 
 export function useAlertLibrary() {
@@ -416,7 +484,7 @@ export function useAlertLibrary() {
       return false;
     }
     const available = streamsByType[streamType];
-    if (!(available instanceof Set)) return false;
+    if (!(available instanceof Map)) return false;
 
     return required.every((streamName) => available.has(streamName));
   };

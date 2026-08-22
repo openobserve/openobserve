@@ -15,14 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  DEFAULT_TUNABLES,
-  NUMERIC_OPERATORS,
-  applyTunables,
-  coerceTunable,
-  lockedSqlThreshold,
-  readTunables,
-} from "./libraryTunables";
+import { DEFAULT_TUNABLES, coerceTunable, readTunables } from "./libraryTunables";
 import type { AlertLibraryFile } from "@/types/alertLibrary";
 
 // Trimmed from the real library files (verified against the live bucket).
@@ -104,89 +97,6 @@ describe("readTunables", () => {
   });
 });
 
-describe("applyTunables", () => {
-  it("writes the edits back without mutating the file it was given", () => {
-    const original = promqlFile();
-    const next = applyTunables(original, {
-      ...readTunables(original),
-      threshold: 4,
-      period: 15,
-      frequency: 30,
-      silence: 60,
-      promqlOperator: ">=",
-      promqlValue: 250,
-    });
-
-    expect(next.trigger_condition).toMatchObject({
-      threshold: 4,
-      period: 15,
-      frequency: 30,
-      silence: 60,
-      // Untouched: only the four settled fields are editable.
-      operator: ">=",
-    });
-    expect((next.query_condition as any).promql_condition).toMatchObject({
-      column: "value",
-      operator: ">=",
-      value: 250,
-    });
-    // The source file is the session cache's copy in spirit — never edited.
-    expect((original.trigger_condition as any).threshold).toBe(1);
-    expect((original.query_condition as any).promql_condition.value).toBe(100);
-  });
-
-  it("leaves the query text alone — there is no substitution engine", () => {
-    const original = sqlFile();
-    const next = applyTunables(original, { ...readTunables(original), threshold: 99 });
-    expect((next.query_condition as any).sql).toBe((original.query_condition as any).sql);
-  });
-
-  it("does not invent a promql_condition on a SQL alert", () => {
-    const next = applyTunables(sqlFile(), {
-      ...readTunables(sqlFile()),
-      promqlOperator: ">",
-      promqlValue: 5,
-    });
-    expect((next.query_condition as any).promql_condition).toBeNull();
-  });
-});
-
-describe("lockedSqlThreshold", () => {
-  it("finds a threshold embedded in the SQL text", () => {
-    expect(lockedSqlThreshold(sqlFile())).toMatchObject({
-      column: "event_count",
-      operator: ">",
-      value: "12",
-    });
-  });
-
-  it("returns null for PromQL — its threshold is a structured field, not text", () => {
-    expect(lockedSqlThreshold(promqlFile())).toBeNull();
-  });
-
-  it("returns null for SQL with no HAVING clause", () => {
-    const file = sqlFile();
-    (file.query_condition as any).sql = 'SELECT * FROM "k8s_events"';
-    expect(lockedSqlThreshold(file)).toBeNull();
-  });
-
-  it("matches a lowercase having and a decimal literal", () => {
-    const file = sqlFile();
-    (file.query_condition as any).sql = "SELECT avg(x) as m FROM t GROUP BY y having m >= 0.75";
-    expect(lockedSqlThreshold(file)).toMatchObject({ operator: ">=", value: "0.75" });
-  });
-
-  it("never throws on a file with no query at all", () => {
-    expect(lockedSqlThreshold({} as AlertLibraryFile)).toBeNull();
-  });
-});
-
-describe("NUMERIC_OPERATORS", () => {
-  it("offers only comparisons that make sense against a metric value", () => {
-    expect([...NUMERIC_OPERATORS]).toEqual(["=", "!=", ">=", "<=", ">", "<"]);
-  });
-});
-
 describe("coerceTunable", () => {
   it("parses what a number input actually emits — a string", () => {
     expect(coerceTunable("period", "15")).toBe(15);
@@ -222,18 +132,11 @@ describe("coerceTunable", () => {
   });
 
   it("does not invent a promql threshold from an EMPTY promql_condition", () => {
-    // The reader treats {} as "no condition" and shows no threshold row, so the
-    // writer must not emit one either — it used to write { ">=", 0 }, an alert
-    // that fires on every evaluation of any non-negative metric.
     const file = {
       query_condition: { type: "promql", promql: "up", promql_condition: {} },
     } as unknown as AlertLibraryFile;
 
-    const tunables = readTunables(file);
-    expect(tunables.promqlOperator).toBeNull();
-
-    const applied = applyTunables(file, tunables);
-    expect((applied.query_condition as Record<string, unknown>).promql_condition).toEqual({});
+    expect(readTunables(file).promqlOperator).toBeNull();
   });
 
   it("floors numbers that came from the FILE, not just numbers the user typed", () => {

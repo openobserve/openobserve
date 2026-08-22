@@ -25,14 +25,15 @@
 //   real threshold is a field BESIDE the query, not a number inside it.
 //
 //   EMBEDDED, read-only — the `HAVING … > N` literal the 18 SQL alerts carry.
-//   Rewriting query text from a form field is how a template language starts;
-//   the drawer shows it locked and points at "Customize in editor" instead.
+//   Query text is never rewritten from a form field; "Customize in editor"
+//   opens the alert editor instead.
 //
-// Pure and file-in/file-out, so the drawer stays markup and this stays tested.
+// Pure and file-in/file-out, so the install wizard stays markup and this stays
+// tested.
 
 import type { AlertLibraryFile } from "@/types/alertLibrary";
 
-/** The structured knobs the drawer edits, per alert. */
+/** The structured knobs the install wizard edits, per alert. */
 export interface LibraryTunables {
   threshold: number;
   /** Rolling evaluation window, minutes. */
@@ -61,14 +62,6 @@ export const DEFAULT_TUNABLES: LibraryTunables = {
   promqlOperator: null,
   promqlValue: null,
 };
-
-/**
- * Comparisons offered for the PromQL condition.
- *
- * The numeric subset of the alert form's `triggerOperators` — `Contains` /
- * `NotContains` are string tests and mean nothing against a metric value.
- */
-export const NUMERIC_OPERATORS = ["=", "!=", ">=", "<=", ">", "<"] as const;
 
 /** The knobs bound to a number input, and therefore edited as text. */
 export type NumericTunableKey = "threshold" | "period" | "frequency" | "silence" | "promqlValue";
@@ -105,23 +98,6 @@ export const coerceTunable = (key: NumericTunableKey, value: string | number): n
   return minimum === null ? parsed : Math.max(minimum, parsed);
 };
 
-/** A threshold that lives inside the SQL text, and therefore cannot be a field. */
-export interface LockedSqlThreshold {
-  /** The whole matched clause, for display. */
-  clause: string;
-  column: string;
-  operator: string;
-  /** Kept as text: this is shown, never parsed back into the query. */
-  value: string;
-}
-
-/**
- * `HAVING <column> <op> <number>` — the one shape the SQL alerts use for a
- * semantic threshold. Loose on the column (it may be a function call) and
- * strict on the literal, because the literal is the only part being reported.
- */
-const HAVING_THRESHOLD = /\bhaving\b\s+([\w.()*]+)\s*(>=|<=|!=|<>|>|<|=)\s*(-?\d+(?:\.\d+)?)/i;
-
 /** Everything in a fetched file is untrusted — read through, never index blind. */
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -131,16 +107,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 const asNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
-/**
- * The file's PromQL condition, or null when it has none.
- *
- * ONE definition, shared by the reader and the writer. They used to disagree:
- * the reader treated `{}` / `[]` as "no condition" (so the drawer showed no
- * threshold row), while the writer treated them as truthy objects and wrote a
- * fabricated `{ operator: ">=", value: 0 }` into the installed alert — a
- * threshold nothing on screen had offered, firing on every evaluation of any
- * non-negative metric.
- */
+/** The file's PromQL condition, or null when it has none — `{}` counts as none. */
 const promqlConditionOf = (file: AlertLibraryFile): Record<string, unknown> | null => {
   const condition = asRecord(asRecord(file?.query_condition).promql_condition);
   return Object.keys(condition).length > 0 ? condition : null;
@@ -206,24 +173,4 @@ export function applyTunables(file: AlertLibraryFile, tunables: LibraryTunables)
     : { ...queryCondition };
 
   return next;
-}
-
-/**
- * The SQL-embedded threshold, if this alert has one.
- *
- * PromQL is excluded by construction rather than by regex: its comparisons in
- * query text are structural guards (`rate(...) > 0` to avoid dividing by zero),
- * not the alert's threshold, and offering to "unlock" one would be wrong.
- */
-export function lockedSqlThreshold(file: AlertLibraryFile): LockedSqlThreshold | null {
-  const queryCondition = asRecord(file?.query_condition);
-  if (queryCondition.type !== "sql") return null;
-
-  const sql = queryCondition.sql;
-  if (typeof sql !== "string") return null;
-
-  const match = HAVING_THRESHOLD.exec(sql);
-  if (!match) return null;
-
-  return { clause: match[0], column: match[1], operator: match[2], value: match[3] };
 }

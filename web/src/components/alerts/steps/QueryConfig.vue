@@ -893,10 +893,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.queryConfig.viewAlertQuery") }}
                         <OTooltip :delay="200" side="bottom">
                           <template #content>
-                            <pre
-                              class="hljs rounded-default m-0 p-2 font-mono text-xs whitespace-pre-wrap"
-                              v-html="highlightedSqlQuery"
-                            />
+                            <AlertQueryPreview :query="generatedSqlQuery" />
                           </template>
                         </OTooltip>
                       </span>
@@ -988,10 +985,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("alerts.queryConfig.viewAlertQuery") }}
                     <OTooltip :delay="200" side="bottom">
                       <template #content>
-                        <pre
-                          class="hljs rounded-default m-0 p-2 font-mono text-xs whitespace-pre-wrap"
-                          v-html="highlightedSqlQuery"
-                        />
+                        <AlertQueryPreview :query="generatedSqlQuery" />
                       </template>
                     </OTooltip>
                   </span>
@@ -1623,11 +1617,6 @@ import {
   getImageURL,
   resolveBrowserTimezone,
 } from "@/utils/zincutils";
-import hljs from "highlight.js/lib/core";
-import sql from "highlight.js/lib/languages/sql";
-
-hljs.registerLanguage("sql", sql);
-
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
@@ -1635,6 +1624,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
+import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
@@ -1661,6 +1651,7 @@ export default defineComponent({
   components: {
     OTag,
     AlertMultiToggle,
+    AlertQueryPreview,
     FilterGroup,
     QueryEditorDialog,
     CustomConfirmDialog,
@@ -3494,16 +3485,10 @@ export default defineComponent({
     // (empty SQL / SQL error / empty PromQL / aggregate-column toast) are
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
-    const highlightedSqlQuery = computed(() => {
-      if (!props.generatedSqlQuery) return "";
-      return hljs.highlight(props.generatedSqlQuery, { language: "sql" }).value;
-    });
-
     return {
       raw,
       t,
       store,
-      highlightedSqlQuery,
       localTab,
       tabOptions,
       shouldShowTabs,

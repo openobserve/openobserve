@@ -78,4 +78,21 @@ export interface AlertLibraryManifest {
 export type AlertLibraryFile = Record<string, unknown>;
 
 /** Org stream names grouped by stream type, for readiness checks. */
-export type StreamsByType = Record<string, Set<string>>;
+/**
+ * Stream name → microsecond epoch of its newest record (0 when it has never
+ * ingested), grouped by stream type.
+ *
+ * A Set of names would answer "does this stream exist", which is not the same
+ * question as "would an alert on it have anything to fire on".
+ */
+export type StreamsByType = Record<string, Map<string, number>>;
+
+/**
+ * How much use an alert's streams would be to it.
+ *
+ * `missing` — no such stream in this org.
+ * `never`   — the stream exists and has never received a record.
+ * `stale`   — it received data once, but nothing recently.
+ * `fresh`   — receiving data.
+ */
+export type StreamDataState = "missing" | "never" | "stale" | "fresh";

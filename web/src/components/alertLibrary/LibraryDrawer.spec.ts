@@ -36,8 +36,8 @@ vi.mock("@/composables/alerts/useAlertCreation", () => ({
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mocks.toast }));
 
-// PreviewAlert is driven through its exposed ref, so the stub has to expose the
-// same surface rather than being a plain template stub.
+// PreviewAlert is driven through the ref it exposes, so the stub has to expose
+// the same surface rather than being a plain template stub.
 vi.mock("@/components/alerts/PreviewAlert.vue", async () => {
   const { defineComponent, h, ref } = await import("vue");
   return {
@@ -54,13 +54,15 @@ vi.mock("@/components/alerts/PreviewAlert.vue", async () => {
       setup(_props, { expose }) {
         expose({
           refreshData: mocks.refreshData,
-          evaluationStatus: ref({ wouldTrigger: true, reason: "matched 4 rows" }),
+          evaluationStatus: ref({ wouldTrigger: true, reason: "4 rows match (4 >= 1)" }),
         });
         return () => h("div", { "data-test": "preview-alert" });
       },
     }),
   };
 });
+
+import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 
 import LibraryDrawer from "./LibraryDrawer.vue";
 
@@ -74,32 +76,8 @@ const ODrawerStub = {
     '<div data-test="o-drawer" :data-title="title" :data-subtitle="subTitle"><slot /><slot name="footer" /></div>',
 };
 
-const OCodeBlockStub = {
-  name: "OCodeBlock",
-  props: ["code", "lang", "wrap", "maxLines", "copyMessage"],
-  template: '<pre :data-test="$attrs[\'data-test\']" :data-lang="lang">{{ code }}</pre>',
-};
-
-const OInputStub = {
-  name: "OInput",
-  props: ["modelValue", "label", "helpText", "suffix", "type", "size"],
-  emits: ["update:modelValue"],
-  template:
-    '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-};
-
-const OSelectStub = {
-  name: "OSelect",
-  props: ["modelValue", "options", "label", "size"],
-  emits: ["update:modelValue"],
-  template: '<select :data-test="$attrs[\'data-test\']" :data-value="modelValue"></select>',
-};
-
 const stubs = {
   ODrawer: ODrawerStub,
-  OCodeBlock: OCodeBlockStub,
-  OInput: OInputStub,
-  OSelect: OSelectStub,
 };
 
 // ── fixtures ───────────────────────────────────────────────────────────────
@@ -189,128 +167,109 @@ describe("LibraryDrawer", () => {
     expect(mocks.loadAlertFile).not.toHaveBeenCalled();
   });
 
-  it("renders the query, highlighted as the language it is written in", async () => {
+  it("previews the whole query through the same component the alert editor uses", async () => {
     const wrapper = await mountDrawer();
-    const block = wrapper.find('[data-test="alert-library-drawer-query"]');
-    expect(block.text()).toContain("rate(go_gc_duration_seconds_sum[5m])");
-    expect(block.attributes("data-lang")).toBe("promql");
-  });
-
-  it("names the identity fields install will stamp: library id and content hash", async () => {
-    const wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="alert-library-drawer-id"]').text()).toBe(
-      "k8s/go_gc_pause_high",
+    const preview = wrapper.findComponent(AlertQueryPreview);
+    expect(preview.props("query")).toBe("rate(go_gc_duration_seconds_sum[5m])");
+    expect(preview.props("language")).toBe("promql");
+    expect(wrapper.find('[data-test="alert-library-drawer-query"]').text()).toContain(
+      "rate(go_gc_duration_seconds_sum[5m])",
     );
-    expect(wrapper.find('[data-test="alert-library-drawer-hash"]').text()).toBe("1c09e8f6ac33");
   });
 
-  it("shows the priority the alert installs as, per the settled severity mapping", async () => {
-    const warning = await mountDrawer();
-    expect(warning.find('[data-test="alert-library-drawer-priority"]').text()).toContain("P3");
-
-    const critical = await mountDrawer({ entry: sqlEntry });
-    expect(critical.find('[data-test="alert-library-drawer-priority"]').text()).toContain("P1");
-  });
-
-  it("offers the PromQL condition as fields, because that is where its threshold lives", async () => {
-    const wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="alert-library-drawer-promql-operator"]').exists()).toBe(true);
-    expect(
-      wrapper.find('[data-test="alert-library-drawer-promql-value"]').attributes("value"),
-    ).toBe("100");
-  });
-
-  it("shows one threshold on a PromQL alert, not two", async () => {
-    // The metric condition IS the threshold ("fire above 80% CPU"). The
-    // trigger_condition threshold is a series COUNT, and every PromQL alert in
-    // the library pins it at 1 — so rendering both put an editable field with a
-    // single sensible value directly beneath the number the user came to change,
-    // under the same label. Verified across the catalog: 69/69 PromQL alerts.
-    const wrapper = await mountDrawer();
-
-    expect(wrapper.find('[data-test="alert-library-drawer-promql-value"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').exists()).toBe(false);
-  });
-
-  it("keeps the match count on a SQL alert, where it is the only threshold", async () => {
-    // No metric condition exists here, so this field carries the real meaning
-    // and must not disappear with it.
+  it("previews a SQL alert as SQL", async () => {
     mocks.loadAlertFile.mockResolvedValue(sqlFile());
     const wrapper = await mountDrawer({ entry: sqlEntry });
-
-    expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').exists()).toBe(true);
+    const preview = wrapper.findComponent(AlertQueryPreview);
+    expect(preview.props("language")).toBe("sql");
+    expect(preview.props("query")).toContain('FROM "k8s_events"');
   });
 
-  it("seeds the structured knobs from the file rather than from a default", async () => {
+  it("keeps the threshold visible — a PromQL alert's is the metric condition", async () => {
     const wrapper = await mountDrawer();
-    const value = (test: string) => wrapper.find(`[data-test="${test}"]`).attributes("value");
-    expect(value("alert-library-drawer-period")).toBe("5");
-    expect(value("alert-library-drawer-frequency")).toBe("5");
-    expect(value("alert-library-drawer-silence")).toBe("30");
+    expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').text()).toBe("> 100");
   });
 
-  it("locks a threshold that lives inside the SQL text instead of editing the query", async () => {
+  it("falls back to the row count a SQL alert's trigger compares", async () => {
     mocks.loadAlertFile.mockResolvedValue(sqlFile());
     const wrapper = await mountDrawer({ entry: sqlEntry });
-
-    const locked = wrapper.find('[data-test="alert-library-drawer-locked"]');
-    expect(locked.exists()).toBe(true);
-    expect(locked.text()).toContain("event_count > 7");
-    // No PromQL condition fields on a SQL alert — there is no such field to edit.
-    expect(wrapper.find('[data-test="alert-library-drawer-promql-value"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').text()).toBe(">= 1");
   });
 
-  it("leaves the lock off an alert whose threshold is a real field", async () => {
+  it("evaluates the alert as soon as the drawer opens — no button to press", async () => {
     const wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="alert-library-drawer-locked"]').exists()).toBe(false);
-  });
-
-  it("previews the notification the alert would send", async () => {
-    const wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="alert-library-drawer-row-template"]').text()).toContain(
-      "GC pause is {value}",
-    );
-  });
-
-  it("says so plainly when there is no row template", async () => {
-    const file = promqlFile();
-    delete file.row_template;
-    mocks.loadAlertFile.mockResolvedValue(file);
-    const wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="alert-library-drawer-row-template"]').exists()).toBe(false);
-  });
-
-  it("admits remediation notes do not exist yet rather than showing an empty box", async () => {
-    const wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="alert-library-drawer-remediation"]').text()).toContain(
-      "metadata backfill",
-    );
-  });
-
-  it("runs the preview through PreviewAlert's exposed ref — it emits nothing", async () => {
-    const wrapper = await mountDrawer();
-    await wrapper.find('[data-test="alert-library-drawer-run-preview"]').trigger("click");
-    await flushPromises();
-
-    expect(mocks.refreshData).toHaveBeenCalled();
     const preview = wrapper.findComponent({ name: "PreviewAlert" });
+
+    expect(preview.exists()).toBe(true);
+    expect(preview.props("query")).toBe("rate(go_gc_duration_seconds_sum[5m])");
+    expect(preview.props("selectedTab")).toBe("promql");
+    // PreviewAlert does not self-run for PromQL, so the drawer must start it.
+    expect(mocks.refreshData).toHaveBeenCalled();
     // Without these four the refresh silently no-ops.
     const formData = preview.props("formData") as Record<string, unknown>;
     expect(formData.stream_name).toBe("go_gc_duration_seconds_sum");
     expect(formData.stream_type).toBe("metrics");
     expect(formData.query_condition).toBeTruthy();
     expect(formData.trigger_condition).toBeTruthy();
-    expect(preview.props("selectedTab")).toBe("promql");
   });
 
-  it("cannot preview an alert whose stream this org does not have", async () => {
+  it("re-evaluates for the next alert rather than leaving the last one's chart", async () => {
+    const wrapper = await mountDrawer();
+    mocks.loadAlertFile.mockResolvedValue(sqlFile());
+
+    await wrapper.setProps({ entry: sqlEntry });
+    await flushPromises();
+
+    const preview = wrapper.findComponent({ name: "PreviewAlert" });
+    expect(preview.props("query")).toContain('FROM "k8s_events"');
+    expect(preview.props("selectedTab")).toBe("sql");
+  });
+
+  it("re-runs when the same alert is opened again instead of freezing", async () => {
+    const wrapper = await mountDrawer({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    mocks.refreshData.mockClear();
+
+    await wrapper.setProps({ open: false });
+    await flushPromises();
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(mocks.refreshData).toHaveBeenCalled();
+  });
+
+  it("reports the verdict beside the chart", async () => {
+    const wrapper = await mountDrawer();
+    expect(wrapper.find('[data-test="alert-library-drawer-evaluation"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-library-drawer-preview"]').text()).toContain(
+      "4 rows match",
+    );
+  });
+
+  it("says there is nothing to evaluate rather than drawing an empty chart", async () => {
     const wrapper = await mountDrawer({ ready: false });
-    expect(
-      wrapper.find('[data-test="alert-library-drawer-run-preview"]').attributes("disabled"),
-    ).toBeDefined();
+    expect(wrapper.findComponent({ name: "PreviewAlert" }).exists()).toBe(false);
     expect(wrapper.find('[data-test="alert-library-drawer-preview"]').text()).toContain(
       "nothing to evaluate",
     );
+  });
+
+  it("no longer offers tunables, a notification preview, a run or remediation", async () => {
+    const wrapper = await mountDrawer();
+    for (const test of [
+      "alert-library-drawer-tunables",
+      "alert-library-drawer-row-template",
+      "alert-library-drawer-run-preview",
+      "alert-library-drawer-remediation",
+      "alert-library-drawer-runbook",
+      "alert-library-drawer-id",
+      "alert-library-drawer-condition",
+      "alert-library-drawer-hash",
+      "alert-library-drawer-priority",
+    ]) {
+      expect(wrapper.find(`[data-test="${test}"]`).exists()).toBe(false);
+    }
   });
 
   it("hands the editor a library prefill and closes, so the two do not fight", async () => {
@@ -334,9 +293,8 @@ describe("LibraryDrawer", () => {
     expect(wrapper.emitted("update:open")).toBeUndefined();
   });
 
-  it("carries the drawer's edits into what it hands on — the tuned file, not the fetched one", async () => {
+  it("hands the install wizard the file it fetched", async () => {
     const wrapper = await mountDrawer();
-    await wrapper.find('[data-test="alert-library-drawer-silence"]').setValue("45");
     await wrapper.find('[data-test="alert-library-drawer-install"]').trigger("click");
 
     const payload = wrapper.emitted("install")?.[0]?.[0] as {
@@ -344,16 +302,71 @@ describe("LibraryDrawer", () => {
       file: AlertLibraryFile;
     };
     expect(payload.entry.id).toBe("k8s/go_gc_pause_high");
-    expect((payload.file.trigger_condition as Record<string, unknown>).silence).toBe(45);
+    expect(payload.file.name).toBe("go_gc_pause_high");
   });
 
-  it("will not let a cleared window become an alert that evaluates over zero minutes", async () => {
+  // A published file may carry zeros, or no trigger_condition at all —
+  // assertAlertFile only checks it is an object. Raw, that installs an alert
+  // evaluating over a zero-length window that fires on every evaluation, and
+  // contradicts the threshold the panel above it displays.
+  it("installs the floored file, not the zeros the published one carried", async () => {
+    mocks.loadAlertFile.mockResolvedValue({
+      ...promqlFile(),
+      trigger_condition: { period: 0, operator: ">=", threshold: 0, frequency: 0, silence: 0 },
+    });
     const wrapper = await mountDrawer();
-    await wrapper.find('[data-test="alert-library-drawer-period"]').setValue("");
     await wrapper.find('[data-test="alert-library-drawer-install"]').trigger("click");
 
-    const payload = wrapper.emitted("install")?.[0]?.[0] as { file: AlertLibraryFile };
-    expect((payload.file.trigger_condition as Record<string, unknown>).period).toBe(1);
+    const payload = wrapper.emitted("install")?.[0]?.[0] as {
+      entry: AlertLibraryEntry;
+      file: AlertLibraryFile;
+    };
+    const trigger = payload.file.trigger_condition as Record<string, number>;
+    expect(trigger.period).toBeGreaterThan(0);
+    expect(trigger.threshold).toBeGreaterThan(0);
+  });
+
+  it("previews the floored file, so a missing trigger_condition cannot reach the API", async () => {
+    const { trigger_condition: _dropped, ...noTrigger } = promqlFile() as Record<string, unknown>;
+    mocks.loadAlertFile.mockResolvedValue(noTrigger);
+    const wrapper = await mountDrawer();
+
+    const preview = wrapper.findComponent({ name: "PreviewAlert" });
+    const trigger = (preview.props("formData") as Record<string, any>).trigger_condition;
+    expect(trigger.period).toBeGreaterThan(0);
+    expect(trigger.threshold).toBeGreaterThan(0);
+  });
+
+  // "The stream exists" and "the stream has data" are different answers, and
+  // only the first used to be shown — so an alert on a stream that has never
+  // been written to read "Data available" and previewed as "would not fire".
+  it("says a ready stream has never ingested, rather than claiming data is available", async () => {
+    const wrapper = await mountDrawer({ dataState: "never" });
+
+    const chip = wrapper.find('[data-test="alert-library-drawer-availability"]');
+    expect(chip.text()).not.toContain("Data available");
+    expect(wrapper.find('[data-test="alert-library-drawer-needs-data"]').exists()).toBe(true);
+  });
+
+  it("says when a quiet stream last had data", async () => {
+    const threeDaysAgoMicros = (Date.now() - 3 * 24 * 60 * 60 * 1000) * 1000;
+    const wrapper = await mountDrawer({
+      dataState: "stale",
+      lastIngestedMicros: threeDaysAgoMicros,
+    });
+
+    const chip = wrapper.find('[data-test="alert-library-drawer-availability"]');
+    expect(chip.text()).toContain("3 days ago");
+    expect(wrapper.find('[data-test="alert-library-drawer-needs-data"]').exists()).toBe(true);
+  });
+
+  it("keeps its clean state when the stream is actually ingesting", async () => {
+    const wrapper = await mountDrawer({ dataState: "fresh" });
+
+    expect(wrapper.find('[data-test="alert-library-drawer-availability"]').text()).toContain(
+      "Data available",
+    );
+    expect(wrapper.find('[data-test="alert-library-drawer-needs-data"]').exists()).toBe(false);
   });
 
   it("reports a file that could not be fetched instead of rendering an empty alert", async () => {
