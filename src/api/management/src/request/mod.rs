@@ -61,6 +61,7 @@ pub mod short_url;
 pub mod slos;
 pub mod sourcemaps;
 pub mod status;
+pub mod status_pages;
 pub mod stream;
 pub mod synthetics;
 pub mod users;

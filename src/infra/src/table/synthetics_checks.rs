@@ -833,6 +833,13 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
     let _lock = super::get_lock().await;
     let res = Entity::update_many()
         .col_expr(Column::LastCheckStatus, Expr::value(status))
+        // The status-page rebuilder's delta read watermarks on `updated_at`;
+        // the `ne` filter keeps this transition-only, so healthy acks bump
+        // nothing (`advance_schedule` must NOT bump it — it fires every run).
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
         .filter(Column::Id.eq(id))
         .filter(Column::LastCheckStatus.ne(status))
         .exec(conn)
@@ -918,6 +925,13 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
         .col_expr(
             Column::DegradedNotifiedAt,
             Expr::value(state.degraded_notified_at),
+        )
+        // Watermark for the status-page rebuilder's delta read. Safe here
+        // because the caller only writes when `next != prior` (job_api), so a
+        // healthy check acking every minute never bumps it.
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
         )
         .filter(Column::Id.eq(id))
         .filter(Column::ConsecutiveFailures.eq(expected.consecutive_failures))

@@ -32,7 +32,7 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, folders, kv, model_pricing, organization,
-    service_accounts, short_url, slos, sourcemaps, status, stream, synthetics, users,
+    service_accounts, short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -675,6 +675,33 @@ pub fn basic_routes() -> Router {
             alerts::external_events::MAX_BODY_BYTES,
         ));
 
+    // Public status pages — unauthenticated by design, like chart_render
+    // above: existence and visibility are checked inside the handler, and the
+    // handlers are pure meta-store point-reads (no search, storage, or
+    // cross-node calls on this plane).
+    if get_config().synthetics.enabled && get_config().synthetics.status_pages_enabled {
+        router = router
+            .route(
+                "/api/status_pages_public/{slug}",
+                get(status_pages::public::snapshot),
+            )
+            // Password unlock — unauthenticated by design (in-handler crypto +
+            // rate-limit), same plane as the read routes.
+            .route(
+                "/api/status_pages_public/{slug}/auth",
+                post(status_pages::public::auth),
+            )
+            .route(
+                "/api/status_pages_public/{slug}/badge.svg",
+                get(status_pages::public::badge),
+            )
+            .route(
+                "/api/status_pages_public/{slug}/feed.xml",
+                get(status_pages::public::feed),
+            )
+            .route("/status/{slug}", get(status_pages::public::page));
+    }
+
     router
 }
 
@@ -1296,6 +1323,33 @@ pub fn service_routes() -> Router {
                 post(synthetics::job_artifact_urls),
             )
             .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload));
+
+        // Status pages — authenticated admin CRUD (the public read plane lives
+        // in basic_routes, not here). Gated on the same flag as the public
+        // routes. RBAC is enforced by the OpenFGA route-permission middleware
+        // (resource "status_page"); the per-mapped-check folder-authz is
+        // in-handler (R-1).
+        if config::get_config().synthetics.status_pages_enabled {
+            router = router
+                .route(
+                    "/{org_id}/status_pages",
+                    get(status_pages::admin::list_pages).post(status_pages::admin::create_page),
+                )
+                .route(
+                    "/{org_id}/status_pages/{id}",
+                    get(status_pages::admin::get_page)
+                        .put(status_pages::admin::update_page)
+                        .delete(status_pages::admin::delete_page),
+                )
+                .route(
+                    "/{org_id}/status_pages/{id}/components",
+                    put(status_pages::admin::set_components),
+                )
+                .route(
+                    "/{org_id}/status_pages/{id}/rotate_slug",
+                    post(status_pages::admin::rotate_slug),
+                );
+        }
 
         // The private-VPC-agent path, and the only part of synthetics that
         // is enterprise. Not registered at all in an OSS build, so these

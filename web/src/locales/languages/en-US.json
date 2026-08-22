@@ -13062,6 +13062,127 @@
     "queryFailed": "Query failed",
     "relationNotContaining": "not containing"
   },
+  "statusPages": {
+    "tabTitle": "Status Pages",
+    "newPage": "New status page",
+    "createTitle": "New status page",
+    "editTitle": "Edit status page",
+    "back": "Status pages",
+    "loadFailed": "Failed to load status page",
+    "footerTitle": "status pages",
+    "searchPlaceholder": "Search status pages",
+    "copyUrl": "Copy URL",
+    "publicUrl": "Public URL",
+    "rotateSlug": "Rotate URL",
+    "more": "More actions",
+    "columns": {
+      "name": "Name",
+      "health": "Health",
+      "visibility": "Visibility",
+      "components": "Components",
+      "url": "URL",
+      "updated": "Updated"
+    },
+    "health": {
+      "operational": "Operational",
+      "degraded": "Degraded",
+      "partialOutage": "Partial outage",
+      "majorOutage": "Major outage",
+      "maintenance": "Maintenance",
+      "noData": "No data"
+    },
+    "visibility": {
+      "draft": "Draft",
+      "public": "Public",
+      "password": "Password"
+    },
+    "sections": {
+      "details": "Details",
+      "visibility": "Visibility",
+      "display": "Display",
+      "confirmation": "Confirmation",
+      "components": "Components"
+    },
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "e.g. Acme Status",
+      "description": "Description",
+      "descriptionPlaceholder": "What this status page covers",
+      "brandName": "Brand name",
+      "accentColor": "Accent color",
+      "displayTz": "Display timezone",
+      "visibility": "Visibility",
+      "password": "Password",
+      "passwordPlaceholder": "Set a password",
+      "passwordSetPlaceholder": "Leave blank to keep current password",
+      "passwordHelp": "Visitors must enter this password to view the page.",
+      "passwordSetHelp": "A password is already set. Leave blank to keep it, or type a new one to replace it.",
+      "showUptimePercent": "Show uptime percentage",
+      "showTimelineBars": "Show timeline bars",
+      "showResponseTime": "Show response time",
+      "showResponseTimeHelp": "Turn off so the page does not leak performance numbers.",
+      "noindex": "Discourage search indexing",
+      "noindexHelp": "Adds a noindex tag so search engines skip the public page.",
+      "confirmFailures": "Confirm failures",
+      "confirmFailuresHelp": "Consecutive failed checks before a component is marked down.",
+      "confirmRecovery": "Confirm recovery",
+      "confirmRecoveryHelp": "Consecutive passing checks before a component is marked recovered."
+    },
+    "components": {
+      "add": "Add component",
+      "empty": "No components yet. Add one to group the checks a visitor sees.",
+      "name": "Component name",
+      "namePlaceholder": "e.g. API",
+      "checks": "Checks",
+      "checksPlaceholder": "Select checks",
+      "noChecks": "No checks available",
+      "remove": "Remove component"
+    },
+    "preview": {
+      "title": "Live preview",
+      "subtitle": "How your public page looks as you edit",
+      "sampleBadge": "Sample data",
+      "eyebrow": "Service status",
+      "untitled": "Your status page",
+      "allOperational": "All systems operational",
+      "operational": "Operational",
+      "empty": "Add a component to see it on the page.",
+      "uptime90": "90-day uptime",
+      "legendUptime": "uptime",
+      "draftNote": "Draft — not publicly visible yet.",
+      "passwordNote": "Password-protected — visitors must sign in to view.",
+      "publicNote": "Public — anyone with the link can view.",
+      "poweredBy": "Powered by"
+    },
+    "empty": {
+      "title": "No status pages yet",
+      "description": "Create a public status page to share the health of your services."
+    },
+    "dialog": {
+      "deleteTitle": "Delete status page",
+      "deleteBody": "Delete \"{name}\"? This cannot be undone."
+    },
+    "validation": {
+      "nameRequired": "Name is required",
+      "accentColor": "Enter a color as #RRGGBB",
+      "nonNegative": "Enter 0 or a positive number",
+      "passwordRequired": "Set a password for a password-protected page"
+    },
+    "toast": {
+      "creating": "Creating status page...",
+      "created": "Status page created",
+      "createFailed": "Failed to create status page",
+      "saving": "Saving...",
+      "saved": "Status page saved",
+      "saveFailed": "Failed to save status page",
+      "deleting": "Deleting status page...",
+      "deleted": "Status page deleted",
+      "deleteFailed": "Failed to delete status page",
+      "urlCopied": "URL copied to clipboard",
+      "slugRotated": "Public URL rotated",
+      "slugRotateFailed": "Failed to rotate URL"
+    }
+  },
   "shortcuts": {
     "then": "then",
     "escKey": "Esc",

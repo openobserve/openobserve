@@ -39,6 +39,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("synthetics.newCheck.button") }}
       </OButton>
       <OButton
+        v-else-if="activeSection === 'status-pages'"
+        size="sm"
+        variant="primary"
+        data-test="status-pages-new-btn"
+        icon-left="add"
+        @click="showCreateStatusPage = true"
+      >
+        {{ t("statusPages.newPage") }}
+      </OButton>
+      <OButton
         v-else
         size="sm"
         variant="primary"
@@ -53,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabs
         :model-value="activeSection"
         align="left"
-        @change="activeSection = $event as 'checks' | 'private'"
+        @change="activeSection = $event as SyntheticsSection"
       >
         <OTab name="checks">
           <OIcon name="radar" size="sm" />
@@ -62,6 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTab v-if="privateLocationsEnabled" name="private">
           <OIcon name="location-on" size="sm" />
           <span>{{ t("synthetics.tabs.private") }}</span>
+        </OTab>
+        <OTab v-if="statusPagesEnabled" name="status-pages">
+          <OIcon name="monitor-heart" size="sm" />
+          <span>{{ t("statusPages.tabTitle") }}</span>
         </OTab>
       </OTabs>
     </template>
@@ -222,6 +236,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </MonitorTable>
       </div>
+
+      <!-- ── STATUS PAGES TAB ── -->
+      <StatusPagesList
+        v-if="statusPagesEnabled && activeSection === 'status-pages'"
+        :pages="statusPages"
+        :loading="statusPagesLoading"
+        :timezone="store.state.timezone"
+        @refresh="loadStatusPages"
+        @new-page="showCreateStatusPage = true"
+        @edit="openStatusPageEdit"
+        @delete="confirmDeleteStatusPage"
+      />
     </div>
 
     <!-- Duplicate check dialog -->
@@ -340,6 +366,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
+
+    <!-- Create status page -->
+    <CreateStatusPageDialog
+      v-if="statusPagesEnabled"
+      v-model:open="showCreateStatusPage"
+      :org-identifier="orgIdentifier"
+      @created="onStatusPageCreated"
+    />
+
   </OPageLayout>
 </template>
 
@@ -359,6 +394,11 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
 import PrivateLocations from "@/views/synthetics/PrivateLocations.vue";
+import StatusPagesList from "@/views/synthetics/status-pages/StatusPagesList.vue";
+import CreateStatusPageDialog from "@/views/synthetics/status-pages/CreateStatusPageDialog.vue";
+import statusPagesService, {
+  type StatusPageListItem,
+} from "@/services/status_pages";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
@@ -387,6 +427,7 @@ import {
   syntheticsCreateRoute,
   syntheticsEditRoute,
   syntheticsResultsRoute,
+  statusPageEditRoute,
 } from "@/utils/synthetics/routes";
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -399,6 +440,8 @@ const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
 
 // ── API types ──────────────────────────────────────────────────────────
+type SyntheticsSection = "checks" | "private" | "status-pages";
+
 interface ApiMonitorFrequency {
   type: string;
   interval: number;
@@ -553,18 +596,29 @@ const privateLocationsEnabled = computed(() =>
   Boolean(store.state.zoConfig?.synthetics_private_locations_enabled),
 );
 
-// Defaults to 'checks', but honors ?section=private so links back from the
-// private-location detail page (its own back button, deep links) land on
-// the tab the user actually came from instead of always resetting to Checks.
-// A ?section=private on a build without private locations falls back to
-// Checks rather than landing on a tab that is not rendered.
-const activeSection = ref<"checks" | "private">(
-  route.query.section === "private" && privateLocationsEnabled.value ? "private" : "checks",
+// Status pages are gated on their own /config flag on top of synthetics_enabled,
+// mirroring the private-locations split — an OSS build can ship synthetics
+// without offering status pages.
+const statusPagesEnabled = computed(() =>
+  Boolean(store.state.zoConfig?.status_pages_enabled),
 );
+
+// Defaults to 'checks', but honors ?section=private / ?section=status-pages so
+// links back from a detail surface land on the tab the user actually came from
+// instead of always resetting to Checks. A ?section for a tab this build does not
+// render falls back to Checks rather than landing on a tab that is not shown.
+const initialSection = ((): SyntheticsSection => {
+  const s = route.query.section;
+  if (s === "private" && privateLocationsEnabled.value) return "private";
+  if (s === "status-pages" && statusPagesEnabled.value) return "status-pages";
+  return "checks";
+})();
+const activeSection = ref<SyntheticsSection>(initialSection);
 // Private Locations data is never fetched on initial render (only on manual
 // refresh or after a delete) — load it the first time the tab is actually
 // opened, so switching to it isn't silently empty.
 let privateLocationsLoaded = false;
+let statusPagesLoadedOnce = false;
 watch(
   activeSection,
   async (val) => {
@@ -575,6 +629,11 @@ watch(
       // empty org and the tab is stuck showing 0 rows forever.
       await waitForOrgIdentifier();
       loadPrivateLocations();
+    }
+    if (val === "status-pages" && !statusPagesLoadedOnce) {
+      statusPagesLoadedOnce = true;
+      await waitForOrgIdentifier();
+      loadStatusPages();
     }
   },
   { immediate: true },
@@ -792,6 +851,62 @@ async function deleteLocation() {
     locationToDelete.value = null;
   }
 }
+
+// ── Status pages tab ───────────────────────────────────────────────────
+const statusPages = ref<StatusPageListItem[]>([]);
+const statusPagesLoading = ref(false);
+const showCreateStatusPage = ref(false);
+
+async function loadStatusPages() {
+  if (!orgIdentifier.value) return;
+  statusPagesLoading.value = true;
+  try {
+    const res = await statusPagesService.list(orgIdentifier.value);
+    statusPages.value = (res.data as any).pages ?? [];
+  } catch (err) {
+    console.error("[status-pages] failed to load", err);
+  } finally {
+    statusPagesLoading.value = false;
+  }
+}
+
+const openStatusPageEdit = (page: StatusPageListItem) => {
+  router.push(statusPageEditRoute({ orgIdentifier: orgIdentifier.value }, page.id));
+};
+
+const onStatusPageCreated = async (page: StatusPageListItem) => {
+  // Drop straight into the full-page editor on the freshly created page.
+  openStatusPageEdit(page);
+};
+
+const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
+  const ok = await confirm({
+    title: t("statusPages.dialog.deleteTitle"),
+    message: t("statusPages.dialog.deleteBody", { name: page.name }),
+  });
+  if (!ok) return;
+  const dismiss = toast({
+    variant: "loading",
+    message: t("statusPages.toast.deleting"),
+    timeout: 0,
+  });
+  try {
+    await statusPagesService.delete(orgIdentifier.value, page.id);
+    statusPages.value = statusPages.value.filter((p) => p.id !== page.id);
+    dismiss();
+    toast({ variant: "success", message: t("statusPages.toast.deleted") });
+  } catch (err: any) {
+    dismiss();
+    toast({
+      variant: "error",
+      message:
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        t("statusPages.toast.deleteFailed"),
+    });
+    console.error("[status-pages] delete failed", err);
+  }
+};
 
 const locationOpts = ref<{ label: I18nText; value: string }[]>([
   { label: t("synthetics.filters.allLocations"), value: "all" },

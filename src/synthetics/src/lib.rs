@@ -48,6 +48,7 @@ pub mod job_api;
 pub mod reaper;
 pub mod scheduler;
 pub mod service;
+pub mod status_pages;
 
 /// One row per execution — the record the UI's run list and run detail read.
 pub const RESULTS_STREAM: &str = "synthetics_results";
@@ -161,6 +162,11 @@ fn spawn_workers() {
     tokio::spawn(scheduler::run());
     tokio::spawn(dispatcher::run());
     tokio::spawn(reaper::run());
+    // POC scope: single cluster. Multi-region needs this split — the
+    // incident-engine half claim-gated, the snapshot half per region.
+    if config::get_config().synthetics.status_pages_enabled {
+        tokio::spawn(status_pages::run());
+    }
     // Its own task, not a step on the reaper's tick: a pass is up to a thousand
     // rows of outbound HTTP, and the reaper's lease bookkeeping cannot wait
     // behind it. Its own kill switch too, checked per pass rather than here.

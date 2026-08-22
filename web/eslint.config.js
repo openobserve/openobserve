@@ -297,7 +297,7 @@ const GLYPHS_AND_UNITS = [
 const SPEC_IDENTIFIERS = ["GET", "UTC", "SQL", "PromQL", "OK", "ERROR"];
 
 /** Bare text nodes, where `raw()` has no expression to wrap. */
-const TEXT_NODE_LITERALS = ["1000", "./.env", "trace.zip"];
+const TEXT_NODE_LITERALS = ["1000", "./.env", "trace.zip", "OpenObserve"];
 
 const NON_TRANSLATABLE = [...GLYPHS_AND_UNITS, ...SPEC_IDENTIFIERS, ...TEXT_NODE_LITERALS];
 const NON_TRANSLATABLE_SET = new Set(NON_TRANSLATABLE);

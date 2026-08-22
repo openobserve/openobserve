@@ -62,6 +62,7 @@ axum.workspace = true
 http.workspace = true
 http-body-util.workspace = true
 anyhow.workspace = true
+argon2.workspace = true
 async-trait.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true

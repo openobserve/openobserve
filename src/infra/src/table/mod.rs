@@ -73,6 +73,7 @@ pub mod slo_backfill_jobs;
 pub mod slo_budget;
 pub mod slos;
 pub mod source_maps;
+pub mod status_pages;
 pub mod synthetics_agents;
 pub mod synthetics_checks;
 pub mod synthetics_jobs;

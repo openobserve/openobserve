@@ -1,0 +1,193 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Authenticated admin CRUD for status pages. Routes live in `service_routes()`
+//! under `auth_middleware`, so per-route RBAC is enforced declaratively by the
+//! OpenFGA route-permission middleware (mirrors synthetics). The one check that
+//! CANNOT be declarative is the per-mapped-check folder-authz (R-1) — a status
+//! page must never publish the status of a synthetics check the caller cannot
+//! read — so `set_components` verifies each check in-handler before writing.
+
+use axum::{
+    Json,
+    extract::Path,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use common::meta::http::HttpResponse as MetaHttpResponse;
+use config::meta::status_pages::{CreatePageRequest, SetComponentsRequest, UpdatePageRequest};
+use openobserve_api_common::extractors::Headers;
+
+use crate::service::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use crate::service::auth::check_permissions;
+
+fn map_err(ctx: &str, e: anyhow::Error) -> Response {
+    let msg = e.to_string();
+    if msg.starts_with("validation: ") {
+        return MetaHttpResponse::bad_request(msg);
+    }
+    if msg == "not found" {
+        return MetaHttpResponse::not_found(msg);
+    }
+    tracing::error!("[status_pages] {ctx}: {e}");
+    MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
+}
+
+pub async fn list_pages(Path(org_id): Path<String>) -> Response {
+    match openobserve_core::status_pages::list_pages_view(&org_id).await {
+        Ok(resp) => MetaHttpResponse::json(resp),
+        Err(e) => map_err("list_pages", e),
+    }
+}
+
+pub async fn create_page(
+    Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<CreatePageRequest>,
+) -> Response {
+    match openobserve_core::status_pages::create_page(&org_id, body, &user.user_id).await {
+        Ok(page) => {
+            audit(&org_id, &user.user_id, "create_page", Some(&page.id)).await;
+            MetaHttpResponse::json(page)
+        }
+        Err(e) => map_err("create_page", e),
+    }
+}
+
+pub async fn get_page(Path((org_id, id)): Path<(String, String)>) -> Response {
+    match openobserve_core::status_pages::get_page(&org_id, &id).await {
+        Ok(Some(page)) => MetaHttpResponse::json(page),
+        Ok(None) => MetaHttpResponse::not_found("not found"),
+        Err(e) => map_err("get_page", e),
+    }
+}
+
+pub async fn update_page(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<UpdatePageRequest>,
+) -> Response {
+    match openobserve_core::status_pages::update_page(&org_id, &id, body).await {
+        Ok(page) => {
+            audit(&org_id, &user.user_id, "update_page", Some(&id)).await;
+            MetaHttpResponse::json(page)
+        }
+        Err(e) => map_err("update_page", e),
+    }
+}
+
+pub async fn delete_page(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    match openobserve_core::status_pages::delete_page(&org_id, &id).await {
+        Ok(true) => {
+            audit(&org_id, &user.user_id, "delete_page", Some(&id)).await;
+            MetaHttpResponse::ok("deleted")
+        }
+        Ok(false) => MetaHttpResponse::not_found("not found"),
+        Err(e) => map_err("delete_page", e),
+    }
+}
+
+pub async fn rotate_slug(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    match openobserve_core::status_pages::rotate_slug(&org_id, &id).await {
+        Ok(slug) => {
+            audit(&org_id, &user.user_id, "rotate_slug", Some(&id)).await;
+            MetaHttpResponse::json(serde_json::json!({ "slug": slug }))
+        }
+        Err(e) => map_err("rotate_slug", e),
+    }
+}
+
+/// PUT components — the R-1 gate. Every mapped check is verified for folder-level
+/// synthetics READ by the caller BEFORE any write. Without this, a user maps
+/// checks they cannot see onto a public page and exfiltrates their status.
+pub async fn set_components(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<SetComponentsRequest>,
+) -> Response {
+    // R-1: clear every distinct mapped check for folder-level read first.
+    #[cfg(feature = "enterprise")]
+    {
+        use std::collections::HashSet;
+        let check_ids: HashSet<&str> = body
+            .components
+            .iter()
+            .flat_map(|c| c.check_ids.iter().map(String::as_str))
+            .collect();
+        for check_id in check_ids {
+            match caller_can_read_check(&org_id, &user.user_id, check_id).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    return MetaHttpResponse::forbidden(format!(
+                        "you do not have read access to check {check_id}"
+                    ));
+                }
+                Err(e) => return map_err("set_components:authz", e),
+            }
+        }
+    }
+    match openobserve_core::status_pages::set_components(&org_id, &id, body).await {
+        Ok(()) => {
+            audit(&org_id, &user.user_id, "set_components", Some(&id)).await;
+            MetaHttpResponse::ok("updated")
+        }
+        Err(e) => map_err("set_components", e),
+    }
+}
+
+/// R-1 composition: resolve the check's folder, then OpenFGA-check read on it.
+/// Enterprise-only — the OSS build has no OpenFGA (and its stub returns false),
+/// so the gate is compiled only where it can be enforced.
+#[cfg(feature = "enterprise")]
+async fn caller_can_read_check(
+    org_id: &str,
+    user_id: &str,
+    check_id: &str,
+) -> Result<bool, anyhow::Error> {
+    let Some(check) = openobserve_synthetics::service::get_synthetic(org_id, check_id).await?
+    else {
+        return Ok(false); // unknown check → deny
+    };
+    Ok(check_permissions(
+        check_id,
+        org_id,
+        user_id,
+        "synthetics",
+        "GET",
+        Some(&check.folder_id),
+        false,
+        true,
+        false,
+    )
+    .await)
+}
+
+/// R-4: append an uptime-affecting mutation to the immutable audit log. Best
+/// effort — an audit-write failure must not fail the user's operation, but it
+/// is logged loudly.
+async fn audit(org_id: &str, actor: &str, action: &str, notice_id: Option<&str>) {
+    if let Err(e) =
+        openobserve_core::status_pages::write_audit(org_id, actor, action, notice_id).await
+    {
+        tracing::error!("[status_pages] audit write failed for {action}: {e}");
+    }
+}

@@ -49,6 +49,7 @@ mod search_job;
 mod semantic_groups;
 mod service_streams;
 mod short_urls;
+mod status_pages;
 mod synthetics;
 mod synthetics_locations;
 mod synthetics_probe_tokens;
@@ -60,7 +61,7 @@ use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
     EvalDatasetsQueue, EvalJobsQueue, EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue,
     FoldersQueue, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
-    SearchJobsQueue, SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
+    SearchJobsQueue, StatusPagesQueue, SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
 };
 
 fn parse_eval_key(
@@ -178,6 +179,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_orgs_msg: organization::process,
         on_org_ingestion_token_msg: org_ingestion_token::process,
     };
+    let status_pages_queue = StatusPagesQueue {
+        on_status_pages_msg: status_pages::process,
+    };
     let queues: Vec<Box<dyn SuperClusterQueueTrait + Sync + Send>> = vec![
         Box::new(meta_queue),
         Box::new(schema_queue),
@@ -198,6 +202,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(scheduler_queue),
         Box::new(synthetics_queue),
         Box::new(org_users_queue),
+        Box::new(status_pages_queue),
     ];
 
     for queue in queues {
