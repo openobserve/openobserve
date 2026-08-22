@@ -1647,6 +1647,7 @@ mod tests {
             keys,
             vec![
                 "build_id",
+                "build_type",
                 "commit_hash",
                 "custom_hide_self_logo",
                 "custom_logo_dark_img",
@@ -1658,6 +1659,15 @@ mod tests {
                 "telemetry_enabled",
             ],
             "unauthenticated /config must expose exactly the login-page bootstrap fields"
+        );
+
+        // build_type (enterprise/cloud/opensource) is not sensitive and the o2
+        // CLI + o2-operator read it from this unauthenticated endpoint to gate
+        // enterprise commands — it must stay a real build-type token.
+        assert_eq!(
+            payload.get("build_type").and_then(Value::as_str),
+            Some("opensource"),
+            "bootstrap build_type must carry the real build kind"
         );
 
         // Transition shim: `commit_hash` is served VALUED as the opaque

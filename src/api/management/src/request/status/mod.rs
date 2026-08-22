@@ -245,6 +245,10 @@ struct ConfigResponse<'a> {
 #[derive(Serialize)]
 struct ConfigBootstrapResponse {
     build_id: String,
+    /// `enterprise` / `cloud` / `opensource`. Not sensitive, and the o2 CLI and
+    /// o2-operator read it from this unauthenticated endpoint to gate their
+    /// enterprise-only commands, so it must stay on the bootstrap.
+    build_type: String,
     /// Transition shim, VALUED as `build_id` (never the real commit): pre-split
     /// frontends read `commit_hash` for stale-build detection, and across the
     /// split upgrade their comparison must still fire. Remove one release after
@@ -384,8 +388,16 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
     let custom_logo_dark_img = enterprise_value!(None, get_logo_dark().await);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
 
+    #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
+    let build_type = "cloud";
+    #[cfg(feature = "enterprise")]
+    let build_type = "enterprise";
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
+    let build_type = "opensource";
+
     axum::Json(ConfigBootstrapResponse {
         build_id: config::BUILD_ID.clone(),
+        build_type: build_type.to_string(),
         commit_hash: config::BUILD_ID.clone(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         sso_enabled,

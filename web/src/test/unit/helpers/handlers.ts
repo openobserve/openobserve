@@ -173,6 +173,7 @@ export const restHandlers = [
   http.get(`${store.state.API_ENDPOINT}/config`, () => {
     return HttpResponse.json({
       build_id: "3cc381d699e28bcb",
+      build_type: "opensource",
       commit_hash: "3cc381d699e28bcb",
       telemetry_enabled: true,
       sso_enabled: false,

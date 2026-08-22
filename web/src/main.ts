@@ -63,6 +63,7 @@ interface ConfigResponse {
   data?: {
     telemetry_enabled?: boolean;
     build_id?: string;
+    build_type?: string;
     commit_hash?: string;
     rum?: {
       enabled: boolean;
