@@ -30,12 +30,19 @@ pub struct SsrfGuard;
 
 impl SsrfGuard {
     pub fn validate_url_with_config(url: &str) -> Result<(), String> {
-        let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
-        let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
-        Self::validate_url_inner(url, allow_loopback, skip_ssrf)
+        let cfg = crate::get_config();
+        let allow_loopback = cfg.common.ssrf_allow_loopback;
+        let allow_private_ip = cfg.common.ssrf_allow_private_ip;
+        let skip_ssrf = cfg.common.skip_ssrf_checks;
+        Self::validate_url_inner(url, allow_loopback, allow_private_ip, skip_ssrf)
     }
 
-    fn validate_url_inner(url: &str, allow_loopback: bool, skip_ssrf: bool) -> Result<(), String> {
+    fn validate_url_inner(
+        url: &str,
+        allow_loopback: bool,
+        allow_private_ip: bool,
+        skip_ssrf: bool,
+    ) -> Result<(), String> {
         let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
 
         if parsed.scheme() != "http" && parsed.scheme() != "https" {
@@ -61,7 +68,7 @@ impl SsrfGuard {
         };
 
         if let Ok(ip_addr) = unbracketed_host.parse::<IpAddr>() {
-            if Self::is_private_ip_inner(&ip_addr, allow_loopback) {
+            if Self::is_private_ip_inner(&ip_addr, allow_loopback, allow_private_ip) {
                 return Err(format!(
                     "Access to private IP address {} is not allowed for security reasons. \
                      This prevents Server-Side Request Forgery (SSRF) attacks.",
@@ -109,7 +116,7 @@ impl SsrfGuard {
 
     #[cfg(test)]
     fn is_private_ip(ip: &IpAddr) -> bool {
-        Self::is_private_ip_inner(ip, false)
+        Self::is_private_ip_inner(ip, false, false)
     }
 
     /// Validate a single resolved IP against the SSRF policy, honoring
@@ -117,16 +124,18 @@ impl SsrfGuard {
     /// hostname → private-IP bypasses are blocked even when the literal
     /// hostname string passed the pre-flight check.
     pub fn check_ip_with_config(ip: &IpAddr) -> Result<(), String> {
-        let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
-        let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
+        let cfg = crate::get_config();
+        let allow_loopback = cfg.common.ssrf_allow_loopback;
+        let allow_private_ip = cfg.common.ssrf_allow_private_ip;
+        let skip_ssrf = cfg.common.skip_ssrf_checks;
         if skip_ssrf {
             return Ok(());
         }
-        Self::check_ip_inner(ip, allow_loopback)
+        Self::check_ip_inner(ip, allow_loopback, allow_private_ip)
     }
 
-    fn check_ip_inner(ip: &IpAddr, allow_loopback: bool) -> Result<(), String> {
-        if Self::is_private_ip_inner(ip, allow_loopback) {
+    fn check_ip_inner(ip: &IpAddr, allow_loopback: bool, allow_private_ip: bool) -> Result<(), String> {
+        if Self::is_private_ip_inner(ip, allow_loopback, allow_private_ip) {
             return Err(format!(
                 "Access to private IP address {} is not allowed for security reasons. \
                  This prevents Server-Side Request Forgery (SSRF) attacks.",
@@ -140,8 +149,10 @@ impl SsrfGuard {
     /// DNS and validates every returned IP. Closes the hostname-points-at-private
     /// bypass that the sync validator can't see.
     pub async fn validate_url_with_config_async(url: &str) -> Result<(), String> {
-        let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
-        let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
+        let cfg = crate::get_config();
+        let allow_loopback = cfg.common.ssrf_allow_loopback;
+        let allow_private_ip = cfg.common.ssrf_allow_private_ip;
+        let skip_ssrf = cfg.common.skip_ssrf_checks;
         // When loopback is explicitly allowed we're in a dev/test environment;
         // skip SSRF validation entirely so test fixtures with placeholder URLs
         // (e.g. "DEMO") and unresolvable hostnames don't get rejected at save time.
@@ -149,7 +160,7 @@ impl SsrfGuard {
         if allow_loopback || skip_ssrf {
             return Ok(());
         }
-        Self::validate_url_inner(url, allow_loopback, skip_ssrf)?;
+        Self::validate_url_inner(url, allow_loopback, allow_private_ip, skip_ssrf)?;
 
         let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
         let Some(host) = parsed.host_str() else {
@@ -173,7 +184,7 @@ impl SsrfGuard {
         let mut saw_any = false;
         for sa in addrs {
             saw_any = true;
-            Self::check_ip_inner(&sa.ip(), allow_loopback)?;
+            Self::check_ip_inner(&sa.ip(), allow_loopback, allow_private_ip)?;
         }
 
         if !saw_any {
@@ -183,7 +194,7 @@ impl SsrfGuard {
         Ok(())
     }
 
-    fn is_private_ip_inner(ip: &IpAddr, allow_loopback: bool) -> bool {
+    fn is_private_ip_inner(ip: &IpAddr, allow_loopback: bool, allow_private_ip: bool) -> bool {
         match ip {
             IpAddr::V4(ipv4) => {
                 let octets = ipv4.octets();
@@ -191,9 +202,9 @@ impl SsrfGuard {
                 // 0.0.0.0/8 — "this network" (RFC 1122); OS routes to loopback on connect
                 (octets[0] == 0)
                     || (!allow_loopback && octets[0] == 127)
-                    || (octets[0] == 10)
-                    || (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31)
-                    || (octets[0] == 192 && octets[1] == 168)
+                    || (!allow_private_ip && octets[0] == 10)
+                    || (!allow_private_ip && octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31)
+                    || (!allow_private_ip && octets[0] == 192 && octets[1] == 168)
                     || (octets[0] == 169 && octets[1] == 254)
                     || (octets[0] == 100 && octets[1] >= 64 && octets[1] <= 127)
                     || (octets[0] == 192 && octets[1] == 0 && octets[2] == 2)
@@ -208,7 +219,7 @@ impl SsrfGuard {
             }
             IpAddr::V6(ipv6) => {
                 if let Some(v4) = ipv6.to_ipv4_mapped() {
-                    return Self::is_private_ip_inner(&IpAddr::V4(v4), allow_loopback);
+                    return Self::is_private_ip_inner(&IpAddr::V4(v4), allow_loopback, allow_private_ip);
                 }
 
                 let segments = ipv6.segments();
@@ -217,7 +228,7 @@ impl SsrfGuard {
                 ipv6.is_unspecified()
                     || (!allow_loopback && ipv6.is_loopback())
                     || (segments[0] & 0xffc0) == 0xfe80
-                    || (segments[0] & 0xfe00) == 0xfc00
+                    || (!allow_private_ip && (segments[0] & 0xfe00) == 0xfc00)
                     || (segments[0] == 0x2001 && segments[1] == 0xdb8)
             }
         }
