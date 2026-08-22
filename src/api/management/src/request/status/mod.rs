@@ -245,6 +245,11 @@ struct ConfigResponse<'a> {
 #[derive(Serialize)]
 struct ConfigBootstrapResponse {
     build_id: String,
+    /// Transition shim, VALUED as `build_id` (never the real commit): pre-split
+    /// frontends read `commit_hash` for stale-build detection, and across the
+    /// split upgrade their comparison must still fire. Remove one release after
+    /// the split ships.
+    commit_hash: String,
     telemetry_enabled: bool,
     sso_enabled: bool,
     native_login_enabled: bool,
@@ -381,6 +386,7 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
 
     axum::Json(ConfigBootstrapResponse {
         build_id: config::BUILD_ID.clone(),
+        commit_hash: config::BUILD_ID.clone(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         sso_enabled,
         native_login_enabled,

@@ -48,4 +48,22 @@ describe("buildVersionChecker", () => {
     await expect(checker.checkForNewVersion()).resolves.toBe(false);
     expect(configService.get_config).not.toHaveBeenCalled();
   });
+
+  it("falls back to commit_hash when the server predates build_id (rolling deploy)", async () => {
+    const checker = await loadChecker();
+    checker.setInitialVersion("aaaaaaaaaaaaaaaa");
+    (configService.get_config as any).mockResolvedValue({
+      data: { commit_hash: "oldbackendcommithash1234" },
+    });
+
+    await expect(checker.checkForNewVersion()).resolves.toBe(true);
+  });
+
+  it("removes the orphaned pre-split localStorage key on load", async () => {
+    localStorage.setItem("o2_initial_commit_hash", "deadbeef");
+
+    await loadChecker();
+
+    expect(localStorage.getItem("o2_initial_commit_hash")).toBeNull();
+  });
 });

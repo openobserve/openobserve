@@ -847,8 +847,9 @@ export default defineComponent({
     };
 
     const navigateToLicense = () => {
-      // Get meta org identifier
-      const metaOrgIdentifier = store.state.zoConfig.meta_org;
+      // Get meta org identifier; "_meta" fallback covers the window before the
+      // authenticated full config (which carries meta_org) has loaded.
+      const metaOrgIdentifier = store.state.zoConfig.meta_org || "_meta";
 
       // Find the meta org from the organizations list
       const metaOrg = store.state.organizations?.find(

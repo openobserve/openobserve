@@ -63,6 +63,7 @@ interface ConfigResponse {
   data?: {
     telemetry_enabled?: boolean;
     build_id?: string;
+    commit_hash?: string;
     rum?: {
       enabled: boolean;
       client_token: string;
@@ -89,9 +90,11 @@ const getConfig = async () => {
     }
     config.enableAnalytics = res.data.telemetry_enabled?.toString() ?? "false";
 
-    // Store the opaque build fingerprint for stale-build detection
-    if (res.data.build_id) {
-      buildVersionChecker.setInitialVersion(res.data.build_id);
+    // Store the opaque build fingerprint for stale-build detection.
+    // commit_hash fallback covers a not-yet-upgraded backend mid rolling deploy.
+    const buildFingerprint = res.data.build_id ?? res.data.commit_hash;
+    if (buildFingerprint) {
+      buildVersionChecker.setInitialVersion(buildFingerprint);
     }
     if (res.data.rum?.enabled) {
       const options = {

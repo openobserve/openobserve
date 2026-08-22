@@ -1168,11 +1168,18 @@ export default defineComponent({
      * fields; everything menu- and feature-related arrives here.
      * @throws {Error} If the request fails.
      */
-    const getConfig = async () => {
+    const FULL_CONFIG_RETRY_DELAYS_MS = [2000, 5000, 15000];
+
+    const getConfig = async (attempt = 0) => {
       const orgIdentifier = store.state.selectedOrganization?.identifier;
-      // No org yet on a fresh session — the selectedOrganization watcher below
-      // retries as soon as one is resolved.
-      if (!orgIdentifier) return;
+      if (!orgIdentifier) {
+        // No org yet on a fresh session — the selectedOrganization watcher
+        // retries as soon as one is resolved. Fail open meanwhile: a user whose
+        // org never resolves (org-list failure, zero orgs) must still see the
+        // base menu, not a blank shell.
+        menuReady.value = true;
+        return;
+      }
       await configService
         .get_config_full(orgIdentifier)
         .then(async (res: any) => {
@@ -1189,11 +1196,34 @@ export default defineComponent({
           if (res.data.rum.enabled) {
             setRumUser();
           }
+          // The empty-data → /ingestion redirect depends on
+          // restricted_routes_on_empty_data, which only arrives with the full
+          // config — the first navigation ran before it landed, so re-check now.
+          if (
+            res.data.restricted_routes_on_empty_data === true &&
+            store.state.organizationData.isDataIngested === false
+          ) {
+            await verifyStreamExist(store.state.selectedOrganization);
+          }
         })
         .catch((error) => {
-          console.log(error);
-          // Fail open: reveal the base menu even if /config never resolves.
+          console.error("Failed to load the full configuration:", error);
+          // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
+          // Session replay must not be lost to a failed config fetch — the rum
+          // settings already arrived with the unauthenticated bootstrap.
+          if (store.state.zoConfig?.rum?.enabled) {
+            setRumUser();
+          }
+          // A transient failure (expired session being refreshed, rolling
+          // deploy) would otherwise strand the session on the bootstrap subset.
+          if (attempt < FULL_CONFIG_RETRY_DELAYS_MS.length) {
+            setTimeout(() => {
+              if (needsFullConfig()) {
+                getConfig(attempt + 1);
+              }
+            }, FULL_CONFIG_RETRY_DELAYS_MS[attempt]);
+          }
         });
     };
 

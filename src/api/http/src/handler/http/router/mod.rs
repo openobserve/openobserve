@@ -1647,6 +1647,7 @@ mod tests {
             keys,
             vec![
                 "build_id",
+                "commit_hash",
                 "custom_hide_self_logo",
                 "custom_logo_dark_img",
                 "custom_logo_img",
@@ -1657,6 +1658,16 @@ mod tests {
                 "telemetry_enabled",
             ],
             "unauthenticated /config must expose exactly the login-page bootstrap fields"
+        );
+
+        // Transition shim: `commit_hash` is served VALUED as the opaque
+        // build_id so pre-split frontends' stale-build checkers still fire
+        // across the upgrade, without disclosing the real commit. Remove the
+        // key (and this assertion) one release after the split ships.
+        assert_eq!(
+            payload.get("commit_hash"),
+            payload.get("build_id"),
+            "bootstrap commit_hash must alias build_id, never the real commit"
         );
     }
 

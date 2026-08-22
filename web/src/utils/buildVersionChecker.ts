@@ -34,6 +34,15 @@ class BuildVersionChecker {
   private cacheDuration = 5 * 60 * 1000; // Cache for 5 minutes
   private cachedConfig: any = null;
 
+  constructor() {
+    // One-time cleanup of the pre-split baseline key.
+    try {
+      localStorage.removeItem("o2_initial_commit_hash");
+    } catch {
+      // localStorage unavailable — nothing to clean.
+    }
+  }
+
   /**
    * Get initial version from localStorage or null if not set
    */
@@ -67,14 +76,16 @@ class BuildVersionChecker {
 
     // Return cached version if still fresh
     if (this.cachedConfig && now - this.lastCheckTime < this.cacheDuration) {
-      return this.cachedConfig.build_id;
+      return this.cachedConfig.build_id ?? this.cachedConfig.commit_hash;
     }
 
     const response = await configService.get_config();
     this.cachedConfig = response.data;
     this.lastCheckTime = now;
 
-    return this.cachedConfig.build_id;
+    // commit_hash fallback: a not-yet-upgraded backend during a rolling deploy
+    // has no build_id on /config yet.
+    return this.cachedConfig.build_id ?? this.cachedConfig.commit_hash;
   }
 
   /**

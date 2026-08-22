@@ -61,9 +61,11 @@ pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 /// Opaque per-build fingerprint for the unauthenticated `/config` bootstrap:
 /// the UI detects a redeploy by comparing it, without the endpoint disclosing
-/// the version or commit hash.
-pub static BUILD_ID: Lazy<String> =
-    Lazy::new(|| digest(format!("{COMMIT_HASH}{BUILD_DATE}"))[..16].to_string());
+/// the version or commit hash. Derived from the commit alone — BUILD_DATE
+/// would differ between rebuilds of the same commit (per-arch images,
+/// staggered fleet builds) and make mixed same-commit fleets flap the UI's
+/// stale-build prompt.
+pub static BUILD_ID: Lazy<String> = Lazy::new(|| digest(COMMIT_HASH)[..16].to_string());
 
 pub const META_ORG_ID: &str = "_meta";
 pub const DEFAULT_ORG: &str = "default";
