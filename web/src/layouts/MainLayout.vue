@@ -609,14 +609,26 @@ export default defineComponent({
       announcementBarObserver = null;
     });
 
+    const needsFullConfig = () =>
+      !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
+      store.state.zoConfig.version == "";
+
+    // The full config endpoint is authenticated and org-scoped; on a fresh
+    // session the org can resolve after this component mounts.
+    watch(
+      () => store.state.selectedOrganization?.identifier,
+      (identifier) => {
+        if (identifier && needsFullConfig()) {
+          getConfig();
+        }
+      },
+    );
+
     onMounted(async () => {
       filterMenus();
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
-      if (
-        !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
-        store.state.zoConfig.version == ""
-      ) {
+      if (needsFullConfig()) {
         getConfig();
       } else {
         if (config.isCloud == "false") {
@@ -1151,13 +1163,18 @@ export default defineComponent({
     };
 
     /**
-     * Get configuration from the backend.
-     * @return {"version":"","instance":"","commit_hash":"","build_date":"","default_fts_keys":["field1","field2"],"telemetry_enabled":true,"default_functions":[{"name":"function name","text":"match_all('v')"}}
+     * Get the full authenticated configuration from the backend. The
+     * unauthenticated bootstrap fetched in main.ts carries only the login-page
+     * fields; everything menu- and feature-related arrives here.
      * @throws {Error} If the request fails.
      */
     const getConfig = async () => {
+      const orgIdentifier = store.state.selectedOrganization?.identifier;
+      // No org yet on a fresh session — the selectedOrganization watcher below
+      // retries as soon as one is resolved.
+      if (!orgIdentifier) return;
       await configService
-        .get_config()
+        .get_config_full(orgIdentifier)
         .then(async (res: any) => {
           if (config.isCloud == "false") {
             linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
