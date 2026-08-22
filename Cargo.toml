@@ -517,6 +517,7 @@ opentelemetry-proto = { version = "0.32", features = [
     "with-serde",
     "logs",
     "metrics",
+    "profiles",
     "trace",
 ] }
 parking_lot = "0.12"

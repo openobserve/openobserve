@@ -21,6 +21,7 @@ use openobserve_node::{cluster_info::ClusterInfoService, node::NodeService};
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
     metrics::v1::metrics_service_server::MetricsServiceServer,
+    profiles::v1development::profiles_service_server::ProfilesServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
 use proto::cluster_rpc::{
@@ -46,6 +47,7 @@ use crate::{
             ingest::Ingester,
             logs::LogsServer,
             metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
+            profiles::ProfilesServer,
             query_cache::QueryCacheServerImpl,
             stream::StreamServiceImpl,
             traces::TraceServer,
@@ -112,6 +114,11 @@ async fn run_common(
         .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    let profiles_svc = ProfilesServiceServer::new(ProfilesServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -150,6 +157,7 @@ async fn run_common(
     let metrics_svc = authenticated(metrics_svc);
     let metrics_ingest_svc = otlp_authenticated(metrics_ingest_svc);
     let trace_svc = otlp_authenticated(trace_svc);
+    let profiles_svc = otlp_authenticated(profiles_svc);
     let logs_svc = otlp_authenticated(logs_svc);
     let query_cache_svc = authenticated(query_cache_svc);
     let ingest_svc = authenticated(ingest_svc);
@@ -172,6 +180,7 @@ async fn run_common(
         .add_service(metrics_svc)
         .add_service(metrics_ingest_svc)
         .add_service(trace_svc)
+        .add_service(profiles_svc)
         .add_service(logs_svc)
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
@@ -217,10 +226,16 @@ async fn run_router(
         .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    let profiles_svc = ProfilesServiceServer::new(router::grpc::ingest::profiles::ProfilesServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
     let logs_svc = otlp_authenticated(logs_svc);
     let metrics_svc = otlp_authenticated(metrics_svc);
     let traces_svc = otlp_authenticated(traces_svc);
+    let profiles_svc = otlp_authenticated(profiles_svc);
 
     log::info!(
         "starting gRPC server {} at {}",
@@ -234,6 +249,7 @@ async fn run_router(
         .add_service(logs_svc)
         .add_service(metrics_svc)
         .add_service(traces_svc)
+        .add_service(profiles_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
