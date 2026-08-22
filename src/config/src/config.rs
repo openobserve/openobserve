@@ -454,6 +454,10 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
+        status_pages_enabled,
+        status_page_rebuild_interval,
+        status_page_trust_proxy_headers,
+        status_page_public_rpm,
         lambda_browser: _,
         lambda_net: _,
         api_endpoint: _,
@@ -475,6 +479,18 @@ pub(crate) fn synthetics_restart_required_changes(
     if old.enabled != *enabled {
         changed.push("ZO_SYNTHETICS_ENABLED");
     }
+    // Gates a `tokio::spawn` exactly like `enabled` does.
+    if old.status_pages_enabled != *status_pages_enabled {
+        changed.push("ZO_STATUS_PAGES_ENABLED");
+    }
+    // Read once when the rebuilder loop starts.
+    if old.status_page_rebuild_interval != *status_page_rebuild_interval {
+        changed.push("ZO_STATUS_PAGE_REBUILD_INTERVAL");
+    }
+    // Read live per request; no restart needed, so not reported here — bind
+    // them so the exhaustive match compiles.
+    let _ = status_page_trust_proxy_headers;
+    let _ = status_page_public_rpm;
     changed
 }
 
@@ -898,6 +914,42 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
+    /// Public status pages built on synthetics. Off by default; requires
+    /// `enabled` — the rebuilder and status-page routes only exist when both
+    /// are true.
+    #[env_config(
+        name = "ZO_STATUS_PAGES_ENABLED",
+        default = false,
+        help = "Master switch for public status pages built on synthetics. Requires ZO_SYNTHETICS_ENABLED."
+    )]
+    pub status_pages_enabled: bool,
+    /// Seconds between status-page snapshot rebuild ticks.
+    #[env_config(
+        name = "ZO_STATUS_PAGE_REBUILD_INTERVAL",
+        default = 60,
+        help = "Seconds between status-page snapshot rebuild ticks."
+    )]
+    pub status_page_rebuild_interval: u64,
+    /// Trust `X-Forwarded-For` for the public status-page password-attempt
+    /// limiter. Off by default: a spoofable header must not be the rate-limit
+    /// key unless a trusted proxy sets it.
+    #[env_config(
+        name = "ZO_STATUS_PAGE_TRUST_PROXY_HEADERS",
+        default = false,
+        help = "Trust X-Forwarded-For for the status-page password-attempt limiter (only behind a trusted proxy)."
+    )]
+    pub status_page_trust_proxy_headers: bool,
+    /// Per-IP request budget per minute for the public status-page read routes
+    /// (snapshot / page / badge / feed). Generous by default — thousands of a
+    /// customer's employees can share one corporate NAT egress IP during an
+    /// outage, so a tight cap would 429 legitimate panicked visitors. 0
+    /// disables the limiter.
+    #[env_config(
+        name = "ZO_STATUS_PAGE_PUBLIC_RPM",
+        default = 240,
+        help = "Per-IP requests/minute for the public status-page read routes. 0 disables."
+    )]
+    pub status_page_public_rpm: u32,
     /// Lambda function name for the browser probe (handles all engines:
     /// chromium, firefox, edge).
     #[env_config(

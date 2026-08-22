@@ -171,6 +171,7 @@ mod m20260820_000003_create_llm_secrets;
 mod m20260824_000001_create_llm_playground_snapshots;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260827_000001_drop_table_action_scripts;
+mod m20260822_000001_create_status_pages_tables;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -416,6 +417,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
             Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
             Box::new(m20260827_000001_drop_table_action_scripts::Migration),
+            Box::new(m20260822_000001_create_status_pages_tables::Migration),
         ]
     }
 }
@@ -447,6 +449,10 @@ mod tests {
             .into_iter()
             .map(|migration| migration.name().to_string())
             .collect();
+        assert_eq!(
+            names.last().map(String::as_str),
+            Some("m20260822_000001_create_status_pages_tables")
+        );
         assert_eq!(
             names
                 .iter()

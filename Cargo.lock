@@ -8086,6 +8086,7 @@ name = "openobserve-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "argon2",
  "arrow",
  "arrow-json",
  "arrow-schema",
