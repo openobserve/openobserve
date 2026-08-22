@@ -351,6 +351,24 @@ describe("PreviewAlert - refreshData method", () => {
     w.unmount();
   });
 
+  // A binary operator or an aggregation strips every label, so the series comes
+  // back with an empty label set that the legend would otherwise render as "{}".
+  it('names a label-less promql series after the stream, not "{}"', async () => {
+    const w = await mountComp({
+      query: "a / on(instance, job) b",
+      selectedTab: "promql",
+      formData: baseFormData(),
+    });
+
+    w.vm.refreshData();
+    await nextTick();
+
+    expect(w.vm.dashboardPanelData?.data?.queries?.[0]?.config?.promql_legend_fallback).toBe(
+      "test-stream",
+    );
+    w.unmount();
+  });
+
   it("sets queryType to sql in custom mode", async () => {
     const w = await mountComp({
       query: "SELECT * FROM logs",

@@ -1271,6 +1271,12 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queries[0].config.promql_mode = true;
+    // A binary operator or an aggregation strips every label, leaving a series
+    // the legend renders as "{}". Name it after what the alert measures — the
+    // same fallback AlertGroupChart uses. Consulted only when a series has no
+    // name of its own to give: labels that identify it always win.
+    dashboardPanelData.data.queries[0].config.promql_legend_fallback =
+      props.formData.stream_name || t("alerts.preview");
     dashboardPanelData.data.queryType = "promql";
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
