@@ -132,10 +132,10 @@ pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
         .and_then(|_| refresh_openfga_config())
 }
 
+/// Authenticated full UI configuration (`GET /api/{org_id}/config`).
 #[derive(Serialize)]
 struct ConfigResponse<'a> {
     version: String,
-    instance: String,
     commit_hash: String,
     build_date: String,
     build_type: String,
@@ -234,6 +234,25 @@ struct ConfigResponse<'a> {
     billing_group_allowed_orgs: String,
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
+}
+
+/// Unauthenticated bootstrap configuration (`GET /config`).
+///
+/// Served without auth so the login page can render, which makes every field a
+/// disclosure to anonymous clients. Keep it to what the login page actually
+/// consumes; everything else belongs in [`ConfigResponse`] behind auth. The
+/// exact-key-set test on this response enforces that.
+#[derive(Serialize)]
+struct ConfigBootstrapResponse {
+    build_id: String,
+    telemetry_enabled: bool,
+    sso_enabled: bool,
+    native_login_enabled: bool,
+    custom_logo_text: String,
+    custom_logo_img: Option<String>,
+    custom_logo_dark_img: Option<String>,
+    custom_hide_self_logo: bool,
+    rum: Rum,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -336,6 +355,45 @@ pub async fn schedulez() -> impl IntoResponse {
     )
 }
 
+/// Unauthenticated login-page bootstrap; the full config is served
+/// authenticated by [`zo_config`].
+pub async fn zo_config_bootstrap() -> impl IntoResponse {
+    let cfg = get_config();
+    #[cfg(feature = "enterprise")]
+    let o2cfg = get_o2_config();
+    #[cfg(feature = "enterprise")]
+    let dex_cfg = get_dex_config();
+
+    #[cfg(feature = "enterprise")]
+    let block_features = block_feature_for_report_failure().await;
+
+    let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
+    let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
+    let custom_logo_text = enterprise_value!(
+        "".to_string(),
+        get_logo_text()
+            .await
+            .unwrap_or_else(|| o2cfg.common.custom_logo_text.clone())
+    );
+    let custom_logo_img = enterprise_value!(None, get_logo().await);
+    let custom_logo_dark_img = enterprise_value!(None, get_logo_dark().await);
+    let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
+
+    axum::Json(ConfigBootstrapResponse {
+        build_id: config::BUILD_ID.clone(),
+        telemetry_enabled: cfg.common.telemetry_enabled,
+        sso_enabled,
+        native_login_enabled,
+        custom_logo_text,
+        custom_logo_img,
+        custom_logo_dark_img,
+        custom_hide_self_logo,
+        rum: Rum::from_cfg(cfg.clone()),
+    })
+}
+
+/// Full UI configuration; org-scoped so auth applies, though the payload is
+/// instance-level.
 pub async fn zo_config() -> impl IntoResponse {
     let cfg = get_config();
     #[cfg(feature = "enterprise")]
@@ -429,7 +487,6 @@ pub async fn zo_config() -> impl IntoResponse {
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
-        instance: get_instance_id(),
         commit_hash: config::COMMIT_HASH.to_string(),
         build_date: config::BUILD_DATE.to_string(),
         build_type: build_type.to_string(),

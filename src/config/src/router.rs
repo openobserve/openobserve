@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 34] = [
-    ("config", 0),               // /config
+const QUERIER_ROUTES: [(&str, usize); 35] = [
+    ("config", 0),               // /config (unauthenticated bootstrap)
+    ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
     ("organizations", 1),        // /api/organizations
     ("settings", 2),             // /api/{org_id}/settings/...
@@ -142,9 +143,10 @@ mod tests {
 
     #[test]
     fn test_is_querier_route() {
-        // Test config route
+        // Test config routes: the unauthenticated bootstrap and the
+        // authenticated per-org config are both served by queriers.
         assert!(is_querier_route("/config"));
-        assert!(!is_querier_route("/api/org1/config"));
+        assert!(is_querier_route("/api/org1/config"));
 
         // Test summary route
         assert!(is_querier_route("/api/org1/summary"));
