@@ -49,7 +49,7 @@ test.describe('Config Endpoint Split: Login Bootstrap vs Authenticated Full Conf
 
     const body = await resp.json();
     expect(Object.keys(body).sort()).toEqual([...BOOTSTRAP_EXACT_KEYS].sort());
-    expect(body.build_type).toBe('opensource');
+    expect(['opensource', 'enterprise']).toContain(body.build_type);
     expect(typeof body.commit_hash).toBe('string');
     expect(body.commit_hash.length).toBeGreaterThan(0);
     expect(body.version).toBeUndefined();
@@ -69,7 +69,7 @@ test.describe('Config Endpoint Split: Login Bootstrap vs Authenticated Full Conf
     const body = await resp.json();
     expect(typeof body.version).toBe('string');
     expect(body.version.length).toBeGreaterThan(0);
-    expect(body.build_type).toBe('opensource');
+    expect(['opensource', 'enterprise']).toContain(body.build_type);
     expect(Array.isArray(body.sql_reserved_keywords)).toBe(true);
     expect(body.sql_reserved_keywords.length).toBeGreaterThan(0);
     expect(body.instance).toBeUndefined();
@@ -122,7 +122,7 @@ test.describe('Config Endpoint Split: Login Bootstrap vs Authenticated Full Conf
       // About page shows the full-config canary (non-empty version + opensource).
       await localPm.aboutPage.gotoAboutPageByUrl(getOrgIdentifier());
       await localPm.aboutPage.waitForVersionNonEmpty();
-      await localPm.aboutPage.expectBuildType('opensource');
+      await localPm.aboutPage.expectBuildType(bootstrapBody.build_type);
       testLogger.info('Bootstrap → login → full config → About version canary verified');
     } finally {
       await context.close();

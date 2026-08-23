@@ -9,14 +9,14 @@ export class AboutPage {
         this.aboutPageMenu = page.locator('[data-test="menu-link-about-item"]');
         // this.aboutPageMenu = page.locator('[data-test="menu-link-about-item"]');
         // Config-endpoint split (config-bootstrap): the meta-bar pills are the
-        // visible canary that the authenticated full config loaded. These
-        // data-test attributes were added in web/src/views/About.vue.
+        // visible canary that the authenticated full config loaded. The About
+        // view renders them without dedicated data-test hooks, so locate them
+        // by their stable text/role contracts instead.
         this.navRail = page.locator('[data-test="navbar-main-nav"]');
-        this.versionPill = page.locator('[data-test="about-version"]');
-        this.buildTypePill = page.locator('[data-test="about-build-type"]');
-        this.commitHashPill = page.locator('[data-test="about-commit-hash"]');
-        this.buildDatePill = page.locator('[data-test="about-build-date"]');
-        this.commitCopyButton = page.locator('[data-test="about-commit-copy"]');
+        this.versionPill = page.getByText(/v\d+\.\d+\.\d+/);
+        this.buildTypePill = page.getByText(/^\s*(opensource|enterprise)\s*$/);
+        this.commitHashPill = page.getByText(/^[0-9a-f]{40}$/);
+        this.commitCopyButton = page.getByRole('button', { name: 'Copy commit hash' });
         this.successToast = page.locator('[data-test-variant="success"]');
 
     }

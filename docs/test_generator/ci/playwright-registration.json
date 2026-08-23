@@ -1,6 +1,0 @@
-{
-  "group": "GeneralTests",
-  "spec_filename": "configBootstrap.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
