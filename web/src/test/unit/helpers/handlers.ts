@@ -169,12 +169,11 @@ export const restHandlers = [
     },
   ),
 
-  // Unauthenticated login bootstrap (commit_hash aliases build_id by design)
+  // Unauthenticated login bootstrap
   http.get(`${store.state.API_ENDPOINT}/config`, () => {
     return HttpResponse.json({
-      build_id: "3cc381d699e28bcb",
       build_type: "opensource",
-      commit_hash: "3cc381d699e28bcb",
+      commit_hash: "3cc381d699e28bcb1b6d74310be16ec060b37e0d",
       telemetry_enabled: true,
       sso_enabled: false,
       native_login_enabled: true,

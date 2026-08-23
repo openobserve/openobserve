@@ -62,7 +62,6 @@ reoInit();
 interface ConfigResponse {
   data?: {
     telemetry_enabled?: boolean;
-    build_id?: string;
     build_type?: string;
     commit_hash?: string;
     rum?: {
@@ -91,11 +90,9 @@ const getConfig = async () => {
     }
     config.enableAnalytics = res.data.telemetry_enabled?.toString() ?? "false";
 
-    // Store the opaque build fingerprint for stale-build detection.
-    // commit_hash fallback covers a not-yet-upgraded backend mid rolling deploy.
-    const buildFingerprint = res.data.build_id ?? res.data.commit_hash;
-    if (buildFingerprint) {
-      buildVersionChecker.setInitialVersion(buildFingerprint);
+    // Store initial commit hash for version checking
+    if (res.data.commit_hash) {
+      buildVersionChecker.setInitialVersion(res.data.commit_hash);
     }
     if (res.data.rum?.enabled) {
       const options = {

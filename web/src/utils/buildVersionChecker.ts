@@ -18,30 +18,18 @@ import configService from "@/services/config";
 /**
  * Approach:
  * 1. When app loads, config API is called (by main.ts) and stored in Vuex store
- * 2. We store the initial opaque build_id from that config in localStorage
- * 3. On chunk/resource errors, fetch config API again to check if build_id changed
+ * 2. We store the initial commit hash from that config in localStorage
+ * 3. On chunk/resource errors, fetch config API again to check if commit hash changed
  * 4. Cache config responses to avoid excessive API calls
- * 5. Only treat as stale build if build_id actually changed
- *
- * The unauthenticated /config bootstrap deliberately exposes no version or
- * commit hash; build_id is its opaque per-deploy fingerprint.
+ * 5. Only treat as stale build if commit hash actually changed
  */
 
 class BuildVersionChecker {
-  private readonly STORAGE_KEY = "o2_initial_build_id";
+  private readonly STORAGE_KEY = "o2_initial_commit_hash";
   private isChecking = false;
   private lastCheckTime = 0;
   private cacheDuration = 5 * 60 * 1000; // Cache for 5 minutes
   private cachedConfig: any = null;
-
-  constructor() {
-    // One-time cleanup of the pre-split baseline key.
-    try {
-      localStorage.removeItem("o2_initial_commit_hash");
-    } catch {
-      // localStorage unavailable — nothing to clean.
-    }
-  }
 
   /**
    * Get initial version from localStorage or null if not set
@@ -60,32 +48,30 @@ class BuildVersionChecker {
    * This should be called from main.ts after the config is fetched
    * Updates on every page load to ensure we track the current deployed version
    */
-  public setInitialVersion(buildId: string): void {
+  public setInitialVersion(commitHash: string): void {
     try {
-      localStorage.setItem(this.STORAGE_KEY, buildId);
+      localStorage.setItem(this.STORAGE_KEY, commitHash);
     } catch (error) {
       console.warn("Failed to write to localStorage:", error);
     }
   }
 
   /**
-   * Fetch the opaque build id from the bootstrap config API
+   * Fetch commit hash from config API
    */
-  async fetchBuildId(): Promise<string> {
+  async fetchCommitHash(): Promise<string> {
     const now = Date.now();
 
     // Return cached version if still fresh
     if (this.cachedConfig && now - this.lastCheckTime < this.cacheDuration) {
-      return this.cachedConfig.build_id ?? this.cachedConfig.commit_hash;
+      return this.cachedConfig.commit_hash;
     }
 
     const response = await configService.get_config();
     this.cachedConfig = response.data;
     this.lastCheckTime = now;
 
-    // commit_hash fallback: a not-yet-upgraded backend during a rolling deploy
-    // has no build_id on /config yet.
-    return this.cachedConfig.build_id ?? this.cachedConfig.commit_hash;
+    return this.cachedConfig.commit_hash;
   }
 
   /**
@@ -104,9 +90,13 @@ class BuildVersionChecker {
 
     this.isChecking = true;
     try {
-      const currentBuildId = await this.fetchBuildId();
+      const currentServerHash = await this.fetchCommitHash();
 
-      return !!currentBuildId && currentBuildId !== initialVersion;
+      // Compare short hashes (first 7 chars)
+      const initialShort = initialVersion.substring(0, 7);
+      const currentShort = currentServerHash.substring(0, 7);
+
+      return currentShort !== initialShort;
     } catch (error) {
       return false;
     } finally {
