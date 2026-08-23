@@ -75,7 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-warning text-xs font-semibold tracking-wide uppercase">{{
                   t("about.build_lbl")
                 }}</span>
-                {{ formatDate(store.state.zoConfig.build_date) }}
+                {{
+                  store.state.zoConfig.build_date ? formatDate(store.state.zoConfig.build_date) : ""
+                }}
               </span>
             </div>
           </div>

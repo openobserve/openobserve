@@ -169,10 +169,25 @@ export const restHandlers = [
     },
   ),
 
+  // Unauthenticated login bootstrap
   http.get(`${store.state.API_ENDPOINT}/config`, () => {
     return HttpResponse.json({
+      build_type: "opensource",
+      commit_hash: "3cc381d699e28bcb1b6d74310be16ec060b37e0d",
+      telemetry_enabled: true,
+      sso_enabled: false,
+      native_login_enabled: true,
+      custom_logo_text: "",
+      custom_logo_img: null,
+      custom_logo_dark_img: null,
+      custom_hide_self_logo: false,
+    });
+  }),
+
+  // Authenticated full configuration
+  http.get(`${store.state.API_ENDPOINT}/api/:org_identifier/config`, () => {
+    return HttpResponse.json({
       version: "v0.3.2",
-      instance: "7049348417797095424",
       commit_hash: "3cc381d699e28bcb1b6d74310be16ec060b37e0d",
       build_date: "2023-04-05T11:01:23Z",
       default_fts_keys: ["log", "message", "msg", "content", "data"],
@@ -334,21 +349,6 @@ export const restHandlers = [
       {
         message: "Custom text updated successfully",
         custom_text: body,
-      },
-      { status: 200 },
-    );
-  }),
-
-  // Config Service handler
-  http.get(`${store.state.API_ENDPOINT}/config`, () => {
-    return HttpResponse.json(
-      {
-        streaming_enabled: true,
-        custom_logo_text: "Test Logo Text",
-        custom_logo_img: "base64imagedata",
-        meta_org: "default",
-        version: "v0.10.0",
-        default_fts_keys: ["log", "message", "msg", "content", "data"],
       },
       { status: 200 },
     );
