@@ -32,7 +32,7 @@
       </div>
       <div v-else class="indexDetailsContainer h-screen w-full p-5">
         <div
-          class="titleContainer items-flex-start bg-surface-subtle border-input-border rounded-default flex flex-col gap-5 border p-4"
+          class="titleContainer items-flex-start bg-surface-subtle border-border-default rounded-default flex flex-col gap-5 border p-4"
         >
           <div
             data-test="stream-details-container"

@@ -61,9 +61,27 @@
   --color-surface-chrome: color-mix(in srgb, var(--color-primary-50) 55%, var(--color-grey-50));
   --color-surface-chrome-deeper: var(--color-primary-100);
 
-  /* Borders */
-  --color-border-default: var(--color-grey-200);
+  /* Borders — three steps, chosen against WCAG 2.1 SC 1.4.11 (Non-text
+     Contrast), which asks for 3:1 on the visual boundary of a UI COMPONENT.
+     That bar applies to a boundary the user must perceive to operate the thing
+     (an input's edge is the only signal it is an input); it does not apply to a
+     decorative grouping line, so the three steps are held to different bars.
+
+     Contrast against a white surface:
+       subtle  #ededed  1.17:1   grouping only, never a control edge
+       default #d4d4d4  1.48:1   card / table / rail edges
+       control #949494  3.02:1   inputs, checkboxes, anything operable
+       strong  #a3a3a3  2.52:1   emphasis, not an accessibility guarantee
+
+     `default` was grey-200 (1.26:1) and read as barely-there on a white card;
+     grey-300 firms it without turning every card into a box. Controls get
+     their own token rather than borrowing `strong`, which does NOT reach 3:1
+     and would have quietly implied it did. */
+  --color-border-default: var(--color-grey-300);
   --color-border-strong: var(--color-grey-400);
+  /* The only border step that clears 3:1 in light mode. Use for the edge of
+     anything the user operates — input, select, checkbox, radio, textarea. */
+  --color-border-control: #949494;
   /* Soft divider — lighter than the structural border. Use for in-list row
      dividers and intra-card section splits. */
   --color-border-subtle: var(--color-grey-150);
@@ -133,6 +151,7 @@
      nothing else substitutes. Registering makes them usable in a template. */
   --color-border-default: var(--color-border-default);
   --color-border-strong: var(--color-border-strong);
+  --color-border-control: var(--color-border-control);
   --color-border-subtle: var(--color-border-subtle);
 
   /* Overlay scrim */

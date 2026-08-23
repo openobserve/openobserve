@@ -81,7 +81,9 @@ vi.mock("@/utils/streamPersist", () => ({
   restoreMetricsStream: vi.fn(() => ""),
 }));
 
-vi.mock("vuex", () => ({
+// partial: the panel seed path reaches @/stores, which needs the real createStore
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       selectedOrganization: { identifier: "org1" },

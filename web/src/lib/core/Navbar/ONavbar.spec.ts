@@ -140,7 +140,7 @@ describe("ONavbar", () => {
       const reliability = wrapper.find('[data-test="nav-group-reliability"]');
       expect(reliability.exists()).toBe(true);
       expect(reliability.attributes("data-children")).toBe(
-        "alertList,alertDestinations,alertTemplates",
+        "alertList,alertDestinations,alertTemplates,alertLibrary",
       );
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
     });

@@ -185,3 +185,38 @@ describe.each(localeFiles)("%s", (file) => {
     });
   }
 });
+
+// The checks above are subset checks: a locale that is MISSING a key is skipped
+// (`if (english === undefined) continue` guards the reverse direction only).
+// That is deliberate for the corpus at large — machine translation runs behind
+// en-US, and a missing key falls back to en-US at runtime, which is survivable.
+//
+// It is not survivable for a message the UI composes at render time. The alert
+// preview badge builds its sentence from a label fragment
+// ("{count} {label} match ({comparison})"), and vue-i18n's fallback for an
+// unknown key is the key PATH — so a locale missing one fragment renders
+// "1 alerts.previewEvaluation.matchingSeries match (1 >= 1)" mid-sentence,
+// which reads as a crash rather than as untranslated English.
+//
+// Nothing else catches it: `I18nKey` is derived from en-US alone
+// (src/types/i18n.ts:37), so type-check sees a valid key, and the interpolation
+// check above never looks at keys a locale does not have.
+describe("alerts.previewEvaluation key parity", () => {
+  const PREFIX = "alerts.previewEvaluation.";
+  const sourceKeys = loadLocale(SOURCE_LOCALE)
+    .map(([key]) => key)
+    .filter((key) => key.startsWith(PREFIX));
+
+  it("en-US defines the block at all", () => {
+    expect(sourceKeys.length).toBeGreaterThan(0);
+  });
+
+  it.each(localeFiles.filter((file) => file !== `${SOURCE_LOCALE}.json`))(
+    "%s defines every key en-US does",
+    (file) => {
+      const locale = new Map(loadLocale(file.replace(/\.json$/, "")));
+      const missing = sourceKeys.filter((key) => !locale.has(key));
+      expect(missing).toEqual([]);
+    },
+  );
+});
