@@ -1,0 +1,32 @@
+{
+  "feature_slug": "config-bootstrap",
+  "feature_title": "Config Endpoint Split: Login Bootstrap vs Authenticated Full Config",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "configBootstrap.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/configBootstrap.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/main.ts",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/services/config.ts",
+    "web/src/views/Login.vue",
+    "web/src/views/About.vue",
+    "web/src/views/UsageTab.vue",
+    "web/src/components/settings/General.vue",
+    "web/src/components/EnterpriseUpgradeDialog.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Linked OSS+ENT pair. The bulk of changed paths (src/api/common/src/auth, src/api/http/src, src/api/management/src/request/status, src/config/src/router, web/src/**) are open-source locations. The enterprise layer is o2_openfga/src/meta/route_permissions.rs, which is enterprise-owned (OpenFGA authorization lives in the o2-enterprise repo) and is explicitly marked in the diff as a linked/sister PR (o2-enterprise #2485). Enterprise keywords (sso_enabled, native_login_enabled, custom_logo) appear only in code/fields, not as the deciding signal — the PATH split is what drives edition=both.",
+    "skip": "Not skipped: the diff is not docs/CI-only, no tests-added label or skip comment is present (empty feature hint and trigger comment), and it alters a user-facing flow (login bootstrap + authenticated full-config loading). The only test files changed are page-object helpers (tests/ui-testing/pages/logsPages/*.js) and Vitest unit tests (web/src/**/*.spec.ts) — not Playwright E2E specs, so no auto-skip-enhance applies.",
+    "e2e": "E2E is warranted: the unauthenticated /config endpoint was narrowed to login-page bootstrap fields and the full config moved to the authenticated GET /api/{org}/config. The login page (native login/SSO), post-login menu rendering in MainLayout, About build-date display, and UsageTab/settings config refresh all now depend on the new split loading flow — a regression breaks login or leaves a blank menu shell.",
+    "area": "GeneralTests: the change is cross-cutting app bootstrap/config-loading, not a single product area (Logs/Metrics/etc.). The web edits live in main.ts, MainLayout.vue, Login.vue, About.vue, UsageTab.vue and settings components, and GeneralTests is the existing catch-all area in the ci-matrix manifests where sibling general specs (cipherKeys, logoManagement, model-pricing) already live.",
+    "group": "playwright_group=GeneralTests: the closest existing shard in ci_matrix.ent.json / ci_matrix_env.json; the new configBootstrap.spec.js should join that group's run_files.",
+    "existing_tests": "No E2E specs in the diff. No files under tests/ui-testing/playwright-tests/**/*.spec.js changed. The two tests/ui-testing/pages/logsPages/*.js files are page-object helpers (not .spec.js), and the web/src/**/*.spec.ts files are Vitest unit tests — neither counts as Playwright E2E coverage of the new feature."
+  }
+}

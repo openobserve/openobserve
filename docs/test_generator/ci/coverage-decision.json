@@ -1,0 +1,16 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/configBootstrap.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/landingPage.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/sanity.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/login-form-validation.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/logoManagement.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_files": [
+    "tests/ui-testing/ci-matrix/ci_matrix.json (GeneralTests run_files)",
+    "tests/ui-testing/ci-matrix/ci_matrix_regression.json (GeneralTests-Regression run_files)"
+  ],
+  "rationale": "No existing E2E/API spec covers the /config → /api/{org}/config endpoint split. landingPage.spec.js exercises post-login navigation but asserts none of the config bootstrap key-set contract, the full-config version canary, or the menu-rail timing; login-form-validation.spec.js covers form validation, not config loading; logoManagement.spec.js covers the enterprise logo UI, not config loading. The security contract (unauthenticated bootstrap exact-key-set) plus the authenticated full-config load is a brand-new test surface with no sibling spec to append to, so a new GeneralTests spec is warranted."
+}

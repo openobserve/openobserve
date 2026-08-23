@@ -8,6 +8,16 @@ export class AboutPage {
         this.helpPageMenu = page.locator('[data-test="menu-link-help-item"]');
         this.aboutPageMenu = page.locator('[data-test="menu-link-about-item"]');
         // this.aboutPageMenu = page.locator('[data-test="menu-link-about-item"]');
+        // Config-endpoint split (config-bootstrap): the meta-bar pills are the
+        // visible canary that the authenticated full config loaded. These
+        // data-test attributes were added in web/src/views/About.vue.
+        this.navRail = page.locator('[data-test="navbar-main-nav"]');
+        this.versionPill = page.locator('[data-test="about-version"]');
+        this.buildTypePill = page.locator('[data-test="about-build-type"]');
+        this.commitHashPill = page.locator('[data-test="about-commit-hash"]');
+        this.buildDatePill = page.locator('[data-test="about-build-date"]');
+        this.commitCopyButton = page.locator('[data-test="about-commit-copy"]');
+        this.successToast = page.locator('[data-test-variant="success"]');
 
     }
     async clickHelpMenu() {
@@ -55,6 +65,58 @@ export class AboutPage {
         } catch (error) {
             throw new Error(`Failed to select organization: ${orgName}`);
         }
+    }
+
+    // ── Config-endpoint split (config-bootstrap) helpers ────────────────────
+    // Navigate straight to the About page for the given org. Used by the config
+    // specs instead of driving the Help menu, so the navigation is deterministic
+    // and the version pill can be polled after the async full-config fetch.
+    async gotoAboutPageByUrl(orgIdentifier) {
+        await this.page.goto(
+            `${process.env["ZO_BASE_URL"]}/web/about?org_identifier=${orgIdentifier}`,
+            { waitUntil: 'domcontentloaded', timeout: 60000 },
+        );
+        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    }
+
+    // The left nav rail only renders once the authenticated full config resolves
+    // (MainLayout sets menuReady=true in getConfig success/fail-open). It is the
+    // positive signal that the full config — not just the bootstrap — has loaded.
+    async expectNavRailVisible(timeout = 15000) {
+        await expect(this.navRail).toBeVisible({ timeout });
+    }
+
+    // Poll the version pill until it holds a non-empty string. `version` exists
+    // ONLY on the full config, so a non-empty pill proves the full config loaded
+    // and the smaller bootstrap subset did not clobber it.
+    async waitForVersionNonEmpty(timeout = 30000) {
+        await expect(this.versionPill).toBeVisible({ timeout });
+        await expect(this.versionPill).not.toHaveText(/^\s*$/, { timeout });
+    }
+
+    async expectBuildType(expected) {
+        await expect(this.buildTypePill).toBeVisible({ timeout: 15000 });
+        await expect(this.buildTypePill).toHaveText(expected);
+    }
+
+    async getVersionText() {
+        return (await this.versionPill.innerText()).trim();
+    }
+
+    async waitForCommitHashNonEmpty(timeout = 30000) {
+        await expect(this.commitHashPill).toBeVisible({ timeout });
+        await expect(this.commitHashPill).not.toHaveText(/^\s*$/, { timeout });
+    }
+
+    async copyCommitHash() {
+        await expect(this.commitCopyButton).toBeVisible({ timeout: 15000 });
+        await this.commitCopyButton.click();
+    }
+
+    // The copy-to-clipboard success toast (variant="success") is the durable
+    // signal that copyToClipboard ran; the toast itself auto-dismisses.
+    async expectCopySuccessToast() {
+        await expect(this.successToast.first()).toBeVisible({ timeout: 15000 });
     }
 
 

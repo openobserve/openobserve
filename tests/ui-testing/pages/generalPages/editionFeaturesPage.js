@@ -120,6 +120,15 @@ export class EditionFeaturesPage {
     await expect(item, `"${CLOUD_ONLY_FEATURE_NAME}" must stay hidden outside Cloud`).toBeHidden();
   }
 
+  // Asserts the offer badge does NOT show the hardcoded fallback value. Used by
+  // the config-bootstrap ENT-only fixme to prove the configured ingestion_quota
+  // (not the `?? 50` fallback) is rendered once the backend returns
+  // `ingestion_quota` on the full config (EnterpriseUpgradeDialog.vue:512).
+  async expectOfferBadgeNotContaining(text) {
+    await expect(this.offerBadge).toBeVisible({ timeout: 10000 });
+    await expect(this.offerBadge).not.toContainText(text);
+  }
+
   // Opens the popup for a link locator and returns the new page.
   //
   // The click and the popup wait are deliberately NOT raced inside one Promise.all

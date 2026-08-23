@@ -23,6 +23,13 @@ export class LoginPage {
     await expect(this.homeMenuItem).toBeVisible({ timeout });
   }
 
+  // Assert both native login fields are visible — proves the login page rendered
+  // from the unauthenticated bootstrap alone (used by the config-bootstrap spec).
+  async expectLoginFormVisible(timeout = 30000) {
+    await expect(this.userIdInput).toBeVisible({ timeout });
+    await expect(this.passwordInput).toBeVisible({ timeout });
+  }
+
   // ── Login-form validation helpers ─────────────────────────────────────────
   // Open the internal-user login form on a fresh (unauthenticated) page and wait
   // until both fields are interactable. On enterprise/SSO builds this clicks
