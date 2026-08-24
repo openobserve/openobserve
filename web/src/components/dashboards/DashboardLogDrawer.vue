@@ -758,12 +758,7 @@ function openInLogs() {
       :default-columns="false"
       data-test="log-explorer-results-table"
       @update:current-page="(p: number) => goToPage(p - 1)"
-      @update:page-size="
-        (n: number) => {
-          pageSize = n;
-          goToPage(0);
-        }
-      "
+      @update:page-size="(n: number) => (pageSize = n)"
       @row-click="(row: any) => openEventDetail(row)"
     >
       <template #cell-_timestamp="{ value }">{{ fmtTs(value) }}</template>

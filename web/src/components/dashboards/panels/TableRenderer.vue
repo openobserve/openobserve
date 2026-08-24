@@ -222,7 +222,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["row-click", "format-column", "cell-click", "explore-cell"],
+  emits: ["row-click", "format-column", "explore-cell"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
@@ -381,8 +381,8 @@ export default defineComponent({
     const isCellDrillable = (columnId: string) =>
       props.drilldownAllColumns || drilldownColumnSet.value.has(columnId);
 
-    // Own event (not `cell-click`) so it fires even when a panel drilldown config
-    // would otherwise swallow plain cell clicks.
+    // Dedicated drilldown event (the search icon), independent of row-click, so it fires even when
+    // a panel drilldown config would otherwise own plain cell clicks.
     const onCellDrilldown = (params: { columnId: string; row: any; value: any }) => {
       if (!isCellDrillable(params.columnId)) return;
       emit("explore-cell", params, sortedRows.value.indexOf(params.row));
@@ -539,7 +539,12 @@ export default defineComponent({
     };
 
     const downloadTableAsJSON = (title?: string) => {
-      const rows = tableRef.value?.getRows() ?? [];
+      // Strip the internal per-query marker (`__q`) so it never leaks into exports.
+      const rows = (tableRef.value?.getRows() ?? []).map((row: any) => {
+        const copy = { ...row };
+        delete copy.__q;
+        return copy;
+      });
       const content = JSON.stringify({ columns: props.data?.columns, rows }, null, 2);
       const blob = new Blob([content], { type: "application/json" });
       const url = URL.createObjectURL(blob);

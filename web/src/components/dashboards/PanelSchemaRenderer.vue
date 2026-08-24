@@ -47,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
-          @cell-click="(params) => onCellClick(params.columnId, params.value, params.row)"
           @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
           @format-column="onFormatColumn"
           ref="tableRendererRef"
@@ -1361,7 +1360,13 @@ export default defineComponent({
       if (!query || String(query.cell_panel) !== String(props.panelSchema.id)) return;
       if (props.panelSchema.type !== "table" || props.panelSchema.queryType === "promql") return;
       const field = String(query.cell_field ?? "");
-      const value = String(query.cell_value ?? "");
+      const rawValue = String(query.cell_value ?? "");
+      const value: string | number =
+        String(query.cell_vtype) === "number" &&
+        rawValue !== "" &&
+        Number.isFinite(Number(rawValue))
+          ? Number(rawValue)
+          : rawValue;
       const stream = String(query.cell_stream ?? "");
       const stype = String(query.cell_stype ?? "logs");
       const t0 = Number(query.cell_t0 ?? 0);
@@ -1685,9 +1690,9 @@ export default defineComponent({
         );
         const m = re.exec(sql.replace(/\n/g, " "));
         if (m?.[1]) {
-          const col = m[1].split(".").pop()!; // strip stream prefix
-
-          if (col.toLowerCase() !== alias.toLowerCase()) return col;
+          const parts = m[1].split("."); // strip stream prefix
+          const col = parts[parts.length - 1];
+          if (col && col.toLowerCase() !== alias.toLowerCase()) return col;
         }
       }
 
@@ -1718,6 +1723,7 @@ export default defineComponent({
           cell_panel: props.panelSchema.id,
           cell_field: params.field,
           cell_value: String(params.value),
+          cell_vtype: typeof params.value,
           cell_stream: params.stream,
           cell_stype: params.streamType,
           cell_t0: String(params.startTime),
@@ -1735,6 +1741,7 @@ export default defineComponent({
           "cell_panel",
           "cell_field",
           "cell_value",
+          "cell_vtype",
           "cell_stream",
           "cell_stype",
           "cell_t0",
@@ -1782,11 +1789,6 @@ export default defineComponent({
         endTime: metaEndMicros || selEndMicros || Date.now() * 1000,
         baseWhere,
       });
-    }
-
-    function onCellClick(alias: string, value: unknown, row: any) {
-      if (props.panelSchema.config?.drilldown?.length > 0) return;
-      exploreCellInLogs(alias, value, row);
     }
 
     return {
@@ -1858,7 +1860,6 @@ export default defineComponent({
       hideContextMenu,
       handleCreateAlert,
       cellDrawer,
-      onCellClick,
       exploreCellInLogs,
       onCellDrawerOpenChange,
     };
