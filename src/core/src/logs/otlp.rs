@@ -415,6 +415,7 @@ pub async fn handle_request(
                                 &mut res,
                                 timestamps[idx],
                                 timestamps[idx],
+                                timestamps[idx],
                             ) {
                                 stream_status.status.failed += 1;
                                 stream_status.status.error = e.to_string();
@@ -538,9 +539,12 @@ pub async fn handle_request(
             .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
         if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
             for (idx, mut res) in pipeline_inputs.iter().cloned().enumerate() {
-                if let Err(e) =
-                    super::handle_timestamp_for_value(&mut res, timestamps[idx], timestamps[idx])
-                {
+                if let Err(e) = super::handle_timestamp_for_value(
+                    &mut res,
+                    timestamps[idx],
+                    timestamps[idx],
+                    timestamps[idx],
+                ) {
                     stream_status.status.failed += 1;
                     stream_status.status.error = e.to_string();
                     metrics::INGEST_ERRORS

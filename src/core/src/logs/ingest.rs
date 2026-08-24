@@ -410,7 +410,7 @@ pub async fn ingest(
                         for (idx, mut res) in stream_pl_results {
                             // handle timestamp
                             let timestamp =
-                                match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+                                match handle_timestamp_for_value(&mut res, min_ts, max_ts, 0) {
                                     Ok(ts) => ts,
                                     Err(e) => {
                                         stream_status.status.failed += 1;
@@ -696,7 +696,7 @@ fn finalize_and_buffer_record(
             return false;
         }
     };
-    let timestamp = match handle_timestamp_for_value(&mut res, ctx.min_ts, ctx.max_ts) {
+    let timestamp = match handle_timestamp_for_value(&mut res, ctx.min_ts, ctx.max_ts, 0) {
         Ok(ts) => ts,
         Err(e) => {
             ctx.stream_status.status.failed += 1;

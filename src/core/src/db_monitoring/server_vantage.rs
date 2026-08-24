@@ -1266,6 +1266,7 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     // liveness probe is simultaneously describing as healthy.
     if let Some(tag) = take_unrecognized_recipe(local_val) {
         warn_unrecognized_recipe(&tag);
+        #[cfg(not(feature = "enterprise"))]
         return;
     }
     // On OSS every shipped recipe tag is `EnterpriseOnly`: the recipe is
