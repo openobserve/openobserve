@@ -2709,6 +2709,35 @@ mod tests {
         assert_eq!(map(AlertPriority::P1), Some(IncidentSeverity::P1));
         assert_eq!(map(AlertPriority::P2), Some(IncidentSeverity::P2));
         assert_eq!(map(AlertPriority::P4), Some(IncidentSeverity::P4));
+
+        // The two that reach the mapping's default arm, and so were the two it
+        // could get wrong unnoticed. P5 mapped to P3 until 2026-08-24 — the
+        // least urgent priority opening a more severe incident than P4 does.
+        assert_eq!(map(AlertPriority::P3), Some(IncidentSeverity::P3));
+        assert_eq!(map(AlertPriority::P5), Some(IncidentSeverity::P4));
+
+        // Five priorities into four severities, and the ordering has to survive
+        // the join: a less urgent alert must never open a more severe incident.
+        let rank = |s: IncidentSeverity| match s {
+            IncidentSeverity::P1 => 4,
+            IncidentSeverity::P2 => 3,
+            IncidentSeverity::P3 => 2,
+            IncidentSeverity::P4 => 1,
+        };
+        let ranks: Vec<i32> = [
+            AlertPriority::P1,
+            AlertPriority::P2,
+            AlertPriority::P3,
+            AlertPriority::P4,
+            AlertPriority::P5,
+        ]
+        .into_iter()
+        .map(|p| rank(map(p).expect("every priority maps")))
+        .collect();
+        assert!(
+            ranks.windows(2).all(|w| w[0] >= w[1]),
+            "severity must not increase as priority falls: {ranks:?}"
+        );
     }
 
     #[test]
