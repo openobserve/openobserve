@@ -1,0 +1,130 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * W11 · The Recommendations section's WIRING.
+ *
+ * The arithmetic of every rule is pinned in `utils/dbm/recommendations.spec.ts`
+ * against pure functions. What cannot be seen from there is whether the page
+ * actually calls them, and whether it renders the honesty properties the rules
+ * depend on. Three things are pinned here:
+ *
+ *   • The section asks for the index section (`includeIndexes`) — the rule is
+ *     worthless if the page never fetches the data it predicates on.
+ *   • The lifetime-counter disclosure is rendered, and gated on the API's own
+ *     flag rather than hardcoded. Without it "not scanned" reads as a claim
+ *     about the selected time range, which a cumulative counter cannot support.
+ *   • The empty state distinguishes "nothing crossed a threshold" from "some
+ *     checks did not run on this engine". Collapsing them tells a MySQL user
+ *     they have no unused indexes when the check never ran.
+ *
+ * Read off the source, for the reason dbmRequestGuard.spec.ts gives. Values
+ * live in pure functions with their own unit tests.
+ */
+
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const source = () => readFileSync(join(here, "TableHealthPage.vue"), "utf8");
+
+describe("recommendations section wiring", () => {
+  it("asks for the index section, or the unused-index rule has nothing to read", () => {
+    // One request, two sections: index health rides the table_health call via
+    // `includeIndexes` — a second awaited endpoint was a full extra round trip.
+    expect(source()).toContain("includeIndexes: true");
+    expect(source()).toContain("index_hits");
+  });
+
+  it("keeps index failure from wearing the empty-list costume", () => {
+    // The server states `index_read_failed`; the page must consult it rather
+    // than render "no unused indexes" over a read that never happened.
+    expect(source()).toContain("index_read_failed");
+  });
+
+  it("runs the rules through buildRecommendations rather than re-deriving them", () => {
+    const src = source();
+    expect(src).toContain("buildRecommendations");
+    // The page must not re-implement a predicate the util owns; a second copy
+    // of `idx_scan_count === 0` here could silently disagree with the rule.
+    expect(src).not.toMatch(/idx_scan_count\s*===\s*0/);
+  });
+
+  it("renders the lifetime-counter disclosure from the API's own flag", () => {
+    const src = source();
+    expect(src).toContain("dbm.recommendations.countersCumulative");
+    // Gated on the response flag: a build that omits it has not made the claim,
+    // and rendering the sentence anyway would invent a disclosure.
+    expect(src).toMatch(/counters_are_cumulative/);
+  });
+
+  it("keeps 'nothing found' apart from 'not collected for this engine'", () => {
+    const src = source();
+    expect(src).toContain("recommendationsEmptyCause");
+    expect(src).toContain("dbm.recommendations.enginePartialTitle");
+    expect(src).toContain("dbm.recommendations.allClearTitle");
+  });
+
+  it("shows each rule's arithmetic, so a card can be audited", () => {
+    expect(source()).toContain("recommendationRuleParams");
+  });
+
+  /**
+   * These are deterministic predicates over counters. Gating them on
+   * `ai_enabled`/`isEnterprise` — the gate `DbmSuggestFixButton` applies —
+   * would make an OSS-only feature enterprise-only by association.
+   */
+  it("does not gate the section on the AI or enterprise flags", () => {
+    const src = source();
+    // Anchored on the CALL, not on the word: "recommendations" also appears in
+    // this page's prose, so an `indexOf` on the bare word matches a comment and
+    // makes the assertions below vacuously true on a page with no section.
+    const at = src.indexOf("buildRecommendations");
+    expect(at).toBeGreaterThan(-1);
+    const section = src.slice(at);
+    expect(section).not.toContain("ai_enabled");
+    expect(section).not.toContain("isEnterprise");
+  });
+
+  /**
+   * `buildRecommendations` emits one entry per detected item, so a database
+   * with fifteen blocked sessions would render fifteen list items and the strip
+   * becomes a wall nobody reads. The page must render the collapsed list — one
+   * row per rule — rather than iterating the raw one.
+   */
+  it("renders one row per rule, not one per detected item", () => {
+    const src = source();
+    expect(src).toContain("collapseRecommendations");
+    // The v-for must walk the collapsed list; iterating `recommendations`
+    // directly is the uncapped rendering.
+    expect(src).toMatch(/v-for="entry in collapsedRecommendations"/);
+    expect(src).not.toMatch(/v-for="rec in recommendations"/);
+  });
+
+  /**
+   * Collapsing is only honest if the reader can SEE that entries are hidden.
+   * The row that stands for several must say how many, and must say it ONLY
+   * when something is actually hidden — a bare "and 0 more" would claim a
+   * remainder that does not exist.
+   */
+  it("discloses the entries a collapsed row stands for", () => {
+    const src = source();
+    expect(src).toContain("dbm.recommendations.andMore");
+    expect(src).toMatch(/hiddenCount\s*>\s*0/);
+  });
+});

@@ -37,6 +37,7 @@ import type { Component } from "vue";
 // ── Databases & storage ──────────────────────────────────────────────────────
 import Postgresql from "~icons/logos/postgresql";
 import Mysql from "~icons/logos/mysql-icon";
+import MariaDb from "~icons/logos/mariadb-icon";
 import Mongodb from "~icons/logos/mongodb-icon";
 import Redis from "~icons/logos/redis";
 import Snowflake from "~icons/logos/snowflake-icon";
@@ -157,6 +158,7 @@ export const GLYPH_REGISTRY = {
   // Databases & storage
   postgresql: Postgresql,
   mysql: Mysql,
+  mariadb: MariaDb,
   mongodb: Mongodb,
   redis: Redis,
   oracle: oracleUrl,

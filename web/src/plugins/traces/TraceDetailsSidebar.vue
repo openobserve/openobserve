@@ -713,7 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
 
         <OTabPanel name="database" class="h-full p-0">
-          <DbSpanDetails :span="span" />
+          <DbSpanDetails :span="span" :stream="streamName" />
         </OTabPanel>
 
         <OTabPanel name="links">

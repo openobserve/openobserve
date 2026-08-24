@@ -36,6 +36,17 @@ pub fn sum64_bytes(bytes: &[u8]) -> u64 {
     gxhash::sum64_bytes(bytes)
 }
 
+/// Streaming [`Hasher`] for keys built from several fields.
+///
+/// Not [`gxhash::new_hasher`]: gxhash's streaming hasher reads up to 16 bytes past
+/// its input, guarded by a hardcoded 4 KiB page size, so on a 4 KiB-page aarch64
+/// host an input ending near a page boundary trips a `ptr::copy` precondition and
+/// aborts the process with a non-unwinding panic. The bulk [`sum64_bytes`] entry
+/// point is unaffected and stays on gxhash.
+pub fn new_key_hasher() -> impl std::hash::Hasher {
+    ahash::AHasher::default()
+}
+
 pub fn get_passcode_hash(pass: &str, salt: &str) -> String {
     let t_cost = 4;
     let m_cost = 2048;

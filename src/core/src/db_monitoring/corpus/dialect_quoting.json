@@ -1,0 +1,262 @@
+[
+  {
+    "id": "pg-dollar-quote-tagged",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "INSERT INTO notes (body) VALUES ($tag$super secret body$tag$)"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "INSERT INTO notes (body) VALUES (?)",
+      "operation": "INSERT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_notes_insert",
+    "literals": ["super secret body"],
+    "source": "authored"
+  },
+  {
+    "id": "pg-e-escape-string",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM people WHERE last_name = E'O\\'Brien'"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM people WHERE last_name = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_people_by_last_name",
+    "literals": ["O\\'Brien", "Brien"],
+    "source": "authored"
+  },
+  {
+    "id": "pg-nested-block-comment",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "db.system": "postgresql",
+        "db.statement": "/* outer /* inner secret_token_9f31 */ still outer */ SELECT * FROM users WHERE id = $1"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM users WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "pg_users_by_id",
+    "literals": ["secret_token_9f31"],
+    "source": "authored"
+  },
+  {
+    "id": "mysql-hash-comment",
+    "dialect": "mysql",
+    "input": {
+      "attrs": {
+        "db.system": "mysql",
+        "db.statement": "SELECT * FROM users WHERE email = 'pii.leak@example.com' # lookup for ticket 88231"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM users WHERE email = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mysql_users_by_email",
+    "literals": ["pii.leak@example.com", "88231"],
+    "source": "authored"
+  },
+  {
+    "id": "mysql-backtick-identifiers",
+    "dialect": "mysql",
+    "input": {
+      "attrs": {
+        "db.system": "mysql",
+        "db.statement": "SELECT `Name`, `Role` FROM `Users` WHERE id = ?"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT `Name`, `Role` FROM `Users` WHERE id = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mysql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mysql_users_quoted_cols",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "mariadb-mysql-mode",
+    "dialect": "mariadb",
+    "input": {
+      "attrs": {
+        "db.system": "mariadb",
+        "db.statement": "SELECT `sku` FROM `catalog_items` WHERE vendor = 'acme-secret-vendor'"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT `sku` FROM `catalog_items` WHERE vendor = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mariadb",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mariadb_catalog_by_vendor",
+    "literals": ["acme-secret-vendor"],
+    "source": "authored"
+  },
+  {
+    "id": "mssql-nstring-brackets",
+    "dialect": "mssql",
+    "input": {
+      "attrs": {
+        "db.system": "mssql",
+        "db.statement": "SELECT * FROM [Users] WHERE name = N'muñoz secret'"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM [Users] WHERE name = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mssql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mssql_users_by_name",
+    "literals": ["muñoz secret"],
+    "source": "authored"
+  },
+  {
+    "id": "mssql-at-param-new-system-name",
+    "dialect": "mssql",
+    "input": {
+      "attrs": {
+        "db.system.name": "microsoft.sql_server",
+        "db.query.text": "SELECT * FROM [Users] WHERE name = @name"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM [Users] WHERE name = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "mssql",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "mssql_users_by_name",
+    "literals": [],
+    "source": "authored"
+  },
+  {
+    "id": "oracle-q-quote",
+    "dialect": "oracle",
+    "input": {
+      "attrs": {
+        "db.system": "oracle",
+        "db.statement": "SELECT * FROM t WHERE c = q'[it's a secret payload]'"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM t WHERE c = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "oracle",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "oracle_t_by_c",
+    "literals": ["it's a secret payload"],
+    "source": "authored"
+  },
+  {
+    "id": "oracle-named-bind-new-system-name",
+    "dialect": "oracle",
+    "input": {
+      "attrs": {
+        "db.system.name": "oracle.db",
+        "db.query.text": "SELECT * FROM t WHERE c = :val"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "SELECT * FROM t WHERE c = ?",
+      "operation": "SELECT",
+      "stmt_class": "query",
+      "system": "oracle",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "oracle_t_by_c",
+    "literals": [],
+    "source": "authored"
+  }
+]
