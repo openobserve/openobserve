@@ -167,7 +167,7 @@ pub const MINUTES_PER_DAY: u32 = 1440;
 /// Bounds are minutes since UTC midnight and the range is half-open:
 /// `[start_minute, end_minute)`. A window whose `start_minute` is greater than its
 /// `end_minute` wraps past midnight (e.g. `990 -> 30` is 16:30–00:30 UTC). Equal
-/// bounds mean the window covers the whole day.
+/// bounds are rejected on write — leave `utc_windows` empty for an always-on tier.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct UtcTimeWindow {

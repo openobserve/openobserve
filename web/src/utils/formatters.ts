@@ -286,40 +286,68 @@ export function formatUtcWindows(
   return `${ranges} UTC`;
 }
 
+// Constructing an Intl.DateTimeFormat is the expensive part and these run on every
+// render. `null` caches a timezone the runtime rejects, so it is not retried.
+const hhmmFormatters = new Map<string, Intl.DateTimeFormat | null>();
+const abbrFormatters = new Map<string, Intl.DateTimeFormat | null>();
+
+function cachedFormatter(
+  cache: Map<string, Intl.DateTimeFormat | null>,
+  timeZone: string,
+  build: () => Intl.DateTimeFormat,
+): Intl.DateTimeFormat | null {
+  const cached = cache.get(timeZone);
+  if (cached !== undefined) return cached;
+  let formatter: Intl.DateTimeFormat | null;
+  try {
+    formatter = build();
+  } catch {
+    formatter = null;
+  }
+  cache.set(timeZone, formatter);
+  return formatter;
+}
+
 /**
  * A UTC minute-of-day rendered as `HH:MM` in the given IANA timezone (today's
  * offset — good enough for a conversion hint; DST shifts it by design).
  * Returns "" for an unknown timezone.
  */
 export function utcMinuteToTzHhmm(minute: number, timeZone: string): string {
+  const formatter = cachedFormatter(
+    hhmmFormatters,
+    timeZone,
+    () =>
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }),
+  );
+  if (!formatter) return "";
   const m = ((Math.round(minute) % 1440) + 1440) % 1440;
   const now = new Date();
   const d = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), Math.floor(m / 60), m % 60),
   );
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      timeZone,
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    }).format(d);
-  } catch {
-    return "";
-  }
+  return formatter.format(d);
 }
 
 /** Short display name for an IANA timezone, e.g. "GMT+5:30" or "PST". */
 export function timezoneAbbr(timeZone: string): string {
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      timeZoneName: "short",
-    }).formatToParts(new Date());
-    return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
-  } catch {
-    return timeZone;
-  }
+  const formatter = cachedFormatter(
+    abbrFormatters,
+    timeZone,
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        timeZoneName: "short",
+      }),
+  );
+  if (!formatter) return timeZone;
+  const parts = formatter.formatToParts(new Date());
+  return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
 }
 
 /**

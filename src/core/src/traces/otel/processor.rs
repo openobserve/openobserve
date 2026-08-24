@@ -114,7 +114,8 @@ impl OtelIngestionProcessor {
     /// Process span with optional user-defined model pricing entries.
     /// If matching pricing is found in `org_pricing_entries`, it takes priority over built-in
     /// pricing. `span_start_nanos` is the span's `start_time_unix_nano` from the OTLP payload;
-    /// it is used to select the most-recently-applicable pricing definition via `valid_from`.
+    /// it is used to select the most-recently-applicable pricing definition via `valid_from`
+    /// and the time-of-day tier via `utc_windows`. Zero means unknown: no time restriction.
     /// In production always call `get_org_pricing_entries` to populate this slice.
     pub fn process_span_with_pricing(
         &self,
@@ -258,12 +259,15 @@ impl OtelIngestionProcessor {
         let mut input_includes_cache = extracted.input_includes_cache;
 
         if is_generation_or_embedding(extracted.op_name) {
-            let span_ts_micros = i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX);
+            // Zero means the payload carried no start time; treat it as unknown rather
+            // than as 1970-01-01, which would land every such span in a time-of-day tier.
+            let span_ts_micros = (span_start_nanos != 0)
+                .then(|| i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX));
             let matched_pricing = extracted.model_name.as_ref().and_then(|mn| {
                 crate::db::model_pricing::find_pricing_sync_at(
                     org_pricing_entries,
                     mn,
-                    Some(span_ts_micros),
+                    span_ts_micros,
                 )
             });
             let tokenizer_key: &str = extracted.model_name.as_deref().unwrap_or("");
@@ -300,7 +304,7 @@ impl OtelIngestionProcessor {
                             &pricing_def,
                             &billable_usage,
                             &tier_usage,
-                            Some(span_ts_micros),
+                            span_ts_micros,
                         );
                     if !result.cost.is_empty() {
                         log::debug!(
@@ -320,7 +324,7 @@ impl OtelIngestionProcessor {
                         model_name,
                         input_tokens,
                         output_tokens,
-                        Some(span_ts_micros),
+                        span_ts_micros,
                     ) {
                         cost.insert("input".to_string(), input_cost);
                         cost.insert("output".to_string(), output_cost);
@@ -1198,6 +1202,18 @@ mod tests {
         // 01:00 UTC is the inclusive start of the first window → peak.
         let (start_input, ..) = deepseek_costs(nanos_at_utc(1, 0));
         assert!((start_input - 0.00132).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_process_span_deepseek_missing_start_time_falls_back_to_unrestricted() {
+        // A zero start_time_unix_nano means the payload carried no timestamp. It must not
+        // be read as 1970-01-01 00:00 UTC, which would pin the span to whatever tier
+        // covers UTC midnight; an unknown time falls back to the unrestricted tier.
+        let (input_cost, output_cost, total_cost) = deepseek_costs(0);
+
+        assert!((input_cost - 0.00066).abs() < 1e-12);
+        assert!((output_cost - 0.00099).abs() < 1e-12);
+        assert!((total_cost - 0.00165).abs() < 1e-12);
     }
 
     #[test]
