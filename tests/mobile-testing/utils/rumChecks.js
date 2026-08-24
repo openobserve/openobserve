@@ -142,17 +142,23 @@ function networkSuite({ name, tags, service, urlSubstring, flows, device = '' })
 // regression can't hide. iOS specs pass requireReplay:false because the mobile replay is not always
 // rendered for iOS in CI (observed); there it skips-with-reason instead of a false fail. Scoping the
 // skip this way keeps enforcement on the platforms where the replay does render.
-// knownReplayBug: pass a tracking-issue reference for a platform whose Session Replay is known-broken
-// upstream (in the SDK) — the test is then `test.fixme`, documenting the bug and flipping green when the
-// SDK is fixed (same pattern as the o2-enterprise#2289 skips). Do NOT use it to hide an unexplained
-// non-upload: a missing replay with no filed bug must FAIL here (that is the whole point of the P0).
+// knownReplayBug: a tracking-issue reference for a platform whose Session Replay is known-broken
+// UPSTREAM (in the SDK). The test is marked EXPECTED-TO-FAIL (test.fail) — NOT skipped: it still runs
+// the real path and reports as a known failure (never a false green), and the run turns RED the day
+// the SDK is fixed and it starts passing, forcing this marker to be removed. Do NOT use it to hide an
+// unexplained non-upload — a missing replay with no filed bug must fail outright (that is the P0's job).
 function maskingSuite({ name, tags, service, pii, flows, device = '', knownReplayBug = null }) {
   test.describe(name, () => {
-    const runner = knownReplayBug ? test.fixme : test;
-    runner(
+    test(
       'session replay uploads segments and PII is masked (MASK_ALL)',
       { tag: [...tags, '@replay', '@masking', '@P0'] },
       async ({ page }) => {
+        if (knownReplayBug) {
+          test.fail(
+            true,
+            `known upstream bug ${knownReplayBug}: session replay does not upload — remove this marker when the SDK is fixed`,
+          );
+        }
         const start = Date.now() - 30000;
         for (const f of flows) runFlow(f, { device });
 
