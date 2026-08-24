@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="$emit('update:modelValue', $event)"
     >
       <template v-if="modelValue" #icon-left>
-        <FolderIcon :token="selectedFolderIcon" />
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
       </template>
       <template v-if="!disable" #after-options>
         <OSeparator />
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="$emit('update:modelValue', $event)"
     >
       <template v-if="modelValue" #icon-left>
-        <FolderIcon :token="selectedFolderIcon" />
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
       </template>
     </OSelect>
     <OButton

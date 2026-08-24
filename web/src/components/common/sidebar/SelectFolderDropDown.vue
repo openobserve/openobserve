@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            folder's icon comes in through #icon-left. Omitted entirely while
            nothing is selected — an empty field has no folder to stand for. -->
       <template v-if="selectedFolder" #icon-left>
-        <FolderIcon :token="selectedFolderIcon" />
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
       </template>
       <template #empty>{{ t("search.noResult") }}</template>
     </OSelect>

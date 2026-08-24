@@ -137,7 +137,7 @@
               data-test="dashboard-drilldown-folder-select"
             >
               <template v-if="drilldownData.data.folder" #icon-left>
-                <FolderIcon :token="selectedFolderIcon" />
+                <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
               </template>
             </OFormSelect>
           </div>

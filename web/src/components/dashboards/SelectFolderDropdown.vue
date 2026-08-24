@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex-1"
     >
       <template v-if="selectedFolder" #icon-left>
-        <FolderIcon :token="selectedFolderIcon" />
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
       </template>
     </OSelect>
 
