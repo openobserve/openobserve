@@ -14758,8 +14758,7 @@
       "syntaxError": "SQL syntax error"
     },
     "hover": {
-      "deprecated": "**Deprecated** — prefer the canonical function.",
-      "duplicate": "Duplicate Dashboard"
+      "deprecated": "**Deprecated** — prefer the canonical function."
     }
   }
 }
