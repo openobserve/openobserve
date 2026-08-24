@@ -159,8 +159,7 @@ impl ActiveIndexedMetricsWriter {
         writer.finish().await?;
         drop(writer.into_inner());
 
-        file_meta.compressed_size =
-            i64::try_from(tokio::fs::metadata(&data_path).await?.len()).unwrap_or(i64::MAX);
+        // compressed_size is set by the compactor when it uploads the file
         Ok(MergedFile::MetricsIndexed {
             data_path,
             metrics_index_path: write_temp_file(metrics_index.finish()?).await?,
@@ -170,7 +169,11 @@ impl ActiveIndexedMetricsWriter {
 }
 
 fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
-    let (file, path) = tempfile::NamedTempFile::new()?.into_parts();
+    // spool under data_tmp_dir, not the OS temp dir (often a RAM-backed
+    // tmpfs); it is wiped at startup, reclaiming files a crash orphaned
+    let tmp_dir = &config::get_config().common.data_tmp_dir;
+    std::fs::create_dir_all(tmp_dir)?;
+    let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
     Ok((tokio::fs::File::from_std(file), path))
 }
 
@@ -296,7 +299,6 @@ mod tests {
             data_path.is_file()
                 && metrics_index_path.is_file()
                 && meta.original_size < max_file_size as i64
-                && meta.compressed_size == std::fs::metadata(data_path).unwrap().len() as i64
         }));
 
         let mut file_hashes = Vec::new();
