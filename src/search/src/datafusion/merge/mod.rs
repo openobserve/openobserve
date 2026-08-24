@@ -34,13 +34,13 @@ use crate::datafusion::{exec::DataFusionContextBuilder, sort_order::FileSortOrde
 
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
-mod merged_file;
 mod metrics;
 pub mod mode;
+mod result;
 mod single_file;
 
-pub use merged_file::{MergeResult, MergedFile};
 pub use mode::{MergeMode, MergeOutput};
+pub use result::{MergeResult, MergedFile};
 
 /// Merge `tables` (the union of the input files) into one or more files
 /// according to `mode`, written as `output` says.
