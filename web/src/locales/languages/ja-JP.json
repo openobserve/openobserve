@@ -4492,6 +4492,8 @@
     "folder": "フォルダ",
     "folders": "フォルダー",
     "searchFolder": "検索フォルダー",
+    "folderIcon": "アイコン",
+    "folderIconAria": "フォルダアイコンを選択",
     "deleteFolder": "[フォルダを削除]",
     "deleteFolderMessage": "このフォルダを削除してよろしいですか?",
     "trellisLayout": "トレリスレイアウト",
@@ -6017,6 +6019,7 @@
     "SearchSQLCancelled": "エラー:検索 SQL はキャンセルされました。"
   },
   "alerts": {
+    "allAlerts": "すべてのアラート",
     "compositeAlert": "複合",
     "import": {
       "anomalyImportSuccess": "異常検出 - {index}: \"{name}\" のインポートに成功しました",
@@ -7345,6 +7348,10 @@
         "panel": {
           "label": "アラートを作成",
           "toast": "ダッシュボードパネルからインポートされたクエリ: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "エディターでカスタマイズ",
+          "toast": "アラートライブラリから: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7412,112 @@
     "impactTemplate": "使用元 {destinations} · {alerts}",
     "impactDestination": "使用元 {alerts}"
   },
+  "alert_library": {
+    "header": "アラートライブラリ",
+    "subtitle": "厳選された、すぐにインストールできるアラート。既に取り込んでいるデータと照合されます",
+    "sectionTab": "ライブラリ",
+    "contribute": "GitHubで貢献",
+    "searchPlaceholder": "名前、説明、またはストリームで検索",
+    "searchLabel": "アラートライブラリを検索",
+    "categories": "カテゴリ",
+    "searchCategories": "カテゴリを検索",
+    "searchCategoriesAria": "カテゴリフィルターを検索",
+    "noCategoryMatch": "一致するカテゴリがありません。",
+    "selectedCount": "{count} 件選択中",
+    "facetAria": "{label}、{count} 件のアラート",
+    "severity": "重大度",
+    "severityAll": "すべて",
+    "severityCritical": "重大",
+    "severityWarning": "警告",
+    "severityInfo": "情報",
+    "statReady": "インストール可能",
+    "statNeedsData": "未取り込み",
+    "statAll": "すべて",
+    "notIngested": "未取り込み: {stream}",
+    "notIngestedHint": "この組織は{stream}を受信していないため、このアラートが発動することはありません。それでもインストールすると、データが到着した時点で動作を開始します。",
+    "alertCount": "{count} 件のアラート | {count} 件のアラート",
+    "noCollectorTitle": "ここにはまだデータに一致するものはありません",
+    "noCollectorDescription": "これらの{count}件のアラートは、この組織が受信しているストリームに対してクエリを実行していません。{group}テレメトリをOpenObserveに送信すると、ここで表示されます。",
+    "setupGuide": "取り込みガイド",
+    "emptyLibraryTitle": "アラートライブラリは空です",
+    "emptyLibraryDescription": "カタログは読み込まれましたが、アラートが含まれていません。これはフィルターではなく公開の問題です。しばらくしてから再試行してください。",
+    "noMatchesTitle": "これらのフィルターに一致するアラートはありません",
+    "noMatchesDescription": "別のカテゴリ、重大度、または検索語を試してください。",
+    "clearFilters": "フィルターをクリア",
+    "loadFailedTitle": "アラートライブラリを読み込めませんでした",
+    "retry": "再試行",
+    "openDetails": "{title}を開く",
+    "drawer": {
+      "dataAvailable": "データ利用可能",
+      "streamNotFound": "ストリームが見つかりません",
+      "detects": "検出内容",
+      "noDescription": "ライブラリに説明がありません。",
+      "needsDataCallout": "このアラートは{stream}に対してクエリを実行しますが、この組織はこれを受信していません。今インストールすると、発動しないアラートが作成されます。",
+      "query": "クエリ",
+      "stream": "ストリーム",
+      "streamType": "ストリームタイプ",
+      "metricCondition": "メトリクス条件",
+      "matchCount": "必要な一致行数",
+      "previewBlocked": "{stream}はこの組織のストリームではないため、評価するものはありません。",
+      "wouldTrigger": "発火する",
+      "wouldNotTrigger": "発火しない",
+      "loading": "ライブラリからこのアラートを読み込んでいます",
+      "loadFailed": "このアラートをライブラリから読み込めませんでした。",
+      "customize": "エディタでカスタマイズ",
+      "customizeHint": "このアラートが事前に入力された標準のアラートエディタを開きます。",
+      "customizeFailed": "このアラートをエディタで開けませんでした。",
+      "install": "インストール",
+      "neverIngested": "データがまだありません",
+      "neverIngestedCallout": "{stream} は存在しますが、データを一度も受信していないため、このアラートは発火する対象がありません。",
+      "lastData": "最終データ {when}",
+      "staleCallout": "{stream} が最後にデータを受信したのは {when} です。このアラートは、取り込みが再開されるまで静かな状態を維持します。",
+      "unknownTime": "不明な時刻に"
+    },
+    "install": {
+      "title": "ライブラリからインストール",
+      "subtitle": "アラートの通知先、インストールするアラート、および保存先フォルダを選択します。",
+      "stepDestination": "通知先",
+      "stepAlerts": "アラート",
+      "stepFolder": "フォルダー",
+      "stepTune": "調整",
+      "stepInstall": "インストール",
+      "destinationIntro": "このバッチのすべてのアラートは、ここで選択した通知先に通知します。ライブラリファイルには、エクスポート元の組織の通知先が名前として含まれていますが、それらはお客様の組織には存在しません。",
+      "destinationLabel": "通知先",
+      "destinationPlaceholder": "通知先を選択",
+      "destinationsLoadFailed": "既存の通知先を読み込めませんでした。",
+      "retry": "再試行",
+      "destinationsNoneBody": "この組織にはまだアラート通知先がないため、これらのアラートの通知先がありません。通知先ページで作成し、ここに戻って選択してください。",
+      "openDestinations": "通知先を開く",
+      "selectAll": "すべて選択",
+      "clear": "クリア",
+      "selectedCount": "{count} / {total} 件選択中",
+      "folderIntro": "インストールしたアラートはここに保存されます。このバッチ専用のフォルダが必要な場合は、+ボタンからフォルダーを作成してください。",
+      "tuneToggle": "このバッチのすべてのアラートにこれらを設定します",
+      "tuneHint": "バッチ全体に設定しても安全なのはこの2つだけです。しきい値はアラートごとに設定されます。変更するには、そのアラートを開いて単独でインストールしてください。",
+      "frequency": "実行間隔",
+      "silence": "サイレンス期間",
+      "minutes": "分",
+      "summaryTuningNone": "ライブラリのデフォルト",
+      "summaryTuningOverride": "{frequency} 分ごと、{silence} 分間サイレンス",
+      "run": "{count} 個のアラートをインストール | {count} 個のアラートをインストール",
+      "retryFailed": "{count} 件の失敗を再試行 | {count} 件の失敗を再試行",
+      "allInstalled": "{count} 件のアラートをインストールしました | {count} 件のアラートをインストールしました",
+      "someFailed": "{installed} 件インストール、{failed} 件失敗",
+      "unknownError": "アラートを作成できませんでした。",
+      "unreadableConditions": "このアラートのフィルター条件は、このバージョンでは読み取れない形式です。インストールするとフィルターなしのアラートが作成されるため、スキップされました。",
+      "back": "戻る",
+      "next": "次へ",
+      "cancel": "キャンセル",
+      "done": "完了"
+    },
+    "error": {
+      "network": "ライブラリに到達できませんでした。ネットワーク接続を確認して、もう一度お試しください。",
+      "http": "ライブラリサーバーがエラーを返しました。しばらくしてからもう一度お試しください。",
+      "unparseable": "ライブラリがカタログではないものを返しました。",
+      "unsupported_version": "このライブラリカタログは、このバージョンのOpenObserveで読み取れるものより新しいです。参照するにはアップグレードしてください。",
+      "malformed": "ライブラリカタログが不完全または破損しています。"
+    }
+  },
   "alert_templates": {
     "exportTemplate": "テンプレートをエクスポート",
     "selected": "選択済み",
@@ -7429,7 +7542,7 @@
     "importBodyLabel": "テンプレート本文 *",
     "importTypeLabel": "テンプレートタイプ *",
     "importTitleLabel": "テンプレートタイトル *",
-    "header": "テンプレート",
+    "header": "宛先テンプレート",
     "add": "テンプレートを追加",
     "edit": "編集",
     "name": "名前",
@@ -7636,6 +7749,7 @@
     "destinationsLoadError": "宛先の読み込みエラー"
   },
   "alert_destinations": {
+    "sectionTab": "宛先",
     "chooseTypeTitle": "タイプを選択",
     "selectDestinationType": "宛先タイプを選択",
     "connectionStepTitle": "接続",
@@ -13269,6 +13383,24 @@
     "combobox": {
       "noOptionsFound": "オプションが見つかりません"
     },
+    "emojiPicker": {
+      "chooseIcon": "アイコンを選択",
+      "searchPlaceholder": "アイコンを検索...",
+      "removeIcon": "アイコンを削除",
+      "noResults": "検索に一致するアイコンがありません",
+      "groups": {
+        "results": "結果",
+        "status": "ステータス",
+        "services": "サービス",
+        "ai": "AI",
+        "creatures": "クリーチャー",
+        "infra": "インフラストラクチャ",
+        "data": "データ",
+        "teams": "チーム",
+        "objects": "オブジェクト",
+        "world": "世界"
+      }
+    },
     "input": {
       "clear": "クリア"
     },
@@ -14626,7 +14758,8 @@
       "syntaxError": "SQL 構文エラー"
     },
     "hover": {
-      "deprecated": "**非推奨** — 正規の関数を推奨します。"
+      "deprecated": "**非推奨** — 正規の関数を推奨します。",
+      "duplicate": "ダッシュボードを複製"
     }
   }
 }

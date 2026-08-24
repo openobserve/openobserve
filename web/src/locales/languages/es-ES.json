@@ -4492,6 +4492,8 @@
     "folder": "Carpeta",
     "folders": "Carpetas",
     "searchFolder": "Carpeta de búsqueda",
+    "folderIcon": "Icono",
+    "folderIconAria": "Elige un icono de carpeta",
     "deleteFolder": "Eliminar carpeta",
     "deleteFolderMessage": "¿Está seguro de que desea eliminar esta carpeta?",
     "trellisLayout": "Diseño de enrejado",
@@ -6017,6 +6019,7 @@
     "SearchSQLCancelled": "Error: se canceló Search SQL."
   },
   "alerts": {
+    "allAlerts": "Todas las alertas",
     "compositeAlert": "Compuesta",
     "import": {
       "anomalyImportSuccess": "Detección de anomalías - {index}: \"{name}\" importado correctamente",
@@ -7345,6 +7348,10 @@
         "panel": {
           "label": "Crear alerta",
           "toast": "Consulta importada del panel del tablero: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Personalizar en el editor",
+          "toast": "De la biblioteca de alertas: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7412,112 @@
     "impactTemplate": "Usado por {destinations} · {alerts}",
     "impactDestination": "Usado por {alerts}"
   },
+  "alert_library": {
+    "header": "Biblioteca de alertas",
+    "subtitle": "Alertas seleccionadas, listas para instalar, que coinciden con los datos que ya ingieres",
+    "sectionTab": "Biblioteca",
+    "contribute": "Contribuye en GitHub",
+    "searchPlaceholder": "Buscar por nombre, descripción o stream",
+    "searchLabel": "Buscar en la biblioteca de alertas",
+    "categories": "Categoría",
+    "searchCategories": "Buscar categorías",
+    "searchCategoriesAria": "Buscar filtros de categoría",
+    "noCategoryMatch": "No hay categorías que coincidan.",
+    "selectedCount": "{count} seleccionados",
+    "facetAria": "{label}, {count} alertas",
+    "severity": "Gravedad",
+    "severityAll": "Todas",
+    "severityCritical": "Crítico",
+    "severityWarning": "Advertencia",
+    "severityInfo": "Info",
+    "statReady": "Lista para instalar",
+    "statNeedsData": "No ingerido",
+    "statAll": "Todos",
+    "notIngested": "No ingerido: {stream}",
+    "notIngestedHint": "Esta organización no está recibiendo {stream}, por lo que esta alerta nunca se activaría. Instálala de todos modos y empezará a funcionar una vez que lleguen los datos.",
+    "alertCount": "{count} alerta | {count} alertas",
+    "noCollectorTitle": "Nada aquí coincide con tus datos todavía",
+    "noCollectorDescription": "Ninguna de estas {count} alertas consulta un stream que esta organización esté recibiendo. Envía telemetría de {group} a OpenObserve y aparecerán aquí.",
+    "setupGuide": "Guía de ingesta",
+    "emptyLibraryTitle": "La biblioteca de alertas está vacía",
+    "emptyLibraryDescription": "El catálogo se cargó pero no contiene alertas. Este es un problema de publicación, no de filtro — inténtalo de nuevo en breve.",
+    "noMatchesTitle": "Ninguna alerta coincide con estos filtros",
+    "noMatchesDescription": "Prueba con otra categoría, gravedad o término de búsqueda.",
+    "clearFilters": "Limpiar filtros",
+    "loadFailedTitle": "No se pudo cargar la biblioteca de alertas",
+    "retry": "Reintentar",
+    "openDetails": "Abrir {title}",
+    "drawer": {
+      "dataAvailable": "Datos disponibles",
+      "streamNotFound": "Stream no encontrado",
+      "detects": "Qué detecta",
+      "noDescription": "No hay descripción en la biblioteca.",
+      "needsDataCallout": "Esta alerta consulta {stream}, que esta organización no está recibiendo. Instalarla ahora crearía una alerta que nunca se activaría.",
+      "query": "Consulta",
+      "stream": "Stream",
+      "streamType": "Tipo de stream",
+      "metricCondition": "Condición de métrica",
+      "matchCount": "Filas coincidentes requeridas",
+      "previewBlocked": "{stream} no es un stream en esta organización, por lo que no hay nada que evaluar.",
+      "wouldTrigger": "Se dispararía",
+      "wouldNotTrigger": "No se dispararía",
+      "loading": "Cargando esta alerta desde la biblioteca",
+      "loadFailed": "Esta alerta no se pudo cargar desde la biblioteca.",
+      "customize": "Personalizar en el editor",
+      "customizeHint": "Abre el editor de alertas estándar precargado con esta alerta.",
+      "customizeFailed": "Esta alerta no se pudo abrir en el editor.",
+      "install": "Instalar",
+      "neverIngested": "Aún no hay datos",
+      "neverIngestedCallout": "{stream} existe pero nunca ha recibido datos, por lo que esta alerta no tiene nada sobre lo que dispararse.",
+      "lastData": "Últimos datos {when}",
+      "staleCallout": "{stream} recibió datos por última vez {when}. Esta alerta permanecerá en silencio hasta que se reanude la ingesta.",
+      "unknownTime": "en un momento desconocido"
+    },
+    "install": {
+      "title": "Instalar desde la biblioteca",
+      "subtitle": "Elige dónde notifican las alertas, qué alertas instalar y dónde se archivan.",
+      "stepDestination": "Destino",
+      "stepAlerts": "Alertas",
+      "stepFolder": "Carpeta",
+      "stepTune": "Ajustar",
+      "stepInstall": "Instalar",
+      "destinationIntro": "Cada alerta de este lote notifica al destino que elijas aquí. Los archivos de la biblioteca nombran los destinos de la organización desde la que se exportaron, que no existen en la tuya.",
+      "destinationLabel": "Destino",
+      "destinationPlaceholder": "Elige un destino",
+      "destinationsLoadFailed": "No se pudieron cargar tus destinos existentes.",
+      "retry": "Intentar de nuevo",
+      "destinationsNoneBody": "Esta organización aún no tiene destinos de alerta, por lo que no hay a dónde notifiquen estas alertas. Crea uno en la página de Destinos y luego vuelve y elígelo aquí.",
+      "openDestinations": "Abrir Destinos",
+      "selectAll": "Seleccionar todo",
+      "clear": "Limpiar",
+      "selectedCount": "{count} de {total} seleccionados",
+      "folderIntro": "Las alertas instaladas se archivan aquí. Crea una carpeta desde el botón + si este lote merece la suya propia.",
+      "tuneToggle": "Establece esto para cada alerta de este lote",
+      "tuneHint": "Solo estos dos son seguros de establecer para todo un lote. Los umbrales permanecen por alerta: cambia uno abriendo esa alerta e instalándola por separado.",
+      "frequency": "Ejecutar cada",
+      "silence": "Silenciar durante",
+      "minutes": "min",
+      "summaryTuningNone": "Valores predeterminados de la biblioteca",
+      "summaryTuningOverride": "Cada {frequency} min, silenciado {silence} min",
+      "run": "Instalar {count} alerta | Instalar {count} alertas",
+      "retryFailed": "Reintentar {count} error | Reintentar {count} errores",
+      "allInstalled": "{count} alerta instalada | {count} alertas instaladas",
+      "someFailed": "{installed} instaladas, {failed} fallidas",
+      "unknownError": "No se pudo crear la alerta.",
+      "unreadableConditions": "Las condiciones de filtro de esta alerta están en un formato que esta versión no puede leer. Instalarla crearía una alerta sin filtro, por lo que se omitió.",
+      "back": "Atrás",
+      "next": "Siguiente",
+      "cancel": "Cancelar",
+      "done": "Listo"
+    },
+    "error": {
+      "network": "No se pudo acceder a la biblioteca. Comprueba tu conexión de red e inténtalo de nuevo.",
+      "http": "El servidor de la biblioteca devolvió un error. Inténtalo de nuevo en un momento.",
+      "unparseable": "La biblioteca respondió con algo que no es un catálogo.",
+      "unsupported_version": "Este catálogo de biblioteca es más nuevo de lo que esta versión de OpenObserve puede leer. Actualiza para navegarlo.",
+      "malformed": "El catálogo de la biblioteca está incompleto o dañado."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Exportar plantilla",
     "selected": "Seleccionados",
@@ -7429,7 +7542,7 @@
     "importBodyLabel": "Cuerpo de plantilla *",
     "importTypeLabel": "Tipo de plantilla *",
     "importTitleLabel": "Título de plantilla *",
-    "header": "Plantillas",
+    "header": "Plantillas de destino",
     "add": "Añadir plantilla",
     "edit": "Editar",
     "name": "Nombre",
@@ -7636,6 +7749,7 @@
     "destinationsLoadError": "Error al cargar destinos"
   },
   "alert_destinations": {
+    "sectionTab": "Destinos",
     "chooseTypeTitle": "Elegir tipo",
     "selectDestinationType": "Seleccionar tipo de destino",
     "connectionStepTitle": "Conexión",
@@ -13269,6 +13383,24 @@
     "combobox": {
       "noOptionsFound": "No se encontraron opciones"
     },
+    "emojiPicker": {
+      "chooseIcon": "Elige un icono",
+      "searchPlaceholder": "Buscar iconos...",
+      "removeIcon": "Quitar icono",
+      "noResults": "Ningún icono coincide con tu búsqueda",
+      "groups": {
+        "results": "Resultados",
+        "status": "Estado",
+        "services": "Servicios",
+        "ai": "IA",
+        "creatures": "Criaturas",
+        "infra": "Infraestructura",
+        "data": "Datos",
+        "teams": "Equipos",
+        "objects": "Objetos",
+        "world": "Mundo"
+      }
+    },
     "input": {
       "clear": "Limpiar"
     },
@@ -14626,7 +14758,8 @@
       "syntaxError": "Error de sintaxis SQL"
     },
     "hover": {
-      "deprecated": "**Obsoleto** — prefiera la función canónica."
+      "deprecated": "**Obsoleto** — prefiera la función canónica.",
+      "duplicate": "Duplicar panel"
     }
   }
 }

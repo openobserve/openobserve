@@ -4492,6 +4492,8 @@
     "folder": "Klasör",
     "folders": "Klasörler",
     "searchFolder": "Arama Klasörü",
+    "folderIcon": "Simge",
+    "folderIconAria": "Bir klasör simgesi seçin",
     "deleteFolder": "Klasörü Sil",
     "deleteFolderMessage": "Bu klasörü silmek istediğinizden emin misiniz?",
     "trellisLayout": "Kafes Düzeni",
@@ -6017,6 +6019,7 @@
     "SearchSQLCancelled": "Hata: Search SQL iptal edildi."
   },
   "alerts": {
+    "allAlerts": "Tüm Uyarılar",
     "compositeAlert": "Bileşik",
     "import": {
       "anomalyImportSuccess": "Anomali Tespiti - {index}: \"{name}\" başarıyla içe aktarıldı",
@@ -7345,6 +7348,10 @@
         "panel": {
           "label": "Uyarı Oluştur",
           "toast": "Sorgu gösterge panelinden aktarıldı: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Düzenleyicide özelleştir",
+          "toast": "Uyarı Kitaplığından: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7412,112 @@
     "impactTemplate": "Kullanan: {destinations} · {alerts}",
     "impactDestination": "Kullanan: {alerts}"
   },
+  "alert_library": {
+    "header": "Uyarı Kitaplığı",
+    "subtitle": "Seçilmiş, kuruluma hazır uyarılar; halihazırda aldığınız verilerle eşleştirilir",
+    "sectionTab": "Kitaplık",
+    "contribute": "GitHub'da katkıda bulunun",
+    "searchPlaceholder": "Ada, açıklamaya veya akışa göre ara",
+    "searchLabel": "Uyarı kitaplığını ara",
+    "categories": "Kategori",
+    "searchCategories": "Kategorileri ara",
+    "searchCategoriesAria": "Kategori filtrelerini ara",
+    "noCategoryMatch": "Eşleşen kategori yok.",
+    "selectedCount": "{count} seçili",
+    "facetAria": "{label}, {count} uyarı",
+    "severity": "Önem Derecesi",
+    "severityAll": "Tümü",
+    "severityCritical": "Kritik",
+    "severityWarning": "Uyarı",
+    "severityInfo": "Bilgi",
+    "statReady": "Kuruluma hazır",
+    "statNeedsData": "Alınmadı",
+    "statAll": "Tümü",
+    "notIngested": "Alınmadı: {stream}",
+    "notIngestedHint": "Bu kuruluş {stream} akışını almıyor, bu nedenle bu uyarı hiç tetiklenmez. Yine de kurun, veri geldiğinde çalışmaya başlayacaktır.",
+    "alertCount": "{count} uyarı | {count} uyarı",
+    "noCollectorTitle": "Henüz burada verilerinizle eşleşen bir şey yok",
+    "noCollectorDescription": "Bu {count} uyarıdan hiçbiri bu kuruluşun aldığı bir akışı sorgulamıyor. {group} telemetrisini OpenObserve'e gönderin, burada görünmeye başlarlar.",
+    "setupGuide": "Veri alma kılavuzu",
+    "emptyLibraryTitle": "Uyarı kitaplığı boş",
+    "emptyLibraryDescription": "Katalog yüklendi ancak uyarı içermiyor. Bu bir filtre sorunu değil, yayınlama sorunu — kısa süre sonra tekrar deneyin.",
+    "noMatchesTitle": "Bu filtrelerle eşleşen uyarı yok",
+    "noMatchesDescription": "Başka bir kategori, önem derecesi veya arama terimi deneyin.",
+    "clearFilters": "Filtreleri temizle",
+    "loadFailedTitle": "Uyarı kitaplığı yüklenemedi",
+    "retry": "Yeniden dene",
+    "openDetails": "{title} aç",
+    "drawer": {
+      "dataAvailable": "Veri mevcut",
+      "streamNotFound": "Akış bulunamadı",
+      "detects": "Neyi algılar",
+      "noDescription": "Kitaplıkta açıklama yok.",
+      "needsDataCallout": "Bu uyarı, bu kuruluşun almadığı {stream} akışını sorguluyor. Şimdi kurmak, hiç tetiklenmeyecek bir uyarı oluşturur.",
+      "query": "Sorgu",
+      "stream": "Akış",
+      "streamType": "Akış türü",
+      "metricCondition": "Metrik koşulu",
+      "matchCount": "Eşleşen satır gerekli",
+      "previewBlocked": "{stream}, bu kuruluşta bir akış değil, bu nedenle değerlendirilecek bir şey yok.",
+      "wouldTrigger": "Tetiklenir",
+      "wouldNotTrigger": "Tetiklenmez",
+      "loading": "Bu uyarı kitaplıktan yükleniyor",
+      "loadFailed": "Bu uyarı kitaplıktan yüklenemedi.",
+      "customize": "Düzenleyicide özelleştir",
+      "customizeHint": "Bu uyarıyla önceden doldurulmuş standart uyarı düzenleyicisini açar.",
+      "customizeFailed": "Bu uyarı düzenleyicide açılamadı.",
+      "install": "Yükle",
+      "neverIngested": "Henüz veri yok",
+      "neverIngestedCallout": "{stream} mevcut ancak hiç veri almadı, bu yüzden bu uyarının tetikleneceği bir şey yok.",
+      "lastData": "Son veri {when}",
+      "staleCallout": "{stream} son veriyi {when} aldı. Bu uyarı, veri alımı devam edene kadar sessiz kalacak.",
+      "unknownTime": "bilinmeyen bir zamanda"
+    },
+    "install": {
+      "title": "Kitaplıktan yükle",
+      "subtitle": "Uyarıların nereye bildirim göndereceğini, hangi uyarıların yükleneceğini ve nereye dosyalanacağını seçin.",
+      "stepDestination": "Hedef",
+      "stepAlerts": "Uyarılar",
+      "stepFolder": "Klasör",
+      "stepTune": "Ayarla",
+      "stepInstall": "Yükle",
+      "destinationIntro": "Bu gruptaki her uyarı, burada seçtiğiniz hedefe bildirim gönderir. Kitaplık dosyaları, dışa aktarıldıkları kuruluşun hedeflerini adlandırır; bu hedefler sizde mevcut değildir.",
+      "destinationLabel": "Hedef",
+      "destinationPlaceholder": "Bir hedef seçin",
+      "destinationsLoadFailed": "Mevcut hedefleriniz yüklenemedi.",
+      "retry": "Tekrar dene",
+      "destinationsNoneBody": "Bu kuruluşta henüz uyarı hedefi yok, bu yüzden bu uyarıların bildirim göndereceği bir yer yok. Hedefler sayfasında bir tane oluşturun, ardından geri gelip buradan seçin.",
+      "openDestinations": "Hedefleri Aç",
+      "selectAll": "Tümünü seç",
+      "clear": "Temizle",
+      "selectedCount": "{count} / {total} seçildi",
+      "folderIntro": "Yüklenen uyarılar buraya dosyalanır. Bu grubun kendine ait bir klasörü hak ediyorsa + düğmesinden bir klasör oluşturun.",
+      "tuneToggle": "Bunları bu gruptaki her uyarı için ayarla",
+      "tuneHint": "Bir grubun tamamı için yalnızca bu ikisini ayarlamak güvenlidir. Eşikler uyarı başına kalır — birini değiştirmek için o uyarıyı açıp kendi başına yükleyin.",
+      "frequency": "Çalıştırma sıklığı",
+      "silence": "Sessiz kalma süresi",
+      "minutes": "dk",
+      "summaryTuningNone": "Kitaplık varsayılanları",
+      "summaryTuningOverride": "Her {frequency} dakikada bir, {silence} dakika sessiz",
+      "run": "{count} uyarı yükle | {count} uyarı yükle",
+      "retryFailed": "{count} hatayı yeniden dene | {count} hatayı yeniden dene",
+      "allInstalled": "{count} uyarı yüklendi | {count} uyarı yüklendi",
+      "someFailed": "{installed} yüklendi, {failed} başarısız",
+      "unknownError": "Uyarı oluşturulamadı.",
+      "unreadableConditions": "Bu uyarının filtre koşulları, bu sürümün okuyamadığı bir biçimde. Yüklemek, filtresiz bir uyarı oluşturacağı için atlandı.",
+      "back": "Geri",
+      "next": "İleri",
+      "cancel": "İptal",
+      "done": "Bitti"
+    },
+    "error": {
+      "network": "Kitaplığa ulaşılamadı. Ağ bağlantınızı kontrol edip tekrar deneyin.",
+      "http": "Kitaplık sunucusu bir hata döndürdü. Birazdan tekrar deneyin.",
+      "unparseable": "Kütüphane, katalog olmayan bir şeyle yanıt verdi.",
+      "unsupported_version": "Bu kütüphane kataloğu, bu OpenObserve sürümünün okuyabildiğinden daha yeni. Göz atmak için yükseltin.",
+      "malformed": "Kütüphane kataloğu eksik veya hasarlı."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Şablonu Dışa Aktar",
     "selected": "seçili",
@@ -7429,7 +7542,7 @@
     "importBodyLabel": "Şablon Gövdesi *",
     "importTypeLabel": "Şablon Türü *",
     "importTitleLabel": "Şablon Başlığı *",
-    "header": "Şablonlar",
+    "header": "Hedef Şablonları",
     "add": "Şablon Ekle",
     "edit": "Düzenle",
     "name": "İsim",
@@ -7636,6 +7749,7 @@
     "destinationsLoadError": "Hedefler yüklenirken hata"
   },
   "alert_destinations": {
+    "sectionTab": "Hedefler",
     "chooseTypeTitle": "Tür Seçin",
     "selectDestinationType": "Hedef Türü Seçin",
     "connectionStepTitle": "Bağlantı",
@@ -13269,6 +13383,24 @@
     "combobox": {
       "noOptionsFound": "Seçenek bulunamadı"
     },
+    "emojiPicker": {
+      "chooseIcon": "Bir simge seçin",
+      "searchPlaceholder": "Simge ara...",
+      "removeIcon": "Simgeyi kaldır",
+      "noResults": "Aramanızla eşleşen simge yok",
+      "groups": {
+        "results": "Sonuçlar",
+        "status": "Durum",
+        "services": "Hizmetler",
+        "ai": "AI",
+        "creatures": "Yaratıklar",
+        "infra": "Altyapı",
+        "data": "Veri",
+        "teams": "Ekipler",
+        "objects": "Nesneler",
+        "world": "Dünya"
+      }
+    },
     "input": {
       "clear": "Temizle"
     },
@@ -14626,7 +14758,8 @@
       "syntaxError": "SQL sözdizimi hatası"
     },
     "hover": {
-      "deprecated": "**Kullanımdan kaldırıldı** — kanonik işlevi tercih edin."
+      "deprecated": "**Kullanımdan kaldırıldı** — kanonik işlevi tercih edin.",
+      "duplicate": "Panoyu Çoğalt"
     }
   }
 }

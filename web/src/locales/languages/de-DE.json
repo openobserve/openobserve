@@ -4492,6 +4492,8 @@
     "folder": "Mappe",
     "folders": "Ordner",
     "searchFolder": "Ordner durchsuchen",
+    "folderIcon": "Symbol",
+    "folderIconAria": "Ordnersymbol auswählen",
     "deleteFolder": "Ordner löschen",
     "deleteFolderMessage": "Möchten Sie diesen Ordner wirklich löschen?",
     "trellisLayout": "Gitter-Layout",
@@ -6017,6 +6019,7 @@
     "SearchSQLCancelled": "Fehler: Die Suche in SQL wurde abgebrochen."
   },
   "alerts": {
+    "allAlerts": "Alle Alerts",
     "compositeAlert": "Zusammengesetzt",
     "import": {
       "anomalyImportSuccess": "Anomalieerkennung - {index}: \\\"{name}\\\" erfolgreich importiert",
@@ -7345,6 +7348,10 @@
         "panel": {
           "label": "Alarm erstellen",
           "toast": "Abfrage aus dem Dashboard-Panel importiert: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Im Editor anpassen",
+          "toast": "Aus der Alert-Bibliothek: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7412,112 @@
     "impactTemplate": "Verwendet von {destinations} · {alerts}",
     "impactDestination": "Verwendet von {alerts}"
   },
+  "alert_library": {
+    "header": "Alert-Bibliothek",
+    "subtitle": "Kuratierte, sofort installierbare Alerts, abgeglichen mit den Daten, die Sie bereits aufnehmen.",
+    "sectionTab": "Bibliothek",
+    "contribute": "Auf GitHub beitragen",
+    "searchPlaceholder": "Suche nach Name, Beschreibung oder Stream",
+    "searchLabel": "Alert-Bibliothek durchsuchen",
+    "categories": "Kategorie",
+    "searchCategories": "Kategorien durchsuchen",
+    "searchCategoriesAria": "Kategorie-Filter durchsuchen",
+    "noCategoryMatch": "Keine passenden Kategorien.",
+    "selectedCount": "{count} ausgewählt",
+    "facetAria": "{label}, {count} Alerts",
+    "severity": "Schweregrad",
+    "severityAll": "Alle",
+    "severityCritical": "Kritisch",
+    "severityWarning": "Warnung",
+    "severityInfo": "Info",
+    "statReady": "Bereit zur Installation",
+    "statNeedsData": "Nicht erfasst",
+    "statAll": "Alle",
+    "notIngested": "Nicht erfasst: {stream}",
+    "notIngestedHint": "Diese Organisation empfängt {stream} nicht, daher würde dieser Alert nie ausgelöst werden. Installieren Sie ihn trotzdem, und er funktioniert, sobald die Daten eintreffen.",
+    "alertCount": "{count} Alert | {count} Alerts",
+    "noCollectorTitle": "Noch nichts passt zu Ihren Daten",
+    "noCollectorDescription": "Keiner dieser {count} Alerts fragt einen Stream ab, den diese Organisation empfängt. Senden Sie {group}-Telemetriedaten an OpenObserve, und sie werden hier angezeigt.",
+    "setupGuide": "Erfassungsleitfaden",
+    "emptyLibraryTitle": "Die Alert-Bibliothek ist leer",
+    "emptyLibraryDescription": "Der Katalog wurde geladen, enthält aber keine Alerts. Dies ist ein Veröffentlichungsproblem, kein Filter — versuchen Sie es in Kürze erneut.",
+    "noMatchesTitle": "Keine Alerts entsprechen diesen Filtern",
+    "noMatchesDescription": "Versuchen Sie eine andere Kategorie, einen anderen Schweregrad oder einen anderen Suchbegriff.",
+    "clearFilters": "Filter löschen",
+    "loadFailedTitle": "Die Alert-Bibliothek konnte nicht geladen werden",
+    "retry": "Wiederholen",
+    "openDetails": "{title} öffnen",
+    "drawer": {
+      "dataAvailable": "Daten verfügbar",
+      "streamNotFound": "Stream nicht gefunden",
+      "detects": "Was wird erkannt",
+      "noDescription": "Keine Beschreibung in der Bibliothek.",
+      "needsDataCallout": "Dieser Alert fragt {stream} ab, den diese Organisation nicht empfängt. Wenn Sie ihn jetzt installieren, erstellen Sie einen Alert, der nie ausgelöst wird.",
+      "query": "Abfrage",
+      "stream": "Stream",
+      "streamType": "Stream-Typ",
+      "metricCondition": "Metrikbedingung",
+      "matchCount": "Erforderliche übereinstimmende Zeilen",
+      "previewBlocked": "{stream} ist kein Stream in dieser Organisation, daher gibt es nichts auszuwerten.",
+      "wouldTrigger": "Würde auslösen",
+      "wouldNotTrigger": "Würde nicht auslösen",
+      "loading": "Lade diesen Alert aus der Bibliothek",
+      "loadFailed": "Dieser Alert konnte nicht aus der Bibliothek geladen werden.",
+      "customize": "Im Editor anpassen",
+      "customizeHint": "Öffnet den Standard-Alert-Editor, der mit diesem Alert vorausgefüllt ist.",
+      "customizeFailed": "Dieser Alert konnte nicht im Editor geöffnet werden.",
+      "install": "Installieren",
+      "neverIngested": "Noch keine Daten",
+      "neverIngestedCallout": "{stream} existiert, hat aber noch nie Daten empfangen, daher hat dieser Alert nichts, worauf er auslösen kann.",
+      "lastData": "Letzte Daten {when}",
+      "staleCallout": "{stream} hat zuletzt {when} Daten empfangen. Dieser Alert bleibt still, bis die Datenaufnahme fortgesetzt wird.",
+      "unknownTime": "zu einem unbekannten Zeitpunkt"
+    },
+    "install": {
+      "title": "Aus der Bibliothek installieren",
+      "subtitle": "Wählen Sie, wohin Alerts benachrichtigen, welche Alerts installiert werden sollen und wo sie abgelegt werden.",
+      "stepDestination": "Ziel",
+      "stepAlerts": "Alerts",
+      "stepFolder": "Ordner",
+      "stepTune": "Anpassen",
+      "stepInstall": "Installieren",
+      "destinationIntro": "Jeder Alert in diesem Stapel benachrichtigt das Ziel, das Sie hier wählen. Bibliotheksdateien nennen die Ziele der Organisation, aus der sie exportiert wurden, die in Ihrer nicht existieren.",
+      "destinationLabel": "Ziel",
+      "destinationPlaceholder": "Ziel auswählen",
+      "destinationsLoadFailed": "Ihre vorhandenen Ziele konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "destinationsNoneBody": "Diese Organisation hat noch keine Alert-Ziele, daher gibt es keinen Ort, an den diese Alerts benachrichtigen können. Erstellen Sie eines auf der Seite „Ziele“ und wählen Sie es dann hier aus.",
+      "openDestinations": "Ziele öffnen",
+      "selectAll": "Alle auswählen",
+      "clear": "Leeren",
+      "selectedCount": "{count} von {total} ausgewählt",
+      "folderIntro": "Installierte Alerts werden hier abgelegt. Erstellen Sie mit der +-Schaltfläche einen Ordner, wenn dieser Stapel einen eigenen verdient.",
+      "tuneToggle": "Diese für jeden Alert in diesem Stapel festlegen",
+      "tuneHint": "Nur diese beiden können sicher für einen ganzen Stapel festgelegt werden. Schwellenwerte bleiben pro Alert – ändern Sie einen, indem Sie diesen Alert öffnen und separat installieren.",
+      "frequency": "Alle",
+      "silence": "Stummschalten für",
+      "minutes": "min",
+      "summaryTuningNone": "Bibliotheksstandards",
+      "summaryTuningOverride": "Alle {frequency} min, stumm für {silence} min",
+      "run": "Installieren {count} Alert | Installieren {count} Alerts",
+      "retryFailed": "Wiederholen {count} Fehler | Wiederholen {count} Fehler",
+      "allInstalled": "{count} Alert installiert | {count} Alerts installiert",
+      "someFailed": "{installed} installiert, {failed} fehlgeschlagen",
+      "unknownError": "Der Alert konnte nicht erstellt werden.",
+      "unreadableConditions": "Die Filterbedingungen dieses Alerts haben ein Format, das diese Version nicht lesen kann. Die Installation würde einen Alert ohne Filter erstellen, daher wurde er übersprungen.",
+      "back": "Zurück",
+      "next": "Weiter",
+      "cancel": "Abbrechen",
+      "done": "Fertig"
+    },
+    "error": {
+      "network": "Die Bibliothek konnte nicht erreicht werden. Überprüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.",
+      "http": "Der Bibliotheksserver hat einen Fehler zurückgegeben. Versuchen Sie es in einem Moment erneut.",
+      "unparseable": "Die Bibliothek hat mit etwas geantwortet, das kein Katalog ist.",
+      "unsupported_version": "Dieser Bibliothekskatalog ist neuer als diese Version von OpenObserve lesen kann. Aktualisieren Sie, um ihn zu durchsuchen.",
+      "malformed": "Der Bibliothekskatalog ist unvollständig oder beschädigt."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Vorlage exportieren",
     "selected": "ausgewählt",
@@ -7429,7 +7542,7 @@
     "importBodyLabel": "Vorlageninhalt *",
     "importTypeLabel": "Vorlagentyp *",
     "importTitleLabel": "Vorlagentitel *",
-    "header": "Vorlagen",
+    "header": "Zielvorlagen",
     "add": "Vorlage hinzufügen",
     "edit": "Bearbeiten",
     "name": "Name",
@@ -7636,6 +7749,7 @@
     "destinationsLoadError": "Fehler beim Laden der Ziele"
   },
   "alert_destinations": {
+    "sectionTab": "Ziele",
     "chooseTypeTitle": "Typ auswählen",
     "selectDestinationType": "Zieltyp auswählen",
     "connectionStepTitle": "Verbindung",
@@ -13269,6 +13383,24 @@
     "combobox": {
       "noOptionsFound": "Keine Optionen gefunden"
     },
+    "emojiPicker": {
+      "chooseIcon": "Wählen Sie ein Symbol",
+      "searchPlaceholder": "Symbole suchen...",
+      "removeIcon": "Symbol entfernen",
+      "noResults": "Keine Symbole entsprechen Ihrer Suche",
+      "groups": {
+        "results": "Ergebnisse",
+        "status": "Status",
+        "services": "Dienste",
+        "ai": "KI",
+        "creatures": "Kreaturen",
+        "infra": "Infrastruktur",
+        "data": "Daten",
+        "teams": "Teams",
+        "objects": "Objekte",
+        "world": "Welt"
+      }
+    },
     "input": {
       "clear": "Löschen"
     },
@@ -14626,7 +14758,8 @@
       "syntaxError": "SQL-Syntaxfehler"
     },
     "hover": {
-      "deprecated": "**Veraltet** — die kanonische Funktion bevorzugen."
+      "deprecated": "**Veraltet** — die kanonische Funktion bevorzugen.",
+      "duplicate": "Dashboard duplizieren"
     }
   }
 }

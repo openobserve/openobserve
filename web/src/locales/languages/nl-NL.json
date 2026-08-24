@@ -4492,6 +4492,8 @@
     "folder": "Folder",
     "folders": "Mappen",
     "searchFolder": "Folder zoeken",
+    "folderIcon": "Icoon",
+    "folderIconAria": "Kies een mapicoon",
     "deleteFolder": "Map verwijderen",
     "deleteFolderMessage": "Weet je zeker dat je deze map wilt verwijderen?",
     "trellisLayout": "Trellis-indeling",
@@ -6017,6 +6019,7 @@
     "SearchSQLCancelled": "Fout: Search SQL is geannuleerd."
   },
   "alerts": {
+    "allAlerts": "Alle waarschuwingen",
     "compositeAlert": "Samengesteld",
     "import": {
       "anomalyImportSuccess": "Anomaliedetectie - {index}: \"{name}\" succesvol geïmporteerd",
@@ -7345,6 +7348,10 @@
         "panel": {
           "label": "Alert maken",
           "toast": "Query geïmporteerd uit dashboardpaneel: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Aanpassen in de editor",
+          "toast": "Uit de waarschuwingsbibliotheek: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7412,112 @@
     "impactTemplate": "Gebruikt door {destinations} · {alerts}",
     "impactDestination": "Gebruikt door {alerts}"
   },
+  "alert_library": {
+    "header": "Waarschuwingsbibliotheek",
+    "subtitle": "Samengestelde, direct te installeren waarschuwingen, afgestemd op de data die je al binnenhaalt",
+    "sectionTab": "Bibliotheek",
+    "contribute": "Bijdragen op GitHub",
+    "searchPlaceholder": "Zoek op naam, beschrijving of stream",
+    "searchLabel": "Doorzoek de waarschuwingsbibliotheek",
+    "categories": "Categorie",
+    "searchCategories": "Categorieën doorzoeken",
+    "searchCategoriesAria": "Doorzoek categoriefilters",
+    "noCategoryMatch": "Geen categorieën gevonden.",
+    "selectedCount": "{count} geselecteerd",
+    "facetAria": "{label}, {count} waarschuwingen",
+    "severity": "Ernst",
+    "severityAll": "Alle",
+    "severityCritical": "Kritiek",
+    "severityWarning": "Waarschuwing",
+    "severityInfo": "Info",
+    "statReady": "Klaar om te installeren",
+    "statNeedsData": "Niet opgenomen",
+    "statAll": "Alle",
+    "notIngested": "Niet opgenomen: {stream}",
+    "notIngestedHint": "Deze organisatie ontvangt geen {stream}, dus deze waarschuwing zal nooit worden geactiveerd. Installeer deze toch en deze begint te werken zodra de gegevens binnenkomen.",
+    "alertCount": "{count} waarschuwing | {count} waarschuwingen",
+    "noCollectorTitle": "Nog niets komt overeen met je data",
+    "noCollectorDescription": "Geen van deze {count} waarschuwingen bevraagt een stream die deze organisatie ontvangt. Stuur {group} telemetrie naar OpenObserve en ze worden hier zichtbaar.",
+    "setupGuide": "Handleiding voor data-opname",
+    "emptyLibraryTitle": "De waarschuwingsbibliotheek is leeg",
+    "emptyLibraryDescription": "De catalogus is geladen maar bevat geen waarschuwingen. Dit is een publicatieprobleem, geen filter — probeer het later opnieuw.",
+    "noMatchesTitle": "Geen waarschuwingen voldoen aan deze filters",
+    "noMatchesDescription": "Probeer een andere categorie, ernst of zoekterm.",
+    "clearFilters": "Filters wissen",
+    "loadFailedTitle": "De waarschuwingsbibliotheek kon niet worden geladen",
+    "retry": "Opnieuw",
+    "openDetails": "Open {title}",
+    "drawer": {
+      "dataAvailable": "Data beschikbaar",
+      "streamNotFound": "Stream niet gevonden",
+      "detects": "Wat het detecteert",
+      "noDescription": "Geen beschrijving in de bibliotheek.",
+      "needsDataCallout": "Deze waarschuwing bevraagt {stream}, die deze organisatie niet ontvangt. Als je deze nu installeert, wordt er een waarschuwing gecreëerd die nooit afgaat.",
+      "query": "Query",
+      "stream": "Stream",
+      "streamType": "Streamtype",
+      "metricCondition": "Metric-voorwaarde",
+      "matchCount": "Overeenkomende rijen vereist",
+      "previewBlocked": "{stream} is geen stream in deze organisatie, dus er valt niets te evalueren.",
+      "wouldTrigger": "Zou afgaan",
+      "wouldNotTrigger": "Zou niet afgaan",
+      "loading": "Deze alert uit de bibliotheek laden",
+      "loadFailed": "Deze alert kon niet uit de bibliotheek worden geladen.",
+      "customize": "Aanpassen in de editor",
+      "customizeHint": "Opent de standaardeditor voor alerts, vooraf gevuld met deze alert.",
+      "customizeFailed": "Deze alert kon niet in de editor worden geopend.",
+      "install": "Installeren",
+      "neverIngested": "Nog geen data",
+      "neverIngestedCallout": "{stream} bestaat, maar heeft nog nooit data ontvangen, dus er is voor deze alert niets om op af te gaan.",
+      "lastData": "Laatste data {when}",
+      "staleCallout": "{stream} ontving voor het laatst data {when}. Deze alert blijft stil totdat er weer data binnenkomt.",
+      "unknownTime": "op een onbekend tijdstip"
+    },
+    "install": {
+      "title": "Installeren vanuit de bibliotheek",
+      "subtitle": "Kies waar alerts meldingen naartoe sturen, welke alerts u installeert en waar ze worden opgeslagen.",
+      "stepDestination": "Bestemming",
+      "stepAlerts": "Alerts",
+      "stepFolder": "Map",
+      "stepTune": "Afstemmen",
+      "stepInstall": "Installeren",
+      "destinationIntro": "Elke alert in deze batch stuurt meldingen naar de bestemming die u hier kiest. Bibliotheekbestanden vermelden de bestemmingen van de organisatie waaruit ze zijn geëxporteerd, die in de uwe niet bestaan.",
+      "destinationLabel": "Bestemming",
+      "destinationPlaceholder": "Kies een bestemming",
+      "destinationsLoadFailed": "Uw bestaande bestemmingen konden niet worden geladen.",
+      "retry": "Opnieuw proberen",
+      "destinationsNoneBody": "Deze organisatie heeft nog geen alertbestemmingen, dus deze alerts kunnen nergens een melding naartoe sturen. Maak er een aan op de pagina Bestemmingen en kom dan terug om deze hier te kiezen.",
+      "openDestinations": "Bestemmingen openen",
+      "selectAll": "Alles selecteren",
+      "clear": "Wissen",
+      "selectedCount": "{count} van {total} geselecteerd",
+      "folderIntro": "Geïnstalleerde alerts worden hier opgeslagen. Maak een map aan met de +-knop als deze batch een eigen map verdient.",
+      "tuneToggle": "Stel deze in voor elke alert in deze batch",
+      "tuneHint": "Alleen deze twee zijn veilig om voor een hele batch in te stellen. Drempelwaarden blijven per alert — wijzig er een door die alert te openen en deze apart te installeren.",
+      "frequency": "Uitvoeren elke",
+      "silence": "Dempen voor",
+      "minutes": "min",
+      "summaryTuningNone": "Bibliotheekstandaarden",
+      "summaryTuningOverride": "Elke {frequency} min, gedempt {silence} min",
+      "run": "Installeer {count} alert | Installeer {count} alerts",
+      "retryFailed": "Probeer {count} fout opnieuw | Probeer {count} fouten opnieuw",
+      "allInstalled": "{count} alert geïnstalleerd | {count} alerts geïnstalleerd",
+      "someFailed": "{installed} geïnstalleerd, {failed} mislukt",
+      "unknownError": "De alert kon niet worden gemaakt.",
+      "unreadableConditions": "Deze alert heeft filtervoorwaarden in een formaat dat deze versie niet kan lezen. Installeren zou een alert zonder filter maken, dus deze is overgeslagen.",
+      "back": "Terug",
+      "next": "Volgende",
+      "cancel": "Annuleren",
+      "done": "Klaar"
+    },
+    "error": {
+      "network": "De bibliotheek kon niet worden bereikt. Controleer uw netwerkverbinding en probeer het opnieuw.",
+      "http": "De bibliotheekserver heeft een fout geretourneerd. Probeer het over een moment opnieuw.",
+      "unparseable": "De bibliotheek reageerde met iets dat geen catalogus is.",
+      "unsupported_version": "Deze bibliotheekcatalogus is nieuwer dan deze versie van OpenObserve kan lezen. Upgrade om deze te bekijken.",
+      "malformed": "De bibliotheekcatalogus is onvolledig of beschadigd."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Template exporteren",
     "selected": "geselecteerd",
@@ -7429,7 +7542,7 @@
     "importBodyLabel": "Template-inhoud *",
     "importTypeLabel": "Templatetype *",
     "importTitleLabel": "Templatetitel *",
-    "header": "Sjablonen",
+    "header": "Bestemmingssjablonen",
     "add": "Sjabloon toevoegen",
     "edit": "Bewerken",
     "name": "Naam",
@@ -7636,6 +7749,7 @@
     "destinationsLoadError": "Fout bij het laden van bestemmingen"
   },
   "alert_destinations": {
+    "sectionTab": "Bestemmingen",
     "chooseTypeTitle": "Kies type",
     "selectDestinationType": "Selecteer bestemmingstype",
     "connectionStepTitle": "Verbinding",
@@ -13269,6 +13383,24 @@
     "combobox": {
       "noOptionsFound": "Geen opties gevonden"
     },
+    "emojiPicker": {
+      "chooseIcon": "Kies een icoon",
+      "searchPlaceholder": "Zoek iconen...",
+      "removeIcon": "Verwijder icoon",
+      "noResults": "Geen iconen komen overeen met je zoekopdracht.",
+      "groups": {
+        "results": "Resultaten",
+        "status": "Status",
+        "services": "Services",
+        "ai": "AI",
+        "creatures": "Creaturen",
+        "infra": "Infrastructuur",
+        "data": "Data",
+        "teams": "Teams",
+        "objects": "Objecten",
+        "world": "Wereld"
+      }
+    },
     "input": {
       "clear": "Wissen"
     },
@@ -14626,7 +14758,8 @@
       "syntaxError": "SQL-syntaxfout"
     },
     "hover": {
-      "deprecated": "**Verouderd** — geef de voorkeur aan de canonieke functie."
+      "deprecated": "**Verouderd** — geef de voorkeur aan de canonieke functie.",
+      "duplicate": "Dashboard dupliceren"
     }
   }
 }

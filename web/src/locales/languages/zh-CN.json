@@ -4492,6 +4492,8 @@
     "folder": "文件夹",
     "folders": "文件夹",
     "searchFolder": "搜索文件夹",
+    "folderIcon": "图标",
+    "folderIconAria": "选择文件夹图标",
     "deleteFolder": "删除文件夹",
     "deleteFolderMessage": "确定要删除此文件夹吗？",
     "trellisLayout": "网格布局",
@@ -6017,6 +6019,7 @@
     "SearchSQLCancelled": "错误：搜索 SQL 已取消。"
   },
   "alerts": {
+    "allAlerts": "所有告警",
     "compositeAlert": "复合",
     "import": {
       "anomalyImportSuccess": "异常检测 - {index}: \"{name}\" 导入成功",
@@ -7345,6 +7348,10 @@
         "panel": {
           "label": "创建警报",
           "toast": "查询已从仪表板面板导入：\"{sourceLabel}\""
+        },
+        "library": {
+          "label": "在编辑器中自定义",
+          "toast": "来自告警库：{sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7412,112 @@
     "impactTemplate": "被 {destinations} · {alerts} 使用",
     "impactDestination": "被 {alerts} 使用"
   },
+  "alert_library": {
+    "header": "告警库",
+    "subtitle": "精选且可直接安装的告警，与您已采集的数据相匹配",
+    "sectionTab": "库",
+    "contribute": "在 GitHub 上贡献",
+    "searchPlaceholder": "按名称、描述或流搜索",
+    "searchLabel": "搜索告警库",
+    "categories": "分类",
+    "searchCategories": "搜索分类",
+    "searchCategoriesAria": "搜索分类筛选器",
+    "noCategoryMatch": "没有匹配的分类。",
+    "selectedCount": "已选 {count} 个",
+    "facetAria": "{label}，{count} 个告警",
+    "severity": "严重性",
+    "severityAll": "全部",
+    "severityCritical": "严重",
+    "severityWarning": "警告",
+    "severityInfo": "信息",
+    "statReady": "可安装",
+    "statNeedsData": "未采集",
+    "statAll": "全部",
+    "notIngested": "未采集：{stream}",
+    "notIngestedHint": "此组织未接收 {stream}，因此该告警永远不会触发。您仍然可以安装它，数据到达后即可开始工作。",
+    "alertCount": "{count} 个告警 | {count} 个告警",
+    "noCollectorTitle": "这里还没有与您的数据匹配的内容",
+    "noCollectorDescription": "这些 {count} 个告警中，没有一个查询此组织正在接收的流。将 {group} 遥测数据发送到 OpenObserve，它们就会在这里显示。",
+    "setupGuide": "采集指南",
+    "emptyLibraryTitle": "告警库为空",
+    "emptyLibraryDescription": "目录已加载但不包含任何告警。这是发布问题，而非筛选问题——请稍后再试。",
+    "noMatchesTitle": "没有符合这些筛选条件的告警",
+    "noMatchesDescription": "尝试其他分类、严重性或搜索词。",
+    "clearFilters": "清除筛选条件",
+    "loadFailedTitle": "无法加载告警库",
+    "retry": "重试",
+    "openDetails": "打开 {title}",
+    "drawer": {
+      "dataAvailable": "数据可用",
+      "streamNotFound": "未找到流",
+      "detects": "检测内容",
+      "noDescription": "库中没有描述。",
+      "needsDataCallout": "此告警查询的 {stream} 并非此组织正在接收的流。立即安装将创建一个永远不会触发的告警。",
+      "query": "查询",
+      "stream": "流",
+      "streamType": "流类型",
+      "metricCondition": "指标条件",
+      "matchCount": "需要匹配的行数",
+      "previewBlocked": "{stream} 不是此组织中的流，因此没有可评估的内容。",
+      "wouldTrigger": "会触发",
+      "wouldNotTrigger": "不会触发",
+      "loading": "正在从库中加载此警报",
+      "loadFailed": "无法从库中加载此警报。",
+      "customize": "在编辑器中自定义",
+      "customizeHint": "打开标准警报编辑器并预填此警报。",
+      "customizeFailed": "无法在编辑器中打开此警报。",
+      "install": "安装",
+      "neverIngested": "尚无数据",
+      "neverIngestedCallout": "{stream} 存在但从未接收过数据，因此此警报没有可触发的内容。",
+      "lastData": "上次数据 {when}",
+      "staleCallout": "{stream} 上次接收数据是在 {when}。此警报将保持静默，直到数据接入恢复。",
+      "unknownTime": "在未知时间"
+    },
+    "install": {
+      "title": "从库中安装",
+      "subtitle": "选择警报通知的位置、要安装的警报以及它们的归档位置。",
+      "stepDestination": "目标",
+      "stepAlerts": "警报",
+      "stepFolder": "文件夹",
+      "stepTune": "调整",
+      "stepInstall": "安装",
+      "destinationIntro": "此批次中的每个警报都会通知您在此处选择的目标。库文件指定的是导出它们的组织中的目标，这些目标在您的组织中不存在。",
+      "destinationLabel": "目标",
+      "destinationPlaceholder": "选择目标",
+      "destinationsLoadFailed": "无法加载您现有的目标。",
+      "retry": "重试",
+      "destinationsNoneBody": "此组织尚无警报目标，因此这些警报无处通知。请在“目标”页面上创建一个，然后返回此处选择它。",
+      "openDestinations": "打开目标页面",
+      "selectAll": "全选",
+      "clear": "清除",
+      "selectedCount": "已选择 {count} / {total}",
+      "folderIntro": "安装的警报归档在此处。如果此批次需要单独的文件夹，请使用 + 按钮创建文件夹。",
+      "tuneToggle": "为此批次中的每个警报设置这些选项",
+      "tuneHint": "只有这两项适合为整个批次设置。阈值保持每个警报单独设置——如需更改，请打开该警报并单独安装它。",
+      "frequency": "运行频率",
+      "silence": "静默时长",
+      "minutes": "分钟",
+      "summaryTuningNone": "库默认值",
+      "summaryTuningOverride": "每 {frequency} 分钟，静默 {silence} 分钟",
+      "run": "安装 {count} 个警报 | 安装 {count} 个警报",
+      "retryFailed": "重试 {count} 个失败 | 重试 {count} 个失败",
+      "allInstalled": "已安装 {count} 个警报 | 已安装 {count} 个警报",
+      "someFailed": "已安装 {installed} 个，失败 {failed} 个",
+      "unknownError": "无法创建警报。",
+      "unreadableConditions": "此警报的筛选条件采用此版本无法读取的格式。安装它会创建一个没有筛选条件的警报，因此已跳过。",
+      "back": "返回",
+      "next": "下一步",
+      "cancel": "取消",
+      "done": "完成"
+    },
+    "error": {
+      "network": "无法访问库。请检查您的网络连接，然后重试。",
+      "http": "库服务器返回错误。请稍后重试。",
+      "unparseable": "库返回的内容不是目录。",
+      "unsupported_version": "此库目录比当前版本的 OpenObserve 所能读取的更新。请升级以浏览。",
+      "malformed": "库目录不完整或已损坏。"
+    }
+  },
   "alert_templates": {
     "exportTemplate": "导出模板",
     "selected": "已选择",
@@ -7429,7 +7542,7 @@
     "importBodyLabel": "模板正文 *",
     "importTypeLabel": "模板类型 *",
     "importTitleLabel": "模板标题 *",
-    "header": "模板",
+    "header": "目标模板",
     "add": "添加模板",
     "edit": "编辑",
     "name": "名称",
@@ -7636,6 +7749,7 @@
     "destinationsLoadError": "加载目标时出错"
   },
   "alert_destinations": {
+    "sectionTab": "目标",
     "chooseTypeTitle": "选择类型",
     "selectDestinationType": "选择目标类型",
     "connectionStepTitle": "连接",
@@ -13269,6 +13383,24 @@
     "combobox": {
       "noOptionsFound": "未找到选项"
     },
+    "emojiPicker": {
+      "chooseIcon": "选择一个图标",
+      "searchPlaceholder": "搜索图标...",
+      "removeIcon": "移除图标",
+      "noResults": "没有图标符合你的搜索",
+      "groups": {
+        "results": "结果",
+        "status": "状态",
+        "services": "服务",
+        "ai": "AI",
+        "creatures": "生物",
+        "infra": "基础设施",
+        "data": "数据",
+        "teams": "团队",
+        "objects": "对象",
+        "world": "世界"
+      }
+    },
     "input": {
       "clear": "清除"
     },
@@ -14626,7 +14758,8 @@
       "syntaxError": "SQL 语法错误"
     },
     "hover": {
-      "deprecated": "**已弃用** — 请优先使用规范函数。"
+      "deprecated": "**已弃用** — 请优先使用规范函数。",
+      "duplicate": "复制仪表盘"
     }
   }
 }

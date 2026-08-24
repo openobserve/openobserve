@@ -4492,6 +4492,8 @@
     "folder": "Thư mục",
     "folders": "Các thư mục",
     "searchFolder": "Tìm kiếm thư mục",
+    "folderIcon": "Biểu tượng",
+    "folderIconAria": "Chọn biểu tượng thư mục",
     "deleteFolder": "Xóa thư mục",
     "deleteFolderMessage": "Bạn có chắc muốn xóa thư mục này?",
     "trellisLayout": "Bố cục Trellis",
@@ -6017,6 +6019,7 @@
     "SearchSQLCancelled": "Lỗi: SQL tìm kiếm đã bị hủy."
   },
   "alerts": {
+    "allAlerts": "Tất cả cảnh báo",
     "compositeAlert": "Tổng hợp",
     "import": {
       "anomalyImportSuccess": "Phát hiện bất thường - {index}: \"{name}\" đã được nhập thành công",
@@ -7345,6 +7348,10 @@
         "panel": {
           "label": "Tạo cảnh báo",
           "toast": "Truy vấn được nhập từ bảng điều khiển: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Tùy chỉnh trong trình chỉnh sửa",
+          "toast": "Từ Thư viện cảnh báo: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7412,112 @@
     "impactTemplate": "Được sử dụng bởi {destinations} · {alerts}",
     "impactDestination": "Được sử dụng bởi {alerts}"
   },
+  "alert_library": {
+    "header": "Thư viện cảnh báo",
+    "subtitle": "Các cảnh báo được tuyển chọn, sẵn sàng cài đặt, khớp với dữ liệu bạn đã đưa vào",
+    "sectionTab": "Thư viện",
+    "contribute": "Đóng góp trên GitHub",
+    "searchPlaceholder": "Tìm kiếm theo tên, mô tả hoặc luồng dữ liệu",
+    "searchLabel": "Tìm kiếm thư viện cảnh báo",
+    "categories": "Danh mục",
+    "searchCategories": "Tìm kiếm danh mục",
+    "searchCategoriesAria": "Tìm kiếm bộ lọc danh mục",
+    "noCategoryMatch": "Không có danh mục phù hợp.",
+    "selectedCount": "{count} đã chọn",
+    "facetAria": "{label}, {count} cảnh báo",
+    "severity": "Mức độ nghiêm trọng",
+    "severityAll": "Tất cả",
+    "severityCritical": "Nghiêm trọng",
+    "severityWarning": "Cảnh báo",
+    "severityInfo": "Thông tin",
+    "statReady": "Sẵn sàng cài đặt",
+    "statNeedsData": "Chưa đưa vào",
+    "statAll": "Tất cả",
+    "notIngested": "Chưa đưa vào: {stream}",
+    "notIngestedHint": "Tổ chức này không nhận {stream}, vì vậy cảnh báo này sẽ không bao giờ kích hoạt. Vẫn cài đặt nó và nó sẽ bắt đầu hoạt động khi dữ liệu đến.",
+    "alertCount": "{count} cảnh báo | {count} cảnh báo",
+    "noCollectorTitle": "Chưa có gì ở đây khớp với dữ liệu của bạn",
+    "noCollectorDescription": "Không có cảnh báo nào trong {count} cảnh báo này truy vấn một luồng dữ liệu mà tổ chức này đang nhận. Gửi dữ liệu đo từ xa {group} đến OpenObserve và chúng sẽ hiển thị ở đây.",
+    "setupGuide": "Hướng dẫn đưa dữ liệu vào",
+    "emptyLibraryTitle": "Thư viện cảnh báo trống",
+    "emptyLibraryDescription": "Danh mục đã tải nhưng không chứa cảnh báo nào. Đây là sự cố phát hành, không phải bộ lọc — hãy thử lại ngay.",
+    "noMatchesTitle": "Không có cảnh báo nào khớp với các bộ lọc này",
+    "noMatchesDescription": "Thử danh mục, mức độ nghiêm trọng hoặc từ khóa tìm kiếm khác.",
+    "clearFilters": "Xóa bộ lọc",
+    "loadFailedTitle": "Không thể tải thư viện cảnh báo",
+    "retry": "Thử lại",
+    "openDetails": "Mở {title}",
+    "drawer": {
+      "dataAvailable": "Dữ liệu khả dụng",
+      "streamNotFound": "Không tìm thấy luồng dữ liệu",
+      "detects": "Những gì nó phát hiện",
+      "noDescription": "Không có mô tả trong thư viện.",
+      "needsDataCallout": "Cảnh báo này truy vấn {stream}, mà tổ chức này không nhận. Cài đặt ngay bây giờ sẽ tạo ra một cảnh báo không bao giờ kích hoạt.",
+      "query": "Truy vấn",
+      "stream": "Luồng dữ liệu",
+      "streamType": "Loại luồng dữ liệu",
+      "metricCondition": "Điều kiện chỉ số",
+      "matchCount": "Số hàng khớp cần thiết",
+      "previewBlocked": "{stream} không phải là luồng dữ liệu trong tổ chức này, vì vậy không có gì để đánh giá.",
+      "wouldTrigger": "Sẽ kích hoạt",
+      "wouldNotTrigger": "Sẽ không kích hoạt",
+      "loading": "Đang tải cảnh báo này từ thư viện",
+      "loadFailed": "Không thể tải cảnh báo này từ thư viện.",
+      "customize": "Tùy chỉnh trong trình soạn thảo",
+      "customizeHint": "Mở trình soạn thảo cảnh báo tiêu chuẩn được điền sẵn với cảnh báo này.",
+      "customizeFailed": "Không thể mở cảnh báo này trong trình soạn thảo.",
+      "install": "Cài đặt",
+      "neverIngested": "Chưa có dữ liệu",
+      "neverIngestedCallout": "{stream} tồn tại nhưng chưa từng nhận dữ liệu, vì vậy cảnh báo này không có gì để kích hoạt.",
+      "lastData": "Dữ liệu gần nhất {when}",
+      "staleCallout": "{stream} nhận dữ liệu cuối vào {when}. Cảnh báo này sẽ giữ im lặng cho đến khi hoạt động thu nạp dữ liệu tiếp tục.",
+      "unknownTime": "vào thời điểm không xác định"
+    },
+    "install": {
+      "title": "Cài đặt từ thư viện",
+      "subtitle": "Chọn nơi cảnh báo gửi thông báo, cảnh báo nào để cài đặt và nơi chúng được lưu trữ.",
+      "stepDestination": "Đích",
+      "stepAlerts": "Cảnh báo",
+      "stepFolder": "Thư mục",
+      "stepTune": "Tinh chỉnh",
+      "stepInstall": "Cài đặt",
+      "destinationIntro": "Mọi cảnh báo trong lô này gửi thông báo đến đích bạn chọn ở đây. Các tệp thư viện nêu tên các đích của tổ chức mà chúng được xuất ra, những đích này không tồn tại trong tổ chức của bạn.",
+      "destinationLabel": "Đích",
+      "destinationPlaceholder": "Chọn một đích",
+      "destinationsLoadFailed": "Không thể tải các đích hiện có của bạn.",
+      "retry": "Thử lại",
+      "destinationsNoneBody": "Tổ chức này chưa có đích cảnh báo nào, vì vậy không có nơi nào để các cảnh báo này gửi thông báo. Hãy tạo một đích trên trang Đích, sau đó quay lại và chọn nó ở đây.",
+      "openDestinations": "Mở Đích",
+      "selectAll": "Chọn tất cả",
+      "clear": "Bỏ chọn",
+      "selectedCount": "Đã chọn {count} trong {total}",
+      "folderIntro": "Các cảnh báo đã cài đặt được lưu trữ ở đây. Tạo một thư mục từ nút + nếu lô này đáng có thư mục riêng.",
+      "tuneToggle": "Đặt các tùy chọn này cho mọi cảnh báo trong lô",
+      "tuneHint": "Chỉ có hai tùy chọn này là an toàn để đặt cho toàn bộ lô. Ngưỡng vẫn theo từng cảnh báo — hãy thay đổi một ngưỡng bằng cách mở cảnh báo đó và cài đặt riêng.",
+      "frequency": "Chạy mỗi",
+      "silence": "Tạm ngưng trong",
+      "minutes": "phút",
+      "summaryTuningNone": "Mặc định thư viện",
+      "summaryTuningOverride": "Mỗi {frequency} phút, tạm ngưng {silence} phút",
+      "run": "Cài đặt {count} cảnh báo | Cài đặt {count} cảnh báo",
+      "retryFailed": "Thử lại {count} lỗi | Thử lại {count} lỗi",
+      "allInstalled": "Đã cài đặt {count} cảnh báo | Đã cài đặt {count} cảnh báo",
+      "someFailed": "Đã cài đặt {installed}, thất bại {failed}",
+      "unknownError": "Không thể tạo cảnh báo.",
+      "unreadableConditions": "Điều kiện lọc của cảnh báo này ở định dạng mà phiên bản này không đọc được. Cài đặt nó sẽ tạo cảnh báo không có bộ lọc, vì vậy nó đã bị bỏ qua.",
+      "back": "Quay lại",
+      "next": "Tiếp theo",
+      "cancel": "Hủy",
+      "done": "Xong"
+    },
+    "error": {
+      "network": "Không thể truy cập thư viện. Kiểm tra kết nối mạng của bạn và thử lại.",
+      "http": "Máy chủ thư viện trả về lỗi. Hãy thử lại sau ít phút.",
+      "unparseable": "Thư viện đã phản hồi với một thứ không phải là danh mục.",
+      "unsupported_version": "Danh mục thư viện này mới hơn phiên bản OpenObserve này có thể đọc. Hãy nâng cấp để duyệt nó.",
+      "malformed": "Danh mục thư viện không đầy đủ hoặc bị hỏng."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Xuất Mẫu",
     "selected": "đã chọn",
@@ -7429,7 +7542,7 @@
     "importBodyLabel": "Nội dung Mẫu *",
     "importTypeLabel": "Loại Mẫu *",
     "importTitleLabel": "Tiêu đề Mẫu *",
-    "header": "Mẫu",
+    "header": "Mẫu điểm đến",
     "add": "Mẫu mới",
     "edit": "Chỉnh sửa",
     "name": "Tên",
@@ -7636,6 +7749,7 @@
     "destinationsLoadError": "Lỗi khi tải điểm đến"
   },
   "alert_destinations": {
+    "sectionTab": "Điểm đến",
     "chooseTypeTitle": "Chọn Loại",
     "selectDestinationType": "Chọn Loại Điểm Đến",
     "connectionStepTitle": "Kết nối",
@@ -13269,6 +13383,24 @@
     "combobox": {
       "noOptionsFound": "Không tìm thấy tùy chọn"
     },
+    "emojiPicker": {
+      "chooseIcon": "Chọn một biểu tượng",
+      "searchPlaceholder": "Tìm kiếm biểu tượng...",
+      "removeIcon": "Xóa biểu tượng",
+      "noResults": "Không có biểu tượng nào khớp với tìm kiếm của bạn",
+      "groups": {
+        "results": "Kết quả",
+        "status": "Trạng thái",
+        "services": "Dịch vụ",
+        "ai": "AI",
+        "creatures": "Sinh vật",
+        "infra": "Cơ sở hạ tầng",
+        "data": "Dữ liệu",
+        "teams": "Nhóm",
+        "objects": "Đối tượng",
+        "world": "Thế giới"
+      }
+    },
     "input": {
       "clear": "Xóa"
     },
@@ -14626,7 +14758,8 @@
       "syntaxError": "Lỗi cú pháp SQL"
     },
     "hover": {
-      "deprecated": "**Không dùng nữa** — hãy ưu tiên hàm chuẩn."
+      "deprecated": "**Không dùng nữa** — hãy ưu tiên hàm chuẩn.",
+      "duplicate": "Nhân bản Bảng tổng quan"
     }
   }
 }
