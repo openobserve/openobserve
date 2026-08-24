@@ -261,7 +261,11 @@ import llmExperimentsService, {
   type ExperimentRowDetail,
 } from "@/services/llm-experiments.service";
 import ExperimentRowDetailDrawer from "@/enterprise/components/AIObservability/ExperimentRowDetailDrawer.vue";
-import { aiExperimentCompareRoute, aiExperimentsRoute } from "./experimentRoutes";
+import {
+  aiExperimentCompareRoute,
+  aiExperimentDetailRoute,
+  aiExperimentsRoute,
+} from "./experimentRoutes";
 import { experimentScoreValue, openExperimentTrace } from "./experimentResults";
 
 defineOptions({ name: "AIExperimentDetailPage" });
@@ -572,11 +576,17 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
 }
 
 async function cancelExperiment() {
-  await runAction(() => llmExperimentsService.cancel(orgId.value, experimentId.value));
+  await runAction(() => llmExperimentsService.cancel(orgId.value, experimentId.value), {
+    success: t("aiObservability.experiments.cancelSuccess"),
+    error: t("aiObservability.experiments.cancelError"),
+  });
 }
 
 async function retryExperiment() {
-  await runAction(() => llmExperimentsService.retry(orgId.value, experimentId.value));
+  await runAction(() => llmExperimentsService.retry(orgId.value, experimentId.value), {
+    success: t("aiObservability.experiments.retrySuccess"),
+    error: t("aiObservability.experiments.retryError"),
+  });
 }
 
 /** This run is the candidate; the picker supplies the baseline it is measured against. */
@@ -587,19 +597,34 @@ function openComparison(baselineId: string) {
 }
 
 async function cloneExperiment() {
-  await runAction(() => llmExperimentsService.clone(orgId.value, experimentId.value));
+  acting.value = true;
+  try {
+    const clone = await llmExperimentsService.clone(orgId.value, experimentId.value);
+    toast({ variant: "success", message: t("aiObservability.experiments.cloneSuccess") });
+    void router.push(aiExperimentDetailRoute(orgId.value, clone.id));
+  } catch (error: any) {
+    toast({
+      variant: "error",
+      message: raw(error?.response?.data?.message) || t("aiObservability.experiments.cloneError"),
+    });
+  } finally {
+    acting.value = false;
+  }
 }
 
-async function runAction(action: () => Promise<unknown>) {
+async function runAction(
+  action: () => Promise<unknown>,
+  messages: { success: I18nText; error: I18nText },
+) {
   acting.value = true;
   try {
     await action();
+    toast({ variant: "success", message: messages.success });
     await refresh();
   } catch (error: any) {
     toast({
       variant: "error",
-      message:
-        raw(error?.response?.data?.message) || t("aiObservability.experiments.detail.loadError"),
+      message: raw(error?.response?.data?.message) || messages.error,
     });
   } finally {
     acting.value = false;

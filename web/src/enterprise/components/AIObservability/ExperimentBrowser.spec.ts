@@ -19,6 +19,13 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ replace, push }),
 }));
 
+const cloneExperiment = vi.fn();
+const toast = vi.fn();
+vi.mock("@/services/llm-experiments.service", () => ({
+  default: { clone: (...a: any[]) => cloneExperiment(...a) },
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => toast(...a) }));
+
 vi.mock("vue-i18n", () => ({
   // Params are echoed, not dropped: a label is only correct if the right
   // numbers reach it, and a key-only mock hides that entirely.
@@ -67,7 +74,7 @@ const stubs = {
       "showHeader",
       "loading",
     ],
-    emits: ["update:selectedIds"],
+    emits: ["update:selectedIds", "row-click"],
     methods: {
       toggle(row, checked) {
         const next = checked
@@ -78,7 +85,7 @@ const stubs = {
     },
     template: `<table :data-loading="String(loading ?? false)"><tbody>
       <template v-for="row in data" :key="row.id">
-        <tr>
+        <tr @click="$emit('row-click', row, $event)">
           <td v-if="selection === 'multiple'">
             <input
               type="checkbox"
@@ -174,6 +181,32 @@ describe("ExperimentBrowser", () => {
       expect(el.props("label")).toBeUndefined();
       expect(el.attributes("aria-label")).toBeTruthy();
     }
+  });
+
+  // The clone is a new run that this list does not show until it is opened, so
+  // the action confirms and navigates rather than leaving the page unchanged.
+  it("clones a row from the actions column and opens the copy", async () => {
+    cloneExperiment.mockResolvedValue({ id: "copy" });
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("one", "dataset-a", 1)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    await wrapper.get('[data-test="ai-experiment-clone-one"]').trigger("click");
+    await flushPromises();
+
+    expect(cloneExperiment).toHaveBeenCalledWith("acme", "one");
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "aiExperimentDetail", params: { id: "copy" } }),
+    );
+    // The click must not ALSO open the row it sits in, which would race the
+    // navigation to the clone.
+    expect(wrapper.emitted("select")).toBeUndefined();
   });
 
   it("stands up one loading group before any data has arrived", () => {

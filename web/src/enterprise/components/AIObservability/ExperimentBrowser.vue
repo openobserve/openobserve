@@ -206,9 +206,11 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="flex items-center gap-2">
+          <!-- No gap: icon-sm buttons are square hit targets that already carry
+               their own whitespace, the same as the Alerts row actions. -->
+          <div class="flex items-center">
             <OButton
-              size="sm"
+              size="icon-sm"
               variant="ghost"
               :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
               :title="
@@ -224,6 +226,17 @@
               :data-test="`ai-experiment-baseline-${row.id}`"
               @click.stop="setBaseline(row)"
             />
+            <OButton
+              size="icon-sm"
+              variant="ghost"
+              icon-left="content-copy"
+              :disabled="cloningId === row.id"
+              :aria-label="t('aiObservability.experiments.clone')"
+              :data-test="`ai-experiment-clone-${row.id}`"
+              @click.stop="cloneExperiment(row)"
+            >
+              <OTooltip side="bottom" :content="t('aiObservability.experiments.clone')" />
+            </OButton>
           </div>
         </template>
       </OTable>
@@ -248,7 +261,10 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LlmDataset } from "@/services/llm-datasets.service";
-import type { ExperimentDetail, LlmExperiment } from "@/services/llm-experiments.service";
+import llmExperimentsService, {
+  type ExperimentDetail,
+  type LlmExperiment,
+} from "@/services/llm-experiments.service";
 import {
   comparisonEligibility,
   experimentEvidence,
@@ -257,7 +273,10 @@ import {
   type ComparisonIneligibilityReason,
   writeExperimentBaselines,
 } from "@/enterprise/views/AIObservability/experimentDiscovery";
-import { aiExperimentCompareRoute } from "@/enterprise/views/AIObservability/experimentRoutes";
+import {
+  aiExperimentCompareRoute,
+  aiExperimentDetailRoute,
+} from "@/enterprise/views/AIObservability/experimentRoutes";
 
 const props = withDefaults(
   defineProps<{
@@ -287,6 +306,7 @@ const router = useRouter();
 const initialDataset =
   props.fixedDatasetId || (props.syncUrl ? String(route.query.dataset ?? "") : "");
 const datasetFilter = ref(initialDataset);
+const cloningId = ref("");
 const nameSearch = ref(props.syncUrl ? String(route.query.experiment ?? "") : "");
 const baselineByDataset = ref(readExperimentBaselines(props.orgId));
 const selectedIds = ref<string[]>([]);
@@ -515,6 +535,24 @@ function costLabel(experiment: LlmExperiment) {
 
 function isBaseline(experiment: LlmExperiment) {
   return baselineByDataset.value[experiment.datasetId] === experiment.id;
+}
+
+// Cloning opens the copy, the same as cloning from the detail page — the new
+// run is the thing you wanted, and it is not visible in this list until then.
+async function cloneExperiment(experiment: LlmExperiment) {
+  cloningId.value = experiment.id;
+  try {
+    const clone = await llmExperimentsService.clone(props.orgId, experiment.id);
+    toast({ variant: "success", message: t("aiObservability.experiments.cloneSuccess") });
+    void router.push(aiExperimentDetailRoute(props.orgId, clone.id));
+  } catch (error: any) {
+    toast({
+      variant: "error",
+      message: raw(error?.response?.data?.message) || t("aiObservability.experiments.cloneError"),
+    });
+  } finally {
+    cloningId.value = "";
+  }
 }
 
 function setBaseline(experiment: LlmExperiment) {

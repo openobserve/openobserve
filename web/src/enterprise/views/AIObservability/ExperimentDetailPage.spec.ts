@@ -9,23 +9,27 @@ import {
 } from "@/enterprise/views/AIObservability/experimentTestFixtures";
 
 const route = reactive({ params: { id: "exp-1" }, query: {} }) as any;
+const push = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => route,
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }));
 vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
 }));
 const get = vi.fn();
+const clone = vi.fn();
+const toast = vi.fn();
 vi.mock("@/services/llm-experiments.service", () => ({
   default: {
     get: (...a: any[]) => get(...a),
     getRow: vi.fn(),
     cancel: vi.fn(),
     retry: vi.fn(),
-    clone: vi.fn(),
+    clone: (...a: any[]) => clone(...a),
   },
 }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => toast(...a) }));
 vi.mock("@/services/llm-datasets.service", () => ({
   default: {
     list: vi.fn().mockResolvedValue([{ id: "ds-1", name: "Test Dataset" }]),
@@ -309,6 +313,33 @@ describe("ExperimentDetailPage", () => {
     (wrapper.vm as any).statusFilter = "error";
     await flushPromises();
     expect(rows.map((r) => r.taskStatus)).toEqual(["error"]);
+  });
+
+  // Clone produced no feedback at all: it toasted only on failure, and its
+  // success path refreshed the CURRENT experiment, so nothing on screen moved.
+  it("confirms a clone and opens the new experiment", async () => {
+    get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
+    clone.mockResolvedValue({ id: "exp-2" });
+    const wrapper = mount(ExperimentDetailPage, {
+      global: {
+        stubs: {
+          OTable: { template: `<table />` },
+          OButton: {
+            emits: ["click"],
+            template: `<button v-bind="$attrs" @click="$emit('click')"><slot /></button>`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-test="ai-experiment-detail-clone"]').trigger("click");
+    await flushPromises();
+
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "aiExperimentDetail", params: { id: "exp-2" } }),
+    );
   });
 
   it("re-fetches the results from the table toolbar", async () => {
