@@ -321,6 +321,21 @@ describe("FunctionPicker", () => {
     expect(addFn.props("defaultCode")).toBe("() => 'persisted'");
   });
 
+  it("reopened, untouched inline raw_fn node is NOT dirty (seed = initialRawFn)", async () => {
+    // Reopen a saved inline node: editor seeds from initialRawFn, defaultCode is the
+    // fresh-node placeholder. Nothing typed → must be clean (no spurious exit prompt).
+    const wrapper = wf({ initialRawFn: "() => 'persisted'", defaultCode: "// seed" });
+    await flushPromises();
+    expect((wrapper.vm as any).isDirty()).toBe(false);
+  });
+
+  it("editing a reopened inline raw_fn node past its persisted code → dirty", async () => {
+    const wrapper = wf({ initialRawFn: "() => 'persisted'", defaultCode: "// seed" });
+    await flushPromises();
+    mockEditorCode = "() => 'edited'"; // diverges from the persisted raw_fn
+    expect((wrapper.vm as any).isDirty()).toBe(true);
+  });
+
   it("isDirty() is false outside single-screen mode (raw_fn is workflow-only)", async () => {
     const wrapper = createWrapper({ language: "javascript", initialName: "js_fn" });
     await flushPromises();

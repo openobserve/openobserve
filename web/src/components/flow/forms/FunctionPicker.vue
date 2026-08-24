@@ -465,8 +465,11 @@ const isDirty = (): boolean => {
   if (!props.createButton) return false; // raw_fn is a workflow-only concept
   const code = editorCode().trim();
   if (selectedFunction.value) return code !== (selectedDefinition.value || "").trim();
-  // No saved fn selected: dirty only when there's real code beyond the seed default.
-  const seed = (props.defaultCode || "").trim();
+  // No saved fn selected: dirty only when the code diverges from what the editor was
+  // seeded with — the node's persisted raw_fn if it has one, else the fresh default
+  // (matches `editorSeed`). Comparing against defaultCode alone flags an untouched
+  // reopened inline node as dirty.
+  const seed = (props.initialRawFn || props.defaultCode || "").trim();
   return code.length > 0 && code !== seed;
 };
 // Discard: revert the editor to its seed by remounting — the selected fn's saved code
