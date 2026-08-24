@@ -1,7 +1,11 @@
 const { maskingSuite } = require('../utils/rumChecks');
 const cfg = require('../utils/config');
 
-// Same RN app as RN-Android, built with Session Replay MASK_ALL — no on-screen PII may appear.
+// KNOWN BUG — openobserve#13942: on iOS the RN Session-Replay bridge posts segments to Datadog's
+// `/api/v2/replay` instead of OpenObserve's `/replay`, so they are rejected (401) and ZERO segments
+// reach `_sessionreplay` — session replay silently records nothing on RN iOS. The P0 upload assertion
+// in maskingSuite therefore fails here; test.fixme documents it and flips green once the SDK is fixed.
+// (RN Android is unaffected — see rn-android.masking. Fix lives in openobserve-react-native-rum.)
 maskingSuite({
   name: 'RN iOS · Session Replay privacy masking',
   tags: ['@mobile', '@rn-ios'],
@@ -9,5 +13,5 @@ maskingSuite({
   pii: ['alex.morgan@example.com', '4242 4242 4242 4242'],
   flows: ['ios-react-native/masking.yaml'],
   device: cfg.IOS_SIM_UDID,
-  requireReplay: false, // iOS mobile replay is not always rendered in CI → skip-with-reason, don't false-fail
+  knownReplayBug: 'openobserve#13942',
 });
