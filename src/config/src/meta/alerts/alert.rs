@@ -109,7 +109,11 @@ pub struct Alert {
     ///
     /// **Mutable** configuration — editable on any update, like `name`.
     /// Display + propagation only: it must never influence evaluation,
-    /// silence, delivery or incident severity (PT-5 / D19).
+    /// silence, or delivery (PT-5 / D19). B-29 carved out one exception:
+    /// when set, it takes precedence over the eval_level default for
+    /// incident severity at creation/escalation — see
+    /// `config::meta::alerts::priority` and
+    /// `core::alerts::incidents::create_new_incident`.
     ///
     /// `value_type` is required here because the enum serializes as an
     /// integer via serde `try_from`/`into`; without it the generated OpenAPI

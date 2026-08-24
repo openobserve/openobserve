@@ -56,7 +56,9 @@ pub struct CorrelationSubject {
     pub org_id: String,
     pub kind: config::meta::alerts::incidents::AlertKind,
     pub base_destinations: Vec<String>,
-    /// Pre-mapped severity for external events; `None` → enterprise default (internal path)
+    /// Pre-mapped severity: external events carry their own; internal alerts
+    /// carry `alert.priority` mapped through `determine_severity`, when set.
+    /// `None` → eval_level default (Critical→P2, Warning→P3).
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
 }
 
@@ -631,6 +633,17 @@ pub async fn correlate_alert_to_incident(
             sem_result.group_values
         );
     }
+    // B-29: a P1 alert must open a P1 incident, not the eval_level default.
+    // `alert.priority` is the operator's stated urgency, so when it's set it
+    // wins over the Critical/Warning->P2/P3 fallback in `create_new_incident`
+    // — otherwise the incident dashboard's severity tiles silently undercount
+    // P1s for every alert that only defines a Critical tier.
+    let severity = alert.priority.and_then(|p| {
+        o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
+            .parse()
+            .ok()
+    });
+
     // Build the correlation subject for the internal alert path.
     let subject = CorrelationSubject {
         id: alert.get_unique_key(),
@@ -638,7 +651,7 @@ pub async fn correlate_alert_to_incident(
         org_id: alert.org_id.to_string(),
         kind: AlertKind::Internal,
         base_destinations: alert.destinations.clone(),
-        severity: None,
+        severity,
     };
 
     // Find or create incident
@@ -1391,11 +1404,20 @@ async fn find_or_create_incident(
             // silence layer explicitly let this delivery through, and
             // suppressing it here would lose the only page for the
             // escalation.
+            //
+            // B-29: `subject.severity` (alert.priority, when set) is the same
+            // precedence signal `create_new_incident` uses and takes the same
+            // priority here — otherwise a P1 alert repeating against an
+            // incident it didn't create could be capped at the eval_level
+            // default (P2) instead of escalating to the priority it's
+            // actually configured for.
             use config::meta::alerts::incidents::{IncidentEvent, IncidentSeverity};
-            let level_severity = eval_level.and_then(|l| match l {
-                config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
-                config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
-                _ => None,
+            let level_severity = subject.severity.or_else(|| {
+                eval_level.and_then(|l| match l {
+                    config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
+                    config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
+                    _ => None,
+                })
             });
             // P1 is most urgent; higher urgency = escalation.
             let urgency = |s: IncidentSeverity| match s {
@@ -2657,6 +2679,24 @@ mod tests {
             config::meta::alerts::priority::AlertPriority::P2,
             "the shared default must stay the louder of the two"
         );
+    }
+
+    /// B-29: a P1 alert must map to a P1 incident severity, not the eval_level
+    /// default (Critical -> P2) — this is the exact mapping `correlate_alert_to_incident`
+    /// uses to pre-populate `CorrelationSubject.severity` for the internal alert path.
+    #[test]
+    fn test_alert_priority_maps_to_incident_severity() {
+        use config::meta::alerts::{incidents::IncidentSeverity, priority::AlertPriority};
+
+        let map = |p: AlertPriority| -> Option<IncidentSeverity> {
+            o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
+                .parse()
+                .ok()
+        };
+
+        assert_eq!(map(AlertPriority::P1), Some(IncidentSeverity::P1));
+        assert_eq!(map(AlertPriority::P2), Some(IncidentSeverity::P2));
+        assert_eq!(map(AlertPriority::P4), Some(IncidentSeverity::P4));
     }
 
     #[test]
