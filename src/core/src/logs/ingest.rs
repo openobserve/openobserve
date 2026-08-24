@@ -1136,7 +1136,7 @@ fn construct_values_from_open_telemetry_v1_metric(
                         resource_attributes.get("aws.exporter.arn").unwrap(),
                     );
 
-                    let mut mv = serde_json::json!({
+                    let mut mv = json::json!({
                         "metric_stream_name": resource_id,
                         "account_id": resource_attributes.get("cloud.account.id").unwrap(),
                         "region": resource_attributes.get("cloud.region").unwrap(),

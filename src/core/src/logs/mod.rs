@@ -665,7 +665,7 @@ mod tests {
 
     #[test]
     fn test_parse_bulk_index_index_action() {
-        let v = serde_json::json!({"index": {"_index": "my-stream", "_id": "doc1"}});
+        let v = json!({"index": {"_index": "my-stream", "_id": "doc1"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_some());
         let (action, index, doc_id) = result.unwrap();
@@ -676,7 +676,7 @@ mod tests {
 
     #[test]
     fn test_parse_bulk_index_create_action_no_doc_id() {
-        let v = serde_json::json!({"create": {"_index": "my-stream"}});
+        let v = json!({"create": {"_index": "my-stream"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_some());
         let (action, index, doc_id) = result.unwrap();
@@ -687,14 +687,14 @@ mod tests {
 
     #[test]
     fn test_parse_bulk_index_no_known_action_returns_none() {
-        let v = serde_json::json!({"delete": {"_index": "my-stream"}});
+        let v = json!({"delete": {"_index": "my-stream"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_none());
     }
 
     #[test]
     fn test_parse_bulk_index_missing_index_skips_action() {
-        let v = serde_json::json!({"index": {"_id": "doc1"}});
+        let v = json!({"index": {"_id": "doc1"}});
         let result = parse_bulk_index(&v);
         assert!(result.is_none());
     }
