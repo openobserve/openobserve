@@ -53,6 +53,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import config from "@/aws-exports";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -94,10 +95,10 @@ const sections = computed<Section[]>(() => {
     },
     // Last: the catalog is where you go once to fetch an alert, not where you
     // work. The rail's Reliability flyout lists these four in this same order.
-    // Only when the route is registered — the build-time Alert Library flag
-    // (VITE_OPENOBSERVE_ALERT_LIBRARY) skips registration to hide it, exactly
-    // as the rail flyout gates its own children through router.hasRoute.
-    ...(router.hasRoute("alertLibrary")
+    // Gated on the same build-time flag that unregisters the route
+    // (VITE_OPENOBSERVE_ALERT_LIBRARY): hides the tab AND blocks direct-URL
+    // access (an unregistered /alert-library falls through to Error404).
+    ...(config.showAlertLibrary !== "false"
       ? ([
           {
             key: "alertLibrary",
