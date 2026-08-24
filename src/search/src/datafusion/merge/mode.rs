@@ -150,25 +150,21 @@ impl MergeMode {
     /// sort. Any mix with other layouts declares no order; otherwise the
     /// classic `_timestamp DESC`.
     pub fn input_sort_order(&self, files: &[FileKey]) -> FileSortOrder {
+        let hash_ordered = files
+            .iter()
+            .filter(|f| MetricsFileLayout::of(&f.key).is_some())
+            .count();
         match self {
             Self::MetricsHashSorted | Self::MetricsIndexed => {
-                if files
-                    .iter()
-                    .all(|f| MetricsFileLayout::of(&f.key).is_some())
-                {
+                if hash_ordered == files.len() {
                     FileSortOrder::HashTimestampAsc
                 } else {
                     FileSortOrder::None
                 }
             }
-            #[cfg(feature = "enterprise")]
-            Self::Downsampling(_)
-                if files
-                    .iter()
-                    .any(|f| MetricsFileLayout::of(&f.key).is_some()) =>
-            {
-                FileSortOrder::None
-            }
+            // hash-ordered files under any other mode: declare no order so
+            // the merge re-sorts instead of trusting `_timestamp DESC`
+            _ if hash_ordered > 0 => FileSortOrder::None,
             _ => FileSortOrder::TimestampDesc,
         }
     }
@@ -328,9 +324,17 @@ mod tests {
                 FileSortOrder::None
             );
         }
-        // ordinary modes never interpret metrics layout markers
+        // classic merge over hash-ordered files (layout switched off): no order
         assert_eq!(
-            MergeMode::Classic.input_sort_order(&[legacy, sorted]),
+            MergeMode::Classic.input_sort_order(&[legacy.clone(), sorted.clone()]),
+            FileSortOrder::None
+        );
+        assert_eq!(
+            MergeMode::Classic.input_sort_order(std::slice::from_ref(&sorted)),
+            FileSortOrder::None
+        );
+        assert_eq!(
+            MergeMode::Classic.input_sort_order(std::slice::from_ref(&legacy)),
             FileSortOrder::TimestampDesc
         );
     }
