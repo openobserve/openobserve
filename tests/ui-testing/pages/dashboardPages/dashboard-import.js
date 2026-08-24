@@ -85,9 +85,26 @@ export default class DashboardImport {
         await this.page.waitForURL(/\/dashboards\/import/, { timeout: 15000 });
       }
       await fileTab.waitFor({ state: "visible", timeout: 15000 });
-    }).toPass({ timeout: 60000, intervals: [500, 1000, 2000] });
 
-    await this.inputFile.waitFor({ state: "attached", timeout: 15000 });
+      // Waiting for the TAB is not the same as being ON it. The file control is
+      // rendered under v-if="activeTab == 'import_json_file'", so if the view is
+      // sitting on the URL tab the control never mounts and the attached-wait
+      // below times out against an element that was never going to exist —
+      // the "dashboard-import-file-control-field not attached" flake.
+      //
+      // activeTab defaults to import_json_file, which is why this passes most of
+      // the time; it only bites when the default has been changed by a previous
+      // interaction on the same page. Click the tab unless it is already active,
+      // then gate on the control itself rather than on the tab.
+      const fileTabActive = await fileTab
+        .getAttribute("data-state")
+        .then((v) => v === "active")
+        .catch(() => false);
+      if (!fileTabActive) {
+        await fileTab.click();
+      }
+      await this.inputFile.waitFor({ state: "attached", timeout: 15000 });
+    }).toPass({ timeout: 60000, intervals: [500, 1000, 2000] });
   }
 
   //click import button

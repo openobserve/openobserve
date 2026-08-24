@@ -104,6 +104,7 @@ test.describe("Dashboard Max Query Range", () => {
       const searchDone1 = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
       await searchDone1;
+      await mqr.waitForPanelsIdle();
 
       // Assert warning icon is visible
       await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
@@ -150,6 +151,7 @@ test.describe("Dashboard Max Query Range", () => {
       const searchDone6w = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
       await searchDone6w;
+      await mqr.waitForPanelsIdle();
 
       // Warning should be visible
       await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
@@ -162,6 +164,7 @@ test.describe("Dashboard Max Query Range", () => {
       const searchDone2h = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("2-h");
       await searchDone2h;
+      await mqr.waitForPanelsIdle();
 
       // Warning should disappear
       await expect(pm.dashboardMaxQueryRange.warningIcon).not.toBeVisible({
@@ -319,6 +322,7 @@ test.describe("Dashboard Max Query Range", () => {
       const searchDone5 = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
       await searchDone5;
+      await mqr.waitForPanelsIdle();
 
       // Verify warning is present
       await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
