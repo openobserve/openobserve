@@ -13441,7 +13441,7 @@
     "ladderL0Parallel": "Triaged alongside",
     "ladderL0Only": "Triaged, nobody paged",
     "ladderStaleDefaultTag": "Ladder never learned the rotations",
-    "ladderStaleDefaultHint": "Every level pages the whole team, but this team has rotations \u2014 the ladder was created before they existed. Adding or removing a member re-runs the default, or edit the ladder once by hand.",
+    "ladderStaleDefaultHint": "Every level pages the whole team, but this team has rotations — the ladder was created before they existed. Adding or removing a member re-runs the default, or edit the ladder once by hand.",
     "ladderEndsStops": "Escalation stops",
     "ladderEndsHandsOff": "The page hands off",
     "reachShortNoSmtp": "email only · no SMTP transport",
@@ -13696,6 +13696,16 @@
     "l0ModeShortOnly": "agent only",
     "l0BudgetSeconds": "{count} second | {count} seconds",
     "l0MaxStepsOption": "up to 1 step | up to {count} steps",
-    "l0VerdictPowers": "Verdict powers"
+    "l0VerdictPowers": "Verdict powers",
+    "ruleEditorValueServices": "{count} service | {count} services",
+    "ruleEditorDimensionsFromTelemetry": "Only fields this organization has actually sent. A rule pinned to anything else would never match.",
+    "ruleEditorVocabularyUnfiltered": "Nothing has been discovered yet, so every known field is listed. Some may never match here.",
+    "ruleEditorOwnService": "Own a service",
+    "ruleEditorOwnServicePlaceholder": "Pick a discovered service",
+    "ruleEditorOrByField": "or match on a field below",
+    "ruleEditorServiceNameOnly": "by service name only — no infrastructure identity discovered",
+    "ruleEditorOwnServiceHelp": "Pick a service and this claims the whole identity discovery found for it — its cluster, namespace and deployment — instead of you entering each one. Services with no infrastructure identity are claimed by name.",
+    "ruleEditorValueHelp": "Values already seen on this field, commonest first. Type your own if it is not listed yet, or end it with * to claim a family, like db-*.",
+    "ruleEditorTeamHelp": "The team paged when a signal matches. Its own escalation ladder decides who is woken and in what order."
   }
 }

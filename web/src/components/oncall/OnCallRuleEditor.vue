@@ -138,6 +138,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </span>
 
+          <!-- A service's identity is already decided: the org's identity sets
+               say a Kubernetes service is cluster + namespace + deployment, and
+               discovery has recorded exactly that per service. Claiming one
+               writes all of it at once, which is the difference between owning
+               a service and reconstructing its address three fields at a time. -->
+          <div
+            v-if="!pairs.length && serviceOptions.length"
+            class="flex flex-wrap items-end gap-2"
+            data-test="oncall-rule-editor-claim-service"
+          >
+            <OSelect
+              v-model="claimedService"
+              :label="t('oncall.ruleEditorOwnService')"
+              :options="serviceOptions"
+              :placeholder="t('oncall.ruleEditorOwnServicePlaceholder')"
+              size="sm"
+              width="md"
+              searchable
+              data-test="oncall-rule-editor-service"
+              @update:model-value="claimService"
+            >
+              <template #tooltip>
+                <OTooltip side="right" :content="t('oncall.ruleEditorOwnServiceHelp')" />
+              </template>
+            </OSelect>
+            <OText variant="meta" class="pb-2">{{ t("oncall.ruleEditorOrByField") }}</OText>
+          </div>
+
           <!-- A closed vocabulary for the dimension: free text is how a rule
                ends up pinned to a field nothing ever emits, which reads as
                "never matched". The value stays open — it is data — but the
@@ -152,7 +180,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               width="sm"
               searchable
               data-test="oncall-rule-editor-dimension-name"
-            />
+            >
+              <!-- The list is short because it is what this org emits, not what
+                   the product understands. Said on demand: a reader who does
+                   not wonder should not have to read it. -->
+              <template #tooltip>
+                <OTooltip
+                  side="right"
+                  :content="
+                    vocabularyIsUnfiltered
+                      ? t('oncall.ruleEditorVocabularyUnfiltered')
+                      : t('oncall.ruleEditorDimensionsFromTelemetry')
+                  "
+                />
+              </template>
+            </OSelect>
             <!-- Enter commits the pair: the hands are already on the value
                  field, and reaching for Add to add a second condition is the
                  slow half of writing a two-condition rule. -->
@@ -164,7 +206,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('oncall.ruleEditorValuePlaceholder')"
                 size="sm"
                 data-test="oncall-rule-editor-dimension-value"
-              />
+              >
+                <template #tooltip>
+                  <OTooltip side="right" :content="t('oncall.ruleEditorValueHelp')" />
+                </template>
+              </OCombobox>
             </span>
             <OButton
               variant="outline"
@@ -227,7 +273,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchable
           data-test="oncall-rule-editor-team"
           @update:model-value="(v: unknown) => (team = String(v))"
-        />
+        >
+          <template #tooltip>
+            <OTooltip side="right" :content="t('oncall.ruleEditorTeamHelp')" />
+          </template>
+        </OSelect>
       </div>
 
       <!-- The verification, in the same panel as the edit. Only the unrouted
@@ -313,20 +363,20 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import type { OwnershipRuleStats, TeamRungSummary, UnroutedSignal } from "@/ts/interfaces/oncall";
+import type {
+  DimensionCatalogue,
+  DiscoveredService,
+  OwnershipRuleStats,
+  TeamRungSummary,
+  UnroutedSignal,
+} from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import {
-  dimensionsSentence,
-  identityDimensions,
-  normalizeDimensionValue,
-  priorityLabel,
-  priorityTagVariant,
-  ruleClaimsDimensions,
-} from "@/utils/oncall";
+import { SERVICE_DIMENSION, dimensionsSentence, identityDimensions, normalizeDimensionValue, priorityLabel, priorityTagVariant, ruleClaimsDimensions } from "@/utils/oncall";
 
 export interface RuleDraft {
   dimensions: Record<string, string>;
@@ -352,6 +402,10 @@ const props = withDefaults(
     teams?: { id: string; name: string }[];
     /** The org's field vocabulary, so a condition reads as it does elsewhere. */
     aliases?: { id: string; display?: string }[];
+    /** What this org actually emits — see {@link DimensionCatalogue}. */
+    catalogue?: DimensionCatalogue;
+    /** Services discovery has seen, each claimable as one whole identity. */
+    services?: DiscoveredService[];
     /** Replayed against the draft to answer "what would this catch". */
     signals?: UnroutedSignal[];
     /** The target team's ladder, so "page" says what paging means. */
@@ -365,6 +419,8 @@ const props = withDefaults(
     teamId: "",
     teams: () => [],
     aliases: () => [],
+    catalogue: () => ({ present: [], values: {} }),
+    services: () => [],
     signals: () => [],
     ladder: () => [],
     saving: false,
@@ -411,25 +467,93 @@ function dimensionsOf(): Record<string, string> {
   return Object.fromEntries(pairs.value.map((pair) => [pair.name, pair.value]));
 }
 
-const dimensionOptions = computed(() =>
-  props.aliases.map((alias) => ({ label: raw(alias.display || alias.id), value: alias.id })),
+/// Dimensions this org has actually emitted, in the order the registry
+/// recommends, and nothing else.
+///
+/// The vocabulary lists every field name the product understands across every
+/// platform — around thirty. An org running Kubernetes has eight of them. The
+/// other twenty-two were offered anyway, so the commonest way to write a rule
+/// that never matches was to pick one off the top of the list.
+///
+/// An empty catalogue means the registry has nothing to say yet, and the whole
+/// vocabulary is better than an empty picker.
+const dimensionOptions = computed(() => {
+  const label = (id: string) =>
+    raw(props.aliases.find((alias) => alias.id === id)?.display || id);
+  const present = props.catalogue.present;
+  if (!present.length) {
+    return props.aliases.map((alias) => ({ label: label(alias.id), value: alias.id }));
+  }
+  // A condition already on the draft stays selectable even if the registry has
+  // since stopped seeing it, or editing an old rule would silently drop it.
+  const onDraft = pairs.value.map((pair) => pair.name).filter((name) => !present.includes(name));
+  return [...present, ...onDraft].map((id) => ({ label: label(id), value: id }));
+});
+
+const claimedService = ref("");
+
+/// Discovered services, labelled with the identity a claim would write so the
+/// choice is legible before it is made.
+const serviceOptions = computed(() =>
+  props.services.map((service) => ({
+    label: raw(service.name),
+    value: service.name,
+    description: Object.keys(service.identity).length
+      ? raw(Object.values(service.identity).join(" / "))
+      : t("oncall.ruleEditorServiceNameOnly"),
+  })),
+);
+
+/// Fill the conditions from the service's own identity.
+///
+/// Anything the identity sets do not cover — bare metal, a VM, an appliance —
+/// has no infrastructure identity to write, so the claim falls back to the
+/// service name. That is a real, narrower claim rather than a failure, and the
+/// option said so before it was picked.
+function claimService(name: unknown) {
+  const service = props.services.find((candidate) => candidate.name === String(name));
+  if (!service) return;
+  const identity = Object.keys(service.identity).length
+    ? service.identity
+    : { [SERVICE_DIMENSION]: service.name };
+  pairs.value = Object.entries(identity).map(([key, value]) => ({ name: key, value: String(value) }));
+  claimedService.value = "";
+  adding.value = false;
+}
+
+/// Whether the picker is showing the whole vocabulary because the registry is
+/// empty. The form says so rather than letting somebody pick a dimension this
+/// deployment has never seen and wait for a page that never comes.
+const vocabularyIsUnfiltered = computed(
+  () => !props.catalogue.present.length && props.aliases.length > 0,
 );
 
 const teamOptions = computed(() =>
   props.teams.map((option) => ({ label: raw(option.name), value: option.id })),
 );
 
-/// The values this dimension has actually arrived with. A rule written against
-/// a value nothing emits looks right and catches nothing, and the queue is the
-/// only place the real spellings exist.
+/// The values this dimension has actually arrived with.
+///
+/// Two sources, and the second is why this stopped being a text box. The
+/// unrouted queue only holds what has already fallen through, so a team writing
+/// a rule *before* anything breaks got an empty list. The registry holds every
+/// value discovery has seen, with the number of services carrying it — which is
+/// also the only hint on this form about how broad a rule is about to be.
 const valueOptions = computed(() => {
   if (!draftName.value) return [];
-  const seen = new Set<string>();
+  const counts = props.catalogue.values[draftName.value] ?? {};
+  const seen = new Map<string, number>(Object.entries(counts));
   for (const signal of props.signals) {
     const value = signal.dimensions?.[draftName.value];
-    if (value) seen.add(String(value));
+    if (value && !seen.has(String(value))) seen.set(String(value), 0);
   }
-  return [...seen].sort().map((value) => ({ label: raw(value), value }));
+  return [...seen.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([value, services]) => ({
+      label: raw(value),
+      value,
+      description: services ? t("oncall.ruleEditorValueServices", { count: services }, services) : undefined,
+    }));
 });
 
 /// The queue, heaviest first: the path that fell through most often is the one

@@ -31,6 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rules="rules"
       :signals="signals"
       :aliases="aliases"
+      :catalogue="catalogue"
+      :services="services"
       :team-id="teamId"
       :team-name="teamName"
       :teams="teams"
@@ -105,9 +107,12 @@ import type { SimulatorQuery } from "@/components/oncall/OnCallRoutingSimulator.
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import alertsService from "@/services/alerts";
+import { getDimensionAnalytics, getServicesList } from "@/services/service_streams";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
 import type {
+  DimensionCatalogue,
+  DiscoveredService,
   OnCallTeam,
   OwnershipRuleStats,
   RoutingPreview,
@@ -133,6 +138,12 @@ const store = useStore();
 const rules = ref<OwnershipRuleStats[]>([]);
 const signals = ref<UnroutedSignal[]>([]);
 const aliases = ref<{ id: string; display?: string }[]>([]);
+/// What this org's telemetry actually carries, so the rule editor offers
+/// dimensions that can match and values that have been seen.
+const catalogue = ref<DimensionCatalogue>({ present: [], values: {} });
+/// Discovered services, so a rule can claim one whole identity rather than be
+/// assembled a dimension at a time.
+const services = ref<DiscoveredService[]>([]);
 const { config: routingConfig, load: loadRoutingConfig, refresh: refreshRoutingConfig } =
   useOnCallRoutingConfig();
 
@@ -170,6 +181,52 @@ async function fetchAliases() {
     aliases.value = res.data ?? [];
   } catch {
     aliases.value = [];
+  }
+}
+
+/// The semantic groups say what a dimension COULD be called; this says which of
+/// them this org has ever emitted, and with what values. Without it the editor
+/// offers the whole vocabulary, most of which can never match here.
+/// Services discovery has seen. The identity a rule would write is already on
+/// the record — the org's identity sets decided it — so claiming one is a
+/// choice, not three fields the reader has to reconstruct.
+async function fetchServices() {
+  try {
+    const res = await getServicesList(orgId.value);
+    const rows: unknown[] = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    const seen = new Map<string, DiscoveredService>();
+    for (const row of rows as Record<string, any>[]) {
+      const name = String(row.service_name ?? "");
+      if (!name) continue;
+      const identity = (row.disambiguation ?? {}) as Record<string, string>;
+      const existing = seen.get(name);
+      // One row per service. A service seen both with and without its
+      // infrastructure identity is one service to a human, and the narrower
+      // record is the one worth claiming.
+      if (!existing || (!Object.keys(existing.identity).length && Object.keys(identity).length)) {
+        seen.set(name, { name, setId: String(row.set_id ?? "default"), identity });
+      }
+    }
+    services.value = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    services.value = [];
+  }
+}
+
+async function fetchCatalogue() {
+  try {
+    const res = await getDimensionAnalytics(orgId.value);
+    const dims = res.data?.dimensions ?? [];
+    catalogue.value = {
+      present: res.data?.recommended_priority_dimensions ?? dims.map((d) => d.dimension_name),
+      values: Object.fromEntries(
+        dims.map((d) => [d.dimension_name, d.value_counts ?? {}]),
+      ),
+    };
+  } catch {
+    // An empty catalogue falls back to the full vocabulary and free-text
+    // values, which is what this screen did before it existed.
+    catalogue.value = { present: [], values: {} };
   }
 }
 
@@ -370,6 +427,8 @@ onMounted(() => {
   fetchRules();
   fetchSignals();
   fetchAliases();
+  fetchCatalogue();
+  fetchServices();
   fetchRoutingConfig();
 });
 </script>

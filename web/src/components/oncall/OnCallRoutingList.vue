@@ -393,6 +393,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :team-id="teamId"
       :teams="teams"
       :aliases="aliases"
+      :catalogue="catalogue"
+      :services="services"
       :signals="openSignals"
       :ladder="ladder"
       :saving="saving"
@@ -420,7 +422,13 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import type { OwnershipRuleStats, TeamRungSummary, UnroutedSignal } from "@/ts/interfaces/oncall";
+import type {
+  DimensionCatalogue,
+  DiscoveredService,
+  OwnershipRuleStats,
+  TeamRungSummary,
+  UnroutedSignal,
+} from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { compareRulePrecedence, dimensionsSentence, identityDimensions } from "@/utils/oncall";
@@ -470,6 +478,10 @@ const props = withDefaults(
     signals?: UnroutedSignal[];
     /** The org's field vocabulary, so a condition reads as it does elsewhere. */
     aliases?: { id: string; display?: string }[];
+    /** What this org actually emits — see {@link DimensionCatalogue}. */
+    catalogue?: DimensionCatalogue;
+    /** Services discovery has seen, claimable whole. */
+    services?: DiscoveredService[];
     teamId?: string;
     teamName?: string;
     teams?: { id: string; name: string }[];
@@ -486,6 +498,8 @@ const props = withDefaults(
     rules: () => [],
     signals: () => [],
     aliases: () => [],
+    catalogue: () => ({ present: [], values: {} }),
+    services: () => [],
     teamId: "",
     teamName: "",
     teams: () => [],
