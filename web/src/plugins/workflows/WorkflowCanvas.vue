@@ -41,6 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @edges-change="onEdgesChange"
     @node-drag-start="onNodeDragStart"
     @node-drag-stop="onNodeDragStop"
+    @node-mouse-enter="onNodeMouseEnter"
+    @node-mouse-leave="onNodeMouseLeave"
+    @edge-mouse-enter="onEdgeMouseEnter"
+    @edge-mouse-leave="onEdgeMouseLeave"
     @edge-click="onEdgeClick"
     @connect="onConnect"
     @drop="onDrop"
@@ -87,8 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="edgeProps.data"
         :marker-end="edgeProps.markerEnd"
         :style="edgeProps.style"
-        :insertable="!readOnly"
+        :insertable="!readOnly && isEdgeRevealed(edgeProps.id)"
         @insert="onEdgeInsert(edgeProps.id, $event)"
+        @insert-enter="onInsertEnter(edgeProps.id)"
+        @insert-leave="onInsertLeave"
       />
     </template>
 
@@ -232,20 +238,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
   </div>
 
-  <!-- Append `+` — every step that can still chain onward gets a `+` to add the next
-       step. A leaf shows it straight below (with a connector stub); a node that
-       already has children shows it on the free side to fan out another branch,
-       instead of the old click-the-source-dot. Flow-anchored so it tracks the node. -->
+  <!-- Append `+` — every step that can still chain onward gets a straight-down `+`
+       to add the next step / fan out a branch. A leaf's is persistent; a node whose
+       centre slot is already taken by a child reveals it on HOVER only. The `+`'s own
+       mouse events keep the reveal alive while the cursor is on it. Flow-anchored so
+       it tracks the node. -->
   <div
     v-for="pt in appendPoints"
     :key="pt.id"
     data-test="workflow-flow-append-add"
-    class="absolute top-[var(--wf-oy)] left-[var(--wf-ox)] z-10 flex origin-top -translate-x-1/2 scale-[var(--wf-oz)] flex-col items-center"
+    class="absolute top-[var(--wf-oy)] left-[var(--wf-ox)] z-20 flex origin-top -translate-x-1/2 scale-[var(--wf-oz)] flex-col items-center"
     :style="{ '--wf-ox': pt.left + 'px', '--wf-oy': pt.top + 'px', '--wf-oz': pt.zoom }"
+    @mouseenter="onAppendEnter(pt.id)"
+    @mouseleave="onNodeMouseLeave"
   >
-    <!-- Straight stub for a leaf / centred `+`; a curved connector edge from the
-         node to a fan-out `+` that sits off to the side. -->
-    <span v-if="pt.line" class="border-border-strong h-5 border-l-2"></span>
+    <!-- Connector is ALWAYS drawn for a shown point — a leaf's straight stub, or a
+         branch's short side-nudged curve. Option C: the point only renders while its
+         node is hovered, so at rest there's nothing here. -->
+    <span v-if="!pt.svgW" class="border-border-strong h-5 border-l-2"></span>
     <svg
       v-else
       :width="pt.svgW"
@@ -515,72 +525,142 @@ const actionSlot = computed(() => {
   return screenBelow(triggerNode.value);
 });
 
-// The append `+` for ONE node. A leaf (no children) gets the plain straight-down
-// `+` below its centre. A node that ALREADY has children gets a `+` on the FREE
-// side, so it never lands on the existing downward edge — and clicking it fans out
-// another branch: children lean right → `+` on the LEFT, lean left → RIGHT, sit on
-// both sides → CENTRED below (that gap is free). `line` = draw the little connector
-// stub (only when the `+` is straight below).
+// Option C reveal state: the currently-hovered node and edge drive the append `+` and
+// the mid-edge insert `+`. A generous hide delay so the cursor can travel the connector
+// path onto the small `+` without it vanishing first (the `+`'s own mouseenter cancels
+// the timer anyway; this covers the gap in between).
+const HIDE_DELAY = 300;
+const hoveredNodeId = ref("");
+const hoveredEdgeId = ref("");
+let nodeHideTimer: ReturnType<typeof setTimeout> | null = null;
+let edgeHideTimer: ReturnType<typeof setTimeout> | null = null;
+const cancelNodeHide = () => {
+  if (nodeHideTimer) clearTimeout(nodeHideTimer);
+  nodeHideTimer = null;
+};
+const cancelEdgeHide = () => {
+  if (edgeHideTimer) clearTimeout(edgeHideTimer);
+  edgeHideTimer = null;
+};
+const onNodeMouseEnter = (e: any) => {
+  cancelNodeHide();
+  hoveredNodeId.value = e?.node?.id || "";
+};
+const onNodeMouseLeave = () => {
+  cancelNodeHide();
+  nodeHideTimer = setTimeout(() => (hoveredNodeId.value = ""), HIDE_DELAY);
+};
+// Hovering the EDGE line itself reveals that edge's insert `+`, so you can drop a step
+// between two nodes without travelling up to a node first.
+const onEdgeMouseEnter = (e: any) => {
+  cancelEdgeHide();
+  hoveredEdgeId.value = e?.edge?.id || "";
+};
+const onEdgeMouseLeave = () => {
+  cancelEdgeHide();
+  edgeHideTimer = setTimeout(() => (hoveredEdgeId.value = ""), HIDE_DELAY);
+};
+// Hovering an append `+` keeps its node the hovered one, so the `+` (and any edge
+// inserts on that node) stay up while the cursor is on the chip.
+const onAppendEnter = (id: string) => {
+  cancelNodeHide();
+  hoveredNodeId.value = id;
+};
+// Cursor moved onto a mid-edge `+`: keep it up regardless of whether it was revealed by
+// the edge line or an endpoint node (re-assert the edge as hovered, freeze both timers).
+const onInsertEnter = (edgeId: string) => {
+  cancelNodeHide();
+  cancelEdgeHide();
+  hoveredEdgeId.value = edgeId;
+};
+const onInsertLeave = () => {
+  onNodeMouseLeave();
+  onEdgeMouseLeave();
+};
+// Option C: a mid-edge insert `+` shows while the edge line is hovered OR while either
+// of its endpoint nodes is hovered — so it's reachable both ways, and the canvas is
+// otherwise quiet at rest.
+const isEdgeRevealed = (edgeId: string) => {
+  if (hoveredEdgeId.value === edgeId) return true;
+  const id = hoveredNodeId.value;
+  if (!id) return false;
+  const e = (workflowObj.currentSelectedWorkflow?.edges || []).find((x: any) => x.id === edgeId);
+  return !!e && (e.source === id || e.target === id);
+};
+
+// The append `+` for ONE node. A leaf (no children) shows a persistent STRAIGHT-DOWN
+// `+` — the "add next step" affordance. A node that ALREADY has children reveals its
+// `+` on HOVER only (`hoverOnly`, so the canvas isn't cluttered) and nudges it a
+// little to the side AWAY from the existing edge(s) — with a short connector — so it
+// reads as a separate branch handle rather than sitting on the edge. Clicking fans out.
 const appendPointFor = (node: any) => {
   const base = screenBelow(node); // { left, top, zoom } — below centre
   const wf = workflowObj.currentSelectedWorkflow;
   const childIds = (wf.edges || [])
     .filter((e: any) => e.source === node.id)
     .map((e: any) => e.target);
-  if (!childIds.length) return { ...base, line: true, cx: 0 }; // leaf → straight stub `+`
+  if (!childIds.length) return { ...base, hoverOnly: false, cx: 0, svgW: 0 }; // leaf → stub
 
+  // Where do the existing children sit relative to the node centre?
   const nodeW = findNode(node.id)?.dimensions?.width ?? 240;
   const nodeCx = (node.position?.x ?? 0) + nodeW / 2;
   const byId = new Map((wf.nodes || []).map((n: any) => [n.id, n]));
-  const TH = 40; // flow-px: within this of the node centre counts as "centred"
-  let left = 0;
-  let right = 0;
-  let center = 0;
+  const TH = 40;
+  let hasLeft = false;
+  let hasRight = false;
   for (const cid of childIds) {
     const c: any = byId.get(cid);
     if (!c) continue;
     const cw = findNode(cid)?.dimensions?.width ?? 240;
     const ccx = (c.position?.x ?? 0) + cw / 2;
-    if (ccx > nodeCx + TH) right++;
-    else if (ccx < nodeCx - TH) left++;
-    else center++;
+    if (ccx > nodeCx + TH) hasRight = true;
+    else if (ccx < nodeCx - TH) hasLeft = true;
   }
-  // Pick the free side; a lone centred child (or a crowded node) defaults to right.
-  let side: "left" | "right" | "center" = "right";
-  if (right > 0 && left === 0) side = "left";
-  else if (left > 0 && right === 0) side = "right";
-  else if (left > 0 && right > 0 && center === 0) side = "center";
-  if (side === "center") return { ...base, line: true, cx: 0 };
-  const sign = side === "right" ? 1 : -1;
-  const off = nodeW / 2 + 28;
-  // `cx` is the node's LOCAL x relative to the `+` (the div is scaled by zoom, so
-  // it's the unscaled offset) — the connector curve starts there. `svgW` sizes the
-  // (centred) connector SVG so the curve isn't clipped.
+  // Both sides busy (a fanned-out node like the trigger) → the open space is the V-gap
+  // straight below centre, so drop the `+` there with a clean vertical stub (any side
+  // offset just lands it back on top of an existing branch edge). One side / a lone
+  // centred child → a small nudge to the free side, off the existing edge.
+  let sign: number;
+  let off: number;
+  if (hasLeft && hasRight) {
+    sign = 1;
+    off = 0; // centred in the V-gap — straight-down stub
+  } else {
+    sign = hasRight ? -1 : 1;
+    off = 40; // a little difference, not the old wide swing
+  }
   return {
     ...base,
+    hoverOnly: true,
     left: base.left + off * base.zoom * sign,
-    line: false,
-    cx: -off * sign,
+    cx: -off * sign, // node's LOCAL x relative to the `+` (connector start)
     svgW: 2 * off,
   };
 };
 
-// Append `+` points: one under (or beside) EVERY step that can still chain onward
-// (not a terminal/output node), so a fan-out branch can be added from any node, not
-// just leaves. Excludes the trigger while the Action slot covers it, so there's
-// never a bare `+` and a labelled Action card on the same node.
+// Append `+` points: one under EVERY step that can still chain onward (not a
+// terminal/output node), so a fan-out branch can be added from any node — but a
+// point whose slot is taken (`hoverOnly`) shows only while its node is hovered.
+// Excludes the trigger while the Action slot covers it, so there's never a bare `+`
+// and a labelled Action card on the same node.
 const appendPoints = computed(() => {
   if (readOnly.value) return [];
   const wf = workflowObj.currentSelectedWorkflow;
   const nodes = wf.nodes || [];
-  return nodes
-    .filter((n: any) => {
-      if (nodeMeta(n.data?.node_type)?.ioType === "output") return false; // terminal
-      // The trigger's first step is offered via the labelled Action slot instead.
-      if (hasTrigger.value && stepCount.value === 0) return false;
-      return true;
-    })
-    .map((n: any) => ({ id: n.id, ...appendPointFor(n) }));
+  return (
+    nodes
+      .filter((n: any) => {
+        if (nodeMeta(n.data?.node_type)?.ioType === "output") return false; // terminal
+        // The trigger's first step is offered via the labelled Action slot instead.
+        if (hasTrigger.value && stepCount.value === 0) return false;
+        return true;
+      })
+      .map((n: any) => ({ id: n.id, ...appendPointFor(n) }))
+      // Option C: nothing shows at rest — a node's append `+` appears only while that
+      // node (or its own `+`) is hovered. Leaves hover-gate too, so at rest the whole
+      // canvas is quiet.
+      .filter((pt: any) => pt.id === hoveredNodeId.value)
+  );
 });
 
 // Mid-edge `+` clicked → splice a step onto that edge (A→new→B). Reuses the same

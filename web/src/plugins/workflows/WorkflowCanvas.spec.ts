@@ -54,6 +54,10 @@ vi.mock("@vue-flow/core", async () => {
         "node-change",
         "nodes-change",
         "edges-change",
+        "node-mouse-enter",
+        "node-mouse-leave",
+        "edge-mouse-enter",
+        "edge-mouse-leave",
       ],
       data() {
         return {
@@ -144,6 +148,7 @@ vi.mock("@/components/flow/FlowEdge.vue", () => ({
       "data",
       "markerEnd",
       "style",
+      "insertable",
     ],
     template: '<div class="mock-flow-edge" />',
   },
@@ -510,12 +515,14 @@ describe("WorkflowCanvas", () => {
     });
   });
 
-  // Append `+`: previously only leaves got one; now every non-terminal node does,
-  // so a fan-out branch can be added from a node that already has a child.
-  describe("append + (fan-out from any node)", () => {
+  // Append `+` (option A): straight-down for every non-terminal node, but a node
+  // whose centre slot is taken by a child reveals it on HOVER only; a leaf and a
+  // free-centre (fanned-out) node keep it persistent.
+  describe("append + (Option C: nothing at rest, node hover reveals)", () => {
     beforeEach(() => vf.findNode.mockReturnValue({ dimensions: { width: 200 } }));
+    const count = (w: any) => w.findAll('[data-test="workflow-flow-append-add"]').length;
 
-    it("offers an append + on a node that ALREADY has a child (not just the leaf)", async () => {
+    it("shows no append + at rest and reveals only the hovered node's", async () => {
       wfObj.currentSelectedWorkflow = {
         nodes: [
           { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
@@ -525,11 +532,18 @@ describe("WorkflowCanvas", () => {
       };
       wrapper = mountCanvas();
       await nextTick();
-      // BOTH the trigger (has a child → fan-out +) and the leaf condition get a +.
-      expect(wrapper.findAll('[data-test="workflow-flow-append-add"]').length).toBe(2);
+      expect(count(wrapper)).toBe(0); // quiet at rest — even the leaf c1
+
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "c1" } });
+      await nextTick();
+      expect(count(wrapper)).toBe(1); // only the hovered node's +
+
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "t1" } });
+      await nextTick();
+      expect(count(wrapper)).toBe(1); // still just one — the newly hovered node
     });
 
-    it("never offers an append + on a terminal (output) node", async () => {
+    it("never offers a + on a terminal (output) node", async () => {
       wfObj.currentSelectedWorkflow = {
         nodes: [
           { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
@@ -539,8 +553,147 @@ describe("WorkflowCanvas", () => {
       };
       wrapper = mountCanvas();
       await nextTick();
-      // Only the trigger (has a child) — the destination is terminal, so no +.
-      expect(wrapper.findAll('[data-test="workflow-flow-append-add"]').length).toBe(1);
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "d1" } });
+      await nextTick();
+      expect(count(wrapper)).toBe(0); // d1 is terminal → never a +
+    });
+  });
+
+  describe("edge insert + (Option C: revealed by endpoint-node hover)", () => {
+    beforeEach(() => vf.findNode.mockReturnValue({ dimensions: { width: 200 } }));
+    const insertable = (w: any) => w.findComponent({ name: "FlowEdge" }).props("insertable");
+
+    it("hides the mid-edge + until an endpoint node is hovered", async () => {
+      // The mocked VueFlow renders edge-custom for edge id "e1"; wire e1 to n1→n2.
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "n1", position: { x: 100, y: 40 }, data: { node_type: "condition" } },
+          { id: "n2", position: { x: 100, y: 240 }, data: { node_type: "condition" } },
+        ],
+        edges: [{ id: "e1", source: "n1", target: "n2" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      expect(insertable(wrapper)).toBe(false); // quiet at rest
+
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n1" } });
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true); // source hovered → revealed
+
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n2" } });
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true); // target hovered → still revealed
+    });
+
+    it("reveals the mid-edge + when the edge line itself is hovered", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "n1", position: { x: 100, y: 40 }, data: { node_type: "condition" } },
+          { id: "n2", position: { x: 100, y: 240 }, data: { node_type: "condition" } },
+        ],
+        edges: [{ id: "e1", source: "n1", target: "n2" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      expect(insertable(wrapper)).toBe(false); // no node hovered
+
+      flow(wrapper).vm.$emit("edge-mouse-enter", { edge: { id: "e1" } });
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true); // edge line hovered → revealed
+    });
+  });
+
+  describe("Option C reveal timing + keep-alive (300ms delay)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vf.findNode.mockReturnValue({ dimensions: { width: 200 } });
+    });
+    afterEach(() => vi.useRealTimers());
+
+    const count = (w: any) => w.findAll('[data-test="workflow-flow-append-add"]').length;
+    const insertable = (w: any) => w.findComponent({ name: "FlowEdge" }).props("insertable");
+    const oneNode = () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [{ id: "n1", position: { x: 100, y: 40 }, data: { node_type: "condition" } }],
+        edges: [],
+      };
+    };
+    const twoNodesOneEdge = () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "n1", position: { x: 100, y: 40 }, data: { node_type: "condition" } },
+          { id: "n2", position: { x: 100, y: 240 }, data: { node_type: "condition" } },
+        ],
+        edges: [{ id: "e1", source: "n1", target: "n2" }],
+      };
+    };
+
+    it("holds the node's + for the full 300ms after leaving, then hides", async () => {
+      oneNode();
+      wrapper = mountCanvas();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n1" } });
+      await nextTick();
+      expect(count(wrapper)).toBe(1);
+
+      flow(wrapper).vm.$emit("node-mouse-leave");
+      vi.advanceTimersByTime(299);
+      await nextTick();
+      expect(count(wrapper)).toBe(1); // still up just before the delay elapses
+
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(count(wrapper)).toBe(0); // hidden at 300ms
+    });
+
+    it("cancels the node hide when the cursor lands on the append +", async () => {
+      oneNode();
+      wrapper = mountCanvas();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n1" } });
+      await nextTick();
+
+      flow(wrapper).vm.$emit("node-mouse-leave"); // hide scheduled
+      vi.advanceTimersByTime(100);
+      // Cursor reaches the + chip mid-travel — its mouseenter freezes the timer.
+      await wrapper.find('[data-test="workflow-flow-append-add"]').trigger("mouseenter");
+      vi.advanceTimersByTime(300);
+      await nextTick();
+      expect(count(wrapper)).toBe(1); // still visible — never hid
+    });
+
+    it("holds the edge + for 300ms after the edge line is left, then hides", async () => {
+      twoNodesOneEdge();
+      wrapper = mountCanvas();
+      flow(wrapper).vm.$emit("edge-mouse-enter", { edge: { id: "e1" } });
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true);
+
+      flow(wrapper).vm.$emit("edge-mouse-leave");
+      vi.advanceTimersByTime(299);
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true);
+
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(insertable(wrapper)).toBe(false);
+    });
+
+    it("keeps the edge + alive when the cursor moves onto it (insert-enter)", async () => {
+      twoNodesOneEdge();
+      wrapper = mountCanvas();
+      flow(wrapper).vm.$emit("edge-mouse-enter", { edge: { id: "e1" } });
+      await nextTick();
+
+      flow(wrapper).vm.$emit("edge-mouse-leave"); // hide scheduled
+      vi.advanceTimersByTime(100);
+      wrapper.findComponent({ name: "FlowEdge" }).vm.$emit("insert-enter"); // onto the +
+      vi.advanceTimersByTime(300);
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true); // frozen while on the chip
+
+      wrapper.findComponent({ name: "FlowEdge" }).vm.$emit("insert-leave"); // off the +
+      vi.advanceTimersByTime(300);
+      await nextTick();
+      expect(insertable(wrapper)).toBe(false); // released → hides
     });
   });
 });

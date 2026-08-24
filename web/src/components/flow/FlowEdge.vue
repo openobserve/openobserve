@@ -38,6 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="pointer-events-auto absolute top-0 left-0 [transform:var(--wf-edge-mid)]"
       :style="{ '--wf-edge-mid': `translate(-50%, -50%) translate(${path[1]}px, ${path[2]}px)` }"
+      @mouseenter="emit('insert-enter')"
+      @mouseleave="emit('insert-leave')"
     >
       <FlowAddButton data-test="workflow-edge-add" @click.stop="emit('insert', $event)" />
     </div>
@@ -66,8 +68,14 @@ const props = defineProps({
   insertable: { type: Boolean, required: false, default: false },
 });
 
-// Clicking the mid-edge `+` asks the canvas to splice a step onto THIS edge.
-const emit = defineEmits<{ (e: "insert", event: MouseEvent): void }>();
+// Clicking the mid-edge `+` asks the canvas to splice a step onto THIS edge. The
+// insert-enter/insert-leave pair lets the canvas keep the chip alive while the cursor
+// moves from the node onto it (Option C reveals the chip on node hover).
+const emit = defineEmits<{
+  (e: "insert", event: MouseEvent): void;
+  (e: "insert-enter"): void;
+  (e: "insert-leave"): void;
+}>();
 
 const path = computed(() => getBezierPath(props));
 </script>
