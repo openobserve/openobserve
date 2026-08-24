@@ -69,6 +69,17 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "count",
     showQueryPreview: true,
   },
+  library: {
+    id: "library",
+    labelKey: "alerts.prefill.sources.library.label",
+    toastKey: "alerts.prefill.sources.library.toast",
+    icon: "menu-book",
+    // A library alert already carries its own threshold — either a structured
+    // `promql_condition` or a HAVING inside the SQL — so the trigger only has to
+    // ask whether anything came back.
+    defaultThreshold: "matching-rows",
+    showQueryPreview: true,
+  },
   panel: {
     id: "panel",
     labelKey: "alerts.prefill.sources.panel.label",

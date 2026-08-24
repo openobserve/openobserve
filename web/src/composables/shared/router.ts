@@ -69,6 +69,7 @@ const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
+const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
@@ -596,6 +597,21 @@ const useRoutes = () => {
       component: TemplateList,
       meta: {
         titleKey: "alert_templates.header",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // The curated alert catalog — a sibling of Alerts for the same reason
+      // Destinations and Templates are: flat, so the rail lights exactly one
+      // entry. The four pages present as peer tabs (AlertSectionTabs), which is
+      // presentation only and does not imply nesting.
+      path: "alert-library",
+      name: "alertLibrary",
+      component: AlertLibrary,
+      meta: {
+        titleKey: "alert_library.header",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

@@ -7293,12 +7293,17 @@
       "matchingGroups": "grupos coincidentes",
       "dataPoint": "punto de datos",
       "dataPoints": "puntos de datos",
+      "matchingSeries": "serie",
+      "matchingSeriesPlural": "series",
       "row": "fila",
       "rows": "filas",
       "result": "resultado",
       "results": "resultados",
       "reasonMatch": "{count} {label} coinciden ({comparison})",
-      "reasonNoMatch": "Se encontraron {count} {label} - no cumplen {comparison}"
+      "reasonNoMatch": "Se encontraron {count} {label} - no cumplen {comparison}",
+      "levelCritical": "Crítico",
+      "levelWarning": "Advertencia",
+      "reasonLevel": "{reason} — {level}"
     },
     "selectAllColumnsNotAllowed": "No se permite seleccionar todas las columnas",
     "customSql": "SQL personalizado",

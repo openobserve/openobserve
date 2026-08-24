@@ -33,6 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="inline-select-folder-dropdown"
       @update:model-value="$emit('update:modelValue', $event)"
     >
+      <template v-if="modelValue" #icon-left>
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
+      </template>
       <template v-if="!disable" #after-options>
         <OSeparator />
         <!-- Padded, outlined and at the standard 34px control height: flush
@@ -75,7 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="alert-v3-select folder-select"
       :disabled="disable"
       @update:model-value="$emit('update:modelValue', $event)"
-    />
+    >
+      <template v-if="modelValue" #icon-left>
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
+      </template>
+    </OSelect>
     <OButton
       v-if="!disable"
       variant="outline"
@@ -106,6 +113,9 @@ import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { folderIconOption } from "./folderIconOption";
+import FolderIcon from "./FolderIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
@@ -116,6 +126,7 @@ export default defineComponent({
     OIcon,
     OSelect,
     OSeparator,
+    FolderIcon,
   },
   emits: ["update:modelValue"],
   props: {
@@ -146,12 +157,22 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store: any = useStore();
     const showDialog = ref(false);
+    const { iconFor } = useFolderIcons();
+
+    const selectedFolderIcon = computed(() =>
+      iconFor(
+        (store.state.organizationData.foldersByType[props.type] ?? []).find(
+          (f: any) => f.folderId === props.modelValue,
+        ),
+      ),
+    );
 
     const folderOptions = computed(
       () =>
         store.state.organizationData.foldersByType[props.type]?.map((f: any) => ({
           label: f.name,
           value: f.folderId,
+          iconComponent: folderIconOption(iconFor(f)),
         })) ?? [],
     );
 
@@ -171,6 +192,7 @@ export default defineComponent({
       store,
       showDialog,
       folderOptions,
+      selectedFolderIcon,
       onFolderAdded,
     };
   },

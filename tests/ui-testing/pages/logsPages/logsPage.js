@@ -9912,7 +9912,11 @@ export class LogsPage {
     async isQuickModeEnabledOnInstance() {
         return await this.page
             .evaluate(async () => {
-                const res = await fetch('/config');
+                // quick_mode_enabled lives on the AUTHENTICATED per-org config;
+                // the unauthenticated /config bootstrap no longer carries flags.
+                const org =
+                    new URLSearchParams(location.search).get('org_identifier') || 'default';
+                const res = await fetch(`/api/${org}/config`, { credentials: 'include' });
                 if (!res.ok) return false;
                 const cfg = await res.json();
                 return cfg.quick_mode_enabled === true;

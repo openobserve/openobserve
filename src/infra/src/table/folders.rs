@@ -35,6 +35,7 @@ impl From<Model> for Folder {
             folder_id: value.folder_id.to_string(),
             name: value.name,
             description: value.description.unwrap_or_default(),
+            icon: value.icon,
         }
     }
 }
@@ -119,6 +120,7 @@ pub async fn put(
             let mut active = model.into_active_model();
             active.name = Set(folder.name);
             active.description = Set(Some(folder.description).filter(|d| !d.is_empty()));
+            active.icon = Set(folder.icon.filter(|i| !i.is_empty()));
             let model: Model = active.update(client).await?.try_into_model()?;
             model
         }
@@ -136,6 +138,7 @@ pub async fn put(
                 r#type: Set::<i16>(folder_type_into_i16(folder_type)),
                 name: Set(folder.name),
                 description: Set(Some(folder.description).filter(|d| !d.is_empty())),
+                icon: Set(folder.icon.filter(|i| !i.is_empty())),
             };
             let model: Model = active.insert(client).await?.try_into_model()?;
             model
@@ -284,6 +287,7 @@ mod tests {
             folder_id: "fid-1".to_string(),
             name: "Alerts".to_string(),
             description: Some("My alert folder".to_string()),
+            icon: Some("🚀".to_string()),
             r#type: 1,
         };
         let folder = Folder::from(model);
@@ -300,6 +304,7 @@ mod tests {
             folder_id: "fid-2".to_string(),
             name: "Dashboards".to_string(),
             description: None,
+            icon: None,
             r#type: 0,
         };
         let folder = Folder::from(model);

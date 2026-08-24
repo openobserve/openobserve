@@ -72,7 +72,7 @@ pub async fn search(
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
         // only indexed metrics files own a sidecar; other layouts stay as they are
-        if MetricsFileLayout::of(&file.key) != MetricsFileLayout::Indexed {
+        if MetricsFileLayout::of(&file.key) != Some(MetricsFileLayout::Indexed) {
             continue;
         }
         let Some(sidecar_path) = MetricsFileLayout::metrics_index_path(&file.key) else {
