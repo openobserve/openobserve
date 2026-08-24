@@ -53,7 +53,15 @@ const stubs = {
   // Mirrors the real shape: an outer table of dataset rows whose #expansion
   // slot renders the nested experiments table (which owns the selection gutter).
   OTable: {
-    props: ["data", "columns", "selection", "selectedIds", "isRowSelectable", "showHeader"],
+    props: [
+      "data",
+      "columns",
+      "selection",
+      "selectedIds",
+      "isRowSelectable",
+      "showHeader",
+      "loading",
+    ],
     emits: ["update:selectedIds"],
     methods: {
       toggle(row, checked) {
@@ -63,7 +71,7 @@ const stubs = {
         this.$emit("update:selectedIds", next);
       },
     },
-    template: `<table><tbody>
+    template: `<table :data-loading="String(loading ?? false)"><tbody>
       <template v-for="row in data" :key="row.id">
         <tr>
           <td v-if="selection === 'multiple'">
@@ -133,10 +141,10 @@ describe("ExperimentBrowser", () => {
 
     expect(wrapper.find('[data-test="ai-experiment-group-loading"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="ai-experiment-group-dataset-a"]').exists()).toBe(true);
-    expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(true);
+    expect(wrapper.get("table").attributes("data-loading")).toBe("true");
 
     await wrapper.setProps({ loading: false });
-    expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(false);
+    expect(wrapper.get("table").attributes("data-loading")).toBe("false");
   });
 
   it("asks the page to re-fetch from the refresh button", async () => {
