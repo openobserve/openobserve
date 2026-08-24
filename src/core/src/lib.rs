@@ -25,6 +25,7 @@ pub mod authz;
 pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
+pub mod db_monitoring;
 use ::common;
 use ::db;
 pub mod error_suggest;

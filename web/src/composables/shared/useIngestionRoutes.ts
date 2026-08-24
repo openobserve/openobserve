@@ -57,6 +57,7 @@ import Redis from "@/components/ingestion/databases/Redis.vue";
 import CouchDB from "@/components/ingestion/databases/CouchDB.vue";
 import Elasticsearch from "@/components/ingestion/databases/Elasticsearch.vue";
 import MySQL from "@/components/ingestion/databases/MySQL.vue";
+import MariaDB from "@/components/ingestion/databases/MariaDB.vue";
 import SAPHana from "@/components/ingestion/databases/SAPHana.vue";
 import Snowflake from "@/components/ingestion/databases/Snowflake.vue";
 import Zookeeper from "@/components/ingestion/databases/Zookeeper.vue";
@@ -483,6 +484,14 @@ const useIngestionRoutes = () => {
               path: "mysql",
               name: "mysql",
               component: MySQL,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "mariadb",
+              name: "mariadb",
+              component: MariaDB,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
