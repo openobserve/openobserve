@@ -2722,6 +2722,7 @@ dependencies = [
  "sea-orm",
  "serde",
  "serde_json",
+ "serde_with",
  "sha256",
  "sqlparser",
  "sqlx",

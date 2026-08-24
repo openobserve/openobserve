@@ -19,6 +19,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 
 use super::llm_experiments::ExperimentSkipReason;
 
@@ -98,6 +99,48 @@ impl From<LlmScoreTargetScope> for LlmScoreDataLevel {
 }
 
 /// Producer identity used to build the read-side deduplication key.
+/// Why an errored Score carries no value.
+///
+/// The mirror of `skip_reason`: that explains a `Skipped` status, this explains
+/// an `Error` one. Terminality is a scalar comparison on this column, so
+/// deciding whether a scorer is finished never depends on parsing a JSON blob.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LlmScoreErrorReason {
+    /// The bounded attempt sequence continues. Not terminal.
+    AttemptFailed,
+    /// The sequence is spent. Terminal: no further attempt will be made.
+    AttemptsExhausted,
+}
+
+/// How an annotation was submitted.
+///
+/// The distinction is whether a review submission governed it, not which page
+/// it was typed on: Discovery is where a target is found and queued, so an
+/// annotation made there is a direct one, the same as any other.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LlmScoreAnnotationSource {
+    /// Submitted as part of an annotation queue review.
+    Queue,
+    /// Submitted directly, with no review submission behind it.
+    Manual,
+}
+
+/// What caused an evaluation task.
+///
+/// Defined here rather than beside the task types because `LlmScoreRecord`
+/// stores it and `config` cannot reference the enterprise crate. Enterprise
+/// re-exports it from `eval_jobs::tasks`, so the task message and the Score it
+/// produces carry one type rather than two that have to be kept in step.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvaluationTaskProducer {
+    SpanPipeline,
+    EvalScheduler,
+    Manual,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum LlmScoreEvaluationSource<'a> {
     Automated {
@@ -191,6 +234,15 @@ pub fn evaluation_key(
     .to_string()
 }
 
+/// Open-ended JSON fields are stored as one string column each.
+///
+/// Log ingestion flattens nested values before schema inference. A plain
+/// `Option<Value>` field therefore becomes one column per key, no parent key
+/// survives a `SELECT *`, and every key a scorer invents widens the stream
+/// schema permanently. `evaluation_key` already avoids this by being a
+/// `String`. Any field added here that holds open-ended JSON needs the same
+/// `serde_as` attribute.
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LlmScoreRecord {
     pub id: String,
@@ -300,8 +352,34 @@ pub struct LlmScoreRecord {
     /// Justification for this individual Score dimension.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+    /// Attempts this scorer dimension has consumed, 1-based. Resuming the
+    /// bounded sequence after a restart reads this and nothing else.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<serde_json::Value>,
+    pub attempt_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_reason: Option<LlmScoreErrorReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotation_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotation_source: Option<LlmScoreAnnotationSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_producer: Option<EvaluationTaskProducer>,
+    /// Free-text reason a person gave when triggering a manual evaluation.
+    /// Distinct from `reasoning`, which is the scorer's justification for the
+    /// value it produced.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_trigger_reason: Option<String>,
+    /// Open-ended metadata that whatever produced this Score's value attached
+    /// to it: LLM judge output, remote scorer output, or a reviewer's per-Score
+    /// metadata. Never interpreted by the server.
+    #[serde_as(as = "Option<serde_with::json::JsonString>")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scorer_metadata: Option<serde_json::Value>,
+    /// Open-ended metadata the annotation request attached to the annotation as
+    /// a whole. Set only on the annotation path.
+    #[serde_as(as = "Option<serde_with::json::JsonString>")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotation_metadata: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
     pub _timestamp: i64,
@@ -358,7 +436,14 @@ impl Default for LlmScoreRecord {
             job_id: None,
             job_version: None,
             reasoning: None,
-            metadata: None,
+            attempt_count: None,
+            error_reason: None,
+            annotation_id: None,
+            annotation_source: None,
+            task_producer: None,
+            task_trigger_reason: None,
+            scorer_metadata: None,
+            annotation_metadata: None,
             author: None,
             _timestamp: 0,
         }
@@ -400,7 +485,17 @@ impl LlmScoreRecord {
             job_version: Some(0),
             reasoning: Some(String::new()),
             skip_reason: Some(ExperimentSkipReason::NoReference),
-            metadata: Some(serde_json::json!({})),
+            attempt_count: Some(0),
+            error_reason: Some(LlmScoreErrorReason::AttemptFailed),
+            annotation_id: Some(String::new()),
+            annotation_source: Some(LlmScoreAnnotationSource::Manual),
+            task_producer: Some(EvaluationTaskProducer::Manual),
+            task_trigger_reason: Some(String::new()),
+            // A `serde_as` JSON field infers as one Utf8 column. The old nested value
+            // flattened away to nothing here, which is why every `metadata_*`
+            // column used to arrive through schema evolution instead.
+            scorer_metadata: Some(serde_json::json!({})),
+            annotation_metadata: Some(serde_json::json!({})),
             author: Some(String::new()),
             ..Self::default()
         }
@@ -520,7 +615,14 @@ mod tests {
             job_id: Some("job-1".to_string()),
             job_version: Some(1),
             reasoning: None,
-            metadata: None,
+            attempt_count: None,
+            error_reason: None,
+            annotation_id: None,
+            annotation_source: None,
+            task_producer: None,
+            task_trigger_reason: None,
+            scorer_metadata: None,
+            annotation_metadata: None,
             author: None,
             _timestamp: timestamp,
         }
@@ -656,7 +758,7 @@ mod tests {
         assert!(obj.contains_key("job_id"));
         assert!(obj.contains_key("reasoning"));
         assert!(obj.contains_key("review_submission_comments"));
-        assert!(obj.contains_key("metadata"));
+        assert!(obj.contains_key("scorer_metadata"));
         assert!(obj.contains_key("author"));
         assert!(obj.contains_key("_timestamp"));
     }
@@ -785,7 +887,8 @@ mod tests {
             LlmScoreDataSourceType::Annotation,
             0.8,
         );
-        manual.metadata = Some(serde_json::json!({"reason": "operator requested re-evaluation"}));
+        manual.task_producer = Some(EvaluationTaskProducer::Manual);
+        manual.task_trigger_reason = Some("operator requested re-evaluation".to_string());
         manual.author = Some("operator@example.com".to_string());
 
         let latest = latest_score_records(vec![automatic, manual]);
@@ -795,9 +898,120 @@ mod tests {
         assert_eq!(latest[0].source_type, LlmScoreDataSourceType::Annotation);
         assert_eq!(latest[0].value_numeric, Some(0.8));
         assert_eq!(
-            latest[0].metadata,
-            Some(serde_json::json!({"reason": "operator requested re-evaluation"}))
+            latest[0].task_trigger_reason.as_deref(),
+            Some("operator requested re-evaluation")
         );
+    }
+
+    /// The invariant this type exists for: an open-ended value stays one
+    /// column through the transform ingestion applies, however deep it is.
+    #[test]
+    fn json_string_survives_ingestion_flattening_as_one_column() {
+        let mut record = test_score_record(
+            "s-1",
+            "key-1",
+            10,
+            10,
+            LlmScoreDataSourceType::LlmJudge,
+            0.5,
+        );
+        record.scorer_metadata = Some(serde_json::json!({
+            "confidence": 0.9,
+            "rubric": {"version": "v3", "weights": [1, 2]},
+        }));
+
+        let ingested =
+            crate::utils::flatten::flatten(serde_json::to_value(&record).unwrap()).unwrap();
+        let object = ingested.as_object().unwrap();
+
+        assert!(
+            object
+                .keys()
+                .all(|key| !key.starts_with("scorer_metadata_")),
+            "a nested key widened the stream schema: {:?}",
+            object.keys().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            object["scorer_metadata"],
+            serde_json::Value::String(
+                r#"{"confidence":0.9,"rubric":{"version":"v3","weights":[1,2]}}"#.to_string()
+            )
+        );
+    }
+
+    fn round_trip_scorer_metadata(value: serde_json::Value) -> LlmScoreRecord {
+        let mut record = test_score_record(
+            "s-1",
+            "key-1",
+            10,
+            10,
+            LlmScoreDataSourceType::LlmJudge,
+            0.5,
+        );
+        record.scorer_metadata = Some(value);
+        let encoded = serde_json::to_value(&record).unwrap();
+        assert!(
+            encoded["scorer_metadata"].is_string(),
+            "the column must hold a string, not {}",
+            encoded["scorer_metadata"]
+        );
+        serde_json::from_value(encoded).unwrap()
+    }
+
+    #[test]
+    fn json_string_round_trips_every_value_shape() {
+        for value in [
+            serde_json::json!({"a": 1}),
+            serde_json::json!([1, 2, 3]),
+            serde_json::json!("a bare string"),
+            serde_json::json!(7),
+            serde_json::json!(null),
+        ] {
+            assert_eq!(
+                round_trip_scorer_metadata(value.clone()).scorer_metadata,
+                Some(value)
+            );
+        }
+    }
+
+    /// Deserialization is deliberately strict. Every write goes through the
+    /// same encoding, so a column holding anything but a JSON string means a
+    /// record reached the stream without it. That is a defect to surface, not
+    /// one to absorb into a `Value::String` and carry forward silently.
+    #[test]
+    fn a_column_that_is_not_an_encoded_string_fails_to_load() {
+        let mut row = serde_json::to_value(test_score_record(
+            "s-1",
+            "key-1",
+            10,
+            10,
+            LlmScoreDataSourceType::LlmJudge,
+            0.5,
+        ))
+        .unwrap();
+        row["scorer_metadata"] = serde_json::json!({"a": 1});
+
+        assert!(serde_json::from_value::<LlmScoreRecord>(row).is_err());
+    }
+
+    /// A row that predates these columns has neither, and still loads.
+    #[test]
+    fn a_row_without_the_open_ended_columns_loads() {
+        let mut row = serde_json::to_value(test_score_record(
+            "s-1",
+            "key-1",
+            10,
+            10,
+            LlmScoreDataSourceType::LlmJudge,
+            0.5,
+        ))
+        .unwrap();
+        row.as_object_mut().unwrap().remove("scorer_metadata");
+        row.as_object_mut().unwrap().remove("annotation_metadata");
+
+        let loaded: LlmScoreRecord = serde_json::from_value(row).unwrap();
+        assert!(loaded.scorer_metadata.is_none());
+        assert!(loaded.annotation_metadata.is_none());
     }
 
     #[test]
