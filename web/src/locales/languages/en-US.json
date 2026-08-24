@@ -10686,9 +10686,9 @@
         "different_dataset": "Experiments can only be compared when they use the same dataset."
       },
       "form": {
-        "namePlaceholder": "Untitled experiment",
+        "namePlaceholder": "prompt_v4_reranker",
         "descriptionLabel": "Description",
-        "descriptionPlaceholder": "Add a description",
+        "descriptionPlaceholder": "A short summary of what this run changes.",
         "identitySection": "Identity",
         "datasetPlaceholder": "Select a dataset",
         "datasetPinned": "Pinned at version v{version} — later dataset edits never change this experiment's results.",
