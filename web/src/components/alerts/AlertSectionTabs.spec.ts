@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 import AlertSectionTabs from "./AlertSectionTabs.vue";
 import i18n from "@/locales";
@@ -46,6 +47,28 @@ describe("AlertSectionTabs", () => {
     const wrapper = mountTabs();
     const labels = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
     expect(labels).toEqual(["All Alerts", "Destinations", "Destination Templates", "Library"]);
+  });
+
+  it("omits the Library tab when its route is unregistered (build flag off)", async () => {
+    // VITE_OPENOBSERVE_ALERT_LIBRARY=false skips route registration; the strip
+    // reads that off router.hasRoute, so the tab drops with the route.
+    const blank = { template: "<div />" };
+    const noLibraryRouter = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/alerts", name: "alertList", component: blank },
+        { path: "/alert-destinations", name: "alertDestinations", component: blank },
+        { path: "/alert-templates", name: "alertTemplates", component: blank },
+      ],
+    });
+    await noLibraryRouter.push({ name: "alertList" });
+    await noLibraryRouter.isReady();
+    const wrapper = mount(AlertSectionTabs, {
+      global: { provide: { store }, plugins: [i18n, noLibraryRouter] },
+    });
+    const labels = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
+    expect(labels).toEqual(["All Alerts", "Destinations", "Destination Templates"]);
+    expect(wrapper.find('[data-test="alert-section-tab-alertLibrary"]').exists()).toBe(false);
   });
 
   it("marks the tab for the current route active", async () => {

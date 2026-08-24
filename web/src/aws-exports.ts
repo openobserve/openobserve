@@ -20,6 +20,13 @@ function readLLMUIFlag(): "true" | "false" {
   return String(import.meta.env.VITE_OPENOBSERVE_LLM_UI) === "false" ? "false" : "true";
 }
 
+// Alert Library visibility is controlled at build time via the
+// `VITE_OPENOBSERVE_ALERT_LIBRARY` env var. Visible by default; set the env
+// var to "false" to hide the Alert Library from the UI.
+function readAlertLibraryFlag(): "true" | "false" {
+  return String(import.meta.env.VITE_OPENOBSERVE_ALERT_LIBRARY) === "false" ? "false" : "true";
+}
+
 const config = {
   aws_mobile_analytics_app_id: "ab7e9321f83c45a8967ff3b9bd90e83a",
   aws_mobile_analytics_app_region: "us-west-2",
@@ -53,6 +60,13 @@ const config = {
   // default; set the env var to "false" to hide. Consumers use the
   // existing string check `config.showLLMUI !== 'false'`.
   showLLMUI: readLLMUIFlag(),
+  // Master switch for the Alert Library (the curated catalog page and its
+  // nav/tab entries alongside Alerts / Destinations / Templates).
+  //
+  // Controlled at build time by `VITE_OPENOBSERVE_ALERT_LIBRARY`. Visible by
+  // default; set the env var to "false" to hide. Consumers use the existing
+  // string check `config.showAlertLibrary !== 'false'`.
+  showAlertLibrary: readAlertLibraryFlag(),
 };
 
 export default config;

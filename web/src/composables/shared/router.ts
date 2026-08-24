@@ -602,21 +602,30 @@ const useRoutes = () => {
         routeGuard(to, from, next);
       },
     },
-    {
-      // The curated alert catalog — a sibling of Alerts for the same reason
-      // Destinations and Templates are: flat, so the rail lights exactly one
-      // entry. The four pages present as peer tabs (AlertSectionTabs), which is
-      // presentation only and does not imply nesting.
-      path: "alert-library",
-      name: "alertLibrary",
-      component: AlertLibrary,
-      meta: {
-        titleKey: "alert_library.header",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
+    // The curated alert catalog — a sibling of Alerts for the same reason
+    // Destinations and Templates are: flat, so the rail lights exactly one
+    // entry. The four pages present as peer tabs (AlertSectionTabs), which is
+    // presentation only and does not imply nesting.
+    //
+    // Registered only when the build-time flag is on (visible by default;
+    // VITE_OPENOBSERVE_ALERT_LIBRARY=false hides it). Skipping registration
+    // drops the nav-rail entry for free — ONavGroup filters children through
+    // router.hasRoute — and makes a hand-typed /alert-library hit the catch-all.
+    ...(config.showAlertLibrary !== "false"
+      ? [
+          {
+            path: "alert-library",
+            name: "alertLibrary",
+            component: AlertLibrary,
+            meta: {
+              titleKey: "alert_library.header",
+            },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+        ]
+      : []),
     {
       // Alert Sources feeds Incidents (correlation, resolve lifecycle) — same
       // Reliability workflow as Alerts/SLOs/Incidents/Destinations/Templates

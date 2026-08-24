@@ -94,12 +94,19 @@ const sections = computed<Section[]>(() => {
     },
     // Last: the catalog is where you go once to fetch an alert, not where you
     // work. The rail's Reliability flyout lists these four in this same order.
-    {
-      key: "alertLibrary",
-      label: t("alert_library.sectionTab"),
-      icon: "menu-book",
-      to: { name: "alertLibrary", query },
-    },
+    // Only when the route is registered — the build-time Alert Library flag
+    // (VITE_OPENOBSERVE_ALERT_LIBRARY) skips registration to hide it, exactly
+    // as the rail flyout gates its own children through router.hasRoute.
+    ...(router.hasRoute("alertLibrary")
+      ? [
+          {
+            key: "alertLibrary",
+            label: t("alert_library.sectionTab"),
+            icon: "menu-book" as IconName,
+            to: { name: "alertLibrary", query },
+          },
+        ]
+      : []),
   ];
 });
 
