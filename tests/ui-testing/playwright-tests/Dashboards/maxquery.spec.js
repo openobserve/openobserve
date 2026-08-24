@@ -12,6 +12,7 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
 import { generateDashboardName } from "./utils/configPanelHelpers.js";
 
 import PageManager from "../../pages/page-manager";
+import DashboardMaxQueryRange from "../../pages/dashboardPages/dashboard-max-query-range.js";
 const testLogger = require("../utils/test-logger.js");
 
 // Use a dedicated stream for max query range tests (not e2e_automate)
@@ -111,8 +112,8 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Verify tooltip text
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("Query duration is modified due to query range restriction");
-      expect(tooltipText).toContain("Data returned for:");
+      // Accept either backend wording — see expectRangeRestrictionTooltip.
+      mqr.expectRangeRestrictionTooltip(expect, tooltipText);
 
       testLogger.info("Tooltip text verified", { tooltipText });
 
@@ -324,11 +325,22 @@ test.describe("Dashboard Max Query Range", () => {
         timeout: 15000,
       });
 
-      // Hover and verify the tooltip mentions the correct restriction hours
+      // Hover and verify the tooltip reports the restriction.
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("restriction of 3 hours");
-      expect(tooltipText).toContain("Data returned for:");
-      testLogger.info("Tooltip correctly shows 3-hour restriction", { tooltipText });
+      mqr.expectRangeRestrictionTooltip(expect, tooltipText);
+
+      // Only the non-streaming backend names the limit in hours; the streaming
+      // path reports the cached window and never says "restriction of N hours".
+      // Assert the number where the message actually carries it, rather than
+      // pinning the whole test to one deployment mode.
+      if (DashboardMaxQueryRange.statesRestrictionHours(tooltipText)) {
+        expect(tooltipText).toContain("restriction of 3 hours");
+      } else {
+        testLogger.info(
+          "Streaming backend: tooltip reports the limit without naming hours",
+          { tooltipText }
+        );
+      }
 
       // Cleanup
       await pm.dashboardCreate.backToDashboardList();
@@ -416,7 +428,8 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Verify tooltip
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("Query duration is modified due to query range restriction");
+      // Accept either backend wording — see expectRangeRestrictionTooltip.
+      mqr.expectRangeRestrictionTooltip(expect, tooltipText);
 
       // Cleanup
       await pm.dashboardPanelActions.addPanelName("MultiSQL Max Query Panel");

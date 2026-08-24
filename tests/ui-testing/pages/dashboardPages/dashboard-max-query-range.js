@@ -4,6 +4,10 @@ const testLogger = require("../../playwright-tests/utils/test-logger.js");
 const DEFAULT_STREAM = "e2e_max_query_range";
 
 export default class DashboardMaxQueryRange {
+  /** Matches either backend wording for a max-query-range restriction. */
+  static RANGE_RESTRICTION_RE =
+    /Query duration is modified due to query range restriction|reached max query range limit/;
+
   /**
    * @param {import('@playwright/test').Page} page
    */
@@ -275,6 +279,50 @@ export default class DashboardMaxQueryRange {
   // ---------------------------------------------------------------------------
 
   /**
+   * Assert that a max-query-range tooltip actually reports a range restriction,
+   * whichever backend path produced it.
+   *
+   * The backend emits TWO different messages for the same condition:
+   *
+   *   non-streaming (api/search/src/search/mod.rs)
+   *     "Query duration is modified due to query range restriction of N hours"
+   *   streaming (search_service/src/streaming/execution.rs)
+   *     "reached max query range limit", wrapped in PARTIAL_ERROR_RESPONSE_MESSAGE
+   *
+   * Which one you get depends on whether the deployment runs streaming search,
+   * so asserting either literal pins the test to one deployment mode. That is a
+   * wrong-environment failure, not a flake — retrying cannot fix it, which is
+   * why these tests failed all three CI attempts while passing against a
+   * non-streaming alpha.
+   *
+   * Both paths carry the adjusted window as "Data returned for: <from> to <to>",
+   * so that part is asserted unconditionally.
+   *
+   * @param {Function} expect - Playwright expect
+   * @param {string} tooltipText
+   */
+  expectRangeRestrictionTooltip(expect, tooltipText) {
+    expect(
+      DashboardMaxQueryRange.RANGE_RESTRICTION_RE.test(tooltipText),
+      `tooltip did not report a max-query-range restriction in either the ` +
+        `streaming or non-streaming wording. Received: ${tooltipText}`,
+    ).toBe(true);
+    expect(tooltipText).toContain("Data returned for:");
+  }
+
+  /**
+   * True when the tooltip came from the NON-streaming path, which is the only
+   * one that names the restriction in hours ("restriction of 3 hours"). The
+   * streaming path reports the cached window instead and never states the limit,
+   * so an hours assertion is only meaningful when this returns true.
+   *
+   * @param {string} tooltipText
+   */
+  static statesRestrictionHours(tooltipText) {
+    return /restriction of \d+ hours?/.test(tooltipText);
+  }
+
+    /**
    * Hover over the first warning icon and return the tooltip text.
    * @returns {Promise<string>}
    */

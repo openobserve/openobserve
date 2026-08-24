@@ -1762,9 +1762,11 @@ test.describe("Multi-SQL Query Support", () => {
             )
             .toBeGreaterThanOrEqual(2);
 
-          expect(tooltipText).toContain(
-            "Query duration is modified due to query range restriction"
-          );
+          // Accept either backend wording. This literal is the non-streaming
+          // message only; a streaming deployment says "reached max query range
+          // limit" instead, so asserting it directly would pass on a
+          // non-streaming alpha and fail in streaming CI.
+          mqr.expectRangeRestrictionTooltip(expect, tooltipText);
 
           await cleanupTestDashboard(page, pm, dashboardName);
         }
