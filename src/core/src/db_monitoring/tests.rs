@@ -578,6 +578,60 @@ fn normalize_cached_hit_matches_direct_normalize_and_caches_failures() {
     assert!(normalize_cached(bad, Dialect::Postgresql, true).is_none());
 }
 
+#[test]
+fn normalize_cache_key_is_stable_and_distinguishes_its_inputs() {
+    let text = "SELECT a FROM t WHERE id = 1";
+    // Stable across calls: an unstable key would silently disable the cache.
+    assert_eq!(
+        normalize_cache_key(text, Dialect::Postgresql, true),
+        normalize_cache_key(text, Dialect::Postgresql, true)
+    );
+    // Every component of the triple must move the key.
+    assert_ne!(
+        normalize_cache_key(text, Dialect::Postgresql, true),
+        normalize_cache_key(text, Dialect::Postgresql, false)
+    );
+    assert_ne!(
+        normalize_cache_key(text, Dialect::Postgresql, true),
+        normalize_cache_key(text, Dialect::Mysql, true)
+    );
+    assert_ne!(
+        normalize_cache_key(text, Dialect::Postgresql, true),
+        normalize_cache_key("SELECT b FROM t WHERE id = 1", Dialect::Postgresql, true)
+    );
+    // `text` must not be concatenable into the flags: a key built by simply
+    // appending the fields would map these two triples onto one entry.
+    assert_ne!(
+        normalize_cache_key("ab", Dialect::Postgresql, true),
+        normalize_cache_key("b", Dialect::Postgresql, true)
+    );
+}
+
+/// Hashing must be defined for every length up to the cache's own cap, at any
+/// allocation offset. gxhash's streaming hasher reads up to 16 bytes past the
+/// input under a hardcoded 4 KiB page assumption, which aborts the process on
+/// aarch64 when the read crosses a mapping; the key must not depend on that.
+#[test]
+fn normalize_cache_key_handles_every_length_and_offset() {
+    // A page-sized arena so slices land at every offset within a page,
+    // including the last bytes before a boundary.
+    let arena = vec![b'a'; 16 * 1024];
+    for len in [0usize, 1, 7, 15, 16, 17, 31, 32, 33, 4095, 4096, 4097] {
+        for off in [0usize, 1, 8, 4080, 4088, 4095] {
+            if off + len > arena.len() {
+                continue;
+            }
+            let s = std::str::from_utf8(&arena[off..off + len]).unwrap();
+            // Must not abort, and must agree with itself.
+            assert_eq!(
+                normalize_cache_key(s, Dialect::Postgresql, true),
+                normalize_cache_key(s, Dialect::Postgresql, true),
+                "unstable key at len={len} off={off}"
+            );
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // o2_db_env comes from RESOURCE attributes (design §3.1 row `o2_db_env`:
 // `deployment.environment.name` → `deployment.environment`, resource attrs).

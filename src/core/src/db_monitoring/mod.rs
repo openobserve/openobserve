@@ -218,9 +218,11 @@ static NORMALIZE_CACHE: LazyLock<Vec<Mutex<NormalizeCache>>> = LazyLock::new(|| 
         .collect()
 });
 
+/// Not gxhash: its streaming hasher reads up to 16 bytes past the input, guarded by a
+/// hardcoded 4 KiB page size, so on a 4 KiB-page aarch64 host a text ending near a page
+/// boundary aborts the process (non-unwinding panic) from the ingest hot path.
 fn normalize_cache_key(text: &str, dialect: Dialect, fold_identifiers: bool) -> NormalizeCacheKey {
-    // Workspace default hasher (gxhash; DefaultHasher on archs without AES).
-    let mut h = config::utils::hash::gxhash::new_hasher();
+    let mut h = config::utils::hash::new_key_hasher();
     dialect.hash(&mut h);
     fold_identifiers.hash(&mut h);
     text.hash(&mut h);
