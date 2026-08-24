@@ -22,7 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="t('components.navbar.mainNavigation')"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] shrink-0 flex-col overflow-y-auto pb-1"
+    class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] flex-col overflow-y-auto pb-1"
+    :class="overlay ? 'fixed inset-y-0 left-0 z-40 shadow-lg' : 'shrink-0'"
     @keydown="handleKeydown"
   >
     <!-- Three rail-entry shapes (see navGroups.ts):
@@ -100,6 +101,7 @@ defineOptions({ inheritAttrs: false });
 const props = withDefaults(defineProps<NavbarProps>(), {
   miniMode: false,
   visible: true,
+  overlay: false,
 });
 
 const emit = defineEmits<NavbarEmits>();

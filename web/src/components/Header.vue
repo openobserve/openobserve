@@ -16,6 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
+    <!-- MOBILE MENU TOGGLE: reveals the nav rail as an overlay below the
+         mobile breakpoint, where it stays hidden by default instead of
+         permanently reserving its column width. -->
+    <OButton
+      v-if="isMobile"
+      variant="ghost"
+      size="icon-toolbar"
+      data-test="header-mobile-menu-toggle"
+      class="ml-1 shrink-0"
+      :aria-label="t('menu.toggleNavigation')"
+      @click="toggleMenu"
+    >
+      <OIcon name="menu" size="sm" class="size-5!" />
+    </OButton>
+
     <!-- LEFT SIDE: Logo -->
     <div class="flex shrink-0 items-center justify-start pl-3">
       <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
@@ -528,6 +543,12 @@ export default defineComponent({
       type: String,
       required: true,
     },
+    // Whether the viewport is below the mobile breakpoint — shows the nav
+    // rail hamburger toggle when true.
+    isMobile: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: [
     "update:selectedOrg",
@@ -543,6 +564,7 @@ export default defineComponent({
     "openPredefinedThemes",
     "openShortcuts",
     "signout",
+    "toggleMenu",
   ],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
@@ -636,6 +658,10 @@ export default defineComponent({
       emit("signout");
     };
 
+    const toggleMenu = () => {
+      emit("toggleMenu");
+    };
+
     // Handle mouse hover events for AI button
     const handleMouseEnter = () => {
       emit("update:isHovered", true);
@@ -677,6 +703,7 @@ export default defineComponent({
       openPredefinedThemes,
       openShortcuts,
       signout,
+      toggleMenu,
       handleMouseEnter,
       handleMouseLeave,
       handleOrgSelection,

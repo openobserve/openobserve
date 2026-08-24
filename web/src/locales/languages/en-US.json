@@ -1069,7 +1069,8 @@
     "experience": "Experience",
     "slos": "SLOs",
     "reliability": "Reliability",
-    "onCall": "On-Call"
+    "onCall": "On-Call",
+    "toggleNavigation": "Toggle navigation"
   },
   "rum": {
     "noSessionReplay": "No session replay available",

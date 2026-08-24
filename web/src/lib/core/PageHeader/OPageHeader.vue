@@ -50,11 +50,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        61px on some pages and 60px on others. -->
   <header
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
-    :class="[tabsBelow ? 'flex flex-col' : 'flex h-15 items-center justify-between gap-4']"
+    :class="[
+      tabsBelow
+        ? 'flex flex-col'
+        : 'flex h-15 items-center justify-between gap-4 max-sm:h-auto max-sm:flex-wrap max-sm:gap-y-2 max-sm:py-2.5',
+    ]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
          (display:contents) so the title block + actions stay direct children of
-         the header — preserving the original single-row inline-tabs layout. -->
+         the header — preserving the original single-row inline-tabs layout.
+         Below `sm` the header itself (not this wrapper) is the flex container
+         doing the wrapping, since `contents` promotes these children up to it. -->
     <div :class="tabsBelow ? 'flex h-15 items-center justify-between gap-4' : 'contents'">
       <div class="flex h-full min-w-0 flex-1 items-center gap-3.25">
         <slot name="title-prefix" />
@@ -130,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div v-if="hasActions" class="flex shrink-0 items-center gap-2">
+      <div v-if="hasActions" class="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:flex-wrap">
         <slot name="actions" />
       </div>
     </div>

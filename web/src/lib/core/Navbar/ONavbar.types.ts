@@ -112,6 +112,14 @@ export interface NavbarProps {
   linksList: NavItem[];
   miniMode?: boolean;
   visible?: boolean;
+  /**
+   * Render the rail as a fixed slide-over above page content instead of a
+   * normal flex sibling that reserves its own column width. Used on narrow
+   * viewports, where the rail is hidden by default (`visible=false`) and
+   * revealed on demand via a header hamburger toggle — reserving its ~90px
+   * column permanently there would eat a quarter of a 390px viewport.
+   */
+  overlay?: boolean;
 }
 
 export interface NavbarEmits {
