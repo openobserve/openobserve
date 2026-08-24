@@ -286,6 +286,16 @@ export interface OTableProps<TData = any> {
 
   // ── Virtual Scroll ──
   virtualScroll?: boolean;
+  /**
+   * Build the TanStack row model only for the virtualizer's visible window
+   * instead of every data row. TanStack materializes a Row object per data row
+   * regardless of virtual scroll (which only bounds DOM nodes), so very large
+   * datasets (100k+ rows) freeze or OOM the tab without this. Applies only
+   * while no client-side row transform needs the full model: requires
+   * virtualScroll, pagination "none", non-client sorting, expansion "none",
+   * no wrap, no tree, and deactivates while a column/global filter is set.
+   */
+  windowRowModel?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
   /**

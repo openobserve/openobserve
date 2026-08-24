@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :horizontal-scroll="true"
       :row-height="22"
       :virtual-scroll="virtualizeRows"
+      :window-row-model="virtualizeRows"
       :default-columns="false"
       :show-global-filter="false"
       :enable-column-filter="enableFiltering"

@@ -9,7 +9,9 @@ import {
   onMounted,
   provide,
   ref,
+  shallowRef,
   watch,
+  watchEffect,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
@@ -298,12 +300,55 @@ const tableData = computed<TData[]>(() => {
   return source ? source.slice() : [];
 });
 
+// ── Windowed row model ──────────────────────────────────────────
+// TanStack builds a Row object per data row independent of virtual scroll,
+// which only bounds DOM nodes — 100k+ rows freeze the tab and ~1M rows OOM it.
+// When `windowRowModel` applies, only the virtualizer's visible slice enters
+// the row model; the watcher further down keeps the bounds in step with the
+// virtualizer. `activeClientFilters` is synced after the table exists because
+// filter state lives inside useTableCore.
+const ROW_WINDOW_FALLBACK = 200;
+const rowWindowStart = shallowRef(0);
+const rowWindowEnd = shallowRef(ROW_WINDOW_FALLBACK);
+const activeClientFilters = shallowRef(false);
+
+const rowModelWindowed = computed(
+  () =>
+    !!props.windowRowModel &&
+    !!props.virtualScroll &&
+    props.pagination === "none" &&
+    props.sorting !== "client" &&
+    props.expansion === "none" &&
+    !props.wrap &&
+    !tree.enabled.value &&
+    !activeClientFilters.value,
+);
+
+// Cached so repeated reads of the table's `data` option see a stable array
+// identity; a fresh slice per read would re-trigger TanStack's reactive
+// options merge on every access.
+const windowedTableData = computed<TData[]>(() => {
+  const data = tableData.value;
+  if (rowModelWindowed.value) {
+    return data.slice(rowWindowStart.value, rowWindowEnd.value);
+  }
+  return data;
+});
+
 // ── Core table instance ─────────────────────────────────────────
-const { table, effectiveColumns, columnOrder, userReorderedColumns, columnSizing, columnSizeVars } =
+const {
+  table,
+  effectiveColumns,
+  columnOrder,
+  userReorderedColumns,
+  columnSizing,
+  columnSizeVars,
+  columnFilters,
+} =
   useTableCore<TData>(
     {
       get data() {
-        return tableData.value;
+        return windowedTableData.value;
       },
       get columns() {
         return props.columns;
@@ -592,7 +637,36 @@ const {
   // table. Keep its raw offset stable when wrapped rows are remeasured so a
   // query refresh cannot move the owning page's scrollbar.
   preserveScrollOffsetOnRowResize: () => !!props.scrollEl && useDynamicRowHeight.value,
+  // Windowed row model: scrollbar and spacers span the full dataset even though
+  // only the visible slice is materialized.
+  totalCount: () => (rowModelWindowed.value ? tableData.value.length : undefined),
 });
+
+watchEffect(() => {
+  activeClientFilters.value = columnFilters.value.length > 0 || !!globalFilterLocal.value;
+});
+
+// Keep the row-model window in step with the virtualizer. A sync watcher (not a
+// computed) keeps the model out of the virtualizer's own dependency chain:
+// its count reads tableData, never the windowed model.
+watch(
+  [virtualRows, rowModelWindowed],
+  ([items, windowed]) => {
+    if (!windowed) {
+      rowWindowStart.value = 0;
+      rowWindowEnd.value = ROW_WINDOW_FALLBACK;
+      return;
+    }
+    if (!items.length) {
+      rowWindowStart.value = 0;
+      rowWindowEnd.value = ROW_WINDOW_FALLBACK;
+      return;
+    }
+    rowWindowStart.value = items[0].index;
+    rowWindowEnd.value = items[items.length - 1].index + 1;
+  },
+  { immediate: true },
+);
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
 
@@ -1026,6 +1100,8 @@ defineExpose({
     }
   },
   getRows: () => {
+    // Windowed model only holds the visible slice; the full dataset lives in tableData.
+    if (rowModelWindowed.value) return [...tableData.value];
     return table.getRowModel().rows.map((r) => r.original);
   },
 });
@@ -1296,6 +1372,7 @@ defineExpose({
             :global-filter-active="!!globalFilterLocal"
             :row-key="props.rowKey"
             :virtual-rows="isVirtual ? virtualRows : undefined"
+            :row-index-offset="rowModelWindowed ? rowWindowStart : 0"
             :total-size="isVirtual ? totalSize : undefined"
             :base-offset="isVirtual ? baseOffset : undefined"
             :measure-element="isVirtual ? measureElement : undefined"
