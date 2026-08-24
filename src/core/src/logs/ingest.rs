@@ -1187,11 +1187,55 @@ fn construct_values_from_open_telemetry_v1_metric(
 #[cfg(test)]
 mod tests {
 
-    use super::{
-        decode_and_decompress_to_string, decode_and_decompress_to_vec,
-        deserialize_aws_record_from_vec, extract_resource_id_from_amazon_resource_number,
-        get_size_of_var_int_header, get_tuple_from_open_telemetry_key_value,
-    };
+    use ingestion_common::{IngestUser, SystemJobType};
+
+    use super::*;
+
+    #[test]
+    fn test_internal_rollup_write_guard_blocks_users_in_all_editions() {
+        let user = IngestUser::User("someone@example.com".to_string());
+        assert!(is_blocked_internal_rollup_write(
+            "_o2_db_stats",
+            &user,
+            false
+        ));
+        assert!(is_blocked_internal_rollup_write(
+            "_o2_service_graph",
+            &user,
+            false
+        ));
+        assert!(is_blocked_internal_rollup_write(
+            "_agent_signals",
+            &user,
+            false
+        ));
+        // Ordinary streams are unaffected.
+        assert!(!is_blocked_internal_rollup_write("default", &user, false));
+        assert!(!is_blocked_internal_rollup_write("o2_stuff", &user, false));
+    }
+
+    #[test]
+    fn test_internal_rollup_write_guard_exempts_internal_writers() {
+        // The gRPC ServiceGraph arm ingests as SystemJob(InternalGrpc) with
+        // is_derived=true — both flags independently pass the guard.
+        let internal = IngestUser::SystemJob(SystemJobType::InternalGrpc);
+        assert!(!is_blocked_internal_rollup_write(
+            "_o2_service_graph",
+            &internal,
+            true
+        ));
+        assert!(!is_blocked_internal_rollup_write(
+            "_o2_db_stats",
+            &internal,
+            false
+        ));
+        let user = IngestUser::User("someone@example.com".to_string());
+        assert!(!is_blocked_internal_rollup_write(
+            "_o2_db_stats",
+            &user,
+            true
+        ));
+    }
 
     #[test]
     fn test_get_tuple_from_open_telemetry_key_value_string_value() {
