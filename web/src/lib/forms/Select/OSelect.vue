@@ -653,8 +653,31 @@ const navigableIndices = computed(() =>
 );
 
 // Reset highlight whenever the dropdown opens or the filtered list changes.
+// Single-select: land on the current value instead of the top of the list —
+// a 48-row virtualised list (e.g. a time-of-day picker) otherwise always opens
+// scrolled to its first entry, forcing a scroll/search just to see what's
+// already chosen. Multi-select keeps its own affordance (pinned-to-top in
+// `baseFilteredOptions`), so it stays untouched.
 watch(popoverOpen, (open) => {
-  if (open) highlightedIndex.value = -1;
+  if (!open) {
+    highlightedIndex.value = -1;
+    return;
+  }
+  if (props.multiple) {
+    highlightedIndex.value = -1;
+    return;
+  }
+  const selected = selectedValues.value[0];
+  const index =
+    selected === undefined
+      ? -1
+      : filteredOptions.value.findIndex((opt) => !opt.header && opt.value === selected);
+  highlightedIndex.value = index;
+  if (index < 0) return;
+  nextTick(() => {
+    virtualizer.value.scrollToIndex(index, { align: "center", behavior: "auto" });
+    nextTick(scrollHighlightedIntoView);
+  });
 });
 watch(filteredOptions, () => {
   highlightedIndex.value = -1;
