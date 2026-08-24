@@ -1,0 +1,30 @@
+{
+  "feature_slug": "database-monitoring",
+  "feature_title": "Database Monitoring",
+  "area": "Infra",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "databaseMonitoringCore.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Infra/databaseMonitoringCore.spec.js",
+  "playwright_group": "Infra",
+  "source_files": [
+    "web/src/views/DatabaseMonitoring/DbmShell.vue",
+    "web/src/views/DatabaseMonitoring/QueriesPage.vue",
+    "web/src/views/DatabaseMonitoring/QueryDetailPage.vue",
+    "web/src/views/DatabaseMonitoring/DatabasesPage.vue",
+    "web/src/composables/dbm/useDbmScope.ts",
+    "web/src/services/db_monitoring.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "File paths span both trees: OSS backend (src/api/management/src/request/db_monitoring/, src/core/src/db_monitoring/, src/db/src/db_monitoring.rs, src/jobs/src/job/db_monitoring.rs), OSS frontend (web/src/views/DatabaseMonitoring/, web/src/components/dbm/, web/src/utils/dbm/), and enterprise paths (o2_enterprise/src/enterprise/db_monitoring/ plus o2_openfga route/authorization). This is a linked OSS implementation with an enterprise-gated layer (deadlocks/blocking/table_health return 403 on OSS), so edition is 'both'. No enterprise keyword was needed to decide — the paths are authoritative.",
+    "skip": "Not skipping. The change is clearly user-facing: new DatabaseMonitoring views (DbmShell, QueriesPage, QueryDetailPage, DatabasesPage, ActivityPage, DeadlocksPage, BlockedQueriesPage, SamplesPage, TableHealthPage), new nav groups, routes and REST endpoints. feature_hint.txt and trigger_comment.txt are both empty, so there is no explicit opt-out label or skip comment.",
+    "e2e": "E2E is warranted: this is a new user-facing Database Monitoring UI surface with multiple interactive pages (databases, top queries, query detail, deadlocks, blocked queries, samples, table health), scope filters, and navigation — all backed by new REST endpoints that a user can hit. The UI behavior (filters, tabs, empty states, live-tail/staleness rendering) needs browser-level verification.",
+    "area": "Area is 'Infra' — the diff's own Playwright specs live in tests/ui-testing/playwright-tests/Infra/ (databaseMonitoring*.spec.js), and this is a new infrastructure/database-observability product surface rather than a change inside an existing Logs/Metrics/Traces area. The bulk of the UI changes live under web/src/views/DatabaseMonitoring/ and web/src/components/dbm/.",
+    "group": "playwright_group is 'Infra' — a new matrix shard. No 'Infra' testfolder exists in ci_matrix.ent.json or ci_matrix_cloud.json, so the Engineer must add a new shard (testfolder 'Infra', actual_folder 'Infra') that runs the databaseMonitoring specs.",
+    "existing_tests": "Yes — the diff adds five Playwright E2E specs under tests/ui-testing/playwright-tests/Infra/ (databaseMonitoring.spec.js, databaseMonitoringFilterMatrix.spec.js, databaseMonitoringFlows.spec.js, databaseMonitoringPlans.spec.js, databaseMonitoringScopeIntegrity.spec.js) plus a page object (tests/ui-testing/pages/dbmPages/databaseMonitoringPage.js). These are the dev's own E2E specs for this feature, so the route is 'enhance' (the Architect should read and extend/complement them). The many web/src/**/*.spec.ts files are Vitest unit tests and do not count as E2E coverage."
+  }
+}

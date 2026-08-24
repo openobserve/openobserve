@@ -115,6 +115,16 @@ export class DatabaseMonitoringPage {
     // Query detail — the Callers panel's instructive empty state.
     this.detailCallersEmpty = page.locator('[data-test="dbm-detail-callers-empty"]');
 
+    // Query detail — the two ABSENT presence states, and what proves a hop
+    // actually landed on content. `not-found` means the URL names no query;
+    // `scope-missed` means it names one this scope cannot see. They must stay
+    // apart: a scope miss claiming "missing" sends the reader to debug an org
+    // switch that never happened.
+    this.detailNotFound = page.locator('[data-test="dbm-detail-not-found"]');
+    this.detailScopeMissed = page.locator('[data-test="dbm-detail-scope-missed"]');
+    this.detailQueryText = page.locator('[data-test="dbm-detail-query-text"]');
+    this.detailTitle = page.locator('[data-test="dbm-detail-title"]');
+
     // The SHARED empty state (DbmEmptyState), used by the overview, Top
     // queries and Slowest calls. It renders one of two variants depending on
     // why the list is empty, and neither is named after the page it appears
@@ -127,6 +137,9 @@ export class DatabaseMonitoringPage {
 
     this.queriesTable = page.locator('[data-test="dbm-queries-table"]');
     this.serverQueriesTable = page.locator('[data-test="dbm-server-queries-table"]');
+    // The row-action "open" button on a Top-queries row. Fold/other rows carry
+    // no actions at all, so this only exists when a real client row is present.
+    this.queriesRowActionOpen = page.locator('[data-test="dbm-queries-row-actions-open"]');
 
     this.databasesTable = page.locator('[data-test="dbm-databases-table"]');
     this.databasesNoTraffic = page.locator('[data-test="dbm-databases-no-traffic"]');
@@ -280,8 +293,12 @@ export class DatabaseMonitoringPage {
     if (!(await badge.count())) return null;
     if (!(await badge.isVisible().catch(() => false))) return null;
     const text = (await badge.textContent()) || '';
-    const digits = text.replace(/[^\d]/g, '');
-    return digits ? Number(digits) : null;
+    // Preserve a leading minus: stripping non-digits (`/[^\d]/g`) turns a "-5"
+    // badge into 5, which a "never negative" guard can never catch. The badge
+    // is an integer (section.count), so the first signed digit run is the value;
+    // the "+" truncation marker and "server count" qualifier are trailing noise.
+    const match = text.match(/-?\d[\d,]*/);
+    return match ? Number(match[0].replace(/,/g, '')) : null;
   }
 
   /** Whether a badge discloses truncation ("50+" rather than an exact count). */
@@ -512,6 +529,37 @@ export class DatabaseMonitoringPage {
   }
 
   /**
+   * The rendered `<body>` text. Encapsulated so specs never reach for
+   * `page.locator('body')` directly — a raw selector that bypasses this object.
+   */
+  async pageBodyText() {
+    return (await this.page.locator('body').textContent()) || '';
+  }
+
+  /**
+   * How many `<script>` elements carry the given literal text. Guards the
+   * hostile-scope test: an injected `<script>alert(1)</script>` that reached
+   * the DOM unescaped is rendered as an element, so a non-zero count is the
+   * failure signal. `has-text` matches a substring, not a regex.
+   */
+  async injectedScriptCount(marker) {
+    return this.page.locator(`script:has-text(${JSON.stringify(marker)})`).count();
+  }
+
+  /**
+   * The OTable pagination indicator's text (e.g. "21-40 of 100"), or '' when
+   * the control is absent. Uses the stable `o2-table-pagination-info` locator
+   * rather than the brittle framework classes a raw `[data-test*="pagination"],
+   * .q-table__bottom` selector would hardcode into a spec.
+   */
+  async pagerText() {
+    await this.paginationInfo.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    if (!(await this.paginationInfo.count())) return '';
+    const text = await this.paginationInfo.first().innerText().catch(() => '');
+    return text || '';
+  }
+
+  /**
    * Everything a generic test needs about one tab: its table, the empty states
    * it is allowed to show, and the badge key.
    *
@@ -668,7 +716,11 @@ export class DatabaseMonitoringPage {
     });
     await this.page.goto(`${baseUrl}/web/infra/databases/query?${params}`, { timeout: 60000 });
     await this.page.waitForLoadState('load', { timeout: 20000 });
-    await this.page.waitForTimeout(2500);
+    // Wait on the real shell signal, not a fixed timer: the detail header is
+    // present in every presence state (content, not-found, scope-missed), so it
+    // is the one element that always proves the page mounted. Non-fatal — the
+    // caller's own assertion still governs.
+    await this.detailTitle.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
   }
 
   /**
@@ -692,7 +744,54 @@ export class DatabaseMonitoringPage {
     });
     await this.page.goto(`${baseUrl}/web/infra/databases/query?${params}`, { timeout: 60000 });
     await this.page.waitForLoadState('load', { timeout: 20000 });
-    await this.page.waitForTimeout(2500);
+    await this.detailTitle.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+  }
+
+  /** Open the query detail route with NO fingerprint — the "missing" case. */
+  async openQueryDetailNoFingerprint({ period = '1h', org } = {}) {
+    const orgId = org || process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const params = new URLSearchParams({ org_identifier: orgId, period });
+    await this.page.goto(`${baseUrl}/web/infra/databases/query?${params}`, { timeout: 60000 });
+    await this.page.waitForLoadState('load', { timeout: 20000 });
+  }
+
+  /**
+   * Open a query's detail page under an EXPLICIT scope, for the presence tests.
+   *
+   * `openQueryDetailTab` only ever sends `system`, so it cannot reproduce the
+   * "named a fingerprint, missed it under this scope" case — the
+   * `dbm-detail-scope-missed` state. Passing an impossible `instance` against a
+   * real fingerprint is exactly that, and it is the only honest way to reach it
+   * (a genuinely-absent fingerprint lands on `not-found` instead).
+   */
+  async openQueryDetailScoped(
+    fingerprint,
+    { tab, system = 'postgresql', instance, namespace, period = '1h', org } = {},
+  ) {
+    const orgId = org || process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const params = new URLSearchParams({ org_identifier: orgId, period, fingerprint, system });
+    if (instance) params.set('instance', instance);
+    if (namespace) params.set('namespace', namespace);
+    if (tab) params.set('tab', tab);
+    await this.page.goto(`${baseUrl}/web/infra/databases/query?${params}`, { timeout: 60000 });
+    await this.page.waitForLoadState('load', { timeout: 20000 });
+  }
+
+  /**
+   * Click the first Top-queries row's "open" action — the click-through hop.
+   *
+   * The action buttons hide behind `opacity-0` until the row is hovered, so the
+   * row is hovered first rather than forced. The result is an SPA push (not a
+   * full load), so callers assert on the URL / detail content rather than a
+   * load event.
+   */
+  async openTopQueryFromRow() {
+    const open = this.queriesRowActionOpen.first();
+    await open.hover();
+    await open.click();
+    await this.page.waitForLoadState('load', { timeout: 20000 }).catch(() => {});
   }
 
   /** A fingerprint the DATABASE reported — available with or without traces. */

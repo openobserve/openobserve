@@ -1,0 +1,13 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Infra/databaseMonitoringFlows.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Infra/databaseMonitoring.spec.js",
+    "tests/ui-testing/playwright-tests/Infra/databaseMonitoringFlows.spec.js",
+    "tests/ui-testing/playwright-tests/Infra/databaseMonitoringFilterMatrix.spec.js",
+    "tests/ui-testing/playwright-tests/Infra/databaseMonitoringPlans.spec.js",
+    "tests/ui-testing/playwright-tests/Infra/databaseMonitoringScopeIntegrity.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev already shipped five comprehensive E2E specs (routing/redirect, badge-table reconciliation, scope filters + matrix, search, pagination, deep links, injection, execution plans, callers empty state, picker fleet integrity) plus the full databaseMonitoringPage.js page object. The feature is fully WIRED with no UNWIRED behaviors. Two genuinely-uncovered WIRED behaviors remain, both query-detail related: (1) the Query Detail presence empty states — dbm-detail-not-found (missing fingerprint) and dbm-detail-scope-missed (fingerprint matches nothing under scope), which only have Vitest unit coverage today (dbmQueryDetailNotFound.spec.ts); and (2) Workflow 3's click-through path (Top queries row action 'open' -> useDbmQueryDetailHop -> detail), since every existing detail test navigates by URL. These are flow/empty-state coverage, so they append naturally to databaseMonitoringFlows.spec.js (the systematic sweep, which already hosts the Callers empty-state test) rather than spawning a new spec. The run-context spec_filename (databaseMonitoringCore.spec.js) is superseded by this decision: no new file, no new shard registration."
+}

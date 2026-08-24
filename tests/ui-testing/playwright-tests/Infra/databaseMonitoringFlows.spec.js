@@ -205,7 +205,7 @@ test.describe('Database Monitoring — flows', () => {
 
     // Either a 404 view or a redirect into the section is acceptable; a blank
     // page or a hung spinner is not. The app must still be usable.
-    const body = (await page.locator('body').textContent()) || '';
+    const body = await dbm.pageBodyText();
     expect(body.trim().length, 'unknown DBM route rendered a blank page').toBeGreaterThan(0);
     testLogger.info(`unknown segment landed on ${page.url()}`);
   });
@@ -240,7 +240,7 @@ test.describe('Database Monitoring — flows', () => {
 
     // The injected markup must not have executed or been rendered as an element.
     expect(
-      await page.locator('script:has-text("alert(1)")').count(),
+      await dbm.injectedScriptCount('alert(1)'),
       'injected script tag was rendered into the page',
     ).toBe(0);
   });
@@ -297,19 +297,13 @@ test.describe('Database Monitoring — flows', () => {
     // table still holds rows.
     const firstRows = await dbm.rowsOn('activity');
     await dbm.nextPageBtn.click();
-    await dbm.page.waitForTimeout(1200);
-
-    const pagerText = await dbm.page
-      .locator('[data-test*="pagination"], .q-table__bottom')
-      .first()
-      .innerText()
-      .catch(() => '');
-    testLogger.info(`after next: pager="${pagerText.replace(/\s+/g, ' ')}"`);
+    const afterPager = await dbm.pagerText();
+    testLogger.info(`after next: pager="${afterPager.replace(/\s+/g, ' ')}"`);
     expect(await dbm.rowsOn('activity'), 'page 2 rendered no rows').toBeGreaterThan(0);
     expect(firstRows, 'page 1 rendered no rows').toBeGreaterThan(0);
 
     await dbm.prevPageBtn.click();
-    await dbm.page.waitForTimeout(1200);
+    await dbm.pagerText();
     const backRows = await dbm.rowsOn('activity');
     expect(backRows, 'paging back lost the rows').toBeGreaterThan(0);
     testLogger.info(`activity paging: page1=${firstPageRows} back=${backRows}`);
@@ -550,5 +544,106 @@ test.describe('Database Monitoring — flows', () => {
       expect(badge, `${tab} badge is negative`).toBeGreaterThanOrEqual(0);
       testLogger.info(`badge ${tab} = ${badge}`);
     }
+  });
+
+  // =========================================================================
+  // QUERY DETAIL PRESENCE: the two absent states must stay apart
+  // =========================================================================
+
+  test('P1: query detail with no fingerprint shows the not-found state, not a blank frame', {
+    tag: ['@dbm', '@infra', '@P1', '@all'],
+  }, async () => {
+    await dbm.openQueryDetailNoFingerprint();
+
+    // The URL names no statement at all. The page must SAY so — an empty frame
+    // here reads as a broken page, and the not-found empty state is the only
+    // thing that tells the reader the address itself is wrong (usually after an
+    // org switch dropped the fingerprint).
+    await expect(
+      dbm.detailNotFound,
+      'a no-fingerprint detail page rendered neither the not-found state nor content',
+    ).toBeVisible({ timeout: 30000 });
+
+    // And the shell is alive, not wedged: the page header still renders so the
+    // reader can navigate away.
+    await expect(dbm.detailTitle, 'the detail shell did not render its header').toBeVisible({
+      timeout: 15000,
+    });
+    testLogger.info('no-fingerprint detail resolved to the not-found presence state');
+  });
+
+  test('P1: a named fingerprint that matches nothing under scope shows scope-missed, not not-found', {
+    tag: ['@dbm', '@infra', '@P1', '@negative', '@all'],
+  }, async () => {
+    const fingerprint = await dbm.firstServerQueryFingerprint();
+    test.skip(!fingerprint, 'no server-reported query in this window to miss');
+
+    // A real fingerprint the ORG holds, opened under an impossible instance.
+    // The two absent states must not be conflated: this statement EXISTS, the
+    // scope just cannot see it, so the page must report the scope miss rather
+    // than claim the query is missing.
+    await dbm.openQueryDetailScoped(fingerprint, {
+      system: engine,
+      instance: 'instance-that-cannot-exist-12345',
+    });
+
+    await expect(
+      dbm.detailScopeMissed,
+      'a scoped miss rendered no scope-missed note',
+    ).toBeVisible({ timeout: 60000 });
+
+    // Two different sentences. `not-found` means the URL names nothing; this
+    // URL names a real fingerprint, so that state must stay gone.
+    await expect(
+      dbm.detailNotFound,
+      'the scope-missed state was conflated with not-found',
+    ).toBeHidden();
+    testLogger.info('scoped miss resolved to the scope-missed presence state');
+  });
+
+  // =========================================================================
+  // POSITIVE: Top queries -> row action "open" -> Query Detail (click path)
+  // =========================================================================
+
+  test('P1: the Top-queries row action "open" hops to the detail page with the fingerprint', {
+    tag: ['@dbm', '@infra', '@P1', '@all'],
+  }, async ({ page }) => {
+    await dbm.navigate('queries');
+    await dbm.expectLoaded();
+    await dbm.settleTab('queries');
+
+    // The click path, not a hand-built URL: every other detail test navigates
+    // by URL, so a mis-wired hop (row -> useDbmQueryDetailHop -> detail) would
+    // be invisible to them. Skip when the client list is empty — a no-traces
+    // org shows the server fallback, which has no row actions at all.
+    test.skip(
+      (await dbm.getRowCount(dbm.queriesTable)) === 0,
+      'no client Top-queries rows (server fallback shown) — nothing to click',
+    );
+    test.skip(
+      (await dbm.queriesRowActionOpen.count()) === 0,
+      'the only rows are the fold/other rows, which carry no open action',
+    );
+
+    await dbm.openTopQueryFromRow();
+
+    // The hop seeds the clicked row's fingerprint into the URL — that is the
+    // whole contract of the hop, and the detail page re-fetches from it.
+    await expect(page, 'the open action did not navigate to the detail route').toHaveURL(
+      /\/infra\/databases\/query/,
+      { timeout: 20000 },
+    );
+    expect(
+      new URL(page.url()).searchParams.get('fingerprint'),
+      'the hop did not seed a fingerprint into the URL',
+    ).toBeTruthy();
+
+    // And it landed on content, not on a presence empty state.
+    await expect(
+      dbm.detailQueryText,
+      'the detail page rendered no statement text after the hop',
+    ).toBeVisible({ timeout: 30000 });
+    await expect(dbm.detailNotFound, 'the hop landed on the not-found state').toBeHidden();
+    testLogger.info(`click-through landed on ${page.url()}`);
   });
 });

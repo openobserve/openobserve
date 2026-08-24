@@ -1,0 +1,22 @@
+{
+  "feature_slug": "database-monitoring",
+  "feature_title": "Database Monitoring",
+  "area": "Infra",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "databaseMonitoringCore.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Infra/databaseMonitoringCore.spec.js",
+  "playwright_group": "Infra",
+  "source_files": [
+    "web/src/views/DatabaseMonitoring/DbmShell.vue",
+    "web/src/views/DatabaseMonitoring/QueriesPage.vue",
+    "web/src/views/DatabaseMonitoring/QueryDetailPage.vue",
+    "web/src/views/DatabaseMonitoring/DatabasesPage.vue",
+    "web/src/composables/dbm/useDbmScope.ts",
+    "web/src/services/db_monitoring.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

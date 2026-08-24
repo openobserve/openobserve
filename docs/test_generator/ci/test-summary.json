@@ -1,0 +1,17 @@
+[
+  {
+    "title": "P1: query detail with no fingerprint shows the not-found state, not a blank frame",
+    "action": "append",
+    "verifies": "the query detail page declares a missing statement (not-found) instead of rendering a blank frame when reached with no fingerprint"
+  },
+  {
+    "title": "P1: a named fingerprint that matches nothing under scope shows scope-missed, not not-found",
+    "action": "append",
+    "verifies": "a real fingerprint opened under an impossible instance reports scope-missed and does not conflate it with not-found"
+  },
+  {
+    "title": "P1: the Top-queries row action \"open\" hops to the detail page with the fingerprint",
+    "action": "append",
+    "verifies": "the Top-queries row action click path navigates to the detail page, seeding the row's fingerprint and painting the statement text"
+  }
+]
