@@ -26,10 +26,7 @@ use bytes::Bytes;
 use chrono::Duration;
 use config::{
     FileFormat, cluster, get_config,
-    meta::{
-        promql::layout::MetricsFileLayout,
-        stream::{FileMeta, StreamType},
-    },
+    meta::stream::{FileMeta, StreamType},
     metrics,
     utils::{parquet::generate_filename_with_time_range, time::now_micros},
 };
@@ -44,6 +41,7 @@ use infra::{
     storage,
 };
 use ingester::{PackSegment, PendingStreamStats};
+use metrics_index::MetricsFileLayout;
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::merge::{self, MergeMode, MergeOutput};
 use tantivy_utils::index_builder::create_tantivy_index;

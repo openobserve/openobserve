@@ -34,6 +34,7 @@ use infra::{
     },
     storage,
 };
+use metrics_index::MetricsFileLayout;
 use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
@@ -295,6 +296,7 @@ pub async fn merge_files(
         buf,
         meta: mut new_file_meta,
         layout,
+        metrics_index,
     } in merged_files
     {
         new_file_meta.compressed_size = buf.len() as i64;
@@ -319,10 +321,31 @@ pub async fn merge_files(
 
         // TODO: check how compliance will interact with org storage
         let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
-        if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
+        let compliance = cfg.s3.feature_force_infrequent_access && storage_type.is_compliance();
+        if compliance {
             storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
         } else {
             storage::put(&account, &new_file_key, buf.clone()).await?;
+        }
+
+        // Indexed metrics files own a `.midx` metrics index; it is not tracked in
+        // file_list and is deleted together with the data file
+        if let Some(metrics_index) = metrics_index {
+            let metrics_index_key = MetricsFileLayout::metrics_index_path(&new_file_key)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("metrics index for a non-indexed metrics file: {new_file_key}")
+                })?;
+            let metrics_index = Bytes::from(metrics_index);
+            if compliance {
+                storage::put_with_compliance(&account, &metrics_index_key, metrics_index.clone())
+                    .await?;
+            } else {
+                storage::put(&account, &metrics_index_key, metrics_index.clone()).await?;
+            }
+            log::debug!(
+                "[COMPACTOR:WORKER:{thread_id}] wrote metrics index {metrics_index_key}, size: {}",
+                metrics_index.len()
+            );
         }
 
         if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {

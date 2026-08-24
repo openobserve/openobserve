@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("synthetics.locations.locationId") }}
           </label>
           <div
-            class="text-text-secondary rounded-default border-input-border bg-surface-subtle border px-3 py-2 text-sm"
+            class="text-text-secondary rounded-default border-border-default bg-surface-subtle border px-3 py-2 text-sm"
           >
             {{ derivedId || "-" }}
           </div>

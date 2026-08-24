@@ -42,7 +42,7 @@ const store = createStore({
 const i18n = createI18n({
   locale: "en",
   legacy: false,
-  messages: { en: {} },
+  messages: { en: { menu: { alerts: "Alerts" } } },
   missingWarn: false,
   fallbackWarn: false,
 });
@@ -124,6 +124,139 @@ describe("ONavGroup", () => {
     expect(flyout().find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
     expect(flyout().find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
     expect(flyout().find('[data-test="nav-group-item-notARoute"]').exists()).toBe(false);
+  });
+
+  it("heads a run of children sharing a categoryKey, and TRANSLATES the header", async () => {
+    // The header was the one string in the rail rendered from a raw literal, so
+    // it would have stayed English in all 15 locales. It takes an i18n key like
+    // every other label here.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    const header = flyout().find('[data-test^="nav-group-section-label-"]');
+    expect(header.exists()).toBe(true);
+    expect(header.text()).toBe("Alerts");
+
+    // The run is a real group to assistive tech, named by that heading. A bare
+    // heading div is not a valid child of role="menu" — AT drops it, and the
+    // grouping this exists to convey is silent.
+    const group = flyout().find('[role="group"]');
+    expect(group.exists()).toBe(true);
+    expect(group.attributes("aria-labelledby")).toBe(header.attributes("id"));
+    expect(header.attributes("role")).toBe("presentation");
+    expect(group.findAll('[role="menuitem"]')).toHaveLength(2);
+  });
+
+  it("sizes the three levels by depth, not against it", async () => {
+    // It ran 11px → 11px → 14px: the group title and its section headers were
+    // the same size, and the ITEMS — the deepest level — were the largest text
+    // in the flyout. Group (base) > section (sm, secondary) > item (sm, plain).
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+      ],
+    });
+    await hoverOpen();
+
+    const classesOf = (sel: string) => flyout().find(sel).classes().join(" ");
+    const groupTitle = flyout().element.firstElementChild?.className ?? "";
+    // Group and items share body size; the group outranks them by weight. It is
+    // NOT a step above — 16px read as a page title inside a 217px menu.
+    expect(groupTitle).toContain("text-sm");
+    expect(groupTitle).toContain("font-semibold");
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).toContain("text-sm");
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).not.toContain("font-semibold");
+    // The section header is the one label that steps DOWN, in the secondary
+    // colour — it names a run, it is not a thing you click.
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-xs");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("font-semibold");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-text-secondary");
+  });
+
+  it("heads the run once, not once per child", async () => {
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    expect(flyout().findAll('[data-test^="nav-group-section-label-"]')).toHaveLength(1);
+  });
+
+  it("leaves uncategorised children unheaded, so they are not filed under it", async () => {
+    // Reliability's SLOs/Incidents sit outside the Alerts header exactly this
+    // way: a trailing child with no key must not inherit the previous header.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        { titleKey: "menu.pipeline", icon: "graph-2", name: "pipelines" },
+      ],
+    });
+    await hoverOpen();
+
+    const rows = flyout().findAll(
+      '[data-test^="nav-group-section-label-"], [data-test^="nav-group-item-"]',
+    );
+    expect(rows.map((r) => r.attributes("data-test"))).toEqual([
+      "nav-group-section-label-h-menu.alerts-0",
+      "nav-group-item-logstreams",
+      "nav-group-item-pipelines",
+    ]);
+    // Outside the group element, not merely after the heading.
+    expect(
+      flyout().find('[role="group"]').find('[data-test="nav-group-item-pipelines"]').exists(),
+    ).toBe(false);
+    // And it is visibly outside: a header owns everything below it until
+    // something says otherwise, and at the same indent nothing else does.
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).toContain("mt-3");
+  });
+
+  it("does not break the run it is still inside", async () => {
+    // The gap marks LEAVING a headed run. Putting it on a member would split
+    // the run into two groups under one header.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).not.toContain("mt-3");
+  });
+
+  it("adds no gap when nothing is categorised at all", async () => {
+    // The Data group has no headers; it must stay one flat list.
+    wrapper = mountGroup();
+    await hoverOpen();
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).not.toContain("mt-3");
   });
 
   // Regression: clicking the tile used to close() the flyout while the pointer
