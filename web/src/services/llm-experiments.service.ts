@@ -53,6 +53,28 @@ export interface ExperimentCreatePayload {
   idempotencyKey?: string | null;
 }
 
+/**
+ * Every pin a clone may change, in the same shape the create payload uses.
+ *
+ * A clone inherits its source's definition, so every field is optional: an
+ * omitted one keeps what the source pinned. `description`, `datasetFilter` and
+ * `metadata` are nullable on an Experiment, so sending an explicit `null`
+ * clears them rather than inheriting.
+ */
+export interface ExperimentClonePayload {
+  name?: string;
+  description?: string | null;
+  datasetId?: string;
+  datasetVersion?: number;
+  datasetFilter?: ExperimentDatasetFilter | null;
+  task?: ExperimentTask;
+  scorers?: ExperimentScorerRef[];
+  trialCount?: number;
+  metadata?: Record<string, unknown> | null;
+  idempotencyKey?: string;
+  confirmCostEstimate?: boolean;
+}
+
 export interface ExperimentSlot {
   rowId: string;
   logicalId: string;
@@ -744,10 +766,15 @@ const llmExperimentsService = {
     return normalizeExecution(response.data);
   },
 
-  async clone(orgId: string, experimentId: string, name?: string): Promise<LlmExperiment> {
-    const response = await http().post(`${base(orgId)}/${experimentId}/clone`, {
-      ...(name ? { name } : {}),
-    });
+  async clone(
+    orgId: string,
+    experimentId: string,
+    overrides: ExperimentClonePayload = {},
+  ): Promise<LlmExperiment> {
+    const response = await http().post(
+      `${base(orgId)}/${experimentId}/clone`,
+      overrides,
+    );
     return normalizeExperiment(response.data);
   },
 };

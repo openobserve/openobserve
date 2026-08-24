@@ -22,9 +22,10 @@ use openobserve_core::llm_evaluations::{
         ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary, ScoringStatus,
     },
     experiments::{
-        CreateExperiment, CreateExperimentResult, Experiment, ExperimentPreview,
-        ExperimentScorerRef, ExperimentSlot, ExperimentSlotPage, ExperimentStatus,
-        ExperimentTaskConfig, PinnedExperimentScorer, PromptMessage, RemoteTaskOverrides,
+        CloneExperimentOverrides, CreateExperiment, CreateExperimentResult, Experiment,
+        ExperimentPreview, ExperimentScorerRef, ExperimentSlot, ExperimentSlotPage,
+        ExperimentStatus, ExperimentTaskConfig, PinnedExperimentScorer, PromptMessage,
+        RemoteTaskOverrides,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -273,10 +274,98 @@ const fn default_trial_count() -> u32 {
     1
 }
 
+/// Deserializer that keeps "absent" and "explicit null" apart for an
+/// `Option<Option<T>>` field.
+///
+/// Serde collapses both to `None` otherwise, which on a clone would make
+/// "inherit the source's value" and "clear it" the same request.
+fn double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Deserialize::deserialize(deserializer).map(Some)
+}
+
+/// Every pin a clone may change, in the same shape the create body uses.
+///
+/// A clone inherits its source's definition, so every field is optional: an
+/// absent one keeps what the source pinned, and an empty body is still a
+/// verbatim copy. `description`, `datasetFilter` and `metadata` are nullable on
+/// an Experiment, so an explicit `null` clears them rather than meaning
+/// "absent".
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CloneExperimentRequestBody {
-    /// Optional name for the clone. Defaults to `<source name> (copy)`.
+    /// Defaults to `<source name> (copy)`.
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub description: Option<Option<String>>,
+    #[serde(default)]
+    pub dataset_id: Option<String>,
+    #[serde(default)]
+    pub dataset_version: Option<i64>,
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<DatasetSnapshotFilterBody>)]
+    pub dataset_filter: Option<Option<DatasetSnapshotFilterBody>>,
+    #[serde(default)]
+    pub task: Option<ExperimentTaskBody>,
+    #[serde(default)]
+    pub scorers: Option<Vec<ExperimentScorerRefBody>>,
+    /// Trials per Dataset Case, between 1 and the configured maximum.
+    #[serde(default)]
+    pub trial_count: Option<u32>,
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<Value>)]
+    pub metadata: Option<Option<Value>>,
+    /// Makes a retried clone replay its first result instead of running the
+    /// Experiment a second time.
+    #[serde(default)]
+    pub idempotency_key: Option<String>,
+    /// Acknowledges a cost estimate above the organization's warning
+    /// threshold. Without it, such a request is refused with `412`.
+    #[serde(default)]
+    pub confirm_cost_estimate: bool,
+}
+
+impl From<CloneExperimentRequestBody> for CloneExperimentOverrides {
+    fn from(value: CloneExperimentRequestBody) -> Self {
+        Self {
+            name: value.name,
+            description: value.description,
+            dataset_id: value.dataset_id,
+            dataset_version: value.dataset_version,
+            dataset_filter: value.dataset_filter.map(|filter| filter.map(Into::into)),
+            task: value.task.map(Into::into),
+            scorers: value.scorers.map(|scorers| {
+                scorers
+                    .into_iter()
+                    .map(|scorer| ExperimentScorerRef {
+                        id: scorer.id,
+                        version: scorer.version,
+                    })
+                    .collect()
+            }),
+            trial_count: value.trial_count,
+            metadata: value.metadata,
+            idempotency_key: value.idempotency_key,
+            confirm_cost_estimate: value.confirm_cost_estimate,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
@@ -1288,6 +1377,92 @@ mod tests {
             panic!("expected an SDK task");
         };
         assert_eq!(task_fingerprint, "sha256:abc");
+    }
+
+    #[test]
+    fn an_empty_clone_body_overrides_nothing() {
+        let body: CloneExperimentRequestBody =
+            serde_json::from_value(serde_json::json!({})).unwrap();
+        let overrides = CloneExperimentOverrides::from(body);
+
+        // The UI's Clone button sends `{}`, and that has to stay a verbatim
+        // copy of the source rather than a definition with every pin blanked.
+        assert_eq!(overrides, CloneExperimentOverrides::default());
+    }
+
+    #[test]
+    fn a_clone_body_accepts_every_pin_the_create_body_does() {
+        let body: CloneExperimentRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "tuned",
+            "description": "second pass",
+            "datasetId": "dataset-2",
+            "datasetVersion": 9,
+            "datasetFilter": {"tags": ["regression"]},
+            "task": {"type": "sdk", "taskFingerprint": "sha256:customer-code-v4"},
+            "scorers": [{"id": "scorer-1", "version": 2}],
+            "trialCount": 5,
+            "metadata": {"suite": "nightly"},
+            "idempotencyKey": "clone-1",
+            "confirmCostEstimate": true
+        }))
+        .unwrap();
+        let overrides = CloneExperimentOverrides::from(body);
+
+        assert_eq!(overrides.name.as_deref(), Some("tuned"));
+        assert_eq!(overrides.description, Some(Some("second pass".to_string())));
+        assert_eq!(overrides.dataset_id.as_deref(), Some("dataset-2"));
+        assert_eq!(overrides.dataset_version, Some(9));
+        assert_eq!(
+            overrides
+                .dataset_filter
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(|filter| filter.tags.as_slice()),
+            Some(["regression".to_string()].as_slice())
+        );
+        assert!(matches!(
+            overrides.task,
+            Some(ExperimentTaskConfig::Sdk { .. })
+        ));
+        assert_eq!(
+            overrides.scorers,
+            Some(vec![ExperimentScorerRef {
+                id: "scorer-1".to_string(),
+                version: Some(2),
+            }])
+        );
+        assert_eq!(overrides.trial_count, Some(5));
+        assert_eq!(
+            overrides.metadata,
+            Some(Some(serde_json::json!({"suite": "nightly"})))
+        );
+        assert_eq!(overrides.idempotency_key.as_deref(), Some("clone-1"));
+        assert!(overrides.confirm_cost_estimate);
+    }
+
+    #[test]
+    fn a_null_clone_override_clears_while_an_absent_one_inherits() {
+        let cleared: CloneExperimentRequestBody = serde_json::from_value(serde_json::json!({
+            "description": null,
+            "datasetFilter": null,
+            "metadata": null
+        }))
+        .unwrap();
+        let cleared = CloneExperimentOverrides::from(cleared);
+
+        // Serde collapses both to `None` without the double-option
+        // deserializer, which would make "run the clone over the whole Dataset"
+        // inexpressible once the source pinned a filter.
+        assert_eq!(cleared.description, Some(None));
+        assert_eq!(cleared.dataset_filter, Some(None));
+        assert_eq!(cleared.metadata, Some(None));
+
+        let absent: CloneExperimentRequestBody =
+            serde_json::from_value(serde_json::json!({"name": "copy"})).unwrap();
+        let absent = CloneExperimentOverrides::from(absent);
+        assert_eq!(absent.description, None);
+        assert_eq!(absent.dataset_filter, None);
+        assert_eq!(absent.metadata, None);
     }
 
     #[test]

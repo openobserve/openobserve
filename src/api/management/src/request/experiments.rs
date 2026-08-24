@@ -1041,7 +1041,8 @@ pub async fn retry_experiment_slot(
     }
 }
 
-/// Clone a sealed Experiment into a new pending definition with isolated evidence.
+/// Clone a sealed Experiment into a new pending definition with isolated
+/// evidence, applying any pin the request overrides.
 #[utoipa::path(
     post,
     path = "/{org_id}/experiments/{experiment_id}/clone",
@@ -1053,11 +1054,13 @@ pub async fn retry_experiment_slot(
         ("org_id" = String, Path, description = "Organization name"),
         ("experiment_id" = String, Path, description = "Sealed (completed or cancelled) source Experiment ID"),
     ),
-    request_body(content = CloneExperimentRequestBody, content_type = "application/json"),
+    request_body(content = inline(CloneExperimentRequestBody), content_type = "application/json"),
     responses(
         (status = 200, description = "Pending clone created", body = ExperimentResponseBody),
-        (status = 404, description = "Experiment not found"),
-        (status = 409, description = "Only sealed Experiments can be cloned"),
+        (status = 400, description = "Invalid Experiment definition after overrides", body = ()),
+        (status = 404, description = "Experiment, Dataset or scorer not found"),
+        (status = 409, description = "Only sealed Experiments can be cloned, or the idempotency key describes a different clone"),
+        (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
     )
 )]
 pub async fn clone_experiment(
@@ -1065,21 +1068,24 @@ pub async fn clone_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CloneExperimentRequestBody>,
 ) -> Response {
-    // A clone copies the source Task config verbatim, so it reaches the same
-    // Remote Task. Checking only at create would leave clone as the way around
-    // that check.
-    match experiments::get(&org_id, &experiment_id).await {
-        Ok(source) => {
-            if let Some((task_ref, _)) = source.task.remote_task()
-                && let Err(response) =
-                    require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
-            {
-                return response;
-            }
-        }
+    // The clone reaches whichever Remote Task it ends up pinning — the source's
+    // when the request overrides nothing, the override's when it does.
+    // Checking only at create would leave clone as the way around that check.
+    let source = match experiments::get(&org_id, &experiment_id).await {
+        Ok(source) => source,
         Err(error) => return experiment_error_response(error),
+    };
+    let effective_task_ref = match body.task.as_ref() {
+        Some(task) => remote_task_ref(task),
+        None => source.task.remote_task().map(|(task_ref, _)| task_ref),
+    };
+    if let Some(task_ref) = effective_task_ref
+        && let Err(response) =
+            require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
+    {
+        return response;
     }
-    match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, body.name).await {
+    match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, body.into()).await {
         Ok(experiment) => {
             set_ownership(&org_id, "experiments", Authz::new(&experiment.id)).await;
             MetaHttpResponse::json(ExperimentResponseBody::from(experiment))
