@@ -24,8 +24,9 @@ use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
-use metrics_index::{MetricsFileLayout, MetricsIndexWriter};
+use metrics_index::MetricsIndexWriter;
 use parquet::arrow::AsyncArrowWriter;
+use tokio::io::AsyncWriteExt;
 
 use super::{MergedFile, append_metadata};
 
@@ -89,7 +90,8 @@ pub(super) async fn write_files(
 /// One output file in progress: the Parquet writer, its `.midx` metrics-index
 /// writer and the running file meta.
 struct ActiveIndexedMetricsWriter {
-    writer: AsyncArrowWriter<Vec<u8>>,
+    writer: AsyncArrowWriter<tokio::fs::File>,
+    data_path: tempfile::TempPath,
     metrics_index: MetricsIndexWriter,
     file_meta: FileMeta,
     timestamp_index: usize,
@@ -102,16 +104,11 @@ impl ActiveIndexedMetricsWriter {
         metadata: &FileMeta,
         timestamp_index: usize,
     ) -> Result<Self> {
-        let writer = new_parquet_writer(
-            Vec::new(),
-            schema,
-            bloom_filter_fields,
-            metadata,
-            false,
-            None,
-        );
+        let (file, data_path) = new_temp_file()?;
+        let writer = new_parquet_writer(file, schema, bloom_filter_fields, metadata, false, None);
         Ok(Self {
             writer,
+            data_path,
             metrics_index: MetricsIndexWriter::try_new(schema)?,
             file_meta: FileMeta::default(),
             timestamp_index,
@@ -149,6 +146,7 @@ impl ActiveIndexedMetricsWriter {
     async fn finish(self, source_meta: &FileMeta, max_file_size: i64) -> Result<MergedFile> {
         let Self {
             mut writer,
+            data_path,
             metrics_index,
             mut file_meta,
             ..
@@ -159,16 +157,28 @@ impl ActiveIndexedMetricsWriter {
             proportional_original_size(source_meta, file_meta.records).min(max_file_size - 1);
         append_metadata(&mut writer, &file_meta)?;
         writer.finish().await?;
+        drop(writer.into_inner());
 
-        let buf = writer.into_inner();
-        file_meta.compressed_size = buf.len() as i64;
-        Ok(MergedFile {
-            buf,
+        file_meta.compressed_size =
+            i64::try_from(tokio::fs::metadata(&data_path).await?.len()).unwrap_or(i64::MAX);
+        Ok(MergedFile::MetricsIndexed {
+            data_path,
+            metrics_index_path: write_temp_file(metrics_index.finish()?).await?,
             meta: file_meta,
-            layout: MetricsFileLayout::Indexed,
-            metrics_index: Some(metrics_index.finish()?),
         })
     }
+}
+
+fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
+    let (file, path) = tempfile::NamedTempFile::new()?.into_parts();
+    Ok((tokio::fs::File::from_std(file), path))
+}
+
+async fn write_temp_file(buf: Vec<u8>) -> Result<tempfile::TempPath> {
+    let (mut file, path) = new_temp_file()?;
+    file.write_all(&buf).await?;
+    file.shutdown().await?;
+    Ok(path)
 }
 
 /// The share of the source `original_size` that `records` rows carry.
@@ -254,31 +264,68 @@ mod tests {
         .unwrap();
 
         assert_eq!(files.len(), 3);
-        assert_eq!(files.iter().map(|f| f.meta.records).sum::<i64>(), 6);
         assert_eq!(
             files
                 .iter()
-                .map(|f| f.meta.original_size)
+                .map(|file| match file {
+                    MergedFile::MetricsIndexed { meta, .. } => meta.records,
+                    _ => unreachable!(),
+                })
+                .sum::<i64>(),
+            6
+        );
+        assert_eq!(
+            files
+                .iter()
+                .map(|file| match file {
+                    MergedFile::MetricsIndexed { meta, .. } => meta.original_size,
+                    _ => unreachable!(),
+                })
                 .collect::<Vec<_>>(),
             vec![150, 150, 100]
         );
-        assert!(files.iter().all(|f| {
-            f.layout == MetricsFileLayout::Indexed
-                && f.metrics_index.is_some()
-                && f.meta.original_size < max_file_size as i64
-                && f.meta.compressed_size == f.buf.len() as i64
+        assert!(files.iter().all(|file| {
+            let MergedFile::MetricsIndexed {
+                data_path,
+                metrics_index_path,
+                meta,
+            } = file
+            else {
+                return false;
+            };
+            data_path.is_file()
+                && metrics_index_path.is_file()
+                && meta.original_size < max_file_size as i64
+                && meta.compressed_size == std::fs::metadata(data_path).unwrap().len() as i64
         }));
 
         let mut file_hashes = Vec::new();
         for file in files {
-            let bytes = bytes::Bytes::from(file.buf);
+            let MergedFile::MetricsIndexed {
+                data_path,
+                metrics_index_path,
+                meta,
+            } = file
+            else {
+                unreachable!()
+            };
+            let persisted_data_path = data_path.to_path_buf();
+            let persisted_metrics_index_path = metrics_index_path.to_path_buf();
+            let bytes = bytes::Bytes::from(tokio::fs::read(&data_path).await.unwrap());
+            drop(data_path);
+            assert!(!persisted_data_path.exists());
             let footer = config::utils::parquet::read_metadata_from_bytes(&bytes)
                 .await
                 .unwrap();
-            assert_eq!(footer.min_ts, file.meta.min_ts);
-            assert_eq!(footer.max_ts, file.meta.max_ts);
-            assert_eq!(footer.records, file.meta.records);
-            assert_eq!(footer.original_size, file.meta.original_size);
+            assert_eq!(footer.min_ts, meta.min_ts);
+            assert_eq!(footer.max_ts, meta.max_ts);
+            assert_eq!(footer.records, meta.records);
+            assert_eq!(footer.original_size, meta.original_size);
+
+            let metrics_index = tokio::fs::read(&metrics_index_path).await.unwrap();
+            drop(metrics_index_path);
+            assert!(!metrics_index.is_empty());
+            assert!(!persisted_metrics_index_path.exists());
 
             let reader = ParquetRecordBatchReaderBuilder::try_new(bytes)
                 .unwrap()

@@ -42,7 +42,7 @@ use crate::datafusion::sort_order::FileSortOrder;
 #[derive(Debug, Clone)]
 pub enum MergeMode {
     /// `SELECT * FROM tbl ORDER BY _timestamp DESC` into one file: logs,
-    /// traces, plain metrics — the ingester and the compactor default.
+    /// traces and plain metrics — the default merge.
     Classic,
     /// The trace time-index metadata stream: one row per `trace_id`
     /// (`MIN(_timestamp)`, `MIN(min_ts)`, `MAX(max_ts)`, …), one file.
@@ -134,12 +134,12 @@ impl MergeMode {
         }
     }
 
-    /// Layout of the file(s) the merge writes.
-    pub fn file_layout(&self) -> MetricsFileLayout {
+    /// Metrics-specific layout of the file(s) the merge writes.
+    pub fn metrics_file_layout(&self) -> Option<MetricsFileLayout> {
         match self {
-            Self::MetricsHashSorted => MetricsFileLayout::HashSorted,
-            Self::MetricsIndexed => MetricsFileLayout::Indexed,
-            _ => MetricsFileLayout::Legacy,
+            Self::MetricsHashSorted => Some(MetricsFileLayout::HashSorted),
+            Self::MetricsIndexed => Some(MetricsFileLayout::Indexed),
+            _ => None,
         }
     }
 
@@ -150,16 +150,25 @@ impl MergeMode {
     /// sort. Any mix with other layouts declares no order; otherwise the
     /// classic `_timestamp DESC`.
     pub fn input_sort_order(&self, files: &[FileKey]) -> FileSortOrder {
-        let hash_ordered = files
-            .iter()
-            .filter(|f| MetricsFileLayout::of(&f.key).is_hash_ordered())
-            .count();
         match self {
-            Self::MetricsHashSorted | Self::MetricsIndexed if hash_ordered == files.len() => {
-                FileSortOrder::HashTimestampAsc
+            Self::MetricsHashSorted | Self::MetricsIndexed => {
+                if files
+                    .iter()
+                    .all(|f| MetricsFileLayout::of(&f.key).is_some())
+                {
+                    FileSortOrder::HashTimestampAsc
+                } else {
+                    FileSortOrder::None
+                }
             }
-            _ if hash_ordered > 0 => FileSortOrder::None,
-            Self::MetricsHashSorted | Self::MetricsIndexed => FileSortOrder::None,
+            #[cfg(feature = "enterprise")]
+            Self::Downsampling(_)
+                if files
+                    .iter()
+                    .any(|f| MetricsFileLayout::of(&f.key).is_some()) =>
+            {
+                FileSortOrder::None
+            }
             _ => FileSortOrder::TimestampDesc,
         }
     }
@@ -272,6 +281,10 @@ mod tests {
             MergeMode::Classic
         ));
         assert!(matches!(
+            MergeMode::for_ingester(StreamType::Metrics, "cpu", &schema),
+            MergeMode::Classic
+        ));
+        assert!(matches!(
             MergeMode::for_compactor(StreamType::Filelist, "x", &schema, 0, false),
             MergeMode::FileList
         ));
@@ -282,10 +295,10 @@ mod tests {
             MergeMode::Classic.input_sort_order(&[]),
             FileSortOrder::TimestampDesc
         );
-        assert_eq!(MergeMode::Classic.file_layout(), MetricsFileLayout::Legacy);
+        assert_eq!(MergeMode::Classic.metrics_file_layout(), None);
         assert_eq!(
-            MergeMode::MetricsHashSorted.file_layout(),
-            MetricsFileLayout::HashSorted
+            MergeMode::MetricsHashSorted.metrics_file_layout(),
+            Some(MetricsFileLayout::HashSorted)
         );
         assert_eq!(
             MergeMode::MetricsIndexed.output_sort_order(),
@@ -315,13 +328,9 @@ mod tests {
                 FileSortOrder::None
             );
         }
-        // classic merge over hash-ordered files (layout switched off): no order
+        // ordinary modes never interpret metrics layout markers
         assert_eq!(
-            MergeMode::Classic.input_sort_order(&[legacy.clone(), sorted.clone()]),
-            FileSortOrder::None
-        );
-        assert_eq!(
-            MergeMode::Classic.input_sort_order(std::slice::from_ref(&legacy)),
+            MergeMode::Classic.input_sort_order(&[legacy, sorted]),
             FileSortOrder::TimestampDesc
         );
     }
