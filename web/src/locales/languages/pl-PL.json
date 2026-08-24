@@ -14758,8 +14758,7 @@
       "syntaxError": "Błąd składni SQL"
     },
     "hover": {
-      "deprecated": "**Przestarzałe** — preferuj funkcję kanoniczną.",
-      "duplicate": "Duplikuj pulpit nawigacyjny"
+      "deprecated": "**Przestarzałe** — preferuj funkcję kanoniczną."
     }
   }
 }

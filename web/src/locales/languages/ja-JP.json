@@ -14758,8 +14758,7 @@
       "syntaxError": "SQL 構文エラー"
     },
     "hover": {
-      "deprecated": "**非推奨** — 正規の関数を推奨します。",
-      "duplicate": "ダッシュボードを複製"
+      "deprecated": "**非推奨** — 正規の関数を推奨します。"
     }
   }
 }

@@ -14758,8 +14758,7 @@
       "syntaxError": "Erreur de syntaxe SQL"
     },
     "hover": {
-      "deprecated": "**Obsolète** — préférez la fonction canonique.",
-      "duplicate": "Dupliquer le tableau de bord"
+      "deprecated": "**Obsolète** — préférez la fonction canonique."
     }
   }
 }

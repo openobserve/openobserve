@@ -14758,8 +14758,7 @@
       "syntaxError": "Error de sintaxis SQL"
     },
     "hover": {
-      "deprecated": "**Obsoleto** — prefiera la función canónica.",
-      "duplicate": "Duplicar panel"
+      "deprecated": "**Obsoleto** — prefiera la función canónica."
     }
   }
 }

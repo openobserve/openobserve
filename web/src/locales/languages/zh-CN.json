@@ -14758,8 +14758,7 @@
       "syntaxError": "SQL 语法错误"
     },
     "hover": {
-      "deprecated": "**已弃用** — 请优先使用规范函数。",
-      "duplicate": "复制仪表盘"
+      "deprecated": "**已弃用** — 请优先使用规范函数。"
     }
   }
 }

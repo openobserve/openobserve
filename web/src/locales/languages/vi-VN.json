@@ -14758,8 +14758,7 @@
       "syntaxError": "Lỗi cú pháp SQL"
     },
     "hover": {
-      "deprecated": "**Không dùng nữa** — hãy ưu tiên hàm chuẩn.",
-      "duplicate": "Nhân bản Bảng tổng quan"
+      "deprecated": "**Không dùng nữa** — hãy ưu tiên hàm chuẩn."
     }
   }
 }

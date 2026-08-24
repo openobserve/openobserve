@@ -14758,8 +14758,7 @@
       "syntaxError": "Erro de sintaxe SQL"
     },
     "hover": {
-      "deprecated": "**Obsoleto** — prefira a função canônica.",
-      "duplicate": "Duplicar Painel"
+      "deprecated": "**Obsoleto** — prefira a função canônica."
     }
   }
 }

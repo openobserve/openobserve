@@ -14758,8 +14758,7 @@
       "syntaxError": "SQL sözdizimi hatası"
     },
     "hover": {
-      "deprecated": "**Kullanımdan kaldırıldı** — kanonik işlevi tercih edin.",
-      "duplicate": "Panoyu Çoğalt"
+      "deprecated": "**Kullanımdan kaldırıldı** — kanonik işlevi tercih edin."
     }
   }
 }

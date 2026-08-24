@@ -14758,8 +14758,7 @@
       "syntaxError": "SQL 語法錯誤"
     },
     "hover": {
-      "deprecated": "**已淘汰** — 請優先使用標準函式。",
-      "duplicate": "複製儀表板"
+      "deprecated": "**已淘汰** — 請優先使用標準函式。"
     }
   }
 }

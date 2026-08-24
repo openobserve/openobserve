@@ -14758,8 +14758,7 @@
       "syntaxError": "SQL-Syntaxfehler"
     },
     "hover": {
-      "deprecated": "**Veraltet** — die kanonische Funktion bevorzugen.",
-      "duplicate": "Dashboard duplizieren"
+      "deprecated": "**Veraltet** — die kanonische Funktion bevorzugen."
     }
   }
 }

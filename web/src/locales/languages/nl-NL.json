@@ -14758,8 +14758,7 @@
       "syntaxError": "SQL-syntaxfout"
     },
     "hover": {
-      "deprecated": "**Verouderd** — geef de voorkeur aan de canonieke functie.",
-      "duplicate": "Dashboard dupliceren"
+      "deprecated": "**Verouderd** — geef de voorkeur aan de canonieke functie."
     }
   }
 }

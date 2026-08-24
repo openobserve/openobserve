@@ -14758,8 +14758,7 @@
       "syntaxError": "Errore di sintassi SQL"
     },
     "hover": {
-      "deprecated": "**Deprecato** — preferisci la funzione canonica.",
-      "duplicate": "Duplica dashboard"
+      "deprecated": "**Deprecato** — preferisci la funzione canonica."
     }
   }
 }
