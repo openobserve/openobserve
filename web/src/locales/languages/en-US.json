@@ -12929,6 +12929,7 @@
     "ownership": "Ownership",
     "ownershipHint": "This team is paged for anything matching these identity paths. The most specific matching rule wins, so a namespace rule overrides a cluster rule.",
     "noOwnershipRules": "No ownership rules. This team is only paged by alerts that name it directly.",
+    "noOwnershipRulesOrg": "No ownership rules. Signals are only routed to a team when an alert names it directly.",
     "editOwnershipRule": "Edit ownership rule",
     "ruleUpdated": "Rule updated",
     "addOwnershipRule": "New rule",

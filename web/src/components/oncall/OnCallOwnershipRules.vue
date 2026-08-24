@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OEmptyState
           size="inline"
           preset="no-data"
-          :description="t('oncall.noOwnershipRules')"
+          :description="emptyDescription"
           data-test="oncall-ownership-empty"
         />
       </template>
@@ -180,6 +180,12 @@ const { t } = useI18nTyped();
 /// `compareRulePrecedence` mirrors the server's comparator; the endpoint hands
 /// them back in storage order, which would number the rows misleadingly.
 const ordered = computed(() => [...props.rules].sort(compareRulePrecedence));
+
+/// `showTeam` is also the signal for "org-scoped view" — no single team is in
+/// context there, so the empty state cannot claim to speak for one.
+const emptyDescription = computed(() =>
+  t(props.showTeam ? "oncall.noOwnershipRulesOrg" : "oncall.noOwnershipRules"),
+);
 
 const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
   {
