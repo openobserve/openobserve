@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "Utwórz nowy cel",
       "select": "Cel",
-      "loadError": "Błąd podczas pobierania celów."
+      "loadError": "Błąd podczas pobierania celów.",
+      "unsupportedType": "Nieobsługiwany typ — przepływy pracy obsługują tylko niestandardowe miejsca docelowe"
     },
     "function": {
       "createNew": "Utwórz nową funkcję",
       "createNewNoteWorkflow": "Uwaga: Funkcja zostanie utworzona, a następnie zostaniesz przekierowany do poprzedniego formularza, aby powiązać nowo utworzoną funkcję z przepływem pracy.",
       "select": "Wybierz funkcję",
       "loadError": "Nie udało się załadować funkcji",
+      "saved": "Funkcja zapisana pomyślnie",
+      "updated": "Funkcja zaktualizowana pomyślnie",
+      "saveError": "Nie udało się zapisać funkcji",
       "flatten": "Po spłaszczeniu",
       "guidelinesTitle": "Wytyczne dotyczące wykonywania funkcji:",
       "rbf": "RBF (Uruchom przed spłaszczeniem):",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "Uruchomienia przepływu pracy",
       "edit": "Edytuj przepływ pracy",
+      "debugInEditor": "Debuguj w edytorze",
       "staleGraphWarning": "Ten przepływ pracy został edytowany od czasu tego uruchomienia — {count} wykonany krok już nie istnieje, więc jego stan nie jest tutaj pokazany. | Ten przepływ pracy został edytowany od czasu tego uruchomienia — {count} wykonane kroki już nie istnieją, więc ich stan nie jest tutaj pokazany."
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "Sukces",
       "failed": "Niepowodzenie",
       "open": "Historia",
+      "openFullView": "Otwórz pełny widok uruchomień",
       "loadError": "Błąd podczas ładowania uruchomień",
       "loadRunError": "Błąd podczas ładowania tego uruchomienia"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "Wymagany jest wyzwalacz",
     "addStepRequired": "Dodaj co najmniej jeden krok po wyzwalaczu",
     "connectAllNodes": "Połącz wszystkie węzły przed zapisaniem",
-    "finishStepsBeforePublish": "Skonfiguruj wszystkie kroki przed publikacją",
+    "finishStepsBeforePublish": "{count} krok wymaga konfiguracji przed publikacją — podświetlony na płótnie. | {count} kroków wymaga konfiguracji przed publikacją — podświetlonych na płótnie.",
     "draft": "Wersja robocza",
     "saveDraft": "Zapisz jako wersję roboczą",
     "publish": "Opublikuj",
@@ -2698,6 +2704,11 @@
       "linkError": "Nie udało się połączyć alertów."
     },
     "chooseTrigger": "Wybierz wyzwalacz",
+    "start": {
+      "triggerHint": "Wybierz zdarzenie, które uruchamia Twój przepływ pracy",
+      "chooseAction": "Wybierz akcję",
+      "actionHint": "Wybierz, co się dzieje po wyzwalaczu"
+    },
     "node": {
       "kindTrigger": "Wyzwalacz",
       "kindLogic": "Logika",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "Pola specyficzne dla zdarzenia",
       "incidentNoExtraFields": "To zdarzenie nie dodaje żadnych pól poza standardowymi.",
       "conditionNoteTitle": "Wytyczne dotyczące warunków",
+      "functionFlattenTitle": "Przed vs po spłaszczeniu",
       "conditionNoteEmpty": "Aby sprawdzić pustą wartość, użyj \"\". Przykład:",
       "conditionNoteNull": "Aby sprawdzić wartość null, użyj null. Przykład:",
       "conditionNoteCustom": "Aby dodać niestandardową kolumnę, wpisz jej nazwę i naciśnij Enter.",
@@ -2745,19 +2757,56 @@
       "enable": "Włącz krok",
       "disabledBadge": "Wyłączony",
       "incompleteBadge": "Skonfiguruj później",
-      "destinationSetUpLater": "Skonfiguruj później",
-      "destinationSetUpLaterPrompt": "Nie masz jeszcze miejsca docelowego? Włącz to, aby skonfigurować je później — możesz zapisać wersję roboczą i przetestować teraz.",
-      "destinationSetUpLaterActive": "Miejsce docelowe jest na razie pomijane — nazwa i komentarz nadal zostaną zapisane. Będziesz potrzebować miejsca docelowego przed publikacją.",
-      "functionSetUpLater": "Skonfiguruj później",
-      "functionSetUpLaterPrompt": "Nie masz jeszcze funkcji? Włącz to, aby skonfigurować ją później — możesz zapisać wersję roboczą i przetestować teraz.",
-      "functionSetUpLaterActive": "Funkcja jest na razie pomijana — nazwa i komentarz nadal zostaną zapisane. Będziesz potrzebować funkcji przed publikacją."
+      "unsavedFnTitle": "Niezapisane zmiany funkcji",
+      "unsavedFnMessage": "Ten krok ma kod funkcji, który nie został zapisany w Twojej bibliotece. Zapisz go, odrzuć zmiany lub kontynuuj edycję.",
+      "unsavedFnSave": "Zapisz funkcję",
+      "unsavedFnDiscard": "Odrzuć zmiany",
+      "unsavedFnKeep": "Kontynuuj edycję"
     },
     "commonFieldsAbove": "Wspólne pola powyżej",
     "canvas": {
       "undo": "Cofnij",
       "tidyUp": "Uporządkuj",
-      "insertStep": "Wstaw krok",
-      "deleteEdge": "Usuń połączenie"
+      "edgeDeleteHint": "Naciśnij Backspace/Delete, aby usunąć połączenie"
+    },
+    "ndv": {
+      "input": "Wejście",
+      "output": "Wyjście",
+      "config": "Konfiguracja",
+      "noInput": "Brak rekordów wejściowych.",
+      "noOutput": "Nie przekazano żadnych rekordów.",
+      "prevStep": "Poprzedni krok · {name}",
+      "nextStep": "Następny krok · {name}",
+      "prevStepBtn": "Poprzedni krok",
+      "nextStepBtn": "Następny krok",
+      "collapseSteps": "Zwiń kroki",
+      "expandSteps": "Rozwiń kroki",
+      "inputTag": "Wejście",
+      "openStep": "Otwórz {name}",
+      "runToView": "Uruchom test, aby zobaczyć te dane.",
+      "noBranchItems": "Brak elementów w tej gałęzi.",
+      "noUpstream": "Brak kroków nadrzędnych.",
+      "noRunYet": "Brak uruchomień.",
+      "runLabel": "Uruchom",
+      "switchRun": "Przełącz uruchomienie",
+      "notInRun": "Ten krok nie jest uwzględniony w tym uruchomieniu.",
+      "runTest": "Uruchom test",
+      "noItems": "Brak elementów",
+      "itemsCount": "{count} element | {count} elementów",
+      "viewTable": "Tabela",
+      "viewJson": "JSON",
+      "itemN": "Element {n}",
+      "executeStep": "Uruchom krok",
+      "sample": "Próbka",
+      "editStep": "Edytuj krok",
+      "testInputHint": "Dane wejściowe testu — edytuj, a następnie uruchom krok.",
+      "noRunsList": "Brak uruchomień."
+    },
+    "runOverlay": {
+      "banner": "Wyświetlanie danych kroku z poprzedniego uruchomienia ({run}). Możesz swobodnie edytować — to uruchomienie nigdy nie jest zmieniane.",
+      "clear": "Wyczyść dane uruchomienia",
+      "ghostNodes": "{count} krok z tego uruchomienia już nie istnieje w workflow, więc jego status nie jest wyświetlany. | {count} kroków z tego uruchomienia już nie istnieją w workflow, więc ich status nie jest wyświetlany.",
+      "missingNode": "Ten krok nie istnieje już w tym workflow — został usunięty po tym uruchomieniu."
     },
     "unsaved": {
       "title": "Niezapisane zmiany",
@@ -2771,7 +2820,20 @@
       "expand": "Rozwiń",
       "close": "Wyczyść i zamknij wyniki",
       "nodesTitle": "Kroki",
-      "empty": "Uruchom test, aby zobaczyć wyniki kroków tutaj."
+      "empty": "Uruchom test, aby zobaczyć wyniki kroków tutaj.",
+      "openNode": "Otwórz węzeł",
+      "viewConfig": "Zobacz konfigurację",
+      "hideConfig": "Ukryj konfigurację",
+      "noConfig": "Brak konfiguracji",
+      "functionLabel": "Funkcja",
+      "destinationLabel": "Cel",
+      "destinationUnsupported": "Nieobsługiwany typ",
+      "destinationMissing": "Ten cel nie istnieje już lub nie można go odczytać.",
+      "headersLabel": "Nagłówki",
+      "templateLabel": "Szablon",
+      "outputFormatLabel": "Format wyjściowy",
+      "tlsVerifyLabel": "Weryfikacja TLS",
+      "tlsDisabled": "Wyłączone"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "Błąd: Wyszukiwanie SQL zostało anulowane."
   },
   "alerts": {
+    "allAlerts": "Wszystkie alerty",
     "compositeAlert": "Złożony",
     "import": {
       "anomalyImportSuccess": "Wykrywanie anomalii - {index}: \"{name}\" zaimportowano pomyślnie",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "Utwórz alert",
           "toast": "Zapytanie zaimportowane z panelu pulpitu: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Dostosuj w edytorze",
+          "toast": "Z biblioteki alertów: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "Używane przez {destinations} · {alerts}",
     "impactDestination": "Używane przez {alerts}"
   },
+  "alert_library": {
+    "header": "Biblioteka alertów",
+    "subtitle": "Wyselekcjonowane, gotowe do instalacji alerty, dopasowane do danych, które już pozyskujesz",
+    "sectionTab": "Biblioteka",
+    "contribute": "Współtwórz na GitHub",
+    "searchPlaceholder": "Szukaj po nazwie, opisie lub strumieniu",
+    "searchLabel": "Przeszukaj bibliotekę alertów",
+    "categories": "Kategoria",
+    "searchCategories": "Szukaj kategorii",
+    "searchCategoriesAria": "Wyszukaj filtry kategorii",
+    "noCategoryMatch": "Brak pasujących kategorii.",
+    "selectedCount": "{count} wybranych",
+    "facetAria": "{label}, {count} alertów",
+    "severity": "Poważność",
+    "severityAll": "Wszystkie",
+    "severityCritical": "Krytyczny",
+    "severityWarning": "Ostrzeżenie",
+    "severityInfo": "Informacja",
+    "statReady": "Gotowe do instalacji",
+    "statNeedsData": "Nie pozyskiwane",
+    "statAll": "Wszystkie",
+    "notIngested": "Nie pozyskiwane: {stream}",
+    "notIngestedHint": "Ta organizacja nie otrzymuje strumienia {stream}, więc ten alert nigdy nie zostanie uruchomiony. Zainstaluj go mimo to, a zacznie działać, gdy dane dotrą.",
+    "alertCount": "{count} alert | {count} alertów",
+    "noCollectorTitle": "Nic tu jeszcze nie pasuje do twoich danych",
+    "noCollectorDescription": "Żaden z tych {count} alertów nie odpytuje strumienia, który ta organizacja otrzymuje. Wyślij telemetrię {group} do OpenObserve, a pojawią się tutaj.",
+    "setupGuide": "Przewodnik po pozyskiwaniu danych",
+    "emptyLibraryTitle": "Biblioteka alertów jest pusta",
+    "emptyLibraryDescription": "Katalog został załadowany, ale nie zawiera alertów. To problem z publikacją, nie z filtrem — spróbuj ponownie za chwilę.",
+    "noMatchesTitle": "Żadne alerty nie pasują do tych filtrów",
+    "noMatchesDescription": "Wypróbuj inną kategorię, powagę lub frazę wyszukiwania.",
+    "clearFilters": "Wyczyść filtry",
+    "loadFailedTitle": "Nie można było załadować biblioteki alertów",
+    "retry": "Ponów",
+    "openDetails": "Otwórz {title}",
+    "drawer": {
+      "dataAvailable": "Dane dostępne",
+      "streamNotFound": "Nie znaleziono strumienia",
+      "detects": "Co wykrywa",
+      "noDescription": "Brak opisu w bibliotece.",
+      "needsDataCallout": "Ten alert zapytuje o {stream}, którego ta organizacja nie odbiera. Zainstalowanie go teraz utworzy alert, który nigdy nie zadziała.",
+      "query": "Zapytanie",
+      "stream": "Strumień",
+      "streamType": "Typ strumienia",
+      "metricCondition": "Warunek metryki",
+      "matchCount": "Wymagane pasujące wiersze",
+      "previewBlocked": "{stream} nie jest strumieniem w tej organizacji, więc nie ma czego oceniać.",
+      "wouldTrigger": "Zadziałałby",
+      "wouldNotTrigger": "Nie zadziałałby",
+      "loading": "Wczytywanie tego alertu z biblioteki",
+      "loadFailed": "Nie można było wczytać tego alertu z biblioteki.",
+      "customize": "Dostosuj w edytorze",
+      "customizeHint": "Otwiera standardowy edytor alertów wypełniony wstępnie tym alertem.",
+      "customizeFailed": "Nie można było otworzyć tego alertu w edytorze.",
+      "install": "Zainstaluj",
+      "neverIngested": "Jeszcze brak danych",
+      "neverIngestedCallout": "{stream} istnieje, ale nigdy nie otrzymał danych, więc ten alert nie ma na czym zadziałać.",
+      "lastData": "Ostatnie dane {when}",
+      "staleCallout": "{stream} ostatnio otrzymał dane {when}. Ten alert pozostanie cichy do czasu wznowienia pozyskiwania danych.",
+      "unknownTime": "o nieznanym czasie"
+    },
+    "install": {
+      "title": "Zainstaluj z biblioteki",
+      "subtitle": "Wybierz, gdzie będą powiadamiać alerty, które alerty zainstalować i gdzie zostaną umieszczone.",
+      "stepDestination": "Miejsce docelowe",
+      "stepAlerts": "Alerty",
+      "stepFolder": "Folder",
+      "stepTune": "Dostrajanie",
+      "stepInstall": "Zainstaluj",
+      "destinationIntro": "Każdy alert w tej partii będzie powiadamiać miejsce docelowe wybrane tutaj. Pliki biblioteki wymieniają miejsca docelowe organizacji, z której zostały wyeksportowane, a takie nie istnieją w Twojej.",
+      "destinationLabel": "Miejsce docelowe",
+      "destinationPlaceholder": "Wybierz miejsce docelowe",
+      "destinationsLoadFailed": "Nie można było wczytać Twoich istniejących miejsc docelowych.",
+      "retry": "Spróbuj ponownie",
+      "destinationsNoneBody": "Ta organizacja nie ma jeszcze miejsc docelowych dla alertów, więc te alerty nie mają gdzie powiadamiać. Utwórz jedno na stronie Miejsc docelowych, a potem wróć i wybierz je tutaj.",
+      "openDestinations": "Otwórz miejsca docelowe",
+      "selectAll": "Zaznacz wszystko",
+      "clear": "Wyczyść",
+      "selectedCount": "{count} z {total} wybranych",
+      "folderIntro": "Zainstalowane alerty są umieszczane tutaj. Utwórz folder przyciskiem +, jeśli ta partia zasługuje na własny.",
+      "tuneToggle": "Ustaw to dla każdego alertu w tej partii",
+      "tuneHint": "Tylko te dwie są bezpieczne do ustawienia dla całej partii. Progi pozostają ustawiane indywidualnie dla alertu — zmień jeden, otwierając ten alert i instalując go osobno.",
+      "frequency": "Uruchamiaj co",
+      "silence": "Wycisz na",
+      "minutes": "min",
+      "summaryTuningNone": "Domyślne ustawienia biblioteki",
+      "summaryTuningOverride": "Co {frequency} min, wyciszony na {silence} min",
+      "run": "Zainstaluj {count} alert | Zainstaluj {count} alertów",
+      "retryFailed": "Ponów próbę dla {count} błędu | Ponów próbę dla {count} błędów",
+      "allInstalled": "{count} alert zainstalowano | {count} alertów zainstalowano",
+      "someFailed": "{installed} zainstalowano, {failed} nieudanych",
+      "unknownError": "Nie można było utworzyć alertu.",
+      "unreadableConditions": "Warunki filtrów tego alertu są w formacie, którego ta wersja nie może odczytać. Zainstalowanie go utworzy alert bez filtra, więc został pominięty.",
+      "back": "Wstecz",
+      "next": "Dalej",
+      "cancel": "Anuluj",
+      "done": "Gotowe"
+    },
+    "error": {
+      "network": "Nie można było połączyć się z biblioteką. Sprawdź połączenie sieciowe i spróbuj ponownie.",
+      "http": "Serwer biblioteki zwrócił błąd. Spróbuj ponownie za chwilę.",
+      "unparseable": "Biblioteka odpowiedziała czymś, co nie jest katalogiem.",
+      "unsupported_version": "Ten katalog biblioteki jest nowszy, niż może odczytać ta wersja OpenObserve. Zaktualizuj, aby go przeglądać.",
+      "malformed": "Katalog biblioteki jest niekompletny lub uszkodzony."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Eksportuj szablon",
     "selected": "Wybrane",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "Treść szablonu *",
     "importTypeLabel": "Typ szablonu *",
     "importTitleLabel": "Tytuł szablonu *",
-    "header": "Szablony",
+    "header": "Szablony miejsc docelowych",
     "add": "Nowy szablon",
     "edit": "Edytuj",
     "name": "Nazwa",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "Błąd podczas ładowania miejsc docelowych"
   },
   "alert_destinations": {
+    "sectionTab": "Miejsca docelowe",
     "chooseTypeTitle": "Wybierz typ",
     "selectDestinationType": "Wybierz typ miejsca docelowego",
     "connectionStepTitle": "Połączenie",

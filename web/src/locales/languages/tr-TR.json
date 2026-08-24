@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "Yeni Hedef Oluştur",
       "select": "Hedef",
-      "loadError": "Hedefler alınırken hata oluştu."
+      "loadError": "Hedefler alınırken hata oluştu.",
+      "unsupportedType": "Desteklenmeyen Tür — İş Akışları Yalnızca Özel Hedefleri Destekler"
     },
     "function": {
       "createNew": "Yeni İşlev Oluştur",
       "createNewNoteWorkflow": "Not: İşlev oluşturulacak, ardından yeni oluşturulan işlevi iş akışıyla ilişkilendirmek için önceki forma yönlendirileceksiniz.",
       "select": "İşlev Seç",
       "loadError": "İşlevler yüklenemedi",
+      "saved": "İşlev Başarıyla Kaydedildi",
+      "updated": "İşlev Başarıyla Güncellendi",
+      "saveError": "İşlev Kaydedilemedi",
       "flatten": "Düzleştirmeden Sonra",
       "guidelinesTitle": "İşlev Yürütme Yönergeleri:",
       "rbf": "RBF (Düzleştirmeden Önce Çalıştır):",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "İş Akışı Çalıştırmaları",
       "edit": "İş Akışını Düzenle",
+      "debugInEditor": "Düzenleyicide Hata Ayıkla",
       "staleGraphWarning": "Bu iş akışı bu çalıştırmadan bu yana düzenlendi — yürüttüğü {count} adım artık mevcut değil, bu yüzden durumu burada gösterilmiyor. | Bu iş akışı bu çalıştırmadan bu yana düzenlendi — yürüttüğü {count} adım artık mevcut değil, bu yüzden durumu burada gösterilmiyor."
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "Başarılı",
       "failed": "Başarısız",
       "open": "Geçmiş",
+      "openFullView": "Tüm Çalıştırmalar Görünümünü Aç",
       "loadError": "Yürütmeler Yüklenirken Hata",
       "loadRunError": "Bu Çalıştırma Yüklenirken Hata"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "Bir Tetikleyici Gerekli",
     "addStepRequired": "Tetikleyiciden Sonra En Az Bir Adım Ekleyin",
     "connectAllNodes": "Kaydetmeden Önce Tüm Düğümleri Bağlayın",
-    "finishStepsBeforePublish": "Yayınlamadan önce tüm adımları yapılandırmayı bitirin",
+    "finishStepsBeforePublish": "{count} adım yayınlanmadan önce kurulum gerektiriyor — tuvalde vurgulanmıştır. | {count} adım yayınlanmadan önce kurulum gerektiriyor — tuvalde vurgulanmıştır.",
     "draft": "Taslak",
     "saveDraft": "Taslak Olarak Kaydet",
     "publish": "Yayınla",
@@ -2698,6 +2704,11 @@
       "linkError": "Uyarılar Bağlanamıyor."
     },
     "chooseTrigger": "Tetikleyici Seç",
+    "start": {
+      "triggerHint": "İş akışınızı başlatan olayı seçin",
+      "chooseAction": "Bir Eylem Seçin",
+      "actionHint": "Tetikleyiciden sonra ne olacağını seçin"
+    },
     "node": {
       "kindTrigger": "Tetikleyici",
       "kindLogic": "Mantık",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "Olay Özel Alanları",
       "incidentNoExtraFields": "Bu olay, ortak alanların dışında herhangi bir alan eklemez.",
       "conditionNoteTitle": "Koşul Yönergeleri",
+      "functionFlattenTitle": "Düzleştirme Öncesi ve Sonrası",
       "conditionNoteEmpty": "Boş Bir Değer Kontrol Etmek İçin \"\" Kullanın. Örnek:",
       "conditionNoteNull": "Null Bir Değer Kontrol Etmek İçin null Kullanın. Örnek:",
       "conditionNoteCustom": "Özel Bir Sütun Eklemek İçin Adını Yazın ve Enter'a Basın.",
@@ -2745,19 +2757,56 @@
       "enable": "Adımı Etkinleştir",
       "disabledBadge": "Devre Dışı",
       "incompleteBadge": "Daha Sonra Kur",
-      "destinationSetUpLater": "Daha Sonra Kur",
-      "destinationSetUpLaterPrompt": "Henüz bir hedefiniz yok mu? Bunu açın ve daha sonra ayarlayın — şimdi taslak kaydedip test edebilirsiniz.",
-      "destinationSetUpLaterActive": "Hedef şimdilik atlanıyor — ad ve yorum yine de kaydedilir. Yayınlamadan önce bir hedefe ihtiyacınız olacak.",
-      "functionSetUpLater": "Daha Sonra Kur",
-      "functionSetUpLaterPrompt": "Henüz bir fonksiyonunuz yok mu? Bunu açın ve daha sonra ayarlayın — şimdi taslak kaydedip test edebilirsiniz.",
-      "functionSetUpLaterActive": "Fonksiyon şimdilik atlanıyor — ad ve yorum yine de kaydedilir. Yayınlamadan önce bir fonksiyona ihtiyacınız olacak."
+      "unsavedFnTitle": "Kaydedilmemiş İşlev Değişiklikleri",
+      "unsavedFnMessage": "Bu adım, kitaplığınıza kaydedilmemiş işlev kodu içeriyor. Kaydedin, değişiklikleri atın veya düzenlemeye devam edin.",
+      "unsavedFnSave": "İşlevi Kaydet",
+      "unsavedFnDiscard": "Değişiklikleri At",
+      "unsavedFnKeep": "Düzenlemeye Devam Et"
     },
     "commonFieldsAbove": "yukarıdaki ortak alanlar",
     "canvas": {
       "undo": "Geri Al",
       "tidyUp": "Toparla",
-      "insertStep": "Adım Ekle",
-      "deleteEdge": "Bağlantıyı Sil"
+      "edgeDeleteHint": "Kenarı kaldırmak için Backspace/Delete tuşlarına basın"
+    },
+    "ndv": {
+      "input": "Giriş",
+      "output": "Çıktı",
+      "config": "Yapılandırma",
+      "noInput": "Giriş kaydı yok.",
+      "noOutput": "İletilen kayıt yok.",
+      "prevStep": "Önceki Adım · {name}",
+      "nextStep": "Sonraki Adım · {name}",
+      "prevStepBtn": "Önceki Adım",
+      "nextStepBtn": "Sonraki Adım",
+      "collapseSteps": "Adımları Daralt",
+      "expandSteps": "Adımları Genişlet",
+      "inputTag": "Giriş",
+      "openStep": "{name} Aç",
+      "runToView": "Bu Verileri Görüntülemek İçin Bir Test Çalıştırın.",
+      "noBranchItems": "Bu Daldaki Öğe Yok.",
+      "noUpstream": "Yukarı Akış Adımı Yok.",
+      "noRunYet": "Henüz Çalıştırma Yok.",
+      "runLabel": "Çalıştır",
+      "switchRun": "Çalıştırmayı Değiştir",
+      "notInRun": "Bu Adım Bu Çalıştırmaya Dahil Değil.",
+      "runTest": "Testi Çalıştır",
+      "noItems": "Öğe Yok",
+      "itemsCount": "{count} Öğe | {count} Öğe",
+      "viewTable": "Tablo",
+      "viewJson": "JSON",
+      "itemN": "Öğe {n}",
+      "executeStep": "Adımı Çalıştır",
+      "sample": "Örnek",
+      "editStep": "Adımı Düzenle",
+      "testInputHint": "Test Girişi — Düzenleyin, Ardından Adımı Çalıştırın.",
+      "noRunsList": "Henüz Çalıştırma Yok."
+    },
+    "runOverlay": {
+      "banner": "Geçmiş bir çalıştırmadan ({run}) adım verileri gösteriliyor. Serbestçe düzenleyebilirsiniz — bu çalıştırma asla değiştirilmez.",
+      "clear": "Çalıştırma Verilerini Temizle",
+      "ghostNodes": "Bu çalıştırmadaki {count} adım artık iş akışında mevcut değil, bu yüzden durumu gösterilmiyor. | Bu çalıştırmadaki {count} adım artık iş akışında mevcut değil, bu yüzden durumları gösterilmiyor.",
+      "missingNode": "Bu adım artık bu iş akışında yok — bu çalıştırmadan sonra kaldırıldı."
     },
     "unsaved": {
       "title": "Kaydedilmemiş Değişiklikler",
@@ -2771,7 +2820,20 @@
       "expand": "Genişlet",
       "close": "Sonuçları Temizle ve Kapat",
       "nodesTitle": "Adımlar",
-      "empty": "Burada adım sonuçlarını görmek için bir test çalıştırın."
+      "empty": "Burada adım sonuçlarını görmek için bir test çalıştırın.",
+      "openNode": "Düğümü Aç",
+      "viewConfig": "Yapılandırmayı Görüntüle",
+      "hideConfig": "Yapılandırmayı Gizle",
+      "noConfig": "Yapılandırma Yok",
+      "functionLabel": "İşlev",
+      "destinationLabel": "Hedef",
+      "destinationUnsupported": "Desteklenmeyen Tür",
+      "destinationMissing": "Bu Hedef Artık Mevcut Değil veya Okunamıyor.",
+      "headersLabel": "Başlıklar",
+      "templateLabel": "Şablon",
+      "outputFormatLabel": "Çıktı Biçimi",
+      "tlsVerifyLabel": "TLS Doğrulaması",
+      "tlsDisabled": "Devre Dışı"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "Hata: Search SQL iptal edildi."
   },
   "alerts": {
+    "allAlerts": "Tüm Uyarılar",
     "compositeAlert": "Bileşik",
     "import": {
       "anomalyImportSuccess": "Anomali Tespiti - {index}: \"{name}\" başarıyla içe aktarıldı",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "Uyarı Oluştur",
           "toast": "Sorgu gösterge panelinden aktarıldı: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Düzenleyicide Özelleştir",
+          "toast": "Uyarı Kitaplığından: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "Kullanan: {destinations} · {alerts}",
     "impactDestination": "Kullanan: {alerts}"
   },
+  "alert_library": {
+    "header": "Uyarı Kitaplığı",
+    "subtitle": "Özenle seçilmiş, kuruluma hazır uyarılar; halihazırda aldığınız verilerle eşleştirilir.",
+    "sectionTab": "Kitaplık",
+    "contribute": "GitHub'da Katkıda Bulun",
+    "searchPlaceholder": "Ada, açıklamaya veya akışa göre ara",
+    "searchLabel": "Uyarı kitaplığını ara",
+    "categories": "Kategori",
+    "searchCategories": "Kategorileri ara",
+    "searchCategoriesAria": "Kategori filtrelerini ara",
+    "noCategoryMatch": "Eşleşen kategori yok.",
+    "selectedCount": "{count} seçili",
+    "facetAria": "{label}, {count} uyarı",
+    "severity": "Önem Düzeyi",
+    "severityAll": "Tümü",
+    "severityCritical": "Kritik",
+    "severityWarning": "Uyarı",
+    "severityInfo": "Bilgi",
+    "statReady": "Kuruluma Hazır",
+    "statNeedsData": "Alınmadı",
+    "statAll": "Tümü",
+    "notIngested": "Alınmadı: {stream}",
+    "notIngestedHint": "Bu kuruluş {stream} akışını almıyor, bu yüzden bu uyarı hiç tetiklenmez. Yine de kurun; veri geldiğinde çalışmaya başlayacaktır.",
+    "alertCount": "{count} uyarı | {count} uyarı",
+    "noCollectorTitle": "Burada henüz verilerinizle eşleşen bir şey yok",
+    "noCollectorDescription": "Bu {count} uyarıdan hiçbiri, bu kuruluşun aldığı bir akışı sorgulamıyor. OpenObserve'e {group} telemetrisi gönderin, böylece burada görünmeye başlarlar.",
+    "setupGuide": "Veri Alım Rehberi",
+    "emptyLibraryTitle": "Uyarı kitaplığı boş",
+    "emptyLibraryDescription": "Katalog yüklendi ancak uyarı içermiyor. Bu bir filtre sorunu değil, bir yayınlama sorunudur — kısa süre sonra tekrar deneyin.",
+    "noMatchesTitle": "Bu filtrelerle eşleşen uyarı yok",
+    "noMatchesDescription": "Başka bir kategori, önem düzeyi veya arama terimi deneyin.",
+    "clearFilters": "Filtreleri Temizle",
+    "loadFailedTitle": "Uyarı kitaplığı yüklenemedi",
+    "retry": "Yeniden Dene",
+    "openDetails": "{title} Aç",
+    "drawer": {
+      "dataAvailable": "Veri mevcut",
+      "streamNotFound": "Akış bulunamadı",
+      "detects": "Neyi algılar",
+      "noDescription": "Kütüphanede açıklama yok.",
+      "needsDataCallout": "Bu uyarı, bu kuruluşun almadığı {stream} akışını sorgular. Şimdi kurarsanız asla tetiklenmeyecek bir uyarı oluşturur.",
+      "query": "Sorgu",
+      "stream": "Akış",
+      "streamType": "Akış türü",
+      "metricCondition": "Metrik koşulu",
+      "matchCount": "Eşleşmesi gereken satırlar",
+      "previewBlocked": "{stream} bu kuruluşta bir akış değildir, bu yüzden değerlendirilecek bir şey yok.",
+      "wouldTrigger": "Tetiklenir",
+      "wouldNotTrigger": "Tetiklenmez",
+      "loading": "Bu uyarı kütüphaneden yükleniyor",
+      "loadFailed": "Bu uyarı kütüphaneden yüklenemedi.",
+      "customize": "Düzenleyicide özelleştir",
+      "customizeHint": "Bu uyarıyla önceden doldurulmuş standart uyarı düzenleyicisini açar.",
+      "customizeFailed": "Bu uyarı düzenleyicide açılamadı.",
+      "install": "Kur",
+      "neverIngested": "Henüz veri yok",
+      "neverIngestedCallout": "{stream} mevcut ancak hiç veri almadı, bu yüzden bu uyarının tetiklenmesi için bir şey yok.",
+      "lastData": "Son veri {when}",
+      "staleCallout": "{stream} en son {when} veri aldı. Bu uyarı, veri alımı yeniden başlayana kadar sessiz kalacak.",
+      "unknownTime": "bilinmeyen bir zamanda"
+    },
+    "install": {
+      "title": "Kütüphaneden kur",
+      "subtitle": "Uyarıların nereye bildirim göndereceğini, hangi uyarıların kurulacağını ve nereye dosyalanacağını seçin.",
+      "stepDestination": "Hedef",
+      "stepAlerts": "Uyarılar",
+      "stepFolder": "Klasör",
+      "stepTune": "Ayarla",
+      "stepInstall": "Kur",
+      "destinationIntro": "Bu gruptaki her uyarı, burada seçtiğiniz hedefe bildirim gönderir. Kütüphane dosyaları, dışa aktarıldıkları kuruluşun hedeflerini belirtir; bu hedefler sizin kuruluşunuzda mevcut değildir.",
+      "destinationLabel": "Hedef",
+      "destinationPlaceholder": "Bir hedef seçin",
+      "destinationsLoadFailed": "Mevcut hedefleriniz yüklenemedi.",
+      "retry": "Tekrar dene",
+      "destinationsNoneBody": "Bu kuruluşun henüz uyarı hedefi yok, bu nedenle bu uyarıların bildirim göndereceği bir yer yok. Hedefler sayfasında bir hedef oluşturun, ardından geri gelin ve buradan seçin.",
+      "openDestinations": "Hedefleri Aç",
+      "selectAll": "Tümünü seç",
+      "clear": "Temizle",
+      "selectedCount": "{count} / {total} seçildi",
+      "folderIntro": "Kurulan uyarılar buraya dosyalanır. Bu grup kendi klasörünü hak ediyorsa + düğmesinden bir klasör oluşturun.",
+      "tuneToggle": "Bunları bu gruptaki her uyarı için ayarla",
+      "tuneHint": "Bir grup için yalnızca bu ikisini ayarlamak güvenlidir. Eşikler uyarı başına kalır — birini değiştirmek için o uyarıyı açıp tek başına kurun.",
+      "frequency": "Çalıştırma aralığı",
+      "silence": "Susturma süresi",
+      "minutes": "dakika",
+      "summaryTuningNone": "Kütüphane varsayılanları",
+      "summaryTuningOverride": "Her {frequency} dakikada bir, {silence} dakika susturulmuş",
+      "run": "{count} uyarı kur | {count} uyarı kur",
+      "retryFailed": "{count} hatayı yeniden dene | {count} hatayı yeniden dene",
+      "allInstalled": "{count} uyarı kuruldu | {count} uyarı kuruldu",
+      "someFailed": "{installed} kuruldu, {failed} başarısız",
+      "unknownError": "Uyarı oluşturulamadı.",
+      "unreadableConditions": "Bu uyarının filtre koşulları, bu sürümün okuyamadığı bir biçimde. Yüklemek, filtresiz bir uyarı oluşturacağı için atlandı.",
+      "back": "Geri",
+      "next": "İleri",
+      "cancel": "İptal",
+      "done": "Tamam"
+    },
+    "error": {
+      "network": "Kitaplığa ulaşılamadı. Ağ bağlantınızı kontrol edip tekrar deneyin.",
+      "http": "Kitaplık sunucusu bir hata döndürdü. Birazdan tekrar deneyin.",
+      "unparseable": "Kitaplık, katalog olmayan bir şeyle yanıt verdi.",
+      "unsupported_version": "Bu kitaplık kataloğu, bu OpenObserve sürümünün okuyabileceğinden daha yeni. Göz atmak için yükseltin.",
+      "malformed": "Kitaplık kataloğu eksik veya hasarlı."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Şablonu Dışa Aktar",
     "selected": "seçili",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "Şablon Gövdesi *",
     "importTypeLabel": "Şablon Türü *",
     "importTitleLabel": "Şablon Başlığı *",
-    "header": "Şablonlar",
+    "header": "Hedef Şablonları",
     "add": "Şablon Ekle",
     "edit": "Düzenle",
     "name": "İsim",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "Hedefler yüklenirken hata"
   },
   "alert_destinations": {
+    "sectionTab": "Hedefler",
     "chooseTypeTitle": "Tür Seçin",
     "selectDestinationType": "Hedef Türü Seçin",
     "connectionStepTitle": "Bağlantı",

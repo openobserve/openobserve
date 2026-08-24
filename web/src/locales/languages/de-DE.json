@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "Neues Ziel erstellen",
       "select": "Ziel",
-      "loadError": "Fehler beim Abrufen der Ziele."
+      "loadError": "Fehler beim Abrufen der Ziele.",
+      "unsupportedType": "Nicht unterstützter Typ — Workflows unterstützen nur benutzerdefinierte Ziele"
     },
     "function": {
       "createNew": "Neue Funktion erstellen",
       "createNewNoteWorkflow": "Hinweis: Die Funktion wird erstellt, dann werden Sie zum vorherigen Formular weitergeleitet, um die neu erstellte Funktion mit dem Workflow zu verknüpfen.",
       "select": "Funktion auswählen",
       "loadError": "Fehler beim Laden der Funktionen",
+      "saved": "Funktion erfolgreich gespeichert",
+      "updated": "Funktion erfolgreich aktualisiert",
+      "saveError": "Speichern der Funktion fehlgeschlagen",
       "flatten": "Nach der Abflachung",
       "guidelinesTitle": "Richtlinien zur Funktionsausführung:",
       "rbf": "RBF (Ausführung vor der Abflachung):",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "Workflow-Ausführungen",
       "edit": "Workflow bearbeiten",
+      "debugInEditor": "Im Editor debuggen",
       "staleGraphWarning": "Dieser Workflow wurde seit diesem Lauf bearbeitet — der {count} Schritt, den er ausgeführt hat, existiert nicht mehr, daher wird sein Status hier nicht angezeigt. | Dieser Workflow wurde seit diesem Lauf bearbeitet — die {count} Schritte, die er ausgeführt hat, existieren nicht mehr, daher wird ihr Status hier nicht angezeigt."
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "Erfolg",
       "failed": "Fehlgeschlagen",
       "open": "Verlauf",
+      "openFullView": "Vollständige Ausführungsansicht öffnen",
       "loadError": "Fehler beim Laden der Ausführungen",
       "loadRunError": "Fehler beim Laden dieser Ausführung"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "Ein Trigger ist erforderlich",
     "addStepRequired": "Fügen Sie mindestens einen Schritt nach dem Trigger hinzu",
     "connectAllNodes": "Verbinden Sie alle Knoten vor dem Speichern",
-    "finishStepsBeforePublish": "Schließe die Konfiguration aller Schritte ab, bevor du veröffentlichst",
+    "finishStepsBeforePublish": "{count} Schritt muss vor der Veröffentlichung eingerichtet werden — auf der Leinwand hervorgehoben. | {count} Schritte müssen vor der Veröffentlichung eingerichtet werden — auf der Leinwand hervorgehoben.",
     "draft": "Entwurf",
     "saveDraft": "Als Entwurf speichern",
     "publish": "Veröffentlichen",
@@ -2698,6 +2704,11 @@
       "linkError": "Alarme konnten nicht verknüpft werden."
     },
     "chooseTrigger": "Trigger auswählen",
+    "start": {
+      "triggerHint": "Wählen Sie das Ereignis aus, das Ihren Workflow startet",
+      "chooseAction": "Aktion auswählen",
+      "actionHint": "Wählen Sie, was nach dem Trigger passiert"
+    },
     "node": {
       "kindTrigger": "Auslöser",
       "kindLogic": "Logik",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "Ereignisspezifische Felder",
       "incidentNoExtraFields": "Dieses Ereignis fügt keine Felder über die üblichen hinaus hinzu.",
       "conditionNoteTitle": "Richtlinien für Bedingungen",
+      "functionFlattenTitle": "Vor vs. nach Flattening",
       "conditionNoteEmpty": "Um einen leeren Wert zu prüfen, verwenden Sie \"\". Beispiel:",
       "conditionNoteNull": "Um einen Null-Wert zu prüfen, verwenden Sie null. Beispiel:",
       "conditionNoteCustom": "Um eine benutzerdefinierte Spalte hinzuzufügen, geben Sie ihren Namen ein und drücken Sie die Eingabetaste.",
@@ -2745,19 +2757,56 @@
       "enable": "Schritt aktivieren",
       "disabledBadge": "Deaktiviert",
       "incompleteBadge": "Später einrichten",
-      "destinationSetUpLater": "Später einrichten",
-      "destinationSetUpLaterPrompt": "Noch kein Ziel? Aktiviere dies, um es später einzurichten — du kannst einen Entwurf speichern und jetzt testen.",
-      "destinationSetUpLaterActive": "Das Ziel wird vorerst übersprungen — Name und Kommentar werden weiterhin gespeichert. Du brauchst ein Ziel, bevor du veröffentlichst.",
-      "functionSetUpLater": "Später einrichten",
-      "functionSetUpLaterPrompt": "Noch keine Funktion? Aktiviere dies, um sie später einzurichten — du kannst einen Entwurf speichern und jetzt testen.",
-      "functionSetUpLaterActive": "Die Funktion wird vorerst übersprungen — Name und Kommentar werden weiterhin gespeichert. Du brauchst eine Funktion, bevor du veröffentlichst."
+      "unsavedFnTitle": "Nicht gespeicherte Funktionsänderungen",
+      "unsavedFnMessage": "Dieser Schritt enthält Funktionscode, der nicht in Ihrer Bibliothek gespeichert ist. Speichern Sie ihn, verwerfen Sie die Änderungen oder bearbeiten Sie weiter.",
+      "unsavedFnSave": "Funktion speichern",
+      "unsavedFnDiscard": "Änderungen verwerfen",
+      "unsavedFnKeep": "Weiter bearbeiten"
     },
     "commonFieldsAbove": "gemeinsame Felder oben",
     "canvas": {
       "undo": "Rückgängig machen",
       "tidyUp": "Aufräumen",
-      "insertStep": "Schritt einfügen",
-      "deleteEdge": "Verbindung löschen"
+      "edgeDeleteHint": "Drücken Sie Backspace/Entf, um die Kante zu entfernen"
+    },
+    "ndv": {
+      "input": "Eingabe",
+      "output": "Ausgabe",
+      "config": "Konfiguration",
+      "noInput": "Keine Eingabedatensätze.",
+      "noOutput": "Keine Datensätze weitergeleitet.",
+      "prevStep": "Vorheriger Schritt · {name}",
+      "nextStep": "Nächster Schritt · {name}",
+      "prevStepBtn": "Vorheriger Schritt",
+      "nextStepBtn": "Nächster Schritt",
+      "collapseSteps": "Schritte einklappen",
+      "expandSteps": "Schritte erweitern",
+      "inputTag": "Eingabe",
+      "openStep": "{name} öffnen",
+      "runToView": "Führen Sie einen Test aus, um diese Daten anzuzeigen.",
+      "noBranchItems": "Keine Elemente in diesem Zweig.",
+      "noUpstream": "Keine vorgelagerten Schritte.",
+      "noRunYet": "Noch keine Ausführung.",
+      "runLabel": "Ausführen",
+      "switchRun": "Ausführung wechseln",
+      "notInRun": "Dieser Schritt ist in dieser Ausführung nicht enthalten.",
+      "runTest": "Test ausführen",
+      "noItems": "Keine Elemente",
+      "itemsCount": "{count} Element | {count} Elemente",
+      "viewTable": "Tabelle",
+      "viewJson": "JSON",
+      "itemN": "Element {n}",
+      "executeStep": "Schritt ausführen",
+      "sample": "Beispiel",
+      "editStep": "Schritt bearbeiten",
+      "testInputHint": "Testeingabe — Bearbeiten, dann Schritt ausführen.",
+      "noRunsList": "Noch keine Ausführungen."
+    },
+    "runOverlay": {
+      "banner": "Anzeigen von Schrittdaten aus einer vergangenen Ausführung ({run}). Sie können frei bearbeiten — diese Ausführung wird nie geändert.",
+      "clear": "Ausführungsdaten löschen",
+      "ghostNodes": "{count} Schritt aus diesem Lauf existiert nicht mehr im Workflow, daher wird sein Status nicht angezeigt. | {count} Schritte aus diesem Lauf existieren nicht mehr im Workflow, daher wird ihr Status nicht angezeigt.",
+      "missingNode": "Dieser Schritt existiert nicht mehr in diesem Workflow — er wurde nach diesem Lauf entfernt."
     },
     "unsaved": {
       "title": "Nicht gespeicherte Änderungen",
@@ -2771,7 +2820,20 @@
       "expand": "Aufklappen",
       "close": "Ergebnisse löschen und schließen",
       "nodesTitle": "Schritte",
-      "empty": "Führen Sie einen Test aus, um hier die Schrittergebnisse zu sehen."
+      "empty": "Führen Sie einen Test aus, um hier die Schrittergebnisse zu sehen.",
+      "openNode": "Knoten öffnen",
+      "viewConfig": "Konfiguration anzeigen",
+      "hideConfig": "Konfiguration ausblenden",
+      "noConfig": "Keine Konfiguration",
+      "functionLabel": "Funktion",
+      "destinationLabel": "Ziel",
+      "destinationUnsupported": "Nicht unterstützter Typ",
+      "destinationMissing": "Dieses Ziel existiert nicht mehr oder kann nicht gelesen werden.",
+      "headersLabel": "Header",
+      "templateLabel": "Vorlage",
+      "outputFormatLabel": "Ausgabeformat",
+      "tlsVerifyLabel": "TLS-Überprüfung",
+      "tlsDisabled": "Deaktiviert"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "Fehler: Die Suche in SQL wurde abgebrochen."
   },
   "alerts": {
+    "allAlerts": "Alle Alarme",
     "compositeAlert": "Zusammengesetzt",
     "import": {
       "anomalyImportSuccess": "Anomalieerkennung - {index}: \\\"{name}\\\" erfolgreich importiert",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "Alarm erstellen",
           "toast": "Abfrage aus dem Dashboard-Panel importiert: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Im Editor anpassen",
+          "toast": "Aus der Alarmbibliothek: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "Verwendet von {destinations} · {alerts}",
     "impactDestination": "Verwendet von {alerts}"
   },
+  "alert_library": {
+    "header": "Alarmbibliothek",
+    "subtitle": "Kuratierte, sofort installierbare Alarme, abgeglichen mit den Daten, die Sie bereits erfassen",
+    "sectionTab": "Bibliothek",
+    "contribute": "Auf GitHub mitwirken",
+    "searchPlaceholder": "Nach Name, Beschreibung oder Stream suchen",
+    "searchLabel": "Alarmbibliothek durchsuchen",
+    "categories": "Kategorie",
+    "searchCategories": "Kategorien suchen",
+    "searchCategoriesAria": "Kategoriefilter suchen",
+    "noCategoryMatch": "Keine passenden Kategorien.",
+    "selectedCount": "{count} ausgewählt",
+    "facetAria": "{label}, {count} Alarme",
+    "severity": "Schweregrad",
+    "severityAll": "Alle",
+    "severityCritical": "Kritisch",
+    "severityWarning": "Warnung",
+    "severityInfo": "Info",
+    "statReady": "Bereit zur Installation",
+    "statNeedsData": "Nicht erfasst",
+    "statAll": "Alle",
+    "notIngested": "Nicht erfasst: {stream}",
+    "notIngestedHint": "Diese Organisation empfängt {stream} nicht, daher würde dieser Alarm nie ausgelöst. Installieren Sie ihn trotzdem, und er funktioniert, sobald die Daten eintreffen.",
+    "alertCount": "{count} Alarm | {count} Alarme",
+    "noCollectorTitle": "Hier passt noch nichts zu Ihren Daten",
+    "noCollectorDescription": "Keiner dieser {count} Alarme fragt einen Stream ab, den diese Organisation empfängt. Senden Sie {group}-Telemetrie an OpenObserve, und sie werden hier angezeigt.",
+    "setupGuide": "Erfassungsleitfaden",
+    "emptyLibraryTitle": "Die Alarmbibliothek ist leer",
+    "emptyLibraryDescription": "Der Katalog wurde geladen, enthält jedoch keine Alarme. Dies ist ein Veröffentlichungsproblem, kein Filter — versuchen Sie es in Kürze erneut.",
+    "noMatchesTitle": "Keine Alarme passen zu diesen Filtern",
+    "noMatchesDescription": "Versuchen Sie eine andere Kategorie, einen anderen Schweregrad oder einen anderen Suchbegriff.",
+    "clearFilters": "Filter löschen",
+    "loadFailedTitle": "Die Alarmbibliothek konnte nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "openDetails": "{title} öffnen",
+    "drawer": {
+      "dataAvailable": "Daten verfügbar",
+      "streamNotFound": "Stream nicht gefunden",
+      "detects": "Was er erkennt",
+      "noDescription": "Keine Beschreibung in der Bibliothek.",
+      "needsDataCallout": "Dieser Alert fragt {stream} ab, den diese Organisation nicht empfängt. Eine Installation jetzt würde einen Alert erzeugen, der nie ausgelöst wird.",
+      "query": "Abfrage",
+      "stream": "Stream",
+      "streamType": "Stream-Typ",
+      "metricCondition": "Metrikbedingung",
+      "matchCount": "Passende Zeilen erforderlich",
+      "previewBlocked": "{stream} ist kein Stream in dieser Organisation, daher gibt es nichts auszuwerten.",
+      "wouldTrigger": "Würde auslösen",
+      "wouldNotTrigger": "Würde nicht auslösen",
+      "loading": "Dieser Alert wird aus der Bibliothek geladen",
+      "loadFailed": "Dieser Alert konnte nicht aus der Bibliothek geladen werden.",
+      "customize": "Im Editor anpassen",
+      "customizeHint": "Öffnet den Standard-Alert-Editor, der mit diesem Alert vorbefüllt ist.",
+      "customizeFailed": "Dieser Alert konnte nicht im Editor geöffnet werden.",
+      "install": "Installieren",
+      "neverIngested": "Noch keine Daten",
+      "neverIngestedCallout": "{stream} existiert, hat aber noch nie Daten empfangen, daher hat dieser Alert nichts, worauf er auslösen könnte.",
+      "lastData": "Letzte Daten {when}",
+      "staleCallout": "{stream} hat zuletzt Daten {when} empfangen. Dieser Alert bleibt ruhig, bis die Datenerfassung wieder aufgenommen wird.",
+      "unknownTime": "zu einem unbekannten Zeitpunkt"
+    },
+    "install": {
+      "title": "Aus der Bibliothek installieren",
+      "subtitle": "Wählen Sie, wohin Alerts benachrichtigen, welche Alerts installiert werden sollen und wo sie abgelegt werden.",
+      "stepDestination": "Ziel",
+      "stepAlerts": "Alerts",
+      "stepFolder": "Ordner",
+      "stepTune": "Feinabstimmen",
+      "stepInstall": "Installieren",
+      "destinationIntro": "Jeder Alert in dieser Gruppe benachrichtigt das Ziel, das Sie hier wählen. Bibliotheksdateien benennen die Ziele der Organisation, aus der sie exportiert wurden, die in Ihrer Organisation nicht existieren.",
+      "destinationLabel": "Ziel",
+      "destinationPlaceholder": "Ziel auswählen",
+      "destinationsLoadFailed": "Ihre vorhandenen Ziele konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "destinationsNoneBody": "Diese Organisation hat noch keine Alert-Ziele, daher gibt es keinen Ort, an den diese Alerts benachrichtigen können. Erstellen Sie ein Ziel auf der Seite „Ziele“ und wählen Sie es dann hier aus.",
+      "openDestinations": "Ziele öffnen",
+      "selectAll": "Alle auswählen",
+      "clear": "Auswahl aufheben",
+      "selectedCount": "{count} von {total} ausgewählt",
+      "folderIntro": "Installierte Alerts werden hier abgelegt. Erstellen Sie einen Ordner über die Schaltfläche +, wenn diese Gruppe einen eigenen Ordner verdient.",
+      "tuneToggle": "Diese für jeden Alert in dieser Gruppe festlegen",
+      "tuneHint": "Nur diese beiden können sicher für eine ganze Gruppe festgelegt werden. Schwellenwerte bleiben pro Alert – ändern Sie einen, indem Sie den Alert öffnen und einzeln installieren.",
+      "frequency": "Alle",
+      "silence": "Unterdrücken für",
+      "minutes": "Min.",
+      "summaryTuningNone": "Bibliotheksstandards",
+      "summaryTuningOverride": "Alle {frequency} Min., stummgeschaltet {silence} Min.",
+      "run": "Installiere {count} Alert | Installiere {count} Alerts",
+      "retryFailed": "Wiederhole {count} Fehlversuch | Wiederhole {count} Fehlversuche",
+      "allInstalled": "{count} Alert installiert | {count} Alerts installiert",
+      "someFailed": "{installed} installiert, {failed} fehlgeschlagen",
+      "unknownError": "Der Alert konnte nicht erstellt werden.",
+      "unreadableConditions": "Die Filterbedingungen dieses Alerts sind in einem Format, das diese Version nicht lesen kann. Die Installation würde einen Alert ohne Filter erstellen, daher wurde er übersprungen.",
+      "back": "Zurück",
+      "next": "Weiter",
+      "cancel": "Abbrechen",
+      "done": "Fertig"
+    },
+    "error": {
+      "network": "Die Bibliothek konnte nicht erreicht werden. Überprüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.",
+      "http": "Der Bibliotheksserver hat einen Fehler zurückgegeben. Versuchen Sie es in einem Moment noch einmal.",
+      "unparseable": "Die Bibliothek hat mit etwas geantwortet, das kein Katalog ist.",
+      "unsupported_version": "Dieser Bibliothekskatalog ist neuer, als diese Version von OpenObserve lesen kann. Aktualisieren Sie, um ihn zu durchsuchen.",
+      "malformed": "Der Bibliothekskatalog ist unvollständig oder beschädigt."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Vorlage exportieren",
     "selected": "ausgewählt",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "Vorlageninhalt *",
     "importTypeLabel": "Vorlagentyp *",
     "importTitleLabel": "Vorlagentitel *",
-    "header": "Vorlagen",
+    "header": "Zielvorlagen",
     "add": "Vorlage hinzufügen",
     "edit": "Bearbeiten",
     "name": "Name",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "Fehler beim Laden der Ziele"
   },
   "alert_destinations": {
+    "sectionTab": "Ziele",
     "chooseTypeTitle": "Typ auswählen",
     "selectDestinationType": "Zieltyp auswählen",
     "connectionStepTitle": "Verbindung",

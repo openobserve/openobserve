@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "建立新目的地",
       "select": "目的地",
-      "loadError": "擷取目的地時發生錯誤。"
+      "loadError": "擷取目的地時發生錯誤。",
+      "unsupportedType": "不支援的類型 — 工作流程僅支援自訂目的地"
     },
     "function": {
       "createNew": "建立新函式",
       "createNewNoteWorkflow": "注意：函式將會建立，然後您將被重新導向至先前的表單，以將新建立的函式與工作流程關聯。",
       "select": "選取函式",
       "loadError": "無法載入函式",
+      "saved": "函式已成功儲存",
+      "updated": "函式已成功更新",
+      "saveError": "儲存函式失敗",
       "flatten": "扁平化後",
       "guidelinesTitle": "函式執行指南：",
       "rbf": "RBF（扁平化前執行）：",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "工作流程執行記錄",
       "edit": "編輯工作流程",
+      "debugInEditor": "在編輯器中偵錯",
       "staleGraphWarning": "此工作流程自本次執行後已遭編輯 — 其執行的 {count} 個步驟已不再存在，因此此處未顯示其狀態。 | 此工作流程自本次執行後已遭編輯 — 其執行的 {count} 個步驟已不再存在，因此此處未顯示其狀態。"
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "成功",
       "failed": "失敗",
       "open": "歷史",
+      "openFullView": "開啟完整執行檢視",
       "loadError": "載入執行記錄時發生錯誤",
       "loadRunError": "載入此次執行時發生錯誤"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "需要觸發器",
     "addStepRequired": "在觸發器之後至少新增一個步驟",
     "connectAllNodes": "儲存前連接所有節點",
-    "finishStepsBeforePublish": "完成所有步驟的設定後再發布",
+    "finishStepsBeforePublish": "{count} 個步驟需要在發佈前進行設定 — 已在畫布上標示。 | {count} 個步驟需要在發佈前進行設定 — 已在畫布上標示。",
     "draft": "草稿",
     "saveDraft": "儲存為草稿",
     "publish": "發布",
@@ -2698,6 +2704,11 @@
       "linkError": "無法連結警示。"
     },
     "chooseTrigger": "選擇觸發器",
+    "start": {
+      "triggerHint": "選擇啟動工作流程的事件",
+      "chooseAction": "選擇動作",
+      "actionHint": "選擇觸發後發生的事"
+    },
     "node": {
       "kindTrigger": "觸發器",
       "kindLogic": "邏輯",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "事件特定欄位",
       "incidentNoExtraFields": "此事件除了常見欄位外，不會新增任何欄位。",
       "conditionNoteTitle": "條件指南",
+      "functionFlattenTitle": "扁平化前後",
       "conditionNoteEmpty": "若要檢查空值，請使用 \"\"。範例：",
       "conditionNoteNull": "若要檢查 null 值，請使用 null。範例：",
       "conditionNoteCustom": "若要新增自訂欄位，請輸入其名稱並按 Enter。",
@@ -2745,19 +2757,56 @@
       "enable": "啟用步驟",
       "disabledBadge": "已停用",
       "incompleteBadge": "稍後設定",
-      "destinationSetUpLater": "稍後設定",
-      "destinationSetUpLaterPrompt": "還沒有目的地？開啟此選項以稍後設定 — 您現在可以儲存草稿並進行測試。",
-      "destinationSetUpLaterActive": "目的地目前會略過 — 名稱和備註仍會儲存。發布前您需要設定目的地。",
-      "functionSetUpLater": "稍後設定",
-      "functionSetUpLaterPrompt": "還沒有函數？開啟此選項以稍後設定 — 您現在可以儲存草稿並進行測試。",
-      "functionSetUpLaterActive": "函數目前會略過 — 名稱和備註仍會儲存。發布前您需要設定函數。"
+      "unsavedFnTitle": "未儲存的函式變更",
+      "unsavedFnMessage": "此步驟有未儲存到您的函式庫的函式程式碼。請儲存、捨棄變更或繼續編輯。",
+      "unsavedFnSave": "儲存函式",
+      "unsavedFnDiscard": "捨棄變更",
+      "unsavedFnKeep": "繼續編輯"
     },
     "commonFieldsAbove": "上方的通用欄位",
     "canvas": {
       "undo": "復原",
       "tidyUp": "整理",
-      "insertStep": "插入步驟",
-      "deleteEdge": "刪除連線"
+      "edgeDeleteHint": "按 Backspace/Delete 以移除邊線"
+    },
+    "ndv": {
+      "input": "輸入",
+      "output": "輸出",
+      "config": "組態",
+      "noInput": "沒有輸入記錄。",
+      "noOutput": "沒有轉送的記錄。",
+      "prevStep": "上一步 · {name}",
+      "nextStep": "下一步 · {name}",
+      "prevStepBtn": "上一步",
+      "nextStepBtn": "下一步",
+      "collapseSteps": "摺疊步驟",
+      "expandSteps": "展開步驟",
+      "inputTag": "輸入",
+      "openStep": "開啟 {name}",
+      "runToView": "執行測試以檢視此資料。",
+      "noBranchItems": "此分支上沒有項目。",
+      "noUpstream": "沒有上游步驟。",
+      "noRunYet": "尚未執行。",
+      "runLabel": "執行",
+      "switchRun": "切換執行",
+      "notInRun": "此步驟不包含在此次執行中。",
+      "runTest": "執行測試",
+      "noItems": "沒有項目",
+      "itemsCount": "{count} 個項目 | {count} 個項目",
+      "viewTable": "表格",
+      "viewJson": "JSON",
+      "itemN": "項目 {n}",
+      "executeStep": "執行步驟",
+      "sample": "範例",
+      "editStep": "編輯步驟",
+      "testInputHint": "測試輸入 — 編輯，然後執行步驟。",
+      "noRunsList": "尚無執行。"
+    },
+    "runOverlay": {
+      "banner": "顯示過去執行（{run}）的步驟資料。您可以自由編輯 — 此執行絕不會變更。",
+      "clear": "清除執行資料",
+      "ghostNodes": "此運行中的 {count} 個步驟不再存在於工作流程中，因此不顯示其狀態。 | 此運行中的 {count} 個步驟不再存在於工作流程中，因此不顯示其狀態。",
+      "missingNode": "該步驟不再存在於此工作流程中 — 它在此次運行後已被移除。"
     },
     "unsaved": {
       "title": "未儲存的變更",
@@ -2771,7 +2820,20 @@
       "expand": "展开",
       "close": "清除并关闭结果",
       "nodesTitle": "步骤",
-      "empty": "运行测试以在此处查看步骤结果。"
+      "empty": "运行测试以在此处查看步骤结果。",
+      "openNode": "開啟節點",
+      "viewConfig": "檢視設定",
+      "hideConfig": "隱藏設定",
+      "noConfig": "無設定",
+      "functionLabel": "函式",
+      "destinationLabel": "目的地",
+      "destinationUnsupported": "不支援的類型",
+      "destinationMissing": "此目的地不再存在或無法讀取。",
+      "headersLabel": "標頭",
+      "templateLabel": "範本",
+      "outputFormatLabel": "輸出格式",
+      "tlsVerifyLabel": "TLS 驗證",
+      "tlsDisabled": "已停用"
     }
   },
   "pipeline": {
@@ -4345,7 +4407,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -6012,6 +6079,7 @@
     "SearchSQLCancelled": "錯誤：搜尋 SQL 已取消。"
   },
   "alerts": {
+    "allAlerts": "所有警示",
     "compositeAlert": "複合",
     "import": {
       "anomalyImportSuccess": "異常偵測 - {index}: \"{name}\" 匯入成功",
@@ -7340,6 +7408,10 @@
         "panel": {
           "label": "建立警示",
           "toast": "已從儀表板面板匯入查詢：「{sourceLabel}」"
+        },
+        "library": {
+          "label": "在編輯器中自訂",
+          "toast": "來自警示庫：{sourceLabel}"
         }
       },
       "warnings": {
@@ -7400,6 +7472,112 @@
     "impactTemplate": "由 {destinations} · {alerts} 使用",
     "impactDestination": "由 {alerts} 使用"
   },
+  "alert_library": {
+    "header": "警示庫",
+    "subtitle": "精心策劃、可立即安裝的警示，與您已擷取的資料比對",
+    "sectionTab": "程式庫",
+    "contribute": "在 GitHub 上貢獻",
+    "searchPlaceholder": "依名稱、描述或串流搜尋",
+    "searchLabel": "搜尋警示庫",
+    "categories": "類別",
+    "searchCategories": "搜尋類別",
+    "searchCategoriesAria": "搜尋類別篩選器",
+    "noCategoryMatch": "沒有相符的類別。",
+    "selectedCount": "已選取 {count} 個",
+    "facetAria": "{label}，{count} 個警示",
+    "severity": "嚴重性",
+    "severityAll": "全部",
+    "severityCritical": "嚴重",
+    "severityWarning": "警告",
+    "severityInfo": "資訊",
+    "statReady": "可安裝",
+    "statNeedsData": "未擷取",
+    "statAll": "全部",
+    "notIngested": "未擷取：{stream}",
+    "notIngestedHint": "此組織未接收 {stream}，因此此警示永遠不會觸發。仍然安裝它，一旦資料到達就會開始運作。",
+    "alertCount": "{count} 個警示 | {count} 個警示",
+    "noCollectorTitle": "此處尚無與您的資料相符的項目",
+    "noCollectorDescription": "這些 {count} 個警示皆未查詢此組織正在接收的串流。將 {group} 遙測傳送至 OpenObserve，它們就會在此亮起。",
+    "setupGuide": "擷取指南",
+    "emptyLibraryTitle": "警示庫是空的",
+    "emptyLibraryDescription": "目錄已載入但不包含任何警示。這是發布問題，而非篩選問題 — 請稍後再試。",
+    "noMatchesTitle": "沒有符合這些篩選器的警示",
+    "noMatchesDescription": "請嘗試其他類別、嚴重性或搜尋字詞。",
+    "clearFilters": "清除篩選器",
+    "loadFailedTitle": "無法載入警示庫",
+    "retry": "重試",
+    "openDetails": "開啟 {title}",
+    "drawer": {
+      "dataAvailable": "資料可用",
+      "streamNotFound": "找不到串流",
+      "detects": "偵測內容",
+      "noDescription": "程式庫中沒有描述。",
+      "needsDataCallout": "此警示查詢 {stream}，但此組織並未接收該串流。立即安裝會建立一個永遠不會觸發的警示。",
+      "query": "查詢",
+      "stream": "串流",
+      "streamType": "串流類型",
+      "metricCondition": "指標條件",
+      "matchCount": "需要符合的列數",
+      "previewBlocked": "{stream} 不是此組織中的串流，因此沒有可評估的內容。",
+      "wouldTrigger": "會觸發",
+      "wouldNotTrigger": "不會觸發",
+      "loading": "正在從程式庫載入此警示",
+      "loadFailed": "無法從程式庫載入此警示。",
+      "customize": "在編輯器中自訂",
+      "customizeHint": "開啟已預先填入此警示的標準警示編輯器。",
+      "customizeFailed": "無法在編輯器中開啟此警示。",
+      "install": "安裝",
+      "neverIngested": "尚無資料",
+      "neverIngestedCallout": "{stream} 存在但從未接收過資料，因此此警示沒有可觸發的依據。",
+      "lastData": "最後資料 {when}",
+      "staleCallout": "{stream} 上次接收資料的時間為 {when}。此警示將保持靜默，直到資料擷取恢復。",
+      "unknownTime": "於未知時間"
+    },
+    "install": {
+      "title": "從程式庫安裝",
+      "subtitle": "選擇警示通知的位置、要安裝的警示，以及它們的歸檔位置。",
+      "stepDestination": "目的地",
+      "stepAlerts": "警示",
+      "stepFolder": "資料夾",
+      "stepTune": "調整",
+      "stepInstall": "安裝",
+      "destinationIntro": "此批次中的每個警示都會通知您在此選擇的目的地。程式庫檔案會列出其匯出来源組織的目的地，這些目的地不存在於您的組織中。",
+      "destinationLabel": "目的地",
+      "destinationPlaceholder": "選擇目的地",
+      "destinationsLoadFailed": "無法載入您現有的目的地。",
+      "retry": "再試一次",
+      "destinationsNoneBody": "此組織還沒有警示目的地，因此這些警示無處可通知。請在「目的地」頁面建立一個，然後回來在此處選取。",
+      "openDestinations": "開啟目的地",
+      "selectAll": "全選",
+      "clear": "清除",
+      "selectedCount": "已選取 {count} / {total}",
+      "folderIntro": "已安裝的警示會歸檔在這裡。如果此批次值得擁有自己的資料夾，請從 + 按鈕建立一個資料夾。",
+      "tuneToggle": "為此批次中的每個警示設定這些選項",
+      "tuneHint": "只有這兩個選項適合為整個批次設定。閾值仍依警示個別設定 — 若要變更某個警示，請開啟該警示並單獨安裝。",
+      "frequency": "執行頻率",
+      "silence": "靜音時長",
+      "minutes": "分鐘",
+      "summaryTuningNone": "程式庫預設",
+      "summaryTuningOverride": "每 {frequency} 分鐘，靜音 {silence} 分鐘",
+      "run": "安裝 {count} 個警示 | 安裝 {count} 個警示",
+      "retryFailed": "重試 {count} 個失敗 | 重試 {count} 個失敗",
+      "allInstalled": "{count} 個警示已安裝 | {count} 個警示已安裝",
+      "someFailed": "{installed} 個已安裝，{failed} 個失敗",
+      "unknownError": "無法建立警示。",
+      "unreadableConditions": "此警示的篩選條件格式是此版本無法讀取的。安裝它會建立沒有篩選條件的警示，因此已略過。",
+      "back": "上一步",
+      "next": "下一步",
+      "cancel": "取消",
+      "done": "完成"
+    },
+    "error": {
+      "network": "無法連線至程式庫。請檢查您的網路連線後重試。",
+      "http": "程式庫伺服器傳回錯誤。請稍後再試。",
+      "unparseable": "程式庫回應的內容不是目錄。",
+      "unsupported_version": "此程式庫目錄比此版本的 OpenObserve 可讀取的版本還新。請升級以瀏覽。",
+      "malformed": "程式庫目錄不完整或已損毀。"
+    }
+  },
   "alert_templates": {
     "exportTemplate": "匯出範本",
     "selected": "已選取",
@@ -7424,7 +7602,7 @@
     "importBodyLabel": "範本內文 *",
     "importTypeLabel": "範本類型 *",
     "importTitleLabel": "範本標題 *",
-    "header": "範本",
+    "header": "目的地範本",
     "add": "新增範本",
     "edit": "編輯",
     "name": "名稱",
@@ -7631,6 +7809,7 @@
     "destinationsLoadError": "載入目的地時發生錯誤"
   },
   "alert_destinations": {
+    "sectionTab": "目的地",
     "chooseTypeTitle": "選擇類型",
     "selectDestinationType": "選擇目的地類型",
     "connectionStepTitle": "連線",

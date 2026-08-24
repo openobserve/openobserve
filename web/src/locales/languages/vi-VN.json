@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "Tạo đích đến mới",
       "select": "Đích đến",
-      "loadError": "Lỗi khi lấy danh sách đích đến."
+      "loadError": "Lỗi khi lấy danh sách đích đến.",
+      "unsupportedType": "Loại không được hỗ trợ — Workflows chỉ hỗ trợ Đích tùy chỉnh"
     },
     "function": {
       "createNew": "Tạo hàm mới",
       "createNewNoteWorkflow": "Lưu ý: Hàm sẽ được tạo, sau đó bạn sẽ được chuyển hướng đến biểu mẫu trước đó để liên kết hàm mới tạo với quy trình làm việc.",
       "select": "Chọn hàm",
       "loadError": "Tải hàm thất bại",
+      "saved": "Đã lưu hàm thành công",
+      "updated": "Đã cập nhật hàm thành công",
+      "saveError": "Không lưu được hàm",
       "flatten": "Sau khi làm phẳng",
       "guidelinesTitle": "Hướng dẫn thực thi hàm:",
       "rbf": "RBF (Chạy trước khi làm phẳng):",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "Lần chạy quy trình",
       "edit": "Sửa quy trình",
+      "debugInEditor": "Gỡ lỗi trong trình chỉnh sửa",
       "staleGraphWarning": "Workflow này đã được chỉnh sửa kể từ lần chạy này — {count} bước mà nó thực hiện không còn tồn tại, vì vậy trạng thái tương ứng không được hiển thị ở đây. | Workflow này đã được chỉnh sửa kể từ lần chạy này — {count} bước mà nó thực hiện không còn tồn tại, vì vậy trạng thái tương ứng không được hiển thị ở đây."
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "Thành công",
       "failed": "Thất bại",
       "open": "Lịch sử",
+      "openFullView": "Mở toàn bộ chế độ xem các lần chạy",
       "loadError": "Lỗi khi tải các lần thực thi",
       "loadRunError": "Lỗi khi tải lần chạy này"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "Cần có một bộ kích hoạt",
     "addStepRequired": "Thêm ít nhất một bước sau bộ kích hoạt",
     "connectAllNodes": "Kết nối tất cả các nút trước khi lưu",
-    "finishStepsBeforePublish": "Hoàn tất cấu hình tất cả các bước trước khi xuất bản",
+    "finishStepsBeforePublish": "{count} bước cần thiết lập trước khi xuất bản — được đánh dấu trên canvas. | {count} bước cần thiết lập trước khi xuất bản — được đánh dấu trên canvas.",
     "draft": "Bản nháp",
     "saveDraft": "Lưu thành bản nháp",
     "publish": "Xuất bản",
@@ -2698,6 +2704,11 @@
       "linkError": "Không thể liên kết cảnh báo."
     },
     "chooseTrigger": "Chọn một trình kích hoạt",
+    "start": {
+      "triggerHint": "Chọn sự kiện bắt đầu workflow của bạn",
+      "chooseAction": "Chọn một hành động",
+      "actionHint": "Chọn điều gì xảy ra sau trigger"
+    },
     "node": {
       "kindTrigger": "Trình kích hoạt",
       "kindLogic": "Logic",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "Các trường cụ thể cho sự kiện",
       "incidentNoExtraFields": "Sự kiện này không thêm trường nào ngoài các trường chung.",
       "conditionNoteTitle": "Hướng dẫn điều kiện",
+      "functionFlattenTitle": "Trước so với sau khi làm phẳng",
       "conditionNoteEmpty": "Để kiểm tra giá trị rỗng, sử dụng \"\". Ví dụ:",
       "conditionNoteNull": "Để kiểm tra giá trị null, sử dụng null. Ví dụ:",
       "conditionNoteCustom": "Để thêm cột tùy chỉnh, nhập tên của nó và nhấn Enter.",
@@ -2745,19 +2757,56 @@
       "enable": "Kích hoạt bước",
       "disabledBadge": "Đã tắt",
       "incompleteBadge": "Thiết lập sau",
-      "destinationSetUpLater": "Thiết lập sau",
-      "destinationSetUpLaterPrompt": "Chưa có đích? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
-      "destinationSetUpLaterActive": "Đích sẽ được bỏ qua trong lúc này — tên và nhận xét vẫn được lưu. Bạn cần một đích trước khi xuất bản.",
-      "functionSetUpLater": "Thiết lập sau",
-      "functionSetUpLaterPrompt": "Chưa có hàm? Bật tùy chọn này để thiết lập sau — bạn có thể lưu bản nháp và kiểm tra ngay bây giờ.",
-      "functionSetUpLaterActive": "Hàm sẽ được bỏ qua trong lúc này — tên và nhận xét vẫn được lưu. Bạn cần một hàm trước khi xuất bản."
+      "unsavedFnTitle": "Thay đổi hàm chưa lưu",
+      "unsavedFnMessage": "Bước này có mã hàm chưa được lưu vào thư viện của bạn. Lưu nó, hủy bỏ các thay đổi hoặc tiếp tục chỉnh sửa.",
+      "unsavedFnSave": "Lưu hàm",
+      "unsavedFnDiscard": "Hủy bỏ thay đổi",
+      "unsavedFnKeep": "Tiếp tục chỉnh sửa"
     },
     "commonFieldsAbove": "các trường chung ở trên",
     "canvas": {
       "undo": "Hoàn tác",
       "tidyUp": "Dọn dẹp",
-      "insertStep": "Chèn bước",
-      "deleteEdge": "Xóa kết nối"
+      "edgeDeleteHint": "Nhấn Backspace/Delete để xóa đường nối"
+    },
+    "ndv": {
+      "input": "Đầu vào",
+      "output": "Đầu ra",
+      "config": "Cấu hình",
+      "noInput": "Không có bản ghi đầu vào.",
+      "noOutput": "Không có bản ghi nào được chuyển tiếp.",
+      "prevStep": "Bước trước · {name}",
+      "nextStep": "Bước tiếp theo · {name}",
+      "prevStepBtn": "Bước trước",
+      "nextStepBtn": "Bước tiếp theo",
+      "collapseSteps": "Thu gọn các bước",
+      "expandSteps": "Mở rộng các bước",
+      "inputTag": "Đầu vào",
+      "openStep": "Mở {name}",
+      "runToView": "Chạy thử để xem dữ liệu này.",
+      "noBranchItems": "Không có mục nào trên nhánh này.",
+      "noUpstream": "Không có bước thượng nguồn.",
+      "noRunYet": "Chưa có lần chạy nào.",
+      "runLabel": "Chạy",
+      "switchRun": "Chuyển lần chạy",
+      "notInRun": "Bước này không nằm trong lần chạy này.",
+      "runTest": "Chạy thử",
+      "noItems": "Không có mục",
+      "itemsCount": "{count} Mục | {count} Mục",
+      "viewTable": "Bảng",
+      "viewJson": "JSON",
+      "itemN": "Mục {n}",
+      "executeStep": "Chạy bước",
+      "sample": "Mẫu",
+      "editStep": "Chỉnh sửa bước",
+      "testInputHint": "Đầu vào thử nghiệm — Chỉnh sửa, sau đó chạy bước.",
+      "noRunsList": "Chưa có lần chạy nào."
+    },
+    "runOverlay": {
+      "banner": "Đang hiển thị dữ liệu bước từ lần chạy trước ({run}). Bạn có thể chỉnh sửa tự do — lần chạy này không bao giờ bị thay đổi.",
+      "clear": "Xóa dữ liệu lần chạy",
+      "ghostNodes": "{count} bước từ lần chạy này không còn tồn tại trong quy trình, vì vậy trạng thái không được hiển thị. | {count} bước từ lần chạy này không còn tồn tại trong quy trình, vì vậy trạng thái không được hiển thị.",
+      "missingNode": "Bước đó không còn tồn tại trong quy trình này — nó đã bị xóa sau lần chạy này."
     },
     "unsaved": {
       "title": "Các thay đổi chưa lưu",
@@ -2771,7 +2820,20 @@
       "expand": "Mở rộng",
       "close": "Xóa & Đóng Kết Quả",
       "nodesTitle": "Các bước",
-      "empty": "Chạy một bài kiểm tra để xem kết quả các bước tại đây."
+      "empty": "Chạy một bài kiểm tra để xem kết quả các bước tại đây.",
+      "openNode": "Mở nút",
+      "viewConfig": "Xem cấu hình",
+      "hideConfig": "Ẩn cấu hình",
+      "noConfig": "Không có cấu hình",
+      "functionLabel": "Chức năng",
+      "destinationLabel": "Đích",
+      "destinationUnsupported": "Loại không được hỗ trợ",
+      "destinationMissing": "Đích này không còn tồn tại hoặc không thể đọc được.",
+      "headersLabel": "Tiêu đề",
+      "templateLabel": "Mẫu",
+      "outputFormatLabel": "Định dạng đầu ra",
+      "tlsVerifyLabel": "Xác minh TLS",
+      "tlsDisabled": "Đã tắt"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "Lỗi: SQL tìm kiếm đã bị hủy."
   },
   "alerts": {
+    "allAlerts": "Tất cả cảnh báo",
     "compositeAlert": "Tổng hợp",
     "import": {
       "anomalyImportSuccess": "Phát hiện bất thường - {index}: \"{name}\" đã được nhập thành công",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "Tạo cảnh báo",
           "toast": "Truy vấn được nhập từ bảng điều khiển: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Tùy chỉnh trong trình chỉnh sửa",
+          "toast": "Từ thư viện cảnh báo: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "Được sử dụng bởi {destinations} · {alerts}",
     "impactDestination": "Được sử dụng bởi {alerts}"
   },
+  "alert_library": {
+    "header": "Thư viện cảnh báo",
+    "subtitle": "Các cảnh báo được tuyển chọn, sẵn sàng cài đặt, khớp với dữ liệu bạn đã tiếp nhận",
+    "sectionTab": "Thư viện",
+    "contribute": "Đóng góp trên GitHub",
+    "searchPlaceholder": "Tìm kiếm theo tên, mô tả hoặc stream",
+    "searchLabel": "Tìm kiếm thư viện cảnh báo",
+    "categories": "Danh mục",
+    "searchCategories": "Tìm kiếm danh mục",
+    "searchCategoriesAria": "Tìm kiếm bộ lọc danh mục",
+    "noCategoryMatch": "Không có danh mục nào khớp.",
+    "selectedCount": "{count} đã chọn",
+    "facetAria": "{label}, {count} cảnh báo",
+    "severity": "Mức độ nghiêm trọng",
+    "severityAll": "Tất cả",
+    "severityCritical": "Nghiêm trọng",
+    "severityWarning": "Cảnh báo",
+    "severityInfo": "Thông tin",
+    "statReady": "Sẵn sàng cài đặt",
+    "statNeedsData": "Chưa được tiếp nhận",
+    "statAll": "Tất cả",
+    "notIngested": "Chưa được tiếp nhận: {stream}",
+    "notIngestedHint": "Tổ chức này không nhận được {stream}, vì vậy cảnh báo này sẽ không bao giờ kích hoạt. Vẫn cài đặt nó và nó sẽ bắt đầu hoạt động khi dữ liệu đến.",
+    "alertCount": "{count} cảnh báo | {count} cảnh báo",
+    "noCollectorTitle": "Chưa có gì khớp với dữ liệu của bạn",
+    "noCollectorDescription": "Không có cảnh báo nào trong số {count} cảnh báo này truy vấn một stream mà tổ chức này đang nhận. Gửi dữ liệu telemetry của {group} tới OpenObserve và chúng sẽ hiển thị tại đây.",
+    "setupGuide": "Hướng dẫn tiếp nhận",
+    "emptyLibraryTitle": "Thư viện cảnh báo trống",
+    "emptyLibraryDescription": "Danh mục đã được tải nhưng không chứa cảnh báo nào. Đây là vấn đề phát hành, không phải bộ lọc — hãy thử lại sau.",
+    "noMatchesTitle": "Không có cảnh báo nào khớp với các bộ lọc này",
+    "noMatchesDescription": "Hãy thử danh mục, mức độ nghiêm trọng hoặc từ khóa tìm kiếm khác.",
+    "clearFilters": "Xóa bộ lọc",
+    "loadFailedTitle": "Không thể tải thư viện cảnh báo",
+    "retry": "Thử lại",
+    "openDetails": "Mở {title}",
+    "drawer": {
+      "dataAvailable": "Dữ liệu khả dụng",
+      "streamNotFound": "Không tìm thấy Stream",
+      "detects": "Những gì nó phát hiện",
+      "noDescription": "Không có mô tả trong thư viện.",
+      "needsDataCallout": "Cảnh báo này truy vấn {stream}, mà tổ chức này không nhận. Cài đặt ngay bây giờ sẽ tạo ra một cảnh báo không bao giờ kích hoạt.",
+      "query": "Truy vấn",
+      "stream": "Stream",
+      "streamType": "Loại Stream",
+      "metricCondition": "Điều kiện số liệu",
+      "matchCount": "Số dòng khớp yêu cầu",
+      "previewBlocked": "{stream} không phải là một stream trong tổ chức này, vì vậy không có gì để đánh giá.",
+      "wouldTrigger": "Sẽ kích hoạt",
+      "wouldNotTrigger": "Sẽ không kích hoạt",
+      "loading": "Đang tải cảnh báo này từ thư viện",
+      "loadFailed": "Không thể tải cảnh báo này từ thư viện.",
+      "customize": "Tùy chỉnh trong trình chỉnh sửa",
+      "customizeHint": "Mở trình chỉnh sửa cảnh báo tiêu chuẩn được điền sẵn với cảnh báo này.",
+      "customizeFailed": "Không thể mở cảnh báo này trong trình chỉnh sửa.",
+      "install": "Cài đặt",
+      "neverIngested": "Chưa có dữ liệu",
+      "neverIngestedCallout": "{stream} tồn tại nhưng chưa bao giờ nhận dữ liệu, vì vậy cảnh báo này không có gì để kích hoạt.",
+      "lastData": "Dữ liệu gần nhất {when}",
+      "staleCallout": "{stream} nhận dữ liệu lần cuối {when}. Cảnh báo này sẽ im lặng cho đến khi việc thu thập dữ liệu tiếp tục.",
+      "unknownTime": "vào thời điểm không xác định"
+    },
+    "install": {
+      "title": "Cài đặt từ thư viện",
+      "subtitle": "Chọn nơi cảnh báo thông báo, những cảnh báo cần cài đặt và nơi chúng được lưu trữ.",
+      "stepDestination": "Đích",
+      "stepAlerts": "Cảnh báo",
+      "stepFolder": "Thư mục",
+      "stepTune": "Tinh chỉnh",
+      "stepInstall": "Cài đặt",
+      "destinationIntro": "Mọi cảnh báo trong đợt này thông báo đến đích bạn chọn tại đây. Các tệp thư viện đặt tên các đích của tổ chức mà chúng được xuất ra, những đích này không tồn tại trong tổ chức của bạn.",
+      "destinationLabel": "Đích",
+      "destinationPlaceholder": "Chọn một đích",
+      "destinationsLoadFailed": "Không thể tải các đích hiện có của bạn.",
+      "retry": "Thử lại",
+      "destinationsNoneBody": "Tổ chức này chưa có đích cảnh báo nào, vì vậy không có nơi nào để các cảnh báo này thông báo. Hãy tạo một đích trên trang Đích, sau đó quay lại và chọn nó tại đây.",
+      "openDestinations": "Mở trang Đích",
+      "selectAll": "Chọn tất cả",
+      "clear": "Bỏ chọn",
+      "selectedCount": "Đã chọn {count} trên {total}",
+      "folderIntro": "Các cảnh báo đã cài đặt được lưu trữ tại đây. Tạo một thư mục từ nút + nếu đợt này cần thư mục riêng.",
+      "tuneToggle": "Đặt các giá trị này cho mọi cảnh báo trong đợt",
+      "tuneHint": "Chỉ hai giá trị này an toàn để đặt cho toàn bộ đợt. Ngưỡng vẫn giữ riêng cho từng cảnh báo — hãy thay đổi một cảnh báo bằng cách mở cảnh báo đó và cài đặt riêng.",
+      "frequency": "Chạy mỗi",
+      "silence": "Im lặng trong",
+      "minutes": "phút",
+      "summaryTuningNone": "Mặc định thư viện",
+      "summaryTuningOverride": "Mỗi {frequency} phút, tắt tiếng {silence} phút",
+      "run": "Cài đặt {count} cảnh báo | Cài đặt {count} cảnh báo",
+      "retryFailed": "Thử lại {count} lỗi | Thử lại {count} lỗi",
+      "allInstalled": "{count} cảnh báo đã cài đặt | {count} cảnh báo đã cài đặt",
+      "someFailed": "{installed} đã cài, {failed} thất bại",
+      "unknownError": "Không thể tạo cảnh báo.",
+      "unreadableConditions": "Điều kiện lọc của cảnh báo này ở định dạng mà phiên bản này không thể đọc được. Cài đặt nó sẽ tạo cảnh báo không có bộ lọc, vì vậy nó đã bị bỏ qua.",
+      "back": "Quay lại",
+      "next": "Tiếp theo",
+      "cancel": "Hủy",
+      "done": "Xong"
+    },
+    "error": {
+      "network": "Không thể truy cập thư viện. Kiểm tra kết nối mạng của bạn và thử lại.",
+      "http": "Máy chủ thư viện trả về lỗi. Vui lòng thử lại sau.",
+      "unparseable": "Thư viện phản hồi với nội dung không phải là danh mục.",
+      "unsupported_version": "Danh mục thư viện này mới hơn những gì phiên bản OpenObserve này có thể đọc được. Hãy nâng cấp để duyệt nó.",
+      "malformed": "Danh mục thư viện không đầy đủ hoặc bị hỏng."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Xuất Mẫu",
     "selected": "đã chọn",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "Nội dung Mẫu *",
     "importTypeLabel": "Loại Mẫu *",
     "importTitleLabel": "Tiêu đề Mẫu *",
-    "header": "Mẫu",
+    "header": "Mẫu đích",
     "add": "Mẫu mới",
     "edit": "Chỉnh sửa",
     "name": "Tên",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "Lỗi khi tải điểm đến"
   },
   "alert_destinations": {
+    "sectionTab": "Đích đến",
     "chooseTypeTitle": "Chọn Loại",
     "selectDestinationType": "Chọn Loại Điểm Đến",
     "connectionStepTitle": "Kết nối",

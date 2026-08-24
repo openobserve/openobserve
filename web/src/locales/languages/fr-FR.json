@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "Créer une nouvelle destination",
       "select": "Destination",
-      "loadError": "Erreur lors du chargement des destinations."
+      "loadError": "Erreur lors du chargement des destinations.",
+      "unsupportedType": "Type non pris en charge — les workflows ne prennent en charge que les destinations personnalisées"
     },
     "function": {
       "createNew": "Créer une nouvelle fonction",
       "createNewNoteWorkflow": "Remarque : La fonction sera créée, puis vous serez redirigé vers le formulaire précédent pour associer la fonction nouvellement créée au workflow.",
       "select": "Sélectionner une fonction",
       "loadError": "Échec du chargement des fonctions",
+      "saved": "Fonction enregistrée avec succès",
+      "updated": "Fonction mise à jour avec succès",
+      "saveError": "Échec de l'enregistrement de la fonction",
       "flatten": "Après aplatissement",
       "guidelinesTitle": "Directives d'exécution de la fonction :",
       "rbf": "RBF (Exécution avant aplatissement) :",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "Exécutions du workflow",
       "edit": "Modifier le workflow",
+      "debugInEditor": "Déboguer dans l'éditeur",
       "staleGraphWarning": "Ce workflow a été modifié depuis cette exécution — {count} étape qu'il a exécutée n'existe plus, donc son statut n'est pas affiché ici. | Ce workflow a été modifié depuis cette exécution — {count} étapes qu'il a exécutées n'existent plus, donc leur statut n'est pas affiché ici."
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "Succès",
       "failed": "Échoué",
       "open": "Historique",
+      "openFullView": "Ouvrir la vue complète des exécutions",
       "loadError": "Erreur lors du chargement des exécutions",
       "loadRunError": "Erreur lors du chargement de cette exécution"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "Un déclencheur est requis",
     "addStepRequired": "Ajoutez au moins une étape après le déclencheur",
     "connectAllNodes": "Connectez tous les nœuds avant d'enregistrer",
-    "finishStepsBeforePublish": "Terminez la configuration de toutes les étapes avant de publier",
+    "finishStepsBeforePublish": "{count} étape nécessite une configuration avant publication — mise en évidence sur le canevas. | {count} étapes nécessitent une configuration avant publication — mises en évidence sur le canevas.",
     "draft": "Brouillon",
     "saveDraft": "Enregistrer comme brouillon",
     "publish": "Publier",
@@ -2698,6 +2704,11 @@
       "linkError": "Impossible de lier les alertes."
     },
     "chooseTrigger": "Choisir un déclencheur",
+    "start": {
+      "triggerHint": "Sélectionnez l'événement qui démarre votre workflow",
+      "chooseAction": "Choisissez une action",
+      "actionHint": "Sélectionnez ce qui se passe après le déclencheur"
+    },
     "node": {
       "kindTrigger": "Déclencheur",
       "kindLogic": "Logique",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "Champs spécifiques de l'événement",
       "incidentNoExtraFields": "Cet événement n'ajoute aucun champ au-delà des champs courants.",
       "conditionNoteTitle": "Directives de condition",
+      "functionFlattenTitle": "Avant vs après l'aplatissement",
       "conditionNoteEmpty": "Pour vérifier une valeur vide, utilisez \"\". Exemple :",
       "conditionNoteNull": "Pour vérifier une valeur nulle, utilisez null. Exemple :",
       "conditionNoteCustom": "Pour ajouter une colonne personnalisée, tapez son nom et appuyez sur Entrée.",
@@ -2745,19 +2757,56 @@
       "enable": "Activer l'étape",
       "disabledBadge": "Désactivé",
       "incompleteBadge": "Configurer plus tard",
-      "destinationSetUpLater": "Configurer plus tard",
-      "destinationSetUpLaterPrompt": "Vous n'avez pas encore de destination ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
-      "destinationSetUpLaterActive": "La destination est ignorée pour le moment — le nom et le commentaire sont tout de même enregistrés. Vous aurez besoin d'une destination avant de publier.",
-      "functionSetUpLater": "Configurer plus tard",
-      "functionSetUpLaterPrompt": "Vous n'avez pas encore de fonction ? Activez cette option pour la configurer plus tard — vous pouvez enregistrer un brouillon et tester maintenant.",
-      "functionSetUpLaterActive": "La fonction est ignorée pour le moment — le nom et le commentaire sont tout de même enregistrés. Vous aurez besoin d'une fonction avant de publier."
+      "unsavedFnTitle": "Modifications de fonction non enregistrées",
+      "unsavedFnMessage": "Cette étape contient du code de fonction non enregistré dans votre bibliothèque. Enregistrez-le, ignorez les modifications ou continuez à modifier.",
+      "unsavedFnSave": "Enregistrer la fonction",
+      "unsavedFnDiscard": "Ignorer les modifications",
+      "unsavedFnKeep": "Continuer à modifier"
     },
     "commonFieldsAbove": "champs communs ci-dessus",
     "canvas": {
       "undo": "Défaire",
       "tidyUp": "Nettoyer",
-      "insertStep": "Insérer une étape",
-      "deleteEdge": "Supprimer la connexion"
+      "edgeDeleteHint": "Appuyez sur Retour arrière/Supprimer pour supprimer la connexion"
+    },
+    "ndv": {
+      "input": "Entrée",
+      "output": "Sortie",
+      "config": "Configuration",
+      "noInput": "Aucun enregistrement d'entrée.",
+      "noOutput": "Aucun enregistrement transmis.",
+      "prevStep": "Étape précédente · {name}",
+      "nextStep": "Étape suivante · {name}",
+      "prevStepBtn": "Étape précédente",
+      "nextStepBtn": "Étape suivante",
+      "collapseSteps": "Réduire les étapes",
+      "expandSteps": "Développer les étapes",
+      "inputTag": "Entrée",
+      "openStep": "Ouvrir {name}",
+      "runToView": "Exécutez un test pour voir ces données.",
+      "noBranchItems": "Aucun élément sur cette branche.",
+      "noUpstream": "Aucune étape en amont.",
+      "noRunYet": "Aucune exécution pour le moment.",
+      "runLabel": "Exécuter",
+      "switchRun": "Changer d'exécution",
+      "notInRun": "Cette étape n'est pas incluse dans cette exécution.",
+      "runTest": "Exécuter le test",
+      "noItems": "Aucun élément",
+      "itemsCount": "{count} élément | {count} éléments",
+      "viewTable": "Tableau",
+      "viewJson": "JSON",
+      "itemN": "Élément {n}",
+      "executeStep": "Exécuter l'étape",
+      "sample": "Échantillon",
+      "editStep": "Modifier l'étape",
+      "testInputHint": "Entrée de test — Modifiez, puis exécutez l'étape.",
+      "noRunsList": "Aucune exécution pour le moment."
+    },
+    "runOverlay": {
+      "banner": "Affichage des données de l'étape d'une exécution passée ({run}). Vous pouvez modifier librement — cette exécution n'est jamais modifiée.",
+      "clear": "Effacer les données d'exécution",
+      "ghostNodes": "{count} étape de cette exécution n'existe plus dans le workflow, son statut n'est donc pas affiché. | {count} étapes de cette exécution n'existent plus dans le workflow, leur statut n'est donc pas affiché.",
+      "missingNode": "Cette étape n'existe plus dans ce workflow — elle a été supprimée après cette exécution."
     },
     "unsaved": {
       "title": "Modifications non enregistrées",
@@ -2771,7 +2820,20 @@
       "expand": "Développer",
       "close": "Effacer et fermer les résultats",
       "nodesTitle": "Étapes",
-      "empty": "Exécutez un test pour voir les résultats des étapes ici."
+      "empty": "Exécutez un test pour voir les résultats des étapes ici.",
+      "openNode": "Ouvrir le nœud",
+      "viewConfig": "Voir la configuration",
+      "hideConfig": "Masquer la configuration",
+      "noConfig": "Aucune configuration",
+      "functionLabel": "Fonction",
+      "destinationLabel": "Destination",
+      "destinationUnsupported": "Type non pris en charge",
+      "destinationMissing": "Cette destination n'existe plus ou ne peut pas être lue.",
+      "headersLabel": "En-têtes",
+      "templateLabel": "Modèle",
+      "outputFormatLabel": "Format de sortie",
+      "tlsVerifyLabel": "Vérification TLS",
+      "tlsDisabled": "Désactivé"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "Erreur : Search SQL a été annulé."
   },
   "alerts": {
+    "allAlerts": "Toutes les alertes",
     "compositeAlert": "Composite",
     "import": {
       "anomalyImportSuccess": "Détection d'anomalies - {index} : \"{name}\" importé avec succès",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "Créer une alerte",
           "toast": "Requête importée du panneau de tableau de bord : \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Personnaliser dans l'éditeur",
+          "toast": "Depuis la bibliothèque d'alertes : {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "Utilisé par {destinations} · {alerts}",
     "impactDestination": "Utilisé par {alerts}"
   },
+  "alert_library": {
+    "header": "Bibliothèque d'alertes",
+    "subtitle": "Alertes sélectionnées, prêtes à installer, et adaptées aux données que vous ingérez déjà",
+    "sectionTab": "Bibliothèque",
+    "contribute": "Contribuer sur GitHub",
+    "searchPlaceholder": "Rechercher par nom, description ou flux",
+    "searchLabel": "Rechercher dans la bibliothèque d'alertes",
+    "categories": "Catégorie",
+    "searchCategories": "Rechercher des catégories",
+    "searchCategoriesAria": "Rechercher des filtres de catégorie",
+    "noCategoryMatch": "Aucune catégorie ne correspond.",
+    "selectedCount": "{count} sélectionné(s)",
+    "facetAria": "{label}, {count} alertes",
+    "severity": "Gravité",
+    "severityAll": "Tous",
+    "severityCritical": "Critique",
+    "severityWarning": "Avertissement",
+    "severityInfo": "Info",
+    "statReady": "Prêt à installer",
+    "statNeedsData": "Non ingéré",
+    "statAll": "Tous",
+    "notIngested": "Non ingéré : {stream}",
+    "notIngestedHint": "Cette organisation ne reçoit pas {stream}, cette alerte ne se déclencherait donc jamais. Installez-la quand même et elle commencera à fonctionner dès que les données arriveront.",
+    "alertCount": "{count} alerte | {count} alertes",
+    "noCollectorTitle": "Rien ici ne correspond encore à vos données",
+    "noCollectorDescription": "Aucune de ces {count} alertes n'interroge un flux que cette organisation reçoit. Envoyez la télémétrie {group} à OpenObserve et elles s'afficheront ici.",
+    "setupGuide": "Guide d'ingestion",
+    "emptyLibraryTitle": "La bibliothèque d'alertes est vide",
+    "emptyLibraryDescription": "Le catalogue s'est chargé mais ne contient aucune alerte. Il s'agit d'un problème de publication, pas d'un filtre — réessayez dans quelques instants.",
+    "noMatchesTitle": "Aucune alerte ne correspond à ces filtres",
+    "noMatchesDescription": "Essayez une autre catégorie, une autre gravité ou un autre terme de recherche.",
+    "clearFilters": "Effacer les filtres",
+    "loadFailedTitle": "La bibliothèque d'alertes n'a pas pu être chargée",
+    "retry": "Réessayer",
+    "openDetails": "Ouvrir {title}",
+    "drawer": {
+      "dataAvailable": "Données disponibles",
+      "streamNotFound": "Flux introuvable",
+      "detects": "Ce qu'il détecte",
+      "noDescription": "Aucune description dans la bibliothèque.",
+      "needsDataCallout": "Cette alerte interroge {stream}, que cette organisation ne reçoit pas. L'installer maintenant créerait une alerte qui ne se déclencherait jamais.",
+      "query": "Requête",
+      "stream": "Flux",
+      "streamType": "Type de flux",
+      "metricCondition": "Condition métrique",
+      "matchCount": "Lignes correspondantes requises",
+      "previewBlocked": "{stream} n'est pas un flux dans cette organisation, il n'y a donc rien à évaluer.",
+      "wouldTrigger": "Se déclencherait",
+      "wouldNotTrigger": "Ne se déclencherait pas",
+      "loading": "Chargement de cette alerte depuis la bibliothèque",
+      "loadFailed": "Cette alerte n'a pas pu être chargée depuis la bibliothèque.",
+      "customize": "Personnaliser dans l'éditeur",
+      "customizeHint": "Ouvre l'éditeur d'alertes standard prérempli avec cette alerte.",
+      "customizeFailed": "Cette alerte n'a pas pu être ouverte dans l'éditeur.",
+      "install": "Installer",
+      "neverIngested": "Pas encore de données",
+      "neverIngestedCallout": "{stream} existe mais n'a jamais reçu de données, cette alerte n'a donc rien sur quoi se déclencher.",
+      "lastData": "Dernières données {when}",
+      "staleCallout": "{stream} a reçu des données pour la dernière fois {when}. Cette alerte restera silencieuse jusqu'à la reprise de l'ingestion.",
+      "unknownTime": "à un moment inconnu"
+    },
+    "install": {
+      "title": "Installer depuis la bibliothèque",
+      "subtitle": "Choisissez où les alertes notifient, quelles alertes installer et où elles sont classées.",
+      "stepDestination": "Destination",
+      "stepAlerts": "Alertes",
+      "stepFolder": "Dossier",
+      "stepTune": "Ajuster",
+      "stepInstall": "Installer",
+      "destinationIntro": "Chaque alerte de ce lot notifie la destination que vous choisissez ici. Les fichiers de la bibliothèque nomment les destinations de l'organisation d'où ils ont été exportés, qui n'existent pas dans la vôtre.",
+      "destinationLabel": "Destination",
+      "destinationPlaceholder": "Choisir une destination",
+      "destinationsLoadFailed": "Vos destinations existantes n'ont pas pu être chargées.",
+      "retry": "Réessayer",
+      "destinationsNoneBody": "Cette organisation n'a pas encore de destinations d'alerte, il n'y a donc aucun endroit où ces alertes peuvent notifier. Créez-en une sur la page Destinations, puis revenez et sélectionnez-la ici.",
+      "openDestinations": "Ouvrir les destinations",
+      "selectAll": "Tout sélectionner",
+      "clear": "Effacer",
+      "selectedCount": "{count} sur {total} sélectionnés",
+      "folderIntro": "Les alertes installées sont classées ici. Créez un dossier à partir du bouton + si ce lot mérite le sien.",
+      "tuneToggle": "Définissez-les pour chaque alerte de ce lot",
+      "tuneHint": "Seules ces deux options peuvent être définies en toute sécurité pour un lot entier. Les seuils restent propres à chaque alerte — modifiez-en un en ouvrant cette alerte et en l'installant séparément.",
+      "frequency": "Exécuter toutes les",
+      "silence": "Silence pendant",
+      "minutes": "min",
+      "summaryTuningNone": "Paramètres par défaut de la bibliothèque",
+      "summaryTuningOverride": "Toutes les {frequency} min, silence {silence} min",
+      "run": "Installer {count} alerte | Installer {count} alertes",
+      "retryFailed": "Réessayer {count} échec | Réessayer {count} échecs",
+      "allInstalled": "{count} alerte installée | {count} alertes installées",
+      "someFailed": "{installed} installés, {failed} échoués",
+      "unknownError": "L'alerte n'a pas pu être créée.",
+      "unreadableConditions": "Les conditions de filtre de cette alerte sont dans un format que cette version ne peut pas lire. L'installer créerait une alerte sans filtre, elle a donc été ignorée.",
+      "back": "Retour",
+      "next": "Suivant",
+      "cancel": "Annuler",
+      "done": "Terminé"
+    },
+    "error": {
+      "network": "La bibliothèque n'a pas pu être atteinte. Vérifiez votre connexion réseau et réessayez.",
+      "http": "Le serveur de la bibliothèque a renvoyé une erreur. Réessayez dans un instant.",
+      "unparseable": "La bibliothèque a répondu avec quelque chose qui n'est pas un catalogue.",
+      "unsupported_version": "Ce catalogue de bibliothèque est plus récent que ce que cette version d'OpenObserve peut lire. Mettez à jour pour le parcourir.",
+      "malformed": "Le catalogue de la bibliothèque est incomplet ou endommagé."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Exporter le modèle",
     "selected": "Sélectionnés",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "Corps du modèle *",
     "importTypeLabel": "Type de modèle *",
     "importTitleLabel": "Titre du modèle *",
-    "header": "Modèles",
+    "header": "Modèles de destination",
     "add": "Ajouter un modèle",
     "edit": "Modifier",
     "name": "Nom",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "Erreur lors du chargement des destinations"
   },
   "alert_destinations": {
+    "sectionTab": "Destinations",
     "chooseTypeTitle": "Choisir le type",
     "selectDestinationType": "Sélectionner le type de destination",
     "connectionStepTitle": "Connexion",

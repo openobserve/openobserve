@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "Nieuwe bestemming aanmaken",
       "select": "Bestemming",
-      "loadError": "Fout bij het ophalen van bestemmingen."
+      "loadError": "Fout bij het ophalen van bestemmingen.",
+      "unsupportedType": "Niet-ondersteund type — workflows ondersteunen alleen aangepaste bestemmingen"
     },
     "function": {
       "createNew": "Nieuwe functie aanmaken",
       "createNewNoteWorkflow": "Opmerking: De functie wordt aangemaakt, waarna u wordt doorgestuurd naar het vorige formulier om de nieuw aangemaakte functie aan de workflow te koppelen.",
       "select": "Functie selecteren",
       "loadError": "Functies laden mislukt",
+      "saved": "Functie succesvol opgeslagen",
+      "updated": "Functie succesvol bijgewerkt",
+      "saveError": "Functie opslaan mislukt",
       "flatten": "Na afvlakking",
       "guidelinesTitle": "Richtlijnen voor functie-uitvoering:",
       "rbf": "RBF (Uitvoeren vóór afvlakking):",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "Workflow-uitvoeringen",
       "edit": "Workflow bewerken",
+      "debugInEditor": "Debuggen in editor",
       "staleGraphWarning": "Deze workflow is bewerkt sinds deze run — {count} stap die werd uitgevoerd bestaat niet meer, dus de status wordt hier niet getoond. | Deze workflow is bewerkt sinds deze run — {count} stappen die werden uitgevoerd bestaan niet meer, dus hun status wordt hier niet getoond."
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "Succes",
       "failed": "Mislukt",
       "open": "Geschiedenis",
+      "openFullView": "Volledige runs-weergave openen",
       "loadError": "Fout bij het laden van uitvoeringen",
       "loadRunError": "Fout bij het laden van deze uitvoering"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "Een trigger is vereist",
     "addStepRequired": "Voeg ten minste één stap toe na de trigger",
     "connectAllNodes": "Verbind alle knooppunten voordat u opslaat",
-    "finishStepsBeforePublish": "Voltooi alle stappen voordat u publiceert.",
+    "finishStepsBeforePublish": "{count} stap moet vóór publicatie worden ingesteld — gemarkeerd op het canvas. | {count} stappen moeten vóór publicatie worden ingesteld — gemarkeerd op het canvas.",
     "draft": "Concept",
     "saveDraft": "Opslaan als concept",
     "publish": "Publiceren",
@@ -2698,6 +2704,11 @@
       "linkError": "Kan meldingen niet koppelen."
     },
     "chooseTrigger": "Kies een trigger",
+    "start": {
+      "triggerHint": "Selecteer de gebeurtenis die je workflow start",
+      "chooseAction": "Kies een actie",
+      "actionHint": "Selecteer wat er na de trigger gebeurt"
+    },
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "Gebeurtenisspecifieke velden",
       "incidentNoExtraFields": "Deze gebeurtenis voegt geen velden toe naast de algemene velden.",
       "conditionNoteTitle": "Richtlijnen voor voorwaarden",
+      "functionFlattenTitle": "Vóór vs na afvlakking",
       "conditionNoteEmpty": "Om een lege waarde te controleren, gebruik \"\". Voorbeeld:",
       "conditionNoteNull": "Om een null-waarde te controleren, gebruik null. Voorbeeld:",
       "conditionNoteCustom": "Om een aangepaste kolom toe te voegen, typt u de naam en drukt u op Enter.",
@@ -2745,19 +2757,56 @@
       "enable": "Stap inschakelen",
       "disabledBadge": "Uitgeschakeld",
       "incompleteBadge": "Stel later in",
-      "destinationSetUpLater": "Stel later in",
-      "destinationSetUpLaterPrompt": "Nog geen bestemming? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
-      "destinationSetUpLaterActive": "De bestemming wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een bestemming nodig voordat u publiceert.",
-      "functionSetUpLater": "Stel later in",
-      "functionSetUpLaterPrompt": "Nog geen functie? Schakel dit in om het later in te stellen — u kunt nu een concept opslaan en testen.",
-      "functionSetUpLaterActive": "De functie wordt voorlopig overgeslagen — de naam en opmerking worden nog steeds opgeslagen. U hebt een functie nodig voordat u publiceert."
+      "unsavedFnTitle": "Niet-opgeslagen functiewijzigingen",
+      "unsavedFnMessage": "Deze stap bevat functiecode die niet in je bibliotheek is opgeslagen. Sla deze op, negeer de wijzigingen of blijf bewerken.",
+      "unsavedFnSave": "Functie opslaan",
+      "unsavedFnDiscard": "Wijzigingen negeren",
+      "unsavedFnKeep": "Blijf bewerken"
     },
     "commonFieldsAbove": "algemene velden hierboven",
     "canvas": {
       "undo": "Ongedaan maken",
       "tidyUp": "Opruimen",
-      "insertStep": "Stap invoegen",
-      "deleteEdge": "Verbinding verwijderen"
+      "edgeDeleteHint": "Druk op Backspace/Delete om de verbinding te verwijderen"
+    },
+    "ndv": {
+      "input": "Invoer",
+      "output": "Uitvoer",
+      "config": "Configuratie",
+      "noInput": "Geen invoerrecords.",
+      "noOutput": "Geen records doorgestuurd.",
+      "prevStep": "Vorige stap · {name}",
+      "nextStep": "Volgende stap · {name}",
+      "prevStepBtn": "Vorige stap",
+      "nextStepBtn": "Volgende stap",
+      "collapseSteps": "Stappen samenvouwen",
+      "expandSteps": "Stappen uitvouwen",
+      "inputTag": "Invoer",
+      "openStep": "Open {name}",
+      "runToView": "Voer een test uit om deze gegevens te bekijken.",
+      "noBranchItems": "Geen items op deze vertakking.",
+      "noUpstream": "Geen upstream-stappen.",
+      "noRunYet": "Nog geen run.",
+      "runLabel": "Uitvoeren",
+      "switchRun": "Wissel run",
+      "notInRun": "Deze stap is niet opgenomen in deze run.",
+      "runTest": "Test uitvoeren",
+      "noItems": "Geen items",
+      "itemsCount": "{count} item | {count} items",
+      "viewTable": "Tabel",
+      "viewJson": "JSON",
+      "itemN": "Item {n}",
+      "executeStep": "Stap uitvoeren",
+      "sample": "Voorbeeld",
+      "editStep": "Stap bewerken",
+      "testInputHint": "Testinvoer — bewerk en voer daarna de stap uit.",
+      "noRunsList": "Nog geen runs."
+    },
+    "runOverlay": {
+      "banner": "Stapgegevens van een eerdere run ({run}) worden weergegeven. Je kunt vrij bewerken — deze run wordt nooit gewijzigd.",
+      "clear": "Run-gegevens wissen",
+      "ghostNodes": "{count} stap van deze run bestaat niet meer in de workflow, dus de status wordt niet getoond. | {count} stappen van deze run bestaan niet meer in de workflow, dus hun status wordt niet getoond.",
+      "missingNode": "Die stap bestaat niet meer in deze workflow — deze is na deze run verwijderd."
     },
     "unsaved": {
       "title": "Niet-opgeslagen wijzigingen",
@@ -2771,7 +2820,20 @@
       "expand": "Uitklappen",
       "close": "Resultaten wissen en sluiten",
       "nodesTitle": "Stappen",
-      "empty": "Voer een test uit om hier de stapresultaten te zien."
+      "empty": "Voer een test uit om hier de stapresultaten te zien.",
+      "openNode": "Node openen",
+      "viewConfig": "Configuratie bekijken",
+      "hideConfig": "Configuratie verbergen",
+      "noConfig": "Geen configuratie",
+      "functionLabel": "Functie",
+      "destinationLabel": "Bestemming",
+      "destinationUnsupported": "Niet-ondersteund type",
+      "destinationMissing": "Deze bestemming bestaat niet meer of kan niet worden gelezen.",
+      "headersLabel": "Kopteksten",
+      "templateLabel": "Sjabloon",
+      "outputFormatLabel": "Uitvoerformaat",
+      "tlsVerifyLabel": "TLS-verificatie",
+      "tlsDisabled": "Uitgeschakeld"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "Fout: Search SQL is geannuleerd."
   },
   "alerts": {
+    "allAlerts": "Alle alerts",
     "compositeAlert": "Samengesteld",
     "import": {
       "anomalyImportSuccess": "Anomaliedetectie - {index}: \"{name}\" succesvol geïmporteerd",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "Alert maken",
           "toast": "Query geïmporteerd uit dashboardpaneel: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Aanpassen in editor",
+          "toast": "Uit de alertbibliotheek: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "Gebruikt door {destinations} · {alerts}",
     "impactDestination": "Gebruikt door {alerts}"
   },
+  "alert_library": {
+    "header": "Alertbibliotheek",
+    "subtitle": "Samengestelde, direct te installeren alerts, afgestemd op de gegevens die u al opneemt",
+    "sectionTab": "Bibliotheek",
+    "contribute": "Bijdragen op GitHub",
+    "searchPlaceholder": "Zoeken op naam, beschrijving of stream",
+    "searchLabel": "Doorzoek de alertbibliotheek",
+    "categories": "Categorie",
+    "searchCategories": "Categorieën zoeken",
+    "searchCategoriesAria": "Categoriefilters zoeken",
+    "noCategoryMatch": "Geen categorieën gevonden.",
+    "selectedCount": "{count} geselecteerd",
+    "facetAria": "{label}, {count} alerts",
+    "severity": "Ernst",
+    "severityAll": "Alle",
+    "severityCritical": "Kritiek",
+    "severityWarning": "Waarschuwing",
+    "severityInfo": "Info",
+    "statReady": "Klaar om te installeren",
+    "statNeedsData": "Niet opgenomen",
+    "statAll": "Alle",
+    "notIngested": "Niet opgenomen: {stream}",
+    "notIngestedHint": "Deze organisatie ontvangt {stream} niet, dus deze alert zou nooit worden geactiveerd. Installeer hem toch en hij werkt zodra de gegevens binnenkomen.",
+    "alertCount": "{count} alert | {count} alerts",
+    "noCollectorTitle": "Niets hier komt nog overeen met uw gegevens",
+    "noCollectorDescription": "Geen van deze {count} alerts bevraagt een stream die deze organisatie ontvangt. Stuur {group}-telemetrie naar OpenObserve en ze verschijnen hier.",
+    "setupGuide": "Handleiding gegevensinvoer",
+    "emptyLibraryTitle": "De alertbibliotheek is leeg",
+    "emptyLibraryDescription": "De catalogus is geladen maar bevat geen alerts. Dit is een publicatieprobleem, geen filter — probeer het binnenkort opnieuw.",
+    "noMatchesTitle": "Geen alerts voldoen aan deze filters",
+    "noMatchesDescription": "Probeer een andere categorie, ernst of zoekterm.",
+    "clearFilters": "Filters wissen",
+    "loadFailedTitle": "De alertbibliotheek kon niet worden geladen",
+    "retry": "Opnieuw proberen",
+    "openDetails": "Open {title}",
+    "drawer": {
+      "dataAvailable": "Data beschikbaar",
+      "streamNotFound": "Stream niet gevonden",
+      "detects": "Wat het detecteert",
+      "noDescription": "Geen beschrijving in de bibliotheek.",
+      "needsDataCallout": "Dit alert bevraagt {stream}, dat deze organisatie niet ontvangt. Het nu installeren zou een alert creëren dat nooit wordt geactiveerd.",
+      "query": "Query",
+      "stream": "Stream",
+      "streamType": "Streamtype",
+      "metricCondition": "Metrische voorwaarde",
+      "matchCount": "Overeenkomende rijen vereist",
+      "previewBlocked": "{stream} is geen stream in deze organisatie, dus er is niets te evalueren.",
+      "wouldTrigger": "Zou afgaan",
+      "wouldNotTrigger": "Zou niet afgaan",
+      "loading": "Dit alert laden uit de bibliotheek",
+      "loadFailed": "Dit alert kon niet uit de bibliotheek worden geladen.",
+      "customize": "Aanpassen in editor",
+      "customizeHint": "Opent de standaard alert-editor, vooraf gevuld met dit alert.",
+      "customizeFailed": "Dit alert kon niet in de editor worden geopend.",
+      "install": "Installeren",
+      "neverIngested": "Nog geen data",
+      "neverIngestedCallout": "{stream} bestaat maar heeft nooit data ontvangen, dus dit alert heeft niets om op af te gaan.",
+      "lastData": "Laatste data {when}",
+      "staleCallout": "{stream} ontving voor het laatst data {when}. Dit alert blijft stil totdat de opname wordt hervat.",
+      "unknownTime": "op een onbekend tijdstip"
+    },
+    "install": {
+      "title": "Installeren vanuit de bibliotheek",
+      "subtitle": "Kies waar alerts meldingen naartoe sturen, welke alerts u installeert en waar ze worden opgeslagen.",
+      "stepDestination": "Bestemming",
+      "stepAlerts": "Alerts",
+      "stepFolder": "Map",
+      "stepTune": "Afstemmen",
+      "stepInstall": "Installeren",
+      "destinationIntro": "Elk alert in deze batch stuurt meldingen naar de bestemming die u hier kiest. Bibliotheekbestanden noemen de bestemmingen van de organisatie waaruit ze zijn geëxporteerd, die in uw organisatie niet bestaan.",
+      "destinationLabel": "Bestemming",
+      "destinationPlaceholder": "Kies een bestemming",
+      "destinationsLoadFailed": "Uw bestaande bestemmingen konden niet worden geladen.",
+      "retry": "Opnieuw proberen",
+      "destinationsNoneBody": "Deze organisatie heeft nog geen alertbestemmingen, dus er is geen plek waar deze alerts meldingen naartoe kunnen sturen. Maak er een aan op de pagina Bestemmingen en kom dan terug om deze hier te kiezen.",
+      "openDestinations": "Open Bestemmingen",
+      "selectAll": "Alles selecteren",
+      "clear": "Wissen",
+      "selectedCount": "{count} van {total} geselecteerd",
+      "folderIntro": "Geïnstalleerde alerts worden hier opgeslagen. Maak een map via de + knop als deze batch een eigen map verdient.",
+      "tuneToggle": "Stel deze in voor elk alert in deze batch",
+      "tuneHint": "Alleen deze twee zijn veilig in te stellen voor een hele batch. Drempelwaarden blijven per alert — wijzig er een door dat alert te openen en het afzonderlijk te installeren.",
+      "frequency": "Uitvoeren elke",
+      "silence": "Stilte voor",
+      "minutes": "min",
+      "summaryTuningNone": "Bibliotheekstandaarden",
+      "summaryTuningOverride": "Elke {frequency} min, onderdrukt {silence} min",
+      "run": "Installeer {count} waarschuwing | Installeer {count} waarschuwingen",
+      "retryFailed": "Probeer {count} fout opnieuw | Probeer {count} fouten opnieuw",
+      "allInstalled": "{count} waarschuwing geïnstalleerd | {count} waarschuwingen geïnstalleerd",
+      "someFailed": "{installed} geïnstalleerd, {failed} mislukt",
+      "unknownError": "De waarschuwing kon niet worden gemaakt.",
+      "unreadableConditions": "De filtervoorwaarden van deze waarschuwing zijn in een formaat dat deze versie niet kan lezen. Installeren zou een waarschuwing zonder filter maken, dus het is overgeslagen.",
+      "back": "Terug",
+      "next": "Volgende",
+      "cancel": "Annuleren",
+      "done": "Klaar"
+    },
+    "error": {
+      "network": "De bibliotheek kon niet worden bereikt. Controleer je netwerkverbinding en probeer het opnieuw.",
+      "http": "De bibliotheekserver heeft een fout geretourneerd. Probeer het over een moment opnieuw.",
+      "unparseable": "De bibliotheek reageerde met iets dat geen catalogus is.",
+      "unsupported_version": "Deze bibliotheekcatalogus is nieuwer dan deze versie van OpenObserve kan lezen. Upgrade om deze te bekijken.",
+      "malformed": "De bibliotheekcatalogus is onvolledig of beschadigd."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Template exporteren",
     "selected": "geselecteerd",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "Template-inhoud *",
     "importTypeLabel": "Templatetype *",
     "importTitleLabel": "Templatetitel *",
-    "header": "Sjablonen",
+    "header": "Bestemmingssjablonen",
     "add": "Sjabloon toevoegen",
     "edit": "Bewerken",
     "name": "Naam",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "Fout bij het laden van bestemmingen"
   },
   "alert_destinations": {
+    "sectionTab": "Bestemmingen",
     "chooseTypeTitle": "Kies type",
     "selectDestinationType": "Selecteer bestemmingstype",
     "connectionStepTitle": "Verbinding",

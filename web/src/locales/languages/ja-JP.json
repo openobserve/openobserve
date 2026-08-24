@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "新しい宛先を作成",
       "select": "宛先",
-      "loadError": "宛先の取得中にエラーが発生しました。"
+      "loadError": "宛先の取得中にエラーが発生しました。",
+      "unsupportedType": "サポートされていないタイプ — ワークフローはカスタム宛先のみサポートします"
     },
     "function": {
       "createNew": "新しい関数を作成",
       "createNewNoteWorkflow": "注：関数が作成され、その後、以前のフォームにリダイレクトされて、新しく作成された関数をワークフローに関連付けます。",
       "select": "関数を選択",
       "loadError": "関数の読み込みに失敗しました",
+      "saved": "関数が正常に保存されました",
+      "updated": "関数が正常に更新されました",
+      "saveError": "関数の保存に失敗しました",
       "flatten": "フラット化後",
       "guidelinesTitle": "関数実行ガイドライン：",
       "rbf": "RBF（フラット化前に実行）：",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "ワークフロー実行",
       "edit": "ワークフローを編集",
+      "debugInEditor": "エディタでデバッグ",
       "staleGraphWarning": "このワークフローはこの実行後に編集されました — 実行した{count}個のステップはもう存在しないため、ここではステータスが表示されません。 | このワークフローはこの実行後に編集されました — 実行した{count}個のステップはもう存在しないため、ここではステータスが表示されません。"
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "成功",
       "failed": "失敗",
       "open": "履歴",
+      "openFullView": "実行全体ビューを開く",
       "loadError": "実行の読み込み中にエラーが発生しました",
       "loadRunError": "この実行の読み込み中にエラーが発生しました"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "トリガーが必要です",
     "addStepRequired": "トリガーの後に少なくとも1つのステップを追加してください",
     "connectAllNodes": "保存する前にすべてのノードを接続してください",
-    "finishStepsBeforePublish": "公開前にすべてのステップの設定を完了してください",
+    "finishStepsBeforePublish": "{count} ステップは公開前にセットアップが必要です — キャンバス上で強調表示されています。 | {count} ステップは公開前にセットアップが必要です — キャンバス上で強調表示されています。",
     "draft": "下書き",
     "saveDraft": "下書きとして保存",
     "publish": "公開",
@@ -2698,6 +2704,11 @@
       "linkError": "アラートをリンクできませんでした。"
     },
     "chooseTrigger": "トリガーを選択",
+    "start": {
+      "triggerHint": "ワークフローを開始するイベントを選択",
+      "chooseAction": "アクションを選択",
+      "actionHint": "トリガー後の動作を選択"
+    },
     "node": {
       "kindTrigger": "トリガー",
       "kindLogic": "ロジック",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "イベント固有フィールド",
       "incidentNoExtraFields": "このイベントは共通フィールド以外のフィールドを追加しません。",
       "conditionNoteTitle": "条件のガイドライン",
+      "functionFlattenTitle": "フラット化前と後",
       "conditionNoteEmpty": "空の値を確認するには、\"\" を使用します。例：",
       "conditionNoteNull": "null値を確認するには、null を使用します。例：",
       "conditionNoteCustom": "カスタム列を追加するには、名前を入力してEnterキーを押します。",
@@ -2745,19 +2757,56 @@
       "enable": "ステップを有効にする",
       "disabledBadge": "無効",
       "incompleteBadge": "後で設定",
-      "destinationSetUpLater": "後で設定",
-      "destinationSetUpLaterPrompt": "まだ送信先がありませんか？これをオンにすると後で設定できます — 今すぐ下書きを保存してテストできます。",
-      "destinationSetUpLaterActive": "今のところ送信先はスキップされます — 名前とコメントは保存されます。公開前に送信先が必要です。",
-      "functionSetUpLater": "後で設定",
-      "functionSetUpLaterPrompt": "まだ関数がありませんか？これをオンにすると後で設定できます — 今すぐ下書きを保存してテストできます。",
-      "functionSetUpLaterActive": "今のところ関数はスキップされます — 名前とコメントは保存されます。公開前に関数が必要です。"
+      "unsavedFnTitle": "未保存の関数変更",
+      "unsavedFnMessage": "このステップにはライブラリに保存されていない関数コードがあります。保存するか、変更を破棄するか、編集を続けてください。",
+      "unsavedFnSave": "関数を保存",
+      "unsavedFnDiscard": "変更を破棄",
+      "unsavedFnKeep": "編集を続ける"
     },
     "commonFieldsAbove": "上記の共通フィールド",
     "canvas": {
       "undo": "元に戻す",
       "tidyUp": "整理",
-      "insertStep": "ステップを挿入",
-      "deleteEdge": "接続を削除"
+      "edgeDeleteHint": "Backspace/Delete キーを押してエッジを削除"
+    },
+    "ndv": {
+      "input": "入力",
+      "output": "出力",
+      "config": "構成",
+      "noInput": "入力レコードがありません。",
+      "noOutput": "転送されたレコードがありません。",
+      "prevStep": "前のステップ · {name}",
+      "nextStep": "次のステップ · {name}",
+      "prevStepBtn": "前のステップ",
+      "nextStepBtn": "次のステップ",
+      "collapseSteps": "ステップを折りたたむ",
+      "expandSteps": "ステップを展開",
+      "inputTag": "入力",
+      "openStep": "{name} を開く",
+      "runToView": "このデータを表示するにはテストを実行してください。",
+      "noBranchItems": "このブランチにはアイテムがありません。",
+      "noUpstream": "上流ステップがありません。",
+      "noRunYet": "まだ実行されていません。",
+      "runLabel": "実行",
+      "switchRun": "実行を切り替え",
+      "notInRun": "このステップはこの実行に含まれていません。",
+      "runTest": "テストを実行",
+      "noItems": "アイテムなし",
+      "itemsCount": "{count} アイテム | {count} アイテム",
+      "viewTable": "テーブル",
+      "viewJson": "JSON",
+      "itemN": "アイテム {n}",
+      "executeStep": "ステップを実行",
+      "sample": "サンプル",
+      "editStep": "ステップを編集",
+      "testInputHint": "テスト入力 — 編集してからステップを実行してください。",
+      "noRunsList": "まだ実行はありません。"
+    },
+    "runOverlay": {
+      "banner": "過去の実行 ({run}) のステップデータを表示しています。自由に編集できます — この実行が変更されることはありません。",
+      "clear": "実行データをクリア",
+      "ghostNodes": "{count} ステップはこの実行からワークフロー内に存在しなくなったため、ステータスは表示されません。 | {count} ステップはこの実行からワークフロー内に存在しなくなったため、ステータスは表示されません。",
+      "missingNode": "そのステップはこのワークフロー内に存在しなくなっています。この実行後に削除されました。"
     },
     "unsaved": {
       "title": "未保存の変更",
@@ -2771,7 +2820,20 @@
       "expand": "展開する",
       "close": "結果をクリアして閉じる",
       "nodesTitle": "ステップ",
-      "empty": "テストを実行すると、ここにステップ結果が表示されます。"
+      "empty": "テストを実行すると、ここにステップ結果が表示されます。",
+      "openNode": "ノードを開く",
+      "viewConfig": "設定を表示",
+      "hideConfig": "設定を非表示",
+      "noConfig": "設定なし",
+      "functionLabel": "関数",
+      "destinationLabel": "宛先",
+      "destinationUnsupported": "未対応タイプ",
+      "destinationMissing": "この宛先は存在しないか、読み取れません。",
+      "headersLabel": "ヘッダー",
+      "templateLabel": "テンプレート",
+      "outputFormatLabel": "出力形式",
+      "tlsVerifyLabel": "TLS検証",
+      "tlsDisabled": "無効"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "エラー:検索 SQL はキャンセルされました。"
   },
   "alerts": {
+    "allAlerts": "すべてのアラート",
     "compositeAlert": "複合",
     "import": {
       "anomalyImportSuccess": "異常検出 - {index}: \"{name}\" のインポートに成功しました",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "アラートを作成",
           "toast": "ダッシュボードパネルからインポートされたクエリ: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "エディターでカスタマイズ",
+          "toast": "アラートライブラリから: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "使用元 {destinations} · {alerts}",
     "impactDestination": "使用元 {alerts}"
   },
+  "alert_library": {
+    "header": "アラートライブラリ",
+    "subtitle": "厳選された、すぐにインストールできるアラート。すでに取り込んでいるデータと照合されます。",
+    "sectionTab": "ライブラリ",
+    "contribute": "GitHubで貢献",
+    "searchPlaceholder": "名前、説明、またはストリームで検索",
+    "searchLabel": "アラートライブラリを検索",
+    "categories": "カテゴリ",
+    "searchCategories": "カテゴリを検索",
+    "searchCategoriesAria": "カテゴリフィルターを検索",
+    "noCategoryMatch": "一致するカテゴリがありません。",
+    "selectedCount": "{count} 件選択済み",
+    "facetAria": "{label}、{count} アラート",
+    "severity": "重大度",
+    "severityAll": "すべて",
+    "severityCritical": "重大",
+    "severityWarning": "警告",
+    "severityInfo": "情報",
+    "statReady": "インストール準備完了",
+    "statNeedsData": "未取り込み",
+    "statAll": "すべて",
+    "notIngested": "未取り込み: {stream}",
+    "notIngestedHint": "この組織は {stream} を受信していないため、このアラートは発動しません。それでもインストールすると、データが到着し次第動作を開始します。",
+    "alertCount": "{count} アラート | {count} アラート",
+    "noCollectorTitle": "ここにあなたのデータに一致するものはまだありません",
+    "noCollectorDescription": "これらの {count} アラートのうち、この組織が受信しているストリームをクエリするものはありません。{group} テレメトリを OpenObserve に送信すると、ここに表示されます。",
+    "setupGuide": "取り込みガイド",
+    "emptyLibraryTitle": "アラートライブラリは空です",
+    "emptyLibraryDescription": "カタログは読み込まれましたが、アラートは含まれていません。これはフィルターではなく公開の問題です。しばらくしてから再試行してください。",
+    "noMatchesTitle": "これらのフィルターに一致するアラートはありません",
+    "noMatchesDescription": "別のカテゴリ、重大度、または検索語を試してください。",
+    "clearFilters": "フィルターをクリア",
+    "loadFailedTitle": "アラートライブラリを読み込めませんでした",
+    "retry": "再試行",
+    "openDetails": "{title} を開く",
+    "drawer": {
+      "dataAvailable": "データ利用可能",
+      "streamNotFound": "ストリームが見つかりません",
+      "detects": "検出する内容",
+      "noDescription": "ライブラリに説明がありません。",
+      "needsDataCallout": "このアラートは {stream} をクエリしますが、この組織は受信していません。今インストールすると、決して発火しないアラートが作成されます。",
+      "query": "クエリ",
+      "stream": "ストリーム",
+      "streamType": "ストリームタイプ",
+      "metricCondition": "メトリック条件",
+      "matchCount": "一致する行が必要",
+      "previewBlocked": "{stream} はこの組織のストリームではないため、評価するものはありません。",
+      "wouldTrigger": "発火する",
+      "wouldNotTrigger": "発火しない",
+      "loading": "ライブラリからこのアラートを読み込んでいます",
+      "loadFailed": "このアラートをライブラリから読み込めませんでした。",
+      "customize": "エディターでカスタマイズ",
+      "customizeHint": "このアラートがあらかじめ入力された標準アラートエディターを開きます。",
+      "customizeFailed": "このアラートをエディターで開けませんでした。",
+      "install": "インストール",
+      "neverIngested": "まだデータがありません",
+      "neverIngestedCallout": "{stream} は存在しますが、データを受信したことがないため、このアラートが発火する対象はありません。",
+      "lastData": "最終データ {when}",
+      "staleCallout": "{stream} が最後にデータを受信したのは {when} です。このアラートは、取り込みが再開されるまで静かなままです。",
+      "unknownTime": "不明な時刻に"
+    },
+    "install": {
+      "title": "ライブラリからインストール",
+      "subtitle": "アラートの通知先、インストールするアラート、および保存先を選択します。",
+      "stepDestination": "宛先",
+      "stepAlerts": "アラート",
+      "stepFolder": "フォルダー",
+      "stepTune": "調整",
+      "stepInstall": "インストール",
+      "destinationIntro": "このバッチのすべてのアラートは、ここで選択した宛先に通知します。ライブラリファイルには、エクスポート元の組織の宛先が指定されていますが、その宛先はお使いの組織には存在しません。",
+      "destinationLabel": "宛先",
+      "destinationPlaceholder": "宛先を選択",
+      "destinationsLoadFailed": "既存の宛先を読み込めませんでした。",
+      "retry": "再試行",
+      "destinationsNoneBody": "この組織にはまだアラートの宛先がないため、これらのアラートの通知先がありません。宛先ページで作成してから、ここに戻って選択してください。",
+      "openDestinations": "宛先を開く",
+      "selectAll": "すべて選択",
+      "clear": "クリア",
+      "selectedCount": "{count} / {total} 選択中",
+      "folderIntro": "インストールされたアラートはここに保存されます。このバッチ専用のフォルダーが必要な場合は、+ ボタンからフォルダーを作成してください。",
+      "tuneToggle": "このバッチのすべてのアラートにこれらを設定",
+      "tuneHint": "バッチ全体に安全に設定できるのはこの2つだけです。しきい値はアラートごとに設定されます。変更するには、そのアラートを開いて個別にインストールします。",
+      "frequency": "実行間隔",
+      "silence": "サイレンス期間",
+      "minutes": "分",
+      "summaryTuningNone": "ライブラリのデフォルト",
+      "summaryTuningOverride": "{frequency} 分ごと、{silence} 分間ミュート",
+      "run": "{count} 件のアラートをインストール | {count} 件のアラートをインストール",
+      "retryFailed": "{count} 件の失敗を再試行 | {count} 件の失敗を再試行",
+      "allInstalled": "{count} 件のアラートがインストールされました | {count} 件のアラートがインストールされました",
+      "someFailed": "{installed} 件成功、{failed} 件失敗",
+      "unknownError": "アラートを作成できませんでした。",
+      "unreadableConditions": "このアラートのフィルター条件は、このバージョンでは読み取れない形式です。インストールするとフィルターのないアラートが作成されるため、スキップされました。",
+      "back": "戻る",
+      "next": "次へ",
+      "cancel": "キャンセル",
+      "done": "完了"
+    },
+    "error": {
+      "network": "ライブラリに到達できませんでした。ネットワーク接続を確認して、もう一度お試しください。",
+      "http": "ライブラリサーバーがエラーを返しました。しばらくしてからもう一度お試しください。",
+      "unparseable": "ライブラリの応答がカタログではありませんでした。",
+      "unsupported_version": "このライブラリカタログは、このバージョンのOpenObserveで読み取れるものより新しいです。参照するにはアップグレードしてください。",
+      "malformed": "ライブラリカタログが不完全または破損しています。"
+    }
+  },
   "alert_templates": {
     "exportTemplate": "テンプレートをエクスポート",
     "selected": "選択済み",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "テンプレート本文 *",
     "importTypeLabel": "テンプレートタイプ *",
     "importTitleLabel": "テンプレートタイトル *",
-    "header": "テンプレート",
+    "header": "宛先テンプレート",
     "add": "テンプレートを追加",
     "edit": "編集",
     "name": "名前",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "宛先の読み込みエラー"
   },
   "alert_destinations": {
+    "sectionTab": "宛先",
     "chooseTypeTitle": "タイプを選択",
     "selectDestinationType": "宛先タイプを選択",
     "connectionStepTitle": "接続",

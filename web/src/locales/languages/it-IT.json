@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "Crea nuova destinazione",
       "select": "Destinazione",
-      "loadError": "Errore durante il recupero delle destinazioni."
+      "loadError": "Errore durante il recupero delle destinazioni.",
+      "unsupportedType": "Tipo non supportato — I flussi di lavoro supportano solo destinazioni personalizzate"
     },
     "function": {
       "createNew": "Crea nuova funzione",
       "createNewNoteWorkflow": "Nota: La funzione verrà creata, poi verrai reindirizzato al modulo precedente per associare la funzione appena creata al workflow.",
       "select": "Seleziona funzione",
       "loadError": "Caricamento funzioni fallito",
+      "saved": "Funzione salvata correttamente",
+      "updated": "Funzione aggiornata correttamente",
+      "saveError": "Salvataggio funzione non riuscito",
       "flatten": "Dopo l'appiattimento",
       "guidelinesTitle": "Linee guida per l'esecuzione della funzione:",
       "rbf": "RBF (Esecuzione prima dell'appiattimento):",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "Esecuzioni del flusso di lavoro",
       "edit": "Modifica flusso di lavoro",
+      "debugInEditor": "Debug nell'editor",
       "staleGraphWarning": "Questo workflow è stato modificato dopo questa esecuzione — il {count} step che ha eseguito non esiste più, quindi il suo stato non viene mostrato qui. | Questo workflow è stato modificato dopo questa esecuzione — i {count} step che ha eseguito non esistono più, quindi i loro stati non vengono mostrati qui."
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "Successo",
       "failed": "Fallito",
       "open": "Cronologia",
+      "openFullView": "Apri la vista completa delle esecuzioni",
       "loadError": "Errore durante il caricamento delle esecuzioni",
       "loadRunError": "Errore durante il caricamento di questa esecuzione"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "È richiesto un trigger",
     "addStepRequired": "Aggiungi almeno un passo dopo il trigger",
     "connectAllNodes": "Collega tutti i nodi prima di salvare",
-    "finishStepsBeforePublish": "Completa la configurazione di tutti i passaggi prima di pubblicare",
+    "finishStepsBeforePublish": "{count} passaggio richiede configurazione prima della pubblicazione — evidenziato sulla tela. | {count} passaggi richiedono configurazione prima della pubblicazione — evidenziati sulla tela.",
     "draft": "Bozza",
     "saveDraft": "Salva come bozza",
     "publish": "Pubblica",
@@ -2698,6 +2704,11 @@
       "linkError": "Impossibile collegare gli avvisi."
     },
     "chooseTrigger": "Scegli un trigger",
+    "start": {
+      "triggerHint": "Seleziona l'evento che avvia il tuo flusso di lavoro",
+      "chooseAction": "Scegli un'azione",
+      "actionHint": "Seleziona cosa succede dopo il trigger"
+    },
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "Campi specifici dell'evento",
       "incidentNoExtraFields": "Questo evento non aggiunge campi oltre a quelli comuni.",
       "conditionNoteTitle": "Linee guida per le condizioni",
+      "functionFlattenTitle": "Prima vs Dopo l'appiattimento",
       "conditionNoteEmpty": "Per controllare un valore vuoto, usa \"\". Esempio:",
       "conditionNoteNull": "Per controllare un valore nullo, usa null. Esempio:",
       "conditionNoteCustom": "Per aggiungere una colonna personalizzata, digita il suo nome e premi Invio.",
@@ -2745,19 +2757,56 @@
       "enable": "Attiva passaggio",
       "disabledBadge": "Disattivato",
       "incompleteBadge": "Configura più tardi",
-      "destinationSetUpLater": "Configura più tardi",
-      "destinationSetUpLaterPrompt": "Non hai ancora una destinazione? Attiva questa opzione per configurarla più tardi — puoi salvare una bozza e fare test subito.",
-      "destinationSetUpLaterActive": "La destinazione viene saltata per ora — nome e commento vengono comunque salvati. Ti servirà una destinazione prima di pubblicare.",
-      "functionSetUpLater": "Configura più tardi",
-      "functionSetUpLaterPrompt": "Non hai ancora una funzione? Attiva questa opzione per configurarla più tardi — puoi salvare una bozza e fare test subito.",
-      "functionSetUpLaterActive": "La funzione viene saltata per ora — nome e commento vengono comunque salvati. Ti servirà una funzione prima di pubblicare."
+      "unsavedFnTitle": "Modifiche alla funzione non salvate",
+      "unsavedFnMessage": "Questo passaggio contiene codice di funzione non salvato nella tua libreria. Salvalo, scarta le modifiche o continua a modificare.",
+      "unsavedFnSave": "Salva funzione",
+      "unsavedFnDiscard": "Scarta modifiche",
+      "unsavedFnKeep": "Continua a modificare"
     },
     "commonFieldsAbove": "campi comuni qui sopra",
     "canvas": {
       "undo": "Annulla",
       "tidyUp": "Riordina",
-      "insertStep": "Inserisci passaggio",
-      "deleteEdge": "Elimina connessione"
+      "edgeDeleteHint": "Premi Backspace/Canc per rimuovere il collegamento"
+    },
+    "ndv": {
+      "input": "Input",
+      "output": "Output",
+      "config": "Configurazione",
+      "noInput": "Nessun record di input.",
+      "noOutput": "Nessun record inoltrato.",
+      "prevStep": "Passaggio precedente · {name}",
+      "nextStep": "Passaggio successivo · {name}",
+      "prevStepBtn": "Passaggio precedente",
+      "nextStepBtn": "Passaggio successivo",
+      "collapseSteps": "Comprimi passaggi",
+      "expandSteps": "Espandi passaggi",
+      "inputTag": "Input",
+      "openStep": "Apri {name}",
+      "runToView": "Esegui un test per visualizzare questi dati.",
+      "noBranchItems": "Nessun elemento in questo ramo.",
+      "noUpstream": "Nessun passaggio a monte.",
+      "noRunYet": "Nessuna esecuzione ancora.",
+      "runLabel": "Esegui",
+      "switchRun": "Cambia esecuzione",
+      "notInRun": "Questo passaggio non è incluso in questa esecuzione.",
+      "runTest": "Esegui test",
+      "noItems": "Nessun elemento",
+      "itemsCount": "{count} Elemento | {count} Elementi",
+      "viewTable": "Tabella",
+      "viewJson": "JSON",
+      "itemN": "Elemento {n}",
+      "executeStep": "Esegui passaggio",
+      "sample": "Campione",
+      "editStep": "Modifica passaggio",
+      "testInputHint": "Input di test — Modifica, quindi esegui il passaggio.",
+      "noRunsList": "Nessuna esecuzione ancora."
+    },
+    "runOverlay": {
+      "banner": "Visualizzazione dei dati del passaggio da un'esecuzione passata ({run}). Puoi modificare liberamente — questa esecuzione non viene mai modificata.",
+      "clear": "Cancella dati esecuzione",
+      "ghostNodes": "{count} passaggio di questa esecuzione non esiste più nel flusso di lavoro, quindi il suo stato non viene mostrato. | {count} passaggi di questa esecuzione non esistono più nel flusso di lavoro, quindi il loro stato non viene mostrato.",
+      "missingNode": "Quel passaggio non esiste più in questo flusso di lavoro — è stato rimosso dopo questa esecuzione."
     },
     "unsaved": {
       "title": "Modifiche non salvate",
@@ -2771,7 +2820,20 @@
       "expand": "Espandi",
       "close": "Cancella e chiudi i risultati",
       "nodesTitle": "Passaggi",
-      "empty": "Esegui un test per vedere i risultati dei passaggi qui."
+      "empty": "Esegui un test per vedere i risultati dei passaggi qui.",
+      "openNode": "Apri nodo",
+      "viewConfig": "Visualizza configurazione",
+      "hideConfig": "Nascondi configurazione",
+      "noConfig": "Nessuna configurazione",
+      "functionLabel": "Funzione",
+      "destinationLabel": "Destinazione",
+      "destinationUnsupported": "Tipo non supportato",
+      "destinationMissing": "Questa destinazione non esiste più o non può essere letta.",
+      "headersLabel": "Intestazioni",
+      "templateLabel": "Modello",
+      "outputFormatLabel": "Formato di output",
+      "tlsVerifyLabel": "Verifica TLS",
+      "tlsDisabled": "Disabilitato"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "Errore: Search SQL è stato annullato."
   },
   "alerts": {
+    "allAlerts": "Tutti gli avvisi",
     "compositeAlert": "Composito",
     "import": {
       "anomalyImportSuccess": "Rilevamento anomalie - {index}: \"{name}\" importato correttamente",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "Crea avviso",
           "toast": "Query importata dal pannello della dashboard: \"{sourceLabel}\""
+        },
+        "library": {
+          "label": "Personalizza nell'editor",
+          "toast": "Dalla libreria di avvisi: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "Usato da {destinations} · {alerts}",
     "impactDestination": "Usato da {alerts}"
   },
+  "alert_library": {
+    "header": "Libreria di avvisi",
+    "subtitle": "Avvisi curati e pronti da installare, abbinati ai dati che già ingerisci",
+    "sectionTab": "Libreria",
+    "contribute": "Contribuisci su GitHub",
+    "searchPlaceholder": "Cerca per nome, descrizione o stream",
+    "searchLabel": "Cerca nella libreria di avvisi",
+    "categories": "Categoria",
+    "searchCategories": "Cerca categorie",
+    "searchCategoriesAria": "Cerca filtri di categoria",
+    "noCategoryMatch": "Nessuna categoria corrisponde.",
+    "selectedCount": "{count} selezionati",
+    "facetAria": "{label}, {count} avvisi",
+    "severity": "Gravità",
+    "severityAll": "Tutti",
+    "severityCritical": "Critico",
+    "severityWarning": "Attenzione",
+    "severityInfo": "Info",
+    "statReady": "Pronto per l'installazione",
+    "statNeedsData": "Non ingerito",
+    "statAll": "Tutti",
+    "notIngested": "Non ingerito: {stream}",
+    "notIngestedHint": "Questa organizzazione non riceve {stream}, quindi questo avviso non scatterebbe mai. Installalo comunque e inizierà a funzionare quando arriveranno i dati.",
+    "alertCount": "{count} avviso | {count} avvisi",
+    "noCollectorTitle": "Niente qui corrisponde ancora ai tuoi dati",
+    "noCollectorDescription": "Nessuno di questi {count} avvisi interroga uno stream che questa organizzazione riceve. Invia la telemetria di {group} a OpenObserve e si accenderanno qui.",
+    "setupGuide": "Guida all'ingestione",
+    "emptyLibraryTitle": "La libreria di avvisi è vuota",
+    "emptyLibraryDescription": "Il catalogo è stato caricato ma non contiene avvisi. Questo è un problema di pubblicazione, non un filtro — riprova tra poco.",
+    "noMatchesTitle": "Nessun avviso corrisponde a questi filtri",
+    "noMatchesDescription": "Prova un'altra categoria, gravità o termine di ricerca.",
+    "clearFilters": "Azzera filtri",
+    "loadFailedTitle": "Impossibile caricare la libreria di avvisi",
+    "retry": "Riprova",
+    "openDetails": "Apri {title}",
+    "drawer": {
+      "dataAvailable": "Dati disponibili",
+      "streamNotFound": "Stream non trovato",
+      "detects": "Cosa rileva",
+      "noDescription": "Nessuna descrizione nella libreria.",
+      "needsDataCallout": "Questo avviso interroga {stream}, che questa organizzazione non sta ricevendo. Installarlo ora creerebbe un avviso che non scatta mai.",
+      "query": "Query",
+      "stream": "Stream",
+      "streamType": "Tipo di stream",
+      "metricCondition": "Condizione metrica",
+      "matchCount": "Righe corrispondenti richieste",
+      "previewBlocked": "{stream} non è uno stream in questa organizzazione, quindi non c'è nulla da valutare.",
+      "wouldTrigger": "Scatterebbe",
+      "wouldNotTrigger": "Non scatterebbe",
+      "loading": "Caricamento di questo avviso dalla libreria",
+      "loadFailed": "Impossibile caricare questo avviso dalla libreria.",
+      "customize": "Personalizza nell'editor",
+      "customizeHint": "Apre l'editor di avvisi standard precompilato con questo avviso.",
+      "customizeFailed": "Impossibile aprire questo avviso nell'editor.",
+      "install": "Installa",
+      "neverIngested": "Ancora nessun dato",
+      "neverIngestedCallout": "{stream} esiste ma non ha mai ricevuto dati, quindi questo avviso non ha nulla su cui attivarsi.",
+      "lastData": "Ultimi dati {when}",
+      "staleCallout": "{stream} ha ricevuto dati l'ultima volta {when}. Questo avviso resterà in silenzio finché l'ingestione non riprende.",
+      "unknownTime": "in un momento sconosciuto"
+    },
+    "install": {
+      "title": "Installa dalla libreria",
+      "subtitle": "Scegli dove gli avvisi notificano, quali avvisi installare e dove vengono archiviati.",
+      "stepDestination": "Destinazione",
+      "stepAlerts": "Avvisi",
+      "stepFolder": "Cartella",
+      "stepTune": "Regola",
+      "stepInstall": "Installa",
+      "destinationIntro": "Ogni avviso in questo lotto notifica la destinazione che scegli qui. I file della libreria nominano le destinazioni dell'organizzazione da cui sono stati esportati, che non esistono nella tua.",
+      "destinationLabel": "Destinazione",
+      "destinationPlaceholder": "Scegli una destinazione",
+      "destinationsLoadFailed": "Impossibile caricare le tue destinazioni esistenti.",
+      "retry": "Riprova",
+      "destinationsNoneBody": "Questa organizzazione non ha ancora destinazioni per gli avvisi, quindi non c'è dove questi avvisi possano notificare. Creane una nella pagina Destinazioni, poi torna e selezionala qui.",
+      "openDestinations": "Apri Destinazioni",
+      "selectAll": "Seleziona tutto",
+      "clear": "Azzera",
+      "selectedCount": "{count} di {total} selezionati",
+      "folderIntro": "Gli avvisi installati vengono archiviati qui. Crea una cartella dal pulsante + se questo lotto merita una propria.",
+      "tuneToggle": "Imposta questi per ogni avviso in questo lotto",
+      "tuneHint": "Solo questi due sono sicuri da impostare per un intero lotto. Le soglie restano per singolo avviso: modificale aprendo quell'avviso e installandolo singolarmente.",
+      "frequency": "Esegui ogni",
+      "silence": "Silenzia per",
+      "minutes": "min",
+      "summaryTuningNone": "Valori predefiniti della libreria",
+      "summaryTuningOverride": "Ogni {frequency} min, silenziato per {silence} min",
+      "run": "Installa {count} avviso | Installa {count} avvisi",
+      "retryFailed": "Riprova {count} errore | Riprova {count} errori",
+      "allInstalled": "{count} avviso installato | {count} avvisi installati",
+      "someFailed": "{installed} installati, {failed} falliti",
+      "unknownError": "Non è stato possibile creare l'avviso.",
+      "unreadableConditions": "Le condizioni di filtro di questo avviso sono in un formato che questa versione non può leggere. Installarlo creerebbe un avviso senza filtro, quindi è stato saltato.",
+      "back": "Indietro",
+      "next": "Avanti",
+      "cancel": "Annulla",
+      "done": "Fine"
+    },
+    "error": {
+      "network": "Impossibile raggiungere la libreria. Controlla la connessione di rete e riprova.",
+      "http": "Il server della libreria ha restituito un errore. Riprova tra un momento.",
+      "unparseable": "La libreria ha risposto con qualcosa che non è un catalogo.",
+      "unsupported_version": "Questo catalogo della libreria è più recente di quanto questa versione di OpenObserve possa leggere. Aggiorna per sfogliarlo.",
+      "malformed": "Il catalogo della libreria è incompleto o danneggiato."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "Esporta template",
     "selected": "selezionati",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "Corpo template *",
     "importTypeLabel": "Tipo template *",
     "importTitleLabel": "Titolo template *",
-    "header": "Template",
+    "header": "Modelli di destinazione",
     "add": "Aggiungi template",
     "edit": "Modifica",
     "name": "Nome",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "Errore durante il caricamento delle destinazioni"
   },
   "alert_destinations": {
+    "sectionTab": "Destinazioni",
     "chooseTypeTitle": "Scegli il tipo",
     "selectDestinationType": "Seleziona il tipo di destinazione",
     "connectionStepTitle": "Connessione",

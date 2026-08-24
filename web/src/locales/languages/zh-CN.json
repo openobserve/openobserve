@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "创建新目的地",
       "select": "目的地",
-      "loadError": "拉取目的地时出错。"
+      "loadError": "拉取目的地时出错。",
+      "unsupportedType": "不支持的类型 — 工作流仅支持自定义目标"
     },
     "function": {
       "createNew": "创建新函数",
       "createNewNoteWorkflow": "注意：函数将被创建，然后您将被重定向到之前的表单，将新创建的函数与工作流关联。",
       "select": "选择函数",
       "loadError": "加载函数失败",
+      "saved": "函数保存成功",
+      "updated": "函数更新成功",
+      "saveError": "保存函数失败",
       "flatten": "展平后",
       "guidelinesTitle": "函数执行指南：",
       "rbf": "RBF（展平前运行）：",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "工作流运行",
       "edit": "编辑工作流",
+      "debugInEditor": "在编辑器中调试",
       "staleGraphWarning": "此工作流自本次运行后已被编辑 — {count} 个已执行的步骤不再存在，因此此处不显示其状态。 | 此工作流自本次运行后已被编辑 — {count} 个已执行的步骤不再存在，因此此处不显示其状态。"
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "成功",
       "failed": "失败",
       "open": "历史",
+      "openFullView": "打开完整运行视图",
       "loadError": "加载执行时出错",
       "loadRunError": "加载本次运行时出错"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "需要触发器",
     "addStepRequired": "在触发器后至少添加一个步骤",
     "connectAllNodes": "保存前连接所有节点",
-    "finishStepsBeforePublish": "完成所有步骤配置后再发布",
+    "finishStepsBeforePublish": "{count} 个步骤在发布前需要设置 — 已在画布上高亮显示。 | {count} 个步骤在发布前需要设置 — 已在画布上高亮显示。",
     "draft": "草稿",
     "saveDraft": "保存为草稿",
     "publish": "发布",
@@ -2698,6 +2704,11 @@
       "linkError": "无法链接告警。"
     },
     "chooseTrigger": "选择触发器",
+    "start": {
+      "triggerHint": "选择启动工作流的事件",
+      "chooseAction": "选择操作",
+      "actionHint": "选择触发后要执行的操作"
+    },
     "node": {
       "kindTrigger": "触发器",
       "kindLogic": "逻辑",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "事件特定字段",
       "incidentNoExtraFields": "此事件除了公共字段外，不添加任何字段。",
       "conditionNoteTitle": "条件指南",
+      "functionFlattenTitle": "展平前后",
       "conditionNoteEmpty": "要检查空值，请使用 \"\"。例如：",
       "conditionNoteNull": "要检查空值，请使用 null。例如：",
       "conditionNoteCustom": "要添加自定义列，请键入其名称并按回车。",
@@ -2745,19 +2757,56 @@
       "enable": "启用步骤",
       "disabledBadge": "已禁用",
       "incompleteBadge": "稍后设置",
-      "destinationSetUpLater": "稍后设置",
-      "destinationSetUpLaterPrompt": "还没有目标？开启此项可稍后设置 — 现在即可保存草稿并测试。",
-      "destinationSetUpLaterActive": "目标暂时跳过 — 名称和备注仍会保存。发布前需要先提供目标。",
-      "functionSetUpLater": "稍后设置",
-      "functionSetUpLaterPrompt": "还没有函数？开启此项可稍后设置 — 现在即可保存草稿并测试。",
-      "functionSetUpLaterActive": "函数暂时跳过 — 名称和备注仍会保存。发布前需要先提供函数。"
+      "unsavedFnTitle": "未保存的函数更改",
+      "unsavedFnMessage": "此步骤包含未保存到库中的函数代码。保存它、丢弃更改或继续编辑。",
+      "unsavedFnSave": "保存函数",
+      "unsavedFnDiscard": "放弃更改",
+      "unsavedFnKeep": "继续编辑"
     },
     "commonFieldsAbove": "以上为公共字段",
     "canvas": {
       "undo": "撤销",
       "tidyUp": "整理",
-      "insertStep": "插入步骤",
-      "deleteEdge": "删除连接"
+      "edgeDeleteHint": "按 Backspace/Delete 键删除连接线"
+    },
+    "ndv": {
+      "input": "输入",
+      "output": "输出",
+      "config": "配置",
+      "noInput": "没有输入记录。",
+      "noOutput": "没有转发记录。",
+      "prevStep": "上一步 · {name}",
+      "nextStep": "下一步 · {name}",
+      "prevStepBtn": "上一步",
+      "nextStepBtn": "下一步",
+      "collapseSteps": "折叠步骤",
+      "expandSteps": "展开步骤",
+      "inputTag": "输入",
+      "openStep": "打开 {name}",
+      "runToView": "运行测试以查看此数据。",
+      "noBranchItems": "此分支上没有项目。",
+      "noUpstream": "没有上游步骤。",
+      "noRunYet": "尚无运行记录。",
+      "runLabel": "运行",
+      "switchRun": "切换运行",
+      "notInRun": "此步骤未包含在此次运行中。",
+      "runTest": "运行测试",
+      "noItems": "无项目",
+      "itemsCount": "{count} 个项目 | {count} 个项目",
+      "viewTable": "表格",
+      "viewJson": "JSON",
+      "itemN": "项目 {n}",
+      "executeStep": "运行步骤",
+      "sample": "示例",
+      "editStep": "编辑步骤",
+      "testInputHint": "测试输入 — 编辑，然后运行步骤。",
+      "noRunsList": "尚无运行记录。"
+    },
+    "runOverlay": {
+      "banner": "正在显示过去一次运行 ({run}) 中的步骤数据。您可以自由编辑 — 这次运行绝不会被更改。",
+      "clear": "清除运行数据",
+      "ghostNodes": "{count} 个来自此运行的步骤在工作流中已不存在，因此不显示其状态。 | {count} 个来自此运行的步骤在工作流中已不存在，因此不显示其状态。",
+      "missingNode": "该步骤在此工作流中已不存在 — 它在此运行后被移除。"
     },
     "unsaved": {
       "title": "未保存的更改",
@@ -2771,7 +2820,20 @@
       "expand": "展开",
       "close": "清除并关闭结果",
       "nodesTitle": "步骤",
-      "empty": "运行测试以在此处查看步骤结果。"
+      "empty": "运行测试以在此处查看步骤结果。",
+      "openNode": "打开节点",
+      "viewConfig": "查看配置",
+      "hideConfig": "隐藏配置",
+      "noConfig": "无配置",
+      "functionLabel": "函数",
+      "destinationLabel": "目标",
+      "destinationUnsupported": "不支持的类型",
+      "destinationMissing": "此目标已不存在或无法读取。",
+      "headersLabel": "标头",
+      "templateLabel": "模板",
+      "outputFormatLabel": "输出格式",
+      "tlsVerifyLabel": "TLS 验证",
+      "tlsDisabled": "已禁用"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "错误：搜索 SQL 已取消。"
   },
   "alerts": {
+    "allAlerts": "所有告警",
     "compositeAlert": "复合",
     "import": {
       "anomalyImportSuccess": "异常检测 - {index}: \"{name}\" 导入成功",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "创建警报",
           "toast": "查询已从仪表板面板导入：\"{sourceLabel}\""
+        },
+        "library": {
+          "label": "在编辑器中自定义",
+          "toast": "来自告警库：{sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "被 {destinations} · {alerts} 使用",
     "impactDestination": "被 {alerts} 使用"
   },
+  "alert_library": {
+    "header": "告警库",
+    "subtitle": "精选且可立即安装的告警，与您已摄取的数据相匹配。",
+    "sectionTab": "库",
+    "contribute": "在 GitHub 上贡献",
+    "searchPlaceholder": "按名称、描述或流搜索",
+    "searchLabel": "搜索告警库",
+    "categories": "类别",
+    "searchCategories": "搜索类别",
+    "searchCategoriesAria": "搜索类别筛选器",
+    "noCategoryMatch": "没有匹配的类别。",
+    "selectedCount": "{count} 个已选",
+    "facetAria": "{label}，{count} 个告警",
+    "severity": "严重性",
+    "severityAll": "全部",
+    "severityCritical": "严重",
+    "severityWarning": "警告",
+    "severityInfo": "信息",
+    "statReady": "可安装",
+    "statNeedsData": "未摄取",
+    "statAll": "全部",
+    "notIngested": "未摄取：{stream}",
+    "notIngestedHint": "该组织未接收 {stream}，因此此告警永远不会触发。仍可安装它，一旦数据到达，它就会开始工作。",
+    "alertCount": "{count} 个告警 | {count} 个告警",
+    "noCollectorTitle": "这里还没有任何内容与您的数据匹配。",
+    "noCollectorDescription": "这些 {count} 个告警均未查询此组织正在接收的流。将 {group} 遥测数据发送到 OpenObserve，它们就会在此显示。",
+    "setupGuide": "摄取指南",
+    "emptyLibraryTitle": "告警库为空",
+    "emptyLibraryDescription": "目录已加载但不包含任何告警。这是发布问题，不是筛选问题 — 请稍后重试。",
+    "noMatchesTitle": "没有告警匹配这些筛选器",
+    "noMatchesDescription": "尝试其他类别、严重性或搜索词。",
+    "clearFilters": "清除筛选器",
+    "loadFailedTitle": "无法加载告警库",
+    "retry": "重试",
+    "openDetails": "打开 {title}",
+    "drawer": {
+      "dataAvailable": "数据可用",
+      "streamNotFound": "未找到流",
+      "detects": "检测内容",
+      "noDescription": "库中没有描述。",
+      "needsDataCallout": "此告警查询 {stream}，但此组织未接收该流。现在安装它会创建一个永远不会触发的告警。",
+      "query": "查询",
+      "stream": "流",
+      "streamType": "流类型",
+      "metricCondition": "指标条件",
+      "matchCount": "所需匹配行数",
+      "previewBlocked": "{stream} 不是此组织中的流，因此没有可评估的内容。",
+      "wouldTrigger": "会触发",
+      "wouldNotTrigger": "不会触发",
+      "loading": "正在从库中加载此告警",
+      "loadFailed": "无法从库中加载此告警。",
+      "customize": "在编辑器中自定义",
+      "customizeHint": "打开已预填此告警的标准告警编辑器。",
+      "customizeFailed": "无法在编辑器中打开此告警。",
+      "install": "安装",
+      "neverIngested": "暂无数据",
+      "neverIngestedCallout": "{stream} 存在但从未接收过数据，因此此告警没有可触发的内容。",
+      "lastData": "最近数据 {when}",
+      "staleCallout": "{stream} 最近接收数据的时间为 {when}。此告警将保持静默，直到数据摄取恢复。",
+      "unknownTime": "在未知时间"
+    },
+    "install": {
+      "title": "从库中安装",
+      "subtitle": "选择告警通知的位置、要安装的告警以及它们归档的位置。",
+      "stepDestination": "目标",
+      "stepAlerts": "告警",
+      "stepFolder": "文件夹",
+      "stepTune": "调整",
+      "stepInstall": "安装",
+      "destinationIntro": "此批次中的每个告警都会通知您在此选择的目标。库文件会引用它们导出自的组织的目标，这些目标在您的组织中不存在。",
+      "destinationLabel": "目标",
+      "destinationPlaceholder": "选择一个目标",
+      "destinationsLoadFailed": "无法加载您现有的目标。",
+      "retry": "重试",
+      "destinationsNoneBody": "此组织尚无告警目标，因此这些告警无处通知。请在“目标”页面创建一个，然后返回此处选择。",
+      "openDestinations": "打开目标",
+      "selectAll": "全选",
+      "clear": "清除",
+      "selectedCount": "已选择 {count} / {total}",
+      "folderIntro": "已安装的告警在此归档。如果此批次需要有独立的文件夹，请点击 + 按钮创建一个。",
+      "tuneToggle": "为此批次中的每个告警设置这些",
+      "tuneHint": "只有这两个可以安全地为整个批次设置。阈值保持每个告警单独设置——通过打开该告警并单独安装来更改。",
+      "frequency": "运行间隔",
+      "silence": "静默时长",
+      "minutes": "分钟",
+      "summaryTuningNone": "库默认值",
+      "summaryTuningOverride": "每 {frequency} 分钟，静音 {silence} 分钟",
+      "run": "安装 {count} 个告警 | 安装 {count} 个告警",
+      "retryFailed": "重试 {count} 个失败项 | 重试 {count} 个失败项",
+      "allInstalled": "已安装 {count} 个告警 | 已安装 {count} 个告警",
+      "someFailed": "已安装 {installed} 个，失败 {failed} 个",
+      "unknownError": "无法创建告警。",
+      "unreadableConditions": "此告警的筛选条件采用当前版本无法读取的格式。安装它将会创建一个没有筛选条件的告警，因此已跳过。",
+      "back": "上一步",
+      "next": "下一步",
+      "cancel": "取消",
+      "done": "完成"
+    },
+    "error": {
+      "network": "无法访问库。请检查网络连接后重试。",
+      "http": "库服务器返回错误。请稍后重试。",
+      "unparseable": "库返回的内容不是目录。",
+      "unsupported_version": "此库目录版本较新，当前版本的 OpenObserve 无法读取。请升级后浏览。",
+      "malformed": "此库目录不完整或已损坏。"
+    }
+  },
   "alert_templates": {
     "exportTemplate": "导出模板",
     "selected": "已选择",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "模板正文 *",
     "importTypeLabel": "模板类型 *",
     "importTitleLabel": "模板标题 *",
-    "header": "模板",
+    "header": "目标模板",
     "add": "添加模板",
     "edit": "编辑",
     "name": "名称",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "加载目标时出错"
   },
   "alert_destinations": {
+    "sectionTab": "目标",
     "chooseTypeTitle": "选择类型",
     "selectDestinationType": "选择目标类型",
     "connectionStepTitle": "连接",

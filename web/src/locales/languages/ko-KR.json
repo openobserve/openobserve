@@ -840,13 +840,17 @@
     "destination": {
       "createNew": "새 대상 생성",
       "select": "대상",
-      "loadError": "대상 가져오기 중 오류가 발생했습니다."
+      "loadError": "대상 가져오기 중 오류가 발생했습니다.",
+      "unsupportedType": "지원되지 않는 유형 — 워크플로는 사용자 지정 대상만 지원합니다."
     },
     "function": {
       "createNew": "새 함수 생성",
       "createNewNoteWorkflow": "참고: 함수가 생성된 후, 이전 양식으로 리디렉션되어 새로 생성된 함수를 워크플로우에 연결하게 됩니다.",
       "select": "함수 선택",
       "loadError": "함수 로드 실패",
+      "saved": "함수가 성공적으로 저장되었습니다.",
+      "updated": "함수가 성공적으로 업데이트되었습니다.",
+      "saveError": "함수 저장에 실패했습니다.",
       "flatten": "평탄화 후",
       "guidelinesTitle": "함수 실행 지침:",
       "rbf": "RBF (평탄화 전 실행):",
@@ -2549,6 +2553,7 @@
     "runs": {
       "title": "워크플로 실행",
       "edit": "워크플로 편집",
+      "debugInEditor": "편집기에서 디버그",
       "staleGraphWarning": "이 워크플로는 이 실행 이후 편집되었습니다 — 실행된 {count} 단계가 더 이상 존재하지 않으므로 상태가 여기에 표시되지 않습니다. | 이 워크플로는 이 실행 이후 편집되었습니다 — 실행된 {count} 단계가 더 이상 존재하지 않으므로 상태가 여기에 표시되지 않습니다."
     },
     "history": {
@@ -2566,6 +2571,7 @@
       "success": "성공",
       "failed": "실패",
       "open": "기록",
+      "openFullView": "전체 실행 보기 열기",
       "loadError": "실행을 로드하는 중 오류 발생",
       "loadRunError": "이 실행을 로드하는 중 오류 발생"
     },
@@ -2584,7 +2590,7 @@
     "triggerRequired": "트리거가 필요합니다.",
     "addStepRequired": "트리거 뒤에 최소 하나의 단계를 추가하세요.",
     "connectAllNodes": "저장하기 전에 모든 노드를 연결하세요.",
-    "finishStepsBeforePublish": "게시하기 전에 모든 단계 구성을 완료하세요",
+    "finishStepsBeforePublish": "{count} 단계는 게시 전에 설정이 필요합니다 — 캔버스에서 강조 표시됩니다. | {count} 단계는 게시 전에 설정이 필요합니다 — 캔버스에서 강조 표시됩니다.",
     "draft": "초안",
     "saveDraft": "초안으로 저장",
     "publish": "게시",
@@ -2698,6 +2704,11 @@
       "linkError": "알림을 연결할 수 없습니다."
     },
     "chooseTrigger": "트리거 선택",
+    "start": {
+      "triggerHint": "워크플로를 시작할 이벤트를 선택하세요.",
+      "chooseAction": "작업 선택",
+      "actionHint": "트리거 후 발생할 작업을 선택하세요."
+    },
     "node": {
       "kindTrigger": "트리거",
       "kindLogic": "로직",
@@ -2720,6 +2731,7 @@
       "incidentSpecificTitle": "이벤트별 필드",
       "incidentNoExtraFields": "이 이벤트는 공통 필드 외에 추가 필드가 없습니다.",
       "conditionNoteTitle": "조건 가이드라인",
+      "functionFlattenTitle": "평면화 전후",
       "conditionNoteEmpty": "빈 값을 확인하려면 \"\"를 사용하세요. 예:",
       "conditionNoteNull": "널 값을 확인하려면 null을 사용하세요. 예:",
       "conditionNoteCustom": "사용자 정의 열을 추가하려면 이름을 입력하고 Enter를 누르세요.",
@@ -2745,19 +2757,56 @@
       "enable": "단계 활성화",
       "disabledBadge": "비활성화됨",
       "incompleteBadge": "나중에 설정",
-      "destinationSetUpLater": "아직 대상이 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
-      "destinationSetUpLaterPrompt": "대상은 지금 건너뜁니다 — 이름과 댓글은 여전히 저장됩니다. 게시하기 전에 대상이 필요합니다.",
-      "destinationSetUpLaterActive": "나중에 설정",
-      "functionSetUpLater": "아직 함수가 없으신가요? 이 옵션을 켜면 나중에 설정할 수 있습니다 — 지금 초안을 저장하고 테스트할 수 있습니다.",
-      "functionSetUpLaterPrompt": "함수는 지금 건너뜁니다 — 이름과 댓글은 여전히 저장됩니다. 게시하기 전에 함수가 필요합니다.",
-      "functionSetUpLaterActive": "나중에 설정"
+      "unsavedFnTitle": "저장되지 않은 함수 변경 사항",
+      "unsavedFnMessage": "이 단계에는 라이브러리에 저장되지 않은 함수 코드가 있습니다. 저장하거나 변경 사항을 취소하거나 계속 편집하세요.",
+      "unsavedFnSave": "함수 저장",
+      "unsavedFnDiscard": "변경 사항 취소",
+      "unsavedFnKeep": "계속 편집"
     },
     "commonFieldsAbove": "위의 공통 필드",
     "canvas": {
       "undo": "실행 취소",
       "tidyUp": "정리",
-      "insertStep": "단계 삽입",
-      "deleteEdge": "연결 삭제"
+      "edgeDeleteHint": "Backspace/Delete 키를 눌러 엣지를 제거하세요."
+    },
+    "ndv": {
+      "input": "입력",
+      "output": "출력",
+      "config": "구성",
+      "noInput": "입력 레코드가 없습니다.",
+      "noOutput": "전달된 레코드가 없습니다.",
+      "prevStep": "이전 단계 · {name}",
+      "nextStep": "다음 단계 · {name}",
+      "prevStepBtn": "이전 단계",
+      "nextStepBtn": "다음 단계",
+      "collapseSteps": "단계 접기",
+      "expandSteps": "단계 펼치기",
+      "inputTag": "입력",
+      "openStep": "{name} 열기",
+      "runToView": "이 데이터를 보려면 테스트를 실행하세요.",
+      "noBranchItems": "이 분기에는 항목이 없습니다.",
+      "noUpstream": "업스트림 단계가 없습니다.",
+      "noRunYet": "아직 실행이 없습니다.",
+      "runLabel": "실행",
+      "switchRun": "실행 전환",
+      "notInRun": "이 단계는 이 실행에 포함되지 않습니다.",
+      "runTest": "테스트 실행",
+      "noItems": "항목 없음",
+      "itemsCount": "{count}개 항목 | {count}개 항목",
+      "viewTable": "표",
+      "viewJson": "JSON",
+      "itemN": "항목 {n}",
+      "executeStep": "단계 실행",
+      "sample": "샘플",
+      "editStep": "단계 편집",
+      "testInputHint": "테스트 입력 — 편집한 후 단계를 실행하세요.",
+      "noRunsList": "아직 실행이 없습니다."
+    },
+    "runOverlay": {
+      "banner": "과거 실행({run})의 단계 데이터를 표시합니다. 자유롭게 편집할 수 있습니다 — 이 실행은 변경되지 않습니다.",
+      "clear": "실행 데이터 지우기",
+      "ghostNodes": "이 실행의 {count} 단계는 더 이상 워크플로에 존재하지 않으므로 상태가 표시되지 않습니다. | 이 실행의 {count} 단계는 더 이상 워크플로에 존재하지 않으므로 상태가 표시되지 않습니다.",
+      "missingNode": "이 단계는 이 워크플로에 더 이상 존재하지 않습니다 — 이 실행 후에 제거되었습니다."
     },
     "unsaved": {
       "title": "저장되지 않은 변경 사항",
@@ -2771,7 +2820,20 @@
       "expand": "펼치기",
       "close": "결과 지우기 및 닫기",
       "nodesTitle": "단계",
-      "empty": "여기에서 테스트를 실행하여 단계 결과를 확인하세요."
+      "empty": "여기에서 테스트를 실행하여 단계 결과를 확인하세요.",
+      "openNode": "노드 열기",
+      "viewConfig": "구성 보기",
+      "hideConfig": "구성 숨기기",
+      "noConfig": "구성 없음",
+      "functionLabel": "함수",
+      "destinationLabel": "대상",
+      "destinationUnsupported": "지원되지 않는 유형",
+      "destinationMissing": "이 대상은 더 이상 존재하지 않거나 읽을 수 없습니다.",
+      "headersLabel": "헤더",
+      "templateLabel": "템플릿",
+      "outputFormatLabel": "출력 형식",
+      "tlsVerifyLabel": "TLS 검증",
+      "tlsDisabled": "비활성화됨"
     }
   },
   "pipeline": {
@@ -6017,6 +6079,7 @@
     "SearchSQLCancelled": "오류: 검색 SQL이 취소되었습니다."
   },
   "alerts": {
+    "allAlerts": "모든 알림",
     "compositeAlert": "복합",
     "import": {
       "anomalyImportSuccess": "이상 탐지 - {index}: \"{name}\"을(를) 성공적으로 가져왔습니다.",
@@ -7345,6 +7408,10 @@
         "panel": {
           "label": "경고 만들기",
           "toast": "대시보드 패널 \"{sourceLabel}\"에서 쿼리를 가져왔습니다."
+        },
+        "library": {
+          "label": "편집기에서 사용자 지정",
+          "toast": "알림 라이브러리에서: {sourceLabel}"
         }
       },
       "warnings": {
@@ -7405,6 +7472,112 @@
     "impactTemplate": "사용처: {destinations} · {alerts}",
     "impactDestination": "사용처: {alerts}"
   },
+  "alert_library": {
+    "header": "알림 라이브러리",
+    "subtitle": "큐레이션된 즉시 설치 가능한 알림으로, 이미 수집 중인 데이터와 대조됩니다",
+    "sectionTab": "라이브러리",
+    "contribute": "GitHub에서 기여하기",
+    "searchPlaceholder": "이름, 설명 또는 스트림으로 검색",
+    "searchLabel": "알림 라이브러리 검색",
+    "categories": "범주",
+    "searchCategories": "범주 검색",
+    "searchCategoriesAria": "범주 필터 검색",
+    "noCategoryMatch": "일치하는 범주가 없습니다.",
+    "selectedCount": "{count}개 선택됨",
+    "facetAria": "{label}, {count}개의 알림",
+    "severity": "심각도",
+    "severityAll": "전체",
+    "severityCritical": "치명적",
+    "severityWarning": "경고",
+    "severityInfo": "정보",
+    "statReady": "설치 준비됨",
+    "statNeedsData": "수집되지 않음",
+    "statAll": "전체",
+    "notIngested": "수집되지 않음: {stream}",
+    "notIngestedHint": "이 조직은 {stream}을(를) 수신하지 않으므로 이 알림은 절대 발생하지 않습니다. 그래도 설치하면 데이터가 도착하는 즉시 작동을 시작합니다.",
+    "alertCount": "{count}개 알림 | {count}개 알림",
+    "noCollectorTitle": "아직 여기에 데이터와 일치하는 항목이 없습니다",
+    "noCollectorDescription": "이 {count}개의 알림 중 어느 것도 이 조직이 수신하는 스트림을 쿼리하지 않습니다. {group} 텔레메트리를 OpenObserve로 보내면 여기에 표시됩니다.",
+    "setupGuide": "수집 가이드",
+    "emptyLibraryTitle": "알림 라이브러리가 비어 있습니다",
+    "emptyLibraryDescription": "카탈로그가 로드되었지만 알림이 포함되어 있지 않습니다. 이는 필터 문제가 아니라 게시 문제입니다 — 잠시 후 다시 시도하세요.",
+    "noMatchesTitle": "이 필터와 일치하는 알림이 없습니다",
+    "noMatchesDescription": "다른 범주, 심각도 또는 검색어를 시도하세요.",
+    "clearFilters": "필터 지우기",
+    "loadFailedTitle": "알림 라이브러리를 로드할 수 없습니다",
+    "retry": "재시도",
+    "openDetails": "{title} 열기",
+    "drawer": {
+      "dataAvailable": "데이터 사용 가능",
+      "streamNotFound": "스트림을 찾을 수 없음",
+      "detects": "감지 대상",
+      "noDescription": "라이브러리에 설명이 없습니다.",
+      "needsDataCallout": "이 경보는 {stream}을(를) 조회하지만 이 조직은 해당 스트림을 수신하지 않습니다. 지금 설치하면 절대 발생하지 않는 경보가 만들어집니다.",
+      "query": "쿼리",
+      "stream": "스트림",
+      "streamType": "스트림 유형",
+      "metricCondition": "메트릭 조건",
+      "matchCount": "일치하는 행 필요",
+      "previewBlocked": "{stream}은(는) 이 조직의 스트림이 아니므로 평가할 항목이 없습니다.",
+      "wouldTrigger": "발생함",
+      "wouldNotTrigger": "발생 안 함",
+      "loading": "라이브러리에서 이 경보를 불러오는 중",
+      "loadFailed": "라이브러리에서 이 경보를 불러올 수 없습니다.",
+      "customize": "편집기에서 사용자 지정",
+      "customizeHint": "이 경보가 미리 채워진 표준 경보 편집기를 엽니다.",
+      "customizeFailed": "편집기에서 이 경보를 열 수 없습니다.",
+      "install": "설치",
+      "neverIngested": "아직 데이터 없음",
+      "neverIngestedCallout": "{stream}은(는) 존재하지만 데이터를 받은 적이 없으므로 이 경보가 발생할 대상이 없습니다.",
+      "lastData": "마지막 데이터 {when}",
+      "staleCallout": "{stream}이(가) 마지막으로 데이터를 수신한 시점은 {when}입니다. 수집이 재개될 때까지 이 경보는 발생하지 않습니다.",
+      "unknownTime": "알 수 없는 시간에"
+    },
+    "install": {
+      "title": "라이브러리에서 설치",
+      "subtitle": "경보가 알림을 보낼 대상, 설치할 경보, 그리고 경보가 보관될 위치를 선택하세요.",
+      "stepDestination": "대상",
+      "stepAlerts": "경보",
+      "stepFolder": "폴더",
+      "stepTune": "조정",
+      "stepInstall": "설치",
+      "destinationIntro": "이 배치의 모든 경보는 여기에서 선택한 대상으로 알림을 보냅니다. 라이브러리 파일에는 해당 경보가 내보내진 조직의 대상 이름이 명시되어 있으며, 그 대상은 현재 조직에 존재하지 않습니다.",
+      "destinationLabel": "대상",
+      "destinationPlaceholder": "대상 선택",
+      "destinationsLoadFailed": "기존 대상을 불러올 수 없습니다.",
+      "retry": "다시 시도",
+      "destinationsNoneBody": "이 조직에는 아직 경보 대상이 없으므로 경보가 알림을 보낼 곳이 없습니다. Destinations 페이지에서 대상을 만든 후 돌아와서 여기에서 선택하세요.",
+      "openDestinations": "Destinations 열기",
+      "selectAll": "전체 선택",
+      "clear": "선택 해제",
+      "selectedCount": "{count}/{total} 선택됨",
+      "folderIntro": "설치된 경보는 여기에 보관됩니다. 이 배치만의 폴더가 필요하면 + 버튼에서 폴더를 만드세요.",
+      "tuneToggle": "이 배치의 모든 경보에 대해 이러한 항목을 설정합니다.",
+      "tuneHint": "전체 배치에 안전하게 설정할 수 있는 것은 이 두 가지만입니다. 임계값은 경보별로 유지됩니다. 경보를 열어서 단독으로 설치하면 하나를 변경할 수 있습니다.",
+      "frequency": "실행 주기",
+      "silence": "무음 시간",
+      "minutes": "분",
+      "summaryTuningNone": "라이브러리 기본값",
+      "summaryTuningOverride": "{frequency}분마다, {silence}분 동안 음소거됨",
+      "run": "알림 {count}개 설치 | 알림 {count}개 설치",
+      "retryFailed": "실패 {count}건 재시도 | 실패 {count}건 재시도",
+      "allInstalled": "알림 {count}개 설치됨 | 알림 {count}개 설치됨",
+      "someFailed": "설치됨 {installed}건, 실패 {failed}건",
+      "unknownError": "알림을 생성할 수 없습니다.",
+      "unreadableConditions": "이 알림의 필터 조건은 이 버전에서 읽을 수 없는 형식입니다. 설치하면 필터가 없는 알림이 생성되므로 건너뛰었습니다.",
+      "back": "뒤로",
+      "next": "다음",
+      "cancel": "취소",
+      "done": "완료"
+    },
+    "error": {
+      "network": "라이브러리에 연결할 수 없습니다. 네트워크 연결을 확인하고 다시 시도하세요.",
+      "http": "라이브러리 서버에서 오류를 반환했습니다. 잠시 후 다시 시도하세요.",
+      "unparseable": "라이브러리가 카탈로그가 아닌 응답을 반환했습니다.",
+      "unsupported_version": "이 라이브러리 카탈로그는 이 버전의 OpenObserve가 읽을 수 있는 것보다 최신입니다. 업그레이드하여 탐색하세요.",
+      "malformed": "라이브러리 카탈로그가 불완전하거나 손상되었습니다."
+    }
+  },
   "alert_templates": {
     "exportTemplate": "템플릿 내보내기",
     "selected": "선택됨",
@@ -7429,7 +7602,7 @@
     "importBodyLabel": "템플릿 본문 *",
     "importTypeLabel": "템플릿 유형 *",
     "importTitleLabel": "템플릿 제목 *",
-    "header": "템플릿",
+    "header": "대상 템플릿",
     "add": "템플릿 추가",
     "edit": "편집",
     "name": "이름",
@@ -7636,6 +7809,7 @@
     "destinationsLoadError": "대상을 불러오는 중 오류 발생"
   },
   "alert_destinations": {
+    "sectionTab": "대상",
     "chooseTypeTitle": "유형 선택",
     "selectDestinationType": "대상 유형 선택",
     "connectionStepTitle": "연결",
